@@ -78,6 +78,12 @@ class FileManager:
         self.dialog_selected = 0  # Index of currently selected choice
         self.should_quit = False  # Flag to control main loop exit
         
+        # Info dialog state
+        self.info_dialog_mode = False
+        self.info_dialog_title = ""
+        self.info_dialog_lines = []
+        self.info_dialog_scroll = 0
+        
         # Log pane setup
         self.log_messages = deque(maxlen=MAX_LOG_MESSAGES)
         self.log_scroll_offset = 0
@@ -964,6 +970,11 @@ class FileManager:
                 if help_x > button_start_x + 4:  # Ensure no overlap
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             return
+        
+        # If in info dialog mode, show info dialog
+        if self.info_dialog_mode:
+            self.draw_info_dialog()
+            return
             
         # If in search mode, show search interface
         if self.search_mode:
@@ -1346,6 +1357,154 @@ class FileManager:
         message = f"Operations for '{filename}':"
         self.show_dialog(message, choices, handle_operation_choice)
     
+    def show_info_dialog(self, title, info_lines):
+        """Show an information dialog with scrollable content"""
+        self.info_dialog_mode = True
+        self.info_dialog_title = title
+        self.info_dialog_lines = info_lines
+        self.info_dialog_scroll = 0
+        self.needs_full_redraw = True
+    
+    def exit_info_dialog_mode(self):
+        """Exit info dialog mode"""
+        self.info_dialog_mode = False
+        self.info_dialog_title = ""
+        self.info_dialog_lines = []
+        self.info_dialog_scroll = 0
+        self.needs_full_redraw = True
+    
+    def handle_info_dialog_input(self, key):
+        """Handle input while in info dialog mode"""
+        if key == 27 or key == ord('q') or key == ord('Q'):  # ESC or Q - close
+            self.exit_info_dialog_mode()
+            return True
+        elif key == curses.KEY_UP or key == ord('k'):
+            # Scroll up
+            if self.info_dialog_scroll > 0:
+                self.info_dialog_scroll -= 1
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_DOWN or key == ord('j'):
+            # Scroll down
+            max_scroll = max(0, len(self.info_dialog_lines) - 10)  # Assuming 10 visible lines
+            if self.info_dialog_scroll < max_scroll:
+                self.info_dialog_scroll += 1
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_PPAGE:  # Page Up
+            self.info_dialog_scroll = max(0, self.info_dialog_scroll - 10)
+            self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_NPAGE:  # Page Down
+            max_scroll = max(0, len(self.info_dialog_lines) - 10)
+            self.info_dialog_scroll = min(max_scroll, self.info_dialog_scroll + 10)
+            self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_HOME:  # Home - go to top
+            self.info_dialog_scroll = 0
+            self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_END:  # End - go to bottom
+            max_scroll = max(0, len(self.info_dialog_lines) - 10)
+            self.info_dialog_scroll = max_scroll
+            self.needs_full_redraw = True
+            return True
+        return False
+    
+    def draw_info_dialog(self):
+        """Draw the info dialog overlay"""
+        height, width = self.stdscr.getmaxyx()
+        
+        # Calculate dialog dimensions (80% of screen, but at least 20x10)
+        dialog_width = max(20, int(width * 0.8))
+        dialog_height = max(10, int(height * 0.8))
+        
+        # Center the dialog
+        start_y = (height - dialog_height) // 2
+        start_x = (width - dialog_width) // 2
+        
+        # Draw dialog background
+        for y in range(start_y, start_y + dialog_height):
+            if y < height:
+                bg_line = " " * min(dialog_width, width - start_x)
+                self.safe_addstr(y, start_x, bg_line, get_status_color())
+        
+        # Draw border
+        border_color = get_status_color() | curses.A_BOLD
+        
+        # Top border
+        if start_y >= 0:
+            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
+            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
+        
+        # Side borders
+        for y in range(start_y + 1, start_y + dialog_height - 1):
+            if y < height:
+                self.safe_addstr(y, start_x, "│", border_color)
+                if start_x + dialog_width - 1 < width:
+                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
+        
+        # Bottom border
+        if start_y + dialog_height - 1 < height:
+            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
+            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
+        
+        # Draw title
+        if self.info_dialog_title and start_y >= 0:
+            title_text = f" {self.info_dialog_title} "
+            title_x = start_x + (dialog_width - len(title_text)) // 2
+            if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
+                self.safe_addstr(start_y, title_x, title_text, border_color)
+        
+        # Calculate content area
+        content_start_y = start_y + 2
+        content_end_y = start_y + dialog_height - 3
+        content_start_x = start_x + 2
+        content_width = dialog_width - 4
+        content_height = content_end_y - content_start_y + 1
+        
+        # Draw content lines
+        visible_lines = self.info_dialog_lines[self.info_dialog_scroll:self.info_dialog_scroll + content_height]
+        
+        for i, line in enumerate(visible_lines):
+            y = content_start_y + i
+            if y <= content_end_y and y < height:
+                # Truncate line if too long
+                display_line = line[:content_width] if len(line) > content_width else line
+                self.safe_addstr(y, content_start_x, display_line, get_status_color())
+        
+        # Draw scroll indicators
+        if len(self.info_dialog_lines) > content_height:
+            # Show scroll position
+            total_lines = len(self.info_dialog_lines)
+            scroll_pos = self.info_dialog_scroll
+            
+            # Scroll bar on the right side
+            scrollbar_x = start_x + dialog_width - 2
+            scrollbar_start_y = content_start_y
+            scrollbar_height = content_height
+            
+            # Calculate scroll thumb position
+            if total_lines > 0:
+                thumb_pos = int((scroll_pos / max(1, total_lines - content_height)) * (scrollbar_height - 1))
+                thumb_pos = max(0, min(scrollbar_height - 1, thumb_pos))
+                
+                for i in range(scrollbar_height):
+                    y = scrollbar_start_y + i
+                    if y < height:
+                        if i == thumb_pos:
+                            self.safe_addstr(y, scrollbar_x, "█", border_color)
+                        else:
+                            self.safe_addstr(y, scrollbar_x, "░", get_status_color() | curses.A_DIM)
+        
+        # Draw help text at bottom
+        help_text = "↑↓:scroll  PgUp/PgDn:page  Home/End:top/bottom  Q/ESC:close"
+        help_y = start_y + dialog_height - 2
+        if help_y < height and len(help_text) <= content_width:
+            help_x = start_x + (dialog_width - len(help_text)) // 2
+            if help_x >= start_x:
+                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+    
     def show_sort_menu(self):
         """Show sort options menu using the multi-choice dialog"""
         current_pane = self.get_current_pane()
@@ -1386,6 +1545,154 @@ class FileManager:
         pane_name = "left" if self.active_pane == 'left' else "right"
         message = f"Sort {pane_name} pane by:"
         self.show_dialog(message, choices, handle_sort_choice)
+    
+    def quick_sort(self, sort_mode):
+        """Quickly change sort mode without showing dialog"""
+        current_pane = self.get_current_pane()
+        current_pane['sort_mode'] = sort_mode
+        
+        # Refresh the file list
+        self.refresh_files(current_pane)
+        self.needs_full_redraw = True
+        
+        # Show feedback
+        pane_name = "left" if self.active_pane == 'left' else "right"
+        print(f"Sorted {pane_name} pane by {sort_mode}")
+    
+    def toggle_reverse_sort(self):
+        """Toggle reverse sort order for current pane"""
+        current_pane = self.get_current_pane()
+        current_pane['sort_reverse'] = not current_pane['sort_reverse']
+        
+        # Refresh the file list
+        self.refresh_files(current_pane)
+        self.needs_full_redraw = True
+        
+        # Show feedback
+        pane_name = "left" if self.active_pane == 'left' else "right"
+        reverse_status = "enabled" if current_pane['sort_reverse'] else "disabled"
+        print(f"Reverse sorting {reverse_status} for {pane_name} pane")
+    
+    def show_file_details(self):
+        """Show detailed information about selected files or current file"""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            print("No files to show details for")
+            return
+        
+        # Determine which files to show details for
+        files_to_show = []
+        
+        if current_pane['selected_files']:
+            # Show details for all selected files
+            for file_path_str in current_pane['selected_files']:
+                try:
+                    file_path = Path(file_path_str)
+                    if file_path.exists():
+                        files_to_show.append(file_path)
+                except:
+                    continue
+        else:
+            # Show details for current cursor position
+            current_file = current_pane['files'][current_pane['selected_index']]
+            files_to_show.append(current_file)
+        
+        if not files_to_show:
+            print("No valid files to show details for")
+            return
+        
+        # Generate details for each file
+        details_lines = []
+        
+        for file_path in files_to_show:
+            try:
+                # Get file stats
+                stat_info = file_path.stat()
+                
+                # Basic info
+                details_lines.append(f"File: {file_path.name}")
+                details_lines.append(f"Path: {file_path}")
+                
+                # Type
+                if file_path.is_dir():
+                    details_lines.append("Type: Directory")
+                elif file_path.is_file():
+                    details_lines.append("Type: File")
+                elif file_path.is_symlink():
+                    details_lines.append("Type: Symbolic Link")
+                    try:
+                        target = file_path.readlink()
+                        details_lines.append(f"Target: {target}")
+                    except:
+                        details_lines.append("Target: <unreadable>")
+                else:
+                    details_lines.append("Type: Special")
+                
+                # Size
+                if file_path.is_file():
+                    size = stat_info.st_size
+                    if size < 1024:
+                        size_str = f"{size} bytes"
+                    elif size < 1024 * 1024:
+                        size_str = f"{size / 1024:.1f} KB"
+                    elif size < 1024 * 1024 * 1024:
+                        size_str = f"{size / (1024 * 1024):.1f} MB"
+                    else:
+                        size_str = f"{size / (1024 * 1024 * 1024):.1f} GB"
+                    details_lines.append(f"Size: {size_str}")
+                elif file_path.is_dir():
+                    # Count directory contents
+                    try:
+                        contents = list(file_path.iterdir())
+                        dir_count = sum(1 for item in contents if item.is_dir())
+                        file_count = sum(1 for item in contents if item.is_file())
+                        details_lines.append(f"Contents: {dir_count} directories, {file_count} files")
+                    except PermissionError:
+                        details_lines.append("Contents: <permission denied>")
+                    except:
+                        details_lines.append("Contents: <error reading>")
+                
+                # Timestamps
+                import time
+                mod_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat_info.st_mtime))
+                details_lines.append(f"Modified: {mod_time}")
+                
+                access_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat_info.st_atime))
+                details_lines.append(f"Accessed: {access_time}")
+                
+                # Permissions
+                import stat
+                mode = stat_info.st_mode
+                perms = stat.filemode(mode)
+                details_lines.append(f"Permissions: {perms}")
+                
+                # Owner info (Unix-like systems)
+                try:
+                    import pwd
+                    import grp
+                    owner = pwd.getpwuid(stat_info.st_uid).pw_name
+                    group = grp.getgrgid(stat_info.st_gid).gr_name
+                    details_lines.append(f"Owner: {owner}:{group}")
+                except:
+                    details_lines.append(f"Owner: UID {stat_info.st_uid}, GID {stat_info.st_gid}")
+                
+                # Add separator if multiple files
+                if len(files_to_show) > 1:
+                    details_lines.append("-" * 50)
+                
+            except Exception as e:
+                details_lines.append(f"Error reading {file_path.name}: {str(e)}")
+                if len(files_to_show) > 1:
+                    details_lines.append("-" * 50)
+        
+        # Show the details in a dialog
+        if len(files_to_show) == 1:
+            title = f"Details: {files_to_show[0].name}"
+        else:
+            title = f"Details: {len(files_to_show)} items"
+        
+        self.show_info_dialog(title, details_lines)
         
     def handle_search_input(self, key):
         """Handle input while in search mode"""
@@ -1877,6 +2184,11 @@ class FileManager:
                 if self.handle_dialog_input(key):
                     continue  # Dialog mode handled the key
             
+            # Handle info dialog mode input
+            if self.info_dialog_mode:
+                if self.handle_info_dialog_input(key):
+                    continue  # Info dialog mode handled the key
+            
             if key == ord('q') or key == ord('Q'):
                 def quit_callback(confirmed):
                     if confirmed:
@@ -2055,6 +2367,16 @@ class FileManager:
                 self.show_file_operations_menu()
             elif key == ord('s') or key == ord('S'):  # 'S' key - show sort menu
                 self.show_sort_menu()
+            elif key == ord('1'):  # '1' key - quick sort by name
+                self.quick_sort('name')
+            elif key == ord('2'):  # '2' key - quick sort by size
+                self.quick_sort('size')
+            elif key == ord('3'):  # '3' key - quick sort by date
+                self.quick_sort('date')
+            elif key == ord('r') or key == ord('R'):  # 'R' key - toggle reverse sort
+                self.toggle_reverse_sort()
+            elif key == ord('i') or key == ord('I'):  # 'I' key - show file details
+                self.show_file_details()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
                 self.left_pane_ratio = 0.5
                 self.needs_full_redraw = True
