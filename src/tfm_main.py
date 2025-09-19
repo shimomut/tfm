@@ -4158,6 +4158,18 @@ class FileManager:
                     self.sync_other_pane_directory()
                 else:  # 'o' - sync current pane to other
                     self.sync_pane_directories()
+            elif key == ord('F'):  # 'F' key (Shift-F) - show search dialog (filename)
+                self.show_search_dialog('filename')
+            elif key == ord('G'):  # 'G' key (Shift-G) - show search dialog (content)
+                self.show_search_dialog('content')
+            elif key == ord('e'):  # 'e' key - edit existing file
+                self.edit_selected_file()
+            elif key == ord('E'):  # 'E' key (Shift-E) - create new file
+                self.enter_create_file_mode()
+            elif key == ord('L'):  # 'L' key - show list dialog demo
+                self.show_list_dialog_demo()
+            elif key == ord('T'):  # 'T' key - show file type filter
+                self.show_file_type_filter()
             elif self.is_key_for_action(key, 'search'):  # Search key - enter search mode
                 self.enter_search_mode()
             elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
@@ -4176,10 +4188,6 @@ class FileManager:
                 self.show_file_details()
             elif self.is_key_for_action(key, 'view_text'):  # View text file
                 self.view_selected_text_file()
-            elif key == ord('e'):  # 'e' key - edit existing file
-                self.edit_selected_file()
-            elif key == ord('E'):  # 'E' key (Shift-E) - create new file
-                self.enter_create_file_mode()
             elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
                 self.copy_selected_files()
             elif self.is_key_for_action(key, 'move_files'):  # Move selected files
@@ -4188,14 +4196,6 @@ class FileManager:
                 self.delete_selected_files()
             elif self.is_key_for_action(key, 'rename_file'):  # Rename file
                 self.enter_rename_mode()
-            elif key == ord('L'):  # 'L' key - show list dialog demo
-                self.show_list_dialog_demo()
-            elif key == ord('T'):  # 'T' key - show file type filter
-                self.show_file_type_filter()
-            elif key == ord('F'):  # 'F' key (Shift-F) - show search dialog (filename)
-                self.show_search_dialog('filename')
-            elif key == ord('G'):  # 'G' key (Shift-G) - show search dialog (content)
-                self.show_search_dialog('content')
             elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
                 self.show_favorite_directories()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
