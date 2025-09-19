@@ -11,7 +11,13 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 - **Resizable Panes**: Adjust pane sizes with Ctrl+Left/Right and Ctrl+U/D
 - **Status Bar**: Shows current path, file count, and operation status
 
-![TFM Main Interface](doc/images/main-screen.png)
+![main screen](doc/images/main-screen.png)
+<img src="doc/images/incremental-search.png" alt="incremental search" width="300">
+<img src="doc/images/favorite-directories.png" alt="favorite directories" width="300">
+<img src="doc/images/grep-dialog.png" alt="grep dialog" width="300">
+<img src="doc/images/search-dialog.png" alt="search dialog" width="300">
+<img src="doc/images/file-info-dialog.png" alt="file info dialog" width="300">
+<img src="doc/images/text-viewer.png" alt="built-in text viewer" width="300">
 
 ### Navigation & Display
 - **Directory Navigation**: Browse directories with arrow keys or vim-style navigation (j/k)
