@@ -670,17 +670,17 @@ class FileManager:
         
         # Controls - progressively abbreviate to fit
         if width > 160:
-            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
         elif width > 140:
-            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 120:
-            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 100:
-            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 80:
-            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         else:
-            controls = "Space:select  F:search  t:test-confirm  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
+            controls = "Space:select  F:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
         
         # Draw status line with background color
         # Fill entire status line with background color
@@ -1570,22 +1570,8 @@ class FileManager:
                 else:
                     # Log unknown Option key sequence for debugging
                     print(f"Unknown Option key sequence: 194, {next_key}")
-            elif key == ord('t') or key == ord('T'):  # 't' key - test log output
-                print(f"{APP_NAME} v{VERSION} - Test stdout message")
-                print("Another stdout message with timestamp")
-                sys.stderr.write("Test stderr error message\n")
-                import time
-                time.sleep(0.1)  # Small delay to see messages appear
-                print(f"Current time: {datetime.now()}")
             elif key == ord('d'):  # 'd' key - debug mode to detect modifier keys
                 self.debug_mode()
-            elif key == ord('t'):  # 't' key - test confirmation dialog
-                def test_callback(confirmed):
-                    if confirmed:
-                        print("User confirmed the test action!")
-                    else:
-                        print("User declined the test action.")
-                self.show_confirmation("Do you want to execute the test action?", test_callback)
             elif key == ord('f') or key == ord('F'):  # 'F' key - enter search mode
                 self.enter_search_mode()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
