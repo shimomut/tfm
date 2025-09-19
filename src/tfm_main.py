@@ -78,6 +78,12 @@ class FileManager:
         self.search_matches = []
         self.search_match_index = 0
         
+        # Rename mode state
+        self.rename_mode = False
+        self.rename_pattern = ""
+        self.rename_original_name = ""
+        self.rename_file_path = None
+        
         # Multi-choice dialog state
         self.dialog_mode = False
         self.dialog_message = ""
@@ -1036,6 +1042,29 @@ class FileManager:
                         self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
             return
         
+        # If in rename mode, show rename interface
+        if self.rename_mode:
+            # Fill entire status line with background color
+            status_line = " " * (width - 1)
+            self.safe_addstr(status_y, 0, status_line, get_status_color())
+            
+            # Show rename prompt and pattern
+            rename_prompt = f"Rename '{self.rename_original_name}' to: {self.rename_pattern}"
+            
+            # Add cursor indicator
+            rename_prompt += "_"
+            
+            # Draw rename prompt
+            self.safe_addstr(status_y, 2, rename_prompt, get_status_color())
+            
+            # Show help text on the right if there's space
+            help_text = "ESC:cancel Enter:confirm"
+            if len(rename_prompt) + len(help_text) + 6 < width:
+                help_x = width - len(help_text) - 3
+                if help_x > len(rename_prompt) + 4:  # Ensure no overlap
+                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            return
+        
         # Normal status display
         # Left side: status info
         status_parts = []
@@ -1241,6 +1270,102 @@ class FileManager:
         self.search_matches = []
         self.search_match_index = 0
         self.needs_full_redraw = True
+    
+    def enter_rename_mode(self):
+        """Enter rename mode for the current file"""
+        current_pane = self.get_current_pane()
+        
+        # Check if there are selected files - if so, do nothing (bulk rename not implemented yet)
+        if current_pane['selected_files']:
+            print("Bulk rename not implemented yet. Please deselect files first.")
+            return
+        
+        # Get the current file
+        if not current_pane['files']:
+            print("No files to rename")
+            return
+            
+        selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        # Don't allow renaming parent directory (..)
+        if (current_pane['selected_index'] == 0 and 
+            len(current_pane['files']) > 0 and 
+            selected_file == current_pane['path'].parent):
+            print("Cannot rename parent directory (..)")
+            return
+        
+        # Enter rename mode
+        self.rename_mode = True
+        self.rename_file_path = selected_file
+        self.rename_original_name = selected_file.name
+        self.rename_pattern = selected_file.name  # Start with current name
+        self.needs_full_redraw = True
+        print(f"Renaming: {self.rename_original_name}")
+    
+    def exit_rename_mode(self):
+        """Exit rename mode"""
+        self.rename_mode = False
+        self.rename_pattern = ""
+        self.rename_original_name = ""
+        self.rename_file_path = None
+        self.needs_full_redraw = True
+    
+    def perform_rename(self):
+        """Perform the actual rename operation"""
+        if not self.rename_file_path or not self.rename_pattern.strip():
+            print("Invalid rename operation")
+            self.exit_rename_mode()
+            return
+        
+        new_name = self.rename_pattern.strip()
+        
+        # Check if name actually changed
+        if new_name == self.rename_original_name:
+            print("Name unchanged")
+            self.exit_rename_mode()
+            return
+        
+        # Check for invalid characters (basic validation)
+        if '/' in new_name or '\0' in new_name:
+            print("Invalid characters in filename")
+            return
+        
+        # Check if new name is empty
+        if not new_name:
+            print("Filename cannot be empty")
+            return
+        
+        # Create new path
+        new_path = self.rename_file_path.parent / new_name
+        
+        # Check if target already exists
+        if new_path.exists():
+            print(f"File or directory '{new_name}' already exists")
+            return
+        
+        try:
+            # Perform the rename
+            self.rename_file_path.rename(new_path)
+            print(f"Renamed '{self.rename_original_name}' to '{new_name}'")
+            
+            # Refresh the current pane
+            current_pane = self.get_current_pane()
+            self.refresh_files(current_pane)
+            
+            # Try to select the renamed file
+            for i, file_path in enumerate(current_pane['files']):
+                if file_path.name == new_name:
+                    current_pane['selected_index'] = i
+                    break
+            
+            self.exit_rename_mode()
+            
+        except PermissionError:
+            print(f"Permission denied renaming '{self.rename_original_name}'")
+        except FileExistsError:
+            print(f"File '{new_name}' already exists")
+        except Exception as e:
+            print(f"Error renaming file: {e}")
         
     def show_dialog(self, message, choices, callback):
         """Show multi-choice dialog
@@ -1690,6 +1815,10 @@ class FileManager:
         help_lines.append("v / V            View text file")
         help_lines.append("e / E            Edit file with text editor")
         help_lines.append("i / I            Show file details")
+        help_lines.append("c / C            Copy files to other pane")
+        help_lines.append("m / M            Move files to other pane")
+        help_lines.append("k / K            Delete files")
+        help_lines.append("r / R            Rename file (single file only)")
         help_lines.append("")
         
         # Search and sorting section
@@ -2295,6 +2424,31 @@ class FileManager:
         # In search mode, capture most other keys to prevent unintended actions
         # Only allow specific keys that make sense during search
         return True
+    
+    def handle_rename_input(self, key):
+        """Handle input while in rename mode"""
+        if key == 27:  # ESC - cancel rename
+            print("Rename cancelled")
+            self.exit_rename_mode()
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Enter - perform rename
+            self.perform_rename()
+            return True
+        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
+            # Backspace - remove last character
+            if self.rename_pattern:
+                self.rename_pattern = self.rename_pattern[:-1]
+                self.needs_full_redraw = True
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            # Add character to rename pattern
+            self.rename_pattern += chr(key)
+            self.needs_full_redraw = True
+            return True
+        
+        # In rename mode, capture most other keys to prevent unintended actions
+        return True
         
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
@@ -2738,6 +2892,11 @@ class FileManager:
                 if self.handle_search_input(key):
                     continue  # Search mode handled the key
             
+            # Handle rename mode input
+            if self.rename_mode:
+                if self.handle_rename_input(key):
+                    continue  # Rename mode handled the key
+            
             # Handle dialog mode input
             if self.dialog_mode:
                 if self.handle_dialog_input(key):
@@ -2750,7 +2909,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting search mode while help dialog is open
-            if self.dialog_mode or self.info_dialog_mode:
+            if self.dialog_mode or self.info_dialog_mode or self.search_mode or self.rename_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
@@ -2947,6 +3106,8 @@ class FileManager:
                 self.move_selected_files()
             elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
                 self.delete_selected_files()
+            elif self.is_key_for_action(key, 'rename_file'):  # Rename file
+                self.enter_rename_mode()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50

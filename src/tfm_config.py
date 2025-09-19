@@ -53,6 +53,7 @@ class DefaultConfig:
         'copy_files': ['c', 'C'],
         'move_files': ['m', 'M'],
         'delete_files': ['k', 'K'],
+        'rename_file': ['r', 'R'],
     }
     
     # File associations (for future use)

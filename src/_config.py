@@ -46,6 +46,7 @@ class Config:
         'edit_file': ['e', 'E'],
         'copy_files': ['c', 'C'],
         'delete_files': ['k', 'K'],
+        'rename_file': ['r', 'R'],
     }
     
     # File associations (for future use)
