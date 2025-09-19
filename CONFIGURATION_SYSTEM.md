@@ -4,11 +4,14 @@ TFM includes a comprehensive configuration system that allows users to customize
 
 ## Configuration File Location
 
-**Default Location**: `~/.tfm/config.py`
+**User Config**: `~/.tfm/config.py`
+**Template File**: `_config.py` (in TFM installation directory)
 
-- **Auto-Creation**: If the config file doesn't exist, TFM automatically creates a default one on first launch
+- **Auto-Creation**: If the config file doesn't exist, TFM automatically creates one from the template on first launch
+- **Template-Based**: Default configuration is maintained in a separate `_config.py` template file
 - **Python Format**: Configuration is stored as a Python class for flexibility and validation
-- **User Directory**: Located in the user's home directory for per-user customization
+- **User Directory**: User config located in the user's home directory for per-user customization
+- **Clean Separation**: Template and user config are separate for easier maintenance
 
 ## Configuration Structure
 
@@ -134,9 +137,10 @@ FILE_ASSOCIATIONS = {
 ### Automatic Loading
 
 1. **Startup Check**: TFM checks for `~/.tfm/config.py` on launch
-2. **Auto-Creation**: Creates default config if file doesn't exist
-3. **Error Handling**: Falls back to built-in defaults if config is invalid
-4. **Validation**: Validates configuration values and reports errors
+2. **Auto-Creation**: Creates default config from `_config.py` template if file doesn't exist
+3. **Template-Based**: Uses separate template file for clean default configuration
+4. **Error Handling**: Falls back to built-in defaults if config is invalid
+5. **Validation**: Validates configuration values and reports errors
 
 ### Configuration API
 
@@ -245,6 +249,32 @@ class Config:
 - **Built-in Defaults**: Comprehensive default configuration available
 - **Error Logging**: Configuration errors are logged to the log pane
 - **User Notification**: Clear messages about configuration issues
+
+## Template System
+
+### Configuration Template
+
+TFM uses a template-based configuration system for better maintainability:
+
+- **Template File**: `_config.py` contains the default configuration template
+- **Clean Defaults**: Template is maintained separately from user configuration
+- **Easy Updates**: Template can be updated without affecting user configs
+- **Consistent Creation**: All new user configs are created from the same template
+
+### Template Benefits
+
+1. **Maintainability**: Default configuration is in a separate, version-controlled file
+2. **Consistency**: All users get the same default configuration structure
+3. **Documentation**: Template includes comprehensive comments and examples
+4. **Upgrades**: Template can be updated independently of user configurations
+
+### Template Structure
+
+The `_config.py` template includes:
+- Complete configuration class with all available options
+- Detailed comments explaining each setting
+- Example values and valid ranges
+- Organized sections for different setting categories
 
 ## Advanced Features
 
