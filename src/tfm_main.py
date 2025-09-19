@@ -84,6 +84,10 @@ class FileManager:
         self.rename_original_name = ""
         self.rename_file_path = None
         
+        # Create directory mode state
+        self.create_dir_mode = False
+        self.create_dir_pattern = ""
+        
         # Multi-choice dialog state
         self.dialog_mode = False
         self.dialog_message = ""
@@ -1031,6 +1035,29 @@ class FileManager:
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             return
         
+        # If in create directory mode, show create directory interface
+        if self.create_dir_mode:
+            # Fill entire status line with background color
+            status_line = " " * (width - 1)
+            self.safe_addstr(status_y, 0, status_line, get_status_color())
+            
+            # Show create directory prompt and pattern
+            create_prompt = f"Create directory: {self.create_dir_pattern}"
+            
+            # Add cursor indicator
+            create_prompt += "_"
+            
+            # Draw create directory prompt
+            self.safe_addstr(status_y, 2, create_prompt, get_status_color())
+            
+            # Show help text on the right if there's space
+            help_text = "ESC:cancel Enter:create"
+            if len(create_prompt) + len(help_text) + 6 < width:
+                help_x = width - len(help_text) - 3
+                if help_x > len(create_prompt) + 4:  # Ensure no overlap
+                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            return
+        
         # Normal status display
         # Left side: status info
         status_parts = []
@@ -1257,6 +1284,74 @@ class FileManager:
         self.rename_original_name = ""
         self.rename_file_path = None
         self.needs_full_redraw = True
+    
+    def enter_create_directory_mode(self):
+        """Enter create directory mode"""
+        current_pane = self.get_current_pane()
+        
+        # Check if current directory is writable
+        if not os.access(current_pane['path'], os.W_OK):
+            print(f"Permission denied: Cannot create directory in {current_pane['path']}")
+            return
+        
+        # Enter create directory mode
+        self.create_dir_mode = True
+        self.create_dir_pattern = ""
+        self.needs_full_redraw = True
+        print("Creating new directory...")
+    
+    def exit_create_directory_mode(self):
+        """Exit create directory mode"""
+        self.create_dir_mode = False
+        self.create_dir_pattern = ""
+        self.needs_full_redraw = True
+    
+    def perform_create_directory(self):
+        """Perform the actual directory creation"""
+        if not self.create_dir_pattern.strip():
+            print("Invalid directory name")
+            self.exit_create_directory_mode()
+            return
+        
+        current_pane = self.get_current_pane()
+        new_dir_name = self.create_dir_pattern.strip()
+        new_dir_path = current_pane['path'] / new_dir_name
+        
+        # Check if directory already exists
+        if new_dir_path.exists():
+            print(f"Directory '{new_dir_name}' already exists")
+            self.exit_create_directory_mode()
+            return
+        
+        try:
+            # Create the directory
+            new_dir_path.mkdir(parents=True, exist_ok=False)
+            print(f"Created directory: {new_dir_name}")
+            
+            # Refresh the current pane to show the new directory
+            self.refresh_files(current_pane)
+            
+            # Move cursor to the newly created directory
+            for i, file_path in enumerate(current_pane['files']):
+                if file_path.name == new_dir_name:
+                    current_pane['selected_index'] = i
+                    # Adjust scroll if needed
+                    height, width = self.stdscr.getmaxyx()
+                    calculated_height = int(height * self.log_height_ratio)
+                    log_height = calculated_height if self.log_height_ratio > 0 else 0
+                    display_height = height - log_height - 4
+                    
+                    if current_pane['selected_index'] < current_pane['scroll_offset']:
+                        current_pane['scroll_offset'] = current_pane['selected_index']
+                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
+                        current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+                    break
+            
+            self.exit_create_directory_mode()
+            
+        except OSError as e:
+            print(f"Failed to create directory '{new_dir_name}': {e}")
+            self.exit_create_directory_mode()
     
     def perform_rename(self):
         """Perform the actual rename operation"""
@@ -1764,7 +1859,7 @@ class FileManager:
         help_lines.append("e / E            Edit file with text editor")
         help_lines.append("i / I            Show file details")
         help_lines.append("c / C            Copy files to other pane")
-        help_lines.append("m / M            Move files to other pane")
+        help_lines.append("m / M            Move files to other pane / Create directory (no selection)")
         help_lines.append("k / K            Delete files")
         help_lines.append("r / R            Rename file (single file only)")
         help_lines.append("")
@@ -2043,26 +2138,22 @@ class FileManager:
             print(f"Copy completed with {error_count} errors")
     
     def move_selected_files(self):
-        """Move selected files to the opposite pane's directory"""
+        """Move selected files to the opposite pane's directory, or create new directory if no files selected"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
         
-        # Get files to move - either selected files or current file if none selected
-        files_to_move = []
+        # Check if any files are selected
+        if not current_pane['selected_files']:
+            # No files selected - create new directory instead
+            self.enter_create_directory_mode()
+            return
         
-        if current_pane['selected_files']:
-            # Move all selected files
-            for file_path_str in current_pane['selected_files']:
-                file_path = Path(file_path_str)
-                if file_path.exists():
-                    files_to_move.append(file_path)
-        else:
-            # Move current file if no files are selected
-            if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                
-                # Parent directory (..) is no longer shown
-                files_to_move.append(selected_file)
+        # Get files to move - selected files
+        files_to_move = []
+        for file_path_str in current_pane['selected_files']:
+            file_path = Path(file_path_str)
+            if file_path.exists():
+                files_to_move.append(file_path)
         
         if not files_to_move:
             print("No files to move")
@@ -2367,6 +2458,31 @@ class FileManager:
             return True
         
         # In rename mode, capture most other keys to prevent unintended actions
+        return True
+    
+    def handle_create_directory_input(self, key):
+        """Handle input while in create directory mode"""
+        if key == 27:  # ESC - cancel directory creation
+            print("Directory creation cancelled")
+            self.exit_create_directory_mode()
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Enter - create directory
+            self.perform_create_directory()
+            return True
+        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
+            # Backspace - remove last character
+            if self.create_dir_pattern:
+                self.create_dir_pattern = self.create_dir_pattern[:-1]
+                self.needs_full_redraw = True
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            # Add character to directory name pattern
+            self.create_dir_pattern += chr(key)
+            self.needs_full_redraw = True
+            return True
+        
+        # In create directory mode, capture most other keys to prevent unintended actions
         return True
         
     def adjust_pane_boundary(self, direction):
@@ -2816,6 +2932,11 @@ class FileManager:
                 if self.handle_rename_input(key):
                     continue  # Rename mode handled the key
             
+            # Handle create directory mode input
+            if self.create_dir_mode:
+                if self.handle_create_directory_input(key):
+                    continue  # Create directory mode handled the key
+            
             # Handle dialog mode input
             if self.dialog_mode:
                 if self.handle_dialog_input(key):
@@ -2828,7 +2949,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting search mode while help dialog is open
-            if self.dialog_mode or self.info_dialog_mode or self.search_mode or self.rename_mode:
+            if self.dialog_mode or self.info_dialog_mode or self.search_mode or self.rename_mode or self.create_dir_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
