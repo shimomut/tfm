@@ -305,6 +305,87 @@ class FileManager:
         
         print(f"Total selected: {len(current_pane['selected_files'])}")
         self.needs_full_redraw = True
+    
+    def sync_pane_directories(self):
+        """Change current pane's directory to match the other pane's directory"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Get the other pane's directory
+        target_directory = other_pane['path']
+        
+        # Check if target directory exists and is accessible
+        if not target_directory.exists():
+            print(f"Target directory does not exist: {target_directory}")
+            return
+            
+        if not target_directory.is_dir():
+            print(f"Target is not a directory: {target_directory}")
+            return
+            
+        try:
+            # Test if we can access the directory
+            list(target_directory.iterdir())
+        except PermissionError:
+            print(f"Permission denied accessing: {target_directory}")
+            return
+        except Exception as e:
+            print(f"Error accessing directory: {e}")
+            return
+        
+        # Change current pane to the other pane's directory
+        old_directory = current_pane['path']
+        current_pane['path'] = target_directory
+        current_pane['selected_index'] = 0
+        current_pane['scroll_offset'] = 0
+        current_pane['selected_files'].clear()  # Clear selections when changing directory
+        
+        # Log the change
+        pane_name = "left" if self.active_pane == 'left' else "right"
+        print(f"Synchronized {pane_name} pane: {old_directory} → {target_directory}")
+        
+        self.needs_full_redraw = True
+    
+    def sync_other_pane_directory(self):
+        """Change other pane's directory to match the current pane's directory"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Get the current pane's directory
+        target_directory = current_pane['path']
+        
+        # Check if target directory exists and is accessible
+        if not target_directory.exists():
+            print(f"Current directory does not exist: {target_directory}")
+            return
+            
+        if not target_directory.is_dir():
+            print(f"Current path is not a directory: {target_directory}")
+            return
+            
+        try:
+            # Test if we can access the directory
+            list(target_directory.iterdir())
+        except PermissionError:
+            print(f"Permission denied accessing: {target_directory}")
+            return
+        except Exception as e:
+            print(f"Error accessing directory: {e}")
+            return
+        
+        # Change other pane to the current pane's directory
+        old_directory = other_pane['path']
+        other_pane['path'] = target_directory
+        other_pane['selected_index'] = 0
+        other_pane['scroll_offset'] = 0
+        other_pane['selected_files'].clear()  # Clear selections when changing directory
+        
+        # Log the change
+        other_pane_name = "right" if self.active_pane == 'left' else "left"
+        current_pane_name = "left" if self.active_pane == 'left' else "right"
+        print(f"Synchronized {other_pane_name} pane to {current_pane_name} pane: {old_directory} → {target_directory}")
+        
+        self.needs_full_redraw = True
         
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
@@ -741,17 +822,17 @@ class FileManager:
         
         # Controls - progressively abbreviate to fit
         if width > 160:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
         elif width > 140:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 120:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 100:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 80:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o/O:sync  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         else:
-            controls = "Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
+            controls = "Space:select  a:select-all-files  A:select-all-items  o/O:sync  F:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
         
         # Draw status line with background color
         # Fill entire status line with background color
@@ -1647,6 +1728,10 @@ class FileManager:
                 self.toggle_all_files_selection()
             elif key == ord('A'):  # 'A' key (Shift+A) - toggle all items selection
                 self.toggle_all_items_selection()
+            elif key == ord('o'):  # 'o' key - sync current pane to other pane
+                self.sync_pane_directories()
+            elif key == ord('O'):  # 'O' key (Shift+O) - sync other pane to current pane
+                self.sync_other_pane_directory()
             elif key == ord('f') or key == ord('F'):  # 'F' key - enter search mode
                 self.enter_search_mode()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
