@@ -1183,7 +1183,9 @@ class FileManager:
             self.exit_confirmation_mode()
             return True
         
-        return False
+        # In confirmation mode, capture ALL keys to prevent them from affecting other parts of the UI
+        # Return True for any unhandled keys to stop further processing
+        return True
         
     def handle_search_input(self, key):
         """Handle input while in search mode"""
@@ -1223,8 +1225,10 @@ class FileManager:
             self.update_search_matches()
             self.needs_full_redraw = True
             return True
-            
-        return False
+        
+        # In search mode, capture most other keys to prevent unintended actions
+        # Only allow specific keys that make sense during search
+        return True
         
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
