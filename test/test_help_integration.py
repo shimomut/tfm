@@ -58,8 +58,8 @@ def test_help_integration(stdscr):
         # If we have a key to press, simulate it
         if key_to_press is not None:
             # Handle the key press
-            if fm.search_mode:
-                if fm.handle_search_input(key_to_press):
+            if fm.isearch_mode:
+                if fm.handle_isearch_input(key_to_press):
                     step_index += 1
                     continue
             

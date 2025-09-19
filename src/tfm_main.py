@@ -74,11 +74,11 @@ class FileManager:
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
         self.needs_full_redraw = True  # Flag to control when to redraw everything
         
-        # Search mode state
-        self.search_mode = False
-        self.search_pattern = ""
-        self.search_matches = []
-        self.search_match_index = 0
+        # Isearch mode state
+        self.isearch_mode = False
+        self.isearch_pattern = ""
+        self.isearch_matches = []
+        self.isearch_match_index = 0
         
         # Filter mode state
         self.filter_mode = False
@@ -798,9 +798,9 @@ class FileManager:
             # Check if this file is multi-selected
             is_multi_selected = str(file_path) in pane_data['selected_files']
             
-            # Check if this file is a search match
-            is_search_match = (self.search_mode and is_active and 
-                             file_index in self.search_matches)
+            # Check if this file is an isearch match
+            is_search_match = (self.isearch_mode and is_active and 
+                             file_index in self.isearch_matches)
             
             # Choose color based on file properties and selection
             is_executable = file_path.is_file() and os.access(file_path, os.X_OK)
@@ -1032,41 +1032,41 @@ class FileManager:
             self.draw_search_dialog()
             return
             
-        # If in search mode, show search interface
-        if self.search_mode:
+        # If in isearch mode, show isearch interface
+        if self.isearch_mode:
             # Fill entire status line with background color
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Show search prompt and pattern
-            search_prompt = f"Search: {self.search_pattern}"
-            if self.search_matches:
-                match_info = f" ({self.search_match_index + 1}/{len(self.search_matches)} matches)"
-                search_prompt += match_info
+            # Show isearch prompt and pattern
+            isearch_prompt = f"Isearch: {self.isearch_pattern}"
+            if self.isearch_matches:
+                match_info = f" ({self.isearch_match_index + 1}/{len(self.isearch_matches)} matches)"
+                isearch_prompt += match_info
             else:
-                if self.search_pattern.strip():
-                    search_prompt += " (no matches)"
+                if self.isearch_pattern.strip():
+                    isearch_prompt += " (no matches)"
                 else:
-                    search_prompt += " (enter patterns separated by spaces)"
+                    isearch_prompt += " (enter patterns separated by spaces)"
                 
             # Add cursor indicator
-            search_prompt += "_"
+            isearch_prompt += "_"
             
-            # Draw search prompt
-            self.safe_addstr(status_y, 2, search_prompt, get_status_color())
+            # Draw isearch prompt
+            self.safe_addstr(status_y, 2, isearch_prompt, get_status_color())
             
             # Show help text on the right if there's space
             help_text = "ESC:exit Enter:accept ↑↓:navigate Space:multi-pattern"
-            if len(search_prompt) + len(help_text) + 6 < width:
+            if len(isearch_prompt) + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
-                if help_x > len(search_prompt) + 4:  # Ensure no overlap
+                if help_x > len(isearch_prompt) + 4:  # Ensure no overlap
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             else:
                 # Shorter help text for narrow terminals
                 short_help = "ESC:exit Enter:accept ↑↓:nav"
-                if len(search_prompt) + len(short_help) + 6 < width:
+                if len(isearch_prompt) + len(short_help) + 6 < width:
                     help_x = width - len(short_help) - 3
-                    if help_x > len(search_prompt) + 4:
+                    if help_x > len(isearch_prompt) + 4:
                         self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
             return
         
@@ -1305,33 +1305,33 @@ class FileManager:
                 
         return matches
         
-    def update_search_matches(self):
-        """Update search matches and move cursor to nearest match"""
-        self.search_matches = self.find_matches(self.search_pattern)
+    def update_isearch_matches(self):
+        """Update isearch matches and move cursor to nearest match"""
+        self.isearch_matches = self.find_matches(self.isearch_pattern)
         
-        if self.search_matches:
+        if self.isearch_matches:
             current_pane = self.get_current_pane()
             current_index = current_pane['selected_index']
             
             # Find the next match at or after current position
             next_match = None
-            for match_idx in self.search_matches:
+            for match_idx in self.isearch_matches:
                 if match_idx >= current_index:
                     next_match = match_idx
                     break
                     
             # If no match found after current position, wrap to first match
             if next_match is None:
-                next_match = self.search_matches[0]
+                next_match = self.isearch_matches[0]
                 
             # Update cursor position
             current_pane['selected_index'] = next_match
-            self.search_match_index = self.search_matches.index(next_match)
+            self.isearch_match_index = self.isearch_matches.index(next_match)
             
             # Ensure the selected item is visible (adjust scroll if needed)
             self.adjust_scroll_for_selection(current_pane)
         else:
-            self.search_match_index = 0
+            self.isearch_match_index = 0
             
     def adjust_scroll_for_selection(self, pane_data):
         """Ensure the selected item is visible by adjusting scroll offset"""
@@ -1346,20 +1346,20 @@ class FileManager:
         elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
             pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
             
-    def enter_search_mode(self):
-        """Enter incremental search mode"""
-        self.search_mode = True
-        self.search_pattern = ""
-        self.search_matches = []
-        self.search_match_index = 0
+    def enter_isearch_mode(self):
+        """Enter isearch mode"""
+        self.isearch_mode = True
+        self.isearch_pattern = ""
+        self.isearch_matches = []
+        self.isearch_match_index = 0
         self.needs_full_redraw = True
         
-    def exit_search_mode(self):
-        """Exit search mode"""
-        self.search_mode = False
-        self.search_pattern = ""
-        self.search_matches = []
-        self.search_match_index = 0
+    def exit_isearch_mode(self):
+        """Exit isearch mode"""
+        self.isearch_mode = False
+        self.isearch_pattern = ""
+        self.isearch_matches = []
+        self.isearch_match_index = 0
         self.needs_full_redraw = True
     
     def enter_filter_mode(self):
@@ -3010,47 +3010,47 @@ class FileManager:
         if error_count > 0:
             print(f"Delete completed with {error_count} errors")
         
-    def handle_search_input(self, key):
-        """Handle input while in search mode"""
-        if key == 27:  # ESC - exit search mode
-            self.exit_search_mode()
+    def handle_isearch_input(self, key):
+        """Handle input while in isearch mode"""
+        if key == 27:  # ESC - exit isearch mode
+            self.exit_isearch_mode()
             return True
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - exit search mode and keep current position
-            self.exit_search_mode()
+            # Enter - exit isearch mode and keep current position
+            self.exit_isearch_mode()
             return True
         elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
             # Backspace - remove last character
-            if self.search_pattern:
-                self.search_pattern = self.search_pattern[:-1]
-                self.update_search_matches()
+            if self.isearch_pattern:
+                self.isearch_pattern = self.isearch_pattern[:-1]
+                self.update_isearch_matches()
                 self.needs_full_redraw = True
             return True
         elif key == curses.KEY_UP:
             # Up arrow - go to previous match
-            if self.search_matches:
-                self.search_match_index = (self.search_match_index - 1) % len(self.search_matches)
+            if self.isearch_matches:
+                self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
-                current_pane['selected_index'] = self.search_matches[self.search_match_index]
+                current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
         elif key == curses.KEY_DOWN:
             # Down arrow - go to next match
-            if self.search_matches:
-                self.search_match_index = (self.search_match_index + 1) % len(self.search_matches)
+            if self.isearch_matches:
+                self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
-                current_pane['selected_index'] = self.search_matches[self.search_match_index]
+                current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
         elif 32 <= key <= 126:  # Printable characters
-            # Add character to search pattern
-            self.search_pattern += chr(key)
-            self.update_search_matches()
+            # Add character to isearch pattern
+            self.isearch_pattern += chr(key)
+            self.update_isearch_matches()
             self.needs_full_redraw = True
             return True
         
-        # In search mode, capture most other keys to prevent unintended actions
-        # Only allow specific keys that make sense during search
+        # In isearch mode, capture most other keys to prevent unintended actions
+        # Only allow specific keys that make sense during isearch
         return True
     
     def handle_filter_input(self, key):
@@ -3440,7 +3440,7 @@ class FileManager:
             "• Ctrl+Space   (alternative)",
             "• Ctrl+S       (alternative)",
             "• Command+Space (probably won't work)",
-            "• F (F key - enter search mode)",
+            "• F (F key - enter isearch mode)",
             "",
             "Key codes will appear below as you press them.",
             "If a combination works for upward selection, it will be noted.",
@@ -3940,10 +3940,10 @@ class FileManager:
             key = self.stdscr.getch()
             current_pane = self.get_current_pane()
             
-            # Handle search mode input first
-            if self.search_mode:
-                if self.handle_search_input(key):
-                    continue  # Search mode handled the key
+            # Handle isearch mode input first
+            if self.isearch_mode:
+                if self.handle_isearch_input(key):
+                    continue  # Isearch mode handled the key
             
             # Handle filter mode input
             if self.filter_mode:
@@ -3986,8 +3986,8 @@ class FileManager:
                     continue  # Search dialog mode handled the key
             
             # Skip regular key processing if any dialog is open
-            # This prevents conflicts like starting search mode while help dialog is open
-            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.search_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
+            # This prevents conflicts like starting isearch mode while help dialog is open
+            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
@@ -4174,8 +4174,8 @@ class FileManager:
                 self.show_list_dialog_demo()
             elif key == ord('T'):  # 'T' key - show file type filter
                 self.show_file_type_filter()
-            elif self.is_key_for_action(key, 'search'):  # Search key - enter search mode
-                self.enter_search_mode()
+            elif self.is_key_for_action(key, 'search'):  # Search key - enter isearch mode
+                self.enter_isearch_mode()
             elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
                 self.enter_filter_mode()
             elif self.is_key_for_action(key, 'clear_filter'):  # Clear filter key

@@ -1,77 +1,58 @@
-# Multi-Choice Dialog → Quick Choice Dialog Rename Summary
+# Search Mode to Isearch Mode Rename Summary
 
 ## Overview
-Successfully renamed "Multi-choice dialog" to "Quick choice dialog" throughout the codebase and updated all related variable names to be more specific and descriptive.
+Successfully renamed "Search mode" and related variables to "isearch mode" (incremental search mode) to clearly differentiate from the "search_dialog_mode".
 
-## Variable Name Changes
+## Changes Made
 
-### Core Variables (src/tfm_main.py)
-- `dialog_mode` → `quick_choice_mode`
-- `dialog_message` → `quick_choice_message` 
-- `dialog_choices` → `quick_choice_choices`
-- `dialog_callback` → `quick_choice_callback`
-- `dialog_selected` → `quick_choice_selected`
+### Variable Names
+- `search_mode` → `isearch_mode`
+- `search_pattern` → `isearch_pattern`
+- `search_matches` → `isearch_matches`
+- `search_match_index` → `isearch_match_index`
 
-### Method Names
-- `exit_dialog_mode()` → `exit_quick_choice_mode()`
-- `handle_dialog_input()` → `handle_quick_choice_input()`
-- Added backward compatibility method `handle_dialog_input()` that calls `handle_quick_choice_input()`
+### Function Names
+- `enter_search_mode()` → `enter_isearch_mode()`
+- `exit_search_mode()` → `exit_isearch_mode()`
+- `handle_search_input()` → `handle_isearch_input()`
+- `update_search_matches()` → `update_isearch_matches()`
 
-### Comments and Documentation
-- Updated all comments referencing "Multi-choice dialog" to "Quick choice dialog"
-- Updated method docstrings to reflect new terminology
-- Updated inline comments in main loop and status display
+### Display Text
+- "Search mode" → "isearch mode"
+- "Search:" prompt → "Isearch:" prompt
+- "incremental search" → "isearch"
+- "enter search mode" → "enter isearch mode"
 
-## Files Modified
+### Files Modified
 
-### Source Code
-- `src/tfm_main.py` - Main implementation with all variable renames
+#### Core Files
+- `src/tfm_main.py` - Main file manager implementation
+- `src/tfm_text_viewer.py` - Text viewer implementation
+- `src/tfm_const.py` - Constants file
 
-### Documentation
-- `doc/MULTI_CHOICE_DIALOG.md` → `doc/QUICK_CHOICE_DIALOG.md` (renamed file)
-- `doc/DELETE_FEATURE_IMPLEMENTATION.md`
-- `doc/M_KEY_REMOVAL_COMPLETE.md`
-- `doc/COPY_FEATURE_IMPLEMENTATION.md`
-- `doc/M_KEY_REMOVAL.md`
-- `doc/DIALOG_EXCLUSIVITY_FIX.md`
-
-### Test Files
-- `test/demo_copy_feature.py`
+#### Test Files
 - `test/test_dialog_exclusivity.py`
-- `test/demo_move_feature.py`
-- `test/final_verification.py`
 - `test/test_dialog_fix_verification.py`
 - `test/test_help_integration.py`
 - `test/test_list_dialog_feature.py`
+- `test/test_search.py`
 
-## Backward Compatibility
+#### Demo Files
+- `demo_list_dialog.py`
 
-The following methods are maintained for backward compatibility:
-- `show_confirmation()` - Still works as before
-- `handle_dialog_input()` - Now calls `handle_quick_choice_input()`
-- `handle_confirmation_input()` - Still works as before
-- `exit_confirmation_mode()` - Now calls `exit_quick_choice_mode()`
+## Key Benefits
 
-## Benefits of the Rename
+1. **Clear Differentiation**: Now clearly distinguishes between:
+   - `isearch_mode` - Incremental search within file lists/text
+   - `search_dialog_mode` - Full search dialog interface
 
-1. **More Descriptive**: "Quick choice" better describes the fast selection nature
-2. **Less Generic**: `quick_choice_mode` is more specific than `dialog_mode`
-3. **Consistent Terminology**: All related variables now use the same prefix
-4. **Clearer Intent**: The name emphasizes the quick selection aspect with hotkeys
+2. **Consistent Terminology**: All references now use "isearch" terminology consistently
 
-## Verification
+3. **Maintained Functionality**: All existing functionality preserved, only naming changed
 
-- ✅ All Python files compile without syntax errors
-- ✅ Main module imports successfully
-- ✅ Test files compile correctly
-- ✅ Backward compatibility maintained
-- ✅ No breaking changes to existing API
+## Notes
 
-## Other Dialog Types Unchanged
-
-The following dialog types retain their original names as they are distinct:
-- `info_dialog_mode` (help dialogs)
-- `list_dialog_mode` (searchable list dialogs)  
-- `search_dialog_mode` (search dialogs)
-
-These were intentionally left unchanged as they serve different purposes and have their own specific functionality.
+- The functionality remains exactly the same
+- All keyboard shortcuts (F key) remain unchanged
+- All search behavior and features are preserved
+- Documentation files in `doc/` folder were not modified to preserve historical context

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to demonstrate the incremental search functionality in TFM
+Test script to demonstrate the isearch functionality in TFM
 """
 
 import fnmatch

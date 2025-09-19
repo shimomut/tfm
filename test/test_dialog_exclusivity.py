@@ -14,21 +14,21 @@ def test_dialog_exclusivity_logic():
     print("=" * 30)
     
     # Simulate the key handling logic
-    def simulate_key_handling(search_mode, quick_choice_mode, info_dialog_mode, key_action):
+    def simulate_key_handling(isearch_mode, quick_choice_mode, info_dialog_mode, key_action):
         """Simulate the key handling logic from tfm_main.py"""
         
         print(f"\nTest Case:")
-        print(f"  search_mode: {search_mode}")
+        print(f"  isearch_mode: {isearch_mode}")
         print(f"  quick_choice_mode: {quick_choice_mode}")
         print(f"  info_dialog_mode: {info_dialog_mode}")
         print(f"  key_action: {key_action}")
         
         # Simulate the input handling order from tfm_main.py
         
-        # 1. Handle search mode input first
-        if search_mode:
-            print("  → Search mode input handling")
-            return "search_handled"
+        # 1. Handle isearch mode input first
+        if isearch_mode:
+            print("  → Isearch mode input handling")
+            return "isearch_handled"
         
         # 2. Handle quick choice mode input
         if quick_choice_mode:

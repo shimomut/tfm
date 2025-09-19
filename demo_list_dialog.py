@@ -87,7 +87,7 @@ def main():
     print("- Navigation with ↑↓ arrow keys")
     print("- Page Up/Down for fast scrolling")
     print("- Home/End keys")
-    print("- Incremental search by typing")
+    print("- Isearch by typing")
     print("- Backspace to clear search")
     print("- Enter to select, ESC to cancel")
     print()

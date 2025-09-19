@@ -216,7 +216,7 @@ def test_integration_points():
         'quick_choice_mode',
         'info_dialog_mode', 
         'list_dialog_mode',
-        'search_mode',
+        'isearch_mode',
         'rename_mode',
         'create_dir_mode',
         'create_file_mode'

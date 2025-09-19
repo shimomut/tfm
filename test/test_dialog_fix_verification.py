@@ -10,30 +10,24 @@ def test_actual_implementation_logic():
     print("TFM Dialog Exclusivity Fix Verification")
     print("=" * 45)
     
-    def simulate_tfm_key_handling(search_mode, quick_choice_mode, info_dialog_mode, key, key_handled_by_dialog=False):
+    def simulate_tfm_key_handling(isearch_mode, quick_choice_mode, info_dialog_mode, key, key_handled_by_dialog=False):
         """
-
-# Add src directory to Python path
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
         Simulate the exact logic from tfm_main.py
         
         Args:
-            search_mode: Whether search mode is active
+            isearch_mode: Whether isearch mode is active
             quick_choice_mode: Whether quick choice dialog is active  
             info_dialog_mode: Whether info dialog (help) is active
             key: The key pressed
             key_handled_by_dialog: Whether the dialog handler consumed the key
         """
         
-        print(f"\nScenario: key='{key}', search={search_mode}, quick_choice={quick_choice_mode}, info_dialog={info_dialog_mode}")
+        print(f"\nScenario: key='{key}', isearch={isearch_mode}, quick_choice={quick_choice_mode}, info_dialog={info_dialog_mode}")
         
-        # Step 1: Handle search mode input first
-        if search_mode:
-            print("  → Search mode handles key")
-            return "search_mode_handled"
+        # Step 1: Handle isearch mode input first
+        if isearch_mode:
+            print("  → Isearch mode handles key")
+            return "isearch_mode_handled"
         
         # Step 2: Handle quick choice mode input
         if quick_choice_mode:
@@ -95,10 +89,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
     print("  ✓ PASS: Search mode NOT started (conflict prevented)")
     
     # Test case 5: Search mode active, help key pressed
-    print("\n5. Search mode active, '?' key pressed")
+    print("\n5. Isearch mode active, '?' key pressed")
     result = simulate_tfm_key_handling(True, False, False, '?')
-    assert result == "search_mode_handled", f"Expected search_mode_handled, got {result}"
-    print("  ✓ PASS: Search mode has priority")
+    assert result == "isearch_mode_handled", f"Expected isearch_mode_handled, got {result}"
+    print("  ✓ PASS: Isearch mode has priority")
     
     # Test case 6: No dialogs, help key pressed
     print("\n6. No dialogs open, '?' key pressed")
@@ -126,7 +120,7 @@ def test_specific_scenarios():
             "description": "Search mode should handle the key (search has priority)",
             "state": (True, False, False),
             "key": "?",
-            "expected": "search_mode_handled"
+            "expected": "isearch_mode_handled"
         },
         {
             "name": "User opens file operations dialog, presses 'f'",
@@ -159,10 +153,10 @@ def test_specific_scenarios():
     
     return True
 
-def simulate_tfm_key_handling(search_mode, quick_choice_mode, info_dialog_mode, key, key_handled_by_dialog):
+def simulate_tfm_key_handling(isearch_mode, quick_choice_mode, info_dialog_mode, key, key_handled_by_dialog):
     """Helper function for simulation"""
-    if search_mode:
-        return "search_mode_handled"
+    if isearch_mode:
+        return "isearch_mode_handled"
     
     if quick_choice_mode:
         if key_handled_by_dialog:
