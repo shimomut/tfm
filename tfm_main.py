@@ -307,9 +307,16 @@ class FileManager:
         self.needs_full_redraw = True
     
     def sync_pane_directories(self):
-        """Change current pane's directory to match the other pane's directory"""
+        """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
+        
+        # Check if both panes are already showing the same directory
+        if current_pane['path'] == other_pane['path']:
+            # Both panes show same directory, sync cursor position instead
+            # For 'o', move cursor in CURRENT pane to match other pane's cursor
+            self.sync_cursor_to_other_pane()
+            return
         
         # Get the other pane's directory
         target_directory = other_pane['path']
@@ -347,9 +354,16 @@ class FileManager:
         self.needs_full_redraw = True
     
     def sync_other_pane_directory(self):
-        """Change other pane's directory to match the current pane's directory"""
+        """Change other pane's directory to match the current pane's directory, or sync cursor if already same directory"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
+        
+        # Check if both panes are already showing the same directory
+        if current_pane['path'] == other_pane['path']:
+            # Both panes show same directory, sync cursor position instead
+            # For Shift-O, move cursor in OTHER pane to match current pane's cursor
+            self.sync_cursor_from_current_pane()
+            return
         
         # Get the current pane's directory
         target_directory = current_pane['path']
@@ -386,6 +400,105 @@ class FileManager:
         print(f"Synchronized {other_pane_name} pane to {current_pane_name} pane: {old_directory} → {target_directory}")
         
         self.needs_full_redraw = True
+    
+    def sync_cursor_to_other_pane(self):
+        """Move cursor in current pane to the same filename as the other pane's cursor"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Get the currently selected file in the other pane
+        if not other_pane['files'] or other_pane['selected_index'] >= len(other_pane['files']):
+            print("No file selected in other pane")
+            return
+            
+        other_selected_file = other_pane['files'][other_pane['selected_index']]
+        
+        # Handle parent directory (..) case
+        if other_selected_file == other_pane['path'].parent:
+            target_filename = ".."
+        else:
+            target_filename = other_selected_file.name
+        
+        # Find the same filename in current pane
+        target_index = None
+        for i, file_path in enumerate(current_pane['files']):
+            if file_path == current_pane['path'].parent and target_filename == "..":
+                target_index = i
+                break
+            elif file_path != current_pane['path'].parent and file_path.name == target_filename:
+                target_index = i
+                break
+        
+        if target_index is not None:
+            # Move cursor to the matching file
+            current_pane['selected_index'] = target_index
+            
+            # Adjust scroll offset if needed to keep selection visible
+            height, width = self.stdscr.getmaxyx()
+            calculated_height = int(height * self.log_height_ratio)
+            log_height = calculated_height if self.log_height_ratio > 0 else 0
+            display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+            
+            if current_pane['selected_index'] < current_pane['scroll_offset']:
+                current_pane['scroll_offset'] = current_pane['selected_index']
+            elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
+                current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+            
+            pane_name = "left" if self.active_pane == 'left' else "right"
+            print(f"Moved {pane_name} pane cursor to: {target_filename}")
+            self.needs_full_redraw = True
+        else:
+            print(f"File '{target_filename}' not found in current pane")
+    
+    def sync_cursor_from_current_pane(self):
+        """Move cursor in other pane to the same filename as the current pane's cursor"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Get the currently selected file in the current pane
+        if not current_pane['files'] or current_pane['selected_index'] >= len(current_pane['files']):
+            print("No file selected in current pane")
+            return
+            
+        current_selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        # Handle parent directory (..) case
+        if current_selected_file == current_pane['path'].parent:
+            target_filename = ".."
+        else:
+            target_filename = current_selected_file.name
+        
+        # Find the same filename in other pane
+        target_index = None
+        for i, file_path in enumerate(other_pane['files']):
+            if file_path == other_pane['path'].parent and target_filename == "..":
+                target_index = i
+                break
+            elif file_path != other_pane['path'].parent and file_path.name == target_filename:
+                target_index = i
+                break
+        
+        if target_index is not None:
+            # Move cursor to the matching file in other pane
+            other_pane['selected_index'] = target_index
+            
+            # Adjust scroll offset if needed to keep selection visible
+            height, width = self.stdscr.getmaxyx()
+            calculated_height = int(height * self.log_height_ratio)
+            log_height = calculated_height if self.log_height_ratio > 0 else 0
+            display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+            
+            if other_pane['selected_index'] < other_pane['scroll_offset']:
+                other_pane['scroll_offset'] = other_pane['selected_index']
+            elif other_pane['selected_index'] >= other_pane['scroll_offset'] + display_height:
+                other_pane['scroll_offset'] = other_pane['selected_index'] - display_height + 1
+            
+            other_pane_name = "right" if self.active_pane == 'left' else "left"
+            print(f"Moved {other_pane_name} pane cursor to: {target_filename}")
+            self.needs_full_redraw = True
+        else:
+            other_pane_name = "right" if self.active_pane == 'left' else "left"
+            print(f"File '{target_filename}' not found in {other_pane_name} pane")
         
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
