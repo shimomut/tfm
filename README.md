@@ -21,6 +21,18 @@ A terminal-based file manager built with Python's curses library. Navigate your 
 - **Text Editor Integration**: Edit files directly with your preferred text editor (vim, nano, etc.)
 - **Keyboard Navigation**: Full keyboard control with intuitive shortcuts
 - **Cross-platform**: Works on macOS, Linux, and Windows (with proper terminal support)
+- **Built-in Help**: Comprehensive help dialog accessible with `?` key showing all key bindings
+
+## Help System
+
+TFM includes a comprehensive help dialog that provides quick access to all key bindings and features:
+
+- **Access**: Press `?` or `h` to open the help dialog
+- **Content**: Organized sections covering navigation, file operations, search, sorting, and more
+- **Navigation**: Scroll through help content with arrow keys, Page Up/Down, Home/End
+- **Always Available**: Accessible from any screen in TFM
+
+The help dialog is your quick reference guide - no need to memorize all key bindings!
 
 ## Controls
 
@@ -38,6 +50,7 @@ A terminal-based file manager built with Python's curses library. Navigate your 
 | `l` | Scroll log pane up (older messages) |
 | `L` | Scroll log pane down (newer messages) |
 | `t` | Test log output (demonstrates stdout/stderr capture) |
+| `?` | Show help dialog with all key bindings |
 | `h` | Toggle hidden files visibility |
 | `Home` | Go to first item in active pane |
 | `End` | Go to last item in active pane |
@@ -103,6 +116,7 @@ _config.py            # Default configuration template
 requirements.txt      # Dependencies (pygments optional)
 README.md             # This file
 TEXT_VIEWER_FEATURE.md # Detailed text viewer documentation
+HELP_DIALOG_FEATURE.md # Help dialog feature documentation
 ```
 
 The application starts in your current working directory and allows you to navigate through your filesystem using keyboard controls.
