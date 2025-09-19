@@ -242,7 +242,6 @@ fi
 ### Test Scripts
 - `python3 test_subshell.py` - Test environment variables
 - `python3 demo_subshell.py` - See usage examples
-- `bash examples_subshell.sh` - Interactive shell examples
 
 ## Searchable Dialogs
 
