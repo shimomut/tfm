@@ -13,8 +13,9 @@ from pathlib import Path
 from datetime import datetime
 from collections import deque
 
-# Import constants
+# Import constants and colors
 from tfm_const import *
+from tfm_colors import *
 
 class LogCapture:
     """Capture stdout/stderr and redirect to log pane"""
@@ -72,13 +73,7 @@ class FileManager:
         self.add_startup_messages()
         
         # Initialize colors
-        curses.start_color()
-        curses.init_pair(COLOR_DIRECTORIES, curses.COLOR_CYAN, curses.COLOR_BLACK)
-        curses.init_pair(COLOR_EXECUTABLES, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(COLOR_SELECTED, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-        curses.init_pair(COLOR_ERROR, curses.COLOR_RED, curses.COLOR_BLACK)
-        curses.init_pair(COLOR_HEADER, curses.COLOR_WHITE, curses.COLOR_BLUE)
-        curses.init_pair(COLOR_STATUS, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        init_colors()
         
         # Configure curses
         curses.curs_set(0)  # Hide cursor
@@ -123,7 +118,7 @@ class FileManager:
         
         try:
             # Left pane footer with active indicator
-            left_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'left' else curses.color_pair(COLOR_HEADER)
+            left_color = get_header_color(self.active_pane == 'left')
             self.stdscr.addstr(y, 2, left_footer, left_color)
         except curses.error:
             pass
@@ -138,7 +133,7 @@ class FileManager:
         
         try:
             # Right pane footer with active indicator
-            right_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'right' else curses.color_pair(COLOR_HEADER)
+            right_color = get_header_color(self.active_pane == 'right')
             self.stdscr.addstr(y, left_pane_width + 2, right_footer, right_color)
         except curses.error:
             pass
@@ -276,7 +271,7 @@ class FileManager:
         right_pane_width = width - left_pane_width
         
         # Clear header area
-        self.stdscr.addstr(0, 0, " " * width, curses.color_pair(COLOR_HEADER))
+        self.stdscr.addstr(0, 0, " " * width, get_header_color())
         
         # Left pane path with safety checks
         if left_pane_width > 6:  # Minimum space needed
@@ -285,7 +280,7 @@ class FileManager:
             if len(left_path) > max_left_path_width:
                 left_path = "..." + left_path[-(max(1, max_left_path_width-3)):]
             
-            left_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'left' else curses.color_pair(COLOR_HEADER)
+            left_color = get_header_color(self.active_pane == 'left')
             try:
                 self.stdscr.addstr(0, 2, left_path[:max_left_path_width], left_color)
             except curses.error:
@@ -294,7 +289,7 @@ class FileManager:
         # Separator with bounds check
         if 0 <= left_pane_width < width:
             try:
-                self.stdscr.addstr(0, left_pane_width, "│", curses.color_pair(COLOR_HEADER))
+                self.stdscr.addstr(0, left_pane_width, "│", get_header_color())
             except curses.error:
                 pass
         
@@ -305,7 +300,7 @@ class FileManager:
             if len(right_path) > max_right_path_width:
                 right_path = "..." + right_path[-(max(1, max_right_path_width-3)):]
                 
-            right_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'right' else curses.color_pair(COLOR_HEADER)
+            right_color = get_header_color(self.active_pane == 'right')
             try:
                 right_start_x = left_pane_width + 2
                 if right_start_x < width:
@@ -359,22 +354,17 @@ class FileManager:
             # Check if this file is multi-selected
             is_multi_selected = str(file_path) in pane_data['selected_files']
             
-            # Choose color based on selection and activity
-            base_color = curses.A_NORMAL
-            if is_dir:
-                base_color = curses.color_pair(COLOR_DIRECTORIES) | curses.A_BOLD
-            elif file_path.is_file() and os.access(file_path, os.X_OK):
-                base_color = curses.color_pair(COLOR_EXECUTABLES)
-                
-            # Apply selection highlighting
-            if file_index == pane_data['selected_index'] and is_active:
-                color = curses.color_pair(COLOR_SELECTED) | curses.A_REVERSE
-            elif file_index == pane_data['selected_index']:
-                color = base_color | curses.A_UNDERLINE
-            elif is_multi_selected:
-                color = base_color | curses.A_STANDOUT  # Highlight multi-selected files
-            else:
-                color = base_color
+            # Choose color based on file properties and selection
+            is_executable = file_path.is_file() and os.access(file_path, os.X_OK)
+            is_selected = file_index == pane_data['selected_index']
+            
+            color = get_file_color(is_dir, is_executable, is_selected, is_active)
+            
+            # Handle multi-selection highlighting
+            if is_multi_selected and not is_selected:
+                # Get base color and add standout for multi-selected files
+                base_color = get_file_color(is_dir, is_executable, False, False)
+                color = base_color | curses.A_STANDOUT
                 
             # Add selection marker for multi-selected files
             selection_marker = "●" if is_multi_selected else " "
@@ -439,7 +429,7 @@ class FileManager:
         # Draw vertical separator for file panes
         for y in range(1, file_pane_bottom):
             try:
-                self.stdscr.addstr(y, left_pane_width, "│", curses.color_pair(COLOR_HEADER))
+                self.stdscr.addstr(y, left_pane_width, "│", get_header_color())
             except curses.error:
                 pass
         
@@ -468,7 +458,7 @@ class FileManager:
         # Draw horizontal separator and file list footers
         try:
             separator_line = "─" * width
-            self.stdscr.addstr(footer_y, 0, separator_line, curses.color_pair(COLOR_HEADER))
+            self.stdscr.addstr(footer_y, 0, separator_line, get_header_color())
             
             # Always draw file list footers
             self.draw_file_footers(footer_y, left_pane_width)
@@ -510,12 +500,7 @@ class FileManager:
             timestamp, source, message = self.log_messages[msg_idx]
             
             # Choose color based on source
-            if source == "STDERR":
-                color = curses.color_pair(COLOR_ERROR)  # Red for stderr
-            elif source == "SYSTEM":
-                color = curses.color_pair(COLOR_SELECTED)  # Yellow for system messages
-            else:
-                color = curses.A_NORMAL
+            color = get_log_color(source)
             
             # Format log line
             log_line = f"{timestamp} [{source}] {message}"
@@ -553,24 +538,24 @@ class FileManager:
         try:
             # Fill entire status line with background color
             status_line = " " * width
-            self.stdscr.addstr(status_y, 0, status_line, curses.color_pair(COLOR_STATUS))
+            self.stdscr.addstr(status_y, 0, status_line, get_status_color())
             
             # Always draw controls - they're the most important part
             if left_status:
                 # Draw left status
-                self.stdscr.addstr(status_y, 2, left_status, curses.color_pair(COLOR_STATUS))
+                self.stdscr.addstr(status_y, 2, left_status, get_status_color())
                 # Right-align controls
                 controls_x = max(len(left_status) + 6, width - len(controls) - 2)
                 if controls_x + len(controls) < width - 2:
-                    self.stdscr.addstr(status_y, controls_x, controls, curses.color_pair(COLOR_STATUS))
+                    self.stdscr.addstr(status_y, controls_x, controls, get_status_color())
                 else:
                     # If no room, just show controls without left status
                     controls_x = max(2, (width - len(controls)) // 2)
-                    self.stdscr.addstr(status_y, controls_x, controls, curses.color_pair(COLOR_STATUS))
+                    self.stdscr.addstr(status_y, controls_x, controls, get_status_color())
             else:
                 # Center controls when no left status
                 controls_x = max(2, (width - len(controls)) // 2)
-                self.stdscr.addstr(status_y, controls_x, controls, curses.color_pair(COLOR_STATUS))
+                self.stdscr.addstr(status_y, controls_x, controls, get_status_color())
         except curses.error:
             # Fallback: just show file info if screen too narrow
             self.stdscr.addstr(status_y, 2, left_status)
@@ -609,7 +594,7 @@ class FileManager:
     def show_error(self, message):
         """Show error message"""
         height, width = self.stdscr.getmaxyx()
-        self.stdscr.addstr(height - 1, 2, f"ERROR: {message}", curses.color_pair(COLOR_ERROR))
+        self.stdscr.addstr(height - 1, 2, f"ERROR: {message}", get_error_color())
         self.stdscr.refresh()
         curses.napms(2000)  # Show for 2 seconds
         
@@ -663,7 +648,7 @@ class FileManager:
         
         # Draw debug header
         debug_title = "=== MODIFIER KEY DETECTION MODE ==="
-        self.stdscr.addstr(2, (width - len(debug_title)) // 2, debug_title, curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
+        self.stdscr.addstr(2, (width - len(debug_title)) // 2, debug_title, get_header_color(True))
         
         # Instructions
         instructions = [
@@ -711,19 +696,19 @@ class FileManager:
                 
                 if debug_key == 0:
                     key_info = f"Ctrl+Space detected! (key code: {debug_key}) ✓ WORKS FOR UPWARD SELECTION"
-                    color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                    color = get_file_color(False, False, True, True) | curses.A_BOLD
                 elif debug_key == 19:
                     key_info = f"Ctrl+S detected! (key code: {debug_key}) ✓ WORKS FOR UPWARD SELECTION"  
-                    color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                    color = get_file_color(False, False, True, True) | curses.A_BOLD
                 elif debug_key == 27:
                     # Check for ESC sequences (Option+Left/Right)
                     next_key = self.stdscr.getch()
                     if next_key == 98:  # 'b'
                         key_info = f"Option+Left detected! (key codes: 27, 98) ✓ WORKS FOR PANE RESIZE"
-                        color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                        color = get_file_color(False, False, True, True) | curses.A_BOLD
                     elif next_key == 102:  # 'f'
                         key_info = f"Option+Right detected! (key codes: 27, 102) ✓ WORKS FOR PANE RESIZE"
-                        color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                        color = get_file_color(False, False, True, True) | curses.A_BOLD
                     else:
                         key_info = f"ESC sequence: 27 followed by {next_key} (char: {chr(next_key) if 32 <= next_key <= 126 else 'non-printable'})"
                         color = curses.A_NORMAL
@@ -732,7 +717,7 @@ class FileManager:
                     next_key = self.stdscr.getch()
                     if next_key == 160:
                         key_info = f"Option+Space detected! (key codes: 194, 160) ✓ WORKS FOR UPWARD SELECTION"
-                        color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                        color = get_file_color(False, False, True, True) | curses.A_BOLD
                     else:
                         key_info = f"Option key sequence: 194 followed by {next_key} (unknown)"
                         color = curses.A_NORMAL

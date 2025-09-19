@@ -16,13 +16,7 @@ DEFAULT_LOG_HEIGHT_RATIO = 0.25  # Log pane takes 1/4 of screen
 MIN_LOG_HEIGHT = 5
 MAX_LOG_MESSAGES = 1000
 
-# Color pair constants
-COLOR_DIRECTORIES = 1
-COLOR_EXECUTABLES = 2
-COLOR_SELECTED = 3
-COLOR_ERROR = 4
-COLOR_HEADER = 5
-COLOR_STATUS = 6
+# Color constants moved to tfm_colors.py
 
 # Key codes (for reference)
 KEY_TAB = 9
