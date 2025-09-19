@@ -66,6 +66,13 @@ class FileManager:
         self.search_matches = []
         self.search_match_index = 0
         
+        # Confirmation mode state
+        self.confirmation_mode = False
+        self.confirmation_message = ""
+        self.confirmation_callback = None
+        self.confirmation_selected = 0  # 0=Yes, 1=No, 2=Cancel
+        self.should_quit = False  # Flag to control main loop exit
+        
         # Log pane setup
         self.log_messages = deque(maxlen=MAX_LOG_MESSAGES)
         self.log_scroll_offset = 0
@@ -576,6 +583,41 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
+        # If in confirmation mode, show confirmation dialog
+        if self.confirmation_mode:
+            # Fill entire status line with background color
+            status_line = " " * (width - 1)
+            self.safe_addstr(status_y, 0, status_line, get_status_color())
+            
+            # Show confirmation message
+            message = f"{self.confirmation_message} "
+            self.safe_addstr(status_y, 2, message, get_status_color())
+            
+            # Show Yes/No/Cancel buttons
+            options = ["Yes", "No", "Cancel"]
+            button_start_x = len(message) + 4
+            
+            for i, option in enumerate(options):
+                if i == self.confirmation_selected:
+                    # Highlight selected option
+                    button_color = get_status_color() | curses.A_REVERSE
+                    button_text = f"[{option}]"
+                else:
+                    button_color = get_status_color()
+                    button_text = f" {option} "
+                
+                if button_start_x + len(button_text) < width - 2:
+                    self.safe_addstr(status_y, button_start_x, button_text, button_color)
+                    button_start_x += len(button_text) + 1
+            
+            # Show help text on the right if there's space
+            help_text = "←→:select Enter:confirm Y/N/C:quick ESC:cancel"
+            if button_start_x + len(help_text) + 6 < width:
+                help_x = width - len(help_text) - 3
+                if help_x > button_start_x + 4:  # Ensure no overlap
+                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            return
+            
         # If in search mode, show search interface
         if self.search_mode:
             # Fill entire status line with background color
@@ -628,17 +670,17 @@ class FileManager:
         
         # Controls - progressively abbreviate to fit
         if width > 160:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
         elif width > 140:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 120:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 100:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 80:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  t:test-confirm  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         else:
-            controls = "Space:select  F:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
+            controls = "Space:select  F:search  t:test-confirm  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
         
         # Draw status line with background color
         # Fill entire status line with background color
@@ -816,6 +858,67 @@ class FileManager:
         self.search_matches = []
         self.search_match_index = 0
         self.needs_full_redraw = True
+        
+    def show_confirmation(self, message, callback):
+        """Show confirmation dialog with Yes/No/Cancel options"""
+        self.confirmation_mode = True
+        self.confirmation_message = message
+        self.confirmation_callback = callback
+        self.confirmation_selected = 0  # Default to "Yes"
+        self.needs_full_redraw = True
+        
+    def exit_confirmation_mode(self):
+        """Exit confirmation mode"""
+        self.confirmation_mode = False
+        self.confirmation_message = ""
+        self.confirmation_callback = None
+        self.confirmation_selected = 0
+        self.needs_full_redraw = True
+        
+    def handle_confirmation_input(self, key):
+        """Handle input while in confirmation mode"""
+        if key == 27:  # ESC - cancel
+            self.exit_confirmation_mode()
+            return True
+        elif key == curses.KEY_LEFT or key == ord('h'):
+            # Move selection left
+            self.confirmation_selected = (self.confirmation_selected - 1) % 3
+            self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_RIGHT or key == ord('l'):
+            # Move selection right
+            self.confirmation_selected = (self.confirmation_selected + 1) % 3
+            self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Execute selected action
+            if self.confirmation_selected == 0:  # Yes
+                if self.confirmation_callback:
+                    self.confirmation_callback(True)
+            elif self.confirmation_selected == 1:  # No
+                if self.confirmation_callback:
+                    self.confirmation_callback(False)
+            # Cancel (2) or any other case just exits without calling callback
+            self.exit_confirmation_mode()
+            return True
+        elif key == ord('y') or key == ord('Y'):
+            # Quick "Yes" with Y key
+            if self.confirmation_callback:
+                self.confirmation_callback(True)
+            self.exit_confirmation_mode()
+            return True
+        elif key == ord('n') or key == ord('N'):
+            # Quick "No" with N key
+            if self.confirmation_callback:
+                self.confirmation_callback(False)
+            self.exit_confirmation_mode()
+            return True
+        elif key == ord('c') or key == ord('C'):
+            # Quick "Cancel" with C key
+            self.exit_confirmation_mode()
+            return True
+        
+        return False
         
     def handle_search_input(self, key):
         """Handle input while in search mode"""
@@ -1270,6 +1373,10 @@ class FileManager:
     def run(self):
         """Main application loop"""
         while True:
+            # Check if we should quit
+            if self.should_quit:
+                break
+                
             # Only do full redraw when needed
             if self.needs_full_redraw:
                 self.refresh_files()
@@ -1296,8 +1403,17 @@ class FileManager:
                 if self.handle_search_input(key):
                     continue  # Search mode handled the key
             
+            # Handle confirmation mode input
+            if self.confirmation_mode:
+                if self.handle_confirmation_input(key):
+                    continue  # Confirmation mode handled the key
+            
             if key == ord('q') or key == ord('Q'):
-                break
+                def quit_callback(confirmed):
+                    if confirmed:
+                        # Set a flag to exit the main loop
+                        self.should_quit = True
+                self.show_confirmation("Are you sure you want to quit TFM?", quit_callback)
             elif key == KEY_CTRL_U:  # Ctrl+U - make log pane smaller
                 self.adjust_log_boundary('up')
             elif key == KEY_CTRL_D:  # Ctrl+D - make log pane larger
@@ -1463,6 +1579,13 @@ class FileManager:
                 print(f"Current time: {datetime.now()}")
             elif key == ord('d'):  # 'd' key - debug mode to detect modifier keys
                 self.debug_mode()
+            elif key == ord('t'):  # 't' key - test confirmation dialog
+                def test_callback(confirmed):
+                    if confirmed:
+                        print("User confirmed the test action!")
+                    else:
+                        print("User declined the test action.")
+                self.show_confirmation("Do you want to execute the test action?", test_callback)
             elif key == ord('f') or key == ord('F'):  # 'F' key - enter search mode
                 self.enter_search_mode()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
