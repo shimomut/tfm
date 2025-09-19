@@ -4507,6 +4507,65 @@ class FileManager:
             if help_x >= start_x:
                 self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
     
+    def _draw_input_field_with_cursor(self, y, x, max_width, label, text, cursor_pos, is_active):
+        """Draw an input field with cursor highlighting using reversed colors"""
+        # Calculate available space for text after label
+        text_start_x = x + len(label)
+        text_max_width = max_width - len(label)
+        
+        if text_max_width <= 0:
+            return
+        
+        # Draw the label
+        base_color = get_status_color() | (curses.A_BOLD if is_active else 0)
+        self.safe_addstr(y, x, label, base_color)
+        
+        # Handle empty text case
+        if not text:
+            if is_active:
+                # Show cursor at beginning of empty field
+                self.safe_addstr(y, text_start_x, " ", base_color | curses.A_REVERSE)
+            return
+        
+        # Ensure cursor is within bounds
+        cursor_pos = max(0, min(cursor_pos, len(text)))
+        
+        # Calculate visible text window if text is too long
+        visible_start = 0
+        visible_end = len(text)
+        
+        if len(text) > text_max_width:
+            # Adjust visible window to keep cursor in view
+            if cursor_pos < text_max_width // 2:
+                # Cursor near start, show from beginning
+                visible_end = text_max_width
+            elif cursor_pos > len(text) - text_max_width // 2:
+                # Cursor near end, show end portion
+                visible_start = len(text) - text_max_width
+            else:
+                # Cursor in middle, center the view
+                visible_start = cursor_pos - text_max_width // 2
+                visible_end = visible_start + text_max_width
+        
+        visible_text = text[visible_start:visible_end]
+        cursor_in_visible = cursor_pos - visible_start
+        
+        # Draw text with cursor highlighting
+        current_x = text_start_x
+        
+        for i, char in enumerate(visible_text):
+            if i == cursor_in_visible and is_active:
+                # Draw cursor character with reversed colors
+                self.safe_addstr(y, current_x, char, base_color | curses.A_REVERSE)
+            else:
+                # Draw normal character
+                self.safe_addstr(y, current_x, char, base_color)
+            current_x += 1
+        
+        # If cursor is at the end of text and field is active, show cursor after last character
+        if cursor_in_visible >= len(visible_text) and is_active and current_x < x + max_width:
+            self.safe_addstr(y, current_x, " ", base_color | curses.A_REVERSE)
+    
     def draw_batch_rename_dialog(self):
         """Draw the batch rename dialog overlay"""
         height, width = self.stdscr.getmaxyx()
@@ -4559,36 +4618,24 @@ class FileManager:
             content_start_x = start_x + 2
             content_width = dialog_width - 4
             
-            # Insert cursor at the correct position
-            if self.batch_rename_input_mode == 'regex':
-                regex_text = (self.batch_rename_regex[:self.batch_rename_regex_cursor] + 
-                             "_" + 
-                             self.batch_rename_regex[self.batch_rename_regex_cursor:])
-            else:
-                regex_text = self.batch_rename_regex
-            
-            regex_line = regex_label + regex_text
-            display_regex = regex_line[:content_width] if len(regex_line) > content_width else regex_line
-            regex_color = get_status_color() | (curses.A_BOLD if self.batch_rename_input_mode == 'regex' else 0)
-            self.safe_addstr(regex_y, content_start_x, display_regex, regex_color)
+            # Draw regex input with cursor highlighting
+            self._draw_input_field_with_cursor(
+                regex_y, content_start_x, content_width,
+                regex_label, self.batch_rename_regex, self.batch_rename_regex_cursor,
+                self.batch_rename_input_mode == 'regex'
+            )
         
         # Draw destination input
         dest_y = start_y + 3
         dest_label = "Destination:   "
         
         if dest_y < height:
-            # Insert cursor at the correct position
-            if self.batch_rename_input_mode == 'destination':
-                dest_text = (self.batch_rename_destination[:self.batch_rename_destination_cursor] + 
-                           "_" + 
-                           self.batch_rename_destination[self.batch_rename_destination_cursor:])
-            else:
-                dest_text = self.batch_rename_destination
-            
-            dest_line = dest_label + dest_text
-            display_dest = dest_line[:content_width] if len(dest_line) > content_width else dest_line
-            dest_color = get_status_color() | (curses.A_BOLD if self.batch_rename_input_mode == 'destination' else 0)
-            self.safe_addstr(dest_y, content_start_x, display_dest, dest_color)
+            # Draw destination input with cursor highlighting
+            self._draw_input_field_with_cursor(
+                dest_y, content_start_x, content_width,
+                dest_label, self.batch_rename_destination, self.batch_rename_destination_cursor,
+                self.batch_rename_input_mode == 'destination'
+            )
         
         # Draw help for macros
         help_y = start_y + 4

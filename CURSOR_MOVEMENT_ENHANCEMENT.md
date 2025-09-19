@@ -22,7 +22,7 @@ Enhanced the batch rename dialog with full cursor movement capabilities, allowin
 - **Tab**: Switch fields while preserving cursor positions
 
 ### Visual Feedback
-- **Cursor Display**: Shows underscore (_) character at current cursor position
+- **Cursor Display**: Uses reversed color highlighting at current cursor position
 - **Active Field**: Bold highlighting indicates which field is currently active
 - **Real-time Updates**: Preview updates immediately as text is modified
 
@@ -54,11 +54,11 @@ if self.batch_rename_input_mode == 'regex':
 
 ### Visual Cursor Rendering
 ```python
-# Display cursor in active field
-if self.batch_rename_input_mode == 'regex':
-    regex_text = (self.batch_rename_regex[:self.batch_rename_regex_cursor] + 
-                 "_" + 
-                 self.batch_rename_regex[self.batch_rename_regex_cursor:])
+# Display cursor with reversed color highlighting
+def _draw_input_field_with_cursor(self, y, x, max_width, label, text, cursor_pos, is_active):
+    # Draw character at cursor position with reversed colors
+    if i == cursor_in_visible and is_active:
+        self.safe_addstr(y, current_x, char, base_color | curses.A_REVERSE)
 ```
 
 ## User Experience Improvements
@@ -71,10 +71,10 @@ if self.batch_rename_input_mode == 'regex':
 
 ### After Enhancement
 - Full text editing at any position
-- Visual cursor shows exact editing position
+- Visual cursor with reversed color highlighting shows exact editing position
 - Standard text navigation controls (arrows, Home/End)
 - Easy correction and modification of existing patterns
-- Familiar text editing experience
+- Familiar text editing experience with professional cursor display
 
 ## Key Features
 
