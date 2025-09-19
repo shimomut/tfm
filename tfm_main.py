@@ -751,8 +751,8 @@ class FileManager:
             
             for i, option in enumerate(options):
                 if i == self.confirmation_selected:
-                    # Highlight selected option
-                    button_color = get_status_color() | curses.A_REVERSE
+                    # Highlight selected option with bold and standout
+                    button_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
                     button_text = f"[{option}]"
                 else:
                     button_color = get_status_color()
