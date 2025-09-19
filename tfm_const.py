@@ -34,7 +34,14 @@ KEY_OPTION_LEFT_2 = 98    # Option+Left second byte (ESC + 'b')
 KEY_OPTION_RIGHT_2 = 102  # Option+Right second byte (ESC + 'f')
 KEY_CTRL_U = 21           # Ctrl+U (vertical resize up)
 KEY_CTRL_D = 4            # Ctrl+D (vertical resize down)
-# Note: Shift+Space is interpreted as regular space in most terminals
+KEY_CTRL_K = 11           # Ctrl+K (log scroll up)
+KEY_CTRL_L = 12           # Ctrl+L (log scroll down)
+# Shift key combinations for log scrolling (terminal-dependent)
+KEY_SHIFT_UP_1 = 337      # Shift+Up in some terminals
+KEY_SHIFT_DOWN_1 = 336    # Shift+Down in some terminals  
+KEY_SHIFT_UP_2 = 393      # Alternative Shift+Up code
+KEY_SHIFT_DOWN_2 = 402    # Alternative Shift+Down code
+# Note: Shift+Arrow keys may send regular arrow codes (258/259) in some terminals
 
 # File size formatting thresholds
 SIZE_KB = 1024

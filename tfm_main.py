@@ -118,7 +118,7 @@ class FileManager:
         
         try:
             # Left pane footer with active indicator
-            left_color = get_header_color(self.active_pane == 'left')
+            left_color = get_footer_color(self.active_pane == 'left')
             self.stdscr.addstr(y, 2, left_footer, left_color)
         except curses.error:
             pass
@@ -133,7 +133,7 @@ class FileManager:
         
         try:
             # Right pane footer with active indicator
-            right_color = get_header_color(self.active_pane == 'right')
+            right_color = get_footer_color(self.active_pane == 'right')
             self.stdscr.addstr(y, left_pane_width + 2, right_footer, right_color)
         except curses.error:
             pass
@@ -217,6 +217,21 @@ class FileManager:
         """Get the inactive pane"""
         return self.right_pane if self.active_pane == 'left' else self.left_pane
     
+    def get_log_scroll_percentage(self):
+        """Calculate the current log scroll position as a percentage"""
+        if len(self.log_messages) <= 1:
+            return 100  # If no messages or only one, we're at 100%
+        
+        # When scroll_offset is 0, we're at the bottom (newest messages) = 100%
+        # When scroll_offset is max, we're at the top (oldest messages) = 0%
+        max_scroll = len(self.log_messages) - 1
+        if max_scroll == 0:
+            return 100
+        
+        # Invert the percentage since offset 0 = bottom (100%) and max offset = top (0%)
+        percentage = int(((max_scroll - self.log_scroll_offset) / max_scroll) * 100)
+        return max(0, min(100, percentage))
+    
     def refresh_files(self, pane=None):
         """Refresh the file list for specified pane or both panes"""
         panes_to_refresh = [pane] if pane else [self.left_pane, self.right_pane]
@@ -289,7 +304,7 @@ class FileManager:
         # Separator with bounds check
         if 0 <= left_pane_width < width:
             try:
-                self.stdscr.addstr(0, left_pane_width, "│", get_header_color())
+                self.stdscr.addstr(0, left_pane_width, "│", get_boundary_color())
             except curses.error:
                 pass
         
@@ -429,7 +444,7 @@ class FileManager:
         # Draw vertical separator for file panes
         for y in range(1, file_pane_bottom):
             try:
-                self.stdscr.addstr(y, left_pane_width, "│", get_header_color())
+                self.stdscr.addstr(y, left_pane_width, "│", get_boundary_color())
             except curses.error:
                 pass
         
@@ -458,7 +473,7 @@ class FileManager:
         # Draw horizontal separator and file list footers
         try:
             separator_line = "─" * width
-            self.stdscr.addstr(footer_y, 0, separator_line, get_header_color())
+            self.stdscr.addstr(footer_y, 0, separator_line, get_boundary_color())
             
             # Always draw file list footers
             self.draw_file_footers(footer_y, left_pane_width)
@@ -519,14 +534,24 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
-        # Left side: minimal status info
-        left_status = ""
+        # Left side: status info
+        status_parts = []
         if self.show_hidden:
-            left_status = "(showing hidden)"
+            status_parts.append("showing hidden")
+        
+        # Add log scroll percentage
+        log_percentage = self.get_log_scroll_percentage()
+        status_parts.append(f"log: {log_percentage}%")
+        
+        left_status = f"({', '.join(status_parts)})" if status_parts else ""
         
         # Controls - progressively abbreviate to fit
-        if width > 120:
-            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+        if width > 150:
+            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+        elif width > 130:
+            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
+        elif width > 110:
+            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 100:
             controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 80:
@@ -542,10 +567,13 @@ class FileManager:
             
             # Always draw controls - they're the most important part
             if left_status:
-                # Draw left status
-                self.stdscr.addstr(status_y, 2, left_status, get_status_color())
+                # Ensure left status fits and draw with proper color
+                max_left_width = width - 20  # Reserve space for controls
+                truncated_left_status = left_status[:max_left_width] if len(left_status) > max_left_width else left_status
+                self.stdscr.addstr(status_y, 2, truncated_left_status, get_status_color())
+                
                 # Right-align controls
-                controls_x = max(len(left_status) + 6, width - len(controls) - 2)
+                controls_x = max(len(truncated_left_status) + 6, width - len(controls) - 2)
                 if controls_x + len(controls) < width - 2:
                     self.stdscr.addstr(status_y, controls_x, controls, get_status_color())
                 else:
@@ -558,7 +586,10 @@ class FileManager:
                 self.stdscr.addstr(status_y, controls_x, controls, get_status_color())
         except curses.error:
             # Fallback: just show file info if screen too narrow
-            self.stdscr.addstr(status_y, 2, left_status)
+            try:
+                self.stdscr.addstr(status_y, 2, left_status, get_status_color())
+            except curses.error:
+                pass  # If we can't draw anything, just skip
         
     def handle_enter(self):
         """Handle Enter key - navigate or open file"""
@@ -639,6 +670,234 @@ class FileManager:
         file_percent = 100 - log_percent
         print(f"Layout: {file_percent}% files | {log_percent}% log")
         
+    def show_color_palette(self):
+        """Show all available colors supported by curses"""
+        height, width = self.stdscr.getmaxyx()
+        
+        # Clear screen and show color palette
+        self.stdscr.clear()
+        
+        # Draw header
+        palette_title = "=== CURSES COLOR PALETTE ==="
+        self.stdscr.addstr(1, (width - len(palette_title)) // 2, palette_title, get_header_color(True))
+        
+        # Get terminal capabilities
+        max_colors = curses.COLORS if hasattr(curses, 'COLORS') else 8
+        max_pairs = curses.COLOR_PAIRS if hasattr(curses, 'COLOR_PAIRS') else 64
+        
+        # Get color capabilities
+        color_info = get_color_capabilities()
+        
+        try:
+            self.stdscr.addstr(2, 4, f"Terminal: {max_colors} colors, {max_pairs} pairs, RGB: {'YES' if color_info['can_change_color'] else 'NO'}", curses.A_DIM)
+        except curses.error:
+            pass
+        
+        start_y = 4
+        current_y = start_y
+        
+        # Show basic color constants
+        try:
+            self.stdscr.addstr(current_y, 4, "Basic Colors (0-7):", curses.A_BOLD)
+            current_y += 1
+        except curses.error:
+            pass
+        
+        basic_colors = [
+            ("BLACK", curses.COLOR_BLACK),
+            ("RED", curses.COLOR_RED),
+            ("GREEN", curses.COLOR_GREEN),
+            ("YELLOW", curses.COLOR_YELLOW),
+            ("BLUE", curses.COLOR_BLUE),
+            ("MAGENTA", curses.COLOR_MAGENTA),
+            ("CYAN", curses.COLOR_CYAN),
+            ("WHITE", curses.COLOR_WHITE),
+        ]
+        
+        for name, color_num in basic_colors:
+            if current_y >= height - 8:  # Leave space for instructions
+                break
+            try:
+                # Create a temporary color pair for demonstration
+                temp_pair = 50 + color_num  # Use high numbers to avoid conflicts
+                if temp_pair < max_pairs:
+                    curses.init_pair(temp_pair, color_num, curses.COLOR_BLACK)
+                    color_attr = curses.color_pair(temp_pair)
+                    
+                    self.stdscr.addstr(current_y, 6, f"{name:<10} ({color_num})", curses.A_NORMAL)
+                    self.stdscr.addstr(current_y, 20, "  SAMPLE  ", color_attr)
+                    
+                    # Also show with white background
+                    temp_pair_bg = 58 + color_num
+                    if temp_pair_bg < max_pairs:
+                        curses.init_pair(temp_pair_bg, color_num, curses.COLOR_WHITE)
+                        color_attr_bg = curses.color_pair(temp_pair_bg)
+                        self.stdscr.addstr(current_y, 32, "  ON WHITE  ", color_attr_bg)
+                current_y += 1
+            except curses.error:
+                current_y += 1
+                continue
+        
+        current_y += 1
+        
+        # Show extended colors if available
+        if max_colors > 8:
+            try:
+                self.stdscr.addstr(current_y, 4, f"Extended Colors (8-{min(max_colors-1, 15)}):", curses.A_BOLD)
+                current_y += 1
+            except curses.error:
+                pass
+            
+            # Show colors 8-15 if available
+            for color_num in range(8, min(max_colors, 16)):
+                if current_y >= height - 6:
+                    break
+                try:
+                    temp_pair = 70 + color_num
+                    if temp_pair < max_pairs:
+                        curses.init_pair(temp_pair, color_num, curses.COLOR_BLACK)
+                        color_attr = curses.color_pair(temp_pair)
+                        
+                        self.stdscr.addstr(current_y, 6, f"Color {color_num:<3}", curses.A_NORMAL)
+                        self.stdscr.addstr(current_y, 16, "  SAMPLE  ", color_attr)
+                    current_y += 1
+                except curses.error:
+                    current_y += 1
+                    continue
+        
+        current_y += 1
+        
+        # Show text attributes
+        try:
+            self.stdscr.addstr(current_y, 4, "Text Attributes:", curses.A_BOLD)
+            current_y += 1
+        except curses.error:
+            pass
+        
+        attributes = [
+            ("A_NORMAL", curses.A_NORMAL),
+            ("A_STANDOUT", curses.A_STANDOUT),
+            ("A_UNDERLINE", curses.A_UNDERLINE),
+            ("A_REVERSE", curses.A_REVERSE),
+            ("A_BLINK", curses.A_BLINK),
+            ("A_DIM", curses.A_DIM),
+            ("A_BOLD", curses.A_BOLD),
+        ]
+        
+        for name, attr in attributes:
+            if current_y >= height - 3:
+                break
+            try:
+                self.stdscr.addstr(current_y, 6, f"{name:<12}", curses.A_NORMAL)
+                self.stdscr.addstr(current_y, 20, "SAMPLE TEXT", attr)
+                current_y += 1
+            except curses.error:
+                current_y += 1
+                continue
+        
+        # Show 256-color info if available
+        if max_colors >= 256:
+            try:
+                self.stdscr.addstr(current_y, 4, f"Terminal supports 256 colors! (showing first 16)", curses.A_DIM)
+                current_y += 1
+            except curses.error:
+                pass
+        
+        # Instructions at bottom
+        try:
+            self.stdscr.addstr(height - 2, 4, "Press 'n' for next page, 'p' for previous, any other key to return", curses.A_BOLD)
+        except curses.error:
+            pass
+            
+        self.stdscr.refresh()
+        
+        # Wait for key press
+        key = self.stdscr.getch()
+        
+        # Handle pagination for 256-color terminals
+        if key == ord('n') or key == ord('N'):
+            self.show_extended_colors()
+        elif key == ord('p') or key == ord('P'):
+            # Already on first page, just return
+            pass
+    
+    def show_extended_colors(self):
+        """Show extended color palette for 256-color terminals"""
+        height, width = self.stdscr.getmaxyx()
+        max_colors = curses.COLORS if hasattr(curses, 'COLORS') else 8
+        max_pairs = curses.COLOR_PAIRS if hasattr(curses, 'COLOR_PAIRS') else 64
+        
+        if max_colors < 256:
+            return  # Not supported
+        
+        self.stdscr.clear()
+        
+        # Draw header
+        palette_title = "=== EXTENDED COLORS (16-255) ==="
+        self.stdscr.addstr(1, (width - len(palette_title)) // 2, palette_title, get_header_color(True))
+        
+        try:
+            self.stdscr.addstr(2, 4, "256-color palette (colors 16-255)", curses.A_DIM)
+        except curses.error:
+            pass
+        
+        start_y = 4
+        current_y = start_y
+        colors_per_row = min(16, (width - 8) // 5)  # Adjust based on screen width
+        
+        # Show colors 16-255 in a grid
+        for color_start in range(16, min(256, max_colors), colors_per_row * 8):  # Show in chunks
+            if current_y >= height - 4:
+                break
+                
+            # Show 8 rows of colors at a time
+            for row in range(8):
+                if current_y >= height - 4:
+                    break
+                    
+                try:
+                    row_text = f"{color_start + row * colors_per_row:3d}: "
+                    self.stdscr.addstr(current_y, 4, row_text, curses.A_DIM)
+                    
+                    x_offset = 9
+                    for col in range(colors_per_row):
+                        color_num = color_start + row * colors_per_row + col
+                        if color_num >= min(256, max_colors):
+                            break
+                            
+                        try:
+                            # Use a high color pair number to avoid conflicts
+                            temp_pair = 100 + (color_num % (max_pairs - 100))
+                            curses.init_pair(temp_pair, curses.COLOR_WHITE, color_num)
+                            color_attr = curses.color_pair(temp_pair)
+                            
+                            self.stdscr.addstr(current_y, x_offset, f"{color_num:3d}", color_attr)
+                            x_offset += 4
+                        except curses.error:
+                            x_offset += 4
+                            continue
+                    
+                    current_y += 1
+                except curses.error:
+                    current_y += 1
+                    continue
+            
+            current_y += 1  # Extra space between chunks
+        
+        # Instructions at bottom
+        try:
+            self.stdscr.addstr(height - 2, 4, "Press 'p' for previous page, any other key to return to debug mode", curses.A_BOLD)
+        except curses.error:
+            pass
+            
+        self.stdscr.refresh()
+        
+        # Wait for key press
+        key = self.stdscr.getch()
+        
+        if key == ord('p') or key == ord('P'):
+            self.show_color_palette()  # Go back to main palette
+
     def debug_mode(self):
         """Interactive debug mode to detect modifier key combinations"""
         height, width = self.stdscr.getmaxyx()
@@ -658,6 +917,9 @@ class FileManager:
             "• Option+Space (works on macOS)",
             "• Option+Left/Right (horizontal pane resizing)",
             "• Ctrl+U/Ctrl+D (vertical pane resizing)",
+            "• Shift+Up/Down (log pane scrolling - may not work)",
+            "• Ctrl+K/Ctrl+L (alternative log scrolling)",
+            "• Page Up/Down (also scrolls log)",
             "• Ctrl+Space   (alternative)",
             "• Ctrl+S       (alternative)",
             "• Command+Space (probably won't work)",
@@ -665,6 +927,7 @@ class FileManager:
             "Key codes will appear below as you press them.",
             "If a combination works for upward selection, it will be noted.",
             "",
+            "Press 'c' to show color palette",
             "Press 'q' to exit debug mode and return to file manager"
         ]
         
@@ -688,6 +951,23 @@ class FileManager:
             
             if debug_key == ord('q') or debug_key == ord('Q'):
                 break
+            elif debug_key == ord('c') or debug_key == ord('C'):
+                self.show_color_palette()
+                # Redraw debug mode after returning from color palette
+                self.stdscr.clear()
+                self.stdscr.addstr(2, (width - len(debug_title)) // 2, debug_title, get_header_color(True))
+                for i, line in enumerate(instructions):
+                    try:
+                        self.stdscr.addstr(4 + i, 4, line)
+                    except curses.error:
+                        pass
+                self.stdscr.addstr(results_y, 4, "Key detection results:", curses.A_BOLD)
+                # Redraw previous results
+                for i in range(min(result_line, 7)):
+                    # We can't easily restore previous results, so just show a message
+                    pass
+                self.stdscr.refresh()
+                continue
             
             # Display the key code
             y_pos = results_start_y + result_line
@@ -721,6 +1001,24 @@ class FileManager:
                     else:
                         key_info = f"Option key sequence: 194 followed by {next_key} (unknown)"
                         color = curses.A_NORMAL
+                elif debug_key == 337:
+                    key_info = f"Shift+Up detected! (key code: {debug_key}) ✓ WORKS FOR LOG SCROLL UP"
+                    color = get_file_color(False, False, True, True) | curses.A_BOLD
+                elif debug_key == 336:
+                    key_info = f"Shift+Down detected! (key code: {debug_key}) ✓ WORKS FOR LOG SCROLL DOWN"
+                    color = get_file_color(False, False, True, True) | curses.A_BOLD
+                elif debug_key == 393:
+                    key_info = f"Alt Shift+Up detected! (key code: {debug_key}) ✓ WORKS FOR LOG SCROLL UP"
+                    color = get_file_color(False, False, True, True) | curses.A_BOLD
+                elif debug_key == 402:
+                    key_info = f"Alt Shift+Down detected! (key code: {debug_key}) ✓ WORKS FOR LOG SCROLL DOWN"
+                    color = get_file_color(False, False, True, True) | curses.A_BOLD
+                elif debug_key == 11:
+                    key_info = f"Ctrl+K detected! (key code: {debug_key}) ✓ WORKS FOR LOG SCROLL UP"
+                    color = get_file_color(False, False, True, True) | curses.A_BOLD
+                elif debug_key == 12:
+                    key_info = f"Ctrl+L detected! (key code: {debug_key}) ✓ WORKS FOR LOG SCROLL DOWN"
+                    color = get_file_color(False, False, True, True) | curses.A_BOLD
                 elif debug_key == 1:
                     key_info = f"Ctrl+A detected (key code: {debug_key})"
                     color = curses.A_NORMAL
@@ -774,6 +1072,14 @@ class FileManager:
                 self.adjust_log_boundary('up')
             elif key == KEY_CTRL_D:  # Ctrl+D - make log pane larger
                 self.adjust_log_boundary('down')
+            elif key == 11:  # Ctrl+K - scroll log up
+                if self.log_scroll_offset < len(self.log_messages) - 1:
+                    self.log_scroll_offset += 1
+                    self.needs_full_redraw = True
+            elif key == 12:  # Ctrl+L - scroll log down
+                if self.log_scroll_offset > 0:
+                    self.log_scroll_offset -= 1
+                    self.needs_full_redraw = True
             elif key == curses.KEY_RESIZE:  # Terminal window resized
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.stdscr.clear()
@@ -807,12 +1113,28 @@ class FileManager:
             elif key == curses.KEY_END:
                 current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
                 self.needs_full_redraw = True
-            elif key == curses.KEY_PPAGE:  # Page Up
-                current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
-                self.needs_full_redraw = True
-            elif key == curses.KEY_NPAGE:  # Page Down
-                current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
-                self.needs_full_redraw = True
+            elif key == curses.KEY_PPAGE:  # Page Up - scroll log up when Ctrl is held, otherwise file navigation
+                # Check if this is Ctrl+Page Up for log scrolling
+                if self.log_scroll_offset < len(self.log_messages) - 1:
+                    # Try log scrolling first, fall back to file navigation
+                    self.log_scroll_offset += 5  # Scroll multiple lines
+                    self.log_scroll_offset = min(self.log_scroll_offset, len(self.log_messages) - 1)
+                    self.needs_full_redraw = True
+                else:
+                    # Regular file navigation
+                    current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
+                    self.needs_full_redraw = True
+            elif key == curses.KEY_NPAGE:  # Page Down - scroll log down when Ctrl is held, otherwise file navigation  
+                # Check if this is Ctrl+Page Down for log scrolling
+                if self.log_scroll_offset > 0:
+                    # Try log scrolling first, fall back to file navigation
+                    self.log_scroll_offset -= 5  # Scroll multiple lines
+                    self.log_scroll_offset = max(0, self.log_scroll_offset)
+                    self.needs_full_redraw = True
+                else:
+                    # Regular file navigation
+                    current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
+                    self.needs_full_redraw = True
             elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
@@ -849,9 +1171,27 @@ class FileManager:
             elif key == ord('l'):  # 'l' key - scroll log up
                 if self.log_scroll_offset < len(self.log_messages) - 1:
                     self.log_scroll_offset += 1
+                    self.needs_full_redraw = True
             elif key == ord('L'):  # 'L' key - scroll log down  
                 if self.log_scroll_offset > 0:
                     self.log_scroll_offset -= 1
+                    self.needs_full_redraw = True
+            elif key == 337:  # Shift+Up in many terminals
+                if self.log_scroll_offset < len(self.log_messages) - 1:
+                    self.log_scroll_offset += 1
+                    self.needs_full_redraw = True
+            elif key == 336:  # Shift+Down in many terminals  
+                if self.log_scroll_offset > 0:
+                    self.log_scroll_offset -= 1
+                    self.needs_full_redraw = True
+            elif key == 393:  # Alternative Shift+Up code
+                if self.log_scroll_offset < len(self.log_messages) - 1:
+                    self.log_scroll_offset += 1
+                    self.needs_full_redraw = True
+            elif key == 402:  # Alternative Shift+Down code
+                if self.log_scroll_offset > 0:
+                    self.log_scroll_offset -= 1
+                    self.needs_full_redraw = True
             elif key == ord(' '):  # Space key - toggle selection and move down
                 self.toggle_selection()
                 self.needs_full_redraw = True
