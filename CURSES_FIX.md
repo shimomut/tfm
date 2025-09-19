@@ -2,7 +2,7 @@
 
 ## Problem
 
-When entering search mode (pressing `/`), TFM was crashing with the error:
+When entering search mode (pressing `F`), TFM was crashing with the error:
 ```
 _curses.error: addwstr() returned ERR
 ```

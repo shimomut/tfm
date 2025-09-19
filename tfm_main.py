@@ -628,17 +628,17 @@ class FileManager:
         
         # Controls - progressively abbreviate to fit
         if width > 160:
-            controls = "Space/Opt+Space:select  /:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
         elif width > 140:
-            controls = "Space/Opt+Space:select  /:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 120:
-            controls = "Space/Opt+Space:select  /:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 100:
-            controls = "Space/Opt+Space:select  /:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 80:
-            controls = "Space/Opt+Space:select  /:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         else:
-            controls = "Space:select  /:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
+            controls = "Space:select  F:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
         
         # Draw status line with background color
         # Fill entire status line with background color
@@ -1145,7 +1145,7 @@ class FileManager:
             "• Ctrl+Space   (alternative)",
             "• Ctrl+S       (alternative)",
             "• Command+Space (probably won't work)",
-            "• / (forward slash - enter search mode)",
+            "• F (F key - enter search mode)",
             "",
             "Key codes will appear below as you press them.",
             "If a combination works for upward selection, it will be noted.",
@@ -1463,7 +1463,7 @@ class FileManager:
                 print(f"Current time: {datetime.now()}")
             elif key == ord('d'):  # 'd' key - debug mode to detect modifier keys
                 self.debug_mode()
-            elif key == ord('/'):  # '/' key - enter search mode
+            elif key == ord('f') or key == ord('F'):  # 'F' key - enter search mode
                 self.enter_search_mode()
         
         # Restore stdout/stderr before exiting

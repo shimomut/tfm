@@ -63,4 +63,4 @@ MAX_LOG_HEIGHT_RATIO = 0.9   # Maximum log pane height (60%)
 LOG_HEIGHT_ADJUST_STEP = 0.05  # 5% adjustment per key press
 
 # Search mode constants
-SEARCH_KEY = ord('/')  # Key to enter search mode
+SEARCH_KEY = ord('f')  # Key to enter search mode (F key)
