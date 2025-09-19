@@ -66,11 +66,12 @@ class FileManager:
         self.search_matches = []
         self.search_match_index = 0
         
-        # Confirmation mode state
-        self.confirmation_mode = False
-        self.confirmation_message = ""
-        self.confirmation_callback = None
-        self.confirmation_selected = 0  # 0=Yes, 1=No, 2=Cancel
+        # Multi-choice dialog state
+        self.dialog_mode = False
+        self.dialog_message = ""
+        self.dialog_choices = []  # List of choice dictionaries: [{"text": "Yes", "key": "y", "value": True}, ...]
+        self.dialog_callback = None
+        self.dialog_selected = 0  # Index of currently selected choice
         self.should_quit = False  # Flag to control main loop exit
         
         # Log pane setup
@@ -848,35 +849,45 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
-        # If in confirmation mode, show confirmation dialog
-        if self.confirmation_mode:
+        # If in dialog mode, show multi-choice dialog
+        if self.dialog_mode:
             # Fill entire status line with background color
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Show confirmation message
-            message = f"{self.confirmation_message} "
+            # Show dialog message
+            message = f"{self.dialog_message} "
             self.safe_addstr(status_y, 2, message, get_status_color())
             
-            # Show Yes/No/Cancel buttons
-            options = ["Yes", "No", "Cancel"]
+            # Show choice buttons
             button_start_x = len(message) + 4
             
-            for i, option in enumerate(options):
-                if i == self.confirmation_selected:
+            for i, choice in enumerate(self.dialog_choices):
+                choice_text = choice["text"]
+                if i == self.dialog_selected:
                     # Highlight selected option with bold and standout
                     button_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
-                    button_text = f"[{option}]"
+                    button_text = f"[{choice_text}]"
                 else:
                     button_color = get_status_color()
-                    button_text = f" {option} "
+                    button_text = f" {choice_text} "
                 
                 if button_start_x + len(button_text) < width - 2:
                     self.safe_addstr(status_y, button_start_x, button_text, button_color)
                     button_start_x += len(button_text) + 1
             
-            # Show help text on the right if there's space
-            help_text = "←→:select Enter:confirm Y/N/C:quick ESC:cancel"
+            # Generate help text based on available quick keys
+            quick_keys = []
+            for choice in self.dialog_choices:
+                if "key" in choice and choice["key"]:
+                    quick_keys.append(choice["key"].upper())
+            
+            help_parts = ["←→:select", "Enter:confirm"]
+            if quick_keys:
+                help_parts.append(f"{'/'.join(quick_keys)}:quick")
+            help_parts.append("ESC:cancel")
+            help_text = " ".join(help_parts)
+            
             if button_start_x + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
                 if help_x > button_start_x + 4:  # Ensure no overlap
@@ -1124,64 +1135,186 @@ class FileManager:
         self.search_match_index = 0
         self.needs_full_redraw = True
         
+    def show_dialog(self, message, choices, callback):
+        """Show multi-choice dialog
+        
+        Args:
+            message: The message to display
+            choices: List of choice dictionaries with format:
+                     [{"text": "Yes", "key": "y", "value": True}, 
+                      {"text": "No", "key": "n", "value": False},
+                      {"text": "Cancel", "key": "c", "value": None}]
+            callback: Function to call with the selected choice's value
+        """
+        self.dialog_mode = True
+        self.dialog_message = message
+        self.dialog_choices = choices
+        self.dialog_callback = callback
+        self.dialog_selected = 0  # Default to first choice
+        self.needs_full_redraw = True
+    
     def show_confirmation(self, message, callback):
-        """Show confirmation dialog with Yes/No/Cancel options"""
-        self.confirmation_mode = True
-        self.confirmation_message = message
-        self.confirmation_callback = callback
-        self.confirmation_selected = 0  # Default to "Yes"
-        self.needs_full_redraw = True
+        """Show confirmation dialog with Yes/No/Cancel options (backward compatibility)"""
+        choices = [
+            {"text": "Yes", "key": "y", "value": True},
+            {"text": "No", "key": "n", "value": False},
+            {"text": "Cancel", "key": "c", "value": None}
+        ]
+        self.show_dialog(message, choices, callback)
         
+    def exit_dialog_mode(self):
+        """Exit dialog mode"""
+        self.dialog_mode = False
+        self.dialog_message = ""
+        self.dialog_choices = []
+        self.dialog_callback = None
+        self.dialog_selected = 0
+        self.needs_full_redraw = True
+    
     def exit_confirmation_mode(self):
-        """Exit confirmation mode"""
-        self.confirmation_mode = False
-        self.confirmation_message = ""
-        self.confirmation_callback = None
-        self.confirmation_selected = 0
-        self.needs_full_redraw = True
+        """Exit confirmation mode (backward compatibility)"""
+        self.exit_dialog_mode()
         
-    def handle_confirmation_input(self, key):
-        """Handle input while in confirmation mode"""
+    def handle_dialog_input(self, key):
+        """Handle input while in dialog mode"""
         if key == 27:  # ESC - cancel
-            self.exit_confirmation_mode()
+            self.exit_dialog_mode()
             return True
         elif key == curses.KEY_LEFT or key == ord('h'):
             # Move selection left
-            self.confirmation_selected = (self.confirmation_selected - 1) % 3
-            self.needs_full_redraw = True
+            if self.dialog_choices:
+                self.dialog_selected = (self.dialog_selected - 1) % len(self.dialog_choices)
+                self.needs_full_redraw = True
             return True
         elif key == curses.KEY_RIGHT or key == ord('l'):
             # Move selection right
-            self.confirmation_selected = (self.confirmation_selected + 1) % 3
-            self.needs_full_redraw = True
+            if self.dialog_choices:
+                self.dialog_selected = (self.dialog_selected + 1) % len(self.dialog_choices)
+                self.needs_full_redraw = True
             return True
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
             # Execute selected action
-            if self.confirmation_selected == 0:  # Yes
-                if self.confirmation_callback:
-                    self.confirmation_callback(True)
-            elif self.confirmation_selected == 1:  # No
-                if self.confirmation_callback:
-                    self.confirmation_callback(False)
-            # Cancel (2) or any other case just exits without calling callback
-            self.exit_confirmation_mode()
+            if self.dialog_choices and 0 <= self.dialog_selected < len(self.dialog_choices):
+                selected_choice = self.dialog_choices[self.dialog_selected]
+                if self.dialog_callback:
+                    self.dialog_callback(selected_choice["value"])
+            self.exit_dialog_mode()
             return True
-        elif key == ord('y') or key == ord('Y'):
-            # Quick "Yes" with Y key
-            if self.confirmation_callback:
-                self.confirmation_callback(True)
-            self.exit_confirmation_mode()
-            return True
-        elif key == ord('n') or key == ord('N'):
-            # Quick "No" with N key
-            if self.confirmation_callback:
-                self.confirmation_callback(False)
-            self.exit_confirmation_mode()
-            return True
-        elif key == ord('c') or key == ord('C'):
-            # Quick "Cancel" with C key
-            self.exit_confirmation_mode()
-            return True
+        else:
+            # Check for quick key matches
+            key_char = chr(key).lower() if 32 <= key <= 126 else None
+            if key_char:
+                for choice in self.dialog_choices:
+                    if "key" in choice and choice["key"] and choice["key"].lower() == key_char:
+                        # Found matching quick key
+                        if self.dialog_callback:
+                            self.dialog_callback(choice["value"])
+                        self.exit_dialog_mode()
+                        return True
+    
+    def handle_confirmation_input(self, key):
+        """Handle input while in confirmation mode (backward compatibility)"""
+        return self.handle_dialog_input(key)
+    
+    def show_file_operations_menu(self):
+        """Show file operations menu using the multi-choice dialog"""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            print("No files in current directory")
+            return
+            
+        selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        # Don't show menu for parent directory
+        if selected_file == current_pane['path'].parent:
+            print("Cannot perform operations on parent directory")
+            return
+            
+        filename = selected_file.name
+        
+        # Define the menu choices
+        choices = [
+            {"text": "Copy", "key": "c", "value": "copy"},
+            {"text": "Move", "key": "m", "value": "move"},
+            {"text": "Delete", "key": "d", "value": "delete"},
+            {"text": "Rename", "key": "r", "value": "rename"},
+            {"text": "Properties", "key": "p", "value": "properties"},
+            {"text": "Cancel", "key": "x", "value": None}
+        ]
+        
+        def handle_operation_choice(operation):
+            if operation is None:
+                print("Operation cancelled")
+                return
+                
+            if operation == "copy":
+                print(f"Copy operation selected for: {filename}")
+                # TODO: Implement copy functionality
+            elif operation == "move":
+                print(f"Move operation selected for: {filename}")
+                # TODO: Implement move functionality
+            elif operation == "delete":
+                # Show a confirmation dialog for delete
+                def confirm_delete(confirmed):
+                    if confirmed:
+                        print(f"Would delete: {filename}")
+                        # TODO: Implement actual delete
+                    else:
+                        print("Delete cancelled")
+                
+                self.show_confirmation(f"Delete '{filename}'?", confirm_delete)
+            elif operation == "rename":
+                print(f"Rename operation selected for: {filename}")
+                # TODO: Implement rename functionality
+            elif operation == "properties":
+                print(f"Properties for: {filename}")
+                # TODO: Implement properties display
+        
+        # Show the dialog
+        message = f"Operations for '{filename}':"
+        self.show_dialog(message, choices, handle_operation_choice)
+    
+    def show_sort_menu(self):
+        """Show sort options menu using the multi-choice dialog"""
+        
+        # Define the sort choices
+        choices = [
+            {"text": "Name", "key": "n", "value": "name"},
+            {"text": "Size", "key": "s", "value": "size"},
+            {"text": "Date", "key": "d", "value": "date"},
+            {"text": "Type", "key": "t", "value": "type"},
+            {"text": "Reverse", "key": "r", "value": "reverse"},
+            {"text": "Cancel", "key": "c", "value": None}
+        ]
+        
+        def handle_sort_choice(sort_type):
+            if sort_type is None:
+                print("Sort cancelled")
+                return
+                
+            if sort_type == "name":
+                print("Sorting by name")
+                # TODO: Implement name sorting
+            elif sort_type == "size":
+                print("Sorting by size")
+                # TODO: Implement size sorting
+            elif sort_type == "date":
+                print("Sorting by date")
+                # TODO: Implement date sorting
+            elif sort_type == "type":
+                print("Sorting by type/extension")
+                # TODO: Implement type sorting
+            elif sort_type == "reverse":
+                print("Reversing current sort order")
+                # TODO: Implement reverse sorting
+            
+            # Refresh the file list after sorting
+            self.needs_full_redraw = True
+        
+        # Show the dialog
+        message = "Sort files by:"
+        self.show_dialog(message, choices, handle_sort_choice)
         
         # In confirmation mode, capture ALL keys to prevent them from affecting other parts of the UI
         # Return True for any unhandled keys to stop further processing
@@ -1672,10 +1805,10 @@ class FileManager:
                 if self.handle_search_input(key):
                     continue  # Search mode handled the key
             
-            # Handle confirmation mode input
-            if self.confirmation_mode:
-                if self.handle_confirmation_input(key):
-                    continue  # Confirmation mode handled the key
+            # Handle dialog mode input
+            if self.dialog_mode:
+                if self.handle_dialog_input(key):
+                    continue  # Dialog mode handled the key
             
             if key == ord('q') or key == ord('Q'):
                 def quit_callback(confirmed):
@@ -1851,6 +1984,10 @@ class FileManager:
                 self.sync_other_pane_directory()
             elif key == ord('f') or key == ord('F'):  # 'F' key - enter search mode
                 self.enter_search_mode()
+            elif key == ord('m') or key == ord('M'):  # 'M' key - show file operations menu
+                self.show_file_operations_menu()
+            elif key == ord('s') or key == ord('S'):  # 'S' key - show sort menu
+                self.show_sort_menu()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
                 self.left_pane_ratio = 0.5
                 self.needs_full_redraw = True
