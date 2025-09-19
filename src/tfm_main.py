@@ -159,18 +159,17 @@ class FileManager:
         return False
         
     def count_files_and_dirs(self, pane_data):
-        """Count directories and files in a pane, excluding parent directory entry"""
+        """Count directories and files in a pane"""
         if not pane_data['files']:
             return 0, 0
             
         files = pane_data['files']
-        # Skip the first entry if it's the parent directory (..)
-        start_idx = 1 if (len(files) > 0 and files[0] == pane_data['path'].parent) else 0
+        # No need to skip parent directory since it's no longer added
         
         dir_count = 0
         file_count = 0
         
-        for file_path in files[start_idx:]:
+        for file_path in files:
             if file_path.is_dir():
                 dir_count += 1
             else:
@@ -223,15 +222,7 @@ class FileManager:
             
         selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Don't allow selection of parent directory (..)
-        if (current_pane['selected_index'] == 0 and 
-            len(current_pane['files']) > 0 and 
-            selected_file == current_pane['path'].parent):
-            # Still move to next item even if we can't select parent directory
-            if current_pane['selected_index'] < len(current_pane['files']) - 1:
-                current_pane['selected_index'] += 1
-            return
-            
+        # Parent directory (..) is no longer shown, so no need to check for it
         file_path_str = str(selected_file)
         
         if file_path_str in current_pane['selected_files']:
@@ -256,13 +247,7 @@ class FileManager:
             
         selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Don't allow selection of parent directory (..)
-        if (current_pane['selected_index'] == 0 and 
-            len(current_pane['files']) > 0 and 
-            selected_file == current_pane['path'].parent):
-            # Can't move up from first item, so just return
-            return
-            
+        # Parent directory (..) is no longer shown, so no need to check for it
         file_path_str = str(selected_file)
         
         if file_path_str in current_pane['selected_files']:
@@ -288,9 +273,8 @@ class FileManager:
         # Get all files (not directories) in current pane
         files_only = []
         for file_path in current_pane['files']:
-            # Skip parent directory entry and directories
-            if (file_path == current_pane['path'].parent or 
-                file_path.is_dir()):
+            # Skip directories (parent directory no longer shown)
+            if file_path.is_dir():
                 continue
             files_only.append(file_path)
         
@@ -321,12 +305,9 @@ class FileManager:
         if not current_pane['files']:
             return
         
-        # Get all items except parent directory entry
+        # Get all items (parent directory no longer shown)
         all_items = []
         for file_path in current_pane['files']:
-            # Skip parent directory entry
-            if file_path == current_pane['path'].parent:
-                continue
             all_items.append(file_path)
         
         if not all_items:
@@ -456,19 +437,13 @@ class FileManager:
             
         other_selected_file = other_pane['files'][other_pane['selected_index']]
         
-        # Handle parent directory (..) case
-        if other_selected_file == other_pane['path'].parent:
-            target_filename = ".."
-        else:
-            target_filename = other_selected_file.name
+        # Parent directory (..) is no longer shown
+        target_filename = other_selected_file.name
         
         # Find the same filename in current pane
         target_index = None
         for i, file_path in enumerate(current_pane['files']):
-            if file_path == current_pane['path'].parent and target_filename == "..":
-                target_index = i
-                break
-            elif file_path != current_pane['path'].parent and file_path.name == target_filename:
+            if file_path.name == target_filename:
                 target_index = i
                 break
         
@@ -505,19 +480,13 @@ class FileManager:
             
         current_selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Handle parent directory (..) case
-        if current_selected_file == current_pane['path'].parent:
-            target_filename = ".."
-        else:
-            target_filename = current_selected_file.name
+        # Parent directory (..) is no longer shown
+        target_filename = current_selected_file.name
         
         # Find the same filename in other pane
         target_index = None
         for i, file_path in enumerate(other_pane['files']):
-            if file_path == other_pane['path'].parent and target_filename == "..":
-                target_index = i
-                break
-            elif file_path != other_pane['path'].parent and file_path.name == target_filename:
+            if file_path.name == target_filename:
                 target_index = i
                 break
         
@@ -590,9 +559,9 @@ class FileManager:
                 # Sort files using the pane's sort mode
                 pane_data['files'] = self.sort_entries(entries, pane_data['sort_mode'], pane_data['sort_reverse'])
                 
-                # Add parent directory option if not at root
-                if pane_data['path'] != pane_data['path'].parent:
-                    pane_data['files'].insert(0, pane_data['path'].parent)
+                # Parent directory (..) suppressed per user request
+                # if pane_data['path'] != pane_data['path'].parent:
+                #     pane_data['files'].insert(0, pane_data['path'].parent)
                     
             except PermissionError:
                 pane_data['files'] = []
@@ -767,12 +736,9 @@ class FileManager:
             file_path = pane_data['files'][file_index]
             
             # Determine display name and attributes
-            if file_index == 0 and len(pane_data['files']) > 0 and file_path == pane_data['path'].parent:
-                display_name = ".."
-                is_dir = True
-            else:
-                display_name = file_path.name
-                is_dir = file_path.is_dir()
+            # Parent directory (..) is no longer shown
+            display_name = file_path.name
+            is_dir = file_path.is_dir()
                 
             # Get file info
             size_str, mtime_str = self.get_file_info(file_path)
@@ -1112,16 +1078,7 @@ class FileManager:
             
         selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Handle parent directory
-        if (current_pane['selected_index'] == 0 and 
-            len(current_pane['files']) > 0 and 
-            selected_file == current_pane['path'].parent):
-            current_pane['path'] = current_pane['path'].parent
-            current_pane['selected_index'] = 0
-            current_pane['scroll_offset'] = 0
-            current_pane['selected_files'].clear()  # Clear selections when changing directory
-            return
-            
+        # Parent directory (..) is no longer shown
         if selected_file.is_dir():
             try:
                 current_pane['path'] = selected_file
@@ -1195,11 +1152,7 @@ class FileManager:
             wrapped_patterns.append(p_lower)
         
         for i, file_path in enumerate(current_pane['files']):
-            # Skip parent directory entry
-            if (i == 0 and len(current_pane['files']) > 0 and 
-                file_path == current_pane['path'].parent):
-                continue
-                
+            # Parent directory (..) is no longer shown
             filename = file_path.name.lower()
             
             # Check if filename matches ALL patterns
@@ -1287,12 +1240,7 @@ class FileManager:
             
         selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Don't allow renaming parent directory (..)
-        if (current_pane['selected_index'] == 0 and 
-            len(current_pane['files']) > 0 and 
-            selected_file == current_pane['path'].parent):
-            print("Cannot rename parent directory (..)")
-            return
+        # Parent directory (..) is no longer shown, so no need to check for it
         
         # Enter rename mode
         self.rename_mode = True
@@ -1883,13 +1831,7 @@ class FileManager:
         
         selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Handle parent directory
-        if (current_pane['selected_index'] == 0 and 
-            len(current_pane['files']) > 0 and 
-            selected_file == current_pane['path'].parent):
-            print("Cannot view parent directory (..) as text")
-            return
-        
+        # Parent directory (..) is no longer shown
         if selected_file.is_dir():
             print("Cannot view directory as text file")
             return
@@ -1935,13 +1877,8 @@ class FileManager:
             
         selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Don't try to edit parent directory
-        if (current_pane['selected_index'] == 0 and 
-            len(current_pane['files']) > 0 and 
-            selected_file == current_pane['path'].parent):
-            print("Cannot edit parent directory (..)")
-            return
-            
+        # Parent directory (..) is no longer shown
+        
         # Allow editing directories (some editors can handle them)
         # but warn if it's a directory
         if selected_file.is_dir():
@@ -1995,13 +1932,7 @@ class FileManager:
             if current_pane['files']:
                 selected_file = current_pane['files'][current_pane['selected_index']]
                 
-                # Don't copy parent directory (..)
-                if (current_pane['selected_index'] == 0 and 
-                    len(current_pane['files']) > 0 and 
-                    selected_file == current_pane['path'].parent):
-                    print("Cannot copy parent directory (..)")
-                    return
-                
+                # Parent directory (..) is no longer shown
                 files_to_copy.append(selected_file)
         
         if not files_to_copy:
@@ -2130,13 +2061,7 @@ class FileManager:
             if current_pane['files']:
                 selected_file = current_pane['files'][current_pane['selected_index']]
                 
-                # Don't move parent directory (..)
-                if (current_pane['selected_index'] == 0 and 
-                    len(current_pane['files']) > 0 and 
-                    selected_file == current_pane['path'].parent):
-                    print("Cannot move parent directory (..)")
-                    return
-                
+                # Parent directory (..) is no longer shown
                 files_to_move.append(selected_file)
         
         if not files_to_move:
@@ -2287,13 +2212,7 @@ class FileManager:
             if current_pane['files']:
                 selected_file = current_pane['files'][current_pane['selected_index']]
                 
-                # Don't delete parent directory (..)
-                if (current_pane['selected_index'] == 0 and 
-                    len(current_pane['files']) > 0 and 
-                    selected_file == current_pane['path'].parent):
-                    print("Cannot delete parent directory (..)")
-                    return
-                
+                # Parent directory (..) is no longer shown
                 files_to_delete.append(selected_file)
         
         if not files_to_delete:
