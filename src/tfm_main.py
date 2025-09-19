@@ -52,7 +52,8 @@ class FileManager:
             'files': [],
             'selected_files': set(),  # Track multi-selected files
             'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
-            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False)
+            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False),
+            'filter_pattern': ""  # Filename filter pattern for this pane
         }
         self.right_pane = {
             'path': right_startup_path,
@@ -61,7 +62,8 @@ class FileManager:
             'files': [],
             'selected_files': set(),  # Track multi-selected files
             'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
-            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False)
+            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False),
+            'filter_pattern': ""  # Filename filter pattern for this pane
         }
         
         self.active_pane = 'left'  # 'left' or 'right'
@@ -77,6 +79,10 @@ class FileManager:
         self.search_pattern = ""
         self.search_matches = []
         self.search_match_index = 0
+        
+        # Filter mode state
+        self.filter_mode = False
+        self.filter_pattern = ""
         
         # Rename mode state
         self.rename_mode = False
@@ -202,10 +208,15 @@ class FileManager:
         left_selected = len(self.left_pane['selected_files'])
         left_sort = self.get_sort_description(self.left_pane)
         
+        # Add filter info to footer if active
+        left_filter_info = ""
+        if self.left_pane['filter_pattern']:
+            left_filter_info = f" | Filter: {self.left_pane['filter_pattern']}"
+        
         if left_selected > 0:
-            left_footer = f" {left_dirs} dirs, {left_files} files ({left_selected} selected) | Sort: {left_sort} "
+            left_footer = f" {left_dirs} dirs, {left_files} files ({left_selected} selected) | Sort: {left_sort}{left_filter_info} "
         else:
-            left_footer = f" {left_dirs} dirs, {left_files} files | Sort: {left_sort} "
+            left_footer = f" {left_dirs} dirs, {left_files} files | Sort: {left_sort}{left_filter_info} "
         
         try:
             # Left pane footer with active indicator
@@ -219,10 +230,15 @@ class FileManager:
         right_selected = len(self.right_pane['selected_files'])
         right_sort = self.get_sort_description(self.right_pane)
         
+        # Add filter info to footer if active
+        right_filter_info = ""
+        if self.right_pane['filter_pattern']:
+            right_filter_info = f" | Filter: {self.right_pane['filter_pattern']}"
+        
         if right_selected > 0:
-            right_footer = f" {right_dirs} dirs, {right_files} files ({right_selected} selected) | Sort: {right_sort} "
+            right_footer = f" {right_dirs} dirs, {right_files} files ({right_selected} selected) | Sort: {right_sort}{right_filter_info} "
         else:
-            right_footer = f" {right_dirs} dirs, {right_files} files | Sort: {right_sort} "
+            right_footer = f" {right_dirs} dirs, {right_files} files | Sort: {right_sort}{right_filter_info} "
         
         try:
             # Right pane footer with active indicator
@@ -573,6 +589,15 @@ class FileManager:
                 entries = list(pane_data['path'].iterdir())
                 if not self.show_hidden:
                     entries = [e for e in entries if not e.name.startswith('.')]
+                
+                # Apply filename filter if set for this pane (only to files, not directories)
+                if pane_data['filter_pattern']:
+                    filtered_entries = []
+                    for entry in entries:
+                        # Always include directories, only filter files
+                        if entry.is_dir() or fnmatch.fnmatch(entry.name, pane_data['filter_pattern']):
+                            filtered_entries.append(entry)
+                    entries = filtered_entries
                 
                 # Sort files using the pane's sort mode
                 pane_data['files'] = self.sort_entries(entries, pane_data['sort_mode'], pane_data['sort_reverse'])
@@ -1031,6 +1056,36 @@ class FileManager:
                         self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
             return
         
+        # If in filter mode, show filter interface
+        if self.filter_mode:
+            # Fill entire status line with background color
+            status_line = " " * (width - 1)
+            self.safe_addstr(status_y, 0, status_line, get_status_color())
+            
+            # Show filter prompt and pattern
+            filter_prompt = f"Filter: {self.filter_pattern}"
+            
+            # Add cursor indicator
+            filter_prompt += "_"
+            
+            # Draw filter prompt
+            self.safe_addstr(status_y, 2, filter_prompt, get_status_color())
+            
+            # Show help text on the right if there's space
+            help_text = "ESC:cancel Enter:apply (files only: *.py, test_*, *.[ch])"
+            if len(filter_prompt) + len(help_text) + 6 < width:
+                help_x = width - len(help_text) - 3
+                if help_x > len(filter_prompt) + 4:  # Ensure no overlap
+                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            else:
+                # Shorter help text for narrow terminals
+                short_help = "ESC:cancel Enter:apply"
+                if len(filter_prompt) + len(short_help) + 6 < width:
+                    help_x = width - len(short_help) - 3
+                    if help_x > len(filter_prompt) + 4:
+                        self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
+            return
+        
         # If in rename mode, show rename interface
         if self.rename_mode:
             # Fill entire status line with background color
@@ -1291,6 +1346,50 @@ class FileManager:
         self.search_pattern = ""
         self.search_matches = []
         self.search_match_index = 0
+        self.needs_full_redraw = True
+    
+    def enter_filter_mode(self):
+        """Enter filename filter mode"""
+        self.filter_mode = True
+        current_pane = self.get_current_pane()
+        self.filter_pattern = current_pane['filter_pattern']  # Start with current filter
+        self.needs_full_redraw = True
+        
+    def exit_filter_mode(self):
+        """Exit filter mode"""
+        self.filter_mode = False
+        self.filter_pattern = ""
+        self.needs_full_redraw = True
+    
+    def apply_filter(self):
+        """Apply the current filter pattern to the active pane"""
+        current_pane = self.get_current_pane()
+        current_pane['filter_pattern'] = self.filter_pattern
+        current_pane['selected_index'] = 0  # Reset selection to top
+        current_pane['scroll_offset'] = 0
+        self.refresh_files(current_pane)
+        
+        # Log the filter action
+        pane_name = "left" if self.active_pane == 'left' else "right"
+        if self.filter_pattern:
+            print(f"Applied filter '{self.filter_pattern}' to {pane_name} pane")
+        else:
+            print(f"Cleared filter from {pane_name} pane")
+        
+        self.needs_full_redraw = True
+    
+    def clear_filter(self):
+        """Clear the filter from the active pane"""
+        current_pane = self.get_current_pane()
+        current_pane['filter_pattern'] = ""
+        current_pane['selected_index'] = 0  # Reset selection to top
+        current_pane['scroll_offset'] = 0
+        self.refresh_files(current_pane)
+        
+        # Log the clear action
+        pane_name = "left" if self.active_pane == 'left' else "right"
+        print(f"Cleared filter from {pane_name} pane")
+        
         self.needs_full_redraw = True
     
     def enter_rename_mode(self):
@@ -2364,6 +2463,10 @@ class FileManager:
         # Search and sorting section
         help_lines.append("=== SEARCH & SORTING ===")
         help_lines.append("f / F            Search files")
+        help_lines.append(";                Filter files by filename pattern")
+        help_lines.append("                 (files only, directories always shown)")
+        help_lines.append("                 (fnmatch: *.py, test_*, *.[ch], etc.)")
+        help_lines.append(": (Shift+;)      Clear filter from current pane")
         help_lines.append("s / S            Sort menu")
         help_lines.append("1                Quick sort by name (toggle reverse if already active)")
         help_lines.append("2                Quick sort by size (toggle reverse if already active)")
@@ -2932,6 +3035,31 @@ class FileManager:
         # Only allow specific keys that make sense during search
         return True
     
+    def handle_filter_input(self, key):
+        """Handle input while in filter mode"""
+        if key == 27:  # ESC - exit filter mode without applying
+            self.exit_filter_mode()
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Enter - apply filter and exit filter mode
+            self.apply_filter()
+            self.exit_filter_mode()
+            return True
+        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
+            # Backspace - remove last character
+            if self.filter_pattern:
+                self.filter_pattern = self.filter_pattern[:-1]
+                self.needs_full_redraw = True
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            # Add character to filter pattern
+            self.filter_pattern += chr(key)
+            self.needs_full_redraw = True
+            return True
+        
+        # In filter mode, capture most other keys to prevent unintended actions
+        return True
+    
     def handle_rename_input(self, key):
         """Handle input while in rename mode"""
         if key == 27:  # ESC - cancel rename
@@ -3449,6 +3577,11 @@ class FileManager:
                 if self.handle_search_input(key):
                     continue  # Search mode handled the key
             
+            # Handle filter mode input
+            if self.filter_mode:
+                if self.handle_filter_input(key):
+                    continue  # Filter mode handled the key
+            
             # Handle rename mode input
             if self.rename_mode:
                 if self.handle_rename_input(key):
@@ -3481,7 +3614,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting search mode while help dialog is open
-            if self.dialog_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
+            if self.dialog_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
@@ -3658,6 +3791,10 @@ class FileManager:
                     self.sync_pane_directories()
             elif self.is_key_for_action(key, 'search'):  # Search key - enter search mode
                 self.enter_search_mode()
+            elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
+                self.enter_filter_mode()
+            elif self.is_key_for_action(key, 'clear_filter'):  # Clear filter key
+                self.clear_filter()
             elif self.is_key_for_action(key, 'sort_menu'):  # Sort menu
                 self.show_sort_menu()
             elif self.is_key_for_action(key, 'quick_sort_name'):  # Quick sort by name

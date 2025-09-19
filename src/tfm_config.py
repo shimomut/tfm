@@ -39,6 +39,8 @@ class DefaultConfig:
         'help': ['?', 'h'],
         'toggle_hidden': ['H'],
         'search': ['f', 'F'],
+        'filter': [';'],
+        'clear_filter': [':'],
         'sort_menu': ['s', 'S'],
         'file_details': ['i', 'I'],
         'quick_sort_name': ['1'],
