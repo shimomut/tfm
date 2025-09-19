@@ -15,16 +15,19 @@ The sub-shell mode feature allows users to temporarily suspend the TFM interface
 When entering sub-shell mode, the following environment variables are automatically set:
 
 ### Directory Variables
-- `LEFT_DIR`: Absolute path of the left file pane directory
-- `RIGHT_DIR`: Absolute path of the right file pane directory  
-- `THIS_DIR`: Absolute path of the currently focused pane directory
-- `OTHER_DIR`: Absolute path of the non-focused pane directory
+- `TFM_LEFT_DIR`: Absolute path of the left file pane directory
+- `TFM_RIGHT_DIR`: Absolute path of the right file pane directory  
+- `TFM_THIS_DIR`: Absolute path of the currently focused pane directory
+- `TFM_OTHER_DIR`: Absolute path of the non-focused pane directory
 
 ### Selected Files Variables
-- `LEFT_SELECTED`: Space-separated list of selected file names in the left pane
-- `RIGHT_SELECTED`: Space-separated list of selected file names in the right pane
-- `THIS_SELECTED`: Space-separated list of selected file names in the focused pane
-- `OTHER_SELECTED`: Space-separated list of selected file names in the non-focused pane
+- `TFM_LEFT_SELECTED`: Space-separated list of selected file names in the left pane
+- `TFM_RIGHT_SELECTED`: Space-separated list of selected file names in the right pane
+- `TFM_THIS_SELECTED`: Space-separated list of selected file names in the focused pane
+- `TFM_OTHER_SELECTED`: Space-separated list of selected file names in the non-focused pane
+
+### Control Variables
+- `TFM_ACTIVE`: Set to `"1"` when in TFM sub-shell mode (used for shell prompt customization)
 
 ## Usage Examples
 
@@ -32,32 +35,32 @@ When entering sub-shell mode, the following environment variables are automatica
 
 ```bash
 # List files in both panes
-ls -la "$LEFT_DIR" "$RIGHT_DIR"
+ls -la "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR"
 
 # Compare directory sizes
-du -sh "$LEFT_DIR" "$RIGHT_DIR"
+du -sh "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR"
 
 # Find files in both directories
-find "$LEFT_DIR" "$RIGHT_DIR" -name "*.py"
+find "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR" -name "*.py"
 ```
 
 ### Working with Selected Files
 
 ```bash
 # Copy selected files from current pane to other pane
-for file in $THIS_SELECTED; do
-    cp "$THIS_DIR/$file" "$OTHER_DIR/"
+for file in $TFM_THIS_SELECTED; do
+    cp "$TFM_THIS_DIR/$file" "$TFM_OTHER_DIR/"
 done
 
 # Show details of selected files
-for file in $THIS_SELECTED; do
-    ls -la "$THIS_DIR/$file"
+for file in $TFM_THIS_SELECTED; do
+    ls -la "$TFM_THIS_DIR/$file"
 done
 
 # Archive selected files
-if [ -n "$THIS_SELECTED" ]; then
-    cd "$THIS_DIR"
-    tar -czf selected_files.tar.gz $THIS_SELECTED
+if [ -n "$TFM_THIS_SELECTED" ]; then
+    cd "$TFM_THIS_DIR"
+    tar -czf selected_files.tar.gz $TFM_THIS_SELECTED
 fi
 ```
 
@@ -65,18 +68,18 @@ fi
 
 ```bash
 # Sync directories (copy newer files)
-rsync -av "$THIS_DIR/" "$OTHER_DIR/"
+rsync -av "$TFM_THIS_DIR/" "$TFM_OTHER_DIR/"
 
 # Compare selected files between panes
-for file in $THIS_SELECTED; do
-    if [ -f "$OTHER_DIR/$file" ]; then
-        diff "$THIS_DIR/$file" "$OTHER_DIR/$file"
+for file in $TFM_THIS_SELECTED; do
+    if [ -f "$TFM_OTHER_DIR/$file" ]; then
+        diff "$TFM_THIS_DIR/$file" "$TFM_OTHER_DIR/$file"
     fi
 done
 
 # Batch rename selected files
-for file in $THIS_SELECTED; do
-    mv "$THIS_DIR/$file" "$THIS_DIR/backup_$file"
+for file in $TFM_THIS_SELECTED; do
+    mv "$TFM_THIS_DIR/$file" "$TFM_THIS_DIR/backup_$file"
 done
 ```
 
@@ -86,7 +89,7 @@ The sub-shell mode uses the user's default shell (from `$SHELL` environment vari
 
 ## Working Directory
 
-When entering sub-shell mode, the working directory is automatically changed to the currently focused pane's directory (`$THIS_DIR`).
+When entering sub-shell mode, the working directory is automatically changed to the currently focused pane's directory (`$TFM_THIS_DIR`).
 
 ## Shell Prompt Customization
 

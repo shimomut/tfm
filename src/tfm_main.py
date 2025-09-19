@@ -3936,12 +3936,12 @@ class FileManager:
             current_pane = self.get_current_pane()
             other_pane = self.get_inactive_pane()
             
-            # Set environment variables
+            # Set environment variables with TFM_ prefix
             env = os.environ.copy()
-            env['LEFT_DIR'] = str(left_pane['path'])
-            env['RIGHT_DIR'] = str(right_pane['path'])
-            env['THIS_DIR'] = str(current_pane['path'])
-            env['OTHER_DIR'] = str(other_pane['path'])
+            env['TFM_LEFT_DIR'] = str(left_pane['path'])
+            env['TFM_RIGHT_DIR'] = str(right_pane['path'])
+            env['TFM_THIS_DIR'] = str(current_pane['path'])
+            env['TFM_OTHER_DIR'] = str(other_pane['path'])
             
             # Get selected files for each pane
             left_selected = [Path(f).name for f in left_pane['selected_files']]
@@ -3949,11 +3949,11 @@ class FileManager:
             current_selected = [Path(f).name for f in current_pane['selected_files']]
             other_selected = [Path(f).name for f in other_pane['selected_files']]
             
-            # Set selected files environment variables (space-separated)
-            env['LEFT_SELECTED'] = ' '.join(left_selected)
-            env['RIGHT_SELECTED'] = ' '.join(right_selected)
-            env['THIS_SELECTED'] = ' '.join(current_selected)
-            env['OTHER_SELECTED'] = ' '.join(other_selected)
+            # Set selected files environment variables (space-separated) with TFM_ prefix
+            env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
+            env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
+            env['TFM_THIS_SELECTED'] = ' '.join(current_selected)
+            env['TFM_OTHER_SELECTED'] = ' '.join(other_selected)
             
             # Set TFM indicator environment variable
             env['TFM_ACTIVE'] = '1'
@@ -3978,14 +3978,14 @@ class FileManager:
             # Print information about the sub-shell environment
             print("TFM Sub-shell Mode")
             print("=" * 50)
-            print(f"LEFT_DIR:      {env['LEFT_DIR']}")
-            print(f"RIGHT_DIR:     {env['RIGHT_DIR']}")
-            print(f"THIS_DIR:      {env['THIS_DIR']}")
-            print(f"OTHER_DIR:     {env['OTHER_DIR']}")
-            print(f"LEFT_SELECTED: {env['LEFT_SELECTED']}")
-            print(f"RIGHT_SELECTED: {env['RIGHT_SELECTED']}")
-            print(f"THIS_SELECTED: {env['THIS_SELECTED']}")
-            print(f"OTHER_SELECTED: {env['OTHER_SELECTED']}")
+            print(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
+            print(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
+            print(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
+            print(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
+            print(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
+            print(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
+            print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
+            print(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
             print("=" * 50)
             print("TFM_ACTIVE environment variable is set for shell customization")
             print("To show [TFM] in your prompt, add this to your shell config:")

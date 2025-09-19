@@ -19,14 +19,15 @@ def demo_subshell_commands():
     current_dir = Path.cwd()
     home_dir = Path.home()
     
-    env['LEFT_DIR'] = str(current_dir)
-    env['RIGHT_DIR'] = str(home_dir)
-    env['THIS_DIR'] = str(current_dir)
-    env['OTHER_DIR'] = str(home_dir)
-    env['LEFT_SELECTED'] = 'tfm.py README.md'
-    env['RIGHT_SELECTED'] = ''
-    env['THIS_SELECTED'] = 'tfm.py README.md'
-    env['OTHER_SELECTED'] = ''
+    env['TFM_LEFT_DIR'] = str(current_dir)
+    env['TFM_RIGHT_DIR'] = str(home_dir)
+    env['TFM_THIS_DIR'] = str(current_dir)
+    env['TFM_OTHER_DIR'] = str(home_dir)
+    env['TFM_LEFT_SELECTED'] = 'tfm.py README.md'
+    env['TFM_RIGHT_SELECTED'] = ''
+    env['TFM_THIS_SELECTED'] = 'tfm.py README.md'
+    env['TFM_OTHER_SELECTED'] = ''
+    env['TFM_ACTIVE'] = '1'
     
     # Add prompt modification like TFM does (both PS1 and PROMPT)
     current_ps1 = env.get('PS1', '')
@@ -43,31 +44,31 @@ def demo_subshell_commands():
         env['PROMPT'] = '[TFM] %n@%m:%~%# '
     
     print("Demo environment setup:")
-    print(f"  Active pane (THIS_DIR): {env['THIS_DIR']}")
-    print(f"  Other pane (OTHER_DIR): {env['OTHER_DIR']}")
-    print(f"  Selected files: {env['THIS_SELECTED']}")
+    print(f"  Active pane (TFM_THIS_DIR): {env['TFM_THIS_DIR']}")
+    print(f"  Other pane (TFM_OTHER_DIR): {env['TFM_OTHER_DIR']}")
+    print(f"  Selected files: {env['TFM_THIS_SELECTED']}")
     print()
     
     commands = [
         {
             'description': 'List files in both panes',
-            'command': 'echo "Left pane:" && ls -la "$LEFT_DIR" | head -5 && echo "Right pane:" && ls -la "$RIGHT_DIR" | head -5'
+            'command': 'echo "Left pane:" && ls -la "$TFM_LEFT_DIR" | head -5 && echo "Right pane:" && ls -la "$TFM_RIGHT_DIR" | head -5'
         },
         {
             'description': 'Show selected files info',
-            'command': 'for file in $THIS_SELECTED; do echo "Selected: $file"; ls -la "$THIS_DIR/$file" 2>/dev/null || echo "  (file not found)"; done'
+            'command': 'for file in $TFM_THIS_SELECTED; do echo "Selected: $file"; ls -la "$TFM_THIS_DIR/$file" 2>/dev/null || echo "  (file not found)"; done'
         },
         {
             'description': 'Compare directory sizes',
-            'command': 'echo "Directory sizes:" && du -sh "$LEFT_DIR" "$RIGHT_DIR" 2>/dev/null || echo "Could not get directory sizes"'
+            'command': 'echo "Directory sizes:" && du -sh "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR" 2>/dev/null || echo "Could not get directory sizes"'
         },
         {
             'description': 'Find Python files in both directories',
-            'command': 'echo "Python files:" && find "$LEFT_DIR" "$RIGHT_DIR" -name "*.py" -type f 2>/dev/null | head -5'
+            'command': 'echo "Python files:" && find "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR" -name "*.py" -type f 2>/dev/null | head -5'
         },
         {
             'description': 'Show environment variables',
-            'command': 'echo "TFM Environment Variables:" && env | grep -E "(LEFT_|RIGHT_|THIS_|OTHER_)" | sort'
+            'command': 'echo "TFM Environment Variables:" && env | grep "^TFM_" | sort'
         },
         {
             'description': 'Show shell prompts with TFM label',
