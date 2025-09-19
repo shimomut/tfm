@@ -1465,6 +1465,10 @@ class FileManager:
                 self.debug_mode()
             elif key == ord('f') or key == ord('F'):  # 'F' key - enter search mode
                 self.enter_search_mode()
+            elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
+                self.left_pane_ratio = 0.5
+                self.needs_full_redraw = True
+                print("Pane split reset to 50% | 50%")
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
