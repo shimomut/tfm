@@ -579,7 +579,7 @@ TFM is released under the MIT License. See LICENSE file for details.
 
 ## Changelog
 
-### v0.10 (Current)
+### v0.90 (Current)
 - ✅ Comprehensive file operations (copy, move, delete, rename)
 - ✅ Advanced batch rename with regex patterns and macros
 - ✅ Professional text editing with full cursor movement
@@ -597,12 +597,6 @@ TFM is released under the MIT License. See LICENSE file for details.
 - ✅ Comprehensive help system
 - ✅ Extensive test coverage
 - ✅ Modular project structure
-
-### Previous Versions
-- v0.9: Text viewer and editor integration
-- v0.8: Help dialog and improved navigation
-- v0.7: Color system and UI improvements
-- v0.6: Basic dual-pane functionality
 
 ---
 

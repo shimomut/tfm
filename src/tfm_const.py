@@ -4,7 +4,7 @@ TUI File Manager - Constants and Configuration
 """
 
 # Version information
-VERSION = "0.10"
+VERSION = "0.90"
 
 # Application metadata
 APP_NAME = "TUI File Manager"
