@@ -49,6 +49,7 @@ class Config:
         'rename_file': ['r', 'R'],
         'favorites': ['j', 'J'],
         'create_archive': ['p', 'P'],
+        'extract_archive': ['u', 'U'],
     }
     
     # File associations (for future use)

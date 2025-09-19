@@ -61,6 +61,7 @@ class DefaultConfig:
         'favorites': ['j', 'J'],
         'subshell': ['x', 'X'],
         'create_archive': ['p', 'P'],
+        'extract_archive': ['u', 'U'],
     }
     
     # File associations (for future use)

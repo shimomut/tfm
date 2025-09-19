@@ -2507,6 +2507,8 @@ class FileManager:
         help_lines.append("m / M            Move files to other pane / Create directory (no selection)")
         help_lines.append("k / K            Delete files")
         help_lines.append("r / R            Rename file (single file only)")
+        help_lines.append("p / P            Create archive from selected files")
+        help_lines.append("u / U            Extract archive to other pane")
         help_lines.append("")
         
         # Search and sorting section
@@ -2566,6 +2568,8 @@ class FileManager:
         help_lines.append("• Sub-shell mode (x) provides environment variables:")
         help_lines.append("  LEFT_DIR, RIGHT_DIR, THIS_DIR, OTHER_DIR")
         help_lines.append("  LEFT_SELECTED, RIGHT_SELECTED, THIS_SELECTED, OTHER_SELECTED")
+        help_lines.append("• Archive operations support ZIP, TAR.GZ, and TGZ formats")
+        help_lines.append("• Archive extraction creates directory with archive base name")
         
         self.show_info_dialog("TFM Help", help_lines)
     
@@ -3208,6 +3212,103 @@ class FileManager:
             for file_path in files_to_archive:
                 # Add file or directory to archive with its name as the archive name
                 tarf.add(file_path, arcname=file_path.name)
+    
+    def extract_selected_archive(self):
+        """Extract the selected archive file to the other pane"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        if not current_pane['files']:
+            print("No files in current directory")
+            return
+        
+        # Get the selected file
+        selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        if not selected_file.is_file():
+            print("Selected item is not a file")
+            return
+        
+        # Check if it's an archive file
+        archive_format = self.detect_archive_format(selected_file.name)
+        if not archive_format:
+            print(f"'{selected_file.name}' is not a supported archive format")
+            print("Supported formats: .zip, .tar.gz, .tgz")
+            return
+        
+        # Create extraction directory in the other pane
+        # Use the base name of the archive (without extension) as directory name
+        archive_basename = self.get_archive_basename(selected_file.name)
+        extract_dir = other_pane['path'] / archive_basename
+        
+        # Check if extraction directory already exists
+        if extract_dir.exists():
+            def overwrite_callback(confirmed):
+                if confirmed:
+                    try:
+                        # Remove existing directory
+                        shutil.rmtree(extract_dir)
+                        self.perform_extraction(selected_file, extract_dir, archive_format, other_pane)
+                    except Exception as e:
+                        print(f"Error removing existing directory: {e}")
+                else:
+                    print("Extraction cancelled")
+            
+            self.show_confirmation(f"Directory '{archive_basename}' already exists. Overwrite?", overwrite_callback)
+        else:
+            self.perform_extraction(selected_file, extract_dir, archive_format, other_pane)
+    
+    def get_archive_basename(self, filename):
+        """Get the base name of an archive file (without extension)"""
+        filename_lower = filename.lower()
+        
+        if filename_lower.endswith('.tar.gz'):
+            return filename[:-7]  # Remove .tar.gz
+        elif filename_lower.endswith('.tgz'):
+            return filename[:-4]  # Remove .tgz
+        elif filename_lower.endswith('.zip'):
+            return filename[:-4]  # Remove .zip
+        else:
+            # Fallback - remove last extension
+            return Path(filename).stem
+    
+    def perform_extraction(self, archive_file, extract_dir, archive_format, other_pane):
+        """Perform the actual extraction"""
+        try:
+            # Create extraction directory
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            
+            if archive_format == 'zip':
+                self.extract_zip_archive(archive_file, extract_dir)
+            elif archive_format in ['tar.gz', 'tgz']:
+                self.extract_tar_archive(archive_file, extract_dir)
+            
+            print(f"Archive extracted successfully to: {extract_dir}")
+            
+            # Refresh the other pane to show the extracted contents
+            self.refresh_files(other_pane)
+            self.needs_full_redraw = True
+            
+        except Exception as e:
+            print(f"Error extracting archive: {e}")
+            # Clean up partially created directory on error
+            try:
+                if extract_dir.exists():
+                    shutil.rmtree(extract_dir)
+            except:
+                pass
+    
+    def extract_zip_archive(self, archive_file, extract_dir):
+        """Extract a ZIP archive"""
+        with zipfile.ZipFile(archive_file, 'r') as zipf:
+            # Extract all files to the target directory
+            zipf.extractall(extract_dir)
+    
+    def extract_tar_archive(self, archive_file, extract_dir):
+        """Extract a TAR.GZ archive"""
+        with tarfile.open(archive_file, 'r:gz') as tarf:
+            # Extract all files to the target directory
+            tarf.extractall(extract_dir)
         
     def handle_isearch_input(self, key):
         """Handle input while in isearch mode"""
@@ -4525,6 +4626,8 @@ class FileManager:
                 self.delete_selected_files()
             elif self.is_key_for_action(key, 'create_archive'):  # Create archive
                 self.enter_create_archive_mode()
+            elif self.is_key_for_action(key, 'extract_archive'):  # Extract archive
+                self.extract_selected_archive()
             elif self.is_key_for_action(key, 'rename_file'):  # Rename file
                 self.enter_rename_mode()
             elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
