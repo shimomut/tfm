@@ -2407,6 +2407,11 @@ class FileManager:
                 if self.handle_info_dialog_input(key):
                     continue  # Info dialog mode handled the key
             
+            # Skip regular key processing if any dialog is open
+            # This prevents conflicts like starting search mode while help dialog is open
+            if self.dialog_mode or self.info_dialog_mode:
+                continue
+            
             if self.is_key_for_action(key, 'quit'):
                 def quit_callback(confirmed):
                     if confirmed:

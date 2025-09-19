@@ -45,7 +45,8 @@ The help dialog includes 8 organized sections:
 1. **Added method**: `show_help_dialog()` (61 lines of help content)
 2. **Added key handler**: Help key binding in main input loop
 3. **Simplified status bar**: Replaced complex key hints with help message
-4. **Integration**: Uses existing info dialog infrastructure
+4. **Added dialog exclusivity**: Prevents mode conflicts (help vs search)
+5. **Integration**: Uses existing info dialog infrastructure
 
 ### No other core files modified
 - Leverages existing configuration system
@@ -57,10 +58,11 @@ The help dialog includes 8 organized sections:
 ### Documentation
 1. **HELP_DIALOG_FEATURE.md** - Comprehensive feature documentation
 2. **STATUS_BAR_SIMPLIFICATION.md** - Status bar simplification details
-3. **HELP_DIALOG_IMPLEMENTATION_SUMMARY.md** - This summary
-4. **demo_help_dialog.py** - Feature demonstration script
-5. **demo_status_simplification.py** - Status bar improvement demo
-6. **verify_help_feature.py** - Implementation verification script
+3. **DIALOG_EXCLUSIVITY_FIX.md** - Dialog mode conflict prevention
+4. **HELP_DIALOG_IMPLEMENTATION_SUMMARY.md** - This summary
+5. **demo_help_dialog.py** - Feature demonstration script
+6. **demo_status_simplification.py** - Status bar improvement demo
+7. **verify_help_feature.py** - Implementation verification script
 
 ### Test Files
 1. **test_help_content.py** - Help content generation test
