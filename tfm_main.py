@@ -17,6 +17,7 @@ from collections import deque
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
+from tfm_config import get_config, get_startup_paths, is_key_bound_to
 
 class LogCapture:
     """Capture stdout/stderr and redirect to log pane"""
@@ -36,32 +37,38 @@ class FileManager:
     def __init__(self, stdscr):
         self.stdscr = stdscr
         
-        # Dual pane setup
+        # Load configuration
+        self.config = get_config()
+        
+        # Get startup paths from configuration
+        left_startup_path, right_startup_path = get_startup_paths()
+        
+        # Dual pane setup with configuration
         self.left_pane = {
-            'path': Path.cwd(),
+            'path': left_startup_path,
             'selected_index': 0,
             'scroll_offset': 0,
             'files': [],
             'selected_files': set(),  # Track multi-selected files
-            'sort_mode': 'name',  # Sorting mode: 'name', 'size', 'date'
-            'sort_reverse': False  # Reverse sort order
+            'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
+            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False)
         }
         self.right_pane = {
-            'path': Path.home(),  # Start right pane in home directory
+            'path': right_startup_path,
             'selected_index': 0,
             'scroll_offset': 0,
             'files': [],
             'selected_files': set(),  # Track multi-selected files
-            'sort_mode': 'name',  # Sorting mode: 'name', 'size', 'date'
-            'sort_reverse': False  # Reverse sort order
+            'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
+            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False)
         }
         
         self.active_pane = 'left'  # 'left' or 'right'
-        self.show_hidden = False
+        self.show_hidden = getattr(self.config, 'SHOW_HIDDEN_FILES', False)
         
         # Pane layout - track left pane width ratio (0.1 to 0.9)
-        self.left_pane_ratio = 0.5  # Start with 50/50 split
-        self.log_height_ratio = DEFAULT_LOG_HEIGHT_RATIO  # Track log pane height ratio
+        self.left_pane_ratio = getattr(self.config, 'DEFAULT_LEFT_PANE_RATIO', 0.5)
+        self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
         self.needs_full_redraw = True  # Flag to control when to redraw everything
         
         # Search mode state
@@ -85,7 +92,8 @@ class FileManager:
         self.info_dialog_scroll = 0
         
         # Log pane setup
-        self.log_messages = deque(maxlen=MAX_LOG_MESSAGES)
+        max_log_messages = getattr(self.config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
+        self.log_messages = deque(maxlen=max_log_messages)
         self.log_scroll_offset = 0
         
         # Redirect stdout and stderr
@@ -129,6 +137,19 @@ class FileManager:
         self.log_messages.append((timestamp, "SYSTEM", f"TFM {VERSION}"))
         self.log_messages.append((timestamp, "SYSTEM", f"GitHub: {GITHUB_URL}"))
         self.log_messages.append((timestamp, "SYSTEM", f"{APP_NAME} started successfully"))
+        
+        # Add configuration info
+        config_file = getattr(self.config, '__module__', 'built-in defaults')
+        if hasattr(self.config, '__file__'):
+            config_file = self.config.__file__
+        self.log_messages.append((timestamp, "CONFIG", f"Configuration loaded"))
+    
+    def is_key_for_action(self, key, action):
+        """Check if a key matches a configured action"""
+        if 32 <= key <= 126:  # Printable ASCII
+            key_char = chr(key)
+            return is_key_bound_to(key_char, action)
+        return False
         
     def count_files_and_dirs(self, pane_data):
         """Count directories and files in a pane, excluding parent directory entry"""
@@ -1415,9 +1436,14 @@ class FileManager:
         """Draw the info dialog overlay"""
         height, width = self.stdscr.getmaxyx()
         
-        # Calculate dialog dimensions (80% of screen, but at least 20x10)
-        dialog_width = max(20, int(width * 0.8))
-        dialog_height = max(10, int(height * 0.8))
+        # Calculate dialog dimensions using configuration
+        width_ratio = getattr(self.config, 'INFO_DIALOG_WIDTH_RATIO', 0.8)
+        height_ratio = getattr(self.config, 'INFO_DIALOG_HEIGHT_RATIO', 0.8)
+        min_width = getattr(self.config, 'INFO_DIALOG_MIN_WIDTH', 20)
+        min_height = getattr(self.config, 'INFO_DIALOG_MIN_HEIGHT', 10)
+        
+        dialog_width = max(min_width, int(width * width_ratio))
+        dialog_height = max(min_height, int(height * height_ratio))
         
         # Center the dialog
         start_y = (height - dialog_height) // 2
@@ -2189,12 +2215,17 @@ class FileManager:
                 if self.handle_info_dialog_input(key):
                     continue  # Info dialog mode handled the key
             
-            if key == ord('q') or key == ord('Q'):
+            if self.is_key_for_action(key, 'quit'):
                 def quit_callback(confirmed):
                     if confirmed:
                         # Set a flag to exit the main loop
                         self.should_quit = True
-                self.show_confirmation("Are you sure you want to quit TFM?", quit_callback)
+                
+                # Check if quit confirmation is enabled
+                if getattr(self.config, 'CONFIRM_QUIT', True):
+                    self.show_confirmation("Are you sure you want to quit TFM?", quit_callback)
+                else:
+                    quit_callback(True)
             elif key == KEY_CTRL_U:  # Ctrl+U - make log pane smaller
                 self.adjust_log_boundary('up')
             elif key == KEY_CTRL_D:  # Ctrl+D - make log pane larger
@@ -2225,7 +2256,7 @@ class FileManager:
             elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
                 self.handle_enter()
                 self.needs_full_redraw = True
-            elif key == ord('h') or key == ord('H'):
+            elif self.is_key_for_action(key, 'toggle_hidden'):
                 self.show_hidden = not self.show_hidden
                 # Reset both panes
                 self.left_pane['selected_index'] = 0
@@ -2319,7 +2350,7 @@ class FileManager:
                 if self.log_scroll_offset > 0:
                     self.log_scroll_offset -= 1
                     self.needs_full_redraw = True
-            elif key == ord(' '):  # Space key - toggle selection and move down
+            elif self.is_key_for_action(key, 'select_file'):  # Toggle file selection
                 self.toggle_selection()
                 self.needs_full_redraw = True
 
@@ -2353,29 +2384,31 @@ class FileManager:
                     print(f"Unknown Option key sequence: 194, {next_key}")
             elif key == ord('d'):  # 'd' key - debug mode to detect modifier keys
                 self.debug_mode()
-            elif key == ord('a'):  # 'a' key - toggle all files selection
+            elif self.is_key_for_action(key, 'select_all_files'):  # Toggle all files selection
                 self.toggle_all_files_selection()
-            elif key == ord('A'):  # 'A' key (Shift+A) - toggle all items selection
+            elif self.is_key_for_action(key, 'select_all_items'):  # Toggle all items selection
                 self.toggle_all_items_selection()
-            elif key == ord('o'):  # 'o' key - sync current pane to other pane
-                self.sync_pane_directories()
-            elif key == ord('O'):  # 'O' key (Shift+O) - sync other pane to current pane
-                self.sync_other_pane_directory()
-            elif key == ord('f') or key == ord('F'):  # 'F' key - enter search mode
+            elif self.is_key_for_action(key, 'sync_panes'):  # Sync panes
+                # Handle both 'o' and 'O' for sync operations
+                if key == ord('O'):  # Shift+O - sync other pane to current
+                    self.sync_other_pane_directory()
+                else:  # 'o' - sync current pane to other
+                    self.sync_pane_directories()
+            elif self.is_key_for_action(key, 'search'):  # Search key - enter search mode
                 self.enter_search_mode()
-            elif key == ord('m') or key == ord('M'):  # 'M' key - show file operations menu
+            elif self.is_key_for_action(key, 'file_operations'):  # File operations menu
                 self.show_file_operations_menu()
-            elif key == ord('s') or key == ord('S'):  # 'S' key - show sort menu
+            elif self.is_key_for_action(key, 'sort_menu'):  # Sort menu
                 self.show_sort_menu()
-            elif key == ord('1'):  # '1' key - quick sort by name
+            elif self.is_key_for_action(key, 'quick_sort_name'):  # Quick sort by name
                 self.quick_sort('name')
-            elif key == ord('2'):  # '2' key - quick sort by size
+            elif self.is_key_for_action(key, 'quick_sort_size'):  # Quick sort by size
                 self.quick_sort('size')
-            elif key == ord('3'):  # '3' key - quick sort by date
+            elif self.is_key_for_action(key, 'quick_sort_date'):  # Quick sort by date
                 self.quick_sort('date')
-            elif key == ord('r') or key == ord('R'):  # 'R' key - toggle reverse sort
+            elif self.is_key_for_action(key, 'toggle_reverse_sort'):  # Toggle reverse sort
                 self.toggle_reverse_sort()
-            elif key == ord('i') or key == ord('I'):  # 'I' key - show file details
+            elif self.is_key_for_action(key, 'file_details'):  # Show file details
                 self.show_file_details()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
                 self.left_pane_ratio = 0.5
