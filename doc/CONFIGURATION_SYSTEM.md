@@ -104,7 +104,6 @@ KEY_BINDINGS = {
     'quick_sort_name': ['1'],
     'quick_sort_size': ['2'],
     'quick_sort_date': ['3'],
-    'toggle_reverse_sort': ['r', 'R'],
     'select_file': [' '],  # Space
     'select_all_files': ['a'],
     'select_all_items': ['A'],
@@ -359,7 +358,6 @@ class Config:
         'quick_sort_name': ['1'],
         'quick_sort_size': ['2'],
         'quick_sort_date': ['3'],
-        'toggle_reverse_sort': ['r'],
         'select_file': [' '],
         'select_all_files': ['a'],
         'select_all_items': ['A'],

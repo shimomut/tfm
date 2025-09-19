@@ -49,10 +49,9 @@ def generate_help_content():
     help_lines.append("=== SEARCH & SORTING ===")
     help_lines.append("f / F            Search files")
     help_lines.append("s / S            Sort menu")
-    help_lines.append("1                Quick sort by name")
-    help_lines.append("2                Quick sort by size")
-    help_lines.append("3                Quick sort by date")
-    help_lines.append("r / R            Toggle reverse sort")
+    help_lines.append("1                Quick sort by name (toggle reverse if already active)")
+    help_lines.append("2                Quick sort by size (toggle reverse if already active)")
+    help_lines.append("3                Quick sort by date (toggle reverse if already active)")
     help_lines.append("")
     
     # View options section

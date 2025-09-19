@@ -1519,31 +1519,26 @@ class FileManager:
         self.show_dialog(message, choices, handle_sort_choice)
     
     def quick_sort(self, sort_mode):
-        """Quickly change sort mode without showing dialog"""
+        """Quickly change sort mode without showing dialog, or toggle reverse if already sorted by this mode"""
         current_pane = self.get_current_pane()
-        current_pane['sort_mode'] = sort_mode
+        pane_name = "left" if self.active_pane == 'left' else "right"
+        
+        # Check if we're already sorting by this mode
+        if current_pane['sort_mode'] == sort_mode:
+            # Toggle reverse mode
+            current_pane['sort_reverse'] = not current_pane['sort_reverse']
+            reverse_status = "reverse" if current_pane['sort_reverse'] else "normal"
+            print(f"Toggled {pane_name} pane to {sort_mode} sorting ({reverse_status})")
+        else:
+            # Change to new sort mode (keep current reverse setting)
+            current_pane['sort_mode'] = sort_mode
+            print(f"Sorted {pane_name} pane by {sort_mode}")
         
         # Refresh the file list
         self.refresh_files(current_pane)
         self.needs_full_redraw = True
-        
-        # Show feedback
-        pane_name = "left" if self.active_pane == 'left' else "right"
-        print(f"Sorted {pane_name} pane by {sort_mode}")
     
-    def toggle_reverse_sort(self):
-        """Toggle reverse sort order for current pane"""
-        current_pane = self.get_current_pane()
-        current_pane['sort_reverse'] = not current_pane['sort_reverse']
-        
-        # Refresh the file list
-        self.refresh_files(current_pane)
-        self.needs_full_redraw = True
-        
-        # Show feedback
-        pane_name = "left" if self.active_pane == 'left' else "right"
-        reverse_status = "enabled" if current_pane['sort_reverse'] else "disabled"
-        print(f"Reverse sorting {reverse_status} for {pane_name} pane")
+
     
     def show_file_details(self):
         """Show detailed information about selected files or current file"""
@@ -1701,10 +1696,9 @@ class FileManager:
         help_lines.append("=== SEARCH & SORTING ===")
         help_lines.append("f / F            Search files")
         help_lines.append("s / S            Sort menu")
-        help_lines.append("1                Quick sort by name")
-        help_lines.append("2                Quick sort by size")
-        help_lines.append("3                Quick sort by date")
-        help_lines.append("r / R            Toggle reverse sort")
+        help_lines.append("1                Quick sort by name (toggle reverse if already active)")
+        help_lines.append("2                Quick sort by size (toggle reverse if already active)")
+        help_lines.append("3                Quick sort by date (toggle reverse if already active)")
         help_lines.append("")
         
         # View options section
@@ -2783,8 +2777,6 @@ class FileManager:
                 self.quick_sort('size')
             elif self.is_key_for_action(key, 'quick_sort_date'):  # Quick sort by date
                 self.quick_sort('date')
-            elif self.is_key_for_action(key, 'toggle_reverse_sort'):  # Toggle reverse sort
-                self.toggle_reverse_sort()
             elif self.is_key_for_action(key, 'file_details'):  # Show file details
                 self.show_file_details()
             elif self.is_key_for_action(key, 'view_text'):  # View text file
