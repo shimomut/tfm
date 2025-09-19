@@ -101,6 +101,14 @@ pip install pygments
 
 ## Technical Details
 
+### Syntax Highlighting Implementation
+The text viewer uses a **curses-native approach** to syntax highlighting:
+
+1. **Pygments tokenization** - Uses pygments to parse and tokenize source code
+2. **Token-to-color mapping** - Maps pygments token types to curses color pairs
+3. **Line-by-line rendering** - Renders each line as a sequence of colored text segments
+4. **No ANSI escape sequences** - Direct curses color application for proper terminal compatibility
+
 ### File Detection
 The viewer uses a multi-step approach to identify text files:
 
@@ -110,16 +118,17 @@ The viewer uses a multi-step approach to identify text files:
 4. **Encoding detection** - tries UTF-8, Latin-1, and CP1252 encodings
 
 ### Performance
-- **Lazy loading** - only loads visible content into memory
-- **Efficient scrolling** - smooth navigation even for large files
-- **Memory conscious** - handles files larger than available RAM
-- **Fast startup** - minimal delay when opening files
+- **Efficient tokenization** - Pygments tokenization done once per file load
+- **Optimized rendering** - Only visible content is rendered to screen
+- **Memory conscious** - Handles large files appropriately
+- **Fast scrolling** - Smooth navigation with proper color handling
 
 ### Error Handling
 - **Graceful fallbacks** for unsupported files or encoding issues
 - **Permission handling** - clear messages for access denied scenarios
 - **Binary file detection** - prevents display of binary content as garbled text
 - **Robust error recovery** - viewer errors don't crash TFM
+- **Syntax highlighting fallback** - Works as plain text viewer if pygments unavailable
 
 ## Integration with TFM
 

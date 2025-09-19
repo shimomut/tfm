@@ -9,13 +9,14 @@ for popular file formats using pygments (optional dependency).
 import curses
 import os
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
+import re
 
 # Try to import pygments for syntax highlighting
 try:
-    from pygments import highlight
+    from pygments import lex
     from pygments.lexers import get_lexer_for_filename, get_lexer_by_name, TextLexer
-    from pygments.formatters import TerminalFormatter
+    from pygments.token import Token
     from pygments.util import ClassNotFound
     PYGMENTS_AVAILABLE = True
 except ImportError:
@@ -31,7 +32,8 @@ class TextViewer:
     def __init__(self, stdscr, file_path: Path):
         self.stdscr = stdscr
         self.file_path = file_path
-        self.lines = []
+        self.lines = []  # List of strings (plain text lines)
+        self.highlighted_lines = []  # List of lists of (text, color) tuples
         self.scroll_offset = 0
         self.horizontal_offset = 0
         self.show_line_numbers = True
@@ -59,23 +61,30 @@ class TextViewer:
             if content is None:
                 # If all encodings fail, try binary mode and show hex
                 self.lines = ["[Binary file - cannot display as text]"]
+                self.highlighted_lines = [[("[Binary file - cannot display as text]", curses.color_pair(COLOR_REGULAR_FILE))]]
                 return
                 
-            # Split into lines and process for syntax highlighting
-            raw_lines = content.splitlines()
+            # Split into lines
+            self.lines = content.splitlines()
             
+            # Apply syntax highlighting if enabled
             if self.syntax_highlighting:
-                self.lines = self.apply_syntax_highlighting(content, raw_lines)
+                self.apply_syntax_highlighting(content)
             else:
-                self.lines = raw_lines
+                # Create plain highlighted lines (no colors)
+                self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
                 
         except Exception as e:
-            self.lines = [f"Error reading file: {str(e)}"]
+            error_msg = f"Error reading file: {str(e)}"
+            self.lines = [error_msg]
+            self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
     
-    def apply_syntax_highlighting(self, content: str, raw_lines: List[str]) -> List[str]:
-        """Apply syntax highlighting using pygments"""
+    def apply_syntax_highlighting(self, content: str):
+        """Apply syntax highlighting using pygments and curses colors"""
         if not PYGMENTS_AVAILABLE:
-            return raw_lines
+            # Create plain highlighted lines (no colors)
+            self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
+            return
             
         try:
             # Get appropriate lexer for the file
@@ -126,16 +135,57 @@ class TextViewer:
             if lexer is None:
                 lexer = TextLexer()
             
-            # Use terminal formatter for curses-compatible output
-            formatter = TerminalFormatter(bg="dark")
-            highlighted = highlight(content, lexer, formatter)
+            # Tokenize the content
+            tokens = list(lexer.get_tokens(content))
             
-            # Split highlighted content back into lines
-            return highlighted.splitlines()
+            # Convert tokens to highlighted lines
+            self.highlighted_lines = self.tokens_to_highlighted_lines(tokens)
             
         except Exception:
-            # If highlighting fails, return original lines
-            return raw_lines
+            # If highlighting fails, create plain highlighted lines
+            self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
+    
+    def tokens_to_highlighted_lines(self, tokens) -> List[List[Tuple[str, int]]]:
+        """Convert pygments tokens to lines of (text, color) tuples"""
+        highlighted_lines = []
+        current_line = []
+        
+        for token_type, text in tokens:
+            # Get the appropriate curses color for this token type
+            color = get_syntax_color(token_type)
+            
+            # Handle newlines - split tokens that contain newlines
+            if '\n' in text:
+                parts = text.split('\n')
+                
+                # Add the first part to current line
+                if parts[0]:
+                    current_line.append((parts[0], color))
+                
+                # Finish current line
+                highlighted_lines.append(current_line)
+                
+                # Add intermediate complete lines
+                for part in parts[1:-1]:
+                    if part:
+                        highlighted_lines.append([(part, color)])
+                    else:
+                        highlighted_lines.append([])  # Empty line
+                
+                # Start new line with last part
+                current_line = []
+                if parts[-1]:
+                    current_line.append((parts[-1], color))
+            else:
+                # No newlines, just add to current line
+                if text:
+                    current_line.append((text, color))
+        
+        # Add final line if not empty
+        if current_line:
+            highlighted_lines.append(current_line)
+        
+        return highlighted_lines
     
     def get_display_dimensions(self) -> Tuple[int, int, int, int]:
         """Get the dimensions for the text display area"""
@@ -201,7 +251,7 @@ class TextViewer:
             pass
     
     def draw_content(self):
-        """Draw the file content"""
+        """Draw the file content with syntax highlighting"""
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
         # Calculate line number width if showing line numbers
@@ -223,10 +273,8 @@ class TextViewer:
             except curses.error:
                 pass
             
-            if line_index >= len(self.lines):
+            if line_index >= len(self.highlighted_lines):
                 continue
-                
-            line_content = self.lines[line_index]
             
             # Draw line number if enabled
             x_pos = start_x
@@ -238,27 +286,45 @@ class TextViewer:
                     pass
                 x_pos += line_num_width
             
-            # Handle horizontal scrolling and line wrapping
-            if self.wrap_lines:
-                # TODO: Implement line wrapping
-                display_content = line_content
-            else:
-                # Apply horizontal offset
-                if self.horizontal_offset < len(line_content):
-                    display_content = line_content[self.horizontal_offset:]
-                else:
-                    display_content = ""
+            # Get the highlighted line (list of (text, color) tuples)
+            highlighted_line = self.highlighted_lines[line_index]
             
-            # Truncate to fit width
-            if len(display_content) > content_width:
-                display_content = display_content[:content_width]
+            # Apply horizontal scrolling
+            current_col = 0
+            display_x = x_pos
             
-            # Draw the content
-            if display_content:
-                try:
-                    self.stdscr.addstr(y_pos, x_pos, display_content)
-                except curses.error:
-                    pass
+            for text, color in highlighted_line:
+                # Skip text that's before the horizontal offset
+                if current_col + len(text) <= self.horizontal_offset:
+                    current_col += len(text)
+                    continue
+                
+                # Calculate visible portion of this text segment
+                start_offset = max(0, self.horizontal_offset - current_col)
+                visible_text = text[start_offset:]
+                
+                # Check if we have room to display this text
+                remaining_width = content_width - (display_x - x_pos)
+                if remaining_width <= 0:
+                    break
+                
+                # Truncate if necessary
+                if len(visible_text) > remaining_width:
+                    visible_text = visible_text[:remaining_width]
+                
+                # Draw the text with its color
+                if visible_text:
+                    try:
+                        self.stdscr.addstr(y_pos, display_x, visible_text, color)
+                        display_x += len(visible_text)
+                    except curses.error:
+                        pass
+                
+                current_col += len(text)
+                
+                # Stop if we've filled the line
+                if display_x - x_pos >= content_width:
+                    break
     
     def handle_key(self, key) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
@@ -307,7 +373,13 @@ class TextViewer:
         elif key == ord('s') or key == ord('S'):
             if PYGMENTS_AVAILABLE:
                 self.syntax_highlighting = not self.syntax_highlighting
-                self.load_file()  # Reload with/without highlighting
+                # Re-apply highlighting without reloading the file
+                if self.syntax_highlighting:
+                    content = '\n'.join(self.lines)
+                    self.apply_syntax_highlighting(content)
+                else:
+                    # Create plain highlighted lines (no colors)
+                    self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
             
         return True
     

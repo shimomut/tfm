@@ -51,8 +51,9 @@ Successfully implemented a comprehensive text file viewer with syntax highlighti
 
 ### ✅ Syntax Highlighting
 - **Automatic detection** of 20+ file formats
-- **Pygments integration** with graceful fallback
-- **Professional color schemes** compatible with terminal
+- **Curses-native implementation** - no ANSI escape sequences
+- **Pygments tokenization** with direct curses color mapping
+- **Professional color schemes** optimized for terminal display
 - **Toggle functionality** (s key) to enable/disable
 
 ### ✅ Navigation & Controls
@@ -80,6 +81,7 @@ Successfully implemented a comprehensive text file viewer with syntax highlighti
 - **Error handling** - graceful fallbacks for unsupported files
 
 ### ✅ Technical Excellence
+- **Curses-native syntax highlighting** - proper color display without escape sequences
 - **Multi-encoding support** (UTF-8, Latin-1, CP1252)
 - **Binary file detection** prevents garbled display
 - **Memory efficient** - handles large files appropriately

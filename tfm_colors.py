@@ -16,6 +16,14 @@ COLOR_REGULAR_FILE = 9  # Regular files
 COLOR_LOG_STDOUT = 10   # Stdout log messages
 COLOR_LOG_SYSTEM = 11   # System log messages
 COLOR_LINE_NUMBERS = 12 # Line numbers in text viewer
+# Syntax highlighting colors
+COLOR_SYNTAX_KEYWORD = 13    # Keywords (def, class, if, etc.)
+COLOR_SYNTAX_STRING = 14     # String literals
+COLOR_SYNTAX_COMMENT = 15    # Comments
+COLOR_SYNTAX_NUMBER = 16     # Numbers
+COLOR_SYNTAX_OPERATOR = 17   # Operators (+, -, =, etc.)
+COLOR_SYNTAX_BUILTIN = 18    # Built-in functions/types
+COLOR_SYNTAX_NAME = 19       # Variable/function names
 
 # Custom RGB color definitions (RGB values 0-255)
 RGB_COLORS = {
@@ -62,6 +70,35 @@ RGB_COLORS = {
     'LINE_NUMBERS_FG': {
         'color_num': 110,
         'rgb': (128, 128, 128)  # Gray for line numbers
+    },
+    # Syntax highlighting colors
+    'SYNTAX_KEYWORD_FG': {
+        'color_num': 111,
+        'rgb': (255, 119, 0)    # Orange for keywords
+    },
+    'SYNTAX_STRING_FG': {
+        'color_num': 112,
+        'rgb': (0, 255, 0)      # Green for strings
+    },
+    'SYNTAX_COMMENT_FG': {
+        'color_num': 113,
+        'rgb': (128, 128, 128)  # Gray for comments
+    },
+    'SYNTAX_NUMBER_FG': {
+        'color_num': 114,
+        'rgb': (255, 255, 0)    # Yellow for numbers
+    },
+    'SYNTAX_OPERATOR_FG': {
+        'color_num': 115,
+        'rgb': (255, 0, 255)    # Magenta for operators
+    },
+    'SYNTAX_BUILTIN_FG': {
+        'color_num': 116,
+        'rgb': (0, 255, 255)    # Cyan for built-ins
+    },
+    'SYNTAX_NAME_FG': {
+        'color_num': 117,
+        'rgb': (220, 220, 220)  # Light gray for names
     }
 }
 
@@ -77,7 +114,15 @@ FALLBACK_COLORS = {
     'REGULAR_FILE_FG': curses.COLOR_WHITE,
     'LOG_STDOUT_FG': curses.COLOR_WHITE,
     'LOG_SYSTEM_FG': curses.COLOR_BLUE,
-    'LINE_NUMBERS_FG': curses.COLOR_WHITE
+    'LINE_NUMBERS_FG': curses.COLOR_WHITE,
+    # Syntax highlighting fallback colors
+    'SYNTAX_KEYWORD_FG': curses.COLOR_YELLOW,
+    'SYNTAX_STRING_FG': curses.COLOR_GREEN,
+    'SYNTAX_COMMENT_FG': curses.COLOR_BLUE,
+    'SYNTAX_NUMBER_FG': curses.COLOR_CYAN,
+    'SYNTAX_OPERATOR_FG': curses.COLOR_MAGENTA,
+    'SYNTAX_BUILTIN_FG': curses.COLOR_CYAN,
+    'SYNTAX_NAME_FG': curses.COLOR_WHITE
 }
 
 def init_colors():
@@ -115,6 +160,14 @@ def init_colors():
             log_stdout_fg = RGB_COLORS['LOG_STDOUT_FG']['color_num']
             log_system_fg = RGB_COLORS['LOG_SYSTEM_FG']['color_num']
             line_numbers_fg = RGB_COLORS['LINE_NUMBERS_FG']['color_num']
+            # Syntax highlighting colors
+            syntax_keyword_fg = RGB_COLORS['SYNTAX_KEYWORD_FG']['color_num']
+            syntax_string_fg = RGB_COLORS['SYNTAX_STRING_FG']['color_num']
+            syntax_comment_fg = RGB_COLORS['SYNTAX_COMMENT_FG']['color_num']
+            syntax_number_fg = RGB_COLORS['SYNTAX_NUMBER_FG']['color_num']
+            syntax_operator_fg = RGB_COLORS['SYNTAX_OPERATOR_FG']['color_num']
+            syntax_builtin_fg = RGB_COLORS['SYNTAX_BUILTIN_FG']['color_num']
+            syntax_name_fg = RGB_COLORS['SYNTAX_NAME_FG']['color_num']
             
         except curses.error:
             rgb_success = False
@@ -132,6 +185,14 @@ def init_colors():
         log_stdout_fg = FALLBACK_COLORS['LOG_STDOUT_FG']
         log_system_fg = FALLBACK_COLORS['LOG_SYSTEM_FG']
         line_numbers_fg = FALLBACK_COLORS['LINE_NUMBERS_FG']
+        # Syntax highlighting fallback colors
+        syntax_keyword_fg = FALLBACK_COLORS['SYNTAX_KEYWORD_FG']
+        syntax_string_fg = FALLBACK_COLORS['SYNTAX_STRING_FG']
+        syntax_comment_fg = FALLBACK_COLORS['SYNTAX_COMMENT_FG']
+        syntax_number_fg = FALLBACK_COLORS['SYNTAX_NUMBER_FG']
+        syntax_operator_fg = FALLBACK_COLORS['SYNTAX_OPERATOR_FG']
+        syntax_builtin_fg = FALLBACK_COLORS['SYNTAX_BUILTIN_FG']
+        syntax_name_fg = FALLBACK_COLORS['SYNTAX_NAME_FG']
     
     # Initialize color pairs
     curses.init_pair(COLOR_DIRECTORIES, directory_fg, curses.COLOR_BLACK)
@@ -146,6 +207,14 @@ def init_colors():
     curses.init_pair(COLOR_LOG_STDOUT, log_stdout_fg, curses.COLOR_BLACK)
     curses.init_pair(COLOR_LOG_SYSTEM, log_system_fg, curses.COLOR_BLACK)
     curses.init_pair(COLOR_LINE_NUMBERS, line_numbers_fg, curses.COLOR_BLACK)
+    # Syntax highlighting color pairs
+    curses.init_pair(COLOR_SYNTAX_KEYWORD, syntax_keyword_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_SYNTAX_STRING, syntax_string_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_SYNTAX_COMMENT, syntax_comment_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_SYNTAX_NUMBER, syntax_number_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_SYNTAX_OPERATOR, syntax_operator_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_SYNTAX_BUILTIN, syntax_builtin_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_SYNTAX_NAME, syntax_name_fg, curses.COLOR_BLACK)
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """Get the appropriate color for a file based on its properties"""
@@ -259,3 +328,26 @@ def get_log_color(source):
 def get_line_number_color():
     """Get line number color for text viewer"""
     return curses.color_pair(COLOR_LINE_NUMBERS)
+
+def get_syntax_color(token_type):
+    """Get syntax highlighting color for a token type"""
+    # Map pygments token types to our color pairs
+    token_str = str(token_type)
+    
+    if 'Keyword' in token_str:
+        return curses.color_pair(COLOR_SYNTAX_KEYWORD)
+    elif 'String' in token_str or 'Literal.String' in token_str:
+        return curses.color_pair(COLOR_SYNTAX_STRING)
+    elif 'Comment' in token_str:
+        return curses.color_pair(COLOR_SYNTAX_COMMENT)
+    elif 'Number' in token_str or 'Literal.Number' in token_str:
+        return curses.color_pair(COLOR_SYNTAX_NUMBER)
+    elif 'Operator' in token_str or 'Punctuation' in token_str:
+        return curses.color_pair(COLOR_SYNTAX_OPERATOR)
+    elif 'Builtin' in token_str or 'Name.Builtin' in token_str:
+        return curses.color_pair(COLOR_SYNTAX_BUILTIN)
+    elif 'Name' in token_str:
+        return curses.color_pair(COLOR_SYNTAX_NAME)
+    else:
+        # Default to regular text color
+        return curses.color_pair(COLOR_REGULAR_FILE)
