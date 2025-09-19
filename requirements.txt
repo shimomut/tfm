@@ -1,0 +1,2 @@
+# No external dependencies required - uses built-in curses library
+# Python 3.6+ required for pathlib
