@@ -29,7 +29,7 @@ def demo_move_feature():
     print("• Added perform_move_operation() for actual move execution")
     print("• Uses shutil.move() for files and directories")
     print("• Special handling for symbolic links using os.readlink()")
-    print("• Integrates with existing multi-choice dialog system")
+    print("• Integrates with existing quick choice dialog system")
     
     print("\n⚙️ CONFIGURATION:")
     print("The move feature requires the following key binding in your config:")

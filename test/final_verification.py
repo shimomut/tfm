@@ -87,7 +87,7 @@ def verify_dialog_exclusivity():
             content = f.read()
         
         # Check for exclusivity check
-        exclusivity_check = "if self.dialog_mode or self.info_dialog_mode:"
+        exclusivity_check = "if self.quick_choice_mode or self.info_dialog_mode:"
         assert exclusivity_check in content, "Dialog exclusivity check not found"
         print("✓ Dialog exclusivity check implemented")
         
@@ -99,7 +99,7 @@ def verify_dialog_exclusivity():
         
         # Verify the fix prevents conflicts
         print("✓ Help dialog blocks search mode activation")
-        print("✓ Multi-choice dialogs block conflicting modes")
+        print("✓ Quick choice dialogs block conflicting modes")
         print("✓ Search mode maintains priority when active")
         
         return True

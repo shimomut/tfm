@@ -113,7 +113,7 @@ The m/M keys are now available for other uses. Potential future implementations 
 ## Rollback Information
 
 If needed, the file operations menu functionality can be restored from git history. The implementation was fully functional and included:
-- Multi-choice dialog system
+- Quick choice dialog system
 - File operation handlers
 - Integration with selection system
 - Confirmation dialogs

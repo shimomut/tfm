@@ -50,7 +50,7 @@ The delete feature shows context-aware confirmation messages:
 
 1. **Key Handler**: Added to main key processing loop in `tfm_main.py`
 2. **Configuration**: Added `delete_files` key binding to configuration system
-3. **Dialog System**: Uses existing multi-choice dialog system for confirmation
+3. **Dialog System**: Uses existing quick choice dialog system for confirmation
 4. **File Refresh**: Integrates with existing file refresh mechanism
 
 ## Usage

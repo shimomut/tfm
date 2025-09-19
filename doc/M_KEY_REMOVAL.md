@@ -120,7 +120,7 @@ All related code has been completely removed:
 
 If the file operations menu needs to be restored in the future, the functionality can be found in the git history before this change. The implementation included:
 
-- Multi-choice dialog system
+- Quick choice dialog system
 - File operation handlers (copy, move, delete, rename, properties)
 - Integration with file selection system
 - Confirmation dialogs for destructive operations

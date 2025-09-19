@@ -10,7 +10,7 @@ def test_actual_implementation_logic():
     print("TFM Dialog Exclusivity Fix Verification")
     print("=" * 45)
     
-    def simulate_tfm_key_handling(search_mode, dialog_mode, info_dialog_mode, key, key_handled_by_dialog=False):
+    def simulate_tfm_key_handling(search_mode, quick_choice_mode, info_dialog_mode, key, key_handled_by_dialog=False):
         """
 
 # Add src directory to Python path
@@ -22,26 +22,26 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
         
         Args:
             search_mode: Whether search mode is active
-            dialog_mode: Whether multi-choice dialog is active  
+            quick_choice_mode: Whether quick choice dialog is active  
             info_dialog_mode: Whether info dialog (help) is active
             key: The key pressed
             key_handled_by_dialog: Whether the dialog handler consumed the key
         """
         
-        print(f"\nScenario: key='{key}', search={search_mode}, dialog={dialog_mode}, info_dialog={info_dialog_mode}")
+        print(f"\nScenario: key='{key}', search={search_mode}, quick_choice={quick_choice_mode}, info_dialog={info_dialog_mode}")
         
         # Step 1: Handle search mode input first
         if search_mode:
             print("  → Search mode handles key")
             return "search_mode_handled"
         
-        # Step 2: Handle dialog mode input
-        if dialog_mode:
+        # Step 2: Handle quick choice mode input
+        if quick_choice_mode:
             if key_handled_by_dialog:
-                print("  → Dialog mode handles key")
-                return "dialog_mode_handled"
+                print("  → Quick choice mode handles key")
+                return "quick_choice_mode_handled"
             else:
-                print("  → Dialog mode doesn't handle key, continuing...")
+                print("  → Quick choice mode doesn't handle key, continuing...")
         
         # Step 3: Handle info dialog mode input
         if info_dialog_mode:
@@ -52,7 +52,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
                 print("  → Info dialog doesn't handle key, continuing...")
         
         # Step 4: Skip regular key processing if any dialog is open
-        if dialog_mode or info_dialog_mode:
+        if quick_choice_mode or info_dialog_mode:
             print("  → Regular key processing SKIPPED (dialog open)")
             return "skipped_due_to_dialog"
         
@@ -88,8 +88,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
     assert result == "info_dialog_handled", f"Expected info_dialog_handled, got {result}"
     print("  ✓ PASS: Help dialog handles its own keys")
     
-    # Test case 4: Multi-choice dialog open, search key pressed
-    print("\n4. Multi-choice dialog open, 'f' key pressed")
+    # Test case 4: Quick choice dialog open, search key pressed
+    print("\n4. Quick choice dialog open, 'f' key pressed")
     result = simulate_tfm_key_handling(False, True, False, 'f', key_handled_by_dialog=False)
     assert result == "skipped_due_to_dialog", f"Expected skipped_due_to_dialog, got {result}"
     print("  ✓ PASS: Search mode NOT started (conflict prevented)")
@@ -159,21 +159,21 @@ def test_specific_scenarios():
     
     return True
 
-def simulate_tfm_key_handling(search_mode, dialog_mode, info_dialog_mode, key, key_handled_by_dialog):
+def simulate_tfm_key_handling(search_mode, quick_choice_mode, info_dialog_mode, key, key_handled_by_dialog):
     """Helper function for simulation"""
     if search_mode:
         return "search_mode_handled"
     
-    if dialog_mode:
+    if quick_choice_mode:
         if key_handled_by_dialog:
-            return "dialog_mode_handled"
+            return "quick_choice_mode_handled"
     
     if info_dialog_mode:
         if key_handled_by_dialog:
             return "info_dialog_handled"
     
     # The key fix: Skip regular processing if any dialog is open
-    if dialog_mode or info_dialog_mode:
+    if quick_choice_mode or info_dialog_mode:
         return "skipped_due_to_dialog"
     
     # Regular key processing
@@ -194,7 +194,7 @@ if __name__ == "__main__":
             print("🎉 ALL TESTS PASSED!")
             print("\nThe dialog exclusivity fix works correctly:")
             print("✓ Help dialog and search mode are mutually exclusive")
-            print("✓ Multi-choice dialogs block conflicting modes")
+            print("✓ Quick choice dialogs block conflicting modes")
             print("✓ Search mode maintains priority when active")
             print("✓ Regular key processing is properly gated")
             print("\nUser experience improvements:")

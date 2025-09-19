@@ -16,13 +16,13 @@ def demo_copy_feature():
     print("• Press 'C' key to copy selected files to the opposite pane")
     print("• Copies current file if no files are selected")
     print("• Directories are copied recursively")
-    print("• Shows multi-choice dialog for conflicts: Overwrite/Skip/Cancel")
+    print("• Shows quick choice dialog for conflicts: Overwrite/Skip/Cancel")
     
     print("\n🔧 IMPLEMENTATION DETAILS:")
     print("• Added 'copy_files': ['c', 'C'] to KEY_BINDINGS")
     print("• Added copy_selected_files() method to FileManager")
     print("• Uses shutil.copy2() for files and shutil.copytree() for directories")
-    print("• Integrates with existing multi-choice dialog system")
+    print("• Integrates with existing quick choice dialog system")
     
     print("\n⚡ KEY FEATURES:")
     print("1. Smart file selection:")

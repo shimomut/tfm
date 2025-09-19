@@ -63,8 +63,8 @@ def test_help_integration(stdscr):
                     step_index += 1
                     continue
             
-            if fm.dialog_mode:
-                if fm.handle_dialog_input(key_to_press):
+            if fm.quick_choice_mode:
+                if fm.handle_quick_choice_input(key_to_press):
                     step_index += 1
                     continue
             

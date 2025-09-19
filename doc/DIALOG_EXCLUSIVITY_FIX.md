@@ -81,7 +81,7 @@ if self.is_key_for_action(key, 'quit'):
 
 ### 1. Prevents Mode Conflicts
 - Help dialog and search mode are mutually exclusive
-- Multi-choice dialogs and search mode are mutually exclusive
+- Quick choice dialogs and search mode are mutually exclusive
 - Any dialog blocks conflicting mode activation
 
 ### 2. Predictable User Experience
@@ -111,7 +111,7 @@ if self.dialog_mode or self.info_dialog_mode:
 
 ### Affected Modes
 - **Info Dialog Mode** (help dialog): Blocks all regular key processing
-- **Dialog Mode** (multi-choice dialogs): Blocks all regular key processing
+- **Dialog Mode** (quick choice dialogs): Blocks all regular key processing
 - **Search Mode**: Maintains priority (handles input first)
 
 ## Testing
@@ -119,7 +119,7 @@ if self.dialog_mode or self.info_dialog_mode:
 ### Test Coverage
 - ✅ Normal operation (no dialogs)
 - ✅ Help dialog blocks search activation
-- ✅ Multi-choice dialog blocks search activation
+- ✅ Quick choice dialog blocks search activation
 - ✅ Search mode maintains priority
 - ✅ Dialog handlers get first chance at keys
 - ✅ Regular processing properly gated

@@ -3,26 +3,23 @@
 Test script to verify dialog mode exclusivity
 """
 
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
 def test_dialog_exclusivity_logic():
     """Test the logic for dialog mode exclusivity"""
     print("Dialog Mode Exclusivity Test")
     print("=" * 30)
     
     # Simulate the key handling logic
-    def simulate_key_handling(search_mode, dialog_mode, info_dialog_mode, key_action):
-
-
-
-# Add src directory to Python path
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
+    def simulate_key_handling(search_mode, quick_choice_mode, info_dialog_mode, key_action):
         """Simulate the key handling logic from tfm_main.py"""
         
         print(f"\nTest Case:")
         print(f"  search_mode: {search_mode}")
-        print(f"  dialog_mode: {dialog_mode}")
+        print(f"  quick_choice_mode: {quick_choice_mode}")
         print(f"  info_dialog_mode: {info_dialog_mode}")
         print(f"  key_action: {key_action}")
         
@@ -33,10 +30,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
             print("  → Search mode input handling")
             return "search_handled"
         
-        # 2. Handle dialog mode input
-        if dialog_mode:
-            print("  → Dialog mode input handling")
-            return "dialog_handled"
+        # 2. Handle quick choice mode input
+        if quick_choice_mode:
+            print("  → Quick choice mode input handling")
+            return "quick_choice_handled"
         
         # 3. Handle info dialog mode input
         if info_dialog_mode:
@@ -44,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
             return "info_dialog_handled"
         
         # 4. Skip regular key processing if any dialog is open
-        if dialog_mode or info_dialog_mode:
+        if quick_choice_mode or info_dialog_mode:
             print("  → Regular key processing SKIPPED (dialog open)")
             return "skipped_due_to_dialog"
         
@@ -69,7 +66,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
         (False, False, True, 'search', "Should NOT start search (help dialog open)"),
         (False, False, True, 'help', "Should be handled by info dialog handler"),
         
-        # Multi-choice dialog open - search should be blocked
+        # Quick choice dialog open - search should be blocked
         (False, True, False, 'search', "Should NOT start search (dialog open)"),
         (False, True, False, 'help', "Should be handled by dialog handler"),
         
@@ -103,7 +100,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
     print("\n" + "=" * 40)
     print("Key Insights:")
     print("✓ Help dialog blocks search mode activation")
-    print("✓ Multi-choice dialog blocks search mode activation")
+    print("✓ Quick choice dialog blocks search mode activation")
     print("✓ Search mode has priority over other modes")
     print("✓ Dialog handlers get first chance at keys")
     print("✓ Regular key processing is skipped when dialogs are open")

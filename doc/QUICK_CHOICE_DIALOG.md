@@ -1,17 +1,17 @@
-# Multi-Choice Dialog System
+# Quick Choice Dialog System
 
-The TFM file manager now includes a flexible multi-choice dialog system that can be used for any type of user selection interface.
+The TFM file manager now includes a flexible quick choice dialog system that can be used for any type of user selection interface.
 
 ## Overview
 
-The multi-choice dialog system generalizes the previous confirmation dialog to support any number of choices with custom text, quick keys, and return values.
+The quick choice dialog system generalizes the previous confirmation dialog to support any number of choices with custom text, quick keys, and return values.
 
 ## API
 
 ### Core Methods
 
 #### `show_dialog(message, choices, callback)`
-Shows a multi-choice dialog with custom options.
+Shows a quick choice dialog with custom options.
 
 **Parameters:**
 - `message`: The message to display to the user
@@ -160,10 +160,10 @@ Press 'S' to show sorting options:
 
 ## Benefits
 
-1. **Consistency**: All multi-choice interactions use the same interface
+1. **Consistency**: All quick choice interactions use the same interface
 2. **Flexibility**: Easy to add new menus and options
 3. **Usability**: Quick keys and keyboard navigation
-4. **Maintainability**: Single system handles all dialog types
+4. **Maintainability**: Single system handles all quick choice types
 5. **Extensibility**: Easy to add new dialog types
 
 ## Future Enhancements

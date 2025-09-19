@@ -98,12 +98,12 @@ class FileManager:
         self.create_file_mode = False
         self.create_file_pattern = ""
         
-        # Multi-choice dialog state
-        self.dialog_mode = False
-        self.dialog_message = ""
-        self.dialog_choices = []  # List of choice dictionaries: [{"text": "Yes", "key": "y", "value": True}, ...]
-        self.dialog_callback = None
-        self.dialog_selected = 0  # Index of currently selected choice
+        # Quick choice dialog state
+        self.quick_choice_mode = False
+        self.quick_choice_message = ""
+        self.quick_choice_choices = []  # List of choice dictionaries: [{"text": "Yes", "key": "y", "value": True}, ...]
+        self.quick_choice_callback = None
+        self.quick_choice_selected = 0  # Index of currently selected choice
         self.should_quit = False  # Flag to control main loop exit
         
         # Info dialog state
@@ -972,22 +972,22 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
-        # If in dialog mode, show multi-choice dialog
-        if self.dialog_mode:
+        # If in quick choice mode, show quick choice dialog
+        if self.quick_choice_mode:
             # Fill entire status line with background color
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
             # Show dialog message
-            message = f"{self.dialog_message} "
+            message = f"{self.quick_choice_message} "
             self.safe_addstr(status_y, 2, message, get_status_color())
             
             # Show choice buttons
             button_start_x = len(message) + 4
             
-            for i, choice in enumerate(self.dialog_choices):
+            for i, choice in enumerate(self.quick_choice_choices):
                 choice_text = choice["text"]
-                if i == self.dialog_selected:
+                if i == self.quick_choice_selected:
                     # Highlight selected option with bold and standout
                     button_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
                     button_text = f"[{choice_text}]"
@@ -1001,7 +1001,7 @@ class FileManager:
             
             # Generate help text based on available quick keys
             quick_keys = []
-            for choice in self.dialog_choices:
+            for choice in self.quick_choice_choices:
                 if "key" in choice and choice["key"]:
                     quick_keys.append(choice["key"].upper())
             
@@ -1637,7 +1637,7 @@ class FileManager:
             print(f"Error renaming file: {e}")
         
     def show_dialog(self, message, choices, callback):
-        """Show multi-choice dialog
+        """Show quick choice dialog
         
         Args:
             message: The message to display
@@ -1647,11 +1647,11 @@ class FileManager:
                       {"text": "Cancel", "key": "c", "value": None}]
             callback: Function to call with the selected choice's value
         """
-        self.dialog_mode = True
-        self.dialog_message = message
-        self.dialog_choices = choices
-        self.dialog_callback = callback
-        self.dialog_selected = 0  # Default to first choice
+        self.quick_choice_mode = True
+        self.quick_choice_message = message
+        self.quick_choice_choices = choices
+        self.quick_choice_callback = callback
+        self.quick_choice_selected = 0  # Default to first choice
         self.needs_full_redraw = True
     
     def show_confirmation(self, message, callback):
@@ -1663,59 +1663,63 @@ class FileManager:
         ]
         self.show_dialog(message, choices, callback)
         
-    def exit_dialog_mode(self):
-        """Exit dialog mode"""
-        self.dialog_mode = False
-        self.dialog_message = ""
-        self.dialog_choices = []
-        self.dialog_callback = None
-        self.dialog_selected = 0
+    def exit_quick_choice_mode(self):
+        """Exit quick choice mode"""
+        self.quick_choice_mode = False
+        self.quick_choice_message = ""
+        self.quick_choice_choices = []
+        self.quick_choice_callback = None
+        self.quick_choice_selected = 0
         self.needs_full_redraw = True
     
     def exit_confirmation_mode(self):
         """Exit confirmation mode (backward compatibility)"""
-        self.exit_dialog_mode()
+        self.exit_quick_choice_mode()
         
-    def handle_dialog_input(self, key):
-        """Handle input while in dialog mode"""
+    def handle_quick_choice_input(self, key):
+        """Handle input while in quick choice mode"""
         if key == 27:  # ESC - cancel
-            self.exit_dialog_mode()
+            self.exit_quick_choice_mode()
             return True
         elif key == curses.KEY_LEFT:
             # Move selection left
-            if self.dialog_choices:
-                self.dialog_selected = (self.dialog_selected - 1) % len(self.dialog_choices)
+            if self.quick_choice_choices:
+                self.quick_choice_selected = (self.quick_choice_selected - 1) % len(self.quick_choice_choices)
                 self.needs_full_redraw = True
             return True
         elif key == curses.KEY_RIGHT:
             # Move selection right
-            if self.dialog_choices:
-                self.dialog_selected = (self.dialog_selected + 1) % len(self.dialog_choices)
+            if self.quick_choice_choices:
+                self.quick_choice_selected = (self.quick_choice_selected + 1) % len(self.quick_choice_choices)
                 self.needs_full_redraw = True
             return True
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
             # Execute selected action
-            if self.dialog_choices and 0 <= self.dialog_selected < len(self.dialog_choices):
-                selected_choice = self.dialog_choices[self.dialog_selected]
-                if self.dialog_callback:
-                    self.dialog_callback(selected_choice["value"])
-            self.exit_dialog_mode()
+            if self.quick_choice_choices and 0 <= self.quick_choice_selected < len(self.quick_choice_choices):
+                selected_choice = self.quick_choice_choices[self.quick_choice_selected]
+                if self.quick_choice_callback:
+                    self.quick_choice_callback(selected_choice["value"])
+            self.exit_quick_choice_mode()
             return True
         else:
             # Check for quick key matches
             key_char = chr(key).lower() if 32 <= key <= 126 else None
             if key_char:
-                for choice in self.dialog_choices:
+                for choice in self.quick_choice_choices:
                     if "key" in choice and choice["key"] and choice["key"].lower() == key_char:
                         # Found matching quick key
-                        if self.dialog_callback:
-                            self.dialog_callback(choice["value"])
-                        self.exit_dialog_mode()
+                        if self.quick_choice_callback:
+                            self.quick_choice_callback(choice["value"])
+                        self.exit_quick_choice_mode()
                         return True
+    
+    def handle_dialog_input(self, key):
+        """Handle input while in dialog mode (backward compatibility)"""
+        return self.handle_quick_choice_input(key)
     
     def handle_confirmation_input(self, key):
         """Handle input while in confirmation mode (backward compatibility)"""
-        return self.handle_dialog_input(key)
+        return self.handle_quick_choice_input(key)
     
 
     def show_info_dialog(self, title, info_lines):
@@ -2255,7 +2259,7 @@ class FileManager:
         self.show_list_dialog("Go to Favorite Directory", display_items, favorite_callback)
     
     def show_sort_menu(self):
-        """Show sort options menu using the multi-choice dialog"""
+        """Show sort options menu using the quick choice dialog"""
         current_pane = self.get_current_pane()
         
         # Get current sort mode for display
@@ -3961,10 +3965,10 @@ class FileManager:
                 if self.handle_create_file_input(key):
                     continue  # Create file mode handled the key
             
-            # Handle dialog mode input
-            if self.dialog_mode:
-                if self.handle_dialog_input(key):
-                    continue  # Dialog mode handled the key
+            # Handle quick choice mode input
+            if self.quick_choice_mode:
+                if self.handle_quick_choice_input(key):
+                    continue  # Quick choice mode handled the key
             
             # Handle info dialog mode input
             if self.info_dialog_mode:
@@ -3983,7 +3987,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting search mode while help dialog is open
-            if self.dialog_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.search_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
+            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.search_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):

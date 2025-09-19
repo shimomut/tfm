@@ -213,7 +213,7 @@ def test_integration_points():
     
     # Test that dialog modes are mutually exclusive
     dialog_modes = [
-        'dialog_mode',
+        'quick_choice_mode',
         'info_dialog_mode', 
         'list_dialog_mode',
         'search_mode',

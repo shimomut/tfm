@@ -23,7 +23,7 @@ Successfully implemented the C key copy functionality for the TUI File Manager (
 
 ### 4. Conflict Resolution
 - Detects existing files in destination directory
-- Shows multi-choice dialog with three options:
+- Shows quick choice dialog with three options:
   - **Overwrite**: Replace existing files
   - **Skip**: Copy only non-conflicting files  
   - **Cancel**: Abort the entire operation
@@ -137,7 +137,7 @@ When files already exist in the destination:
 ### ✅ Completed
 - Configuration system integration
 - Key binding system integration
-- Multi-choice dialog system integration
+- Quick choice dialog system integration
 - File operation system integration
 - Error handling system integration
 - Log system integration
