@@ -65,8 +65,9 @@ Successfully implemented a comprehensive text file viewer with syntax highlighti
 ### ✅ Display Options
 - **Line numbers** with toggle (n key)
 - **Line wrapping** with toggle (w key) 
-- **Clean header** showing file info and status
-- **Status indicators** for all viewer options
+- **Clean header** with file info and controls
+- **Comprehensive status bar** showing position, size, format, and options
+- **Real-time status updates** for all viewer settings
 
 ### ✅ File Format Support
 - **Programming**: Python, JavaScript, Java, C/C++, Go, Rust, PHP, Ruby, Shell

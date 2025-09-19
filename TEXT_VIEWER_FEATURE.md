@@ -23,7 +23,8 @@ TFM now includes a built-in text file viewer with syntax highlighting support fo
 - **Line numbers**: Toggle with `n` key (on by default)
 - **Line wrapping**: Toggle with `w` key (off by default)
 - **Syntax highlighting**: Toggle with `s` key (on by default if pygments available)
-- **Clean interface** with file info and status indicators
+- **Status bar**: Shows current position, file size, format, and active options
+- **Clean interface** with comprehensive information display
 
 ### ✅ File Format Support
 
@@ -76,12 +77,17 @@ TFM now includes a built-in text file viewer with syntax highlighting support fo
 | `s` | Toggle syntax highlighting on/off |
 
 ### Status Information
-The viewer header shows:
+The viewer interface provides comprehensive status information:
+
+**Header:**
 - **File name** and path
-- **Syntax highlighting status** (ON/OFF)
-- **Line numbers status** (ON/OFF)  
-- **Line wrapping status** (ON/OFF)
-- **Available controls** for quick reference
+- **Keyboard controls** for quick reference
+
+**Status Bar (bottom):**
+- **Current position**: Line number and scroll percentage
+- **File information**: Size and format type
+- **Horizontal scroll**: Column position when scrolled
+- **Active options**: NUM (line numbers), WRAP (line wrapping), SYNTAX (highlighting)
 
 ## Installation & Dependencies
 

@@ -51,6 +51,7 @@ TFM includes a built-in text file viewer with syntax highlighting support. When 
 - **Syntax highlighting** for 20+ file formats (Python, JavaScript, JSON, Markdown, YAML, etc.)
 - **Line numbers** (toggle with `n`)
 - **Horizontal scrolling** (arrow keys)
+- **Status bar** showing position, file size, format, and active options
 - **Multiple encoding support** (UTF-8, Latin-1, CP1252)
 - **Automatic file type detection**
 

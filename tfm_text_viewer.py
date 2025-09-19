@@ -191,9 +191,9 @@ class TextViewer:
         """Get the dimensions for the text display area"""
         height, width = self.stdscr.getmaxyx()
         
-        # Reserve space for header (2 lines) and footer (1 line)
+        # Reserve space for header (2 lines) and status bar (1 line)
         start_y = 2
-        display_height = height - 3
+        display_height = height - 4  # Header (2) + status bar (1) + margin (1)
         start_x = 0
         display_width = width
         
@@ -220,33 +220,100 @@ class TextViewer:
         except curses.error:
             pass
         
-        # Status line with controls
-        status_parts = []
-        if self.syntax_highlighting:
-            status_parts.append("Syntax: ON")
-        else:
-            status_parts.append("Syntax: OFF")
-            
-        if self.show_line_numbers:
-            status_parts.append("Lines: ON")
-        else:
-            status_parts.append("Lines: OFF")
-            
-        if self.wrap_lines:
-            status_parts.append("Wrap: ON")
-        else:
-            status_parts.append("Wrap: OFF")
-        
-        status_left = " | ".join(status_parts)
-        controls = "q:quit ↑↓:scroll ←→:h-scroll n:numbers w:wrap s:syntax"
+        # Controls line
+        controls = "q:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page n:numbers w:wrap s:syntax"
         
         try:
-            self.stdscr.addstr(1, 2, status_left, get_status_color())
-            
-            # Right-align controls if there's space
-            if len(status_left) + len(controls) + 6 < width:
-                controls_x = width - len(controls) - 2
-                self.stdscr.addstr(1, controls_x, controls, get_status_color())
+            # Center the controls or left-align if too long
+            if len(controls) + 4 < width:
+                controls_x = (width - len(controls)) // 2
+            else:
+                controls_x = 2
+            self.stdscr.addstr(1, controls_x, controls[:width-4], get_status_color())
+        except curses.error:
+            pass
+    
+    def draw_status_bar(self):
+        """Draw the status bar at the bottom of the viewer"""
+        height, width = self.stdscr.getmaxyx()
+        status_y = height - 1  # Bottom line
+        
+        # Clear status bar area
+        try:
+            self.stdscr.addstr(status_y, 0, " " * (width - 1), get_status_color())
+        except curses.error:
+            pass
+        
+        # Calculate current position info
+        current_line = self.scroll_offset + 1  # 1-based line number
+        total_lines = len(self.lines)
+        
+        # Calculate scroll percentage
+        if total_lines <= 1:
+            scroll_percent = 100
+        else:
+            scroll_percent = min(100, int((current_line / total_lines) * 100))
+        
+        # Get file size
+        try:
+            file_size = self.file_path.stat().st_size
+            if file_size < 1024:
+                size_str = f"{file_size}B"
+            elif file_size < 1024 * 1024:
+                size_str = f"{file_size / 1024:.1f}K"
+            elif file_size < 1024 * 1024 * 1024:
+                size_str = f"{file_size / (1024 * 1024):.1f}M"
+            else:
+                size_str = f"{file_size / (1024 * 1024 * 1024):.1f}G"
+        except:
+            size_str = "---"
+        
+        # Build status components
+        position_info = f"Line {current_line}/{total_lines} ({scroll_percent}%)"
+        file_info = f"{size_str}"
+        
+        # Add horizontal scroll info if applicable
+        if self.horizontal_offset > 0:
+            position_info += f" | Col {self.horizontal_offset + 1}"
+        
+        # Left side: position and file info
+        left_status = f" {position_info} | {file_info} "
+        
+        # Right side: file type and options status
+        right_parts = []
+        
+        # File format/type
+        ext = self.file_path.suffix.lower()
+        if ext:
+            right_parts.append(ext[1:].upper())  # Remove dot and uppercase
+        else:
+            right_parts.append("TEXT")
+        
+        # Show active options
+        options = []
+        if self.show_line_numbers:
+            options.append("NUM")
+        if self.wrap_lines:
+            options.append("WRAP")
+        if PYGMENTS_AVAILABLE and self.syntax_highlighting:
+            options.append("SYNTAX")
+        
+        if options:
+            right_parts.extend(options)
+        
+        right_status = f" {' | '.join(right_parts)} "
+        
+        # Draw left status
+        try:
+            self.stdscr.addstr(status_y, 0, left_status, get_status_color())
+        except curses.error:
+            pass
+        
+        # Draw right status (right-aligned)
+        try:
+            right_x = max(len(left_status) + 2, width - len(right_status))
+            if right_x < width:
+                self.stdscr.addstr(status_y, right_x, right_status, get_status_color())
         except curses.error:
             pass
     
@@ -394,6 +461,7 @@ class TextViewer:
             # Draw components
             self.draw_header()
             self.draw_content()
+            self.draw_status_bar()
             
             # Refresh screen
             self.stdscr.refresh()
