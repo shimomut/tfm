@@ -1778,6 +1778,67 @@ class FileManager:
         except Exception as e:
             print(f"Error viewing file: {str(e)}")
             self.needs_full_redraw = True
+    
+    def suspend_curses(self):
+        """Suspend the curses system to allow external programs to run"""
+        curses.endwin()
+        
+    def resume_curses(self):
+        """Resume the curses system after external program execution"""
+        self.stdscr.refresh()
+        curses.curs_set(0)  # Hide cursor
+        self.needs_full_redraw = True
+    
+    def edit_selected_file(self):
+        """Edit the selected file using the configured text editor"""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            print("No files in current directory")
+            return
+            
+        selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        # Don't try to edit parent directory
+        if (current_pane['selected_index'] == 0 and 
+            len(current_pane['files']) > 0 and 
+            selected_file == current_pane['path'].parent):
+            print("Cannot edit parent directory (..)")
+            return
+            
+        # Allow editing directories (some editors can handle them)
+        # but warn if it's a directory
+        if selected_file.is_dir():
+            print(f"Warning: '{selected_file.name}' is a directory")
+        
+        # Get the configured text editor
+        editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
+        
+        try:
+            # Suspend curses
+            self.suspend_curses()
+            
+            # Launch the text editor as a subprocess
+            import subprocess
+            result = subprocess.run([editor, str(selected_file)], 
+                                  cwd=str(current_pane['path']))
+            
+            # Resume curses
+            self.resume_curses()
+            
+            if result.returncode == 0:
+                print(f"Edited file: {selected_file.name}")
+            else:
+                print(f"Editor exited with code {result.returncode}")
+                
+        except FileNotFoundError:
+            # Resume curses even if editor not found
+            self.resume_curses()
+            print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
+        except Exception as e:
+            # Resume curses even if there's an error
+            self.resume_curses()
+            print(f"Error launching editor: {e}")
         
     def handle_search_input(self, key):
         """Handle input while in search mode"""
@@ -2471,6 +2532,8 @@ class FileManager:
                 self.show_file_details()
             elif self.is_key_for_action(key, 'view_text'):  # View text file
                 self.view_selected_text_file()
+            elif self.is_key_for_action(key, 'edit_file'):  # Edit file with text editor
+                self.edit_selected_file()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
                 self.left_pane_ratio = 0.5
                 self.needs_full_redraw = True

@@ -64,3 +64,7 @@ LOG_HEIGHT_ADJUST_STEP = 0.05  # 5% adjustment per key press
 
 # Search mode constants
 SEARCH_KEY = ord('f')  # Key to enter search mode (F key)
+
+# Text editor constants
+DEFAULT_TEXT_EDITOR = 'vim'  # Default text editor to use
+EDITOR_KEY = ord('e')  # Key to launch text editor (E key)

@@ -45,6 +45,7 @@ class Config:
         'select_all_items': ['A'],
         'sync_panes': ['o', 'O'],
         'view_text': ['v', 'V'],
+        'edit_file': ['e', 'E'],
     }
     
     # File associations (for future use)
@@ -64,6 +65,9 @@ class Config:
     # Performance settings
     MAX_LOG_MESSAGES = 1000
     REFRESH_INTERVAL = 1.0  # seconds
+    
+    # Text editor settings
+    TEXT_EDITOR = 'vim'  # Text editor command (vim, nano, emacs, code, etc.)
     
     # Info dialog settings
     INFO_DIALOG_WIDTH_RATIO = 0.8

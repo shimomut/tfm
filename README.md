@@ -18,6 +18,7 @@ A terminal-based file manager built with Python's curses library. Navigate your 
   - Red text for stderr messages in log pane
 - **Log Management**: Scroll through log messages, auto-scrolls to newest
 - **Text File Viewer**: Built-in text viewer with syntax highlighting for 20+ file formats
+- **Text Editor Integration**: Edit files directly with your preferred text editor (vim, nano, etc.)
 - **Keyboard Navigation**: Full keyboard control with intuitive shortcuts
 - **Cross-platform**: Works on macOS, Linux, and Windows (with proper terminal support)
 
@@ -32,6 +33,7 @@ A terminal-based file manager built with Python's curses library. Navigate your 
 | `←` | Switch to left pane (from right) OR go to parent (in left pane) |
 | `Enter` | Enter directory or view text file with syntax highlighting |
 | `v` | View selected file in text viewer (same as Enter for text files) |
+| `e` | Edit selected file with configured text editor (vim by default) |
 | `Backspace` | Go to parent directory |
 | `l` | Scroll log pane up (older messages) |
 | `L` | Scroll log pane down (newer messages) |

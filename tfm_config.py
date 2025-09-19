@@ -51,6 +51,7 @@ class DefaultConfig:
         'select_all_items': ['A'],
         'sync_panes': ['o', 'O'],
         'view_text': ['v', 'V'],
+        'edit_file': ['e', 'E'],
     }
     
     # File associations (for future use)
@@ -67,6 +68,9 @@ class DefaultConfig:
     # Performance settings
     MAX_LOG_MESSAGES = 1000
     REFRESH_INTERVAL = 1.0  # seconds
+    
+    # Text editor settings
+    TEXT_EDITOR = 'vim'  # Default text editor command
     
     # Info dialog settings
     INFO_DIALOG_WIDTH_RATIO = 0.8
