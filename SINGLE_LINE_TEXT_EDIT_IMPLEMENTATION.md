@@ -58,11 +58,18 @@ The class handles the following key types:
 - **Right Arrow** (261, KEY_RIGHT) - Move cursor right  
 - **Home** (262, KEY_HOME) - Move to beginning
 - **End** (269, KEY_END) - Move to end
+- **Up Arrow** (259, KEY_UP) - Move to beginning (when `handle_vertical_nav=True`)
+- **Down Arrow** (258, KEY_DOWN) - Move to end (when `handle_vertical_nav=True`)
 
 ### Editing Keys
 - **Backspace** (127, 8, 263, KEY_BACKSPACE) - Delete before cursor
 - **Delete** (330, KEY_DC) - Delete at cursor
 - **Printable Characters** (32-126) - Insert character
+
+### Vertical Navigation Control
+The `handle_key()` method accepts an optional `handle_vertical_nav` parameter:
+- When `False` (default): Up/Down keys are not handled, allowing parent dialogs to use them for field navigation
+- When `True`: Up/Down keys move cursor to beginning/end of text
 
 ### Compatibility
 The class handles both curses constants and numeric key codes for maximum compatibility across different terminal environments.
@@ -86,7 +93,7 @@ editor.draw(stdscr, y=10, x=5, max_width=50,
            label="Input: ", is_active=True)
 ```
 
-### Batch Rename Dialog Integration
+### Batch Rename Dialog Integration with Up/Down Navigation
 ```python
 class BatchRenameDialog:
     def __init__(self):
@@ -97,8 +104,12 @@ class BatchRenameDialog:
     def handle_input(self, key):
         if key == 9:  # Tab - switch fields
             self.active_field = 'destination' if self.active_field == 'regex' else 'regex'
+        elif key == 259:  # Up arrow - move to regex field
+            self.active_field = 'regex'
+        elif key == 258:  # Down arrow - move to destination field
+            self.active_field = 'destination'
         else:
-            # Let active editor handle the key
+            # Let active editor handle the key (Up/Down not handled by editor)
             active_editor = self.get_active_editor()
             return active_editor.handle_key(key)
     
@@ -183,12 +194,16 @@ The `[_]` represents the cursor position with reversed highlighting.
 
 ### Existing TFM Dialogs
 The SingleLineTextEdit class can replace manual text editing in:
-- **Batch Rename Dialog** ✅ (Primary use case)
+- **Batch Rename Dialog** ✅ (Primary use case with Up/Down navigation)
 - **File Rename Dialog** (Future enhancement)
 - **Create File Dialog** (Future enhancement)
 - **Create Directory Dialog** (Future enhancement)
 - **Search Dialog** (Future enhancement)
 - **Filter Dialog** (Future enhancement)
+
+### Navigation Patterns
+- **Single Field Dialogs**: Use `handle_vertical_nav=True` for Up/Down cursor movement
+- **Multi-Field Dialogs**: Use `handle_vertical_nav=False` (default) and handle Up/Down at dialog level for field navigation
 
 ### Color Integration
 The class integrates with TFM's color system:

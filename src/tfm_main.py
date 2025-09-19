@@ -17,6 +17,7 @@ import tarfile
 from pathlib import Path
 from datetime import datetime
 from collections import deque
+from tfm_single_line_text_edit import SingleLineTextEdit
 
 # Import constants and colors
 from tfm_const import *
@@ -141,14 +142,13 @@ class FileManager:
         
         # Batch rename dialog state
         self.batch_rename_mode = False
-        self.batch_rename_regex = ""
-        self.batch_rename_destination = ""
+        # Text editors for batch rename dialog
+        self.batch_rename_regex_editor = SingleLineTextEdit()
+        self.batch_rename_destination_editor = SingleLineTextEdit()
+        self.batch_rename_active_field = 'regex'  # 'regex' or 'destination'
         self.batch_rename_files = []  # List of selected files to rename
         self.batch_rename_preview = []  # List of preview results
         self.batch_rename_scroll = 0  # Scroll offset for preview list
-        self.batch_rename_input_mode = 'regex'  # 'regex' or 'destination'
-        self.batch_rename_regex_cursor = 0  # Cursor position in regex field
-        self.batch_rename_destination_cursor = 0  # Cursor position in destination field
         
         # Log pane setup
         max_log_messages = getattr(self.config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
@@ -1705,13 +1705,11 @@ class FileManager:
         
         self.batch_rename_mode = True
         self.batch_rename_files = selected_files
-        self.batch_rename_regex = ""
-        self.batch_rename_destination = ""
+        self.batch_rename_regex_editor.clear()
+        self.batch_rename_destination_editor.clear()
+        self.batch_rename_active_field = 'regex'
         self.batch_rename_preview = []
         self.batch_rename_scroll = 0
-        self.batch_rename_input_mode = 'regex'
-        self.batch_rename_regex_cursor = 0
-        self.batch_rename_destination_cursor = 0
         
         self.needs_full_redraw = True
         print(f"Batch rename mode: {len(selected_files)} files selected")
@@ -1720,13 +1718,11 @@ class FileManager:
         """Exit batch rename mode"""
         self.batch_rename_mode = False
         self.batch_rename_files = []
-        self.batch_rename_regex = ""
-        self.batch_rename_destination = ""
+        self.batch_rename_regex_editor.clear()
+        self.batch_rename_destination_editor.clear()
+        self.batch_rename_active_field = 'regex'
         self.batch_rename_preview = []
         self.batch_rename_scroll = 0
-        self.batch_rename_input_mode = 'regex'
-        self.batch_rename_regex_cursor = 0
-        self.batch_rename_destination_cursor = 0
         self.needs_full_redraw = True
     
     def update_batch_rename_preview(self):
@@ -1735,11 +1731,14 @@ class FileManager:
         
         self.batch_rename_preview = []
         
-        if not self.batch_rename_regex or not self.batch_rename_destination:
+        regex_pattern = self.batch_rename_regex_editor.get_text()
+        destination_pattern = self.batch_rename_destination_editor.get_text()
+        
+        if not regex_pattern or not destination_pattern:
             return
         
         try:
-            pattern = re.compile(self.batch_rename_regex)
+            pattern = re.compile(regex_pattern)
         except re.error as e:
             # Invalid regex pattern
             return
@@ -1750,7 +1749,7 @@ class FileManager:
             
             if match:
                 # Apply destination pattern with substitutions
-                new_name = self.batch_rename_destination
+                new_name = destination_pattern
                 
                 # Replace \0 with entire original filename
                 new_name = new_name.replace('\\0', original_name)
@@ -3573,127 +3572,76 @@ class FileManager:
         # In rename mode, capture most other keys to prevent unintended actions
         return True
     
+    def get_batch_rename_active_editor(self):
+        """Get the currently active batch rename text editor"""
+        return (self.batch_rename_regex_editor if self.batch_rename_active_field == 'regex' 
+                else self.batch_rename_destination_editor)
+    
+    def switch_batch_rename_field(self, field):
+        """Switch to the specified batch rename field"""
+        if field in ['regex', 'destination'] and field != self.batch_rename_active_field:
+            self.batch_rename_active_field = field
+            return True
+        return False
+    
     def handle_batch_rename_input(self, key):
-        """Handle input while in batch rename mode"""
+        """Handle input while in batch rename mode with Up/Down field navigation"""
         if key == 27:  # ESC - cancel batch rename
             print("Batch rename cancelled")
             self.exit_batch_rename_mode()
             return True
+            
         elif key == KEY_TAB:  # Tab - switch between regex and destination input
-            if self.batch_rename_input_mode == 'regex':
-                self.batch_rename_input_mode = 'destination'
-                # Ensure cursor is within bounds of destination field
-                self.batch_rename_destination_cursor = min(self.batch_rename_destination_cursor, len(self.batch_rename_destination))
+            if self.batch_rename_active_field == 'regex':
+                self.switch_batch_rename_field('destination')
             else:
-                self.batch_rename_input_mode = 'regex'
-                # Ensure cursor is within bounds of regex field
-                self.batch_rename_regex_cursor = min(self.batch_rename_regex_cursor, len(self.batch_rename_regex))
+                self.switch_batch_rename_field('regex')
             self.needs_full_redraw = True
             return True
+            
+        elif key == curses.KEY_UP:
+            # Up arrow - move to regex field (previous field)
+            if self.switch_batch_rename_field('regex'):
+                self.needs_full_redraw = True
+            return True
+            
+        elif key == curses.KEY_DOWN:
+            # Down arrow - move to destination field (next field)
+            if self.switch_batch_rename_field('destination'):
+                self.needs_full_redraw = True
+            return True
+            
+        elif key == curses.KEY_PPAGE:  # Page Up - scroll preview up
+            if self.batch_rename_scroll > 0:
+                self.batch_rename_scroll = max(0, self.batch_rename_scroll - 10)
+                self.needs_full_redraw = True
+            return True
+            
+        elif key == curses.KEY_NPAGE:  # Page Down - scroll preview down
+            if self.batch_rename_preview:
+                max_scroll = max(0, len(self.batch_rename_preview) - 10)
+                self.batch_rename_scroll = min(max_scroll, self.batch_rename_scroll + 10)
+                self.needs_full_redraw = True
+            return True
+            
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
             # Enter - perform batch rename
-            if self.batch_rename_regex and self.batch_rename_destination:
+            regex_text = self.batch_rename_regex_editor.get_text()
+            dest_text = self.batch_rename_destination_editor.get_text()
+            if regex_text and dest_text:
                 self.perform_batch_rename()
             else:
                 print("Please enter both regex pattern and destination pattern")
             return True
-        elif key == curses.KEY_UP:
-            # Scroll preview up
-            if self.batch_rename_scroll > 0:
-                self.batch_rename_scroll -= 1
+            
+        else:
+            # Let the active editor handle other keys
+            active_editor = self.get_batch_rename_active_editor()
+            if active_editor.handle_key(key):
+                # Text changed, update preview
+                self.update_batch_rename_preview()
                 self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_DOWN:
-            # Scroll preview down
-            if self.batch_rename_preview and self.batch_rename_scroll < len(self.batch_rename_preview) - 1:
-                self.batch_rename_scroll += 1
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_LEFT:
-            # Move cursor left in current input field
-            if self.batch_rename_input_mode == 'regex':
-                if self.batch_rename_regex_cursor > 0:
-                    self.batch_rename_regex_cursor -= 1
-                    self.needs_full_redraw = True
-            else:  # destination mode
-                if self.batch_rename_destination_cursor > 0:
-                    self.batch_rename_destination_cursor -= 1
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_RIGHT:
-            # Move cursor right in current input field
-            if self.batch_rename_input_mode == 'regex':
-                if self.batch_rename_regex_cursor < len(self.batch_rename_regex):
-                    self.batch_rename_regex_cursor += 1
-                    self.needs_full_redraw = True
-            else:  # destination mode
-                if self.batch_rename_destination_cursor < len(self.batch_rename_destination):
-                    self.batch_rename_destination_cursor += 1
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_HOME:
-            # Move cursor to beginning of current input field
-            if self.batch_rename_input_mode == 'regex':
-                self.batch_rename_regex_cursor = 0
-            else:  # destination mode
-                self.batch_rename_destination_cursor = 0
-            self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_END:
-            # Move cursor to end of current input field
-            if self.batch_rename_input_mode == 'regex':
-                self.batch_rename_regex_cursor = len(self.batch_rename_regex)
-            else:  # destination mode
-                self.batch_rename_destination_cursor = len(self.batch_rename_destination)
-            self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
-            # Backspace - remove character before cursor
-            if self.batch_rename_input_mode == 'regex':
-                if self.batch_rename_regex_cursor > 0:
-                    self.batch_rename_regex = (self.batch_rename_regex[:self.batch_rename_regex_cursor-1] + 
-                                             self.batch_rename_regex[self.batch_rename_regex_cursor:])
-                    self.batch_rename_regex_cursor -= 1
-                    self.update_batch_rename_preview()
-                    self.needs_full_redraw = True
-            else:  # destination mode
-                if self.batch_rename_destination_cursor > 0:
-                    self.batch_rename_destination = (self.batch_rename_destination[:self.batch_rename_destination_cursor-1] + 
-                                                   self.batch_rename_destination[self.batch_rename_destination_cursor:])
-                    self.batch_rename_destination_cursor -= 1
-                    self.update_batch_rename_preview()
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_DC:  # Delete key - remove character at cursor
-            if self.batch_rename_input_mode == 'regex':
-                if self.batch_rename_regex_cursor < len(self.batch_rename_regex):
-                    self.batch_rename_regex = (self.batch_rename_regex[:self.batch_rename_regex_cursor] + 
-                                             self.batch_rename_regex[self.batch_rename_regex_cursor+1:])
-                    self.update_batch_rename_preview()
-                    self.needs_full_redraw = True
-            else:  # destination mode
-                if self.batch_rename_destination_cursor < len(self.batch_rename_destination):
-                    self.batch_rename_destination = (self.batch_rename_destination[:self.batch_rename_destination_cursor] + 
-                                                   self.batch_rename_destination[self.batch_rename_destination_cursor+1:])
-                    self.update_batch_rename_preview()
-                    self.needs_full_redraw = True
-            return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Insert character at cursor position
-            char = chr(key)
-            if self.batch_rename_input_mode == 'regex':
-                self.batch_rename_regex = (self.batch_rename_regex[:self.batch_rename_regex_cursor] + 
-                                         char + 
-                                         self.batch_rename_regex[self.batch_rename_regex_cursor:])
-                self.batch_rename_regex_cursor += 1
-            else:  # destination mode
-                self.batch_rename_destination = (self.batch_rename_destination[:self.batch_rename_destination_cursor] + 
-                                               char + 
-                                               self.batch_rename_destination[self.batch_rename_destination_cursor:])
-                self.batch_rename_destination_cursor += 1
-            self.update_batch_rename_preview()
-            self.needs_full_redraw = True
-            return True
+                return True
         
         # In batch rename mode, capture most other keys to prevent unintended actions
         return True
@@ -4507,65 +4455,7 @@ class FileManager:
             if help_x >= start_x:
                 self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
     
-    def _draw_input_field_with_cursor(self, y, x, max_width, label, text, cursor_pos, is_active):
-        """Draw an input field with cursor highlighting using reversed colors"""
-        # Calculate available space for text after label
-        text_start_x = x + len(label)
-        text_max_width = max_width - len(label)
-        
-        if text_max_width <= 0:
-            return
-        
-        # Draw the label
-        base_color = get_status_color() | (curses.A_BOLD if is_active else 0)
-        self.safe_addstr(y, x, label, base_color)
-        
-        # Handle empty text case
-        if not text:
-            if is_active:
-                # Show cursor at beginning of empty field
-                self.safe_addstr(y, text_start_x, " ", base_color | curses.A_REVERSE)
-            return
-        
-        # Ensure cursor is within bounds
-        cursor_pos = max(0, min(cursor_pos, len(text)))
-        
-        # Calculate visible text window if text is too long
-        visible_start = 0
-        visible_end = len(text)
-        
-        if len(text) > text_max_width:
-            # Adjust visible window to keep cursor in view
-            if cursor_pos < text_max_width // 2:
-                # Cursor near start, show from beginning
-                visible_end = text_max_width
-            elif cursor_pos > len(text) - text_max_width // 2:
-                # Cursor near end, show end portion
-                visible_start = len(text) - text_max_width
-            else:
-                # Cursor in middle, center the view
-                visible_start = cursor_pos - text_max_width // 2
-                visible_end = visible_start + text_max_width
-        
-        visible_text = text[visible_start:visible_end]
-        cursor_in_visible = cursor_pos - visible_start
-        
-        # Draw text with cursor highlighting
-        current_x = text_start_x
-        
-        for i, char in enumerate(visible_text):
-            if i == cursor_in_visible and is_active:
-                # Draw cursor character with reversed colors
-                self.safe_addstr(y, current_x, char, base_color | curses.A_REVERSE)
-            else:
-                # Draw normal character
-                self.safe_addstr(y, current_x, char, base_color)
-            current_x += 1
-        
-        # If cursor is at the end of text and field is active, show cursor after last character
-        if cursor_in_visible >= len(visible_text) and is_active and current_x < x + max_width:
-            self.safe_addstr(y, current_x, " ", base_color | curses.A_REVERSE)
-    
+
     def draw_batch_rename_dialog(self):
         """Draw the batch rename dialog overlay"""
         height, width = self.stdscr.getmaxyx()
@@ -4618,11 +4508,11 @@ class FileManager:
             content_start_x = start_x + 2
             content_width = dialog_width - 4
             
-            # Draw regex input with cursor highlighting
-            self._draw_input_field_with_cursor(
-                regex_y, content_start_x, content_width,
-                regex_label, self.batch_rename_regex, self.batch_rename_regex_cursor,
-                self.batch_rename_input_mode == 'regex'
+            # Draw regex input field using SingleLineTextEdit
+            self.batch_rename_regex_editor.draw(
+                self.stdscr, regex_y, content_start_x, content_width,
+                regex_label,
+                is_active=(self.batch_rename_active_field == 'regex')
             )
         
         # Draw destination input
@@ -4630,33 +4520,39 @@ class FileManager:
         dest_label = "Destination:   "
         
         if dest_y < height:
-            # Draw destination input with cursor highlighting
-            self._draw_input_field_with_cursor(
-                dest_y, content_start_x, content_width,
-                dest_label, self.batch_rename_destination, self.batch_rename_destination_cursor,
-                self.batch_rename_input_mode == 'destination'
+            # Draw destination input field using SingleLineTextEdit
+            self.batch_rename_destination_editor.draw(
+                self.stdscr, dest_y, content_start_x, content_width,
+                dest_label,
+                is_active=(self.batch_rename_active_field == 'destination')
             )
         
+        # Draw navigation help
+        nav_help_y = start_y + 4
+        if nav_help_y < height:
+            nav_help_text = "Navigation: ↑/↓=Switch fields, Tab=Alt switch, PgUp/PgDn=Scroll preview"
+            self.safe_addstr(nav_help_y, content_start_x, nav_help_text[:content_width], get_status_color() | curses.A_DIM)
+        
         # Draw help for macros
-        help_y = start_y + 4
+        help_y = start_y + 5
         if help_y < height:
             help_text = "Macros: \\0=full name, \\1-\\9=regex groups, \\d=index"
             self.safe_addstr(help_y, content_start_x, help_text[:content_width], get_status_color() | curses.A_DIM)
         
         # Draw separator line
-        sep_y = start_y + 5
+        sep_y = start_y + 6
         if sep_y < height:
             sep_line = "├" + "─" * (dialog_width - 2) + "┤"
             self.safe_addstr(sep_y, start_x, sep_line[:dialog_width], border_color)
         
         # Draw preview header
-        preview_header_y = start_y + 6
+        preview_header_y = start_y + 7
         if preview_header_y < height:
             header_text = "Preview:"
             self.safe_addstr(preview_header_y, content_start_x, header_text, get_status_color() | curses.A_BOLD)
         
         # Calculate preview area
-        preview_start_y = start_y + 7
+        preview_start_y = start_y + 8
         preview_end_y = start_y + dialog_height - 3
         preview_height = preview_end_y - preview_start_y + 1
         

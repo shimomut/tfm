@@ -11,7 +11,7 @@ This module provides a reusable SingleLineTextEdit class that handles:
 """
 
 import curses
-from .tfm_colors import get_status_color
+from tfm_colors import get_status_color
 
 
 class SingleLineTextEdit:
@@ -125,12 +125,13 @@ class SingleLineTextEdit:
             return True
         return False
         
-    def handle_key(self, key):
+    def handle_key(self, key, handle_vertical_nav=False):
         """
         Handle a key press and update the text/cursor accordingly
         
         Args:
             key (int): The key code from curses
+            handle_vertical_nav (bool): Whether to handle Up/Down keys for cursor movement
             
         Returns:
             bool: True if the key was handled, False otherwise
@@ -143,6 +144,12 @@ class SingleLineTextEdit:
         elif key == 262 or (hasattr(curses, 'KEY_HOME') and key == curses.KEY_HOME):
             return self.move_cursor_home()
         elif key == 269 or (hasattr(curses, 'KEY_END') and key == curses.KEY_END):
+            return self.move_cursor_end()
+        elif handle_vertical_nav and (key == 259 or (hasattr(curses, 'KEY_UP') and key == curses.KEY_UP)):
+            # Up arrow - move to beginning of line when vertical nav is enabled
+            return self.move_cursor_home()
+        elif handle_vertical_nav and (key == 258 or (hasattr(curses, 'KEY_DOWN') and key == curses.KEY_DOWN)):
+            # Down arrow - move to end of line when vertical nav is enabled
             return self.move_cursor_end()
         elif (key == 263 or key == 127 or key == 8 or 
               (hasattr(curses, 'KEY_BACKSPACE') and key == curses.KEY_BACKSPACE)):
