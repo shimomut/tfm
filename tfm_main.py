@@ -1911,6 +1911,141 @@ class FileManager:
             # Resume curses even if there's an error
             self.resume_curses()
             print(f"Error launching editor: {e}")
+    
+    def copy_selected_files(self):
+        """Copy selected files to the opposite pane's directory"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Get files to copy - either selected files or current file if none selected
+        files_to_copy = []
+        
+        if current_pane['selected_files']:
+            # Copy all selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_copy.append(file_path)
+        else:
+            # Copy current file if no files are selected
+            if current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']]
+                
+                # Don't copy parent directory (..)
+                if (current_pane['selected_index'] == 0 and 
+                    len(current_pane['files']) > 0 and 
+                    selected_file == current_pane['path'].parent):
+                    print("Cannot copy parent directory (..)")
+                    return
+                
+                files_to_copy.append(selected_file)
+        
+        if not files_to_copy:
+            print("No files to copy")
+            return
+        
+        destination_dir = other_pane['path']
+        
+        # Check if destination directory is writable
+        if not os.access(destination_dir, os.W_OK):
+            print(f"Permission denied: Cannot write to {destination_dir}")
+            return
+        
+        # Start copying files
+        self.copy_files_to_directory(files_to_copy, destination_dir)
+    
+    def copy_files_to_directory(self, files_to_copy, destination_dir):
+        """Copy a list of files to the destination directory with conflict resolution"""
+        conflicts = []
+        
+        # Check for conflicts first
+        for source_file in files_to_copy:
+            dest_path = destination_dir / source_file.name
+            if dest_path.exists():
+                conflicts.append((source_file, dest_path))
+        
+        if conflicts:
+            # Show conflict resolution dialog
+            conflict_names = [f.name for f, _ in conflicts]
+            if len(conflicts) == 1:
+                message = f"'{conflict_names[0]}' already exists in destination."
+            else:
+                message = f"{len(conflicts)} files already exist in destination."
+            
+            choices = [
+                {"text": "Overwrite", "key": "o", "value": "overwrite"},
+                {"text": "Skip", "key": "s", "value": "skip"},
+                {"text": "Cancel", "key": "c", "value": "cancel"}
+            ]
+            
+            def handle_conflict_choice(choice):
+                if choice == "cancel":
+                    print("Copy operation cancelled")
+                    return
+                elif choice == "skip":
+                    # Copy only non-conflicting files
+                    non_conflicting = [f for f in files_to_copy 
+                                     if not (destination_dir / f.name).exists()]
+                    if non_conflicting:
+                        self.perform_copy_operation(non_conflicting, destination_dir)
+                        print(f"Copied {len(non_conflicting)} files, skipped {len(conflicts)} conflicts")
+                    else:
+                        print("No files copied (all had conflicts)")
+                elif choice == "overwrite":
+                    # Copy all files, overwriting conflicts
+                    self.perform_copy_operation(files_to_copy, destination_dir, overwrite=True)
+                    print(f"Copied {len(files_to_copy)} files (overwrote {len(conflicts)} existing)")
+            
+            self.show_dialog(message, choices, handle_conflict_choice)
+        else:
+            # No conflicts, copy directly
+            self.perform_copy_operation(files_to_copy, destination_dir)
+            print(f"Copied {len(files_to_copy)} files")
+    
+    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False):
+        """Perform the actual copy operation"""
+        copied_count = 0
+        error_count = 0
+        
+        for source_file in files_to_copy:
+            try:
+                dest_path = destination_dir / source_file.name
+                
+                # Skip if file exists and we're not overwriting
+                if dest_path.exists() and not overwrite:
+                    continue
+                
+                if source_file.is_dir():
+                    # Copy directory recursively
+                    if dest_path.exists():
+                        shutil.rmtree(dest_path)
+                    shutil.copytree(source_file, dest_path)
+                    print(f"Copied directory: {source_file.name}")
+                else:
+                    # Copy file
+                    shutil.copy2(source_file, dest_path)
+                    print(f"Copied file: {source_file.name}")
+                
+                copied_count += 1
+                
+            except PermissionError as e:
+                print(f"Permission denied copying {source_file.name}: {e}")
+                error_count += 1
+            except Exception as e:
+                print(f"Error copying {source_file.name}: {e}")
+                error_count += 1
+        
+        # Refresh both panes to show the copied files
+        self.refresh_files()
+        self.needs_full_redraw = True
+        
+        # Clear selections after successful copy
+        if copied_count > 0:
+            current_pane = self.get_current_pane()
+            current_pane['selected_files'].clear()
+        
+        if error_count > 0:
+            print(f"Copy completed with {error_count} errors")
         
     def handle_search_input(self, key):
         """Handle input while in search mode"""
@@ -2611,6 +2746,8 @@ class FileManager:
                 self.view_selected_text_file()
             elif self.is_key_for_action(key, 'edit_file'):  # Edit file with text editor
                 self.edit_selected_file()
+            elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
+                self.copy_selected_files()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50

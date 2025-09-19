@@ -46,6 +46,7 @@ class Config:
         'sync_panes': ['o', 'O'],
         'view_text': ['v', 'V'],
         'edit_file': ['e', 'E'],
+        'copy_files': ['c', 'C'],
     }
     
     # File associations (for future use)
