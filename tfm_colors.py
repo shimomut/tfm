@@ -12,6 +12,9 @@ COLOR_HEADER = 5        # File list headers (directory paths)
 COLOR_FOOTER = 6        # File list footers (file counts)
 COLOR_STATUS = 7        # Status bar
 COLOR_BOUNDARY = 8      # Pane boundaries
+COLOR_REGULAR_FILE = 9  # Regular files
+COLOR_LOG_STDOUT = 10   # Stdout log messages
+COLOR_LOG_SYSTEM = 11   # System log messages
 
 # Custom RGB color definitions (RGB values 0-255)
 RGB_COLORS = {
@@ -37,7 +40,7 @@ RGB_COLORS = {
     },
     'DIRECTORY_FG': {
         'color_num': 101,
-        'rgb': (0, 204, 204),    # Bright cyan for directories
+        'rgb': (204, 204, 120),  # Yellow for directories
         'description': 'Bright cyan for directory names'
     },
     'EXECUTABLE_FG': {
@@ -49,6 +52,21 @@ RGB_COLORS = {
         'color_num': 103,
         'rgb': (255, 229, 0),    # Bright yellow for selected items
         'description': 'Bright yellow for selected items'
+    },
+    'REGULAR_FILE_FG': {
+        'color_num': 107,
+        'rgb': (220, 220, 220),  # Light gray for regular files
+        'description': 'Light gray for regular files'
+    },
+    'LOG_STDOUT_FG': {
+        'color_num': 108,
+        'rgb': (220, 220, 220),  # Light gray for regular files
+        'description': 'Medium gray for stdout log messages'
+    },
+    'LOG_SYSTEM_FG': {
+        'color_num': 109,
+        'rgb': (100, 200, 255),  # Light blue for system logs
+        'description': 'Light blue for system log messages'
     }
 }
 
@@ -60,7 +78,10 @@ FALLBACK_COLORS = {
     'BOUNDARY_BG': 19,       # Medium blue for boundaries
     'DIRECTORY_FG': curses.COLOR_CYAN,
     'EXECUTABLE_FG': curses.COLOR_GREEN,
-    'SELECTED_FG': curses.COLOR_YELLOW
+    'SELECTED_FG': curses.COLOR_YELLOW,
+    'REGULAR_FILE_FG': curses.COLOR_WHITE,
+    'LOG_STDOUT_FG': curses.COLOR_WHITE,
+    'LOG_SYSTEM_FG': curses.COLOR_BLUE
 }
 
 def init_colors():
@@ -94,6 +115,9 @@ def init_colors():
             directory_fg = RGB_COLORS['DIRECTORY_FG']['color_num']
             executable_fg = RGB_COLORS['EXECUTABLE_FG']['color_num']
             selected_fg = RGB_COLORS['SELECTED_FG']['color_num']
+            regular_file_fg = RGB_COLORS['REGULAR_FILE_FG']['color_num']
+            log_stdout_fg = RGB_COLORS['LOG_STDOUT_FG']['color_num']
+            log_system_fg = RGB_COLORS['LOG_SYSTEM_FG']['color_num']
             
         except curses.error:
             rgb_success = False
@@ -107,6 +131,9 @@ def init_colors():
         directory_fg = FALLBACK_COLORS['DIRECTORY_FG']
         executable_fg = FALLBACK_COLORS['EXECUTABLE_FG']
         selected_fg = FALLBACK_COLORS['SELECTED_FG']
+        regular_file_fg = FALLBACK_COLORS['REGULAR_FILE_FG']
+        log_stdout_fg = FALLBACK_COLORS['LOG_STDOUT_FG']
+        log_system_fg = FALLBACK_COLORS['LOG_SYSTEM_FG']
     
     # Initialize color pairs
     curses.init_pair(COLOR_DIRECTORIES, directory_fg, curses.COLOR_BLACK)
@@ -117,15 +144,19 @@ def init_colors():
     curses.init_pair(COLOR_FOOTER, curses.COLOR_WHITE, footer_bg)
     curses.init_pair(COLOR_STATUS, curses.COLOR_WHITE, status_bg)
     curses.init_pair(COLOR_BOUNDARY, curses.COLOR_WHITE, boundary_bg)
+    curses.init_pair(COLOR_REGULAR_FILE, regular_file_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_LOG_STDOUT, log_stdout_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_LOG_SYSTEM, log_system_fg, curses.COLOR_BLACK)
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """Get the appropriate color for a file based on its properties"""
-    base_color = curses.A_NORMAL
-    
     if is_dir:
         base_color = curses.color_pair(COLOR_DIRECTORIES) | curses.A_BOLD
     elif is_executable:
         base_color = curses.color_pair(COLOR_EXECUTABLES)
+    else:
+        # Regular files now use custom RGB color instead of A_NORMAL
+        base_color = curses.color_pair(COLOR_REGULAR_FILE)
     
     # Apply selection highlighting
     if is_selected and is_active:
@@ -222,6 +253,8 @@ def get_log_color(source):
     if source == "STDERR":
         return curses.color_pair(COLOR_ERROR)  # Red for stderr
     elif source == "SYSTEM":
-        return curses.color_pair(COLOR_SELECTED)  # Yellow for system messages
+        return curses.color_pair(COLOR_LOG_SYSTEM)  # Light blue for system messages
+    elif source == "STDOUT":
+        return curses.color_pair(COLOR_LOG_STDOUT)  # Medium gray for stdout
     else:
-        return curses.A_NORMAL
+        return curses.color_pair(COLOR_LOG_STDOUT)  # Default to stdout color
