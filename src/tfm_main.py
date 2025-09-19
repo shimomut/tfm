@@ -88,6 +88,10 @@ class FileManager:
         self.create_dir_mode = False
         self.create_dir_pattern = ""
         
+        # Create file mode state
+        self.create_file_mode = False
+        self.create_file_pattern = ""
+        
         # Multi-choice dialog state
         self.dialog_mode = False
         self.dialog_message = ""
@@ -1058,6 +1062,29 @@ class FileManager:
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             return
         
+        # If in create file mode, show create file interface
+        if self.create_file_mode:
+            # Fill entire status line with background color
+            status_line = " " * (width - 1)
+            self.safe_addstr(status_y, 0, status_line, get_status_color())
+            
+            # Show create file prompt and pattern
+            create_prompt = f"Create file: {self.create_file_pattern}"
+            
+            # Add cursor indicator
+            create_prompt += "_"
+            
+            # Draw create file prompt
+            self.safe_addstr(status_y, 2, create_prompt, get_status_color())
+            
+            # Show help text on the right if there's space
+            help_text = "ESC:cancel Enter:create"
+            if len(create_prompt) + len(help_text) + 6 < width:
+                help_x = width - len(help_text) - 3
+                if help_x > len(create_prompt) + 4:  # Ensure no overlap
+                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            return
+        
         # Normal status display
         # Left side: status info
         status_parts = []
@@ -1352,6 +1379,77 @@ class FileManager:
         except OSError as e:
             print(f"Failed to create directory '{new_dir_name}': {e}")
             self.exit_create_directory_mode()
+    
+    def enter_create_file_mode(self):
+        """Enter create file mode"""
+        current_pane = self.get_current_pane()
+        
+        # Check if current directory is writable
+        if not os.access(current_pane['path'], os.W_OK):
+            print(f"Permission denied: Cannot create file in {current_pane['path']}")
+            return
+        
+        # Enter create file mode
+        self.create_file_mode = True
+        self.create_file_pattern = ""
+        self.needs_full_redraw = True
+        print("Creating new text file...")
+    
+    def exit_create_file_mode(self):
+        """Exit create file mode"""
+        self.create_file_mode = False
+        self.create_file_pattern = ""
+        self.needs_full_redraw = True
+    
+    def perform_create_file(self):
+        """Perform the actual file creation"""
+        if not self.create_file_pattern.strip():
+            print("Invalid file name")
+            self.exit_create_file_mode()
+            return
+        
+        current_pane = self.get_current_pane()
+        new_file_name = self.create_file_pattern.strip()
+        new_file_path = current_pane['path'] / new_file_name
+        
+        # Check if file already exists
+        if new_file_path.exists():
+            print(f"File '{new_file_name}' already exists")
+            self.exit_create_file_mode()
+            return
+        
+        try:
+            # Create the empty file
+            new_file_path.touch()
+            print(f"Created file: {new_file_name}")
+            
+            # Refresh the current pane to show the new file
+            self.refresh_files(current_pane)
+            
+            # Move cursor to the newly created file
+            for i, file_path in enumerate(current_pane['files']):
+                if file_path.name == new_file_name:
+                    current_pane['selected_index'] = i
+                    # Adjust scroll if needed
+                    height, width = self.stdscr.getmaxyx()
+                    calculated_height = int(height * self.log_height_ratio)
+                    log_height = calculated_height if self.log_height_ratio > 0 else 0
+                    display_height = height - log_height - 4
+                    
+                    if current_pane['selected_index'] < current_pane['scroll_offset']:
+                        current_pane['scroll_offset'] = current_pane['selected_index']
+                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
+                        current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+                    break
+            
+            # Automatically open the file in the text editor
+            self.edit_selected_file()
+            
+            self.exit_create_file_mode()
+            
+        except OSError as e:
+            print(f"Failed to create file '{new_file_name}': {e}")
+            self.exit_create_file_mode()
     
     def perform_rename(self):
         """Perform the actual rename operation"""
@@ -1856,7 +1954,8 @@ class FileManager:
         help_lines.append("a                Select all files")
         help_lines.append("A                Select all items (files + directories)")
         help_lines.append("v / V            View text file")
-        help_lines.append("e / E            Edit file with text editor")
+        help_lines.append("e                Edit existing file with text editor")
+        help_lines.append("E                Create new text file and edit")
         help_lines.append("i / I            Show file details")
         help_lines.append("c / C            Copy files to other pane")
         help_lines.append("m / M            Move files to other pane / Create directory (no selection)")
@@ -2484,6 +2583,31 @@ class FileManager:
         
         # In create directory mode, capture most other keys to prevent unintended actions
         return True
+    
+    def handle_create_file_input(self, key):
+        """Handle input while in create file mode"""
+        if key == 27:  # ESC - cancel file creation
+            print("File creation cancelled")
+            self.exit_create_file_mode()
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Enter - create file
+            self.perform_create_file()
+            return True
+        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
+            # Backspace - remove last character
+            if self.create_file_pattern:
+                self.create_file_pattern = self.create_file_pattern[:-1]
+                self.needs_full_redraw = True
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            # Add character to file name pattern
+            self.create_file_pattern += chr(key)
+            self.needs_full_redraw = True
+            return True
+        
+        # In create file mode, capture most other keys to prevent unintended actions
+        return True
         
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
@@ -2937,6 +3061,11 @@ class FileManager:
                 if self.handle_create_directory_input(key):
                     continue  # Create directory mode handled the key
             
+            # Handle create file mode input
+            if self.create_file_mode:
+                if self.handle_create_file_input(key):
+                    continue  # Create file mode handled the key
+            
             # Handle dialog mode input
             if self.dialog_mode:
                 if self.handle_dialog_input(key):
@@ -2949,7 +3078,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting search mode while help dialog is open
-            if self.dialog_mode or self.info_dialog_mode or self.search_mode or self.rename_mode or self.create_dir_mode:
+            if self.dialog_mode or self.info_dialog_mode or self.search_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
@@ -3138,8 +3267,10 @@ class FileManager:
                 self.show_file_details()
             elif self.is_key_for_action(key, 'view_text'):  # View text file
                 self.view_selected_text_file()
-            elif self.is_key_for_action(key, 'edit_file'):  # Edit file with text editor
+            elif key == ord('e'):  # 'e' key - edit existing file
                 self.edit_selected_file()
+            elif key == ord('E'):  # 'E' key (Shift-E) - create new file
+                self.enter_create_file_mode()
             elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
                 self.copy_selected_files()
             elif self.is_key_for_action(key, 'move_files'):  # Move selected files
