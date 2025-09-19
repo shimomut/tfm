@@ -12,6 +12,8 @@ import sys
 import io
 import fnmatch
 import shlex
+import zipfile
+import tarfile
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -99,6 +101,10 @@ class FileManager:
         # Create file mode state
         self.create_file_mode = False
         self.create_file_pattern = ""
+        
+        # Create archive mode state
+        self.create_archive_mode = False
+        self.create_archive_pattern = ""
         
         # Quick choice dialog state
         self.quick_choice_mode = False
@@ -1165,6 +1171,29 @@ class FileManager:
             
             # Show help text on the right if there's space
             help_text = "ESC:cancel Enter:create"
+            if len(create_prompt) + len(help_text) + 6 < width:
+                help_x = width - len(help_text) - 3
+                if help_x > len(create_prompt) + 4:  # Ensure no overlap
+                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            return
+        
+        # If in create archive mode, show create archive interface
+        if self.create_archive_mode:
+            # Fill entire status line with background color
+            status_line = " " * (width - 1)
+            self.safe_addstr(status_y, 0, status_line, get_status_color())
+            
+            # Show create archive prompt and pattern
+            create_prompt = f"Archive filename: {self.create_archive_pattern}"
+            
+            # Add cursor indicator
+            create_prompt += "_"
+            
+            # Draw create archive prompt
+            self.safe_addstr(status_y, 2, create_prompt, get_status_color())
+            
+            # Show help text on the right if there's space
+            help_text = "ESC:cancel Enter:create (.zip/.tar.gz/.tgz)"
             if len(create_prompt) + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
                 if help_x > len(create_prompt) + 4:  # Ensure no overlap
@@ -3015,6 +3044,170 @@ class FileManager:
             print(f"Successfully deleted {deleted_count} items")
         if error_count > 0:
             print(f"Delete completed with {error_count} errors")
+    
+    def enter_create_archive_mode(self):
+        """Enter archive creation mode"""
+        current_pane = self.get_current_pane()
+        
+        # Check if there are files to archive
+        files_to_archive = []
+        
+        if current_pane['selected_files']:
+            # Archive selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_archive.append(file_path)
+        else:
+            # Archive current file if no files are selected
+            if current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']]
+                files_to_archive.append(selected_file)
+        
+        if not files_to_archive:
+            print("No files to archive")
+            return
+        
+        # Enter archive creation mode
+        self.create_archive_mode = True
+        self.create_archive_pattern = ""
+        self.needs_full_redraw = True
+        
+        # Log what we're about to archive
+        if len(files_to_archive) == 1:
+            print(f"Creating archive from: {files_to_archive[0].name}")
+        else:
+            print(f"Creating archive from {len(files_to_archive)} selected items")
+        print("Enter archive filename (with .zip, .tar.gz, or .tgz extension):")
+    
+    def exit_create_archive_mode(self):
+        """Exit archive creation mode"""
+        self.create_archive_mode = False
+        self.create_archive_pattern = ""
+        self.needs_full_redraw = True
+    
+    def handle_create_archive_input(self, key):
+        """Handle input while in create archive mode"""
+        if key == 27:  # ESC - cancel archive creation
+            print("Archive creation cancelled")
+            self.exit_create_archive_mode()
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Enter - create archive
+            self.perform_create_archive()
+            return True
+        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
+            # Backspace - remove last character
+            if self.create_archive_pattern:
+                self.create_archive_pattern = self.create_archive_pattern[:-1]
+                self.needs_full_redraw = True
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            self.create_archive_pattern += chr(key)
+            self.needs_full_redraw = True
+            return True
+        
+        return False
+    
+    def perform_create_archive(self):
+        """Create the archive file"""
+        if not self.create_archive_pattern.strip():
+            print("Archive filename cannot be empty")
+            return
+        
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Get files to archive
+        files_to_archive = []
+        
+        if current_pane['selected_files']:
+            # Archive selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_archive.append(file_path)
+        else:
+            # Archive current file if no files are selected
+            if current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']]
+                files_to_archive.append(selected_file)
+        
+        if not files_to_archive:
+            print("No files to archive")
+            self.exit_create_archive_mode()
+            return
+        
+        # Determine archive path (save to other pane's directory)
+        archive_filename = self.create_archive_pattern.strip()
+        archive_path = other_pane['path'] / archive_filename
+        
+        # Detect archive format from extension
+        archive_format = self.detect_archive_format(archive_filename)
+        if not archive_format:
+            print("Unsupported archive format. Use .zip, .tar.gz, or .tgz extension")
+            return
+        
+        try:
+            if archive_format == 'zip':
+                self.create_zip_archive(archive_path, files_to_archive)
+            elif archive_format in ['tar.gz', 'tgz']:
+                self.create_tar_archive(archive_path, files_to_archive)
+            
+            print(f"Archive created successfully: {archive_path}")
+            
+            # Refresh the other pane to show the new archive
+            self.refresh_files(other_pane)
+            self.needs_full_redraw = True
+            
+        except Exception as e:
+            print(f"Error creating archive: {e}")
+        
+        self.exit_create_archive_mode()
+    
+    def detect_archive_format(self, filename):
+        """Detect archive format from filename extension"""
+        filename_lower = filename.lower()
+        
+        if filename_lower.endswith('.zip'):
+            return 'zip'
+        elif filename_lower.endswith('.tar.gz'):
+            return 'tar.gz'
+        elif filename_lower.endswith('.tgz'):
+            return 'tgz'
+        else:
+            return None
+    
+    def create_zip_archive(self, archive_path, files_to_archive):
+        """Create a ZIP archive"""
+        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in files_to_archive:
+                if file_path.is_file():
+                    # Add file to archive
+                    zipf.write(file_path, file_path.name)
+                elif file_path.is_dir():
+                    # Add directory recursively
+                    for root, dirs, files in os.walk(file_path):
+                        root_path = Path(root)
+                        # Calculate relative path from the base directory
+                        rel_path = root_path.relative_to(file_path.parent)
+                        
+                        # Add directory entry
+                        if rel_path != Path('.'):
+                            zipf.write(root_path, str(rel_path) + '/')
+                        
+                        # Add files in directory
+                        for file in files:
+                            file_full_path = root_path / file
+                            file_rel_path = file_full_path.relative_to(file_path.parent)
+                            zipf.write(file_full_path, str(file_rel_path))
+    
+    def create_tar_archive(self, archive_path, files_to_archive):
+        """Create a TAR.GZ archive"""
+        with tarfile.open(archive_path, 'w:gz') as tarf:
+            for file_path in files_to_archive:
+                # Add file or directory to archive with its name as the archive name
+                tarf.add(file_path, arcname=file_path.name)
         
     def handle_isearch_input(self, key):
         """Handle input while in isearch mode"""
@@ -4092,6 +4285,11 @@ class FileManager:
                 if self.handle_create_file_input(key):
                     continue  # Create file mode handled the key
             
+            # Handle create archive mode input
+            if self.create_archive_mode:
+                if self.handle_create_archive_input(key):
+                    continue  # Create archive mode handled the key
+            
             # Handle quick choice mode input
             if self.quick_choice_mode:
                 if self.handle_quick_choice_input(key):
@@ -4114,7 +4312,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
+            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
@@ -4325,6 +4523,8 @@ class FileManager:
                 self.move_selected_files()
             elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
                 self.delete_selected_files()
+            elif self.is_key_for_action(key, 'create_archive'):  # Create archive
+                self.enter_create_archive_mode()
             elif self.is_key_for_action(key, 'rename_file'):  # Rename file
                 self.enter_rename_mode()
             elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories

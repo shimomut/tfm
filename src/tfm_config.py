@@ -60,6 +60,7 @@ class DefaultConfig:
         'rename_file': ['r', 'R'],
         'favorites': ['j', 'J'],
         'subshell': ['x', 'X'],
+        'create_archive': ['p', 'P'],
     }
     
     # File associations (for future use)

@@ -32,6 +32,7 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 - **Rename Files**: Rename files/directories with 'R' key
 - **Create Files**: Create new text files with 'Shift+E' and auto-edit
 - **Create Directories**: Create new directories with 'M' key (when no selection)
+- **Create Archives**: Create ZIP, TAR.GZ, or TGZ archives with 'P' key
 - **Multi-Selection**: Select multiple files with Space bar for batch operations
 - **Conflict Resolution**: Interactive dialogs for handling existing files
 
@@ -66,10 +67,12 @@ TFM provides comprehensive file management capabilities with intuitive keyboard 
 - **Conflict Resolution**: Interactive dialogs handle existing files during copy/move
 - **Directory Operations**: All operations work on directories (recursive)
 - **Symbolic Links**: Proper handling of symbolic links (preserved during operations)
+- **Archive Creation**: Create compressed archives from selected files/directories
 
 ### File Creation
 - **New Files**: Press 'Shift+E' to create and immediately edit new text files
 - **New Directories**: Press 'M' with no selection to create new directories
+- **New Archives**: Press 'P' to create ZIP, TAR.GZ, or TGZ archives from selected files
 - **Auto-Editor**: New files automatically open in your configured text editor
 
 ### Safety Features
@@ -126,6 +129,7 @@ The help dialog is your quick reference guide - no need to memorize all key bind
 | `r/R` | Rename selected file |
 | `e` | Edit selected file with configured text editor |
 | `E` | Create new text file and edit |
+| `p/P` | Create archive from selected files (.zip, .tar.gz, .tgz) |
 | `v` | View selected file in text viewer |
 
 ### Display & Search

@@ -48,6 +48,7 @@ class Config:
         'delete_files': ['k', 'K'],
         'rename_file': ['r', 'R'],
         'favorites': ['j', 'J'],
+        'create_archive': ['p', 'P'],
     }
     
     # File associations (for future use)
