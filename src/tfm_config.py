@@ -51,6 +51,7 @@ class DefaultConfig:
         'view_text': ['v', 'V'],
         'edit_file': ['e', 'E'],
         'copy_files': ['c', 'C'],
+        'move_files': ['m', 'M'],
         'delete_files': ['k', 'K'],
     }
     

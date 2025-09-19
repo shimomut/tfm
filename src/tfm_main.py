@@ -1982,6 +1982,164 @@ class FileManager:
         if error_count > 0:
             print(f"Copy completed with {error_count} errors")
     
+    def move_selected_files(self):
+        """Move selected files to the opposite pane's directory"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Get files to move - either selected files or current file if none selected
+        files_to_move = []
+        
+        if current_pane['selected_files']:
+            # Move all selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_move.append(file_path)
+        else:
+            # Move current file if no files are selected
+            if current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']]
+                
+                # Don't move parent directory (..)
+                if (current_pane['selected_index'] == 0 and 
+                    len(current_pane['files']) > 0 and 
+                    selected_file == current_pane['path'].parent):
+                    print("Cannot move parent directory (..)")
+                    return
+                
+                files_to_move.append(selected_file)
+        
+        if not files_to_move:
+            print("No files to move")
+            return
+        
+        destination_dir = other_pane['path']
+        
+        # Check if destination directory is writable
+        if not os.access(destination_dir, os.W_OK):
+            print(f"Permission denied: Cannot write to {destination_dir}")
+            return
+        
+        # Check if any files are being moved to the same directory
+        same_dir_files = [f for f in files_to_move if f.parent == destination_dir]
+        if same_dir_files:
+            if len(same_dir_files) == len(files_to_move):
+                print("Cannot move files to the same directory")
+                return
+            else:
+                # Remove files that are already in the destination directory
+                files_to_move = [f for f in files_to_move if f.parent != destination_dir]
+                print(f"Skipping {len(same_dir_files)} files already in destination directory")
+        
+        # Start moving files
+        self.move_files_to_directory(files_to_move, destination_dir)
+    
+    def move_files_to_directory(self, files_to_move, destination_dir):
+        """Move a list of files to the destination directory with conflict resolution"""
+        conflicts = []
+        
+        # Check for conflicts first
+        for source_file in files_to_move:
+            dest_path = destination_dir / source_file.name
+            if dest_path.exists():
+                conflicts.append((source_file, dest_path))
+        
+        if conflicts:
+            # Show conflict resolution dialog
+            conflict_names = [f.name for f, _ in conflicts]
+            if len(conflicts) == 1:
+                message = f"'{conflict_names[0]}' already exists in destination."
+            else:
+                message = f"{len(conflicts)} files already exist in destination."
+            
+            choices = [
+                {"text": "Overwrite", "key": "o", "value": "overwrite"},
+                {"text": "Skip", "key": "s", "value": "skip"},
+                {"text": "Cancel", "key": "c", "value": "cancel"}
+            ]
+            
+            def handle_conflict_choice(choice):
+                if choice == "cancel":
+                    print("Move operation cancelled")
+                    return
+                elif choice == "skip":
+                    # Move only non-conflicting files
+                    non_conflicting = [f for f in files_to_move 
+                                     if not (destination_dir / f.name).exists()]
+                    if non_conflicting:
+                        self.perform_move_operation(non_conflicting, destination_dir)
+                        print(f"Moved {len(non_conflicting)} files, skipped {len(conflicts)} conflicts")
+                    else:
+                        print("No files moved (all had conflicts)")
+                elif choice == "overwrite":
+                    # Move all files, overwriting conflicts
+                    self.perform_move_operation(files_to_move, destination_dir, overwrite=True)
+                    print(f"Moved {len(files_to_move)} files (overwrote {len(conflicts)} existing)")
+            
+            self.show_dialog(message, choices, handle_conflict_choice)
+        else:
+            # No conflicts, move directly
+            self.perform_move_operation(files_to_move, destination_dir)
+            print(f"Moved {len(files_to_move)} files")
+    
+    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False):
+        """Perform the actual move operation"""
+        moved_count = 0
+        error_count = 0
+        
+        for source_file in files_to_move:
+            try:
+                dest_path = destination_dir / source_file.name
+                
+                # Skip if file exists and we're not overwriting
+                if dest_path.exists() and not overwrite:
+                    continue
+                
+                # Remove destination if it exists and we're overwriting
+                if dest_path.exists() and overwrite:
+                    if dest_path.is_dir():
+                        shutil.rmtree(dest_path)
+                    else:
+                        dest_path.unlink()
+                
+                # Move the file/directory
+                if source_file.is_symlink():
+                    # For symbolic links, copy the link itself (not the target)
+                    link_target = os.readlink(str(source_file))
+                    dest_path.symlink_to(link_target)
+                    source_file.unlink()
+                    print(f"Moved symbolic link: {source_file.name}")
+                elif source_file.is_dir():
+                    # Move directory recursively
+                    shutil.move(str(source_file), str(dest_path))
+                    print(f"Moved directory: {source_file.name}")
+                else:
+                    # Move file
+                    shutil.move(str(source_file), str(dest_path))
+                    print(f"Moved file: {source_file.name}")
+                
+                moved_count += 1
+                
+            except PermissionError as e:
+                print(f"Permission denied moving {source_file.name}: {e}")
+                error_count += 1
+            except Exception as e:
+                print(f"Error moving {source_file.name}: {e}")
+                error_count += 1
+        
+        # Refresh both panes to show the moved files
+        self.refresh_files()
+        self.needs_full_redraw = True
+        
+        # Clear selections after successful move
+        if moved_count > 0:
+            current_pane = self.get_current_pane()
+            current_pane['selected_files'].clear()
+        
+        if error_count > 0:
+            print(f"Move completed with {error_count} errors")
+    
     def delete_selected_files(self):
         """Delete selected files or current file with confirmation"""
         current_pane = self.get_current_pane()
@@ -2785,6 +2943,8 @@ class FileManager:
                 self.edit_selected_file()
             elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
                 self.copy_selected_files()
+            elif self.is_key_for_action(key, 'move_files'):  # Move selected files
+                self.move_selected_files()
             elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
                 self.delete_selected_files()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
