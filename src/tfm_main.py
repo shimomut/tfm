@@ -101,7 +101,7 @@ class FileManager:
         
         # Create file mode state
         self.create_file_mode = False
-        self.create_file_pattern = ""
+        self.create_file_editor = SingleLineTextEdit()
         
         # Create archive mode state
         self.create_archive_mode = False
@@ -1176,20 +1176,21 @@ class FileManager:
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Show create file prompt and pattern
-            create_prompt = f"Create file: {self.create_file_pattern}"
-            
-            # Add cursor indicator
-            create_prompt += "_"
-            
-            # Draw create file prompt
-            self.safe_addstr(status_y, 2, create_prompt, get_status_color())
+            # Draw create file input using SingleLineTextEdit
+            max_input_width = width - 20  # Leave space for help text
+            self.create_file_editor.draw(
+                self.stdscr, status_y, 2, max_input_width,
+                "Create file: ",
+                is_active=True
+            )
             
             # Show help text on the right if there's space
             help_text = "ESC:cancel Enter:create"
-            if len(create_prompt) + len(help_text) + 6 < width:
+            # Calculate space needed for the input field
+            input_field_width = len("Create file: ") + len(self.create_file_editor.text) + 2
+            if input_field_width + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
-                if help_x > len(create_prompt) + 4:  # Ensure no overlap
+                if help_x > input_field_width + 4:  # Ensure no overlap
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             return
         
@@ -1567,25 +1568,26 @@ class FileManager:
         
         # Enter create file mode
         self.create_file_mode = True
-        self.create_file_pattern = ""
+        self.create_file_editor.clear()
         self.needs_full_redraw = True
         print("Creating new text file...")
     
     def exit_create_file_mode(self):
         """Exit create file mode"""
         self.create_file_mode = False
-        self.create_file_pattern = ""
+        self.create_file_editor.clear()
         self.needs_full_redraw = True
     
     def perform_create_file(self):
         """Perform the actual file creation"""
-        if not self.create_file_pattern.strip():
+        file_name = self.create_file_editor.get_text().strip()
+        if not file_name:
             print("Invalid file name")
             self.exit_create_file_mode()
             return
         
         current_pane = self.get_current_pane()
-        new_file_name = self.create_file_pattern.strip()
+        new_file_name = file_name
         new_file_path = current_pane['path'] / new_file_name
         
         # Check if file already exists
@@ -3681,17 +3683,11 @@ class FileManager:
             # Enter - create file
             self.perform_create_file()
             return True
-        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
-            # Backspace - remove last character
-            if self.create_file_pattern:
-                self.create_file_pattern = self.create_file_pattern[:-1]
+        else:
+            # Let the editor handle other keys
+            if self.create_file_editor.handle_key(key):
                 self.needs_full_redraw = True
-            return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Add character to file name pattern
-            self.create_file_pattern += chr(key)
-            self.needs_full_redraw = True
-            return True
+                return True
         
         # In create file mode, capture most other keys to prevent unintended actions
         return True
