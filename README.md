@@ -1,4 +1,4 @@
-# TUI File Manager v0.10
+# TUI File Manager
 
 A powerful terminal-based file manager built with Python's curses library. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, advanced text editing, and professional-grade features.
 
