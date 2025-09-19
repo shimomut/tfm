@@ -40,6 +40,12 @@ class TextViewer:
         self.wrap_lines = False
         self.syntax_highlighting = PYGMENTS_AVAILABLE
         
+        # Search mode state
+        self.search_mode = False
+        self.search_pattern = ""
+        self.search_matches = []  # List of line indices that match
+        self.search_match_index = 0  # Current match index
+        
         # Load file content
         self.load_file()
         
@@ -187,6 +193,103 @@ class TextViewer:
         
         return highlighted_lines
     
+    def find_matches(self, pattern: str) -> List[int]:
+        """Find all lines that match the search pattern (case-insensitive)"""
+        if not pattern:
+            return []
+        
+        matches = []
+        pattern_lower = pattern.lower()
+        
+        for i, line in enumerate(self.lines):
+            if pattern_lower in line.lower():
+                matches.append(i)
+        
+        return matches
+    
+    def update_search_matches(self):
+        """Update search matches and move to nearest match"""
+        self.search_matches = self.find_matches(self.search_pattern)
+        
+        if self.search_matches:
+            # Find the closest match to current position
+            current_line = self.scroll_offset
+            best_match = 0
+            min_distance = abs(self.search_matches[0] - current_line)
+            
+            for i, match_line in enumerate(self.search_matches):
+                distance = abs(match_line - current_line)
+                if distance < min_distance:
+                    min_distance = distance
+                    best_match = i
+            
+            self.search_match_index = best_match
+            self.jump_to_match()
+    
+    def jump_to_match(self):
+        """Jump to the current search match"""
+        if self.search_matches and 0 <= self.search_match_index < len(self.search_matches):
+            match_line = self.search_matches[self.search_match_index]
+            
+            # Center the match on screen if possible
+            start_y, start_x, display_height, display_width = self.get_display_dimensions()
+            center_offset = display_height // 2
+            
+            self.scroll_offset = max(0, match_line - center_offset)
+            
+            # Ensure we don't scroll past the end
+            max_scroll = max(0, len(self.lines) - display_height)
+            self.scroll_offset = min(self.scroll_offset, max_scroll)
+    
+    def enter_search_mode(self):
+        """Enter incremental search mode"""
+        self.search_mode = True
+        self.search_pattern = ""
+        self.search_matches = []
+        self.search_match_index = 0
+    
+    def exit_search_mode(self):
+        """Exit search mode"""
+        self.search_mode = False
+        self.search_pattern = ""
+        self.search_matches = []
+        self.search_match_index = 0
+    
+    def handle_search_input(self, key) -> bool:
+        """Handle input while in search mode. Returns True if key was handled."""
+        if key == 27:  # ESC - exit search mode
+            self.exit_search_mode()
+            return True
+        elif key == curses.KEY_ENTER or key == 10 or key == 13:
+            # Enter - exit search mode and keep current position
+            self.exit_search_mode()
+            return True
+        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
+            # Backspace - remove last character
+            if self.search_pattern:
+                self.search_pattern = self.search_pattern[:-1]
+                self.update_search_matches()
+            return True
+        elif key == curses.KEY_UP or key == ord('k'):
+            # Up arrow - go to previous match
+            if self.search_matches:
+                self.search_match_index = (self.search_match_index - 1) % len(self.search_matches)
+                self.jump_to_match()
+            return True
+        elif key == curses.KEY_DOWN or key == ord('j'):
+            # Down arrow - go to next match
+            if self.search_matches:
+                self.search_match_index = (self.search_match_index + 1) % len(self.search_matches)
+                self.jump_to_match()
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            # Add character to search pattern
+            self.search_pattern += chr(key)
+            self.update_search_matches()
+            return True
+        
+        return False
+    
     def get_display_dimensions(self) -> Tuple[int, int, int, int]:
         """Get the dimensions for the text display area"""
         height, width = self.stdscr.getmaxyx()
@@ -220,18 +323,32 @@ class TextViewer:
         except curses.error:
             pass
         
-        # Controls line
-        controls = "q:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page n:numbers w:wrap s:syntax"
-        
-        try:
-            # Center the controls or left-align if too long
-            if len(controls) + 4 < width:
-                controls_x = (width - len(controls)) // 2
-            else:
-                controls_x = 2
-            self.stdscr.addstr(1, controls_x, controls[:width-4], get_status_color())
-        except curses.error:
-            pass
+        # Controls line or search interface
+        if self.search_mode:
+            # Show search interface
+            search_prompt = f"Search: {self.search_pattern}"
+            if self.search_matches:
+                match_info = f" ({self.search_match_index + 1}/{len(self.search_matches)})"
+                search_prompt += match_info
+            search_prompt += " [ESC:exit ↑↓:navigate]"
+            
+            try:
+                self.stdscr.addstr(1, 2, search_prompt[:width-4], get_search_color())
+            except curses.error:
+                pass
+        else:
+            # Show normal controls
+            controls = "q:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:search n:numbers w:wrap s:syntax"
+            
+            try:
+                # Center the controls or left-align if too long
+                if len(controls) + 4 < width:
+                    controls_x = (width - len(controls)) // 2
+                else:
+                    controls_x = 2
+                self.stdscr.addstr(1, controls_x, controls[:width-4], get_status_color())
+            except curses.error:
+                pass
     
     def draw_status_bar(self):
         """Draw the status bar at the bottom of the viewer"""
@@ -356,6 +473,17 @@ class TextViewer:
             # Get the highlighted line (list of (text, color) tuples)
             highlighted_line = self.highlighted_lines[line_index]
             
+            # Check if this line is a search match
+            is_search_match = (self.search_mode and 
+                             self.search_matches and 
+                             line_index in self.search_matches)
+            
+            # Check if this is the current search match
+            is_current_match = (is_search_match and 
+                              self.search_matches and
+                              0 <= self.search_match_index < len(self.search_matches) and
+                              line_index == self.search_matches[self.search_match_index])
+            
             # Apply horizontal scrolling
             current_col = 0
             display_x = x_pos
@@ -382,7 +510,14 @@ class TextViewer:
                 # Draw the text with its color
                 if visible_text:
                     try:
-                        self.stdscr.addstr(y_pos, display_x, visible_text, color)
+                        # Use search highlight color for matches
+                        display_color = color
+                        if is_current_match:
+                            display_color = get_search_current_color()
+                        elif is_search_match:
+                            display_color = get_search_match_color()
+                        
+                        self.stdscr.addstr(y_pos, display_x, visible_text, display_color)
                         display_x += len(visible_text)
                     except curses.error:
                         pass
@@ -396,6 +531,11 @@ class TextViewer:
     def handle_key(self, key) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
+        
+        # Handle search mode input first
+        if self.search_mode:
+            if self.handle_search_input(key):
+                return True  # Search mode handled the key
         
         if key == ord('q') or key == ord('Q') or key == 27:  # q, Q, or ESC
             return False
@@ -447,6 +587,10 @@ class TextViewer:
                 else:
                     # Create plain highlighted lines (no colors)
                     self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
+        
+        elif key == ord('f') or key == ord('F'):
+            # Enter search mode
+            self.enter_search_mode()
             
         return True
     

@@ -24,6 +24,8 @@ COLOR_SYNTAX_NUMBER = 16     # Numbers
 COLOR_SYNTAX_OPERATOR = 17   # Operators (+, -, =, etc.)
 COLOR_SYNTAX_BUILTIN = 18    # Built-in functions/types
 COLOR_SYNTAX_NAME = 19       # Variable/function names
+COLOR_SEARCH_MATCH = 20      # Search match highlighting
+COLOR_SEARCH_CURRENT = 21    # Current search match highlighting
 
 # Custom RGB color definitions (RGB values 0-255)
 RGB_COLORS = {
@@ -99,6 +101,15 @@ RGB_COLORS = {
     'SYNTAX_NAME_FG': {
         'color_num': 117,
         'rgb': (220, 220, 220)  # Light gray for names
+    },
+    # Search highlighting colors
+    'SEARCH_MATCH_BG': {
+        'color_num': 118,
+        'rgb': (100, 100, 0)    # Dark yellow background for search matches
+    },
+    'SEARCH_CURRENT_BG': {
+        'color_num': 119,
+        'rgb': (150, 75, 0)     # Orange background for current search match
     }
 }
 
@@ -122,7 +133,10 @@ FALLBACK_COLORS = {
     'SYNTAX_NUMBER_FG': curses.COLOR_CYAN,
     'SYNTAX_OPERATOR_FG': curses.COLOR_MAGENTA,
     'SYNTAX_BUILTIN_FG': curses.COLOR_CYAN,
-    'SYNTAX_NAME_FG': curses.COLOR_WHITE
+    'SYNTAX_NAME_FG': curses.COLOR_WHITE,
+    # Search highlighting fallback colors
+    'SEARCH_MATCH_BG': curses.COLOR_YELLOW,
+    'SEARCH_CURRENT_BG': curses.COLOR_RED
 }
 
 def init_colors():
@@ -168,6 +182,9 @@ def init_colors():
             syntax_operator_fg = RGB_COLORS['SYNTAX_OPERATOR_FG']['color_num']
             syntax_builtin_fg = RGB_COLORS['SYNTAX_BUILTIN_FG']['color_num']
             syntax_name_fg = RGB_COLORS['SYNTAX_NAME_FG']['color_num']
+            # Search highlighting colors
+            search_match_bg = RGB_COLORS['SEARCH_MATCH_BG']['color_num']
+            search_current_bg = RGB_COLORS['SEARCH_CURRENT_BG']['color_num']
             
         except curses.error:
             rgb_success = False
@@ -193,6 +210,9 @@ def init_colors():
         syntax_operator_fg = FALLBACK_COLORS['SYNTAX_OPERATOR_FG']
         syntax_builtin_fg = FALLBACK_COLORS['SYNTAX_BUILTIN_FG']
         syntax_name_fg = FALLBACK_COLORS['SYNTAX_NAME_FG']
+        # Search highlighting fallback colors
+        search_match_bg = FALLBACK_COLORS['SEARCH_MATCH_BG']
+        search_current_bg = FALLBACK_COLORS['SEARCH_CURRENT_BG']
     
     # Initialize color pairs
     curses.init_pair(COLOR_DIRECTORIES, directory_fg, curses.COLOR_BLACK)
@@ -215,6 +235,9 @@ def init_colors():
     curses.init_pair(COLOR_SYNTAX_OPERATOR, syntax_operator_fg, curses.COLOR_BLACK)
     curses.init_pair(COLOR_SYNTAX_BUILTIN, syntax_builtin_fg, curses.COLOR_BLACK)
     curses.init_pair(COLOR_SYNTAX_NAME, syntax_name_fg, curses.COLOR_BLACK)
+    # Search highlighting color pairs
+    curses.init_pair(COLOR_SEARCH_MATCH, curses.COLOR_BLACK, search_match_bg)
+    curses.init_pair(COLOR_SEARCH_CURRENT, curses.COLOR_WHITE, search_current_bg)
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """Get the appropriate color for a file based on its properties"""
@@ -351,3 +374,15 @@ def get_syntax_color(token_type):
     else:
         # Default to regular text color
         return curses.color_pair(COLOR_REGULAR_FILE)
+
+def get_search_color():
+    """Get search interface color (same as status color)"""
+    return curses.color_pair(COLOR_STATUS)
+
+def get_search_match_color():
+    """Get search match highlighting color"""
+    return curses.color_pair(COLOR_SEARCH_MATCH)
+
+def get_search_current_color():
+    """Get current search match highlighting color"""
+    return curses.color_pair(COLOR_SEARCH_CURRENT)
