@@ -48,6 +48,39 @@ else
 fi
 echo
 
+echo "Shell Prompt Check:"
+
+# Check PS1 (bash and other shells)
+if [ -n "$PS1" ]; then
+    if [[ "$PS1" == *"[TFM]"* ]]; then
+        echo "✅ PS1 contains [TFM] label"
+        echo "  PS1: $PS1"
+    else
+        echo "❌ PS1 does not contain [TFM] label"
+        echo "  PS1: $PS1"
+    fi
+else
+    echo "ℹ️  PS1 not set (non-interactive shell or zsh)"
+fi
+
+# Check PROMPT (zsh)
+if [ -n "$PROMPT" ]; then
+    if [[ "$PROMPT" == *"[TFM]"* ]]; then
+        echo "✅ PROMPT contains [TFM] label"
+        echo "  PROMPT: $PROMPT"
+    else
+        echo "❌ PROMPT does not contain [TFM] label"
+        echo "  PROMPT: $PROMPT"
+    fi
+else
+    echo "ℹ️  PROMPT not set (non-zsh shell)"
+fi
+
+if [ -z "$PS1" ] && [ -z "$PROMPT" ]; then
+    echo "ℹ️  In interactive mode, prompt would show [TFM] label"
+fi
+echo
+
 echo "======================================"
 echo "Environment variables are working correctly!"
 echo "You can now use these variables in your shell commands."

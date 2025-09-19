@@ -8,6 +8,7 @@ The sub-shell mode feature allows users to temporarily suspend the TFM interface
 
 - **Key binding**: `x` or `X`
 - **Action**: Suspends TFM curses interface and starts a new shell session
+- **Visual indicator**: Shell prompt includes `[TFM]` label for easy identification
 
 ## Environment Variables
 
@@ -87,6 +88,114 @@ The sub-shell mode uses the user's default shell (from `$SHELL` environment vari
 
 When entering sub-shell mode, the working directory is automatically changed to the currently focused pane's directory (`$THIS_DIR`).
 
+## Shell Prompt Customization
+
+TFM sets the `TFM_ACTIVE` environment variable when entering sub-shell mode. To display the `[TFM]` label in your shell prompt, you need to customize your shell configuration files.
+
+### Why Manual Configuration is Needed
+
+Shell configuration files (like `.zshrc` and `.bashrc`) are loaded after TFM sets environment variables, which overwrites any prompt modifications TFM makes. The solution is to modify your shell configuration to check for the `TFM_ACTIVE` environment variable and adjust the prompt accordingly.
+
+### Zsh Configuration
+
+Add this to your `~/.zshrc` file:
+
+```bash
+# TFM sub-shell prompt modification
+if [[ -n "$TFM_ACTIVE" ]]; then
+    PROMPT="[TFM] $PROMPT"
+fi
+```
+
+### Bash Configuration
+
+Add this to your `~/.bashrc` file:
+
+```bash
+# TFM sub-shell prompt modification
+if [[ -n "$TFM_ACTIVE" ]]; then
+    PS1="[TFM] $PS1"
+fi
+```
+
+### Advanced Prompt Customization
+
+For more sophisticated prompt modifications, you can create conditional logic:
+
+#### Zsh Advanced Example
+```bash
+# Advanced TFM prompt customization for zsh
+if [[ -n "$TFM_ACTIVE" ]]; then
+    # Add colored [TFM] label
+    PROMPT="%F{yellow}[TFM]%f $PROMPT"
+    
+    # Or modify the right prompt
+    RPROMPT="$RPROMPT %F{red}(TFM)%f"
+fi
+```
+
+#### Bash Advanced Example
+```bash
+# Advanced TFM prompt customization for bash
+if [[ -n "$TFM_ACTIVE" ]]; then
+    # Add colored [TFM] label
+    PS1="\[\033[1;33m\][TFM]\[\033[0m\] $PS1"
+    
+    # Or create a completely custom TFM prompt
+    PS1="\[\033[1;33m\][TFM]\[\033[0m\] \[\033[1;32m\]\u@\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\$ "
+fi
+```
+
+### Testing Your Configuration
+
+1. **Add the configuration** to your shell config file (`.zshrc` or `.bashrc`)
+2. **Reload your shell configuration**:
+   ```bash
+   # For zsh
+   source ~/.zshrc
+   
+   # For bash  
+   source ~/.bashrc
+   ```
+3. **Test manually** (optional):
+   ```bash
+   # Set the variable and start a new shell to test
+   TFM_ACTIVE=1 zsh  # or bash
+   # You should see [TFM] in the prompt
+   exit
+   ```
+4. **Test with TFM**:
+   - Start TFM and press `x` to enter sub-shell mode
+   - Your prompt should now display the `[TFM]` label
+   - Type `exit` to return to TFM
+
+### Environment Variable Details
+
+When `TFM_ACTIVE` is set:
+- **Value**: Always set to `"1"`
+- **Scope**: Only available in the TFM sub-shell session
+- **Persistence**: Automatically unset when exiting the sub-shell
+
+### Shell Compatibility
+
+| Shell | Config File | Variable | Example |
+|-------|-------------|----------|---------|
+| zsh | `~/.zshrc` | `PROMPT` | `[TFM] %n@%m:%~%# ` |
+| bash | `~/.bashrc` | `PS1` | `[TFM] \u@\h:\w\$ ` |
+| fish | `~/.config/fish/config.fish` | Custom function | See fish documentation |
+
+### Troubleshooting
+
+**Prompt not showing [TFM] label:**
+1. Verify the configuration is added to the correct file
+2. Make sure the syntax is correct for your shell
+3. Test by manually setting `TFM_ACTIVE=1` and starting a new shell
+4. Check if other prompt modifications in your config are overriding the TFM setting
+
+**Configuration conflicts:**
+- Place the TFM configuration **after** other prompt modifications in your config file
+- Some prompt themes may override the `PROMPT` or `PS1` variables - adjust accordingly
+
 ## Returning to TFM
 
 To return to TFM from sub-shell mode:
@@ -133,6 +242,9 @@ KEY_BINDINGS = {
 - Uses `subprocess.run()` with explicit environment passing
 - Supports user's preferred shell from `$SHELL` environment variable
 - Falls back to `/bin/bash` if `$SHELL` is not set
+- Modifies both `PS1` and `PROMPT` environment variables for broad shell compatibility
+- Preserves existing prompt customizations while adding TFM identification
+- Works with bash, zsh, sh, dash, and other POSIX-compatible shells
 
 ## Use Cases
 

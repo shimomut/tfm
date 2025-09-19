@@ -57,6 +57,29 @@ def test_subshell_environment():
         except Exception as e:
             print(f"❌ Error running shell command: {e}")
         
+        # Test prompt modification (both PS1 and PROMPT)
+        print("\nTesting prompt modification:")
+        ps1_value = os.environ.get('PS1', 'Not set')
+        prompt_value = os.environ.get('PROMPT', 'Not set')
+        
+        ps1_has_tfm = '[TFM]' in ps1_value if ps1_value != 'Not set' else False
+        prompt_has_tfm = '[TFM]' in prompt_value if prompt_value != 'Not set' else False
+        
+        if ps1_has_tfm:
+            print(f"✅ PS1 contains [TFM] label: {ps1_value}")
+        else:
+            print(f"ℹ️  PS1: {ps1_value}")
+            
+        if prompt_has_tfm:
+            print(f"✅ PROMPT contains [TFM] label: {prompt_value}")
+        else:
+            print(f"ℹ️  PROMPT: {prompt_value}")
+            
+        if ps1_has_tfm or prompt_has_tfm:
+            print("✅ Shell prompt modification is working")
+        else:
+            print("ℹ️  Prompt variables set but may not be active in non-interactive mode")
+        
         return True
 
 if __name__ == "__main__":

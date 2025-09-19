@@ -3955,6 +3955,26 @@ class FileManager:
             env['THIS_SELECTED'] = ' '.join(current_selected)
             env['OTHER_SELECTED'] = ' '.join(other_selected)
             
+            # Set TFM indicator environment variable
+            env['TFM_ACTIVE'] = '1'
+            
+            # Modify shell prompt to include [TFM] label
+            # Handle both bash (PS1) and zsh (PROMPT) prompts
+            current_ps1 = env.get('PS1', '')
+            current_prompt = env.get('PROMPT', '')
+            
+            # Modify PS1 for bash and other shells
+            if current_ps1:
+                env['PS1'] = f'[TFM] {current_ps1}'
+            else:
+                env['PS1'] = '[TFM] \\u@\\h:\\w\\$ '
+            
+            # Modify PROMPT for zsh
+            if current_prompt:
+                env['PROMPT'] = f'[TFM] {current_prompt}'
+            else:
+                env['PROMPT'] = '[TFM] %n@%m:%~%# '
+            
             # Print information about the sub-shell environment
             print("TFM Sub-shell Mode")
             print("=" * 50)
@@ -3967,6 +3987,10 @@ class FileManager:
             print(f"THIS_SELECTED: {env['THIS_SELECTED']}")
             print(f"OTHER_SELECTED: {env['OTHER_SELECTED']}")
             print("=" * 50)
+            print("TFM_ACTIVE environment variable is set for shell customization")
+            print("To show [TFM] in your prompt, add this to your shell config:")
+            print("  Zsh (~/.zshrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PROMPT=\"[TFM] $PROMPT\"; fi")
+            print("  Bash (~/.bashrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PS1=\"[TFM] $PS1\"; fi")
             print("Type 'exit' to return to TFM")
             print()
             

@@ -36,6 +36,20 @@ def simulate_tfm_subshell():
     env['THIS_SELECTED'] = 'tfm.py README.md'
     env['OTHER_SELECTED'] = ''
     
+    # Add prompt modification like TFM does (both PS1 and PROMPT)
+    current_ps1 = env.get('PS1', '')
+    current_prompt = env.get('PROMPT', '')
+    
+    if current_ps1:
+        env['PS1'] = f'[TFM] {current_ps1}'
+    else:
+        env['PS1'] = '[TFM] \\u@\\h:\\w\\$ '
+    
+    if current_prompt:
+        env['PROMPT'] = f'[TFM] {current_prompt}'
+    else:
+        env['PROMPT'] = '[TFM] %n@%m:%~%# '
+    
     print("Environment variables set:")
     for var in ['LEFT_DIR', 'RIGHT_DIR', 'THIS_DIR', 'OTHER_DIR', 
                 'LEFT_SELECTED', 'RIGHT_SELECTED', 'THIS_SELECTED', 'OTHER_SELECTED']:
@@ -89,6 +103,20 @@ def test_python_script():
     env['RIGHT_SELECTED'] = ''
     env['THIS_SELECTED'] = 'test1.txt test2.txt'
     env['OTHER_SELECTED'] = ''
+    
+    # Add prompt modification like TFM does (both PS1 and PROMPT)
+    current_ps1 = env.get('PS1', '')
+    current_prompt = env.get('PROMPT', '')
+    
+    if current_ps1:
+        env['PS1'] = f'[TFM] {current_ps1}'
+    else:
+        env['PS1'] = '[TFM] \\u@\\h:\\w\\$ '
+    
+    if current_prompt:
+        env['PROMPT'] = f'[TFM] {current_prompt}'
+    else:
+        env['PROMPT'] = '[TFM] %n@%m:%~%# '
     
     try:
         result = subprocess.run([sys.executable, 'test_subshell.py'], 

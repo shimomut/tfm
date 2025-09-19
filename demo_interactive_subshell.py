@@ -28,6 +28,20 @@ def demo_subshell_commands():
     env['THIS_SELECTED'] = 'tfm.py README.md'
     env['OTHER_SELECTED'] = ''
     
+    # Add prompt modification like TFM does (both PS1 and PROMPT)
+    current_ps1 = env.get('PS1', '')
+    current_prompt = env.get('PROMPT', '')
+    
+    if current_ps1:
+        env['PS1'] = f'[TFM] {current_ps1}'
+    else:
+        env['PS1'] = '[TFM] \\u@\\h:\\w\\$ '
+    
+    if current_prompt:
+        env['PROMPT'] = f'[TFM] {current_prompt}'
+    else:
+        env['PROMPT'] = '[TFM] %n@%m:%~%# '
+    
     print("Demo environment setup:")
     print(f"  Active pane (THIS_DIR): {env['THIS_DIR']}")
     print(f"  Other pane (OTHER_DIR): {env['OTHER_DIR']}")
@@ -54,6 +68,10 @@ def demo_subshell_commands():
         {
             'description': 'Show environment variables',
             'command': 'echo "TFM Environment Variables:" && env | grep -E "(LEFT_|RIGHT_|THIS_|OTHER_)" | sort'
+        },
+        {
+            'description': 'Show shell prompts with TFM label',
+            'command': 'echo "Bash prompt (PS1): $PS1" && echo "Zsh prompt (PROMPT): $PROMPT"'
         }
     ]
     

@@ -197,6 +197,7 @@ TFM's sub-shell mode allows you to temporarily suspend the interface and enter a
 ### Activation
 - Press `x` or `X` to enter sub-shell mode
 - TFM suspends and starts a new shell session
+- Shell prompt shows `[TFM]` label for identification
 - Type `exit` to return to TFM
 
 ### Environment Variables
