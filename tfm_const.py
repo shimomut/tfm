@@ -9,7 +9,7 @@ VERSION = "0.10"
 # Application metadata
 APP_NAME = "TUI File Manager"
 APP_DESCRIPTION = "A terminal-based file manager using curses"
-GITHUB_URL = "https://github.com/user/tfm"  # Update with actual repository URL
+GITHUB_URL = "https://github.com/shimomut/tfm"  # Update with actual repository URL
 
 # Display constants
 DEFAULT_LOG_HEIGHT_RATIO = 0.25  # Log pane takes 1/4 of screen
@@ -61,3 +61,6 @@ PANE_ADJUST_STEP = 0.05  # 5% adjustment per key press
 MIN_LOG_HEIGHT_RATIO = 0.0   # Minimum log pane height (0% - can be hidden)
 MAX_LOG_HEIGHT_RATIO = 0.9   # Maximum log pane height (60%)
 LOG_HEIGHT_ADJUST_STEP = 0.05  # 5% adjustment per key press
+
+# Search mode constants
+SEARCH_KEY = ord('/')  # Key to enter search mode

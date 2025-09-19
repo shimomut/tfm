@@ -9,6 +9,7 @@ import stat
 import shutil
 import sys
 import io
+import fnmatch
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -59,6 +60,12 @@ class FileManager:
         self.log_height_ratio = DEFAULT_LOG_HEIGHT_RATIO  # Track log pane height ratio
         self.needs_full_redraw = True  # Flag to control when to redraw everything
         
+        # Search mode state
+        self.search_mode = False
+        self.search_pattern = ""
+        self.search_matches = []
+        self.search_match_index = 0
+        
         # Log pane setup
         self.log_messages = deque(maxlen=MAX_LOG_MESSAGES)
         self.log_scroll_offset = 0
@@ -78,6 +85,25 @@ class FileManager:
         # Configure curses
         curses.curs_set(0)  # Hide cursor
         self.stdscr.keypad(True)
+        
+    def safe_addstr(self, y, x, text, attr=curses.A_NORMAL):
+        """Safely add string to screen, handling boundary conditions"""
+        try:
+            height, width = self.stdscr.getmaxyx()
+            
+            # Check bounds
+            if y < 0 or y >= height or x < 0 or x >= width:
+                return
+                
+            # Truncate text if it would exceed screen width
+            max_len = width - x - 1  # Leave space to avoid last column
+            if max_len <= 0:
+                return
+                
+            truncated_text = text[:max_len] if len(text) > max_len else text
+            self.stdscr.addstr(y, x, truncated_text, attr)
+        except curses.error:
+            pass  # Ignore curses errors
         
     def add_startup_messages(self):
         """Add startup messages directly to log pane"""
@@ -202,12 +228,16 @@ class FileManager:
         if current_pane['selected_index'] > 0:
             current_pane['selected_index'] -= 1
         
+    def restore_stdio(self):
+        """Restore stdout/stderr to original state"""
+        if hasattr(self, 'original_stdout') and sys.stdout != self.original_stdout:
+            sys.stdout = self.original_stdout
+        if hasattr(self, 'original_stderr') and sys.stderr != self.original_stderr:
+            sys.stderr = self.original_stderr
+            
     def __del__(self):
         """Restore stdout/stderr when object is destroyed"""
-        if hasattr(self, 'original_stdout'):
-            sys.stdout = self.original_stdout
-        if hasattr(self, 'original_stderr'):
-            sys.stderr = self.original_stderr
+        self.restore_stdio()
         
     def get_current_pane(self):
         """Get the currently active pane"""
@@ -285,8 +315,11 @@ class FileManager:
         left_pane_width = int(width * self.left_pane_ratio)
         right_pane_width = width - left_pane_width
         
-        # Clear header area
-        self.stdscr.addstr(0, 0, " " * width, get_header_color())
+        # Clear header area (avoid last column)
+        try:
+            self.stdscr.addstr(0, 0, " " * (width - 1), get_header_color())
+        except curses.error:
+            pass
         
         # Left pane path with safety checks
         if left_pane_width > 6:  # Minimum space needed
@@ -369,14 +402,23 @@ class FileManager:
             # Check if this file is multi-selected
             is_multi_selected = str(file_path) in pane_data['selected_files']
             
+            # Check if this file is a search match
+            is_search_match = (self.search_mode and is_active and 
+                             file_index in self.search_matches)
+            
             # Choose color based on file properties and selection
             is_executable = file_path.is_file() and os.access(file_path, os.X_OK)
             is_selected = file_index == pane_data['selected_index']
             
             color = get_file_color(is_dir, is_executable, is_selected, is_active)
             
+            # Handle search match highlighting (takes precedence over multi-selection)
+            if is_search_match and not is_selected:
+                # Highlight search matches with underline
+                base_color = get_file_color(is_dir, is_executable, False, False)
+                color = base_color | curses.A_UNDERLINE
             # Handle multi-selection highlighting
-            if is_multi_selected and not is_selected:
+            elif is_multi_selected and not is_selected:
                 # Get base color and add standout for multi-selected files
                 base_color = get_file_color(is_dir, is_executable, False, False)
                 color = base_color | curses.A_STANDOUT
@@ -534,6 +576,35 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
+        # If in search mode, show search interface
+        if self.search_mode:
+            # Fill entire status line with background color
+            status_line = " " * (width - 1)
+            self.safe_addstr(status_y, 0, status_line, get_status_color())
+            
+            # Show search prompt and pattern
+            search_prompt = f"Search: {self.search_pattern}"
+            if self.search_matches:
+                match_info = f" ({self.search_match_index + 1}/{len(self.search_matches)} matches)"
+                search_prompt += match_info
+            else:
+                search_prompt += " (no matches)"
+                
+            # Add cursor indicator
+            search_prompt += "_"
+            
+            # Draw search prompt
+            self.safe_addstr(status_y, 2, search_prompt, get_status_color())
+            
+            # Show help text on the right if there's space
+            help_text = "ESC:exit Enter:accept ↑↓:navigate"
+            if len(search_prompt) + len(help_text) + 6 < width:
+                help_x = width - len(help_text) - 3
+                if help_x > len(search_prompt) + 4:  # Ensure no overlap
+                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            return
+        
+        # Normal status display
         # Left side: status info
         status_parts = []
         if self.show_hidden:
@@ -546,50 +617,43 @@ class FileManager:
         left_status = f"({', '.join(status_parts)})" if status_parts else ""
         
         # Controls - progressively abbreviate to fit
-        if width > 150:
-            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
-        elif width > 130:
-            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
-        elif width > 110:
-            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
+        if width > 160:
+            controls = "Space/Opt+Space:select  /:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+        elif width > 140:
+            controls = "Space/Opt+Space:select  /:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
+        elif width > 120:
+            controls = "Space/Opt+Space:select  /:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 100:
-            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  /:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 80:
-            controls = "Space/Opt+Space:select  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  /:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         else:
-            controls = "Space:select  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
+            controls = "Space:select  /:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
         
         # Draw status line with background color
-        try:
-            # Fill entire status line with background color
-            status_line = " " * width
-            self.stdscr.addstr(status_y, 0, status_line, get_status_color())
+        # Fill entire status line with background color
+        status_line = " " * (width - 1)
+        self.safe_addstr(status_y, 0, status_line, get_status_color())
+        
+        # Always draw controls - they're the most important part
+        if left_status:
+            # Ensure left status fits and draw with proper color
+            max_left_width = width - 20  # Reserve space for controls
+            truncated_left_status = left_status[:max_left_width] if len(left_status) > max_left_width else left_status
+            self.safe_addstr(status_y, 2, truncated_left_status, get_status_color())
             
-            # Always draw controls - they're the most important part
-            if left_status:
-                # Ensure left status fits and draw with proper color
-                max_left_width = width - 20  # Reserve space for controls
-                truncated_left_status = left_status[:max_left_width] if len(left_status) > max_left_width else left_status
-                self.stdscr.addstr(status_y, 2, truncated_left_status, get_status_color())
-                
-                # Right-align controls
-                controls_x = max(len(truncated_left_status) + 6, width - len(controls) - 2)
-                if controls_x + len(controls) < width - 2:
-                    self.stdscr.addstr(status_y, controls_x, controls, get_status_color())
-                else:
-                    # If no room, just show controls without left status
-                    controls_x = max(2, (width - len(controls)) // 2)
-                    self.stdscr.addstr(status_y, controls_x, controls, get_status_color())
+            # Right-align controls
+            controls_x = max(len(truncated_left_status) + 6, width - len(controls) - 3)
+            if controls_x > len(truncated_left_status) + 4:  # Ensure no overlap
+                self.safe_addstr(status_y, controls_x, controls, get_status_color())
             else:
-                # Center controls when no left status
+                # If no room, just show controls without left status
                 controls_x = max(2, (width - len(controls)) // 2)
-                self.stdscr.addstr(status_y, controls_x, controls, get_status_color())
-        except curses.error:
-            # Fallback: just show file info if screen too narrow
-            try:
-                self.stdscr.addstr(status_y, 2, left_status, get_status_color())
-            except curses.error:
-                pass  # If we can't draw anything, just skip
+                self.safe_addstr(status_y, controls_x, controls, get_status_color())
+        else:
+            # Center controls when no left status
+            controls_x = max(2, (width - len(controls)) // 2)
+            self.safe_addstr(status_y, controls_x, controls, get_status_color())
         
     def handle_enter(self):
         """Handle Enter key - navigate or open file"""
@@ -635,6 +699,129 @@ class FileManager:
         self.stdscr.addstr(height - 1, 2, message)
         self.stdscr.refresh()
         curses.napms(1500)  # Show for 1.5 seconds
+        
+    def find_matches(self, pattern):
+        """Find all files matching the fnmatch pattern in current pane"""
+        current_pane = self.get_current_pane()
+        matches = []
+        
+        if not pattern or not current_pane['files']:
+            return matches
+            
+        # Convert pattern to lowercase for case-insensitive matching
+        pattern_lower = pattern.lower()
+        
+        for i, file_path in enumerate(current_pane['files']):
+            # Skip parent directory entry
+            if (i == 0 and len(current_pane['files']) > 0 and 
+                file_path == current_pane['path'].parent):
+                continue
+                
+            filename = file_path.name.lower()
+            
+            # Use fnmatch for pattern matching
+            if fnmatch.fnmatch(filename, pattern_lower):
+                matches.append(i)
+                
+        return matches
+        
+    def update_search_matches(self):
+        """Update search matches and move cursor to nearest match"""
+        self.search_matches = self.find_matches(self.search_pattern)
+        
+        if self.search_matches:
+            current_pane = self.get_current_pane()
+            current_index = current_pane['selected_index']
+            
+            # Find the next match at or after current position
+            next_match = None
+            for match_idx in self.search_matches:
+                if match_idx >= current_index:
+                    next_match = match_idx
+                    break
+                    
+            # If no match found after current position, wrap to first match
+            if next_match is None:
+                next_match = self.search_matches[0]
+                
+            # Update cursor position
+            current_pane['selected_index'] = next_match
+            self.search_match_index = self.search_matches.index(next_match)
+            
+            # Ensure the selected item is visible (adjust scroll if needed)
+            self.adjust_scroll_for_selection(current_pane)
+        else:
+            self.search_match_index = 0
+            
+    def adjust_scroll_for_selection(self, pane_data):
+        """Ensure the selected item is visible by adjusting scroll offset"""
+        height, width = self.stdscr.getmaxyx()
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+        
+        # Adjust scroll offset to keep selection visible
+        if pane_data['selected_index'] < pane_data['scroll_offset']:
+            pane_data['scroll_offset'] = pane_data['selected_index']
+        elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
+            pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
+            
+    def enter_search_mode(self):
+        """Enter incremental search mode"""
+        self.search_mode = True
+        self.search_pattern = ""
+        self.search_matches = []
+        self.search_match_index = 0
+        self.needs_full_redraw = True
+        
+    def exit_search_mode(self):
+        """Exit search mode"""
+        self.search_mode = False
+        self.search_pattern = ""
+        self.search_matches = []
+        self.search_match_index = 0
+        self.needs_full_redraw = True
+        
+    def handle_search_input(self, key):
+        """Handle input while in search mode"""
+        if key == 27:  # ESC - exit search mode
+            self.exit_search_mode()
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Enter - exit search mode and keep current position
+            self.exit_search_mode()
+            return True
+        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
+            # Backspace - remove last character
+            if self.search_pattern:
+                self.search_pattern = self.search_pattern[:-1]
+                self.update_search_matches()
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_UP or key == ord('k'):
+            # Up arrow - go to previous match
+            if self.search_matches:
+                self.search_match_index = (self.search_match_index - 1) % len(self.search_matches)
+                current_pane = self.get_current_pane()
+                current_pane['selected_index'] = self.search_matches[self.search_match_index]
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_DOWN or key == ord('j'):
+            # Down arrow - go to next match
+            if self.search_matches:
+                self.search_match_index = (self.search_match_index + 1) % len(self.search_matches)
+                current_pane = self.get_current_pane()
+                current_pane['selected_index'] = self.search_matches[self.search_match_index]
+                self.needs_full_redraw = True
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            # Add character to search pattern
+            self.search_pattern += chr(key)
+            self.update_search_matches()
+            self.needs_full_redraw = True
+            return True
+            
+        return False
         
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
@@ -923,6 +1110,7 @@ class FileManager:
             "• Ctrl+Space   (alternative)",
             "• Ctrl+S       (alternative)",
             "• Command+Space (probably won't work)",
+            "• / (forward slash - enter search mode)",
             "",
             "Key codes will appear below as you press them.",
             "If a combination works for upward selection, it will be noted.",
@@ -1030,9 +1218,11 @@ class FileManager:
                     color = curses.A_NORMAL
                 
                 try:
-                    # Clear the line first
-                    self.stdscr.addstr(y_pos, 4, " " * (width - 8))
-                    self.stdscr.addstr(y_pos, 4, key_info[:width-8], color)
+                    # Clear the line first (avoid last column)
+                    clear_width = min(width - 9, width - 4)  # Safe width for clearing
+                    if clear_width > 0:
+                        self.stdscr.addstr(y_pos, 4, " " * clear_width)
+                        self.stdscr.addstr(y_pos, 4, key_info[:clear_width], color)
                     self.stdscr.refresh()
                     result_line += 1
                 except curses.error:
@@ -1065,6 +1255,11 @@ class FileManager:
             # Get user input
             key = self.stdscr.getch()
             current_pane = self.get_current_pane()
+            
+            # Handle search mode input first
+            if self.search_mode:
+                if self.handle_search_input(key):
+                    continue  # Search mode handled the key
             
             if key == ord('q') or key == ord('Q'):
                 break
@@ -1233,18 +1428,39 @@ class FileManager:
                 print(f"Current time: {datetime.now()}")
             elif key == ord('d'):  # 'd' key - debug mode to detect modifier keys
                 self.debug_mode()
+            elif key == ord('/'):  # '/' key - enter search mode
+                self.enter_search_mode()
         
         # Restore stdout/stderr before exiting
-        sys.stdout = self.original_stdout
-        sys.stderr = self.original_stderr
+        self.restore_stdio()
 
 def main(stdscr):
     """Main function to run the file manager"""
+    fm = None
     try:
         fm = FileManager(stdscr)
         fm.run()
     except KeyboardInterrupt:
+        # Clean exit on Ctrl+C
         pass
+    except Exception as e:
+        # Restore stdout/stderr before handling exception
+        if fm is not None:
+            fm.restore_stdio()
+        
+        # Print error information to help with debugging
+        import traceback
+        print(f"\nTFM encountered an unexpected error:", file=sys.stderr)
+        print(f"Error: {type(e).__name__}: {e}", file=sys.stderr)
+        print("\nFull traceback:", file=sys.stderr)
+        traceback.print_exc()
+        
+        # Re-raise the exception so it can be seen after TFM exits
+        raise
+    finally:
+        # Always restore stdout/stderr in case of any exit path
+        if fm is not None:
+            fm.restore_stdio()
 
 if __name__ == "__main__":
     curses.wrapper(main)
