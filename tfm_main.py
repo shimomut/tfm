@@ -234,6 +234,77 @@ class FileManager:
         # Move cursor to previous item after selection
         if current_pane['selected_index'] > 0:
             current_pane['selected_index'] -= 1
+    
+    def toggle_all_files_selection(self):
+        """Toggle selection status of all files (not directories) in current pane"""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            return
+        
+        # Get all files (not directories) in current pane
+        files_only = []
+        for file_path in current_pane['files']:
+            # Skip parent directory entry and directories
+            if (file_path == current_pane['path'].parent or 
+                file_path.is_dir()):
+                continue
+            files_only.append(file_path)
+        
+        if not files_only:
+            print("No files to select in current directory")
+            return
+        
+        # Check if all files are currently selected
+        files_only_str = {str(f) for f in files_only}
+        currently_selected_files = current_pane['selected_files'] & files_only_str
+        
+        if len(currently_selected_files) == len(files_only):
+            # All files are selected, deselect them all
+            current_pane['selected_files'] -= files_only_str
+            print(f"Deselected all {len(files_only)} files")
+        else:
+            # Not all files are selected, select them all
+            current_pane['selected_files'].update(files_only_str)
+            print(f"Selected all {len(files_only)} files")
+        
+        print(f"Total selected: {len(current_pane['selected_files'])}")
+        self.needs_full_redraw = True
+    
+    def toggle_all_items_selection(self):
+        """Toggle selection status of all items (files and directories) in current pane"""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            return
+        
+        # Get all items except parent directory entry
+        all_items = []
+        for file_path in current_pane['files']:
+            # Skip parent directory entry
+            if file_path == current_pane['path'].parent:
+                continue
+            all_items.append(file_path)
+        
+        if not all_items:
+            print("No items to select in current directory")
+            return
+        
+        # Check if all items are currently selected
+        all_items_str = {str(f) for f in all_items}
+        currently_selected_items = current_pane['selected_files'] & all_items_str
+        
+        if len(currently_selected_items) == len(all_items):
+            # All items are selected, deselect them all
+            current_pane['selected_files'] -= all_items_str
+            print(f"Deselected all {len(all_items)} items")
+        else:
+            # Not all items are selected, select them all
+            current_pane['selected_files'].update(all_items_str)
+            print(f"Selected all {len(all_items)} items")
+        
+        print(f"Total selected: {len(current_pane['selected_files'])}")
+        self.needs_full_redraw = True
         
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
@@ -670,17 +741,17 @@ class FileManager:
         
         # Controls - progressively abbreviate to fit
         if width > 160:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
         elif width > 140:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 120:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 100:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         elif width > 80:
-            controls = "Space/Opt+Space:select  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         else:
-            controls = "Space:select  F:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
+            controls = "Space:select  a:select-all-files  A:select-all-items  F:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
         
         # Draw status line with background color
         # Fill entire status line with background color
@@ -1572,6 +1643,10 @@ class FileManager:
                     print(f"Unknown Option key sequence: 194, {next_key}")
             elif key == ord('d'):  # 'd' key - debug mode to detect modifier keys
                 self.debug_mode()
+            elif key == ord('a'):  # 'a' key - toggle all files selection
+                self.toggle_all_files_selection()
+            elif key == ord('A'):  # 'A' key (Shift+A) - toggle all items selection
+                self.toggle_all_items_selection()
             elif key == ord('f') or key == ord('F'):  # 'F' key - enter search mode
                 self.enter_search_mode()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
