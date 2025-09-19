@@ -7,6 +7,7 @@ import curses
 import os
 import stat
 import shutil
+import subprocess
 import sys
 import io
 import fnmatch
@@ -3972,9 +3973,9 @@ class FileManager:
             # Change to the current directory
             os.chdir(current_pane['path'])
             
-            # Start the shell
+            # Start the shell with the modified environment
             shell = env.get('SHELL', '/bin/bash')
-            os.system(f'exec {shell}')
+            subprocess.run([shell], env=env)
             
         except Exception as e:
             print(f"Error starting sub-shell: {e}")

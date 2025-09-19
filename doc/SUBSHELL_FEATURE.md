@@ -122,11 +122,17 @@ KEY_BINDINGS = {
 - Original stdout/stderr are temporarily restored
 - Log capture is suspended during shell session
 - All TFM state is preserved and restored
+- Environment variables are properly passed using `subprocess.run()`
 
 ### Path Handling
 - All paths are converted to absolute paths for reliability
 - Path expansion and resolution is handled automatically
 - Non-existent or inaccessible paths are handled gracefully
+
+### Shell Integration
+- Uses `subprocess.run()` with explicit environment passing
+- Supports user's preferred shell from `$SHELL` environment variable
+- Falls back to `/bin/bash` if `$SHELL` is not set
 
 ## Use Cases
 
