@@ -1323,65 +1323,7 @@ class FileManager:
         """Handle input while in confirmation mode (backward compatibility)"""
         return self.handle_dialog_input(key)
     
-    def show_file_operations_menu(self):
-        """Show file operations menu using the multi-choice dialog"""
-        current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            print("No files in current directory")
-            return
-            
-        selected_file = current_pane['files'][current_pane['selected_index']]
-        
-        # Don't show menu for parent directory
-        if selected_file == current_pane['path'].parent:
-            print("Cannot perform operations on parent directory")
-            return
-            
-        filename = selected_file.name
-        
-        # Define the menu choices
-        choices = [
-            {"text": "Copy", "key": "c", "value": "copy"},
-            {"text": "Move", "key": "m", "value": "move"},
-            {"text": "Delete", "key": "d", "value": "delete"},
-            {"text": "Rename", "key": "r", "value": "rename"},
-            {"text": "Properties", "key": "p", "value": "properties"},
-            {"text": "Cancel", "key": "x", "value": None}
-        ]
-        
-        def handle_operation_choice(operation):
-            if operation is None:
-                print("Operation cancelled")
-                return
-                
-            if operation == "copy":
-                print(f"Copy operation selected for: {filename}")
-                # TODO: Implement copy functionality
-            elif operation == "move":
-                print(f"Move operation selected for: {filename}")
-                # TODO: Implement move functionality
-            elif operation == "delete":
-                # Show a confirmation dialog for delete
-                def confirm_delete(confirmed):
-                    if confirmed:
-                        print(f"Would delete: {filename}")
-                        # TODO: Implement actual delete
-                    else:
-                        print("Delete cancelled")
-                
-                self.show_confirmation(f"Delete '{filename}'?", confirm_delete)
-            elif operation == "rename":
-                print(f"Rename operation selected for: {filename}")
-                # TODO: Implement rename functionality
-            elif operation == "properties":
-                print(f"Properties for: {filename}")
-                # TODO: Implement properties display
-        
-        # Show the dialog
-        message = f"Operations for '{filename}':"
-        self.show_dialog(message, choices, handle_operation_choice)
-    
+
     def show_info_dialog(self, title, info_lines):
         """Show an information dialog with scrollable content"""
         self.info_dialog_mode = True
@@ -1750,7 +1692,6 @@ class FileManager:
         help_lines.append("Ctrl+Space       Select file and move up")
         help_lines.append("a                Select all files")
         help_lines.append("A                Select all items (files + directories)")
-        help_lines.append("m / M            File operations menu (copy/move/delete/rename)")
         help_lines.append("v / V            View text file")
         help_lines.append("e / E            Edit file with text editor")
         help_lines.append("i / I            Show file details")
@@ -2834,8 +2775,6 @@ class FileManager:
                     self.sync_pane_directories()
             elif self.is_key_for_action(key, 'search'):  # Search key - enter search mode
                 self.enter_search_mode()
-            elif self.is_key_for_action(key, 'file_operations'):  # File operations menu
-                self.show_file_operations_menu()
             elif self.is_key_for_action(key, 'sort_menu'):  # Sort menu
                 self.show_sort_menu()
             elif self.is_key_for_action(key, 'quick_sort_name'):  # Quick sort by name

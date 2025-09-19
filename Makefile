@@ -28,6 +28,7 @@ test-quick:
 	@cd test && python3 verify_complete_implementation.py
 	@cd test && python3 verify_delete_feature.py
 	@cd test && python3 verify_navigation_changes.py
+	@cd test && python3 verify_m_key_removal.py
 
 clean:
 	@echo "Cleaning up..."
