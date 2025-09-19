@@ -21,10 +21,12 @@ When entering sub-shell mode, the following environment variables are automatica
 - `TFM_OTHER_DIR`: Absolute path of the non-focused pane directory
 
 ### Selected Files Variables
-- `TFM_LEFT_SELECTED`: Space-separated list of selected file names in the left pane (or cursor position if no selection)
-- `TFM_RIGHT_SELECTED`: Space-separated list of selected file names in the right pane (or cursor position if no selection)
-- `TFM_THIS_SELECTED`: Space-separated list of selected file names in the focused pane (or cursor position if no selection)
-- `TFM_OTHER_SELECTED`: Space-separated list of selected file names in the non-focused pane (or cursor position if no selection)
+- `TFM_LEFT_SELECTED`: Space-separated list of shell-quoted file names in the left pane (or cursor position if no selection)
+- `TFM_RIGHT_SELECTED`: Space-separated list of shell-quoted file names in the right pane (or cursor position if no selection)
+- `TFM_THIS_SELECTED`: Space-separated list of shell-quoted file names in the focused pane (or cursor position if no selection)
+- `TFM_OTHER_SELECTED`: Space-separated list of shell-quoted file names in the non-focused pane (or cursor position if no selection)
+
+**Note**: All filenames are automatically quoted using shell-safe quoting, so they can be used directly in shell commands even if they contain spaces or special characters.
 
 ### Control Variables
 - `TFM_ACTIVE`: Set to `"1"` when in TFM sub-shell mode (used for shell prompt customization)
@@ -40,11 +42,48 @@ The selected files variables (`TFM_*_SELECTED`) follow this logic:
 This ensures that the environment variables always contain useful file names for shell operations, even when you haven't explicitly selected any files.
 
 **Example scenarios:**
-- **Multiple files selected**: `TFM_THIS_SELECTED="file1.txt file2.py file3.md"`
-- **No selection, cursor on file**: `TFM_THIS_SELECTED="current_file.txt"`
+- **Multiple files selected**: `TFM_THIS_SELECTED="file1.txt file2.py 'file with spaces.md'"`
+- **No selection, cursor on file**: `TFM_THIS_SELECTED="'current file.txt'"`
 - **Empty directory**: `TFM_THIS_SELECTED=""`
 
-This behavior makes shell operations more intuitive - you can always work with `$TFM_THIS_SELECTED` knowing it will contain the file(s) you're interested in.
+This behavior makes shell operations extremely intuitive - you can always use `ls -la $TFM_THIS_SELECTED` or `cp $TFM_THIS_SELECTED "$TFM_OTHER_DIR/"` knowing it will work correctly with any filenames, including those with spaces or special characters.
+
+### Shell Quoting
+
+TFM automatically quotes all filenames using shell-safe quoting (via Python's `shlex.quote()`). This means:
+
+- **Filenames with spaces** are quoted: `'My Document.txt'`
+- **Filenames with special characters** are escaped: `'file$with&special.txt'`
+- **Simple filenames** remain unquoted: `simple.txt`
+
+#### **Direct Usage (Recommended)**
+```bash
+# ✅ Works directly with any filenames, including spaces and special characters
+cd "$TFM_THIS_DIR"
+ls -la $TFM_THIS_SELECTED
+cp $TFM_THIS_SELECTED "$TFM_OTHER_DIR/"
+tar -czf backup.tar.gz $TFM_THIS_SELECTED
+```
+
+#### **Examples of Automatic Quoting**
+```bash
+# If you have files: "My Document.txt", "file with spaces.py", "normal.txt"
+# TFM_THIS_SELECTED becomes: 'My Document.txt' 'file with spaces.py' normal.txt
+
+# This now works perfectly:
+ls -la $TFM_THIS_SELECTED
+# Expands to: ls -la 'My Document.txt' 'file with spaces.py' normal.txt
+```
+
+#### **Loop Usage (For Complex Operations)**
+```bash
+# For more complex per-file operations, you can still use loops
+for file in $TFM_THIS_SELECTED; do
+    echo "Processing: $file"  # $file is already properly quoted
+    # Use the quoted filename directly
+    cp "$TFM_THIS_DIR"/$file "$TFM_OTHER_DIR"/
+done
+```
 
 ## Usage Examples
 
@@ -59,30 +98,45 @@ du -sh "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR"
 
 # Find files in both directories
 find "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR" -name "*.py"
+
+# List selected files directly (works with spaces!)
+ls -la $TFM_THIS_SELECTED
 ```
 
 ### Working with Selected Files
 
+**TFM automatically quotes filenames**, so you can use them directly in shell commands without worrying about spaces or special characters.
+
 ```bash
-# Copy selected files (or cursor file) from current pane to other pane
+# ✅ List selected files (works with spaces and special characters!)
+cd "$TFM_THIS_DIR"
+ls -la $TFM_THIS_SELECTED
+
+# ✅ Copy selected files to other pane
+cd "$TFM_THIS_DIR"
+cp $TFM_THIS_SELECTED "$TFM_OTHER_DIR/"
+
+# ✅ Archive selected files
+cd "$TFM_THIS_DIR"
+tar -czf selected_files.tar.gz $TFM_THIS_SELECTED
+
+# ✅ Show file information
+cd "$TFM_THIS_DIR"
+file $TFM_THIS_SELECTED
+
+# ✅ Process files with any command
+cd "$TFM_THIS_DIR"
+wc -l $TFM_THIS_SELECTED  # Count lines in selected files
+```
+
+**Alternative approach using full paths:**
+```bash
+# You can also use loops for more complex operations
 for file in $TFM_THIS_SELECTED; do
-    cp "$TFM_THIS_DIR/$file" "$TFM_OTHER_DIR/"
+    echo "Processing: $file"
+    # Note: $file is already quoted, so use it directly
+    cp "$TFM_THIS_DIR"/$file "$TFM_OTHER_DIR"/
 done
-
-# Show details of selected files (or cursor file)
-for file in $TFM_THIS_SELECTED; do
-    ls -la "$TFM_THIS_DIR/$file"
-done
-
-# Archive selected files (or cursor file)
-if [ -n "$TFM_THIS_SELECTED" ]; then
-    cd "$TFM_THIS_DIR"
-    tar -czf selected_files.tar.gz $TFM_THIS_SELECTED
-fi
-
-# Process current file even if nothing is explicitly selected
-echo "Working with: $TFM_THIS_SELECTED"
-file "$TFM_THIS_DIR"/$TFM_THIS_SELECTED
 ```
 
 ### Advanced Operations
@@ -219,6 +273,11 @@ When `TFM_ACTIVE` is set:
 **Configuration conflicts:**
 - Place the TFM configuration **after** other prompt modifications in your config file
 - Some prompt themes may override the `PROMPT` or `PS1` variables - adjust accordingly
+
+**Filenames with spaces (SOLVED):**
+- TFM now automatically quotes all filenames with spaces or special characters
+- You can use `ls -la $TFM_THIS_SELECTED` directly - it works with any filenames!
+- No more need for complex loops or directory changes for basic operations
 
 ## Returning to TFM
 

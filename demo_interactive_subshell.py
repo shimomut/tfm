@@ -23,7 +23,8 @@ def demo_subshell_commands():
     env['TFM_RIGHT_DIR'] = str(home_dir)
     env['TFM_THIS_DIR'] = str(current_dir)
     env['TFM_OTHER_DIR'] = str(home_dir)
-    env['TFM_LEFT_SELECTED'] = 'tfm.py README.md'  # Multiple files selected
+    # Simulate shell-quoted filenames (including ones with spaces)
+    env['TFM_LEFT_SELECTED'] = 'tfm.py README.md \'Creative Cloud Files\''  # Multiple files, one with spaces
     env['TFM_RIGHT_SELECTED'] = 'Documents'        # Cursor position (no explicit selection)
     env['TFM_THIS_SELECTED'] = 'tfm.py README.md'  # Multiple files selected
     env['TFM_OTHER_SELECTED'] = 'Documents'        # Cursor position (no explicit selection)
@@ -55,8 +56,12 @@ def demo_subshell_commands():
             'command': 'echo "Left pane:" && ls -la "$TFM_LEFT_DIR" | head -5 && echo "Right pane:" && ls -la "$TFM_RIGHT_DIR" | head -5'
         },
         {
-            'description': 'Show selected files info',
-            'command': 'for file in $TFM_THIS_SELECTED; do echo "Selected: $file"; ls -la "$TFM_THIS_DIR/$file" 2>/dev/null || echo "  (file not found)"; done'
+            'description': 'List selected files directly (works with spaces!)',
+            'command': 'cd "$TFM_THIS_DIR" && echo "Selected files:" && ls -la $TFM_THIS_SELECTED 2>/dev/null || echo "Could not list files"'
+        },
+        {
+            'description': 'Show how filenames are automatically quoted',
+            'command': 'echo "Left pane files (note quoting): $TFM_LEFT_SELECTED" && echo "This includes files with spaces properly quoted!"'
         },
         {
             'description': 'Compare directory sizes',

@@ -11,6 +11,7 @@ import subprocess
 import sys
 import io
 import fnmatch
+import shlex
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -3953,12 +3954,17 @@ class FileManager:
                     selected = [cursor_file.name]
                 return selected
             
-            left_selected = get_selected_or_cursor(left_pane)
-            right_selected = get_selected_or_cursor(right_pane)
-            current_selected = get_selected_or_cursor(current_pane)
-            other_selected = get_selected_or_cursor(other_pane)
+            def quote_filenames(filenames):
+                """Quote filenames for safe shell usage"""
+                return [shlex.quote(filename) for filename in filenames]
+            
+            left_selected = quote_filenames(get_selected_or_cursor(left_pane))
+            right_selected = quote_filenames(get_selected_or_cursor(right_pane))
+            current_selected = quote_filenames(get_selected_or_cursor(current_pane))
+            other_selected = quote_filenames(get_selected_or_cursor(other_pane))
             
             # Set selected files environment variables (space-separated) with TFM_ prefix
+            # Filenames are properly quoted for shell safety
             env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
             env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
             env['TFM_THIS_SELECTED'] = ' '.join(current_selected)
