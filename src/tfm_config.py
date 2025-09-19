@@ -59,6 +59,7 @@ class DefaultConfig:
         'delete_files': ['k', 'K'],
         'rename_file': ['r', 'R'],
         'favorites': ['j', 'J'],
+        'subshell': ['x', 'X'],
     }
     
     # File associations (for future use)

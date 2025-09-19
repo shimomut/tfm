@@ -2514,6 +2514,7 @@ class FileManager:
         help_lines.append("=== GENERAL ===")
         help_lines.append("? / h            Show this help")
         help_lines.append("q / Q            Quit TFM")
+        help_lines.append("x / X            Enter sub-shell mode")
         help_lines.append("ESC              Cancel current operation")
         help_lines.append("")
         
@@ -2531,6 +2532,9 @@ class FileManager:
         help_lines.append("• Log pane shows operation results and system messages")
         help_lines.append("• File details (i) shows comprehensive file information")
         help_lines.append("• Text viewer (v) supports syntax highlighting")
+        help_lines.append("• Sub-shell mode (x) provides environment variables:")
+        help_lines.append("  LEFT_DIR, RIGHT_DIR, THIS_DIR, OTHER_DIR")
+        help_lines.append("  LEFT_SELECTED, RIGHT_SELECTED, THIS_SELECTED, OTHER_SELECTED")
         
         self.show_info_dialog("TFM Help", help_lines)
     
@@ -3912,6 +3916,89 @@ class FileManager:
             if help_x >= start_x:
                 self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
         
+    def enter_subshell_mode(self):
+        """Enter sub-shell mode with environment variables set"""
+        # Restore stdout/stderr temporarily
+        self.restore_stdio()
+        
+        # Clear the screen and reset cursor
+        self.stdscr.clear()
+        self.stdscr.refresh()
+        
+        # Reset terminal to normal mode
+        curses.endwin()
+        
+        try:
+            # Get current pane information
+            left_pane = self.left_pane
+            right_pane = self.right_pane
+            current_pane = self.get_current_pane()
+            other_pane = self.get_inactive_pane()
+            
+            # Set environment variables
+            env = os.environ.copy()
+            env['LEFT_DIR'] = str(left_pane['path'])
+            env['RIGHT_DIR'] = str(right_pane['path'])
+            env['THIS_DIR'] = str(current_pane['path'])
+            env['OTHER_DIR'] = str(other_pane['path'])
+            
+            # Get selected files for each pane
+            left_selected = [Path(f).name for f in left_pane['selected_files']]
+            right_selected = [Path(f).name for f in right_pane['selected_files']]
+            current_selected = [Path(f).name for f in current_pane['selected_files']]
+            other_selected = [Path(f).name for f in other_pane['selected_files']]
+            
+            # Set selected files environment variables (space-separated)
+            env['LEFT_SELECTED'] = ' '.join(left_selected)
+            env['RIGHT_SELECTED'] = ' '.join(right_selected)
+            env['THIS_SELECTED'] = ' '.join(current_selected)
+            env['OTHER_SELECTED'] = ' '.join(other_selected)
+            
+            # Print information about the sub-shell environment
+            print("TFM Sub-shell Mode")
+            print("=" * 50)
+            print(f"LEFT_DIR:      {env['LEFT_DIR']}")
+            print(f"RIGHT_DIR:     {env['RIGHT_DIR']}")
+            print(f"THIS_DIR:      {env['THIS_DIR']}")
+            print(f"OTHER_DIR:     {env['OTHER_DIR']}")
+            print(f"LEFT_SELECTED: {env['LEFT_SELECTED']}")
+            print(f"RIGHT_SELECTED: {env['RIGHT_SELECTED']}")
+            print(f"THIS_SELECTED: {env['THIS_SELECTED']}")
+            print(f"OTHER_SELECTED: {env['OTHER_SELECTED']}")
+            print("=" * 50)
+            print("Type 'exit' to return to TFM")
+            print()
+            
+            # Change to the current directory
+            os.chdir(current_pane['path'])
+            
+            # Start the shell
+            shell = env.get('SHELL', '/bin/bash')
+            os.system(f'exec {shell}')
+            
+        except Exception as e:
+            print(f"Error starting sub-shell: {e}")
+            input("Press Enter to continue...")
+        
+        finally:
+            # Reinitialize curses
+            self.stdscr = curses.initscr()
+            curses.curs_set(0)  # Hide cursor
+            self.stdscr.keypad(True)
+            
+            # Reinitialize colors
+            init_colors()
+            
+            # Restore stdout/stderr capture
+            sys.stdout = LogCapture(self.log_messages, "STDOUT")
+            sys.stderr = LogCapture(self.log_messages, "STDERR")
+            
+            # Log return from sub-shell
+            print("Returned from sub-shell mode")
+            
+            # Force full redraw
+            self.needs_full_redraw = True
+
     def run(self):
         """Main application loop"""
         while True:
@@ -4208,6 +4295,8 @@ class FileManager:
                 self.left_pane_ratio = 0.5
                 self.needs_full_redraw = True
                 print("Pane split reset to 50% | 50%")
+            elif self.is_key_for_action(key, 'subshell'):  # Sub-shell mode
+                self.enter_subshell_mode()
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()

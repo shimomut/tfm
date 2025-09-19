@@ -43,6 +43,7 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 - **Search in Files**: Search functionality within viewed text files
 
 ### Advanced Features
+- **Sub-shell Mode**: Suspend TFM and enter shell with environment variables for current state
 - **Favorite Directories**: Quick access to frequently used directories with 'J' key
 - **Searchable Lists**: Filter and search through files and directories
 - **Configuration System**: Fully customizable key bindings and settings
@@ -148,6 +149,7 @@ The help dialog is your quick reference guide - no need to memorize all key bind
 | Key | Action |
 |-----|--------|
 | `q` | Quit application |
+| `x/X` | Enter sub-shell mode with environment variables |
 | `t` | Test log output (demonstrates stdout/stderr capture) |
 
 ## Text Viewer
@@ -187,6 +189,59 @@ For full syntax highlighting, install pygments:
 pip install pygments
 ```
 The viewer works without pygments but displays plain text only.
+
+## Sub-shell Mode
+
+TFM's sub-shell mode allows you to temporarily suspend the interface and enter a shell environment with pre-configured environment variables that provide access to the current state of both file panes and selected files.
+
+### Activation
+- Press `x` or `X` to enter sub-shell mode
+- TFM suspends and starts a new shell session
+- Type `exit` to return to TFM
+
+### Environment Variables
+When entering sub-shell mode, these environment variables are automatically set:
+
+#### Directory Variables
+- `LEFT_DIR`: Absolute path of the left file pane directory
+- `RIGHT_DIR`: Absolute path of the right file pane directory  
+- `THIS_DIR`: Absolute path of the currently focused pane directory
+- `OTHER_DIR`: Absolute path of the non-focused pane directory
+
+#### Selected Files Variables
+- `LEFT_SELECTED`: Space-separated list of selected file names in the left pane
+- `RIGHT_SELECTED`: Space-separated list of selected file names in the right pane
+- `THIS_SELECTED`: Space-separated list of selected file names in the focused pane
+- `OTHER_SELECTED`: Space-separated list of selected file names in the non-focused pane
+
+### Usage Examples
+
+```bash
+# List files in both panes
+ls -la "$LEFT_DIR" "$RIGHT_DIR"
+
+# Copy selected files from current pane to other pane
+for file in $THIS_SELECTED; do
+    cp "$THIS_DIR/$file" "$OTHER_DIR/"
+done
+
+# Compare directory sizes
+du -sh "$LEFT_DIR" "$RIGHT_DIR"
+
+# Find files in both directories
+find "$LEFT_DIR" "$RIGHT_DIR" -name "*.py"
+
+# Archive selected files
+if [ -n "$THIS_SELECTED" ]; then
+    cd "$THIS_DIR"
+    tar -czf selected_files.tar.gz $THIS_SELECTED
+fi
+```
+
+### Test Scripts
+- `python3 test_subshell.py` - Test environment variables
+- `python3 demo_subshell.py` - See usage examples
+- `bash examples_subshell.sh` - Interactive shell examples
 
 ## Searchable Dialogs
 
@@ -416,6 +471,7 @@ TFM is released under the MIT License. See LICENSE file for details.
 - ✅ Favorite directories with searchable dialog
 - ✅ Enhanced text viewer with syntax highlighting
 - ✅ Searchable list dialog system
+- ✅ Sub-shell mode with environment variables
 - ✅ Improved configuration system
 - ✅ Comprehensive help system
 - ✅ Extensive test coverage
