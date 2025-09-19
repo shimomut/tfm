@@ -23,10 +23,10 @@ def demo_subshell_commands():
     env['TFM_RIGHT_DIR'] = str(home_dir)
     env['TFM_THIS_DIR'] = str(current_dir)
     env['TFM_OTHER_DIR'] = str(home_dir)
-    env['TFM_LEFT_SELECTED'] = 'tfm.py README.md'
-    env['TFM_RIGHT_SELECTED'] = ''
-    env['TFM_THIS_SELECTED'] = 'tfm.py README.md'
-    env['TFM_OTHER_SELECTED'] = ''
+    env['TFM_LEFT_SELECTED'] = 'tfm.py README.md'  # Multiple files selected
+    env['TFM_RIGHT_SELECTED'] = 'Documents'        # Cursor position (no explicit selection)
+    env['TFM_THIS_SELECTED'] = 'tfm.py README.md'  # Multiple files selected
+    env['TFM_OTHER_SELECTED'] = 'Documents'        # Cursor position (no explicit selection)
     env['TFM_ACTIVE'] = '1'
     
     # Add prompt modification like TFM does (both PS1 and PROMPT)
@@ -69,6 +69,10 @@ def demo_subshell_commands():
         {
             'description': 'Show environment variables',
             'command': 'echo "TFM Environment Variables:" && env | grep "^TFM_" | sort'
+        },
+        {
+            'description': 'Demonstrate selection behavior',
+            'command': 'echo "Left pane (multiple selected): $TFM_LEFT_SELECTED" && echo "Right pane (cursor position): $TFM_RIGHT_SELECTED" && echo "This shows both explicit selection and cursor fallback"'
         },
         {
             'description': 'Show shell prompts with TFM label',

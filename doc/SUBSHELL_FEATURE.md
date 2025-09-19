@@ -21,13 +21,30 @@ When entering sub-shell mode, the following environment variables are automatica
 - `TFM_OTHER_DIR`: Absolute path of the non-focused pane directory
 
 ### Selected Files Variables
-- `TFM_LEFT_SELECTED`: Space-separated list of selected file names in the left pane
-- `TFM_RIGHT_SELECTED`: Space-separated list of selected file names in the right pane
-- `TFM_THIS_SELECTED`: Space-separated list of selected file names in the focused pane
-- `TFM_OTHER_SELECTED`: Space-separated list of selected file names in the non-focused pane
+- `TFM_LEFT_SELECTED`: Space-separated list of selected file names in the left pane (or cursor position if no selection)
+- `TFM_RIGHT_SELECTED`: Space-separated list of selected file names in the right pane (or cursor position if no selection)
+- `TFM_THIS_SELECTED`: Space-separated list of selected file names in the focused pane (or cursor position if no selection)
+- `TFM_OTHER_SELECTED`: Space-separated list of selected file names in the non-focused pane (or cursor position if no selection)
 
 ### Control Variables
 - `TFM_ACTIVE`: Set to `"1"` when in TFM sub-shell mode (used for shell prompt customization)
+
+### Selection Behavior
+
+The selected files variables (`TFM_*_SELECTED`) follow this logic:
+
+1. **If files are explicitly selected** (using Space, Shift+Up/Down, etc.): Contains the names of all selected files
+2. **If no files are selected**: Contains the name of the file at the current cursor position
+3. **If directory is empty**: Contains an empty string
+
+This ensures that the environment variables always contain useful file names for shell operations, even when you haven't explicitly selected any files.
+
+**Example scenarios:**
+- **Multiple files selected**: `TFM_THIS_SELECTED="file1.txt file2.py file3.md"`
+- **No selection, cursor on file**: `TFM_THIS_SELECTED="current_file.txt"`
+- **Empty directory**: `TFM_THIS_SELECTED=""`
+
+This behavior makes shell operations more intuitive - you can always work with `$TFM_THIS_SELECTED` knowing it will contain the file(s) you're interested in.
 
 ## Usage Examples
 
@@ -47,21 +64,25 @@ find "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR" -name "*.py"
 ### Working with Selected Files
 
 ```bash
-# Copy selected files from current pane to other pane
+# Copy selected files (or cursor file) from current pane to other pane
 for file in $TFM_THIS_SELECTED; do
     cp "$TFM_THIS_DIR/$file" "$TFM_OTHER_DIR/"
 done
 
-# Show details of selected files
+# Show details of selected files (or cursor file)
 for file in $TFM_THIS_SELECTED; do
     ls -la "$TFM_THIS_DIR/$file"
 done
 
-# Archive selected files
+# Archive selected files (or cursor file)
 if [ -n "$TFM_THIS_SELECTED" ]; then
     cd "$TFM_THIS_DIR"
     tar -czf selected_files.tar.gz $TFM_THIS_SELECTED
 fi
+
+# Process current file even if nothing is explicitly selected
+echo "Working with: $TFM_THIS_SELECTED"
+file "$TFM_THIS_DIR"/$TFM_THIS_SELECTED
 ```
 
 ### Advanced Operations

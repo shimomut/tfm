@@ -3943,11 +3943,20 @@ class FileManager:
             env['TFM_THIS_DIR'] = str(current_pane['path'])
             env['TFM_OTHER_DIR'] = str(other_pane['path'])
             
-            # Get selected files for each pane
-            left_selected = [Path(f).name for f in left_pane['selected_files']]
-            right_selected = [Path(f).name for f in right_pane['selected_files']]
-            current_selected = [Path(f).name for f in current_pane['selected_files']]
-            other_selected = [Path(f).name for f in other_pane['selected_files']]
+            # Get selected files for each pane, or cursor position if no selection
+            def get_selected_or_cursor(pane_data):
+                """Get selected files, or current cursor position if no files selected"""
+                selected = [Path(f).name for f in pane_data['selected_files']]
+                if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
+                    # No files selected, use cursor position
+                    cursor_file = pane_data['files'][pane_data['selected_index']]
+                    selected = [cursor_file.name]
+                return selected
+            
+            left_selected = get_selected_or_cursor(left_pane)
+            right_selected = get_selected_or_cursor(right_pane)
+            current_selected = get_selected_or_cursor(current_pane)
+            other_selected = get_selected_or_cursor(other_pane)
             
             # Set selected files environment variables (space-separated) with TFM_ prefix
             env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
