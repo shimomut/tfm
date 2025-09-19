@@ -2046,6 +2046,119 @@ class FileManager:
         
         if error_count > 0:
             print(f"Copy completed with {error_count} errors")
+    
+    def delete_selected_files(self):
+        """Delete selected files or current file with confirmation"""
+        current_pane = self.get_current_pane()
+        
+        # Get files to delete - either selected files or current file if none selected
+        files_to_delete = []
+        
+        if current_pane['selected_files']:
+            # Delete all selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_delete.append(file_path)
+        else:
+            # Delete current file if no files are selected
+            if current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']]
+                
+                # Don't delete parent directory (..)
+                if (current_pane['selected_index'] == 0 and 
+                    len(current_pane['files']) > 0 and 
+                    selected_file == current_pane['path'].parent):
+                    print("Cannot delete parent directory (..)")
+                    return
+                
+                files_to_delete.append(selected_file)
+        
+        if not files_to_delete:
+            print("No files to delete")
+            return
+        
+        # Show confirmation dialog
+        if len(files_to_delete) == 1:
+            file_name = files_to_delete[0].name
+            if files_to_delete[0].is_dir():
+                message = f"Delete directory '{file_name}' and all its contents?"
+            elif files_to_delete[0].is_symlink():
+                message = f"Delete symbolic link '{file_name}'?"
+            else:
+                message = f"Delete file '{file_name}'?"
+        else:
+            dir_count = sum(1 for f in files_to_delete if f.is_dir())
+            file_count = len(files_to_delete) - dir_count
+            if dir_count > 0 and file_count > 0:
+                message = f"Delete {len(files_to_delete)} items ({dir_count} directories, {file_count} files)?"
+            elif dir_count > 0:
+                message = f"Delete {dir_count} directories and all their contents?"
+            else:
+                message = f"Delete {file_count} files?"
+        
+        choices = [
+            {"text": "Yes", "key": "y", "value": True},
+            {"text": "No", "key": "n", "value": False}
+        ]
+        
+        def handle_delete_confirmation(confirmed):
+            if confirmed:
+                self.perform_delete_operation(files_to_delete)
+            else:
+                print("Delete operation cancelled")
+        
+        self.show_dialog(message, choices, handle_delete_confirmation)
+    
+    def perform_delete_operation(self, files_to_delete):
+        """Perform the actual delete operation"""
+        deleted_count = 0
+        error_count = 0
+        
+        for file_path in files_to_delete:
+            try:
+                if file_path.is_symlink():
+                    # Delete symbolic link (not its target)
+                    file_path.unlink()
+                    print(f"Deleted symbolic link: {file_path.name}")
+                elif file_path.is_dir():
+                    # Delete directory recursively
+                    shutil.rmtree(file_path)
+                    print(f"Deleted directory: {file_path.name}")
+                else:
+                    # Delete file
+                    file_path.unlink()
+                    print(f"Deleted file: {file_path.name}")
+                
+                deleted_count += 1
+                
+            except PermissionError as e:
+                print(f"Permission denied deleting {file_path.name}: {e}")
+                error_count += 1
+            except FileNotFoundError:
+                print(f"File not found (already deleted?): {file_path.name}")
+                error_count += 1
+            except Exception as e:
+                print(f"Error deleting {file_path.name}: {e}")
+                error_count += 1
+        
+        # Refresh current pane to show the changes
+        self.refresh_files(self.get_current_pane())
+        self.needs_full_redraw = True
+        
+        # Clear selections after delete operation
+        current_pane = self.get_current_pane()
+        current_pane['selected_files'].clear()
+        
+        # Adjust cursor position if it's now out of bounds
+        if current_pane['selected_index'] >= len(current_pane['files']):
+            current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
+        
+        # Report results
+        if deleted_count > 0:
+            print(f"Successfully deleted {deleted_count} items")
+        if error_count > 0:
+            print(f"Delete completed with {error_count} errors")
         
     def handle_search_input(self, key):
         """Handle input while in search mode"""
@@ -2748,6 +2861,8 @@ class FileManager:
                 self.edit_selected_file()
             elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
                 self.copy_selected_files()
+            elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
+                self.delete_selected_files()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50

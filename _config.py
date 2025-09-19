@@ -47,6 +47,7 @@ class Config:
         'view_text': ['v', 'V'],
         'edit_file': ['e', 'E'],
         'copy_files': ['c', 'C'],
+        'delete_files': ['k', 'K'],
     }
     
     # File associations (for future use)
