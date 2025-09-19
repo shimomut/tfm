@@ -16,6 +16,11 @@ Successfully implemented a comprehensive help dialog feature for TFM that provid
 - **Integration**: Added to main input handling loop in `tfm_main.py`
 - **Code**: `elif self.is_key_for_action(key, 'help'): self.show_help_dialog()`
 
+### 3. Status Bar Simplification
+- **Change**: Replaced complex key binding hints with simple help message
+- **New Message**: `"Press ? for help  •  Tab:switch panes  •  Enter:open  •  q:quit"`
+- **Benefit**: 73% reduction in status bar text, cleaner interface
+
 ### 3. Help Content Structure
 The help dialog includes 8 organized sections:
 
@@ -39,7 +44,8 @@ The help dialog includes 8 organized sections:
 ### tfm_main.py
 1. **Added method**: `show_help_dialog()` (61 lines of help content)
 2. **Added key handler**: Help key binding in main input loop
-3. **Integration**: Uses existing info dialog infrastructure
+3. **Simplified status bar**: Replaced complex key hints with help message
+4. **Integration**: Uses existing info dialog infrastructure
 
 ### No other core files modified
 - Leverages existing configuration system
@@ -50,9 +56,11 @@ The help dialog includes 8 organized sections:
 
 ### Documentation
 1. **HELP_DIALOG_FEATURE.md** - Comprehensive feature documentation
-2. **HELP_DIALOG_IMPLEMENTATION_SUMMARY.md** - This summary
-3. **demo_help_dialog.py** - Feature demonstration script
-4. **verify_help_feature.py** - Implementation verification script
+2. **STATUS_BAR_SIMPLIFICATION.md** - Status bar simplification details
+3. **HELP_DIALOG_IMPLEMENTATION_SUMMARY.md** - This summary
+4. **demo_help_dialog.py** - Feature demonstration script
+5. **demo_status_simplification.py** - Status bar improvement demo
+6. **verify_help_feature.py** - Implementation verification script
 
 ### Test Files
 1. **test_help_content.py** - Help content generation test

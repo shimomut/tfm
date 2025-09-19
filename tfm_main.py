@@ -1048,38 +1048,25 @@ class FileManager:
         
         left_status = f"({', '.join(status_parts)})" if status_parts else ""
         
-        # Controls - progressively abbreviate to fit
-        if width > 160:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
-        elif width > 140:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  Tab:switch  ←→:nav  q:quit  h:hidden"
-        elif width > 120:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log  Tab:switch  ←→:nav  q:quit  h:hidden"
-        elif width > 100:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
-        elif width > 80:
-            controls = "Space/Opt+Space:select  a:select-all-files  A:select-all-items  o/O:sync  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
-        else:
-            controls = "Space:select  a:select-all-files  A:select-all-items  o/O:sync  F:search  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
+        # Simple help message - detailed controls available in help dialog
+        controls = "Press ? for help  •  Tab:switch panes  •  Enter:open  •  q:quit"
         
         # Draw status line with background color
         # Fill entire status line with background color
         status_line = " " * (width - 1)
         self.safe_addstr(status_y, 0, status_line, get_status_color())
         
-        # Always draw controls - they're the most important part
+        # Draw status info and controls
         if left_status:
-            # Ensure left status fits and draw with proper color
-            max_left_width = width - 20  # Reserve space for controls
-            truncated_left_status = left_status[:max_left_width] if len(left_status) > max_left_width else left_status
-            self.safe_addstr(status_y, 2, truncated_left_status, get_status_color())
+            # Draw left status
+            self.safe_addstr(status_y, 2, left_status, get_status_color())
             
-            # Right-align controls
-            controls_x = max(len(truncated_left_status) + 6, width - len(controls) - 3)
-            if controls_x > len(truncated_left_status) + 4:  # Ensure no overlap
+            # Right-align controls if there's space
+            if len(left_status) + len(controls) + 8 < width:
+                controls_x = width - len(controls) - 3
                 self.safe_addstr(status_y, controls_x, controls, get_status_color())
             else:
-                # If no room, just show controls without left status
+                # Center controls if no room for both
                 controls_x = max(2, (width - len(controls)) // 2)
                 self.safe_addstr(status_y, controls_x, controls, get_status_color())
         else:
