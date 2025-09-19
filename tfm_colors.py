@@ -20,53 +20,43 @@ COLOR_LOG_SYSTEM = 11   # System log messages
 RGB_COLORS = {
     'HEADER_BG': {
         'color_num': 100,
-        'rgb': (51, 63, 76),     # Dark blue-gray for file list headers
-        'description': 'Dark blue-gray background for file list headers'
+        'rgb': (51, 63, 76)     # Dark blue-gray for file list headers
     },
     'FOOTER_BG': {
         'color_num': 104,
-        'rgb': (51, 63, 76),     # Dark blue-gray for file list headers
-        'description': 'Darker blue-gray background for file list footers'
+        'rgb': (51, 63, 76)     # Dark blue-gray for file list footers
     },
     'STATUS_BG': {
         'color_num': 105,
-        'rgb': (51, 63, 76),     # Dark blue-gray for file list headers
-        'description': 'Darkest blue-gray background for status bar'
+        'rgb': (51, 63, 76)     # Dark blue-gray for status bar
     },
     'BOUNDARY_BG': {
         'color_num': 106,
-        'rgb': (51, 63, 76),     # Dark blue-gray for file list headers
-        'description': 'Medium dark blue-gray background for boundaries'
+        'rgb': (51, 63, 76)     # Dark blue-gray for boundaries
     },
     'DIRECTORY_FG': {
         'color_num': 101,
-        'rgb': (204, 204, 120),  # Yellow for directories
-        'description': 'Bright cyan for directory names'
+        'rgb': (204, 204, 120)  # Yellow for directories
     },
     'EXECUTABLE_FG': {
         'color_num': 102,
-        'rgb': (51, 229, 51),    # Bright green for executables
-        'description': 'Bright green for executable files'
+        'rgb': (51, 229, 51)    # Bright green for executables
     },
     'SELECTED_FG': {
         'color_num': 103,
-        'rgb': (255, 229, 0),    # Bright yellow for selected items
-        'description': 'Bright yellow for selected items'
+        'rgb': (255, 229, 0)    # Bright yellow for selected items
     },
     'REGULAR_FILE_FG': {
         'color_num': 107,
-        'rgb': (220, 220, 220),  # Light gray for regular files
-        'description': 'Light gray for regular files'
+        'rgb': (220, 220, 220)  # Light gray for regular files
     },
     'LOG_STDOUT_FG': {
         'color_num': 108,
-        'rgb': (220, 220, 220),  # Light gray for regular files
-        'description': 'Medium gray for stdout log messages'
+        'rgb': (220, 220, 220)  # Light gray for stdout logs
     },
     'LOG_SYSTEM_FG': {
         'color_num': 109,
-        'rgb': (100, 200, 255),  # Light blue for system logs
-        'description': 'Light blue for system log messages'
+        'rgb': (100, 200, 255)  # Light blue for system logs
     }
 }
 
@@ -232,7 +222,7 @@ def define_rgb_color(color_num, red, green, blue):
     except curses.error:
         return False
 
-def add_custom_rgb_color(name, color_num, rgb_tuple, description="Custom color"):
+def add_custom_rgb_color(name, color_num, rgb_tuple):
     """
     Add a new custom RGB color to the constants
     
@@ -240,12 +230,10 @@ def add_custom_rgb_color(name, color_num, rgb_tuple, description="Custom color")
         name: Name for the color (e.g., 'MY_CUSTOM_COLOR')
         color_num: Color number to use (should be unique)
         rgb_tuple: (red, green, blue) tuple with values 0-255
-        description: Description of the color
     """
     RGB_COLORS[name] = {
         'color_num': color_num,
-        'rgb': rgb_tuple,
-        'description': description
+        'rgb': rgb_tuple
     }
 
 def get_log_color(source):
