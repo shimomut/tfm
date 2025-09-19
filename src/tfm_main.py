@@ -139,6 +139,15 @@ class FileManager:
         self.search_dialog_scroll = 0  # Scroll offset for results
         self.search_dialog_searching = False  # Whether search is in progress
         
+        # Batch rename dialog state
+        self.batch_rename_mode = False
+        self.batch_rename_regex = ""
+        self.batch_rename_destination = ""
+        self.batch_rename_files = []  # List of selected files to rename
+        self.batch_rename_preview = []  # List of preview results
+        self.batch_rename_scroll = 0  # Scroll offset for preview list
+        self.batch_rename_input_mode = 'regex'  # 'regex' or 'destination'
+        
         # Log pane setup
         max_log_messages = getattr(self.config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
         self.log_messages = deque(maxlen=max_log_messages)
@@ -1039,6 +1048,11 @@ class FileManager:
         if self.search_dialog_mode:
             self.draw_search_dialog()
             return
+        
+        # If in batch rename mode, show batch rename dialog
+        if self.batch_rename_mode:
+            self.draw_batch_rename_dialog()
+            return
             
         # If in isearch mode, show isearch interface
         if self.isearch_mode:
@@ -1438,12 +1452,13 @@ class FileManager:
         self.needs_full_redraw = True
     
     def enter_rename_mode(self):
-        """Enter rename mode for the current file"""
+        """Enter rename mode for the current file or batch rename for multiple files"""
         current_pane = self.get_current_pane()
         
-        # Check if there are selected files - if so, do nothing (bulk rename not implemented yet)
-        if current_pane['selected_files']:
-            print("Bulk rename not implemented yet. Please deselect files first.")
+        # Check if multiple files are selected
+        if len(current_pane['selected_files']) > 1:
+            # Enter batch rename mode
+            self.enter_batch_rename_mode()
             return
         
         # Get the current file
@@ -1666,6 +1681,153 @@ class FileManager:
             print(f"File '{new_name}' already exists")
         except Exception as e:
             print(f"Error renaming file: {e}")
+    
+    def enter_batch_rename_mode(self):
+        """Enter batch rename mode for multiple selected files"""
+        current_pane = self.get_current_pane()
+        
+        if len(current_pane['selected_files']) < 2:
+            print("Select multiple files for batch rename")
+            return
+        
+        # Get list of selected files (only files, not directories for safety)
+        selected_files = []
+        for file_path_str in current_pane['selected_files']:
+            file_path = Path(file_path_str)
+            if file_path.exists() and file_path.is_file():
+                selected_files.append(file_path)
+        
+        if not selected_files:
+            print("No files selected for batch rename")
+            return
+        
+        self.batch_rename_mode = True
+        self.batch_rename_files = selected_files
+        self.batch_rename_regex = ""
+        self.batch_rename_destination = ""
+        self.batch_rename_preview = []
+        self.batch_rename_scroll = 0
+        self.batch_rename_input_mode = 'regex'
+        
+        self.needs_full_redraw = True
+        print(f"Batch rename mode: {len(selected_files)} files selected")
+    
+    def exit_batch_rename_mode(self):
+        """Exit batch rename mode"""
+        self.batch_rename_mode = False
+        self.batch_rename_files = []
+        self.batch_rename_regex = ""
+        self.batch_rename_destination = ""
+        self.batch_rename_preview = []
+        self.batch_rename_scroll = 0
+        self.batch_rename_input_mode = 'regex'
+        self.needs_full_redraw = True
+    
+    def update_batch_rename_preview(self):
+        """Update the preview list for batch rename"""
+        import re
+        
+        self.batch_rename_preview = []
+        
+        if not self.batch_rename_regex or not self.batch_rename_destination:
+            return
+        
+        try:
+            pattern = re.compile(self.batch_rename_regex)
+        except re.error as e:
+            # Invalid regex pattern
+            return
+        
+        for i, file_path in enumerate(self.batch_rename_files):
+            original_name = file_path.name
+            match = pattern.search(original_name)
+            
+            if match:
+                # Apply destination pattern with substitutions
+                new_name = self.batch_rename_destination
+                
+                # Replace \0 with entire original filename
+                new_name = new_name.replace('\\0', original_name)
+                
+                # Replace \1-\9 with regex groups
+                for j in range(1, 10):
+                    group_placeholder = f'\\{j}'
+                    if group_placeholder in new_name:
+                        try:
+                            group_value = match.group(j) if j <= len(match.groups()) else ''
+                            new_name = new_name.replace(group_placeholder, group_value)
+                        except IndexError:
+                            new_name = new_name.replace(group_placeholder, '')
+                
+                # Replace \d with index number
+                new_name = new_name.replace('\\d', str(i + 1))
+                
+                # Check for conflicts
+                new_path = file_path.parent / new_name
+                conflict = new_path.exists() and new_path != file_path
+                
+                self.batch_rename_preview.append({
+                    'original': original_name,
+                    'new': new_name,
+                    'conflict': conflict,
+                    'valid': bool(new_name.strip() and '/' not in new_name and '\0' not in new_name)
+                })
+            else:
+                # No match - keep original name
+                self.batch_rename_preview.append({
+                    'original': original_name,
+                    'new': original_name,
+                    'conflict': False,
+                    'valid': True
+                })
+    
+    def perform_batch_rename(self):
+        """Perform the batch rename operation"""
+        if not self.batch_rename_preview:
+            print("No rename preview available")
+            return
+        
+        # Check for conflicts and invalid names
+        conflicts = [p for p in self.batch_rename_preview if p['conflict']]
+        invalid = [p for p in self.batch_rename_preview if not p['valid']]
+        
+        if conflicts:
+            conflict_names = [p['new'] for p in conflicts]
+            print(f"Cannot rename: conflicts with existing files: {', '.join(conflict_names)}")
+            return
+        
+        if invalid:
+            invalid_names = [p['new'] for p in invalid]
+            print(f"Cannot rename: invalid filenames: {', '.join(invalid_names)}")
+            return
+        
+        # Perform renames
+        renamed_count = 0
+        errors = []
+        
+        for i, preview in enumerate(self.batch_rename_preview):
+            if preview['original'] != preview['new']:
+                try:
+                    old_path = self.batch_rename_files[i]
+                    new_path = old_path.parent / preview['new']
+                    old_path.rename(new_path)
+                    renamed_count += 1
+                except Exception as e:
+                    errors.append(f"{preview['original']}: {e}")
+        
+        # Report results
+        if renamed_count > 0:
+            print(f"Successfully renamed {renamed_count} files")
+        
+        if errors:
+            print(f"Errors: {'; '.join(errors)}")
+        
+        # Clear selections and refresh
+        current_pane = self.get_current_pane()
+        current_pane['selected_files'].clear()
+        self.refresh_files(current_pane)
+        
+        self.exit_batch_rename_mode()
         
     def show_dialog(self, message, choices, callback):
         """Show quick choice dialog
@@ -2506,7 +2668,7 @@ class FileManager:
         help_lines.append("c / C            Copy files to other pane")
         help_lines.append("m / M            Move files to other pane / Create directory (no selection)")
         help_lines.append("k / K            Delete files")
-        help_lines.append("r / R            Rename file (single file only)")
+        help_lines.append("r / R            Rename file (single) / Batch rename (multiple selected)")
         help_lines.append("p / P            Create archive from selected files")
         help_lines.append("u / U            Extract archive to other pane")
         help_lines.append("")
@@ -2561,6 +2723,8 @@ class FileManager:
         # Tips section
         help_lines.append("=== TIPS ===")
         help_lines.append("• Use multi-selection with Space to operate on multiple files")
+        help_lines.append("• Batch rename (R with multiple files) supports regex and macros:")
+        help_lines.append("  \\0=full name, \\1-\\9=regex groups, \\d=index number")
         help_lines.append("• Search supports multiple patterns separated by spaces")
         help_lines.append("• Log pane shows operation results and system messages")
         help_lines.append("• File details (i) shows comprehensive file information")
@@ -3403,6 +3567,65 @@ class FileManager:
         # In rename mode, capture most other keys to prevent unintended actions
         return True
     
+    def handle_batch_rename_input(self, key):
+        """Handle input while in batch rename mode"""
+        if key == 27:  # ESC - cancel batch rename
+            print("Batch rename cancelled")
+            self.exit_batch_rename_mode()
+            return True
+        elif key == KEY_TAB:  # Tab - switch between regex and destination input
+            if self.batch_rename_input_mode == 'regex':
+                self.batch_rename_input_mode = 'destination'
+            else:
+                self.batch_rename_input_mode = 'regex'
+            self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Enter - perform batch rename
+            if self.batch_rename_regex and self.batch_rename_destination:
+                self.perform_batch_rename()
+            else:
+                print("Please enter both regex pattern and destination pattern")
+            return True
+        elif key == curses.KEY_UP:
+            # Scroll preview up
+            if self.batch_rename_scroll > 0:
+                self.batch_rename_scroll -= 1
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_DOWN:
+            # Scroll preview down
+            if self.batch_rename_preview and self.batch_rename_scroll < len(self.batch_rename_preview) - 1:
+                self.batch_rename_scroll += 1
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
+            # Backspace - remove last character from current input
+            if self.batch_rename_input_mode == 'regex':
+                if self.batch_rename_regex:
+                    self.batch_rename_regex = self.batch_rename_regex[:-1]
+                    self.update_batch_rename_preview()
+                    self.needs_full_redraw = True
+            else:  # destination mode
+                if self.batch_rename_destination:
+                    self.batch_rename_destination = self.batch_rename_destination[:-1]
+                    self.update_batch_rename_preview()
+                    self.needs_full_redraw = True
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            # Add character to current input
+            char = chr(key)
+            if self.batch_rename_input_mode == 'regex':
+                self.batch_rename_regex += char
+            else:  # destination mode
+                self.batch_rename_destination += char
+            self.update_batch_rename_preview()
+            self.needs_full_redraw = True
+            return True
+        
+        # In batch rename mode, capture most other keys to prevent unintended actions
+        return True
+    
     def handle_create_directory_input(self, key):
         """Handle input while in create directory mode"""
         if key == 27:  # ESC - cancel directory creation
@@ -4211,6 +4434,149 @@ class FileManager:
             help_x = start_x + (dialog_width - len(help_text)) // 2
             if help_x >= start_x:
                 self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+    
+    def draw_batch_rename_dialog(self):
+        """Draw the batch rename dialog overlay"""
+        height, width = self.stdscr.getmaxyx()
+        
+        # Calculate dialog dimensions
+        dialog_width = max(80, int(width * 0.9))
+        dialog_height = max(25, int(height * 0.9))
+        
+        # Center the dialog
+        start_y = (height - dialog_height) // 2
+        start_x = (width - dialog_width) // 2
+        
+        # Draw dialog background
+        for y in range(start_y, start_y + dialog_height):
+            if y < height:
+                bg_line = " " * min(dialog_width, width - start_x)
+                self.safe_addstr(y, start_x, bg_line, get_status_color())
+        
+        # Draw border
+        border_color = get_status_color() | curses.A_BOLD
+        
+        # Top border
+        if start_y >= 0:
+            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
+            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
+        
+        # Side borders
+        for y in range(start_y + 1, start_y + dialog_height - 1):
+            if y < height:
+                self.safe_addstr(y, start_x, "│", border_color)
+                if start_x + dialog_width - 1 < width:
+                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
+        
+        # Bottom border
+        if start_y + dialog_height - 1 < height:
+            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
+            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
+        
+        # Draw title
+        title_text = f" Batch Rename ({len(self.batch_rename_files)} files) "
+        title_x = start_x + (dialog_width - len(title_text)) // 2
+        if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
+            self.safe_addstr(start_y, title_x, title_text, border_color)
+        
+        # Draw regex input
+        regex_y = start_y + 2
+        regex_label = "Regex Pattern: "
+        regex_cursor = "_" if self.batch_rename_input_mode == 'regex' else ""
+        regex_text = self.batch_rename_regex + regex_cursor
+        regex_line = regex_label + regex_text
+        
+        if regex_y < height:
+            content_start_x = start_x + 2
+            content_width = dialog_width - 4
+            display_regex = regex_line[:content_width] if len(regex_line) > content_width else regex_line
+            regex_color = get_status_color() | (curses.A_BOLD if self.batch_rename_input_mode == 'regex' else 0)
+            self.safe_addstr(regex_y, content_start_x, display_regex, regex_color)
+        
+        # Draw destination input
+        dest_y = start_y + 3
+        dest_label = "Destination:   "
+        dest_cursor = "_" if self.batch_rename_input_mode == 'destination' else ""
+        dest_text = self.batch_rename_destination + dest_cursor
+        dest_line = dest_label + dest_text
+        
+        if dest_y < height:
+            display_dest = dest_line[:content_width] if len(dest_line) > content_width else dest_line
+            dest_color = get_status_color() | (curses.A_BOLD if self.batch_rename_input_mode == 'destination' else 0)
+            self.safe_addstr(dest_y, content_start_x, display_dest, dest_color)
+        
+        # Draw help for macros
+        help_y = start_y + 4
+        if help_y < height:
+            help_text = "Macros: \\0=full name, \\1-\\9=regex groups, \\d=index"
+            self.safe_addstr(help_y, content_start_x, help_text[:content_width], get_status_color() | curses.A_DIM)
+        
+        # Draw separator line
+        sep_y = start_y + 5
+        if sep_y < height:
+            sep_line = "├" + "─" * (dialog_width - 2) + "┤"
+            self.safe_addstr(sep_y, start_x, sep_line[:dialog_width], border_color)
+        
+        # Draw preview header
+        preview_header_y = start_y + 6
+        if preview_header_y < height:
+            header_text = "Preview:"
+            self.safe_addstr(preview_header_y, content_start_x, header_text, get_status_color() | curses.A_BOLD)
+        
+        # Calculate preview area
+        preview_start_y = start_y + 7
+        preview_end_y = start_y + dialog_height - 3
+        preview_height = preview_end_y - preview_start_y + 1
+        
+        # Draw preview list
+        if self.batch_rename_preview:
+            visible_preview = self.batch_rename_preview[self.batch_rename_scroll:self.batch_rename_scroll + preview_height]
+            
+            for i, preview in enumerate(visible_preview):
+                y = preview_start_y + i
+                if y <= preview_end_y and y < height:
+                    original = preview['original']
+                    new = preview['new']
+                    conflict = preview['conflict']
+                    valid = preview['valid']
+                    
+                    # Format preview line
+                    if original == new:
+                        status = "UNCHANGED"
+                        status_color = get_status_color() | curses.A_DIM
+                    elif conflict:
+                        status = "CONFLICT!"
+                        status_color = get_status_color() | curses.A_BOLD | curses.color_pair(1)  # Red
+                    elif not valid:
+                        status = "INVALID!"
+                        status_color = get_status_color() | curses.A_BOLD | curses.color_pair(1)  # Red
+                    else:
+                        status = "OK"
+                        status_color = get_status_color() | curses.color_pair(2)  # Green
+                    
+                    # Create preview line
+                    max_name_width = (content_width - 20) // 2
+                    original_display = original[:max_name_width] if len(original) > max_name_width else original
+                    new_display = new[:max_name_width] if len(new) > max_name_width else new
+                    
+                    preview_line = f"{original_display:<{max_name_width}} → {new_display:<{max_name_width}} [{status}]"
+                    preview_line = preview_line[:content_width]
+                    
+                    self.safe_addstr(y, content_start_x, preview_line, status_color)
+        else:
+            # No preview available
+            no_preview_y = preview_start_y + 2
+            if no_preview_y < height:
+                no_preview_text = "Enter regex pattern and destination to see preview"
+                self.safe_addstr(no_preview_y, content_start_x, no_preview_text, get_status_color() | curses.A_DIM)
+        
+        # Draw help text
+        help_y = start_y + dialog_height - 2
+        if help_y < height:
+            help_text = "Tab: Switch input | Enter: Rename | ESC: Cancel | ↑↓: Scroll preview"
+            help_x = start_x + (dialog_width - len(help_text)) // 2
+            if help_x >= start_x:
+                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
         
     def enter_subshell_mode(self):
         """Enter sub-shell mode with environment variables set"""
@@ -4411,9 +4777,14 @@ class FileManager:
                 if self.handle_search_dialog_input(key):
                     continue  # Search dialog mode handled the key
             
+            # Handle batch rename dialog mode input
+            if self.batch_rename_mode:
+                if self.handle_batch_rename_input(key):
+                    continue  # Batch rename mode handled the key
+            
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
+            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.batch_rename_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
