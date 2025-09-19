@@ -54,6 +54,7 @@ class DefaultConfig:
         'move_files': ['m', 'M'],
         'delete_files': ['k', 'K'],
         'rename_file': ['r', 'R'],
+        'favorites': ['j', 'J'],
     }
     
     # File associations (for future use)
@@ -66,6 +67,18 @@ class DefaultConfig:
     # Directory settings
     STARTUP_LEFT_PATH = None  # None = current directory
     STARTUP_RIGHT_PATH = None  # None = home directory
+    
+    # Favorite directories - list of dictionaries with 'name' and 'path' keys
+    FAVORITE_DIRECTORIES = [
+        {'name': 'Home', 'path': '~'},
+        {'name': 'Documents', 'path': '~/Documents'},
+        {'name': 'Downloads', 'path': '~/Downloads'},
+        {'name': 'Desktop', 'path': '~/Desktop'},
+        {'name': 'Projects', 'path': '~/Projects'},
+        {'name': 'Root', 'path': '/'},
+        {'name': 'Temp', 'path': '/tmp'},
+        {'name': 'Config', 'path': '~/.config'},
+    ]
     
     # Performance settings
     MAX_LOG_MESSAGES = 1000
@@ -268,3 +281,36 @@ def get_startup_paths():
         right_path = Path.home()
     
     return left_path, right_path
+
+
+def get_favorite_directories():
+    """Get the list of favorite directories from configuration"""
+    config = get_config()
+    
+    favorites = []
+    
+    # Get favorites from user config or fall back to defaults
+    favorites_config = None
+    if hasattr(config, 'FAVORITE_DIRECTORIES') and config.FAVORITE_DIRECTORIES:
+        favorites_config = config.FAVORITE_DIRECTORIES
+    else:
+        # Fall back to default favorites if not configured
+        favorites_config = DefaultConfig.FAVORITE_DIRECTORIES
+    
+    if favorites_config:
+        for fav in favorites_config:
+            if isinstance(fav, dict) and 'name' in fav and 'path' in fav:
+                try:
+                    # Expand user path and resolve
+                    path = Path(fav['path']).expanduser().resolve()
+                    if path.exists() and path.is_dir():
+                        favorites.append({
+                            'name': fav['name'],
+                            'path': str(path)
+                        })
+                    else:
+                        print(f"Warning: Favorite directory does not exist: {fav['name']} -> {fav['path']}")
+                except Exception as e:
+                    print(f"Warning: Invalid favorite directory path: {fav['name']} -> {fav['path']}: {e}")
+    
+    return favorites

@@ -47,6 +47,7 @@ class Config:
         'copy_files': ['c', 'C'],
         'delete_files': ['k', 'K'],
         'rename_file': ['r', 'R'],
+        'favorites': ['j', 'J'],
     }
     
     # File associations (for future use)
@@ -62,6 +63,22 @@ class Config:
     # Directory settings
     STARTUP_LEFT_PATH = None  # None = current directory, or specify path like "/home/user/projects"
     STARTUP_RIGHT_PATH = None  # None = home directory, or specify path
+    
+    # Favorite directories - customize your frequently used directories
+    # Each entry should have 'name' and 'path' keys
+    FAVORITE_DIRECTORIES = [
+        {'name': 'Home', 'path': '~'},
+        {'name': 'Documents', 'path': '~/Documents'},
+        {'name': 'Downloads', 'path': '~/Downloads'},
+        {'name': 'Desktop', 'path': '~/Desktop'},
+        {'name': 'Projects', 'path': '~/Projects'},
+        {'name': 'Root', 'path': '/'},
+        {'name': 'Temp', 'path': '/tmp'},
+        {'name': 'Config', 'path': '~/.config'},
+        # Add your own favorites here:
+        # {'name': 'Work', 'path': '/path/to/work'},
+        # {'name': 'Scripts', 'path': '~/bin'},
+    ]
     
     # Performance settings
     MAX_LOG_MESSAGES = 1000

@@ -17,7 +17,7 @@ from collections import deque
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, get_startup_paths, is_key_bound_to
+from tfm_config import get_config, get_startup_paths, is_key_bound_to, get_favorite_directories
 from tfm_text_viewer import view_text_file, is_text_file
 
 class LogCapture:
@@ -2092,6 +2092,55 @@ class FileManager:
         
         self.show_list_dialog("Filter by File Type", extension_list, filter_callback)
     
+    def show_favorite_directories(self):
+        """Show favorite directories using the searchable list dialog"""
+        favorites = get_favorite_directories()
+        
+        if not favorites:
+            print("No favorite directories configured")
+            return
+        
+        # Create display items with name and path
+        display_items = []
+        for fav in favorites:
+            display_items.append(f"{fav['name']} ({fav['path']})")
+        
+        def favorite_callback(selected_item):
+            if selected_item:
+                # Extract the path from the selected item
+                # Format is "Name (path)"
+                try:
+                    # Find the path in parentheses
+                    start_paren = selected_item.rfind('(')
+                    end_paren = selected_item.rfind(')')
+                    if start_paren != -1 and end_paren != -1 and end_paren > start_paren:
+                        selected_path = selected_item[start_paren + 1:end_paren]
+                        
+                        # Change current pane to selected directory
+                        current_pane = self.get_current_pane()
+                        target_path = Path(selected_path)
+                        
+                        if target_path.exists() and target_path.is_dir():
+                            old_path = current_pane['path']
+                            current_pane['path'] = target_path
+                            current_pane['selected_index'] = 0
+                            current_pane['scroll_offset'] = 0
+                            current_pane['selected_files'].clear()  # Clear selections
+                            
+                            pane_name = "left" if self.active_pane == 'left' else "right"
+                            print(f"Changed {pane_name} pane to favorite: {old_path} → {target_path}")
+                            self.needs_full_redraw = True
+                        else:
+                            print(f"Error: Directory no longer exists: {selected_path}")
+                    else:
+                        print("Error: Could not parse selected favorite directory")
+                except Exception as e:
+                    print(f"Error changing to favorite directory: {e}")
+            else:
+                print("Favorite directory selection cancelled")
+        
+        self.show_list_dialog("Go to Favorite Directory", display_items, favorite_callback)
+    
     def show_sort_menu(self):
         """Show sort options menu using the multi-choice dialog"""
         current_pane = self.get_current_pane()
@@ -3637,6 +3686,8 @@ class FileManager:
                 self.show_list_dialog_demo()
             elif key == ord('T'):  # 'T' key - show file type filter
                 self.show_file_type_filter()
+            elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
+                self.show_favorite_directories()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
