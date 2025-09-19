@@ -36,6 +36,14 @@ def test_tfm_config_integration():
     print("\nTesting TFM configuration integration...")
     
     try:
+
+
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
         from tfm_config import get_config, is_key_bound_to
         
         # Get the configuration

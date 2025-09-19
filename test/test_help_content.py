@@ -3,6 +3,14 @@
 Test script to verify help content generation
 """
 
+
+
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
 from tfm_const import VERSION, GITHUB_URL
 
 def generate_help_content():

@@ -10,6 +10,14 @@ def test_dialog_exclusivity_logic():
     
     # Simulate the key handling logic
     def simulate_key_handling(search_mode, dialog_mode, info_dialog_mode, key_action):
+
+
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
         """Simulate the key handling logic from tfm_main.py"""
         
         print(f"\nTest Case:")

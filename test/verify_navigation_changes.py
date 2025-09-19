@@ -4,6 +4,7 @@ Verification script for navigation key changes
 """
 
 import sys
+from pathlib import Path
 
 def main():
     """Verify navigation key changes"""
@@ -11,7 +12,8 @@ def main():
     print("=" * 50)
     
     try:
-        with open('tfm_main.py', 'r') as f:
+        src_path = Path(__file__).parent.parent / 'src' / 'tfm_main.py'
+        with open(src_path, 'r') as f:
             content = f.read()
         
         print("✓ Changes Applied:")

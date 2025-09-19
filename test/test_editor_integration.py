@@ -17,6 +17,7 @@ def test_editor_integration():
     
     # Test 1: Check constants are defined
     try:
+
         from tfm_const import DEFAULT_TEXT_EDITOR, EDITOR_KEY
         print("✓ Constants defined correctly")
         print(f"  - DEFAULT_TEXT_EDITOR: {DEFAULT_TEXT_EDITOR}")

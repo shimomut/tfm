@@ -28,6 +28,8 @@ def verify_implementation():
         errors.append(f"Error loading _config.py: {e}")
     
     try:
+
+
         from tfm_config import DefaultConfig
         if hasattr(DefaultConfig, 'KEY_BINDINGS') and 'copy_files' in DefaultConfig.KEY_BINDINGS:
             copy_keys = DefaultConfig.KEY_BINDINGS['copy_files']

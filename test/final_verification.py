@@ -11,6 +11,8 @@ def verify_help_dialog_feature():
     print("-" * 22)
     
     try:
+
+
         from tfm_main import FileManager
         from tfm_config import get_config
         from tfm_const import VERSION, GITHUB_URL

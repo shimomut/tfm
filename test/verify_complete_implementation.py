@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Complete verification of help dialog and status bar simplification
+Complete verification of TFM implementation
 """
 
+# Add src directory to Python path
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 def verify_help_dialog():
     """Verify help dialog implementation"""
@@ -48,7 +51,8 @@ def verify_status_simplification():
     
     try:
         # Read the main file to check for simplified status
-        with open('tfm_main.py', 'r') as f:
+        src_path = Path(__file__).parent.parent / 'src' / 'tfm_main.py'
+        with open(src_path, 'r') as f:
             content = f.read()
             
         # Check for the new simplified message
@@ -60,24 +64,6 @@ def verify_status_simplification():
         else:
             print("✗ Simplified status message not found")
             return False
-            
-        # Check that old complex logic is removed
-        old_patterns = [
-            "Space/Opt+Space:select  a:select-all-files",
-            "if width > 160:",
-            "elif width > 140:"
-        ]
-        
-        found_old = False
-        for pattern in old_patterns:
-            if pattern in content:
-                print(f"⚠ Old pattern still found: {pattern}")
-                found_old = True
-                
-        if not found_old:
-            print("✓ Old complex status logic removed")
-        else:
-            print("⚠ Some old status logic may remain")
             
         return True
         
@@ -110,13 +96,6 @@ def verify_integration():
         for section in help_sections:
             print(f"  • {section}")
             
-        # Verify the workflow
-        print("\n✓ User workflow:")
-        print("  1. See simplified status: 'Press ? for help'")
-        print("  2. Press ? to open comprehensive help")
-        print("  3. Navigate through organized sections")
-        print("  4. Learn features gradually")
-        
         return True
         
     except Exception as e:
@@ -147,18 +126,12 @@ def verify_benefits():
     print("  • Better terminal compatibility")
     print("  • Gradual learning curve")
     
-    print("\n✓ Technical improvements:")
-    print("  • Simplified status bar logic")
-    print("  • No responsive design complexity")
-    print("  • Consistent across all terminal sizes")
-    print("  • Maintainable help system")
-    
     return True
 
 def main():
     """Run complete verification"""
-    print("TFM Help Dialog & Status Bar Complete Verification")
-    print("=" * 55)
+    print("TFM Complete Implementation Verification")
+    print("=" * 45)
     
     results = []
     
@@ -169,9 +142,9 @@ def main():
     results.append(verify_benefits())
     
     # Summary
-    print("\n" + "=" * 55)
+    print("\n" + "=" * 45)
     print("VERIFICATION SUMMARY")
-    print("=" * 55)
+    print("=" * 45)
     
     if all(results):
         print("🎉 ALL VERIFICATIONS PASSED!")
@@ -181,7 +154,7 @@ def main():
         print("✓ Integration working properly")
         print("✓ Benefits achieved as planned")
         print("\nTo use:")
-        print("1. Run: python3 tfm_main.py")
+        print("1. Run: python tfm.py")
         print("2. Press '?' to see comprehensive help")
         print("3. Enjoy the cleaner interface!")
         return 0

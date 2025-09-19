@@ -80,6 +80,14 @@ def main():
     
     # Check if we can show a preview of the help content
     try:
+
+
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
         from tfm_const import VERSION, GITHUB_URL
         print(f"Help Dialog Preview (TFM {VERSION}):")
         print("-" * 40)

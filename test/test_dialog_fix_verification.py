@@ -4,12 +4,20 @@ Verification test for the dialog exclusivity fix
 """
 
 def test_actual_implementation_logic():
+
+
     """Test the actual implementation logic from tfm_main.py"""
     print("TFM Dialog Exclusivity Fix Verification")
     print("=" * 45)
     
     def simulate_tfm_key_handling(search_mode, dialog_mode, info_dialog_mode, key, key_handled_by_dialog=False):
         """
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
         Simulate the exact logic from tfm_main.py
         
         Args:

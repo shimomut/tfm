@@ -5,6 +5,14 @@ Integration test for help dialog functionality
 
 import curses
 import time
+
+
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
 from tfm_main import FileManager
 
 def test_help_integration(stdscr):

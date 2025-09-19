@@ -4,8 +4,10 @@ Verification script for TFM delete feature
 Shows that the delete functionality is properly implemented
 """
 
+# Add src directory to Python path
 import sys
-sys.path.insert(0, '.')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 def main():
     """Verify delete feature implementation"""
@@ -14,6 +16,7 @@ def main():
     
     # Check configuration
     try:
+
         from tfm_config import DefaultConfig, is_key_bound_to
         
         print("✓ Configuration:")

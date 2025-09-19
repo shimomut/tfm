@@ -12,7 +12,14 @@ import sys
 import os
 
 # Add the current directory to Python path to import TFM modules
-sys.path.insert(0, '.')
+
+
+
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_main import FileManager
 

@@ -13,6 +13,8 @@ def verify_help_feature():
     
     try:
         # Import the FileManager class
+
+
         from tfm_main import FileManager
         
         # Check if show_help_dialog method exists
@@ -89,6 +91,12 @@ def test_help_content_generation():
     print("-" * 30)
     
     try:
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
         from tfm_const import VERSION, GITHUB_URL
         
         # Simulate help content generation

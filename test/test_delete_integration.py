@@ -10,13 +10,14 @@ from pathlib import Path
 import sys
 
 # Add the current directory to Python path
-sys.path.insert(0, '.')
+
 
 def test_delete_key_binding():
     """Test that delete key binding is properly configured"""
     print("Testing delete key binding configuration...")
     
     try:
+
         from tfm_config import DefaultConfig, get_config
         
         # Check default configuration
@@ -59,6 +60,12 @@ def test_delete_methods_exist():
     print("\nTesting delete methods in FileManager...")
     
     try:
+
+# Add src directory to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
         from tfm_main import FileManager
         
         # Check if delete methods exist
