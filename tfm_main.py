@@ -42,14 +42,18 @@ class FileManager:
             'selected_index': 0,
             'scroll_offset': 0,
             'files': [],
-            'selected_files': set()  # Track multi-selected files
+            'selected_files': set(),  # Track multi-selected files
+            'sort_mode': 'name',  # Sorting mode: 'name', 'size', 'date'
+            'sort_reverse': False  # Reverse sort order
         }
         self.right_pane = {
             'path': Path.home(),  # Start right pane in home directory
             'selected_index': 0,
             'scroll_offset': 0,
             'files': [],
-            'selected_files': set()  # Track multi-selected files
+            'selected_files': set(),  # Track multi-selected files
+            'sort_mode': 'name',  # Sorting mode: 'name', 'size', 'date'
+            'sort_reverse': False  # Reverse sort order
         }
         
         self.active_pane = 'left'  # 'left' or 'right'
@@ -145,10 +149,12 @@ class FileManager:
         # Left pane footer
         left_dirs, left_files = self.count_files_and_dirs(self.left_pane)
         left_selected = len(self.left_pane['selected_files'])
+        left_sort = self.get_sort_description(self.left_pane)
+        
         if left_selected > 0:
-            left_footer = f" {left_dirs} dirs, {left_files} files ({left_selected} selected) "
+            left_footer = f" {left_dirs} dirs, {left_files} files ({left_selected} selected) | Sort: {left_sort} "
         else:
-            left_footer = f" {left_dirs} dirs, {left_files} files "
+            left_footer = f" {left_dirs} dirs, {left_files} files | Sort: {left_sort} "
         
         try:
             # Left pane footer with active indicator
@@ -160,10 +166,12 @@ class FileManager:
         # Right pane footer  
         right_dirs, right_files = self.count_files_and_dirs(self.right_pane)
         right_selected = len(self.right_pane['selected_files'])
+        right_sort = self.get_sort_description(self.right_pane)
+        
         if right_selected > 0:
-            right_footer = f" {right_dirs} dirs, {right_files} files ({right_selected} selected) "
+            right_footer = f" {right_dirs} dirs, {right_files} files ({right_selected} selected) | Sort: {right_sort} "
         else:
-            right_footer = f" {right_dirs} dirs, {right_files} files "
+            right_footer = f" {right_dirs} dirs, {right_files} files | Sort: {right_sort} "
         
         try:
             # Right pane footer with active indicator
@@ -545,8 +553,8 @@ class FileManager:
                 if not self.show_hidden:
                     entries = [e for e in entries if not e.name.startswith('.')]
                 
-                # Sort: directories first, then files, both alphabetically
-                pane_data['files'] = sorted(entries, key=lambda x: (not x.is_dir(), x.name.lower()))
+                # Sort files using the pane's sort mode
+                pane_data['files'] = self.sort_entries(entries, pane_data['sort_mode'], pane_data['sort_reverse'])
                 
                 # Add parent directory option if not at root
                 if pane_data['path'] != pane_data['path'].parent:
@@ -560,6 +568,69 @@ class FileManager:
                 pane_data['selected_index'] = max(0, len(pane_data['files']) - 1)
                 
             # Don't clear selected files here - only clear when directory actually changes
+    
+    def sort_entries(self, entries, sort_mode, reverse=False):
+        """Sort file entries based on the specified mode
+        
+        Args:
+            entries: List of Path objects to sort
+            sort_mode: 'name', 'size', or 'date'
+            reverse: Whether to reverse the sort order
+            
+        Returns:
+            Sorted list with directories always first
+        """
+        def get_sort_key(entry):
+            """Generate sort key for an entry"""
+            try:
+                if sort_mode == 'name':
+                    # Sort by name (case-insensitive)
+                    return entry.name.lower()
+                elif sort_mode == 'size':
+                    # Sort by file size (directories get size 0)
+                    if entry.is_dir():
+                        return 0
+                    else:
+                        return entry.stat().st_size
+                elif sort_mode == 'date':
+                    # Sort by modification time
+                    return entry.stat().st_mtime
+                else:
+                    # Default to name sorting
+                    return entry.name.lower()
+            except (OSError, PermissionError):
+                # If we can't get file info, sort by name as fallback
+                return entry.name.lower()
+        
+        # Separate directories and files
+        directories = [e for e in entries if e.is_dir()]
+        files = [e for e in entries if not e.is_dir()]
+        
+        # Sort directories and files separately
+        sorted_dirs = sorted(directories, key=get_sort_key, reverse=reverse)
+        sorted_files = sorted(files, key=get_sort_key, reverse=reverse)
+        
+        # Always put directories first, then files
+        return sorted_dirs + sorted_files
+    
+    def get_sort_description(self, pane_data):
+        """Get a human-readable description of the current sort mode"""
+        mode = pane_data['sort_mode']
+        reverse = pane_data['sort_reverse']
+        
+        mode_names = {
+            'name': 'Name',
+            'size': 'Size', 
+            'date': 'Date'
+        }
+        
+        description = mode_names.get(mode, 'Name')
+        if reverse:
+            description += ' ↓'
+        else:
+            description += ' ↑'
+            
+        return description
             
     def get_file_info(self, path):
         """Get file information for display"""
@@ -1277,14 +1348,18 @@ class FileManager:
     
     def show_sort_menu(self):
         """Show sort options menu using the multi-choice dialog"""
+        current_pane = self.get_current_pane()
         
-        # Define the sort choices
+        # Get current sort mode for display
+        current_mode = current_pane['sort_mode']
+        current_reverse = current_pane['sort_reverse']
+        
+        # Define the sort choices with current mode indication
         choices = [
-            {"text": "Name", "key": "n", "value": "name"},
-            {"text": "Size", "key": "s", "value": "size"},
-            {"text": "Date", "key": "d", "value": "date"},
-            {"text": "Type", "key": "t", "value": "type"},
-            {"text": "Reverse", "key": "r", "value": "reverse"},
+            {"text": f"Name {'★' if current_mode == 'name' else ''}", "key": "n", "value": "name"},
+            {"text": f"Size {'★' if current_mode == 'size' else ''}", "key": "s", "value": "size"},
+            {"text": f"Date {'★' if current_mode == 'date' else ''}", "key": "d", "value": "date"},
+            {"text": f"Reverse {'★' if current_reverse else ''}", "key": "r", "value": "reverse"},
             {"text": "Cancel", "key": "c", "value": None}
         ]
         
@@ -1293,32 +1368,24 @@ class FileManager:
                 print("Sort cancelled")
                 return
                 
-            if sort_type == "name":
-                print("Sorting by name")
-                # TODO: Implement name sorting
-            elif sort_type == "size":
-                print("Sorting by size")
-                # TODO: Implement size sorting
-            elif sort_type == "date":
-                print("Sorting by date")
-                # TODO: Implement date sorting
-            elif sort_type == "type":
-                print("Sorting by type/extension")
-                # TODO: Implement type sorting
-            elif sort_type == "reverse":
-                print("Reversing current sort order")
-                # TODO: Implement reverse sorting
+            if sort_type == "reverse":
+                # Toggle reverse order
+                current_pane['sort_reverse'] = not current_pane['sort_reverse']
+                reverse_status = "enabled" if current_pane['sort_reverse'] else "disabled"
+                print(f"Reverse sorting {reverse_status}")
+            elif sort_type in ["name", "size", "date"]:
+                # Set new sort mode
+                current_pane['sort_mode'] = sort_type
+                print(f"Sorting by {sort_type}")
             
             # Refresh the file list after sorting
+            self.refresh_files(current_pane)
             self.needs_full_redraw = True
         
         # Show the dialog
-        message = "Sort files by:"
+        pane_name = "left" if self.active_pane == 'left' else "right"
+        message = f"Sort {pane_name} pane by:"
         self.show_dialog(message, choices, handle_sort_choice)
-        
-        # In confirmation mode, capture ALL keys to prevent them from affecting other parts of the UI
-        # Return True for any unhandled keys to stop further processing
-        return True
         
     def handle_search_input(self, key):
         """Handle input while in search mode"""
