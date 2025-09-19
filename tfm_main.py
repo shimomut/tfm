@@ -39,17 +39,24 @@ class FileManager:
             'path': Path.cwd(),
             'selected_index': 0,
             'scroll_offset': 0,
-            'files': []
+            'files': [],
+            'selected_files': set()  # Track multi-selected files
         }
         self.right_pane = {
             'path': Path.home(),  # Start right pane in home directory
             'selected_index': 0,
             'scroll_offset': 0,
-            'files': []
+            'files': [],
+            'selected_files': set()  # Track multi-selected files
         }
         
         self.active_pane = 'left'  # 'left' or 'right'
         self.show_hidden = False
+        
+        # Pane layout - track left pane width ratio (0.1 to 0.9)
+        self.left_pane_ratio = 0.5  # Start with 50/50 split
+        self.log_height_ratio = DEFAULT_LOG_HEIGHT_RATIO  # Track log pane height ratio
+        self.needs_full_redraw = True  # Flag to control when to redraw everything
         
         # Log pane setup
         self.log_messages = deque(maxlen=MAX_LOG_MESSAGES)
@@ -61,6 +68,9 @@ class FileManager:
         sys.stdout = LogCapture(self.log_messages, "STDOUT")
         sys.stderr = LogCapture(self.log_messages, "STDERR")
         
+        # Add startup messages to log
+        self.add_startup_messages()
+        
         # Initialize colors
         curses.start_color()
         curses.init_pair(COLOR_DIRECTORIES, curses.COLOR_CYAN, curses.COLOR_BLACK)
@@ -68,10 +78,134 @@ class FileManager:
         curses.init_pair(COLOR_SELECTED, curses.COLOR_YELLOW, curses.COLOR_BLACK)
         curses.init_pair(COLOR_ERROR, curses.COLOR_RED, curses.COLOR_BLACK)
         curses.init_pair(COLOR_HEADER, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(COLOR_STATUS, curses.COLOR_WHITE, curses.COLOR_BLUE)
         
         # Configure curses
         curses.curs_set(0)  # Hide cursor
         self.stdscr.keypad(True)
+        
+    def add_startup_messages(self):
+        """Add startup messages directly to log pane"""
+        timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
+        self.log_messages.append((timestamp, "SYSTEM", f"TFM {VERSION}"))
+        self.log_messages.append((timestamp, "SYSTEM", f"GitHub: {GITHUB_URL}"))
+        self.log_messages.append((timestamp, "SYSTEM", f"{APP_NAME} started successfully"))
+        
+    def count_files_and_dirs(self, pane_data):
+        """Count directories and files in a pane, excluding parent directory entry"""
+        if not pane_data['files']:
+            return 0, 0
+            
+        files = pane_data['files']
+        # Skip the first entry if it's the parent directory (..)
+        start_idx = 1 if (len(files) > 0 and files[0] == pane_data['path'].parent) else 0
+        
+        dir_count = 0
+        file_count = 0
+        
+        for file_path in files[start_idx:]:
+            if file_path.is_dir():
+                dir_count += 1
+            else:
+                file_count += 1
+                
+        return dir_count, file_count
+        
+    def draw_file_footers(self, y, left_pane_width):
+        """Draw footer bars for left and right file panes"""
+        # Left pane footer
+        left_dirs, left_files = self.count_files_and_dirs(self.left_pane)
+        left_selected = len(self.left_pane['selected_files'])
+        if left_selected > 0:
+            left_footer = f" {left_dirs} dirs, {left_files} files ({left_selected} selected) "
+        else:
+            left_footer = f" {left_dirs} dirs, {left_files} files "
+        
+        try:
+            # Left pane footer with active indicator
+            left_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'left' else curses.color_pair(COLOR_HEADER)
+            self.stdscr.addstr(y, 2, left_footer, left_color)
+        except curses.error:
+            pass
+            
+        # Right pane footer  
+        right_dirs, right_files = self.count_files_and_dirs(self.right_pane)
+        right_selected = len(self.right_pane['selected_files'])
+        if right_selected > 0:
+            right_footer = f" {right_dirs} dirs, {right_files} files ({right_selected} selected) "
+        else:
+            right_footer = f" {right_dirs} dirs, {right_files} files "
+        
+        try:
+            # Right pane footer with active indicator
+            right_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'right' else curses.color_pair(COLOR_HEADER)
+            self.stdscr.addstr(y, left_pane_width + 2, right_footer, right_color)
+        except curses.error:
+            pass
+            
+    def toggle_selection(self):
+        """Toggle selection of current file/directory and move to next item"""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            return
+            
+        selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        # Don't allow selection of parent directory (..)
+        if (current_pane['selected_index'] == 0 and 
+            len(current_pane['files']) > 0 and 
+            selected_file == current_pane['path'].parent):
+            # Still move to next item even if we can't select parent directory
+            if current_pane['selected_index'] < len(current_pane['files']) - 1:
+                current_pane['selected_index'] += 1
+            return
+            
+        file_path_str = str(selected_file)
+        
+        if file_path_str in current_pane['selected_files']:
+            current_pane['selected_files'].remove(file_path_str)
+            print(f"Deselected: {selected_file.name}")
+        else:
+            current_pane['selected_files'].add(file_path_str)
+            print(f"Selected: {selected_file.name}")
+        
+        print(f"Total selected: {len(current_pane['selected_files'])}")
+        
+        # Move cursor to next item after selection
+        if current_pane['selected_index'] < len(current_pane['files']) - 1:
+            current_pane['selected_index'] += 1
+            
+    def toggle_selection_up(self):
+        """Toggle selection of current file/directory and move to previous item"""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            return
+            
+        selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        # Don't allow selection of parent directory (..)
+        if (current_pane['selected_index'] == 0 and 
+            len(current_pane['files']) > 0 and 
+            selected_file == current_pane['path'].parent):
+            # Can't move up from first item, so just return
+            return
+            
+        file_path_str = str(selected_file)
+        
+        if file_path_str in current_pane['selected_files']:
+            current_pane['selected_files'].remove(file_path_str)
+            print(f"Deselected: {selected_file.name}")
+        else:
+            current_pane['selected_files'].add(file_path_str)
+            print(f"Selected: {selected_file.name}")
+        
+        print(f"Total selected: {len(current_pane['selected_files'])}")
+        
+        # Move cursor to previous item after selection
+        if current_pane['selected_index'] > 0:
+            current_pane['selected_index'] -= 1
         
     def __del__(self):
         """Restore stdout/stderr when object is destroyed"""
@@ -111,6 +245,8 @@ class FileManager:
             # Reset selection if out of bounds
             if pane_data['selected_index'] >= len(pane_data['files']):
                 pane_data['selected_index'] = max(0, len(pane_data['files']) - 1)
+                
+            # Don't clear selected files here - only clear when directory actually changes
             
     def get_file_info(self, path):
         """Get file information for display"""
@@ -136,40 +272,62 @@ class FileManager:
     def draw_header(self):
         """Draw the header with pane paths and controls"""
         height, width = self.stdscr.getmaxyx()
-        pane_width = width // 2
+        left_pane_width = int(width * self.left_pane_ratio)
+        right_pane_width = width - left_pane_width
         
         # Clear header area
         self.stdscr.addstr(0, 0, " " * width, curses.color_pair(COLOR_HEADER))
         
-        # Left pane path
-        left_path = str(self.left_pane['path'])
-        max_path_width = pane_width - 4
-        if len(left_path) > max_path_width:
-            left_path = "..." + left_path[-(max_path_width-3):]
-        
-        left_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'left' else curses.color_pair(COLOR_HEADER)
-        self.stdscr.addstr(0, 2, left_path, left_color)
-        
-        # Separator
-        self.stdscr.addstr(0, pane_width, "│", curses.color_pair(COLOR_HEADER))
-        
-        # Right pane path
-        right_path = str(self.right_pane['path'])
-        if len(right_path) > max_path_width:
-            right_path = "..." + right_path[-(max_path_width-3):]
+        # Left pane path with safety checks
+        if left_pane_width > 6:  # Minimum space needed
+            left_path = str(self.left_pane['path'])
+            max_left_path_width = max(1, left_pane_width - 4)
+            if len(left_path) > max_left_path_width:
+                left_path = "..." + left_path[-(max(1, max_left_path_width-3)):]
             
-        right_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'right' else curses.color_pair(COLOR_HEADER)
-        self.stdscr.addstr(0, pane_width + 2, right_path, right_color)
+            left_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'left' else curses.color_pair(COLOR_HEADER)
+            try:
+                self.stdscr.addstr(0, 2, left_path[:max_left_path_width], left_color)
+            except curses.error:
+                pass  # Ignore drawing errors for narrow panes
         
-        # Controls at bottom of header
-        controls = "Tab/←→:switch ←/→/Backspace:up l/L:log-scroll t:test q:quit h:hidden"
-        self.stdscr.addstr(1, 2, controls, curses.color_pair(COLOR_HEADER))
+        # Separator with bounds check
+        if 0 <= left_pane_width < width:
+            try:
+                self.stdscr.addstr(0, left_pane_width, "│", curses.color_pair(COLOR_HEADER))
+            except curses.error:
+                pass
+        
+        # Right pane path with safety checks
+        if right_pane_width > 6:  # Minimum space needed
+            right_path = str(self.right_pane['path'])
+            max_right_path_width = max(1, right_pane_width - 4)
+            if len(right_path) > max_right_path_width:
+                right_path = "..." + right_path[-(max(1, max_right_path_width-3)):]
+                
+            right_color = curses.color_pair(COLOR_HEADER) | curses.A_BOLD if self.active_pane == 'right' else curses.color_pair(COLOR_HEADER)
+            try:
+                right_start_x = left_pane_width + 2
+                if right_start_x < width:
+                    self.stdscr.addstr(0, right_start_x, right_path[:max_right_path_width], right_color)
+            except curses.error:
+                pass  # Ignore drawing errors for narrow panes
+        
+        # No controls in header anymore - moved to status bar
         
     def draw_pane(self, pane_data, start_x, pane_width, is_active):
         """Draw a single pane"""
+        # Safety checks to prevent crashes
+        if pane_width < 10:  # Minimum viable pane width
+            return
+        if start_x < 0 or start_x >= self.stdscr.getmaxyx()[1]:
+            return
+            
         height, width = self.stdscr.getmaxyx()
-        log_height = max(MIN_LOG_HEIGHT, int(height * DEFAULT_LOG_HEIGHT_RATIO))
-        display_height = height - log_height - 5  # Reserve space for header, log pane, and status
+        # Allow log pane to be completely hidden (0 height) when ratio is 0
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        display_height = height - log_height - 4  # Reserve space for header, log pane, and status
         
         # Calculate scroll offset
         if pane_data['selected_index'] < pane_data['scroll_offset']:
@@ -180,7 +338,7 @@ class FileManager:
         # Draw files
         for i in range(display_height):
             file_index = i + pane_data['scroll_offset']
-            y = i + 2  # Start after header
+            y = i + 1  # Start after header (no controls line anymore)
             
             if file_index >= len(pane_data['files']):
                 break
@@ -198,6 +356,9 @@ class FileManager:
             # Get file info
             size_str, mtime_str = self.get_file_info(file_path)
             
+            # Check if this file is multi-selected
+            is_multi_selected = str(file_path) in pane_data['selected_files']
+            
             # Choose color based on selection and activity
             base_color = curses.A_NORMAL
             if is_dir:
@@ -205,28 +366,58 @@ class FileManager:
             elif file_path.is_file() and os.access(file_path, os.X_OK):
                 base_color = curses.color_pair(COLOR_EXECUTABLES)
                 
+            # Apply selection highlighting
             if file_index == pane_data['selected_index'] and is_active:
                 color = curses.color_pair(COLOR_SELECTED) | curses.A_REVERSE
             elif file_index == pane_data['selected_index']:
                 color = base_color | curses.A_UNDERLINE
+            elif is_multi_selected:
+                color = base_color | curses.A_STANDOUT  # Highlight multi-selected files
             else:
                 color = base_color
                 
-            # Format line to fit pane - allocate proper space for full datetime
+            # Add selection marker for multi-selected files
+            selection_marker = "●" if is_multi_selected else " "
+            
+            # Format line to fit pane - with safety checks for narrow panes
             datetime_width = 16  # "YYYY-MM-DD HH:MM" = 16 characters
             size_width = 8
-            name_width = pane_width - datetime_width - size_width - 4  # 4 for spacing
+            marker_width = 2  # Space for selection marker
             
-            if len(display_name) > name_width:
-                display_name = display_name[:name_width-3] + "..."
-                
-            # Show full datetime format or abbreviated based on pane width
-            if pane_width < 60:
-                # For narrow panes, show just filename and size
-                line = f"{display_name:<{name_width + datetime_width}} {size_str:>8}"
+            # Safety check: ensure we have minimum space for formatting
+            if pane_width < 20:  # Too narrow to display properly
+                line = f"{selection_marker} {display_name[:pane_width-5]}..."
             else:
-                # For wider panes, show full format
-                line = f"{display_name:<{name_width}} {size_str:>8} {mtime_str}"
+                # Calculate precise filename width for column alignment
+                # Account for the fact that line will be truncated to pane_width-2
+                usable_width = pane_width - 2
+                
+                if pane_width < 60:
+                    # For narrow panes: "● filename size" (no datetime)
+                    # Reserve space for: marker(2) + space(1) + size(8) = 11
+                    name_width = usable_width - 11
+                    
+                    # Truncate filename only if necessary
+                    if len(display_name) > name_width:
+                        truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
+                        display_name = display_name[:truncate_at] + "..."
+                    
+                    # Pad filename to maintain column alignment
+                    padded_name = display_name.ljust(name_width)
+                    line = f"{selection_marker} {padded_name}{size_str:>8}"
+                else:
+                    # For wider panes: "● filename size datetime"
+                    # Reserve space for: marker(2) + space(1) + size(8) + space(1) + datetime(len) = 12 + datetime_width
+                    name_width = usable_width - (12 + datetime_width)
+                    
+                    # Truncate filename only if necessary
+                    if len(display_name) > name_width:
+                        truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
+                        display_name = display_name[:truncate_at] + "..."
+                    
+                    # Pad filename to maintain column alignment
+                    padded_name = display_name.ljust(name_width)
+                    line = f"{selection_marker} {padded_name} {size_str:>8} {mtime_str}"
             
             try:
                 self.stdscr.addstr(y, start_x + 1, line[:pane_width-2], color)
@@ -236,41 +427,62 @@ class FileManager:
     def draw_files(self):
         """Draw both file panes"""
         height, width = self.stdscr.getmaxyx()
-        pane_width = width // 2
-        log_height = max(MIN_LOG_HEIGHT, int(height * DEFAULT_LOG_HEIGHT_RATIO))
+        left_pane_width = int(width * self.left_pane_ratio)
+        right_pane_width = width - left_pane_width
+        # Allow log pane to be completely hidden (0 height) when ratio is 0
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        # Always reserve space for footer line (1) and status line (1)
+        # Plus log content if visible
         file_pane_bottom = height - log_height - 2
         
         # Draw vertical separator for file panes
-        for y in range(2, file_pane_bottom):
+        for y in range(1, file_pane_bottom):
             try:
-                self.stdscr.addstr(y, pane_width, "│", curses.color_pair(COLOR_HEADER))
+                self.stdscr.addstr(y, left_pane_width, "│", curses.color_pair(COLOR_HEADER))
             except curses.error:
                 pass
         
         # Draw left pane
-        self.draw_pane(self.left_pane, 0, pane_width, self.active_pane == 'left')
+        self.draw_pane(self.left_pane, 0, left_pane_width, self.active_pane == 'left')
         
         # Draw right pane
-        self.draw_pane(self.right_pane, pane_width, pane_width, self.active_pane == 'right')
+        self.draw_pane(self.right_pane, left_pane_width, right_pane_width, self.active_pane == 'right')
         
     def draw_log_pane(self):
         """Draw the log pane at the bottom"""
         height, width = self.stdscr.getmaxyx()
-        log_height = max(MIN_LOG_HEIGHT, int(height * DEFAULT_LOG_HEIGHT_RATIO))
-        log_start_y = height - log_height - 1
+        # Allow log pane to be completely hidden (0 height) when ratio is 0
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        left_pane_width = int(width * self.left_pane_ratio)
         
-        # Draw horizontal separator
+        # Always draw the file list footers at the correct position
+        if log_height == 0:
+            # When log is hidden, footers go right above status line
+            footer_y = height - 2
+        else:
+            # When log is visible, footers go above the log area
+            footer_y = height - log_height - 2
+            
+        # Draw horizontal separator and file list footers
         try:
             separator_line = "─" * width
-            self.stdscr.addstr(log_start_y - 1, 0, separator_line, curses.color_pair(COLOR_HEADER))
+            self.stdscr.addstr(footer_y, 0, separator_line, curses.color_pair(COLOR_HEADER))
             
-            # Log pane header with version
-            log_header = f" Log ({len(self.log_messages)} messages) - {APP_NAME} v{VERSION} "
-            self.stdscr.addstr(log_start_y - 1, 2, log_header, curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
+            # Always draw file list footers
+            self.draw_file_footers(footer_y, left_pane_width)
         except curses.error:
             pass
+            
+        # If log pane is hidden (0 height), don't draw log content
+        if log_height == 0:
+            return
+            
+        # Log content starts right after the footer line
+        log_start_y = footer_y + 1
         
-        # Calculate visible log messages
+        # Calculate visible log messages (subtract 1 for the footer line)
         visible_lines = log_height - 1
         total_messages = len(self.log_messages)
         
@@ -300,6 +512,8 @@ class FileManager:
             # Choose color based on source
             if source == "STDERR":
                 color = curses.color_pair(COLOR_ERROR)  # Red for stderr
+            elif source == "SYSTEM":
+                color = curses.color_pair(COLOR_SELECTED)  # Yellow for system messages
             else:
                 color = curses.A_NORMAL
             
@@ -314,20 +528,52 @@ class FileManager:
                 pass
                 
     def draw_status(self):
-        """Draw status line"""
+        """Draw status line with file info and controls"""
         height, width = self.stdscr.getmaxyx()
         status_y = height - 1
         
         current_pane = self.get_current_pane()
         
-        if current_pane['files']:
-            status = f"[{self.active_pane.upper()}] File {current_pane['selected_index'] + 1} of {len(current_pane['files'])}"
-            if self.show_hidden:
-                status += " (showing hidden)"
+        # Left side: minimal status info
+        left_status = ""
+        if self.show_hidden:
+            left_status = "(showing hidden)"
+        
+        # Controls - progressively abbreviate to fit
+        if width > 120:
+            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden  d:debug"
+        elif width > 100:
+            controls = "Space/Opt+Space:select  Opt+←→:h-resize  Ctrl+U/D:v-resize  Tab:switch  ←→:nav  q:quit  h:hidden"
+        elif width > 80:
+            controls = "Space/Opt+Space:select  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  h:hidden"
         else:
-            status = f"[{self.active_pane.upper()}] No files"
+            controls = "Space:select  Opt+←→↕:resize  Tab:switch  q:quit  h:hidden"
+        
+        # Draw status line with background color
+        try:
+            # Fill entire status line with background color
+            status_line = " " * width
+            self.stdscr.addstr(status_y, 0, status_line, curses.color_pair(COLOR_STATUS))
             
-        self.stdscr.addstr(status_y, 2, status)
+            # Always draw controls - they're the most important part
+            if left_status:
+                # Draw left status
+                self.stdscr.addstr(status_y, 2, left_status, curses.color_pair(COLOR_STATUS))
+                # Right-align controls
+                controls_x = max(len(left_status) + 6, width - len(controls) - 2)
+                if controls_x + len(controls) < width - 2:
+                    self.stdscr.addstr(status_y, controls_x, controls, curses.color_pair(COLOR_STATUS))
+                else:
+                    # If no room, just show controls without left status
+                    controls_x = max(2, (width - len(controls)) // 2)
+                    self.stdscr.addstr(status_y, controls_x, controls, curses.color_pair(COLOR_STATUS))
+            else:
+                # Center controls when no left status
+                controls_x = max(2, (width - len(controls)) // 2)
+                self.stdscr.addstr(status_y, controls_x, controls, curses.color_pair(COLOR_STATUS))
+        except curses.error:
+            # Fallback: just show file info if screen too narrow
+            self.stdscr.addstr(status_y, 2, left_status)
         
     def handle_enter(self):
         """Handle Enter key - navigate or open file"""
@@ -345,6 +591,7 @@ class FileManager:
             current_pane['path'] = current_pane['path'].parent
             current_pane['selected_index'] = 0
             current_pane['scroll_offset'] = 0
+            current_pane['selected_files'].clear()  # Clear selections when changing directory
             return
             
         if selected_file.is_dir():
@@ -352,6 +599,7 @@ class FileManager:
                 current_pane['path'] = selected_file
                 current_pane['selected_index'] = 0
                 current_pane['scroll_offset'] = 0
+                current_pane['selected_files'].clear()  # Clear selections when changing directory
             except PermissionError:
                 self.show_error("Permission denied")
         else:
@@ -372,22 +620,164 @@ class FileManager:
         self.stdscr.refresh()
         curses.napms(1500)  # Show for 1.5 seconds
         
+    def adjust_pane_boundary(self, direction):
+        """Adjust the boundary between left and right panes"""
+        if direction == 'left':
+            # Make left pane smaller, right pane larger
+            self.left_pane_ratio = max(MIN_PANE_RATIO, self.left_pane_ratio - PANE_ADJUST_STEP)
+        elif direction == 'right':
+            # Make left pane larger, right pane smaller  
+            self.left_pane_ratio = min(MAX_PANE_RATIO, self.left_pane_ratio + PANE_ADJUST_STEP)
+            
+        # Trigger a full redraw for the new pane layout
+        self.needs_full_redraw = True
+        
+        # Show immediate feedback in log pane
+        left_percent = int(self.left_pane_ratio * 100)
+        right_percent = 100 - left_percent
+        print(f"Pane split: {left_percent}% | {right_percent}%")
+        
+    def adjust_log_boundary(self, direction):
+        """Adjust the boundary between file panes and log pane"""
+        if direction == 'up':
+            # Make log pane smaller, file panes larger
+            self.log_height_ratio = max(MIN_LOG_HEIGHT_RATIO, self.log_height_ratio - LOG_HEIGHT_ADJUST_STEP)
+        elif direction == 'down':
+            # Make log pane larger, file panes smaller
+            self.log_height_ratio = min(MAX_LOG_HEIGHT_RATIO, self.log_height_ratio + LOG_HEIGHT_ADJUST_STEP)
+            
+        # Trigger a full redraw for the new layout
+        self.needs_full_redraw = True
+        
+        # Show immediate feedback in log pane
+        log_percent = int(self.log_height_ratio * 100)
+        file_percent = 100 - log_percent
+        print(f"Layout: {file_percent}% files | {log_percent}% log")
+        
+    def debug_mode(self):
+        """Interactive debug mode to detect modifier key combinations"""
+        height, width = self.stdscr.getmaxyx()
+        
+        # Clear screen and show debug interface
+        self.stdscr.clear()
+        
+        # Draw debug header
+        debug_title = "=== MODIFIER KEY DETECTION MODE ==="
+        self.stdscr.addstr(2, (width - len(debug_title)) // 2, debug_title, curses.color_pair(COLOR_HEADER) | curses.A_BOLD)
+        
+        # Instructions
+        instructions = [
+            "",
+            "Try pressing these key combinations:",
+            "",
+            "• Option+Space (works on macOS)",
+            "• Option+Left/Right (horizontal pane resizing)",
+            "• Ctrl+U/Ctrl+D (vertical pane resizing)",
+            "• Ctrl+Space   (alternative)",
+            "• Ctrl+S       (alternative)",
+            "• Command+Space (probably won't work)",
+            "",
+            "Key codes will appear below as you press them.",
+            "If a combination works for upward selection, it will be noted.",
+            "",
+            "Press 'q' to exit debug mode and return to file manager"
+        ]
+        
+        for i, line in enumerate(instructions):
+            try:
+                self.stdscr.addstr(4 + i, 4, line)
+            except curses.error:
+                pass
+        
+        # Results area
+        results_y = 4 + len(instructions) + 2
+        self.stdscr.addstr(results_y, 4, "Key detection results:", curses.A_BOLD)
+        results_start_y = results_y + 2
+        
+        self.stdscr.refresh()
+        
+        # Debug loop
+        result_line = 0
+        while True:
+            debug_key = self.stdscr.getch()
+            
+            if debug_key == ord('q') or debug_key == ord('Q'):
+                break
+            
+            # Display the key code
+            y_pos = results_start_y + result_line
+            if y_pos < height - 2:  # Don't write past screen bottom
+                key_info = ""
+                
+                if debug_key == 0:
+                    key_info = f"Ctrl+Space detected! (key code: {debug_key}) ✓ WORKS FOR UPWARD SELECTION"
+                    color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                elif debug_key == 19:
+                    key_info = f"Ctrl+S detected! (key code: {debug_key}) ✓ WORKS FOR UPWARD SELECTION"  
+                    color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                elif debug_key == 27:
+                    # Check for ESC sequences (Option+Left/Right)
+                    next_key = self.stdscr.getch()
+                    if next_key == 98:  # 'b'
+                        key_info = f"Option+Left detected! (key codes: 27, 98) ✓ WORKS FOR PANE RESIZE"
+                        color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                    elif next_key == 102:  # 'f'
+                        key_info = f"Option+Right detected! (key codes: 27, 102) ✓ WORKS FOR PANE RESIZE"
+                        color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                    else:
+                        key_info = f"ESC sequence: 27 followed by {next_key} (char: {chr(next_key) if 32 <= next_key <= 126 else 'non-printable'})"
+                        color = curses.A_NORMAL
+                elif debug_key == 194:
+                    # Check for Option+Space sequence
+                    next_key = self.stdscr.getch()
+                    if next_key == 160:
+                        key_info = f"Option+Space detected! (key codes: 194, 160) ✓ WORKS FOR UPWARD SELECTION"
+                        color = curses.color_pair(COLOR_SELECTED) | curses.A_BOLD
+                    else:
+                        key_info = f"Option key sequence: 194 followed by {next_key} (unknown)"
+                        color = curses.A_NORMAL
+                elif debug_key == 1:
+                    key_info = f"Ctrl+A detected (key code: {debug_key})"
+                    color = curses.A_NORMAL
+                elif 32 <= debug_key <= 126:
+                    key_info = f"Key '{chr(debug_key)}' pressed (key code: {debug_key})"
+                    color = curses.A_NORMAL
+                else:
+                    key_info = f"Special key pressed (key code: {debug_key})"
+                    color = curses.A_NORMAL
+                
+                try:
+                    # Clear the line first
+                    self.stdscr.addstr(y_pos, 4, " " * (width - 8))
+                    self.stdscr.addstr(y_pos, 4, key_info[:width-8], color)
+                    self.stdscr.refresh()
+                    result_line += 1
+                except curses.error:
+                    pass
+            
+            # If we've filled the results area, scroll up
+            if result_line >= 8:  # Keep last 8 results visible
+                result_line = 7
+        
     def run(self):
         """Main application loop"""
         while True:
-            self.refresh_files()
-            
-            # Clear screen
-            self.stdscr.clear()
-            
-            # Draw interface
-            self.draw_header()
-            self.draw_files()
-            self.draw_log_pane()
-            self.draw_status()
-            
-            # Refresh screen
-            self.stdscr.refresh()
+            # Only do full redraw when needed
+            if self.needs_full_redraw:
+                self.refresh_files()
+                
+                # Clear screen
+                self.stdscr.clear()
+                
+                # Draw interface
+                self.draw_header()
+                self.draw_files()
+                self.draw_log_pane()
+                self.draw_status()
+                
+                # Refresh screen
+                self.stdscr.refresh()
+                self.needs_full_redraw = False
             
             # Get user input
             key = self.stdscr.getch()
@@ -395,16 +785,28 @@ class FileManager:
             
             if key == ord('q') or key == ord('Q'):
                 break
+            elif key == KEY_CTRL_U:  # Ctrl+U - make log pane smaller
+                self.adjust_log_boundary('up')
+            elif key == KEY_CTRL_D:  # Ctrl+D - make log pane larger
+                self.adjust_log_boundary('down')
+            elif key == curses.KEY_RESIZE:  # Terminal window resized
+                # Clear screen and trigger full redraw to handle new dimensions
+                self.stdscr.clear()
+                self.needs_full_redraw = True
             elif key == KEY_TAB:  # Tab key - switch panes
                 self.active_pane = 'right' if self.active_pane == 'left' else 'left'
+                self.needs_full_redraw = True
             elif key == curses.KEY_UP or key == ord('k'):
                 if current_pane['selected_index'] > 0:
                     current_pane['selected_index'] -= 1
+                    self.needs_full_redraw = True
             elif key == curses.KEY_DOWN or key == ord('j'):
                 if current_pane['selected_index'] < len(current_pane['files']) - 1:
                     current_pane['selected_index'] += 1
+                    self.needs_full_redraw = True
             elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
                 self.handle_enter()
+                self.needs_full_redraw = True
             elif key == ord('h') or key == ord('H'):
                 self.show_hidden = not self.show_hidden
                 # Reset both panes
@@ -412,29 +814,38 @@ class FileManager:
                 self.left_pane['scroll_offset'] = 0
                 self.right_pane['selected_index'] = 0
                 self.right_pane['scroll_offset'] = 0
+                self.needs_full_redraw = True
             elif key == curses.KEY_HOME:
                 current_pane['selected_index'] = 0
                 current_pane['scroll_offset'] = 0
+                self.needs_full_redraw = True
             elif key == curses.KEY_END:
                 current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
+                self.needs_full_redraw = True
             elif key == curses.KEY_PPAGE:  # Page Up
                 current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
+                self.needs_full_redraw = True
             elif key == curses.KEY_NPAGE:  # Page Down
                 current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
+                self.needs_full_redraw = True
             elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
                         current_pane['path'] = current_pane['path'].parent
                         current_pane['selected_index'] = 0
                         current_pane['scroll_offset'] = 0
+                        current_pane['selected_files'].clear()  # Clear selections when changing directory
+                        self.needs_full_redraw = True
                     except PermissionError:
                         self.show_error("Permission denied")
+                        self.needs_full_redraw = True
             elif key == curses.KEY_LEFT and self.active_pane == 'left':  # Left arrow in left pane - go to parent
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
                         current_pane['path'] = current_pane['path'].parent
                         current_pane['selected_index'] = 0
                         current_pane['scroll_offset'] = 0
+                        current_pane['selected_files'].clear()  # Clear selections when changing directory
                     except PermissionError:
                         self.show_error("Permission denied")
             elif key == curses.KEY_RIGHT and self.active_pane == 'right':  # Right arrow in right pane - go to parent
@@ -443,6 +854,7 @@ class FileManager:
                         current_pane['path'] = current_pane['path'].parent
                         current_pane['selected_index'] = 0
                         current_pane['scroll_offset'] = 0
+                        current_pane['selected_files'].clear()  # Clear selections when changing directory
                     except PermissionError:
                         self.show_error("Permission denied")
             elif key == curses.KEY_RIGHT and self.active_pane == 'left':  # Right arrow in left pane - switch to right pane
@@ -455,6 +867,38 @@ class FileManager:
             elif key == ord('L'):  # 'L' key - scroll log down  
                 if self.log_scroll_offset > 0:
                     self.log_scroll_offset -= 1
+            elif key == ord(' '):  # Space key - toggle selection and move down
+                self.toggle_selection()
+                self.needs_full_redraw = True
+
+            elif key == 0:  # Ctrl+Space - toggle selection and move up
+                self.toggle_selection_up()
+                self.needs_full_redraw = True
+            elif key == 19:  # Ctrl+S - toggle selection and move up  
+                self.toggle_selection_up()
+                self.needs_full_redraw = True
+            elif key == 27:  # ESC key - check for Option key sequences
+                # Option+Left sends 27 followed by 'b' (98)
+                # Option+Right sends 27 followed by 'f' (102)
+                # Option+Space sends 194 followed by 160
+                next_key = self.stdscr.getch()
+                if next_key == 98:  # Option+Left (ESC + 'b')
+                    self.adjust_pane_boundary('left')
+                elif next_key == 102:  # Option+Right (ESC + 'f')
+                    self.adjust_pane_boundary('right')
+
+                else:
+                    # Log unknown ESC sequence for debugging
+                    print(f"Unknown ESC sequence: 27, {next_key}")
+            elif key == 194:  # Option+Space sequence (first byte)
+                # Option+Space sends 194 followed by 160 on macOS
+                next_key = self.stdscr.getch()
+                if next_key == 160:  # Option+Space
+                    self.toggle_selection_up()
+                    self.needs_full_redraw = True
+                else:
+                    # Log unknown Option key sequence for debugging
+                    print(f"Unknown Option key sequence: 194, {next_key}")
             elif key == ord('t') or key == ord('T'):  # 't' key - test log output
                 print(f"{APP_NAME} v{VERSION} - Test stdout message")
                 print("Another stdout message with timestamp")
@@ -462,6 +906,8 @@ class FileManager:
                 import time
                 time.sleep(0.1)  # Small delay to see messages appear
                 print(f"Current time: {datetime.now()}")
+            elif key == ord('d'):  # 'd' key - debug mode to detect modifier keys
+                self.debug_mode()
         
         # Restore stdout/stderr before exiting
         sys.stdout = self.original_stdout
