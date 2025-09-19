@@ -122,6 +122,15 @@ class FileManager:
         self.list_dialog_search = ""  # Current search pattern
         self.list_dialog_callback = None  # Callback function when item is selected
         
+        # Search dialog state
+        self.search_dialog_mode = False
+        self.search_dialog_type = 'filename'  # 'filename' or 'content'
+        self.search_dialog_pattern = ""
+        self.search_dialog_results = []  # List of search results
+        self.search_dialog_selected = 0  # Index of currently selected result
+        self.search_dialog_scroll = 0  # Scroll offset for results
+        self.search_dialog_searching = False  # Whether search is in progress
+        
         # Log pane setup
         max_log_messages = getattr(self.config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
         self.log_messages = deque(maxlen=max_log_messages)
@@ -1016,6 +1025,11 @@ class FileManager:
         # If in list dialog mode, show list dialog
         if self.list_dialog_mode:
             self.draw_list_dialog()
+            return
+            
+        # If in search dialog mode, show search dialog
+        if self.search_dialog_mode:
+            self.draw_search_dialog()
             return
             
         # If in search mode, show search interface
@@ -3543,6 +3557,356 @@ class FileManager:
             # If we've filled the results area, scroll up
             if result_line >= 8:  # Keep last 8 results visible
                 result_line = 7
+    
+    def show_search_dialog(self, search_type='filename'):
+        """Show the search dialog for filename or content search"""
+        self.search_dialog_mode = True
+        self.search_dialog_type = search_type
+        self.search_dialog_pattern = ""
+        self.search_dialog_results = []
+        self.search_dialog_selected = 0
+        self.search_dialog_scroll = 0
+        self.search_dialog_searching = False
+        self.needs_full_redraw = True
+    
+    def exit_search_dialog_mode(self):
+        """Exit search dialog mode"""
+        self.search_dialog_mode = False
+        self.search_dialog_type = 'filename'
+        self.search_dialog_pattern = ""
+        self.search_dialog_results = []
+        self.search_dialog_selected = 0
+        self.search_dialog_scroll = 0
+        self.search_dialog_searching = False
+        self.needs_full_redraw = True
+    
+    def perform_search(self):
+        """Perform the actual search based on current pattern and type"""
+        if not self.search_dialog_pattern.strip():
+            self.search_dialog_results = []
+            return
+        
+        self.search_dialog_searching = True
+        self.search_dialog_results = []
+        
+        current_pane = self.get_current_pane()
+        search_root = current_pane['path']
+        
+        try:
+            if self.search_dialog_type == 'filename':
+                # Recursive filename search using fnmatch
+                for file_path in search_root.rglob('*'):
+                    if fnmatch.fnmatch(file_path.name.lower(), self.search_dialog_pattern.lower()):
+                        relative_path = file_path.relative_to(search_root)
+                        self.search_dialog_results.append({
+                            'path': file_path,
+                            'relative_path': str(relative_path),
+                            'type': 'file' if file_path.is_file() else 'dir',
+                            'match_info': file_path.name
+                        })
+            
+            elif self.search_dialog_type == 'content':
+                # Recursive grep-based content search
+                import re
+                pattern = re.compile(self.search_dialog_pattern, re.IGNORECASE)
+                
+                for file_path in search_root.rglob('*'):
+                    if file_path.is_file():
+                        try:
+                            # Only search text files
+                            if self._is_text_file(file_path):
+                                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                    for line_num, line in enumerate(f, 1):
+                                        if pattern.search(line):
+                                            relative_path = file_path.relative_to(search_root)
+                                            self.search_dialog_results.append({
+                                                'path': file_path,
+                                                'relative_path': str(relative_path),
+                                                'type': 'content',
+                                                'line_num': line_num,
+                                                'match_info': f"Line {line_num}: {line.strip()[:60]}..."
+                                            })
+                                            break  # Only show first match per file
+                        except (PermissionError, UnicodeDecodeError, OSError):
+                            continue
+        
+        except Exception as e:
+            print(f"Search error: {e}")
+        
+        self.search_dialog_searching = False
+        self.search_dialog_selected = 0
+        self.search_dialog_scroll = 0
+    
+    def _is_text_file(self, file_path):
+        """Check if a file is likely a text file"""
+        try:
+            # Check file extension
+            text_extensions = {'.txt', '.py', '.js', '.html', '.css', '.md', '.json', '.xml', '.yml', '.yaml', '.cfg', '.conf', '.ini', '.log'}
+            if file_path.suffix.lower() in text_extensions:
+                return True
+            
+            # Check if file has no extension (might be text)
+            if not file_path.suffix:
+                # Read first few bytes to check for binary content
+                with open(file_path, 'rb') as f:
+                    chunk = f.read(1024)
+                    # If it contains null bytes, it's likely binary
+                    return b'\x00' not in chunk
+            
+            return False
+        except:
+            return False
+    
+    def handle_search_dialog_input(self, key):
+        """Handle input while in search dialog mode"""
+        if key == 27:  # ESC - cancel
+            self.exit_search_dialog_mode()
+            return True
+        elif key == curses.KEY_UP:
+            # Move selection up
+            if self.search_dialog_results and self.search_dialog_selected > 0:
+                self.search_dialog_selected -= 1
+                self._adjust_search_dialog_scroll()
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_DOWN:
+            # Move selection down
+            if self.search_dialog_results and self.search_dialog_selected < len(self.search_dialog_results) - 1:
+                self.search_dialog_selected += 1
+                self._adjust_search_dialog_scroll()
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_PPAGE:  # Page Up
+            if self.search_dialog_results:
+                self.search_dialog_selected = max(0, self.search_dialog_selected - 10)
+                self._adjust_search_dialog_scroll()
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_NPAGE:  # Page Down
+            if self.search_dialog_results:
+                self.search_dialog_selected = min(len(self.search_dialog_results) - 1, self.search_dialog_selected + 10)
+                self._adjust_search_dialog_scroll()
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_HOME:  # Home - go to top
+            if self.search_dialog_results:
+                self.search_dialog_selected = 0
+                self.search_dialog_scroll = 0
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_END:  # End - go to bottom
+            if self.search_dialog_results:
+                self.search_dialog_selected = len(self.search_dialog_results) - 1
+                self._adjust_search_dialog_scroll()
+                self.needs_full_redraw = True
+            return True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            # Select current result
+            if self.search_dialog_results and 0 <= self.search_dialog_selected < len(self.search_dialog_results):
+                selected_result = self.search_dialog_results[self.search_dialog_selected]
+                self._navigate_to_search_result(selected_result)
+            self.exit_search_dialog_mode()
+            return True
+        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
+            # Remove last character from search pattern
+            if self.search_dialog_pattern:
+                self.search_dialog_pattern = self.search_dialog_pattern[:-1]
+                self.perform_search()
+                self.needs_full_redraw = True
+            return True
+        elif key == ord('\t'):  # Tab - switch between filename and content search
+            self.search_dialog_type = 'content' if self.search_dialog_type == 'filename' else 'filename'
+            self.perform_search()
+            self.needs_full_redraw = True
+            return True
+        elif 32 <= key <= 126:  # Printable characters
+            # Add character to search pattern
+            self.search_dialog_pattern += chr(key)
+            self.perform_search()
+            self.needs_full_redraw = True
+            return True
+        return False
+    
+    def _adjust_search_dialog_scroll(self):
+        """Adjust scroll offset to keep selected item visible"""
+        height, width = self.stdscr.getmaxyx()
+        
+        # Calculate dialog dimensions
+        dialog_height = max(20, int(height * 0.8))
+        content_height = dialog_height - 8  # Account for title, search box, borders, help
+        
+        if self.search_dialog_selected < self.search_dialog_scroll:
+            self.search_dialog_scroll = self.search_dialog_selected
+        elif self.search_dialog_selected >= self.search_dialog_scroll + content_height:
+            self.search_dialog_scroll = self.search_dialog_selected - content_height + 1
+    
+    def _navigate_to_search_result(self, result):
+        """Navigate to the selected search result"""
+        current_pane = self.get_current_pane()
+        target_path = result['path']
+        
+        if result['type'] == 'dir':
+            # Navigate to directory
+            current_pane['path'] = target_path
+            current_pane['selected_index'] = 0
+            current_pane['scroll_offset'] = 0
+            current_pane['selected_files'].clear()
+            print(f"Navigated to directory: {result['relative_path']}")
+        else:
+            # Navigate to file's directory and select the file
+            parent_dir = target_path.parent
+            current_pane['path'] = parent_dir
+            current_pane['selected_files'].clear()
+            
+            # Refresh files and find the target file
+            self.refresh_files(current_pane)
+            
+            # Find and select the target file
+            for i, file_path in enumerate(current_pane['files']):
+                if file_path == target_path:
+                    current_pane['selected_index'] = i
+                    # Adjust scroll to make selection visible
+                    height, width = self.stdscr.getmaxyx()
+                    calculated_height = int(height * self.log_height_ratio)
+                    log_height = calculated_height if self.log_height_ratio > 0 else 0
+                    display_height = height - log_height - 4
+                    
+                    if current_pane['selected_index'] < current_pane['scroll_offset']:
+                        current_pane['scroll_offset'] = current_pane['selected_index']
+                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
+                        current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+                    break
+            
+            if result['type'] == 'content':
+                print(f"Found content match in: {result['relative_path']} at line {result['line_num']}")
+            else:
+                print(f"Navigated to file: {result['relative_path']}")
+        
+        self.needs_full_redraw = True
+    
+    def draw_search_dialog(self):
+        """Draw the search dialog overlay"""
+        height, width = self.stdscr.getmaxyx()
+        
+        # Calculate dialog dimensions
+        dialog_width = max(60, int(width * 0.8))
+        dialog_height = max(20, int(height * 0.8))
+        
+        # Center the dialog
+        start_y = (height - dialog_height) // 2
+        start_x = (width - dialog_width) // 2
+        
+        # Draw dialog background
+        for y in range(start_y, start_y + dialog_height):
+            if y < height:
+                bg_line = " " * min(dialog_width, width - start_x)
+                self.safe_addstr(y, start_x, bg_line, get_status_color())
+        
+        # Draw border
+        border_color = get_status_color() | curses.A_BOLD
+        
+        # Top border
+        if start_y >= 0:
+            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
+            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
+        
+        # Side borders
+        for y in range(start_y + 1, start_y + dialog_height - 1):
+            if y < height:
+                self.safe_addstr(y, start_x, "│", border_color)
+                if start_x + dialog_width - 1 < width:
+                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
+        
+        # Bottom border
+        if start_y + dialog_height - 1 < height:
+            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
+            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
+        
+        # Draw title
+        title_text = f" Search ({self.search_dialog_type.title()}) "
+        title_x = start_x + (dialog_width - len(title_text)) // 2
+        if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
+            self.safe_addstr(start_y, title_x, title_text, border_color)
+        
+        # Draw search box
+        search_y = start_y + 2
+        search_label = "Pattern: "
+        search_text = self.search_dialog_pattern + "_"  # Add cursor
+        search_line = search_label + search_text
+        
+        if search_y < height:
+            content_start_x = start_x + 2
+            content_width = dialog_width - 4
+            display_search = search_line[:content_width] if len(search_line) > content_width else search_line
+            self.safe_addstr(search_y, content_start_x, display_search, get_status_color())
+        
+        # Draw search type indicator
+        type_y = start_y + 3
+        if type_y < height:
+            type_text = f"Mode: {self.search_dialog_type.title()} (Tab to switch)"
+            self.safe_addstr(type_y, start_x + 2, type_text[:dialog_width - 4], get_status_color() | curses.A_DIM)
+        
+        # Draw separator line
+        sep_y = start_y + 4
+        if sep_y < height:
+            sep_line = "├" + "─" * (dialog_width - 2) + "┤"
+            self.safe_addstr(sep_y, start_x, sep_line[:dialog_width], border_color)
+        
+        # Draw results count
+        count_y = start_y + 5
+        if count_y < height:
+            if self.search_dialog_searching:
+                count_text = "Searching..."
+            else:
+                count_text = f"Results: {len(self.search_dialog_results)}"
+            self.safe_addstr(count_y, start_x + 2, count_text, get_status_color() | curses.A_DIM)
+        
+        # Calculate results area
+        results_start_y = start_y + 6
+        results_end_y = start_y + dialog_height - 3
+        content_start_x = start_x + 2
+        content_width = dialog_width - 4
+        content_height = results_end_y - results_start_y + 1
+        
+        # Draw results
+        visible_results = self.search_dialog_results[self.search_dialog_scroll:self.search_dialog_scroll + content_height]
+        
+        for i, result in enumerate(visible_results):
+            y = results_start_y + i
+            if y <= results_end_y and y < height:
+                result_index = self.search_dialog_scroll + i
+                is_selected = result_index == self.search_dialog_selected
+                
+                # Format result text
+                if result['type'] == 'dir':
+                    result_text = f"📁 {result['relative_path']}"
+                elif result['type'] == 'content':
+                    result_text = f"📄 {result['relative_path']} - {result['match_info']}"
+                else:
+                    result_text = f"📄 {result['relative_path']}"
+                
+                if len(result_text) > content_width - 2:
+                    result_text = result_text[:content_width - 5] + "..."
+                
+                # Add selection indicator
+                if is_selected:
+                    display_text = f"► {result_text}"
+                    item_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
+                else:
+                    display_text = f"  {result_text}"
+                    item_color = get_status_color()
+                
+                # Ensure text fits
+                display_text = display_text[:content_width]
+                self.safe_addstr(y, content_start_x, display_text, item_color)
+        
+        # Draw help text
+        help_y = start_y + dialog_height - 2
+        if help_y < height:
+            help_text = "Enter: Select | Tab: Switch mode | ESC: Cancel"
+            help_x = start_x + (dialog_width - len(help_text)) // 2
+            if help_x >= start_x:
+                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
         
     def run(self):
         """Main application loop"""
@@ -3612,9 +3976,14 @@ class FileManager:
                 if self.handle_list_dialog_input(key):
                     continue  # List dialog mode handled the key
             
+            # Handle search dialog mode input
+            if self.search_dialog_mode:
+                if self.handle_search_dialog_input(key):
+                    continue  # Search dialog mode handled the key
+            
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting search mode while help dialog is open
-            if self.dialog_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
+            if self.dialog_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.search_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
@@ -3823,6 +4192,10 @@ class FileManager:
                 self.show_list_dialog_demo()
             elif key == ord('T'):  # 'T' key - show file type filter
                 self.show_file_type_filter()
+            elif key == ord('F'):  # 'F' key (Shift-F) - show search dialog (filename)
+                self.show_search_dialog('filename')
+            elif key == ord('G'):  # 'G' key (Shift-G) - show search dialog (content)
+                self.show_search_dialog('content')
             elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
                 self.show_favorite_directories()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
