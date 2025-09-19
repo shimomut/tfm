@@ -50,6 +50,7 @@ class DefaultConfig:
         'select_all_files': ['a'],
         'select_all_items': ['A'],
         'sync_panes': ['o', 'O'],
+        'view_text': ['v', 'V'],
     }
     
     # File associations (for future use)

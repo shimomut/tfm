@@ -17,6 +17,7 @@ A terminal-based file manager built with Python's curses library. Navigate your 
   - Underline for selected items in inactive pane
   - Red text for stderr messages in log pane
 - **Log Management**: Scroll through log messages, auto-scrolls to newest
+- **Text File Viewer**: Built-in text viewer with syntax highlighting for 20+ file formats
 - **Keyboard Navigation**: Full keyboard control with intuitive shortcuts
 - **Cross-platform**: Works on macOS, Linux, and Windows (with proper terminal support)
 
@@ -29,7 +30,8 @@ A terminal-based file manager built with Python's curses library. Navigate your 
 | `Tab` | Switch between left and right panes |
 | `→` | Switch to right pane (from left) OR go to parent (in right pane) |
 | `←` | Switch to left pane (from right) OR go to parent (in left pane) |
-| `Enter` | Enter directory or view file info |
+| `Enter` | Enter directory or view text file with syntax highlighting |
+| `v` | View selected file in text viewer (same as Enter for text files) |
 | `Backspace` | Go to parent directory |
 | `l` | Scroll log pane up (older messages) |
 | `L` | Scroll log pane down (newer messages) |
@@ -40,6 +42,36 @@ A terminal-based file manager built with Python's curses library. Navigate your 
 | `Page Up` | Move up 10 items in active pane |
 | `Page Down` | Move down 10 items in active pane |
 | `q` | Quit application |
+
+## Text Viewer
+
+TFM includes a built-in text file viewer with syntax highlighting support. When you press `Enter` on a text file or use the `v` key, the file opens in the integrated viewer.
+
+### Text Viewer Features
+- **Syntax highlighting** for 20+ file formats (Python, JavaScript, JSON, Markdown, YAML, etc.)
+- **Line numbers** (toggle with `n`)
+- **Horizontal scrolling** (arrow keys)
+- **Multiple encoding support** (UTF-8, Latin-1, CP1252)
+- **Automatic file type detection**
+
+### Text Viewer Controls
+| Key | Action |
+|-----|--------|
+| `q` or `ESC` | Exit viewer |
+| `↑↓` or `j/k` | Scroll up/down |
+| `←→` or `h/l` | Scroll left/right |
+| `Page Up/Down` | Page scrolling |
+| `Home/End` | Jump to start/end |
+| `n` | Toggle line numbers |
+| `w` | Toggle line wrapping |
+| `s` | Toggle syntax highlighting |
+
+### Enhanced Syntax Highlighting
+For full syntax highlighting, install pygments:
+```bash
+pip install pygments
+```
+The viewer works without pygments but displays plain text only.
 
 ## Installation & Usage
 
@@ -59,10 +91,15 @@ No additional dependencies required - uses Python's built-in `curses` library.
 ## File Structure
 
 ```
-tfm_main.py       # Main application
-tfm_const.py      # Constants and configuration
-requirements.txt  # Dependencies (none required)
-README.md         # This file
+tfm_main.py           # Main application
+tfm_const.py          # Constants and configuration
+tfm_colors.py         # Color definitions and management
+tfm_config.py         # Configuration system
+tfm_text_viewer.py    # Text file viewer with syntax highlighting
+_config.py            # Default configuration template
+requirements.txt      # Dependencies (pygments optional)
+README.md             # This file
+TEXT_VIEWER_FEATURE.md # Detailed text viewer documentation
 ```
 
 The application starts in your current working directory and allows you to navigate through your filesystem using keyboard controls.

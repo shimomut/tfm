@@ -15,6 +15,7 @@ COLOR_BOUNDARY = 8      # Pane boundaries
 COLOR_REGULAR_FILE = 9  # Regular files
 COLOR_LOG_STDOUT = 10   # Stdout log messages
 COLOR_LOG_SYSTEM = 11   # System log messages
+COLOR_LINE_NUMBERS = 12 # Line numbers in text viewer
 
 # Custom RGB color definitions (RGB values 0-255)
 RGB_COLORS = {
@@ -57,6 +58,10 @@ RGB_COLORS = {
     'LOG_SYSTEM_FG': {
         'color_num': 109,
         'rgb': (100, 200, 255)  # Light blue for system logs
+    },
+    'LINE_NUMBERS_FG': {
+        'color_num': 110,
+        'rgb': (128, 128, 128)  # Gray for line numbers
     }
 }
 
@@ -71,7 +76,8 @@ FALLBACK_COLORS = {
     'SELECTED_FG': curses.COLOR_YELLOW,
     'REGULAR_FILE_FG': curses.COLOR_WHITE,
     'LOG_STDOUT_FG': curses.COLOR_WHITE,
-    'LOG_SYSTEM_FG': curses.COLOR_BLUE
+    'LOG_SYSTEM_FG': curses.COLOR_BLUE,
+    'LINE_NUMBERS_FG': curses.COLOR_WHITE
 }
 
 def init_colors():
@@ -108,6 +114,7 @@ def init_colors():
             regular_file_fg = RGB_COLORS['REGULAR_FILE_FG']['color_num']
             log_stdout_fg = RGB_COLORS['LOG_STDOUT_FG']['color_num']
             log_system_fg = RGB_COLORS['LOG_SYSTEM_FG']['color_num']
+            line_numbers_fg = RGB_COLORS['LINE_NUMBERS_FG']['color_num']
             
         except curses.error:
             rgb_success = False
@@ -124,6 +131,7 @@ def init_colors():
         regular_file_fg = FALLBACK_COLORS['REGULAR_FILE_FG']
         log_stdout_fg = FALLBACK_COLORS['LOG_STDOUT_FG']
         log_system_fg = FALLBACK_COLORS['LOG_SYSTEM_FG']
+        line_numbers_fg = FALLBACK_COLORS['LINE_NUMBERS_FG']
     
     # Initialize color pairs
     curses.init_pair(COLOR_DIRECTORIES, directory_fg, curses.COLOR_BLACK)
@@ -137,6 +145,7 @@ def init_colors():
     curses.init_pair(COLOR_REGULAR_FILE, regular_file_fg, curses.COLOR_BLACK)
     curses.init_pair(COLOR_LOG_STDOUT, log_stdout_fg, curses.COLOR_BLACK)
     curses.init_pair(COLOR_LOG_SYSTEM, log_system_fg, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_LINE_NUMBERS, line_numbers_fg, curses.COLOR_BLACK)
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """Get the appropriate color for a file based on its properties"""
@@ -246,3 +255,7 @@ def get_log_color(source):
         return curses.color_pair(COLOR_LOG_STDOUT)  # Medium gray for stdout
     else:
         return curses.color_pair(COLOR_LOG_STDOUT)  # Default to stdout color
+
+def get_line_number_color():
+    """Get line number color for text viewer"""
+    return curses.color_pair(COLOR_LINE_NUMBERS)

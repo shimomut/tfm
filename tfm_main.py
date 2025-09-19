@@ -18,6 +18,7 @@ from collections import deque
 from tfm_const import *
 from tfm_colors import *
 from tfm_config import get_config, get_startup_paths, is_key_bound_to
+from tfm_text_viewer import view_text_file, is_text_file
 
 class LogCapture:
     """Capture stdout/stderr and redirect to log pane"""
@@ -1114,8 +1115,24 @@ class FileManager:
             except PermissionError:
                 self.show_error("Permission denied")
         else:
-            # For files, show file info
-            self.show_info(f"File: {selected_file.name}")
+            # For files, try to open in text viewer if it's a text file
+            if is_text_file(selected_file):
+                # Save current screen state
+                curses.curs_set(0)
+                
+                # Open text viewer
+                if view_text_file(self.stdscr, selected_file):
+                    # Text viewer completed successfully
+                    print(f"Viewed file: {selected_file.name}")
+                else:
+                    # Fallback to file info if viewer failed
+                    self.show_info(f"File: {selected_file.name}")
+                
+                # Restore TFM display
+                self.needs_full_redraw = True
+            else:
+                # For non-text files, show file info
+                self.show_info(f"File: {selected_file.name}")
             
     def show_error(self, message):
         """Show error message"""
@@ -1719,6 +1736,48 @@ class FileManager:
             title = f"Details: {len(files_to_show)} items"
         
         self.show_info_dialog(title, details_lines)
+    
+    def view_selected_text_file(self):
+        """View the selected file in text viewer if it's a text file"""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            print("No files to view")
+            return
+        
+        selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        # Handle parent directory
+        if (current_pane['selected_index'] == 0 and 
+            len(current_pane['files']) > 0 and 
+            selected_file == current_pane['path'].parent):
+            print("Cannot view parent directory (..) as text")
+            return
+        
+        if selected_file.is_dir():
+            print("Cannot view directory as text file")
+            return
+        
+        if not is_text_file(selected_file):
+            print(f"File '{selected_file.name}' is not recognized as a text file")
+            return
+        
+        try:
+            # Save current screen state
+            curses.curs_set(0)
+            
+            # Open text viewer
+            if view_text_file(self.stdscr, selected_file):
+                print(f"Viewed text file: {selected_file.name}")
+            else:
+                print(f"Failed to view file: {selected_file.name}")
+            
+            # Restore TFM display
+            self.needs_full_redraw = True
+            
+        except Exception as e:
+            print(f"Error viewing file: {str(e)}")
+            self.needs_full_redraw = True
         
     def handle_search_input(self, key):
         """Handle input while in search mode"""
@@ -2410,6 +2469,8 @@ class FileManager:
                 self.toggle_reverse_sort()
             elif self.is_key_for_action(key, 'file_details'):  # Show file details
                 self.show_file_details()
+            elif self.is_key_for_action(key, 'view_text'):  # View text file
+                self.view_selected_text_file()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
                 self.left_pane_ratio = 0.5
                 self.needs_full_redraw = True
