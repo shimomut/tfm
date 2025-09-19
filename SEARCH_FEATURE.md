@@ -13,15 +13,22 @@ TFM now includes an incremental search mode that allows users to quickly find fi
 
 ## Pattern Syntax
 
-The search uses Python's fnmatch module, which supports these wildcards:
+The search uses Python's fnmatch module with multi-pattern support:
 
+### Single Pattern Wildcards
 - `*` - Matches any number of characters (including zero)
 - `?` - Matches exactly one character
 - `[seq]` - Matches any character in seq
 - `[!seq]` - Matches any character not in seq
 
+### Multi-Pattern Search
+- **Space-separated patterns**: All patterns must match the filename
+- **Contains matching**: Each pattern is automatically wrapped with `*` for substring matching
+- **Example**: `test config` finds files containing both "test" AND "config"
+
 ## Examples
 
+### Single Pattern Examples
 | Pattern | Description | Matches |
 |---------|-------------|---------|
 | `*.py` | Python files | main.py, setup.py, test.py |
@@ -30,11 +37,21 @@ The search uses Python's fnmatch module, which supports these wildcards:
 | `M*` | Files starting with "M" | Makefile, main.py |
 | `???.*` | Files with 3-character names | app.js, run.sh |
 | `config.*` | Config files | config.json, config.yaml |
-| `*.[jt]s` | JavaScript/TypeScript files | app.js, main.ts |
+
+### Multi-Pattern Examples
+| Pattern | Description | Matches |
+|---------|-------------|---------|
+| `test config` | Files containing both "test" AND "config" | test_config.py, config_test.txt |
+| `*.py test` | Python files containing "test" | test_main.py, my_test.py |
+| `ab*c 12?3` | Files matching both patterns | abc_1203_file.txt |
+| `main *.js` | JavaScript files containing "main" | main_app.js, main.min.js |
+| `config *.json *.yaml` | Config files in JSON or YAML format | config.json, app_config.yaml |
 
 ## Features
 
 - **Real-time matching**: Results update as you type
+- **Multi-pattern support**: Space-separated patterns (all must match)
+- **Contains matching**: Patterns automatically match substrings
 - **Visual feedback**: Matching files are underlined in the file list
 - **Match counter**: Shows current match position (e.g., "2/5 matches")
 - **Cursor positioning**: Automatically moves to the nearest match
@@ -45,12 +62,13 @@ The search uses Python's fnmatch module, which supports these wildcards:
 
 When in search mode, the status bar shows:
 ```
-Search: *.py_ (2/5 matches)    ESC:exit Enter:accept ↑↓:navigate
+Search: test config_ (2/5 matches)    ESC:exit Enter:accept ↑↓:navigate Space:multi-pattern
 ```
 
 - The `_` indicates the cursor position
 - Match count shows current position and total matches
-- Help text shows available commands
+- Help text shows available commands including multi-pattern support
+- Empty search shows: `Search: _ (enter patterns separated by spaces)`
 
 ## Integration
 

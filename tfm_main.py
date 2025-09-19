@@ -588,7 +588,10 @@ class FileManager:
                 match_info = f" ({self.search_match_index + 1}/{len(self.search_matches)} matches)"
                 search_prompt += match_info
             else:
-                search_prompt += " (no matches)"
+                if self.search_pattern.strip():
+                    search_prompt += " (no matches)"
+                else:
+                    search_prompt += " (enter patterns separated by spaces)"
                 
             # Add cursor indicator
             search_prompt += "_"
@@ -597,11 +600,18 @@ class FileManager:
             self.safe_addstr(status_y, 2, search_prompt, get_status_color())
             
             # Show help text on the right if there's space
-            help_text = "ESC:exit Enter:accept ↑↓:navigate"
+            help_text = "ESC:exit Enter:accept ↑↓:navigate Space:multi-pattern"
             if len(search_prompt) + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
                 if help_x > len(search_prompt) + 4:  # Ensure no overlap
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            else:
+                # Shorter help text for narrow terminals
+                short_help = "ESC:exit Enter:accept ↑↓:nav"
+                if len(search_prompt) + len(short_help) + 6 < width:
+                    help_x = width - len(short_help) - 3
+                    if help_x > len(search_prompt) + 4:
+                        self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
             return
         
         # Normal status display
@@ -701,15 +711,34 @@ class FileManager:
         curses.napms(1500)  # Show for 1.5 seconds
         
     def find_matches(self, pattern):
-        """Find all files matching the fnmatch pattern in current pane"""
+        """Find all files matching the fnmatch patterns in current pane
+        
+        Supports multiple space-delimited patterns where all patterns must match.
+        For example: "ab*c 12?3" will match files that contain both "*ab*c*" and "*12?3*"
+        """
         current_pane = self.get_current_pane()
         matches = []
         
         if not pattern or not current_pane['files']:
             return matches
             
-        # Convert pattern to lowercase for case-insensitive matching
-        pattern_lower = pattern.lower()
+        # Split pattern by spaces to get individual patterns
+        patterns = pattern.strip().split()
+        if not patterns:
+            return matches
+            
+        # Convert all patterns to lowercase for case-insensitive matching
+        # and wrap each pattern with wildcards to match "contains" behavior
+        wrapped_patterns = []
+        for p in patterns:
+            p_lower = p.lower()
+            # If pattern doesn't start with *, add it for "contains" matching
+            if not p_lower.startswith('*'):
+                p_lower = '*' + p_lower
+            # If pattern doesn't end with *, add it for "contains" matching  
+            if not p_lower.endswith('*'):
+                p_lower = p_lower + '*'
+            wrapped_patterns.append(p_lower)
         
         for i, file_path in enumerate(current_pane['files']):
             # Skip parent directory entry
@@ -719,8 +748,14 @@ class FileManager:
                 
             filename = file_path.name.lower()
             
-            # Use fnmatch for pattern matching
-            if fnmatch.fnmatch(filename, pattern_lower):
+            # Check if filename matches ALL patterns
+            all_match = True
+            for wrapped_pattern in wrapped_patterns:
+                if not fnmatch.fnmatch(filename, wrapped_pattern):
+                    all_match = False
+                    break
+                    
+            if all_match:
                 matches.append(i)
                 
         return matches
