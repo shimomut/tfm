@@ -1287,13 +1287,13 @@ class FileManager:
         if key == 27:  # ESC - cancel
             self.exit_dialog_mode()
             return True
-        elif key == curses.KEY_LEFT or key == ord('h'):
+        elif key == curses.KEY_LEFT:
             # Move selection left
             if self.dialog_choices:
                 self.dialog_selected = (self.dialog_selected - 1) % len(self.dialog_choices)
                 self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_RIGHT or key == ord('l'):
+        elif key == curses.KEY_RIGHT:
             # Move selection right
             if self.dialog_choices:
                 self.dialog_selected = (self.dialog_selected + 1) % len(self.dialog_choices)
@@ -1403,13 +1403,13 @@ class FileManager:
         if key == 27 or key == ord('q') or key == ord('Q'):  # ESC or Q - close
             self.exit_info_dialog_mode()
             return True
-        elif key == curses.KEY_UP or key == ord('k'):
+        elif key == curses.KEY_UP:
             # Scroll up
             if self.info_dialog_scroll > 0:
                 self.info_dialog_scroll -= 1
                 self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_DOWN or key == ord('j'):
+        elif key == curses.KEY_DOWN:
             # Scroll down
             max_scroll = max(0, len(self.info_dialog_lines) - 10)  # Assuming 10 visible lines
             if self.info_dialog_scroll < max_scroll:
@@ -2176,7 +2176,7 @@ class FileManager:
                 self.update_search_matches()
                 self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_UP or key == ord('k'):
+        elif key == curses.KEY_UP:
             # Up arrow - go to previous match
             if self.search_matches:
                 self.search_match_index = (self.search_match_index - 1) % len(self.search_matches)
@@ -2184,7 +2184,7 @@ class FileManager:
                 current_pane['selected_index'] = self.search_matches[self.search_match_index]
                 self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_DOWN or key == ord('j'):
+        elif key == curses.KEY_DOWN:
             # Down arrow - go to next match
             if self.search_matches:
                 self.search_match_index = (self.search_match_index + 1) % len(self.search_matches)
@@ -2690,11 +2690,11 @@ class FileManager:
             elif key == KEY_TAB:  # Tab key - switch panes
                 self.active_pane = 'right' if self.active_pane == 'left' else 'left'
                 self.needs_full_redraw = True
-            elif key == curses.KEY_UP or key == ord('k'):
+            elif key == curses.KEY_UP:
                 if current_pane['selected_index'] > 0:
                     current_pane['selected_index'] -= 1
                     self.needs_full_redraw = True
-            elif key == curses.KEY_DOWN or key == ord('j'):
+            elif key == curses.KEY_DOWN:
                 if current_pane['selected_index'] < len(current_pane['files']) - 1:
                     current_pane['selected_index'] += 1
                     self.needs_full_redraw = True
@@ -2771,14 +2771,7 @@ class FileManager:
                 self.active_pane = 'right'
             elif key == curses.KEY_LEFT and self.active_pane == 'right':  # Left arrow in right pane - switch to left pane
                 self.active_pane = 'left'
-            elif key == ord('l'):  # 'l' key - scroll log up
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    self.log_scroll_offset += 1
-                    self.needs_full_redraw = True
-            elif key == ord('L'):  # 'L' key - scroll log down  
-                if self.log_scroll_offset > 0:
-                    self.log_scroll_offset -= 1
-                    self.needs_full_redraw = True
+
             elif key == 337:  # Shift+Up in many terminals
                 if self.log_scroll_offset < len(self.log_messages) - 1:
                     self.log_scroll_offset += 1
