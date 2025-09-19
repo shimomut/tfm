@@ -73,8 +73,11 @@ Successfully implemented a batch rename dialog feature for the TFM (Terminal Fil
 - **Enter**: Execute batch rename operation
 - **ESC**: Cancel and exit batch rename mode
 - **↑/↓**: Scroll through preview list
-- **Backspace**: Delete characters from current input field
-- **Printable characters**: Add to current input field
+- **←/→**: Move text cursor left/right within current input field
+- **Home/End**: Move cursor to beginning/end of current input field
+- **Backspace**: Delete character before cursor
+- **Delete**: Delete character at cursor position
+- **Printable characters**: Insert at cursor position
 
 ### Error Handling
 
@@ -135,4 +138,13 @@ All test cases pass successfully, demonstrating correct regex processing and mac
 - Destination: `\1_\d.\2`
 - Result: `photo_1.jpg`, `image_2.jpg`
 
-The implementation is complete, tested, and ready for use. It provides a powerful and safe way to perform bulk file renaming operations with regex pattern matching and flexible destination templates.
+## Recent Enhancement: Cursor Movement
+
+Added full cursor movement support to the batch rename dialog:
+- **Cursor Position Tracking**: Each input field maintains its own cursor position
+- **Visual Cursor**: The cursor is displayed as an underscore character at the current position
+- **Text Editing**: Insert/delete operations work at the cursor position, not just at the end
+- **Navigation Keys**: Left/Right arrows, Home/End keys for cursor movement
+- **Field Switching**: Cursor positions are preserved when switching between regex and destination fields
+
+The implementation is complete, tested, and ready for use. It provides a powerful and safe way to perform bulk file renaming operations with regex pattern matching and flexible destination templates, now with full text editing capabilities.

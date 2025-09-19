@@ -51,7 +51,10 @@ The destination pattern supports the following macros:
 - **Enter**: Execute the batch rename operation
 - **ESC**: Cancel and exit batch rename mode
 - **↑/↓**: Scroll through the preview list
-- **Backspace**: Delete characters from the current input field
+- **←/→**: Move text cursor left/right within the current input field
+- **Home/End**: Move cursor to beginning/end of the current input field
+- **Backspace**: Delete character before cursor
+- **Delete**: Delete character at cursor position
 
 ## Preview
 
