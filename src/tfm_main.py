@@ -34,6 +34,7 @@ from tfm_list_dialog import ListDialog, ListDialogHelpers
 from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
+from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 
 class FileManager:
     def __init__(self, stdscr):
@@ -53,6 +54,7 @@ class FileManager:
         self.info_dialog = InfoDialog(self.config)
         self.search_dialog = SearchDialog(self.config)
         self.batch_rename_dialog = BatchRenameDialog(self.config)
+        self.quick_choice_bar = QuickChoiceBar(self.config)
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -86,12 +88,7 @@ class FileManager:
         self.create_archive_mode = False
         self.create_archive_editor = SingleLineTextEdit()
         
-        # Quick choice dialog state
-        self.quick_choice_mode = False
-        self.quick_choice_message = ""
-        self.quick_choice_choices = []  # List of choice dictionaries: [{"text": "Yes", "key": "y", "value": True}, ...]
-        self.quick_choice_callback = None
-        self.quick_choice_selected = 0  # Index of currently selected choice
+
         self.should_quit = False  # Flag to control main loop exit
 
         # Add startup messages to log
@@ -634,49 +631,9 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
-        # If in quick choice mode, show quick choice dialog
-        if self.quick_choice_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Show dialog message
-            message = f"{self.quick_choice_message} "
-            self.safe_addstr(status_y, 2, message, get_status_color())
-            
-            # Show choice buttons
-            button_start_x = len(message) + 4
-            
-            for i, choice in enumerate(self.quick_choice_choices):
-                choice_text = choice["text"]
-                if i == self.quick_choice_selected:
-                    # Highlight selected option with bold and standout
-                    button_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
-                    button_text = f"[{choice_text}]"
-                else:
-                    button_color = get_status_color()
-                    button_text = f" {choice_text} "
-                
-                if button_start_x + len(button_text) < width - 2:
-                    self.safe_addstr(status_y, button_start_x, button_text, button_color)
-                    button_start_x += len(button_text) + 1
-            
-            # Generate help text based on available quick keys
-            quick_keys = []
-            for choice in self.quick_choice_choices:
-                if "key" in choice and choice["key"]:
-                    quick_keys.append(choice["key"].upper())
-            
-            help_parts = ["←→:select", "Enter:confirm"]
-            if quick_keys:
-                help_parts.append(f"{'/'.join(quick_keys)}:quick")
-            help_parts.append("ESC:cancel")
-            help_text = " ".join(help_parts)
-            
-            if button_start_x + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > button_start_x + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+        # If in quick choice mode, show quick choice bar
+        if self.quick_choice_bar.mode:
+            self.quick_choice_bar.draw(self.stdscr, self.safe_addstr, status_y, width)
             return
         
         # All dialogs are now handled as overlays in main drawing loop
@@ -1380,7 +1337,7 @@ class FileManager:
         self.exit_batch_rename_mode()
         
     def show_dialog(self, message, choices, callback):
-        """Show quick choice dialog
+        """Show quick choice dialog - wrapper for quick choice bar component
         
         Args:
             message: The message to display
@@ -1390,29 +1347,17 @@ class FileManager:
                       {"text": "Cancel", "key": "c", "value": None}]
             callback: Function to call with the selected choice's value
         """
-        self.quick_choice_mode = True
-        self.quick_choice_message = message
-        self.quick_choice_choices = choices
-        self.quick_choice_callback = callback
-        self.quick_choice_selected = 0  # Default to first choice
+        self.quick_choice_bar.show(message, choices, callback)
         self.needs_full_redraw = True
     
     def show_confirmation(self, message, callback):
         """Show confirmation dialog with Yes/No/Cancel options (backward compatibility)"""
-        choices = [
-            {"text": "Yes", "key": "y", "value": True},
-            {"text": "No", "key": "n", "value": False},
-            {"text": "Cancel", "key": "c", "value": None}
-        ]
-        self.show_dialog(message, choices, callback)
+        QuickChoiceBarHelpers.show_confirmation(self.quick_choice_bar, message, callback)
+        self.needs_full_redraw = True
         
     def exit_quick_choice_mode(self):
-        """Exit quick choice mode"""
-        self.quick_choice_mode = False
-        self.quick_choice_message = ""
-        self.quick_choice_choices = []
-        self.quick_choice_callback = None
-        self.quick_choice_selected = 0
+        """Exit quick choice mode - wrapper for quick choice bar component"""
+        self.quick_choice_bar.exit()
         self.needs_full_redraw = True
     
     def exit_confirmation_mode(self):
@@ -1420,41 +1365,27 @@ class FileManager:
         self.exit_quick_choice_mode()
         
     def handle_quick_choice_input(self, key):
-        """Handle input while in quick choice mode"""
-        if key == 27:  # ESC - cancel
-            self.exit_quick_choice_mode()
+        """Handle input while in quick choice mode - wrapper for quick choice bar component"""
+        result = self.quick_choice_bar.handle_input(key)
+        
+        if result == True:
+            self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_LEFT:
-            # Move selection left
-            if self.quick_choice_choices:
-                self.quick_choice_selected = (self.quick_choice_selected - 1) % len(self.quick_choice_choices)
+        elif isinstance(result, tuple):
+            action, data = result
+            if action == 'cancel':
+                self.exit_quick_choice_mode()
+                return True
+            elif action == 'selection_changed':
                 self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_RIGHT:
-            # Move selection right
-            if self.quick_choice_choices:
-                self.quick_choice_selected = (self.quick_choice_selected + 1) % len(self.quick_choice_choices)
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Execute selected action
-            if self.quick_choice_choices and 0 <= self.quick_choice_selected < len(self.quick_choice_choices):
-                selected_choice = self.quick_choice_choices[self.quick_choice_selected]
-                if self.quick_choice_callback:
-                    self.quick_choice_callback(selected_choice["value"])
-            self.exit_quick_choice_mode()
-            return True
-        else:
-            # Check for quick key matches
-            key_char = chr(key).lower() if 32 <= key <= 126 else None
-            if key_char:
-                for choice in self.quick_choice_choices:
-                    if "key" in choice and choice["key"] and choice["key"].lower() == key_char:
-                        # Found matching quick key
-                        if self.quick_choice_callback:
-                            self.quick_choice_callback(choice["value"])
-                        self.exit_quick_choice_mode()
-                        return True
+                return True
+            elif action == 'execute':
+                if self.quick_choice_bar.callback:
+                    self.quick_choice_bar.callback(data)
+                self.exit_quick_choice_mode()
+                return True
+        
+        return False
     
     def handle_dialog_input(self, key):
         """Handle input while in dialog mode (backward compatibility)"""
@@ -2975,7 +2906,7 @@ class FileManager:
                     continue  # Create archive mode handled the key
             
             # Handle quick choice mode input
-            if self.quick_choice_mode:
+            if self.quick_choice_bar.mode:
                 if self.handle_quick_choice_input(key):
                     continue  # Quick choice mode handled the key
             
@@ -3001,7 +2932,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog.mode or self.batch_rename_dialog.mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
+            if self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog.mode or self.batch_rename_dialog.mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
