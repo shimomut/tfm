@@ -4,31 +4,41 @@ Color definitions and initialization for TFM (Terminal File Manager)
 import curses
 
 # Color pair constants
-COLOR_DIRECTORIES = 1
-COLOR_EXECUTABLES = 2
-COLOR_ERROR = 4
-COLOR_HEADER = 5        # File list headers (directory paths)
-COLOR_FOOTER = 6        # File list footers (file counts)
-COLOR_STATUS = 7        # Status bar
-COLOR_BOUNDARY = 8      # Pane boundaries
-COLOR_REGULAR_FILE = 9  # Regular files
-COLOR_LOG_STDOUT = 10   # Stdout log messages
-COLOR_LOG_SYSTEM = 11   # System log messages
-COLOR_LINE_NUMBERS = 12 # Line numbers in text viewer
+
+# File type colors (normal)
+COLOR_REGULAR_FILE = 1       # Regular files
+COLOR_DIRECTORIES = 2        # Directories
+COLOR_EXECUTABLES = 3        # Executable files
+
+# File type colors (selected)
+COLOR_REGULAR_FILE_SELECTED = 4    # Selected regular files
+COLOR_DIRECTORIES_SELECTED = 5     # Selected directories
+COLOR_EXECUTABLES_SELECTED = 6     # Selected executables
+
+# Interface colors
+COLOR_HEADER = 7        # File list headers (directory paths)
+COLOR_FOOTER = 8        # File list footers (file counts)
+COLOR_STATUS = 9        # Status bar
+COLOR_BOUNDARY = 10     # Pane boundaries
+COLOR_ERROR = 11        # Error messages
+
+# Log colors
+COLOR_LOG_STDOUT = 12   # Stdout log messages
+COLOR_LOG_SYSTEM = 13   # System log messages
+COLOR_LINE_NUMBERS = 14 # Line numbers in text viewer
+
 # Syntax highlighting colors
-COLOR_SYNTAX_KEYWORD = 13    # Keywords (def, class, if, etc.)
-COLOR_SYNTAX_STRING = 14     # String literals
-COLOR_SYNTAX_COMMENT = 15    # Comments
-COLOR_SYNTAX_NUMBER = 16     # Numbers
-COLOR_SYNTAX_OPERATOR = 17   # Operators (+, -, =, etc.)
-COLOR_SYNTAX_BUILTIN = 18    # Built-in functions/types
-COLOR_SYNTAX_NAME = 19       # Variable/function names
-COLOR_SEARCH_MATCH = 20      # Search match highlighting
-COLOR_SEARCH_CURRENT = 21    # Current search match highlighting
-# Selected items with common background
-COLOR_DIRECTORIES_SELECTED = 22    # Selected directories
-COLOR_EXECUTABLES_SELECTED = 23    # Selected executables
-COLOR_REGULAR_FILE_SELECTED = 24   # Selected regular files
+COLOR_SYNTAX_KEYWORD = 15    # Keywords (def, class, if, etc.)
+COLOR_SYNTAX_STRING = 16     # String literals
+COLOR_SYNTAX_COMMENT = 17    # Comments
+COLOR_SYNTAX_NUMBER = 18     # Numbers
+COLOR_SYNTAX_OPERATOR = 19   # Operators (+, -, =, etc.)
+COLOR_SYNTAX_BUILTIN = 20    # Built-in functions/types
+COLOR_SYNTAX_NAME = 21       # Variable/function names
+
+# Search highlighting colors
+COLOR_SEARCH_MATCH = 22      # Search match highlighting
+COLOR_SEARCH_CURRENT = 23    # Current search match highlighting
 
 # Current color scheme
 current_color_scheme = 'dark'
@@ -401,17 +411,25 @@ def init_colors(color_scheme=None):
     header_text_color = default_fg
     
     # Initialize color pairs
+    
+    # File type colors (normal)
+    curses.init_pair(COLOR_REGULAR_FILE, regular_file_fg, bg_color)
     curses.init_pair(COLOR_DIRECTORIES, directory_fg, bg_color)
     curses.init_pair(COLOR_EXECUTABLES, executable_fg, bg_color)
+    
+    # File type colors (selected)
+    curses.init_pair(COLOR_REGULAR_FILE_SELECTED, regular_file_fg, selected_bg)
     curses.init_pair(COLOR_DIRECTORIES_SELECTED, directory_fg, selected_bg)
     curses.init_pair(COLOR_EXECUTABLES_SELECTED, executable_fg, selected_bg)
-    curses.init_pair(COLOR_REGULAR_FILE_SELECTED, regular_file_fg, selected_bg)
-    curses.init_pair(COLOR_ERROR, curses.COLOR_RED, bg_color)
+    
+    # Interface colors
     curses.init_pair(COLOR_HEADER, header_text_color, header_bg)
     curses.init_pair(COLOR_FOOTER, header_text_color, footer_bg)
     curses.init_pair(COLOR_STATUS, header_text_color, status_bg)
     curses.init_pair(COLOR_BOUNDARY, header_text_color, boundary_bg)
-    curses.init_pair(COLOR_REGULAR_FILE, regular_file_fg, bg_color)
+    curses.init_pair(COLOR_ERROR, curses.COLOR_RED, bg_color)
+    
+    # Log colors
     curses.init_pair(COLOR_LOG_STDOUT, log_stdout_fg, bg_color)
     curses.init_pair(COLOR_LOG_SYSTEM, log_system_fg, bg_color)
     curses.init_pair(COLOR_LINE_NUMBERS, line_numbers_fg, bg_color)
