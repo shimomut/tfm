@@ -126,11 +126,11 @@ COLOR_SCHEMES = {
         # Search highlighting colors
         'SEARCH_MATCH_BG': {
             'color_num': 118,
-            'rgb': (100, 100, 0)    # Dark yellow background for search matches
+            'rgb': (30, 60, 120)    # Dark blue-purple background for selected items
         },
         'SEARCH_CURRENT_BG': {
             'color_num': 119,
-            'rgb': (150, 75, 0)     # Orange background for current search match
+            'rgb': (40, 80, 160)    # Dark blue-purple background for selected items
         },
         'DEFAULT_FG': {
             'color_num': 146,
@@ -218,11 +218,11 @@ COLOR_SCHEMES = {
         # Search highlighting colors
         'SEARCH_MATCH_BG': {
             'color_num': 138,
-            'rgb': (255, 255, 255)  # White background for search matches
+            'rgb': (180, 240, 255)    # Dark blue-purple background for selected items
         },
         'SEARCH_CURRENT_BG': {
             'color_num': 139,
-            'rgb': (255, 255, 255)  # White background for current search match
+            'rgb': (140, 200, 255)    # Dark blue-purple background for selected items
         },
         'DEFAULT_FG': {
             'color_num': 148,
