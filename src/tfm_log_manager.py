@@ -87,16 +87,8 @@ class LogManager:
             return
             
         try:
-            # Draw log header
-            log_header = f" Log ({len(self.log_messages)} messages)"
-            if self.log_messages:
-                scroll_pct = self.get_log_scroll_percentage()
-                log_header += f" - {scroll_pct:.0f}%"
-            
-            stdscr.addstr(y_start, 0, log_header.ljust(width)[:width], get_status_color())
-            
-            # Draw log messages
-            display_height = height - 1  # Reserve one line for header
+            # Draw log messages (no header)
+            display_height = height  # Use full height for messages
             
             if self.log_messages and display_height > 0:
                 # Calculate which messages to show
@@ -110,7 +102,7 @@ class LogManager:
                     if i >= display_height:
                         break
                         
-                    y = y_start + 1 + i
+                    y = y_start + i
                     if y >= y_start + height:
                         break
                     
