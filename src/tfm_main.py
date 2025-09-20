@@ -317,7 +317,6 @@ class FileManager:
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         display_height = height - log_height - 3
         return self.pane_manager.adjust_scroll_for_selection(pane_data, display_height)
-    
 
     def apply_filter(self):
         """Apply filter - wrapper for file_operations method"""
@@ -657,16 +656,12 @@ class FileManager:
                         self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
             return
         
-
-        
         # Normal status display
         # Left side: status info
         status_parts = []
         if self.file_operations.show_hidden:
             status_parts.append("showing hidden")
-        
 
-        
         left_status = f"({', '.join(status_parts)})" if status_parts else ""
         
         # Simple help message - detailed controls available in help dialog
@@ -1043,8 +1038,6 @@ class FileManager:
         self.general_dialog.hide()
         self.needs_full_redraw = True
     
-
-    
     def enter_create_file_mode(self):
         """Enter create file mode"""
         current_pane = self.get_current_pane()
@@ -1112,11 +1105,7 @@ class FileManager:
         print("File creation cancelled")
         self.general_dialog.hide()
         self.needs_full_redraw = True
-    
 
-    
-
-    
     def enter_batch_rename_mode(self):
         """Enter batch rename mode for multiple selected files"""
         current_pane = self.get_current_pane()
@@ -1328,9 +1317,7 @@ class FileManager:
         )
         self.needs_full_redraw = True
         self._force_immediate_redraw()
-    
 
-    
     def show_sort_menu(self):
         """Show sort options menu using the quick choice dialog"""
         current_pane = self.get_current_pane()
@@ -1391,9 +1378,7 @@ class FileManager:
         # Refresh the file list
         self.refresh_files(current_pane)
         self.needs_full_redraw = True
-    
 
-    
     def show_file_details(self):
         """Show detailed information about selected files or current file"""
         current_pane = self.get_current_pane()
@@ -2037,8 +2022,6 @@ class FileManager:
         self.general_dialog.hide()
         self.needs_full_redraw = True
     
-
-    
     def perform_create_archive(self):
         """Create the archive file"""
         if not self.create_archive_editor.text.strip():
@@ -2278,8 +2261,6 @@ class FileManager:
         # In isearch mode, capture most other keys to prevent unintended actions
         # Only allow specific keys that make sense during isearch
         return True
-    
-
 
     def handle_batch_rename_input(self, key):
         """Handle input while in batch rename mode - wrapper for batch rename dialog component"""
@@ -2312,9 +2293,7 @@ class FileManager:
                 return True
         
         return True  # Capture most keys in batch rename mode
-    
 
-        
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
         if direction == 'left':
@@ -2402,8 +2381,6 @@ class FileManager:
         
         SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
         self.needs_full_redraw = True
-
-
 
     def run(self):
         """Main application loop"""
