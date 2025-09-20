@@ -2627,9 +2627,10 @@ class FileManager:
                         self.show_error("Permission denied")
             elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'left':  # Right arrow in left pane - switch to right pane
                 self.pane_manager.active_pane = 'right'
+                self.needs_full_redraw = True
             elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
                 self.pane_manager.active_pane = 'left'
-
+                self.needs_full_redraw = True
             elif key == 337:  # Shift+Up in many terminals
                 if self.log_manager.scroll_log_up(1):
                     self.needs_full_redraw = True
