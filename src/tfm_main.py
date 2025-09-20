@@ -1992,37 +1992,42 @@ class FileManager:
             print("No files to delete")
             return
         
-        # Show confirmation dialog
-        if len(files_to_delete) == 1:
-            file_name = files_to_delete[0].name
-            if files_to_delete[0].is_dir():
-                message = f"Delete directory '{file_name}' and all its contents?"
-            elif files_to_delete[0].is_symlink():
-                message = f"Delete symbolic link '{file_name}'?"
-            else:
-                message = f"Delete file '{file_name}'?"
-        else:
-            dir_count = sum(1 for f in files_to_delete if f.is_dir())
-            file_count = len(files_to_delete) - dir_count
-            if dir_count > 0 and file_count > 0:
-                message = f"Delete {len(files_to_delete)} items ({dir_count} directories, {file_count} files)?"
-            elif dir_count > 0:
-                message = f"Delete {dir_count} directories and all their contents?"
-            else:
-                message = f"Delete {file_count} files?"
-        
-        choices = [
-            {"text": "Yes", "key": "y", "value": True},
-            {"text": "No", "key": "n", "value": False}
-        ]
-        
         def handle_delete_confirmation(confirmed):
             if confirmed:
                 self.perform_delete_operation(files_to_delete)
             else:
                 print("Delete operation cancelled")
         
-        self.show_dialog(message, choices, handle_delete_confirmation)
+        # Check if delete confirmation is enabled
+        if getattr(self.config, 'CONFIRM_DELETE', True):
+            # Show confirmation dialog
+            if len(files_to_delete) == 1:
+                file_name = files_to_delete[0].name
+                if files_to_delete[0].is_dir():
+                    message = f"Delete directory '{file_name}' and all its contents?"
+                elif files_to_delete[0].is_symlink():
+                    message = f"Delete symbolic link '{file_name}'?"
+                else:
+                    message = f"Delete file '{file_name}'?"
+            else:
+                dir_count = sum(1 for f in files_to_delete if f.is_dir())
+                file_count = len(files_to_delete) - dir_count
+                if dir_count > 0 and file_count > 0:
+                    message = f"Delete {len(files_to_delete)} items ({dir_count} directories, {file_count} files)?"
+                elif dir_count > 0:
+                    message = f"Delete {dir_count} directories and all their contents?"
+                else:
+                    message = f"Delete {file_count} files?"
+            
+            choices = [
+                {"text": "Yes", "key": "y", "value": True},
+                {"text": "No", "key": "n", "value": False}
+            ]
+            
+            self.show_dialog(message, choices, handle_delete_confirmation)
+        else:
+            # Delete without confirmation
+            handle_delete_confirmation(True)
     
     def perform_delete_operation(self, files_to_delete):
         """Perform the actual delete operation"""

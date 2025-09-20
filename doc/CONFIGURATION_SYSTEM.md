@@ -63,7 +63,6 @@ class Config:
 |---------|------|---------|-------------|
 | `CONFIRM_DELETE` | bool | `True` | Show confirmation for delete operations |
 | `CONFIRM_QUIT` | bool | `True` | Show confirmation when quitting |
-| `AUTO_REFRESH` | bool | `True` | Auto-refresh file lists |
 
 ### Directory Settings
 
@@ -308,18 +307,6 @@ The `_config.py` template includes:
    - Use absolute paths or ~ for home directory
    - Ensure directories exist
    - Check path permissions
-
-### Debug Mode
-
-Enable debug mode in configuration:
-
-```python
-class Config:
-    DEBUG_MODE = True
-    LOG_LEVEL = 'DEBUG'
-```
-
-This provides detailed logging of configuration loading and validation.
 
 ## Configuration File Example
 

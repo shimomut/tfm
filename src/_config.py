@@ -23,9 +23,8 @@ class Config:
     COLOR_SCHEME = 'dark'  # 'dark', 'light'
     
     # Behavior settings
-    CONFIRM_DELETE = True
-    CONFIRM_QUIT = True
-    AUTO_REFRESH = True
+    CONFIRM_DELETE = True   # Show confirmation dialog before deleting files/directories
+    CONFIRM_QUIT = True     # Show confirmation dialog before quitting TFM
     
     # Key bindings - customize your shortcuts
     KEY_BINDINGS = {
@@ -55,16 +54,6 @@ class Config:
         'extract_archive': ['u', 'U'],
     }
     
-    # File associations (for future use)
-    FILE_ASSOCIATIONS = {
-        '.txt': 'text_editor',
-        '.py': 'python_editor',
-        '.md': 'markdown_viewer',
-        '.jpg': 'image_viewer',
-        '.png': 'image_viewer',
-        '.pdf': 'pdf_viewer',
-    }
-    
     # Directory settings
     STARTUP_LEFT_PATH = None  # None = current directory, or specify path like "/home/user/projects"
     STARTUP_RIGHT_PATH = None  # None = home directory, or specify path
@@ -87,26 +76,9 @@ class Config:
     
     # Performance settings
     MAX_LOG_MESSAGES = 1000
-    REFRESH_INTERVAL = 1.0  # seconds
     
     # Text editor settings
     TEXT_EDITOR = 'vim'  # Text editor command (vim, nano, emacs, code, etc.)
-    
-    # Info dialog settings
-    INFO_DIALOG_WIDTH_RATIO = 0.8
-    INFO_DIALOG_HEIGHT_RATIO = 0.8
-    INFO_DIALOG_MIN_WIDTH = 20
-    INFO_DIALOG_MIN_HEIGHT = 10
-    
-    # Advanced settings
-    DEBUG_MODE = False
-    LOG_LEVEL = 'INFO'  # 'DEBUG', 'INFO', 'WARNING', 'ERROR'
-    
-    # Custom commands (for future use)
-    CUSTOM_COMMANDS = {
-        # Example: 'git_status': 'git status --short',
-        # Example: 'disk_usage': 'du -sh *',
-    }
     
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
