@@ -15,6 +15,11 @@ COLOR_REGULAR_FILE_SELECTED = 4    # Selected regular files
 COLOR_DIRECTORIES_SELECTED = 5     # Selected directories
 COLOR_EXECUTABLES_SELECTED = 6     # Selected executables
 
+# File type colors (selected inactive)
+COLOR_REGULAR_FILE_SELECTED_INACTIVE = 24    # Selected regular files in inactive pane
+COLOR_DIRECTORIES_SELECTED_INACTIVE = 25     # Selected directories in inactive pane
+COLOR_EXECUTABLES_SELECTED_INACTIVE = 26     # Selected executables in inactive pane
+
 # Interface colors
 COLOR_HEADER = 7        # File list headers (directory paths)
 COLOR_FOOTER = 8        # File list footers (file counts)
@@ -77,6 +82,10 @@ COLOR_SCHEMES = {
         'SELECTED_BG': {
             'color_num': 103,
             'rgb': (40, 80, 160)    # Dark blue-purple background for selected items
+        },
+        'SELECTED_INACTIVE_BG': {
+            'color_num': 150,
+            'rgb': (80, 80, 80)    # Darker blue background for selected items in inactive pane
         },
         'REGULAR_FILE_FG': {
             'color_num': 107,
@@ -170,6 +179,10 @@ COLOR_SCHEMES = {
             'color_num': 123,
             'rgb': (120, 160, 255)    # Light blue background for selected items
         },
+        'SELECTED_INACTIVE_BG': {
+            'color_num': 151,
+            'rgb': (160, 160, 160)    # Lighter blue background for selected items in inactive pane
+        },
         'REGULAR_FILE_FG': {
             'color_num': 127,
             'rgb': (60, 60, 60)     # Dark gray for regular files
@@ -250,6 +263,7 @@ FALLBACK_COLOR_SCHEMES = {
         'DIRECTORY_FG': curses.COLOR_CYAN,
         'EXECUTABLE_FG': curses.COLOR_GREEN,
         'SELECTED_BG': curses.COLOR_BLUE,
+        'SELECTED_INACTIVE_BG': curses.COLOR_BLACK,
         'REGULAR_FILE_FG': curses.COLOR_WHITE,
         'LOG_STDOUT_FG': curses.COLOR_WHITE,
         'LOG_SYSTEM_FG': curses.COLOR_BLUE,
@@ -277,6 +291,7 @@ FALLBACK_COLOR_SCHEMES = {
         'DIRECTORY_FG': curses.COLOR_BLACK,
         'EXECUTABLE_FG': curses.COLOR_BLACK,
         'SELECTED_BG': curses.COLOR_WHITE,
+        'SELECTED_INACTIVE_BG': curses.COLOR_WHITE,
         'REGULAR_FILE_FG': curses.COLOR_BLACK,
         'LOG_STDOUT_FG': curses.COLOR_BLACK,
         'LOG_SYSTEM_FG': curses.COLOR_BLACK,
@@ -344,6 +359,7 @@ def init_colors(color_scheme=None):
             directory_fg = rgb_colors['DIRECTORY_FG']['color_num']
             executable_fg = rgb_colors['EXECUTABLE_FG']['color_num']
             selected_bg = rgb_colors['SELECTED_BG']['color_num']
+            selected_inactive_bg = rgb_colors['SELECTED_INACTIVE_BG']['color_num']
             regular_file_fg = rgb_colors['REGULAR_FILE_FG']['color_num']
             log_stdout_fg = rgb_colors['LOG_STDOUT_FG']['color_num']
             log_system_fg = rgb_colors['LOG_SYSTEM_FG']['color_num']
@@ -387,6 +403,7 @@ def init_colors(color_scheme=None):
         directory_fg = fallback_colors['DIRECTORY_FG']
         executable_fg = fallback_colors['EXECUTABLE_FG']
         selected_bg = fallback_colors['SELECTED_BG']
+        selected_inactive_bg = fallback_colors['SELECTED_INACTIVE_BG']
         regular_file_fg = fallback_colors['REGULAR_FILE_FG']
         log_stdout_fg = fallback_colors['LOG_STDOUT_FG']
         log_system_fg = fallback_colors['LOG_SYSTEM_FG']
@@ -421,6 +438,11 @@ def init_colors(color_scheme=None):
     curses.init_pair(COLOR_REGULAR_FILE_SELECTED, regular_file_fg, selected_bg)
     curses.init_pair(COLOR_DIRECTORIES_SELECTED, directory_fg, selected_bg)
     curses.init_pair(COLOR_EXECUTABLES_SELECTED, executable_fg, selected_bg)
+    
+    # File type colors (selected inactive) - use dedicated background and underline
+    curses.init_pair(COLOR_REGULAR_FILE_SELECTED_INACTIVE, regular_file_fg, selected_inactive_bg)
+    curses.init_pair(COLOR_DIRECTORIES_SELECTED_INACTIVE, directory_fg, selected_inactive_bg)
+    curses.init_pair(COLOR_EXECUTABLES_SELECTED_INACTIVE, executable_fg, selected_inactive_bg)
     
     # Interface colors
     curses.init_pair(COLOR_HEADER, header_text_color, header_bg)
@@ -499,15 +521,14 @@ def get_file_color(is_dir, is_executable, is_selected, is_active):
         else:
             return curses.color_pair(COLOR_REGULAR_FILE_SELECTED)
     
-    # Handle inactive selection with underline
+    # Handle inactive selection with dedicated colors
     if is_selected:
         if is_dir:
-            base_color = curses.color_pair(COLOR_DIRECTORIES)
+            return curses.color_pair(COLOR_DIRECTORIES_SELECTED_INACTIVE)
         elif is_executable:
-            base_color = curses.color_pair(COLOR_EXECUTABLES)
+            return curses.color_pair(COLOR_EXECUTABLES_SELECTED_INACTIVE)
         else:
-            base_color = curses.color_pair(COLOR_REGULAR_FILE)
-        return base_color | curses.A_UNDERLINE
+            return curses.color_pair(COLOR_REGULAR_FILE_SELECTED_INACTIVE)
     
     # Normal (unselected) files
     if is_dir:
