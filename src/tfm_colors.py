@@ -121,32 +121,40 @@ COLOR_SCHEMES = {
         'SEARCH_CURRENT_BG': {
             'color_num': 119,
             'rgb': (150, 75, 0)     # Orange background for current search match
+        },
+        'DEFAULT_FG': {
+            'color_num': 146,
+            'rgb': (220, 220, 220)  # Light gray for default foreground
+        },
+        'DEFAULT_BG': {
+            'color_num': 147,
+            'rgb': (0, 0, 0)        # Black for default background
         }
     },
     'light': {
         'HEADER_BG': {
             'color_num': 120,
-            'rgb': (255, 255, 255)  # White for file list headers
+            'rgb': (220, 220, 220)     # Gray 
         },
         'FOOTER_BG': {
             'color_num': 124,
-            'rgb': (255, 255, 255)  # White for file list footers
+            'rgb': (220, 220, 220)     # Gray 
         },
         'STATUS_BG': {
             'color_num': 125,
-            'rgb': (255, 255, 255)  # White for status bar
+            'rgb': (220, 220, 220)     # Gray 
         },
         'BOUNDARY_BG': {
             'color_num': 126,
-            'rgb': (255, 255, 255)  # White for boundaries
+            'rgb': (220, 220, 220)     # Gray 
         },
         'DIRECTORY_FG': {
             'color_num': 121,
-            'rgb': (80, 80, 0)  # Yellow for directories
+            'rgb': (160, 120, 0)  # Yellow for directories
         },
         'EXECUTABLE_FG': {
             'color_num': 122,
-            'rgb': (0, 80, 0)    # Bright green for executables
+            'rgb': (0, 160, 0)    # Bright green for executables
         },
         'SELECTED_BG': {
             'color_num': 123,
@@ -205,6 +213,14 @@ COLOR_SCHEMES = {
         'SEARCH_CURRENT_BG': {
             'color_num': 139,
             'rgb': (255, 255, 255)  # White background for current search match
+        },
+        'DEFAULT_FG': {
+            'color_num': 148,
+            'rgb': (0, 0, 0)        # Black for default foreground
+        },
+        'DEFAULT_BG': {
+            'color_num': 149,
+            'rgb': (255, 255, 255)  # White for default background
         }
     }
 }
@@ -238,7 +254,10 @@ FALLBACK_COLOR_SCHEMES = {
         'SYNTAX_NAME_FG': curses.COLOR_WHITE,
         # Search highlighting fallback colors
         'SEARCH_MATCH_BG': curses.COLOR_YELLOW,
-        'SEARCH_CURRENT_BG': curses.COLOR_RED
+        'SEARCH_CURRENT_BG': curses.COLOR_RED,
+        # Default colors
+        'DEFAULT_FG': curses.COLOR_WHITE,
+        'DEFAULT_BG': curses.COLOR_BLACK
     },
     'light': {
         'HEADER_BG': curses.COLOR_WHITE,    # White for headers
@@ -262,7 +281,10 @@ FALLBACK_COLOR_SCHEMES = {
         'SYNTAX_NAME_FG': curses.COLOR_BLACK,
         # Search highlighting fallback colors
         'SEARCH_MATCH_BG': curses.COLOR_WHITE,
-        'SEARCH_CURRENT_BG': curses.COLOR_WHITE
+        'SEARCH_CURRENT_BG': curses.COLOR_WHITE,
+        # Default colors
+        'DEFAULT_FG': curses.COLOR_BLACK,
+        'DEFAULT_BG': curses.COLOR_WHITE
     }
 }
 
@@ -327,6 +349,9 @@ def init_colors(color_scheme=None):
             # Search highlighting colors
             search_match_bg = rgb_colors['SEARCH_MATCH_BG']['color_num']
             search_current_bg = rgb_colors['SEARCH_CURRENT_BG']['color_num']
+            # Default colors
+            default_fg = rgb_colors['DEFAULT_FG']['color_num']
+            default_bg = rgb_colors['DEFAULT_BG']['color_num']
             
             # Print success message for RGB colors
             print(f"Using RGB colors for {current_color_scheme} scheme ({len(rgb_colors)} colors defined)")
@@ -367,10 +392,13 @@ def init_colors(color_scheme=None):
         # Search highlighting fallback colors
         search_match_bg = fallback_colors['SEARCH_MATCH_BG']
         search_current_bg = fallback_colors['SEARCH_CURRENT_BG']
+        # Default colors
+        default_fg = fallback_colors['DEFAULT_FG']
+        default_bg = fallback_colors['DEFAULT_BG']
     
-    # Determine background colors based on scheme
-    bg_color = curses.COLOR_BLACK if current_color_scheme == 'dark' else curses.COLOR_WHITE
-    header_text_color = curses.COLOR_WHITE if current_color_scheme == 'dark' else curses.COLOR_BLACK
+    # Use scheme-specific default colors
+    bg_color = default_bg
+    header_text_color = default_fg
     
     # Initialize color pairs
     curses.init_pair(COLOR_DIRECTORIES, directory_fg, bg_color)
@@ -396,13 +424,9 @@ def init_colors(color_scheme=None):
     curses.init_pair(COLOR_SYNTAX_BUILTIN, syntax_builtin_fg, bg_color)
     curses.init_pair(COLOR_SYNTAX_NAME, syntax_name_fg, bg_color)
     # Search highlighting color pairs
-    search_text_color = curses.COLOR_BLACK if current_color_scheme == 'light' else curses.COLOR_WHITE
+    search_text_color = default_fg
     curses.init_pair(COLOR_SEARCH_MATCH, search_text_color, search_match_bg)
     curses.init_pair(COLOR_SEARCH_CURRENT, search_text_color, search_current_bg)
-    
-    # Set default terminal background color for blank spaces
-    default_fg = curses.COLOR_BLACK if current_color_scheme == 'light' else curses.COLOR_WHITE
-    default_bg = curses.COLOR_WHITE if current_color_scheme == 'light' else curses.COLOR_BLACK
     
     # Store the default colors globally for use by the application
     global default_background_color, default_foreground_color
