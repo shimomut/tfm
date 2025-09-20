@@ -2588,16 +2588,83 @@ class FileManager:
                 pass
     
     def extract_zip_archive(self, archive_file, extract_dir):
-        """Extract a ZIP archive"""
+        """Extract a ZIP archive with progress tracking"""
         with zipfile.ZipFile(archive_file, 'r') as zipf:
-            # Extract all files to the target directory
-            zipf.extractall(extract_dir)
+            # Get list of files to extract
+            file_list = zipf.namelist()
+            total_files = len(file_list)
+            
+            # Start progress tracking if there are multiple files
+            if total_files > 1:
+                self.progress_manager.start_operation(
+                    OperationType.ARCHIVE_EXTRACT,
+                    total_files,
+                    f"ZIP: {archive_file.name}",
+                    self._progress_callback
+                )
+            
+            try:
+                # Extract files one by one to track progress
+                for i, file_info in enumerate(file_list):
+                    if total_files > 1:
+                        # Update progress with current file
+                        filename = Path(file_info).name if file_info else f"file_{i+1}"
+                        self.progress_manager.update_progress(filename, i)
+                    
+                    try:
+                        # Extract individual file
+                        zipf.extract(file_info, extract_dir)
+                    except Exception as e:
+                        print(f"Error extracting {file_info}: {e}")
+                        if total_files > 1:
+                            self.progress_manager.increment_errors()
+                    
+            finally:
+                # Finish progress tracking
+                if total_files > 1:
+                    self.progress_manager.finish_operation()
     
     def extract_tar_archive(self, archive_file, extract_dir):
-        """Extract a TAR.GZ archive"""
+        """Extract a TAR.GZ archive with progress tracking"""
         with tarfile.open(archive_file, 'r:gz') as tarf:
-            # Extract all files to the target directory
-            tarf.extractall(extract_dir)
+            # Get list of members to extract
+            members = tarf.getmembers()
+            # Count only files (not directories) for progress
+            file_members = [m for m in members if m.isfile()]
+            total_files = len(file_members)
+            
+            # Start progress tracking if there are multiple files
+            if total_files > 1:
+                self.progress_manager.start_operation(
+                    OperationType.ARCHIVE_EXTRACT,
+                    total_files,
+                    f"TAR.GZ: {archive_file.name}",
+                    self._progress_callback
+                )
+            
+            try:
+                # Extract members one by one to track progress
+                processed_files = 0
+                for member in members:
+                    if member.isfile():
+                        processed_files += 1
+                        if total_files > 1:
+                            # Update progress with current file
+                            filename = Path(member.name).name if member.name else f"file_{processed_files}"
+                            self.progress_manager.update_progress(filename, processed_files)
+                    
+                    try:
+                        # Extract individual member
+                        tarf.extract(member, extract_dir)
+                    except Exception as e:
+                        print(f"Error extracting {member.name}: {e}")
+                        if total_files > 1 and member.isfile():
+                            self.progress_manager.increment_errors()
+                    
+            finally:
+                # Finish progress tracking
+                if total_files > 1:
+                    self.progress_manager.finish_operation()
         
     def handle_isearch_input(self, key):
         """Handle input while in isearch mode"""
