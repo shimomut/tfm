@@ -26,19 +26,10 @@ from tfm_colors import *
 from tfm_config import get_config, get_startup_paths, is_key_bound_to, get_favorite_directories, get_programs
 from tfm_text_viewer import view_text_file, is_text_file
 
-class LogCapture:
-    """Capture stdout/stderr and redirect to log pane"""
-    def __init__(self, log_messages, source):
-        self.log_messages = log_messages
-        self.source = source
-        
-    def write(self, text):
-        if text.strip():  # Only log non-empty messages
-            timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
-            self.log_messages.append((timestamp, self.source, text.strip()))
-    
-    def flush(self):
-        pass  # Required for file-like object interface
+# Import new modular components
+from tfm_log_manager import LogManager
+from tfm_pane_manager import PaneManager
+from tfm_file_operations import FileOperations
 
 class FileManager:
     def __init__(self, stdscr):
@@ -50,35 +41,12 @@ class FileManager:
         # Get startup paths from configuration
         left_startup_path, right_startup_path = get_startup_paths()
         
-        # Dual pane setup with configuration
-        self.left_pane = {
-            'path': left_startup_path,
-            'selected_index': 0,
-            'scroll_offset': 0,
-            'files': [],
-            'selected_files': set(),  # Track multi-selected files
-            'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
-            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False),
-            'filter_pattern': "",  # Filename filter pattern for this pane
-            'cursor_history': deque(maxlen=100)  # Store cursor position history (filename, directory_path)
-        }
-        self.right_pane = {
-            'path': right_startup_path,
-            'selected_index': 0,
-            'scroll_offset': 0,
-            'files': [],
-            'selected_files': set(),  # Track multi-selected files
-            'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
-            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False),
-            'filter_pattern': "",  # Filename filter pattern for this pane
-            'cursor_history': deque(maxlen=100)  # Store cursor position history (filename, directory_path)
-        }
+        # Initialize modular components
+        self.log_manager = LogManager(self.config)
+        self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path)
+        self.file_operations = FileOperations(self.config)
         
-        self.active_pane = 'left'  # 'left' or 'right'
-        self.show_hidden = getattr(self.config, 'SHOW_HIDDEN_FILES', False)
-        
-        # Pane layout - track left pane width ratio (0.1 to 0.9)
-        self.left_pane_ratio = getattr(self.config, 'DEFAULT_LEFT_PANE_RATIO', 0.5)
+        # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
         self.needs_full_redraw = True  # Flag to control when to redraw everything
         
@@ -153,19 +121,8 @@ class FileManager:
         self.batch_rename_preview = []  # List of preview results
         self.batch_rename_scroll = 0  # Scroll offset for preview list
         
-        # Log pane setup
-        max_log_messages = getattr(self.config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
-        self.log_messages = deque(maxlen=max_log_messages)
-        self.log_scroll_offset = 0
-        
-        # Redirect stdout and stderr
-        self.original_stdout = sys.stdout
-        self.original_stderr = sys.stderr
-        sys.stdout = LogCapture(self.log_messages, "STDOUT")
-        sys.stderr = LogCapture(self.log_messages, "STDERR")
-        
         # Add startup messages to log
-        self.add_startup_messages()
+        self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
         
         # Initialize colors with configured scheme
         color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
@@ -235,18 +192,7 @@ class FileManager:
             # Any other error, use regular clear
             self.stdscr.clear()
         
-    def add_startup_messages(self):
-        """Add startup messages directly to log pane"""
-        timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
-        self.log_messages.append((timestamp, "SYSTEM", f"TFM {VERSION}"))
-        self.log_messages.append((timestamp, "SYSTEM", f"GitHub: {GITHUB_URL}"))
-        self.log_messages.append((timestamp, "SYSTEM", f"{APP_NAME} started successfully"))
-        
-        # Add configuration info
-        config_file = getattr(self.config, '__module__', 'built-in defaults')
-        if hasattr(self.config, '__file__'):
-            config_file = self.config.__file__
-        self.log_messages.append((timestamp, "CONFIG", f"Configuration loaded"))
+
     
     def is_key_for_action(self, key, action):
         """Check if a key matches a configured action"""
@@ -257,34 +203,19 @@ class FileManager:
         
     def count_files_and_dirs(self, pane_data):
         """Count directories and files in a pane"""
-        if not pane_data['files']:
-            return 0, 0
-            
-        files = pane_data['files']
-        # No need to skip parent directory since it's no longer added
-        
-        dir_count = 0
-        file_count = 0
-        
-        for file_path in files:
-            if file_path.is_dir():
-                dir_count += 1
-            else:
-                file_count += 1
-                
-        return dir_count, file_count
+        return self.pane_manager.count_files_and_dirs(pane_data)
         
     def draw_file_footers(self, y, left_pane_width):
         """Draw footer bars for left and right file panes"""
         # Left pane footer
-        left_dirs, left_files = self.count_files_and_dirs(self.left_pane)
-        left_selected = len(self.left_pane['selected_files'])
-        left_sort = self.get_sort_description(self.left_pane)
+        left_dirs, left_files = self.count_files_and_dirs(self.pane_manager.left_pane)
+        left_selected = len(self.pane_manager.left_pane['selected_files'])
+        left_sort = self.get_sort_description(self.pane_manager.left_pane)
         
         # Add filter info to footer if active
         left_filter_info = ""
-        if self.left_pane['filter_pattern']:
-            left_filter_info = f" | Filter: {self.left_pane['filter_pattern']}"
+        if self.pane_manager.left_pane['filter_pattern']:
+            left_filter_info = f" | Filter: {self.pane_manager.left_pane['filter_pattern']}"
         
         if left_selected > 0:
             left_footer = f" {left_dirs} dirs, {left_files} files ({left_selected} selected) | Sort: {left_sort}{left_filter_info} "
@@ -293,20 +224,20 @@ class FileManager:
         
         try:
             # Left pane footer with active indicator
-            left_color = get_footer_color(self.active_pane == 'left')
+            left_color = get_footer_color(self.pane_manager.active_pane == 'left')
             self.stdscr.addstr(y, 2, left_footer, left_color)
         except curses.error:
             pass
             
         # Right pane footer  
-        right_dirs, right_files = self.count_files_and_dirs(self.right_pane)
-        right_selected = len(self.right_pane['selected_files'])
-        right_sort = self.get_sort_description(self.right_pane)
+        right_dirs, right_files = self.count_files_and_dirs(self.pane_manager.right_pane)
+        right_selected = len(self.pane_manager.right_pane['selected_files'])
+        right_sort = self.get_sort_description(self.pane_manager.right_pane)
         
         # Add filter info to footer if active
         right_filter_info = ""
-        if self.right_pane['filter_pattern']:
-            right_filter_info = f" | Filter: {self.right_pane['filter_pattern']}"
+        if self.pane_manager.right_pane['filter_pattern']:
+            right_filter_info = f" | Filter: {self.pane_manager.right_pane['filter_pattern']}"
         
         if right_selected > 0:
             right_footer = f" {right_dirs} dirs, {right_files} files ({right_selected} selected) | Sort: {right_sort}{right_filter_info} "
@@ -315,7 +246,7 @@ class FileManager:
         
         try:
             # Right pane footer with active indicator
-            right_color = get_footer_color(self.active_pane == 'right')
+            right_color = get_footer_color(self.pane_manager.active_pane == 'right')
             self.stdscr.addstr(y, left_pane_width + 2, right_footer, right_color)
         except curses.error:
             pass
@@ -323,328 +254,100 @@ class FileManager:
     def toggle_selection(self):
         """Toggle selection of current file/directory and move to next item"""
         current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            return
-            
-        selected_file = current_pane['files'][current_pane['selected_index']]
-        
-        # Parent directory (..) is no longer shown, so no need to check for it
-        file_path_str = str(selected_file)
-        
-        if file_path_str in current_pane['selected_files']:
-            current_pane['selected_files'].remove(file_path_str)
-            print(f"Deselected: {selected_file.name}")
-        else:
-            current_pane['selected_files'].add(file_path_str)
-            print(f"Selected: {selected_file.name}")
-        
-        print(f"Total selected: {len(current_pane['selected_files'])}")
-        
-        # Move cursor to next item after selection
-        if current_pane['selected_index'] < len(current_pane['files']) - 1:
-            current_pane['selected_index'] += 1
+        success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=1)
+        if success:
+            print(message)
             
     def toggle_selection_up(self):
         """Toggle selection of current file/directory and move to previous item"""
         current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            return
-            
-        selected_file = current_pane['files'][current_pane['selected_index']]
-        
-        # Parent directory (..) is no longer shown, so no need to check for it
-        file_path_str = str(selected_file)
-        
-        if file_path_str in current_pane['selected_files']:
-            current_pane['selected_files'].remove(file_path_str)
-            print(f"Deselected: {selected_file.name}")
-        else:
-            current_pane['selected_files'].add(file_path_str)
-            print(f"Selected: {selected_file.name}")
-        
-        print(f"Total selected: {len(current_pane['selected_files'])}")
-        
-        # Move cursor to previous item after selection
-        if current_pane['selected_index'] > 0:
-            current_pane['selected_index'] -= 1
+        success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=-1)
+        if success:
+            print(message)
     
     def toggle_all_files_selection(self):
         """Toggle selection status of all files (not directories) in current pane"""
         current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            return
-        
-        # Get all files (not directories) in current pane
-        files_only = []
-        for file_path in current_pane['files']:
-            # Skip directories (parent directory no longer shown)
-            if file_path.is_dir():
-                continue
-            files_only.append(file_path)
-        
-        if not files_only:
-            print("No files to select in current directory")
-            return
-        
-        # Check if all files are currently selected
-        files_only_str = {str(f) for f in files_only}
-        currently_selected_files = current_pane['selected_files'] & files_only_str
-        
-        if len(currently_selected_files) == len(files_only):
-            # All files are selected, deselect them all
-            current_pane['selected_files'] -= files_only_str
-            print(f"Deselected all {len(files_only)} files")
-        else:
-            # Not all files are selected, select them all
-            current_pane['selected_files'].update(files_only_str)
-            print(f"Selected all {len(files_only)} files")
-        
-        print(f"Total selected: {len(current_pane['selected_files'])}")
-        self.needs_full_redraw = True
+        success, message = self.file_operations.toggle_all_files_selection(current_pane)
+        if success:
+            print(message)
+            self.needs_full_redraw = True
     
     def toggle_all_items_selection(self):
         """Toggle selection status of all items (files and directories) in current pane"""
         current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            return
-        
-        # Get all items (parent directory no longer shown)
-        all_items = []
-        for file_path in current_pane['files']:
-            all_items.append(file_path)
-        
-        if not all_items:
-            print("No items to select in current directory")
-            return
-        
-        # Check if all items are currently selected
-        all_items_str = {str(f) for f in all_items}
-        currently_selected_items = current_pane['selected_files'] & all_items_str
-        
-        if len(currently_selected_items) == len(all_items):
-            # All items are selected, deselect them all
-            current_pane['selected_files'] -= all_items_str
-            print(f"Deselected all {len(all_items)} items")
-        else:
-            # Not all items are selected, select them all
-            current_pane['selected_files'].update(all_items_str)
-            print(f"Selected all {len(all_items)} items")
-        
-        print(f"Total selected: {len(current_pane['selected_files'])}")
-        self.needs_full_redraw = True
+        success, message = self.file_operations.toggle_all_items_selection(current_pane)
+        if success:
+            print(message)
+            self.needs_full_redraw = True
     
     def sync_pane_directories(self):
         """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Check if both panes are already showing the same directory
-        if current_pane['path'] == other_pane['path']:
-            # Both panes show same directory, sync cursor position instead
-            # For 'o', move cursor in CURRENT pane to match other pane's cursor
-            self.sync_cursor_to_other_pane()
-            return
-        
-        # Get the other pane's directory
-        target_directory = other_pane['path']
-        
-        # Check if target directory exists and is accessible
-        if not target_directory.exists():
-            print(f"Target directory does not exist: {target_directory}")
-            return
+        if self.pane_manager.sync_pane_directories(print):
+            current_pane = self.get_current_pane()
+            self.refresh_files(current_pane)
             
-        if not target_directory.is_dir():
-            print(f"Target is not a directory: {target_directory}")
-            return
+            # Try to restore cursor position for this directory
+            height, width = self.stdscr.getmaxyx()
+            calculated_height = int(height * self.log_height_ratio)
+            log_height = calculated_height if self.log_height_ratio > 0 else 0
+            display_height = height - log_height - 4
             
-        try:
-            # Test if we can access the directory
-            list(target_directory.iterdir())
-        except PermissionError:
-            print(f"Permission denied accessing: {target_directory}")
-            return
-        except Exception as e:
-            print(f"Error accessing directory: {e}")
-            return
-        
-        # Save current cursor position before changing directory
-        self.save_cursor_position(current_pane)
-        
-        # Change current pane to the other pane's directory
-        old_directory = current_pane['path']
-        current_pane['path'] = target_directory
-        current_pane['selected_index'] = 0
-        current_pane['scroll_offset'] = 0
-        current_pane['selected_files'].clear()  # Clear selections when changing directory
-        self.refresh_files(current_pane)
-        
-        # Try to restore cursor position for this directory
-        if not self.restore_cursor_position(current_pane):
-            # If no history found, default to first item
-            current_pane['selected_index'] = 0
-            current_pane['scroll_offset'] = 0
-        
-        # Log the change
-        pane_name = "left" if self.active_pane == 'left' else "right"
-        print(f"Synchronized {pane_name} pane: {old_directory} → {target_directory}")
-        
-        self.needs_full_redraw = True
+            if not self.pane_manager.restore_cursor_position(current_pane, display_height):
+                # If no history found, default to first item
+                current_pane['selected_index'] = 0
+                current_pane['scroll_offset'] = 0
+            
+            self.needs_full_redraw = True
     
     def sync_other_pane_directory(self):
         """Change other pane's directory to match the current pane's directory, or sync cursor if already same directory"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Check if both panes are already showing the same directory
-        if current_pane['path'] == other_pane['path']:
-            # Both panes show same directory, sync cursor position instead
-            # For Shift-O, move cursor in OTHER pane to match current pane's cursor
-            self.sync_cursor_from_current_pane()
-            return
-        
-        # Get the current pane's directory
-        target_directory = current_pane['path']
-        
-        # Check if target directory exists and is accessible
-        if not target_directory.exists():
-            print(f"Current directory does not exist: {target_directory}")
-            return
+        if self.pane_manager.sync_other_pane_directory(print):
+            other_pane = self.get_inactive_pane()
+            self.refresh_files(other_pane)
             
-        if not target_directory.is_dir():
-            print(f"Current path is not a directory: {target_directory}")
-            return
+            # Try to restore cursor position for this directory
+            height, width = self.stdscr.getmaxyx()
+            calculated_height = int(height * self.log_height_ratio)
+            log_height = calculated_height if self.log_height_ratio > 0 else 0
+            display_height = height - log_height - 4
             
-        try:
-            # Test if we can access the directory
-            list(target_directory.iterdir())
-        except PermissionError:
-            print(f"Permission denied accessing: {target_directory}")
-            return
-        except Exception as e:
-            print(f"Error accessing directory: {e}")
-            return
-        
-        # Save current cursor position in other pane before changing directory
-        self.save_cursor_position(other_pane)
-        
-        # Change other pane to the current pane's directory
-        old_directory = other_pane['path']
-        other_pane['path'] = target_directory
-        other_pane['selected_index'] = 0
-        other_pane['scroll_offset'] = 0
-        other_pane['selected_files'].clear()  # Clear selections when changing directory
-        self.refresh_files(other_pane)
-        
-        # Try to restore cursor position for this directory
-        if not self.restore_cursor_position(other_pane):
-            # If no history found, default to first item
-            other_pane['selected_index'] = 0
-            other_pane['scroll_offset'] = 0
-        
-        # Log the change
-        other_pane_name = "right" if self.active_pane == 'left' else "left"
-        current_pane_name = "left" if self.active_pane == 'left' else "right"
-        print(f"Synchronized {other_pane_name} pane to {current_pane_name} pane: {old_directory} → {target_directory}")
-        
-        self.needs_full_redraw = True
+            if not self.pane_manager.restore_cursor_position(other_pane, display_height):
+                # If no history found, default to first item
+                other_pane['selected_index'] = 0
+                other_pane['scroll_offset'] = 0
+            
+            self.needs_full_redraw = True
     
     def sync_cursor_to_other_pane(self):
         """Move cursor in current pane to the same filename as the other pane's cursor"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Get the currently selected file in the other pane
-        if not other_pane['files'] or other_pane['selected_index'] >= len(other_pane['files']):
-            print("No file selected in other pane")
-            return
-            
-        other_selected_file = other_pane['files'][other_pane['selected_index']]
-        
-        # Parent directory (..) is no longer shown
-        target_filename = other_selected_file.name
-        
-        # Find the same filename in current pane
-        target_index = None
-        for i, file_path in enumerate(current_pane['files']):
-            if file_path.name == target_filename:
-                target_index = i
-                break
-        
-        if target_index is not None:
-            # Move cursor to the matching file
-            current_pane['selected_index'] = target_index
-            
+        if self.pane_manager.sync_cursor_to_other_pane(print):
             # Adjust scroll offset if needed to keep selection visible
+            current_pane = self.get_current_pane()
             height, width = self.stdscr.getmaxyx()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+            display_height = height - log_height - 4
             
-            if current_pane['selected_index'] < current_pane['scroll_offset']:
-                current_pane['scroll_offset'] = current_pane['selected_index']
-            elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
-                current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
-            
-            pane_name = "left" if self.active_pane == 'left' else "right"
-            print(f"Moved {pane_name} pane cursor to: {target_filename}")
+            self.pane_manager.adjust_scroll_for_selection(current_pane, display_height)
             self.needs_full_redraw = True
-        else:
-            print(f"File '{target_filename}' not found in current pane")
     
     def sync_cursor_from_current_pane(self):
         """Move cursor in other pane to the same filename as the current pane's cursor"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Get the currently selected file in the current pane
-        if not current_pane['files'] or current_pane['selected_index'] >= len(current_pane['files']):
-            print("No file selected in current pane")
-            return
-            
-        current_selected_file = current_pane['files'][current_pane['selected_index']]
-        
-        # Parent directory (..) is no longer shown
-        target_filename = current_selected_file.name
-        
-        # Find the same filename in other pane
-        target_index = None
-        for i, file_path in enumerate(other_pane['files']):
-            if file_path.name == target_filename:
-                target_index = i
-                break
-        
-        if target_index is not None:
-            # Move cursor to the matching file in other pane
-            other_pane['selected_index'] = target_index
-            
+        if self.pane_manager.sync_cursor_from_current_pane(print):
             # Adjust scroll offset if needed to keep selection visible
+            other_pane = self.get_inactive_pane()
             height, width = self.stdscr.getmaxyx()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+            display_height = height - log_height - 4
             
-            if other_pane['selected_index'] < other_pane['scroll_offset']:
-                other_pane['scroll_offset'] = other_pane['selected_index']
-            elif other_pane['selected_index'] >= other_pane['scroll_offset'] + display_height:
-                other_pane['scroll_offset'] = other_pane['selected_index'] - display_height + 1
-            
-            other_pane_name = "right" if self.active_pane == 'left' else "left"
-            print(f"Moved {other_pane_name} pane cursor to: {target_filename}")
+            self.pane_manager.adjust_scroll_for_selection(other_pane, display_height)
             self.needs_full_redraw = True
-        else:
-            other_pane_name = "right" if self.active_pane == 'left' else "left"
-            print(f"File '{target_filename}' not found in {other_pane_name} pane")
         
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
-        if hasattr(self, 'original_stdout') and sys.stdout != self.original_stdout:
-            sys.stdout = self.original_stdout
-        if hasattr(self, 'original_stderr') and sys.stderr != self.original_stderr:
-            sys.stderr = self.original_stderr
+        self.log_manager.restore_stdio()
             
     def __del__(self):
         """Restore stdout/stderr when object is destroyed"""
@@ -652,197 +355,43 @@ class FileManager:
         
     def get_current_pane(self):
         """Get the currently active pane"""
-        return self.left_pane if self.active_pane == 'left' else self.right_pane
+        return self.pane_manager.get_current_pane()
     
     def get_inactive_pane(self):
         """Get the inactive pane"""
-        return self.right_pane if self.active_pane == 'left' else self.left_pane
+        return self.pane_manager.get_inactive_pane()
     
-    def save_cursor_position(self, pane_data):
-        """Save current cursor position to history"""
-        if not pane_data['files'] or pane_data['selected_index'] >= len(pane_data['files']):
-            return
-            
-        current_file = pane_data['files'][pane_data['selected_index']]
-        current_dir = pane_data['path']
-        
-        # Save as (filename, directory_path) tuple
-        cursor_entry = (current_file.name, str(current_dir))
-        
-        # Remove any existing entry for this directory to avoid duplicates
-        pane_data['cursor_history'] = deque(
-            [entry for entry in pane_data['cursor_history'] if entry[1] != str(current_dir)],
-            maxlen=100
-        )
-        
-        # Add the new entry
-        pane_data['cursor_history'].append(cursor_entry)
-    
-    def restore_cursor_position(self, pane_data):
-        """Restore cursor position from history when changing to a directory"""
-        current_dir = str(pane_data['path'])
-        
-        # Look for a saved cursor position for this directory
-        for filename, saved_dir in reversed(pane_data['cursor_history']):
-            if saved_dir == current_dir:
-                # Try to find this filename in current files
-                for i, file_path in enumerate(pane_data['files']):
-                    if file_path.name == filename:
-                        pane_data['selected_index'] = i
+
                         
-                        # Adjust scroll offset to keep selection visible
-                        height, width = self.stdscr.getmaxyx()
-                        calculated_height = int(height * self.log_height_ratio)
-                        log_height = calculated_height if self.log_height_ratio > 0 else 0
-                        display_height = height - log_height - 4
-                        
-                        if pane_data['selected_index'] < pane_data['scroll_offset']:
-                            pane_data['scroll_offset'] = pane_data['selected_index']
-                        elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
-                            pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
-                        
-                        return True
-        
-        return False
+
     
     def get_log_scroll_percentage(self):
         """Calculate the current log scroll position as a percentage"""
-        if len(self.log_messages) <= 1:
-            return 100  # If no messages or only one, we're at 100%
-        
-        # When scroll_offset is 0, we're at the bottom (newest messages) = 100%
-        # When scroll_offset is max, we're at the top (oldest messages) = 0%
-        max_scroll = len(self.log_messages) - 1
-        if max_scroll == 0:
-            return 100
-        
-        # Invert the percentage since offset 0 = bottom (100%) and max offset = top (0%)
-        percentage = int(((max_scroll - self.log_scroll_offset) / max_scroll) * 100)
-        return max(0, min(100, percentage))
+        return self.log_manager.get_log_scroll_percentage()
     
     def refresh_files(self, pane=None):
         """Refresh the file list for specified pane or both panes"""
-        panes_to_refresh = [pane] if pane else [self.left_pane, self.right_pane]
+        panes_to_refresh = [pane] if pane else [self.pane_manager.left_pane, self.pane_manager.right_pane]
         
         for pane_data in panes_to_refresh:
-            try:
-                entries = list(pane_data['path'].iterdir())
-                if not self.show_hidden:
-                    entries = [e for e in entries if not e.name.startswith('.')]
-                
-                # Apply filename filter if set for this pane (only to files, not directories)
-                if pane_data['filter_pattern']:
-                    filtered_entries = []
-                    for entry in entries:
-                        # Always include directories, only filter files
-                        if entry.is_dir() or fnmatch.fnmatch(entry.name, pane_data['filter_pattern']):
-                            filtered_entries.append(entry)
-                    entries = filtered_entries
-                
-                # Sort files using the pane's sort mode
-                pane_data['files'] = self.sort_entries(entries, pane_data['sort_mode'], pane_data['sort_reverse'])
-                
-                # Parent directory (..) suppressed per user request
-                # if pane_data['path'] != pane_data['path'].parent:
-                #     pane_data['files'].insert(0, pane_data['path'].parent)
-                    
-            except PermissionError:
-                pane_data['files'] = []
-                
-            # Reset selection if out of bounds
-            if pane_data['selected_index'] >= len(pane_data['files']):
-                pane_data['selected_index'] = max(0, len(pane_data['files']) - 1)
-                
-            # Don't clear selected files here - only clear when directory actually changes
+            self.file_operations.refresh_files(pane_data)
     
     def sort_entries(self, entries, sort_mode, reverse=False):
-        """Sort file entries based on the specified mode
-        
-        Args:
-            entries: List of Path objects to sort
-            sort_mode: 'name', 'size', or 'date'
-            reverse: Whether to reverse the sort order
-            
-        Returns:
-            Sorted list with directories always first
-        """
-        def get_sort_key(entry):
-            """Generate sort key for an entry"""
-            try:
-                if sort_mode == 'name':
-                    # Sort by name (case-insensitive)
-                    return entry.name.lower()
-                elif sort_mode == 'size':
-                    # Sort by file size (directories get size 0)
-                    if entry.is_dir():
-                        return 0
-                    else:
-                        return entry.stat().st_size
-                elif sort_mode == 'date':
-                    # Sort by modification time
-                    return entry.stat().st_mtime
-                else:
-                    # Default to name sorting
-                    return entry.name.lower()
-            except (OSError, PermissionError):
-                # If we can't get file info, sort by name as fallback
-                return entry.name.lower()
-        
-        # Separate directories and files
-        directories = [e for e in entries if e.is_dir()]
-        files = [e for e in entries if not e.is_dir()]
-        
-        # Sort directories and files separately
-        sorted_dirs = sorted(directories, key=get_sort_key, reverse=reverse)
-        sorted_files = sorted(files, key=get_sort_key, reverse=reverse)
-        
-        # Always put directories first, then files
-        return sorted_dirs + sorted_files
+        """Sort file entries based on the specified mode"""
+        return self.file_operations.sort_entries(entries, sort_mode, reverse)
     
     def get_sort_description(self, pane_data):
         """Get a human-readable description of the current sort mode"""
-        mode = pane_data['sort_mode']
-        reverse = pane_data['sort_reverse']
-        
-        mode_names = {
-            'name': 'Name',
-            'size': 'Size', 
-            'date': 'Date'
-        }
-        
-        description = mode_names.get(mode, 'Name')
-        if reverse:
-            description += ' ↓'
-        else:
-            description += ' ↑'
-            
-        return description
+        return self.file_operations.get_sort_description(pane_data)
             
     def get_file_info(self, path):
         """Get file information for display"""
-        try:
-            stat_info = path.stat()
-            size = stat_info.st_size
-            mtime = datetime.fromtimestamp(stat_info.st_mtime)
-            
-            # Format size using constants
-            if size < SIZE_KB:
-                size_str = f"{size}B"
-            elif size < SIZE_MB:
-                size_str = f"{size/SIZE_KB:.1f}K"
-            elif size < SIZE_GB:
-                size_str = f"{size/SIZE_MB:.1f}M"
-            else:
-                size_str = f"{size/SIZE_GB:.1f}G"
-                
-            return size_str, mtime.strftime(DATETIME_FORMAT)
-        except (OSError, PermissionError):
-            return "---", "---"
+        return self.file_operations.get_file_info(path)
             
     def draw_header(self):
         """Draw the header with pane paths and controls"""
         height, width = self.stdscr.getmaxyx()
-        left_pane_width = int(width * self.left_pane_ratio)
+        left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         right_pane_width = width - left_pane_width
         
         # Clear header area (avoid last column)
@@ -853,12 +402,12 @@ class FileManager:
         
         # Left pane path with safety checks
         if left_pane_width > 6:  # Minimum space needed
-            left_path = str(self.left_pane['path'])
+            left_path = str(self.pane_manager.left_pane['path'])
             max_left_path_width = max(1, left_pane_width - 4)
             if len(left_path) > max_left_path_width:
                 left_path = "..." + left_path[-(max(1, max_left_path_width-3)):]
             
-            left_color = get_header_color(self.active_pane == 'left')
+            left_color = get_header_color(self.pane_manager.active_pane == 'left')
             try:
                 self.stdscr.addstr(0, 2, left_path[:max_left_path_width], left_color)
             except curses.error:
@@ -873,12 +422,12 @@ class FileManager:
         
         # Right pane path with safety checks
         if right_pane_width > 6:  # Minimum space needed
-            right_path = str(self.right_pane['path'])
+            right_path = str(self.pane_manager.right_pane['path'])
             max_right_path_width = max(1, right_pane_width - 4)
             if len(right_path) > max_right_path_width:
                 right_path = "..." + right_path[-(max(1, max_right_path_width-3)):]
                 
-            right_color = get_header_color(self.active_pane == 'right')
+            right_color = get_header_color(self.pane_manager.active_pane == 'right')
             try:
                 right_start_x = left_pane_width + 2
                 if right_start_x < width:
@@ -1001,7 +550,7 @@ class FileManager:
     def draw_files(self):
         """Draw both file panes"""
         height, width = self.stdscr.getmaxyx()
-        left_pane_width = int(width * self.left_pane_ratio)
+        left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         right_pane_width = width - left_pane_width
         # Allow log pane to be completely hidden (0 height) when ratio is 0
         calculated_height = int(height * self.log_height_ratio)
@@ -1018,10 +567,10 @@ class FileManager:
                 pass
         
         # Draw left pane
-        self.draw_pane(self.left_pane, 0, left_pane_width, self.active_pane == 'left')
+        self.draw_pane(self.pane_manager.left_pane, 0, left_pane_width, self.pane_manager.active_pane == 'left')
         
         # Draw right pane
-        self.draw_pane(self.right_pane, left_pane_width, right_pane_width, self.active_pane == 'right')
+        self.draw_pane(self.pane_manager.right_pane, left_pane_width, right_pane_width, self.pane_manager.active_pane == 'right')
         
     def draw_log_pane(self):
         """Draw the log pane at the bottom"""
@@ -1029,7 +578,7 @@ class FileManager:
         # Allow log pane to be completely hidden (0 height) when ratio is 0
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        left_pane_width = int(width * self.left_pane_ratio)
+        left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         
         # Always draw the file list footers at the correct position
         if log_height == 0:
@@ -1056,45 +605,8 @@ class FileManager:
         # Log content starts right after the footer line
         log_start_y = footer_y + 1
         
-        # Calculate visible log messages (subtract 1 for the footer line)
-        visible_lines = log_height - 1
-        total_messages = len(self.log_messages)
-        
-        if total_messages == 0:
-            try:
-                self.stdscr.addstr(log_start_y, 2, "No log messages", curses.A_DIM)
-            except curses.error:
-                pass
-            return
-        
-        # Auto-scroll to bottom if not manually scrolled
-        if self.log_scroll_offset == 0:
-            start_idx = max(0, total_messages - visible_lines)
-        else:
-            start_idx = max(0, total_messages - visible_lines - self.log_scroll_offset)
-        
-        # Draw log messages
-        for i in range(visible_lines):
-            msg_idx = start_idx + i
-            y = log_start_y + i
-            
-            if msg_idx >= total_messages:
-                break
-                
-            timestamp, source, message = self.log_messages[msg_idx]
-            
-            # Choose color based on source
-            color = get_log_color(source)
-            
-            # Format log line
-            log_line = f"{timestamp} [{source}] {message}"
-            if len(log_line) > width - 2:
-                log_line = log_line[:width-5] + "..."
-                
-            try:
-                self.stdscr.addstr(y, 2, log_line, color)
-            except curses.error:
-                pass
+        # Use log manager to draw the log content
+        self.log_manager.draw_log_pane(self.stdscr, log_start_y, log_height - 1, width)
                 
     def draw_status(self):
         """Draw status line with file info and controls"""
