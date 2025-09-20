@@ -58,7 +58,8 @@ class FileManager:
             'selected_files': set(),  # Track multi-selected files
             'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
             'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False),
-            'filter_pattern': ""  # Filename filter pattern for this pane
+            'filter_pattern': "",  # Filename filter pattern for this pane
+            'cursor_history': deque(maxlen=100)  # Store cursor position history (filename, directory_path)
         }
         self.right_pane = {
             'path': right_startup_path,
@@ -68,7 +69,8 @@ class FileManager:
             'selected_files': set(),  # Track multi-selected files
             'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
             'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False),
-            'filter_pattern': ""  # Filename filter pattern for this pane
+            'filter_pattern': "",  # Filename filter pattern for this pane
+            'cursor_history': deque(maxlen=100)  # Store cursor position history (filename, directory_path)
         }
         
         self.active_pane = 'left'  # 'left' or 'right'
@@ -426,12 +428,22 @@ class FileManager:
             print(f"Error accessing directory: {e}")
             return
         
+        # Save current cursor position before changing directory
+        self.save_cursor_position(current_pane)
+        
         # Change current pane to the other pane's directory
         old_directory = current_pane['path']
         current_pane['path'] = target_directory
         current_pane['selected_index'] = 0
         current_pane['scroll_offset'] = 0
         current_pane['selected_files'].clear()  # Clear selections when changing directory
+        self.refresh_files(current_pane)
+        
+        # Try to restore cursor position for this directory
+        if not self.restore_cursor_position(current_pane):
+            # If no history found, default to first item
+            current_pane['selected_index'] = 0
+            current_pane['scroll_offset'] = 0
         
         # Log the change
         pane_name = "left" if self.active_pane == 'left' else "right"
@@ -473,12 +485,22 @@ class FileManager:
             print(f"Error accessing directory: {e}")
             return
         
+        # Save current cursor position in other pane before changing directory
+        self.save_cursor_position(other_pane)
+        
         # Change other pane to the current pane's directory
         old_directory = other_pane['path']
         other_pane['path'] = target_directory
         other_pane['selected_index'] = 0
         other_pane['scroll_offset'] = 0
         other_pane['selected_files'].clear()  # Clear selections when changing directory
+        self.refresh_files(other_pane)
+        
+        # Try to restore cursor position for this directory
+        if not self.restore_cursor_position(other_pane):
+            # If no history found, default to first item
+            other_pane['selected_index'] = 0
+            other_pane['scroll_offset'] = 0
         
         # Log the change
         other_pane_name = "right" if self.active_pane == 'left' else "left"
@@ -592,6 +614,53 @@ class FileManager:
     def get_inactive_pane(self):
         """Get the inactive pane"""
         return self.right_pane if self.active_pane == 'left' else self.left_pane
+    
+    def save_cursor_position(self, pane_data):
+        """Save current cursor position to history"""
+        if not pane_data['files'] or pane_data['selected_index'] >= len(pane_data['files']):
+            return
+            
+        current_file = pane_data['files'][pane_data['selected_index']]
+        current_dir = pane_data['path']
+        
+        # Save as (filename, directory_path) tuple
+        cursor_entry = (current_file.name, str(current_dir))
+        
+        # Remove any existing entry for this directory to avoid duplicates
+        pane_data['cursor_history'] = deque(
+            [entry for entry in pane_data['cursor_history'] if entry[1] != str(current_dir)],
+            maxlen=100
+        )
+        
+        # Add the new entry
+        pane_data['cursor_history'].append(cursor_entry)
+    
+    def restore_cursor_position(self, pane_data):
+        """Restore cursor position from history when changing to a directory"""
+        current_dir = str(pane_data['path'])
+        
+        # Look for a saved cursor position for this directory
+        for filename, saved_dir in reversed(pane_data['cursor_history']):
+            if saved_dir == current_dir:
+                # Try to find this filename in current files
+                for i, file_path in enumerate(pane_data['files']):
+                    if file_path.name == filename:
+                        pane_data['selected_index'] = i
+                        
+                        # Adjust scroll offset to keep selection visible
+                        height, width = self.stdscr.getmaxyx()
+                        calculated_height = int(height * self.log_height_ratio)
+                        log_height = calculated_height if self.log_height_ratio > 0 else 0
+                        display_height = height - log_height - 4
+                        
+                        if pane_data['selected_index'] < pane_data['scroll_offset']:
+                            pane_data['scroll_offset'] = pane_data['selected_index']
+                        elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
+                            pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
+                        
+                        return True
+        
+        return False
     
     def get_log_scroll_percentage(self):
         """Calculate the current log scroll position as a percentage"""
@@ -1272,10 +1341,22 @@ class FileManager:
         # Parent directory (..) is no longer shown
         if selected_file.is_dir():
             try:
+                # Save current cursor position before changing directory
+                self.save_cursor_position(current_pane)
+                
                 current_pane['path'] = selected_file
                 current_pane['selected_index'] = 0
                 current_pane['scroll_offset'] = 0
                 current_pane['selected_files'].clear()  # Clear selections when changing directory
+                self.refresh_files(current_pane)
+                
+                # Try to restore cursor position for this directory
+                if not self.restore_cursor_position(current_pane):
+                    # If no history found, default to first item
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                
+                self.needs_full_redraw = True
             except PermissionError:
                 self.show_error("Permission denied")
         else:
@@ -5059,10 +5140,21 @@ class FileManager:
             elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
+                        # Save current cursor position before changing directory
+                        self.save_cursor_position(current_pane)
+                        
                         current_pane['path'] = current_pane['path'].parent
                         current_pane['selected_index'] = 0
                         current_pane['scroll_offset'] = 0
                         current_pane['selected_files'].clear()  # Clear selections when changing directory
+                        self.refresh_files(current_pane)
+                        
+                        # Try to restore cursor position for this directory
+                        if not self.restore_cursor_position(current_pane):
+                            # If no history found, default to first item
+                            current_pane['selected_index'] = 0
+                            current_pane['scroll_offset'] = 0
+                        
                         self.needs_full_redraw = True
                     except PermissionError:
                         self.show_error("Permission denied")
@@ -5070,19 +5162,43 @@ class FileManager:
             elif key == curses.KEY_LEFT and self.active_pane == 'left':  # Left arrow in left pane - go to parent
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
+                        # Save current cursor position before changing directory
+                        self.save_cursor_position(current_pane)
+                        
                         current_pane['path'] = current_pane['path'].parent
                         current_pane['selected_index'] = 0
                         current_pane['scroll_offset'] = 0
                         current_pane['selected_files'].clear()  # Clear selections when changing directory
+                        self.refresh_files(current_pane)
+                        
+                        # Try to restore cursor position for this directory
+                        if not self.restore_cursor_position(current_pane):
+                            # If no history found, default to first item
+                            current_pane['selected_index'] = 0
+                            current_pane['scroll_offset'] = 0
+                        
+                        self.needs_full_redraw = True
                     except PermissionError:
                         self.show_error("Permission denied")
             elif key == curses.KEY_RIGHT and self.active_pane == 'right':  # Right arrow in right pane - go to parent
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
+                        # Save current cursor position before changing directory
+                        self.save_cursor_position(current_pane)
+                        
                         current_pane['path'] = current_pane['path'].parent
                         current_pane['selected_index'] = 0
                         current_pane['scroll_offset'] = 0
                         current_pane['selected_files'].clear()  # Clear selections when changing directory
+                        self.refresh_files(current_pane)
+                        
+                        # Try to restore cursor position for this directory
+                        if not self.restore_cursor_position(current_pane):
+                            # If no history found, default to first item
+                            current_pane['selected_index'] = 0
+                            current_pane['scroll_offset'] = 0
+                        
+                        self.needs_full_redraw = True
                     except PermissionError:
                         self.show_error("Permission denied")
             elif key == curses.KEY_RIGHT and self.active_pane == 'left':  # Right arrow in left pane - switch to right pane
