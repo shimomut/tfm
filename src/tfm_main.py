@@ -259,7 +259,7 @@ class FileManager:
             height, width = self.stdscr.getmaxyx()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 4
+            display_height = height - log_height - 3
             
             if not self.pane_manager.restore_cursor_position(current_pane, display_height):
                 # If no history found, default to first item
@@ -278,7 +278,7 @@ class FileManager:
             height, width = self.stdscr.getmaxyx()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 4
+            display_height = height - log_height - 3
             
             if not self.pane_manager.restore_cursor_position(other_pane, display_height):
                 # If no history found, default to first item
@@ -295,7 +295,7 @@ class FileManager:
             height, width = self.stdscr.getmaxyx()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 4
+            display_height = height - log_height - 3
             
             self.pane_manager.adjust_scroll_for_selection(current_pane, display_height)
             self.needs_full_redraw = True
@@ -308,7 +308,7 @@ class FileManager:
             height, width = self.stdscr.getmaxyx()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 4
+            display_height = height - log_height - 3
             
             self.pane_manager.adjust_scroll_for_selection(other_pane, display_height)
             self.needs_full_redraw = True
@@ -318,7 +318,7 @@ class FileManager:
         height, width = self.stdscr.getmaxyx()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 4
+        display_height = height - log_height - 3
         return self.pane_manager.restore_cursor_position(pane_data, display_height)
     
     def save_cursor_position(self, pane_data):
@@ -330,7 +330,7 @@ class FileManager:
         height, width = self.stdscr.getmaxyx()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 4
+        display_height = height - log_height - 3
         return self.pane_manager.adjust_scroll_for_selection(pane_data, display_height)
     
     def find_matches(self, pattern):
@@ -465,7 +465,7 @@ class FileManager:
         # Allow log pane to be completely hidden (0 height) when ratio is 0
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+        display_height = height - log_height - 3  # Reserve space for header, footer, and status
         
         # Calculate scroll offset
         if pane_data['selected_index'] < pane_data['scroll_offset']:
@@ -985,7 +985,7 @@ class FileManager:
         height, width = self.stdscr.getmaxyx()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+        display_height = height - log_height - 3  # Reserve space for header, footer, and status
         
         # Adjust scroll offset to keep selection visible
         if pane_data['selected_index'] < pane_data['scroll_offset']:
@@ -1145,7 +1145,7 @@ class FileManager:
                     height, width = self.stdscr.getmaxyx()
                     calculated_height = int(height * self.log_height_ratio)
                     log_height = calculated_height if self.log_height_ratio > 0 else 0
-                    display_height = height - log_height - 4
+                    display_height = height - log_height - 3
                     
                     if current_pane['selected_index'] < current_pane['scroll_offset']:
                         current_pane['scroll_offset'] = current_pane['selected_index']
@@ -1214,7 +1214,7 @@ class FileManager:
                     height, width = self.stdscr.getmaxyx()
                     calculated_height = int(height * self.log_height_ratio)
                     log_height = calculated_height if self.log_height_ratio > 0 else 0
-                    display_height = height - log_height - 4
+                    display_height = height - log_height - 3
                     
                     if current_pane['selected_index'] < current_pane['scroll_offset']:
                         current_pane['scroll_offset'] = current_pane['selected_index']
@@ -2699,7 +2699,7 @@ class FileManager:
         height, width = self.stdscr.getmaxyx()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 4
+        display_height = height - log_height - 3
         
         SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
         self.needs_full_redraw = True
