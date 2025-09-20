@@ -87,11 +87,11 @@ class FileManager:
         
         # Filter mode state
         self.filter_mode = False
-        self.filter_pattern = ""
+        self.filter_editor = SingleLineTextEdit()
         
         # Rename mode state
         self.rename_mode = False
-        self.rename_pattern = ""
+        self.rename_editor = SingleLineTextEdit()
         self.rename_original_name = ""
         self.rename_file_path = None
         
@@ -1100,27 +1100,28 @@ class FileManager:
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Show filter prompt and pattern
-            filter_prompt = f"Filter: {self.filter_pattern}"
-            
-            # Add cursor indicator
-            filter_prompt += "_"
-            
-            # Draw filter prompt
-            self.safe_addstr(status_y, 2, filter_prompt, get_status_color())
+            # Draw filter input using SingleLineTextEdit
+            max_input_width = width - 50  # Leave space for help text
+            self.filter_editor.draw(
+                self.stdscr, status_y, 2, max_input_width,
+                "Filter: ",
+                is_active=True
+            )
             
             # Show help text on the right if there's space
             help_text = "ESC:cancel Enter:apply (files only: *.py, test_*, *.[ch])"
-            if len(filter_prompt) + len(help_text) + 6 < width:
+            # Calculate space needed for the input field
+            input_field_width = len("Filter: ") + len(self.filter_editor.text) + 2
+            if input_field_width + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
-                if help_x > len(filter_prompt) + 4:  # Ensure no overlap
+                if help_x > input_field_width + 4:  # Ensure no overlap
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             else:
                 # Shorter help text for narrow terminals
                 short_help = "ESC:cancel Enter:apply"
-                if len(filter_prompt) + len(short_help) + 6 < width:
+                if input_field_width + len(short_help) + 6 < width:
                     help_x = width - len(short_help) - 3
-                    if help_x > len(filter_prompt) + 4:
+                    if help_x > input_field_width + 4:
                         self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
             return
         
@@ -1130,20 +1131,22 @@ class FileManager:
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Show rename prompt and pattern
-            rename_prompt = f"Rename '{self.rename_original_name}' to: {self.rename_pattern}"
-            
-            # Add cursor indicator
-            rename_prompt += "_"
-            
-            # Draw rename prompt
-            self.safe_addstr(status_y, 2, rename_prompt, get_status_color())
+            # Draw rename input using SingleLineTextEdit
+            prompt_text = f"Rename '{self.rename_original_name}' to: "
+            max_input_width = width - len(prompt_text) - 25  # Leave space for help text
+            self.rename_editor.draw(
+                self.stdscr, status_y, 2, max_input_width,
+                prompt_text,
+                is_active=True
+            )
             
             # Show help text on the right if there's space
             help_text = "ESC:cancel Enter:confirm"
-            if len(rename_prompt) + len(help_text) + 6 < width:
+            # Calculate space needed for the input field
+            input_field_width = len(prompt_text) + len(self.rename_editor.text) + 2
+            if input_field_width + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
-                if help_x > len(rename_prompt) + 4:  # Ensure no overlap
+                if help_x > input_field_width + 4:  # Ensure no overlap
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             return
         
@@ -1416,27 +1419,29 @@ class FileManager:
         """Enter filename filter mode"""
         self.filter_mode = True
         current_pane = self.get_current_pane()
-        self.filter_pattern = current_pane['filter_pattern']  # Start with current filter
+        self.filter_editor.text = current_pane['filter_pattern']  # Start with current filter
+        self.filter_editor.cursor_pos = len(self.filter_editor.text)  # Position cursor at end
         self.needs_full_redraw = True
         
     def exit_filter_mode(self):
         """Exit filter mode"""
         self.filter_mode = False
-        self.filter_pattern = ""
+        self.filter_editor.clear()
         self.needs_full_redraw = True
     
     def apply_filter(self):
         """Apply the current filter pattern to the active pane"""
         current_pane = self.get_current_pane()
-        current_pane['filter_pattern'] = self.filter_pattern
+        filter_pattern = self.filter_editor.text
+        current_pane['filter_pattern'] = filter_pattern
         current_pane['selected_index'] = 0  # Reset selection to top
         current_pane['scroll_offset'] = 0
         self.refresh_files(current_pane)
         
         # Log the filter action
         pane_name = "left" if self.active_pane == 'left' else "right"
-        if self.filter_pattern:
-            print(f"Applied filter '{self.filter_pattern}' to {pane_name} pane")
+        if filter_pattern:
+            print(f"Applied filter '{filter_pattern}' to {pane_name} pane")
         else:
             print(f"Cleared filter from {pane_name} pane")
         
@@ -1479,14 +1484,15 @@ class FileManager:
         self.rename_mode = True
         self.rename_file_path = selected_file
         self.rename_original_name = selected_file.name
-        self.rename_pattern = selected_file.name  # Start with current name
+        self.rename_editor.text = selected_file.name  # Start with current name
+        self.rename_editor.cursor_pos = len(self.rename_editor.text)  # Position cursor at end
         self.needs_full_redraw = True
         print(f"Renaming: {self.rename_original_name}")
     
     def exit_rename_mode(self):
         """Exit rename mode"""
         self.rename_mode = False
-        self.rename_pattern = ""
+        self.rename_editor.clear()
         self.rename_original_name = ""
         self.rename_file_path = None
         self.needs_full_redraw = True
@@ -1633,12 +1639,12 @@ class FileManager:
     
     def perform_rename(self):
         """Perform the actual rename operation"""
-        if not self.rename_file_path or not self.rename_pattern.strip():
+        if not self.rename_file_path or not self.rename_editor.text.strip():
             print("Invalid rename operation")
             self.exit_rename_mode()
             return
         
-        new_name = self.rename_pattern.strip()
+        new_name = self.rename_editor.text.strip()
         
         # Check if name actually changed
         if new_name == self.rename_original_name:
@@ -3531,17 +3537,11 @@ class FileManager:
             self.apply_filter()
             self.exit_filter_mode()
             return True
-        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
-            # Backspace - remove last character
-            if self.filter_pattern:
-                self.filter_pattern = self.filter_pattern[:-1]
+        else:
+            # Let the editor handle other keys
+            if self.filter_editor.handle_key(key):
                 self.needs_full_redraw = True
-            return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Add character to filter pattern
-            self.filter_pattern += chr(key)
-            self.needs_full_redraw = True
-            return True
+                return True
         
         # In filter mode, capture most other keys to prevent unintended actions
         return True
@@ -3556,17 +3556,11 @@ class FileManager:
             # Enter - perform rename
             self.perform_rename()
             return True
-        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
-            # Backspace - remove last character
-            if self.rename_pattern:
-                self.rename_pattern = self.rename_pattern[:-1]
+        else:
+            # Let the editor handle other keys
+            if self.rename_editor.handle_key(key):
                 self.needs_full_redraw = True
-            return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Add character to rename pattern
-            self.rename_pattern += chr(key)
-            self.needs_full_redraw = True
-            return True
+                return True
         
         # In rename mode, capture most other keys to prevent unintended actions
         return True
