@@ -48,6 +48,8 @@ class Config:
         'delete_files': ['k', 'K'],
         'rename_file': ['r', 'R'],
         'favorites': ['j', 'J'],
+        'subshell': ['X'],
+        'programs': ['x'],
         'create_archive': ['p', 'P'],
         'extract_archive': ['u', 'U'],
     }
@@ -104,3 +106,17 @@ class Config:
         # Example: 'git_status': 'git status --short',
         # Example: 'disk_usage': 'du -sh *',
     }
+    
+    # External programs - each item has "name" and "command" fields
+    # The "command" field is a list for safe subprocess execution
+    PROGRAMS = [
+        {'name': 'Git Status', 'command': ['git', 'status']},
+        {'name': 'Git Log', 'command': ['git', 'log', '--oneline', '-10']},
+        {'name': 'Disk Usage', 'command': ['du', '-sh', '*']},
+        {'name': 'List Processes', 'command': ['ps', 'aux']},
+        {'name': 'System Info', 'command': ['uname', '-a']},
+        {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
+        # Add your own programs here:
+        # {'name': 'My Script', 'command': ['/path/to/script.sh']},
+        # {'name': 'Python REPL', 'command': ['python3']},
+    ]

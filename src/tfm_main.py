@@ -22,7 +22,7 @@ from tfm_single_line_text_edit import SingleLineTextEdit
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, get_startup_paths, is_key_bound_to, get_favorite_directories
+from tfm_config import get_config, get_startup_paths, is_key_bound_to, get_favorite_directories, get_programs
 from tfm_text_viewer import view_text_file, is_text_file
 
 class LogCapture:
@@ -2482,6 +2482,145 @@ class FileManager:
         
         self.show_list_dialog("Go to Favorite Directory", display_items, favorite_callback)
     
+    def show_programs_dialog(self):
+        """Show external programs using the searchable list dialog"""
+        programs = get_programs()
+        
+        if not programs:
+            print("No external programs configured")
+            return
+        
+        # Create display items with program names
+        display_items = []
+        for prog in programs:
+            display_items.append(prog['name'])
+        
+        def program_callback(selected_item):
+            if selected_item:
+                # Find the selected program
+                selected_program = None
+                for prog in programs:
+                    if prog['name'] == selected_item:
+                        selected_program = prog
+                        break
+                
+                if selected_program:
+                    self.execute_external_program(selected_program)
+                else:
+                    print(f"Error: Program not found: {selected_item}")
+            else:
+                print("Program selection cancelled")
+        
+        self.show_list_dialog("Execute External Program", display_items, program_callback)
+    
+    def execute_external_program(self, program):
+        """Execute an external program with environment variables set"""
+        # Restore stdout/stderr temporarily
+        self.restore_stdio()
+        
+        # Clear the screen and reset cursor
+        self.stdscr.clear()
+        self.stdscr.refresh()
+        
+        # Reset terminal to normal mode
+        curses.endwin()
+        
+        try:
+            # Get current pane information
+            left_pane = self.left_pane
+            right_pane = self.right_pane
+            current_pane = self.get_current_pane()
+            other_pane = self.get_inactive_pane()
+            
+            # Set environment variables with TFM_ prefix
+            env = os.environ.copy()
+            env['TFM_LEFT_DIR'] = str(left_pane['path'])
+            env['TFM_RIGHT_DIR'] = str(right_pane['path'])
+            env['TFM_THIS_DIR'] = str(current_pane['path'])
+            env['TFM_OTHER_DIR'] = str(other_pane['path'])
+            
+            # Get selected files for each pane, or cursor position if no selection
+            def get_selected_or_cursor(pane_data):
+                """Get selected files, or current cursor position if no files selected"""
+                selected = [Path(f).name for f in pane_data['selected_files']]
+                if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
+                    # No files selected, use cursor position
+                    cursor_file = pane_data['files'][pane_data['selected_index']]
+                    selected = [cursor_file.name]
+                return selected
+            
+            def quote_filenames(filenames):
+                """Quote filenames for safe shell usage"""
+                return [shlex.quote(filename) for filename in filenames]
+            
+            left_selected = quote_filenames(get_selected_or_cursor(left_pane))
+            right_selected = quote_filenames(get_selected_or_cursor(right_pane))
+            current_selected = quote_filenames(get_selected_or_cursor(current_pane))
+            other_selected = quote_filenames(get_selected_or_cursor(other_pane))
+            
+            # Set selected files environment variables (space-separated) with TFM_ prefix
+            env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
+            env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
+            env['TFM_THIS_SELECTED'] = ' '.join(current_selected)
+            env['TFM_OTHER_SELECTED'] = ' '.join(other_selected)
+            
+            # Set TFM indicator environment variable
+            env['TFM_ACTIVE'] = '1'
+            
+            # Print information about the program execution
+            print(f"TFM External Program: {program['name']}")
+            print("=" * 50)
+            print(f"Command: {' '.join(program['command'])}")
+            print(f"Working Directory: {current_pane['path']}")
+            print(f"TFM_THIS_DIR: {env['TFM_THIS_DIR']}")
+            print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
+            print("=" * 50)
+            print()
+            
+            # Change to the current directory
+            os.chdir(current_pane['path'])
+            
+            # Execute the program with the modified environment
+            result = subprocess.run(program['command'], env=env)
+            
+            # Show exit status
+            print()
+            print("=" * 50)
+            if result.returncode == 0:
+                print(f"Program '{program['name']}' completed successfully")
+            else:
+                print(f"Program '{program['name']}' exited with code {result.returncode}")
+            print("Press Enter to return to TFM...")
+            input()
+            
+        except FileNotFoundError:
+            print(f"Error: Command not found: {program['command'][0]}")
+            print("Press Enter to continue...")
+            input()
+        except Exception as e:
+            print(f"Error executing program '{program['name']}': {e}")
+            print("Press Enter to continue...")
+            input()
+        
+        finally:
+            # Reinitialize curses
+            self.stdscr = curses.initscr()
+            curses.curs_set(0)  # Hide cursor
+            self.stdscr.keypad(True)
+            
+            # Reinitialize colors
+            init_colors()
+            
+            # Restore stdout/stderr capture
+            sys.stdout = LogCapture(self.log_messages, "STDOUT")
+            sys.stderr = LogCapture(self.log_messages, "STDERR")
+            
+            # Log return from program execution
+            print(f"Returned from external program: {program['name']}")
+            
+            # Force full redraw
+            self.needs_full_redraw = True
+    
     def show_sort_menu(self):
         """Show sort options menu using the quick choice dialog"""
         current_pane = self.get_current_pane()
@@ -2740,7 +2879,8 @@ class FileManager:
         help_lines.append("=== GENERAL ===")
         help_lines.append("? / h            Show this help")
         help_lines.append("q / Q            Quit TFM")
-        help_lines.append("x / X            Enter sub-shell mode")
+        help_lines.append("x / X            Execute external programs")
+        help_lines.append("z / Z            Enter sub-shell mode")
         help_lines.append("ESC              Cancel current operation")
         help_lines.append("")
         
@@ -2760,9 +2900,10 @@ class FileManager:
         help_lines.append("• Log pane shows operation results and system messages")
         help_lines.append("• File details (i) shows comprehensive file information")
         help_lines.append("• Text viewer (v) supports syntax highlighting")
-        help_lines.append("• Sub-shell mode (x) provides environment variables:")
-        help_lines.append("  LEFT_DIR, RIGHT_DIR, THIS_DIR, OTHER_DIR")
-        help_lines.append("  LEFT_SELECTED, RIGHT_SELECTED, THIS_SELECTED, OTHER_SELECTED")
+        help_lines.append("• External programs (x) execute with TFM environment variables")
+        help_lines.append("• Sub-shell mode (z) provides environment variables:")
+        help_lines.append("  TFM_LEFT_DIR, TFM_RIGHT_DIR, TFM_THIS_DIR, TFM_OTHER_DIR")
+        help_lines.append("  TFM_LEFT_SELECTED, TFM_RIGHT_SELECTED, TFM_THIS_SELECTED, TFM_OTHER_SELECTED")
         help_lines.append("• Archive operations support ZIP, TAR.GZ, and TGZ formats")
         help_lines.append("• Archive extraction creates directory with archive base name")
         
@@ -5044,6 +5185,8 @@ class FileManager:
                 self.enter_rename_mode()
             elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
                 self.show_favorite_directories()
+            elif self.is_key_for_action(key, 'programs'):  # Show external programs
+                self.show_programs_dialog()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50

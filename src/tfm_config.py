@@ -59,7 +59,8 @@ class DefaultConfig:
         'delete_files': ['k', 'K'],
         'rename_file': ['r', 'R'],
         'favorites': ['j', 'J'],
-        'subshell': ['x', 'X'],
+        'subshell': ['X'],
+        'programs': ['x'],
         'create_archive': ['p', 'P'],
         'extract_archive': ['u', 'U'],
     }
@@ -321,3 +322,26 @@ def get_favorite_directories():
                     print(f"Warning: Invalid favorite directory path: {fav['name']} -> {fav['path']}: {e}")
     
     return favorites
+
+
+def get_programs():
+    """Get the list of external programs from configuration"""
+    config = get_config()
+    
+    programs = []
+    
+    # Get programs from user config
+    if hasattr(config, 'PROGRAMS') and config.PROGRAMS:
+        for prog in config.PROGRAMS:
+            if isinstance(prog, dict) and 'name' in prog and 'command' in prog:
+                if isinstance(prog['command'], list) and prog['command']:
+                    programs.append({
+                        'name': prog['name'],
+                        'command': prog['command']
+                    })
+                else:
+                    print(f"Warning: Program command must be a non-empty list: {prog['name']}")
+            else:
+                print(f"Warning: Invalid program configuration: {prog}")
+    
+    return programs
