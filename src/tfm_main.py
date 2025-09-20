@@ -35,6 +35,7 @@ from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
+from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
 
 class FileManager:
     def __init__(self, stdscr):
@@ -55,6 +56,7 @@ class FileManager:
         self.search_dialog = SearchDialog(self.config)
         self.batch_rename_dialog = BatchRenameDialog(self.config)
         self.quick_choice_bar = QuickChoiceBar(self.config)
+        self.general_dialog = GeneralPurposeDialog(self.config)
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -66,27 +68,8 @@ class FileManager:
         self.isearch_matches = []
         self.isearch_match_index = 0
         
-        # Filter mode state
-        self.filter_mode = False
-        self.filter_editor = SingleLineTextEdit()
-        
-        # Rename mode state
-        self.rename_mode = False
-        self.rename_editor = SingleLineTextEdit()
-        self.rename_original_name = ""
-        self.rename_file_path = None
-        
-        # Create directory mode state
-        self.create_dir_mode = False
-        self.create_dir_editor = SingleLineTextEdit()
-        
-        # Create file mode state
-        self.create_file_mode = False
-        self.create_file_editor = SingleLineTextEdit()
-        
-        # Create archive mode state
-        self.create_archive_mode = False
-        self.create_archive_editor = SingleLineTextEdit()
+        # Dialog state (now handled by general_dialog)
+        self.rename_file_path = None  # Still needed for rename operations
         
 
         self.should_quit = False  # Flag to control main loop exit
@@ -672,133 +655,7 @@ class FileManager:
                         self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
             return
         
-        # If in filter mode, show filter interface
-        if self.filter_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw filter input using SingleLineTextEdit
-            max_input_width = width - 50  # Leave space for help text
-            self.filter_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                "Filter: ",
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:apply (files only: *.py, test_*, *.[ch])"
-            # Calculate space needed for the input field
-            input_field_width = len("Filter: ") + len(self.filter_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            else:
-                # Shorter help text for narrow terminals
-                short_help = "ESC:cancel Enter:apply"
-                if input_field_width + len(short_help) + 6 < width:
-                    help_x = width - len(short_help) - 3
-                    if help_x > input_field_width + 4:
-                        self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
-            return
-        
-        # If in rename mode, show rename interface
-        if self.rename_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw rename input using SingleLineTextEdit
-            prompt_text = f"Rename '{self.rename_original_name}' to: "
-            max_input_width = width - len(prompt_text) - 25  # Leave space for help text
-            self.rename_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                prompt_text,
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:confirm"
-            # Calculate space needed for the input field
-            input_field_width = len(prompt_text) + len(self.rename_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            return
-        
-        # If in create directory mode, show create directory interface
-        if self.create_dir_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw create directory input using SingleLineTextEdit
-            max_input_width = width - 20  # Leave space for help text
-            self.create_dir_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                "Create directory: ",
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:create"
-            # Calculate space needed for the input field
-            input_field_width = len("Create directory: ") + len(self.create_dir_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            return
-        
-        # If in create file mode, show create file interface
-        if self.create_file_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw create file input using SingleLineTextEdit
-            max_input_width = width - 20  # Leave space for help text
-            self.create_file_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                "Create file: ",
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:create"
-            # Calculate space needed for the input field
-            input_field_width = len("Create file: ") + len(self.create_file_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            return
-        
-        # If in create archive mode, show create archive interface
-        if self.create_archive_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw create archive input using SingleLineTextEdit
-            max_input_width = width - 35  # Leave space for help text
-            self.create_archive_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                "Archive filename: ",
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:create (.zip/.tar.gz/.tgz)"
-            # Calculate space needed for the input field
-            input_field_width = len("Archive filename: ") + len(self.create_archive_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            return
+
         
         # Normal status display
         # Left side: status info
@@ -968,16 +825,30 @@ class FileManager:
     
     def enter_filter_mode(self):
         """Enter filename filter mode"""
-        self.filter_mode = True
         current_pane = self.get_current_pane()
-        self.filter_editor.text = current_pane['filter_pattern']  # Start with current filter
-        self.filter_editor.cursor_pos = len(self.filter_editor.text)  # Position cursor at end
+        DialogHelpers.create_filter_dialog(self.general_dialog, current_pane['filter_pattern'])
+        self.general_dialog.callback = self.on_filter_confirm
+        self.general_dialog.cancel_callback = self.on_filter_cancel
         self.needs_full_redraw = True
         
-    def exit_filter_mode(self):
-        """Exit filter mode"""
-        self.filter_mode = False
-        self.filter_editor.clear()
+    def on_filter_confirm(self, filter_text):
+        """Handle filter confirmation"""
+        current_pane = self.get_current_pane()
+        count = self.file_operations.apply_filter(current_pane, filter_text)
+        
+        # Log the filter action
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
+        
+        if filter_text:
+            print(f"Applied filter '{filter_text}' to {pane_name} pane")
+            print(f"Showing {count} items")
+        
+        self.general_dialog.hide()
+        self.needs_full_redraw = True
+    
+    def on_filter_cancel(self):
+        """Handle filter cancellation"""
+        self.general_dialog.hide()
         self.needs_full_redraw = True
     
     def apply_filter(self):
@@ -1031,20 +902,72 @@ class FileManager:
         
         # Parent directory (..) is no longer shown, so no need to check for it
         
-        # Enter rename mode
-        self.rename_mode = True
+        # Enter rename mode using general dialog
         self.rename_file_path = selected_file
-        self.rename_original_name = selected_file.name
-        self.rename_editor.text = selected_file.name  # Start with current name
-        self.rename_editor.cursor_pos = len(self.rename_editor.text)  # Position cursor at end
+        DialogHelpers.create_rename_dialog(self.general_dialog, selected_file.name, selected_file.name)
+        self.general_dialog.callback = self.on_rename_confirm
+        self.general_dialog.cancel_callback = self.on_rename_cancel
         self.needs_full_redraw = True
-        print(f"Renaming: {self.rename_original_name}")
+        print(f"Renaming: {selected_file.name}")
     
-    def exit_rename_mode(self):
-        """Exit rename mode"""
-        self.rename_mode = False
-        self.rename_editor.clear()
-        self.rename_original_name = ""
+    def on_rename_confirm(self, new_name):
+        """Handle rename confirmation"""
+        if not self.rename_file_path or not new_name.strip():
+            print("Invalid rename operation")
+            self.general_dialog.hide()
+            self.rename_file_path = None
+            return
+        
+        original_name = self.rename_file_path.name
+        
+        if new_name == original_name:
+            print("Name unchanged")
+            self.general_dialog.hide()
+            self.rename_file_path = None
+            return
+        
+        try:
+            # Perform the rename
+            new_path = self.rename_file_path.parent / new_name
+            
+            # Check if target already exists
+            if new_path.exists():
+                print(f"File '{new_name}' already exists")
+                self.general_dialog.hide()
+                self.rename_file_path = None
+                return
+            
+            # Perform the rename
+            self.rename_file_path.rename(new_path)
+            print(f"Renamed '{original_name}' to '{new_name}'")
+            
+            # Refresh the current pane
+            current_pane = self.get_current_pane()
+            self.refresh_files(current_pane)
+            
+            # Try to select the renamed file
+            for i, file_path in enumerate(current_pane['files']):
+                if file_path.name == new_name:
+                    current_pane['selected_index'] = i
+                    self.adjust_scroll_for_selection(current_pane)
+                    break
+            
+            self.general_dialog.hide()
+            self.rename_file_path = None
+            
+        except PermissionError:
+            print(f"Permission denied: Cannot rename '{original_name}'")
+            self.general_dialog.hide()
+            self.rename_file_path = None
+        except OSError as e:
+            print(f"Error renaming file: {e}")
+            self.general_dialog.hide()
+            self.rename_file_path = None
+    
+    def on_rename_cancel(self):
+        """Handle rename cancellation"""
+        print("Rename cancelled")
+        self.general_dialog.hide()
         self.rename_file_path = None
         self.needs_full_redraw = True
     
@@ -1057,33 +980,28 @@ class FileManager:
             print(f"Permission denied: Cannot create directory in {current_pane['path']}")
             return
         
-        # Enter create directory mode
-        self.create_dir_mode = True
-        self.create_dir_editor.clear()
+        # Enter create directory mode using general dialog
+        DialogHelpers.create_create_directory_dialog(self.general_dialog)
+        self.general_dialog.callback = self.on_create_directory_confirm
+        self.general_dialog.cancel_callback = self.on_create_directory_cancel
         self.needs_full_redraw = True
         print("Creating new directory...")
     
-    def exit_create_directory_mode(self):
-        """Exit create directory mode"""
-        self.create_dir_mode = False
-        self.create_dir_editor.clear()
-        self.needs_full_redraw = True
-    
-    def perform_create_directory(self):
-        """Perform the actual directory creation"""
-        if not self.create_dir_editor.text.strip():
+    def on_create_directory_confirm(self, dir_name):
+        """Handle create directory confirmation"""
+        if not dir_name.strip():
             print("Invalid directory name")
-            self.exit_create_directory_mode()
+            self.general_dialog.hide()
             return
         
         current_pane = self.get_current_pane()
-        new_dir_name = self.create_dir_editor.text.strip()
+        new_dir_name = dir_name.strip()
         new_dir_path = current_pane['path'] / new_dir_name
         
         # Check if directory already exists
         if new_dir_path.exists():
             print(f"Directory '{new_dir_name}' already exists")
-            self.exit_create_directory_mode()
+            self.general_dialog.hide()
             return
         
         try:
@@ -1091,30 +1009,29 @@ class FileManager:
             new_dir_path.mkdir(parents=True, exist_ok=False)
             print(f"Created directory: {new_dir_name}")
             
-            # Refresh the current pane to show the new directory
+            # Refresh the current pane
             self.refresh_files(current_pane)
             
-            # Move cursor to the newly created directory
+            # Try to select the new directory
             for i, file_path in enumerate(current_pane['files']):
                 if file_path.name == new_dir_name:
                     current_pane['selected_index'] = i
-                    # Adjust scroll if needed
-                    height, width = self.stdscr.getmaxyx()
-                    calculated_height = int(height * self.log_height_ratio)
-                    log_height = calculated_height if self.log_height_ratio > 0 else 0
-                    display_height = height - log_height - 3
-                    
-                    if current_pane['selected_index'] < current_pane['scroll_offset']:
-                        current_pane['scroll_offset'] = current_pane['selected_index']
-                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
-                        current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+                    self.adjust_scroll_for_selection(current_pane)
                     break
             
-            self.exit_create_directory_mode()
+            self.general_dialog.hide()
             
         except OSError as e:
             print(f"Failed to create directory '{new_dir_name}': {e}")
-            self.exit_create_directory_mode()
+            self.general_dialog.hide()
+    
+    def on_create_directory_cancel(self):
+        """Handle create directory cancellation"""
+        print("Directory creation cancelled")
+        self.general_dialog.hide()
+        self.needs_full_redraw = True
+    
+
     
     def enter_create_file_mode(self):
         """Enter create file mode"""
@@ -1125,125 +1042,64 @@ class FileManager:
             print(f"Permission denied: Cannot create file in {current_pane['path']}")
             return
         
-        # Enter create file mode
-        self.create_file_mode = True
-        self.create_file_editor.clear()
+        # Enter create file mode using general dialog
+        DialogHelpers.create_create_file_dialog(self.general_dialog)
+        self.general_dialog.callback = self.on_create_file_confirm
+        self.general_dialog.cancel_callback = self.on_create_file_cancel
         self.needs_full_redraw = True
         print("Creating new text file...")
     
-    def exit_create_file_mode(self):
-        """Exit create file mode"""
-        self.create_file_mode = False
-        self.create_file_editor.clear()
-        self.needs_full_redraw = True
-    
-    def perform_create_file(self):
-        """Perform the actual file creation"""
-        file_name = self.create_file_editor.get_text().strip()
-        if not file_name:
+    def on_create_file_confirm(self, file_name):
+        """Handle create file confirmation"""
+        if not file_name.strip():
             print("Invalid file name")
-            self.exit_create_file_mode()
+            self.general_dialog.hide()
             return
         
         current_pane = self.get_current_pane()
-        new_file_name = file_name
+        new_file_name = file_name.strip()
         new_file_path = current_pane['path'] / new_file_name
         
         # Check if file already exists
         if new_file_path.exists():
             print(f"File '{new_file_name}' already exists")
-            self.exit_create_file_mode()
+            self.general_dialog.hide()
             return
         
         try:
-            # Create the empty file
+            # Create the file
             new_file_path.touch()
             print(f"Created file: {new_file_name}")
             
-            # Refresh the current pane to show the new file
+            # Refresh the current pane
             self.refresh_files(current_pane)
             
-            # Move cursor to the newly created file
+            # Try to select the new file
             for i, file_path in enumerate(current_pane['files']):
                 if file_path.name == new_file_name:
                     current_pane['selected_index'] = i
-                    # Adjust scroll if needed
-                    height, width = self.stdscr.getmaxyx()
-                    calculated_height = int(height * self.log_height_ratio)
-                    log_height = calculated_height if self.log_height_ratio > 0 else 0
-                    display_height = height - log_height - 3
-                    
-                    if current_pane['selected_index'] < current_pane['scroll_offset']:
-                        current_pane['scroll_offset'] = current_pane['selected_index']
-                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
-                        current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+                    self.adjust_scroll_for_selection(current_pane)
                     break
             
-            # Automatically open the file in the text editor
-            self.edit_selected_file()
+            # Open the file for editing if it's a text file
+            if is_text_file(new_file_path):
+                self.edit_selected_file()
             
-            self.exit_create_file_mode()
+            self.general_dialog.hide()
             
         except OSError as e:
             print(f"Failed to create file '{new_file_name}': {e}")
-            self.exit_create_file_mode()
+            self.general_dialog.hide()
     
-    def perform_rename(self):
-        """Perform the actual rename operation"""
-        if not self.rename_file_path or not self.rename_editor.text.strip():
-            print("Invalid rename operation")
-            self.exit_rename_mode()
-            return
-        
-        new_name = self.rename_editor.text.strip()
-        
-        # Check if name actually changed
-        if new_name == self.rename_original_name:
-            print("Name unchanged")
-            self.exit_rename_mode()
-            return
-        
-        # Check for invalid characters (basic validation)
-        if '/' in new_name or '\0' in new_name:
-            print("Invalid characters in filename")
-            return
-        
-        # Check if new name is empty
-        if not new_name:
-            print("Filename cannot be empty")
-            return
-        
-        # Create new path
-        new_path = self.rename_file_path.parent / new_name
-        
-        # Check if target already exists
-        if new_path.exists():
-            print(f"File or directory '{new_name}' already exists")
-            return
-        
-        try:
-            # Perform the rename
-            self.rename_file_path.rename(new_path)
-            print(f"Renamed '{self.rename_original_name}' to '{new_name}'")
-            
-            # Refresh the current pane
-            current_pane = self.get_current_pane()
-            self.refresh_files(current_pane)
-            
-            # Try to select the renamed file
-            for i, file_path in enumerate(current_pane['files']):
-                if file_path.name == new_name:
-                    current_pane['selected_index'] = i
-                    break
-            
-            self.exit_rename_mode()
-            
-        except PermissionError:
-            print(f"Permission denied renaming '{self.rename_original_name}'")
-        except FileExistsError:
-            print(f"File '{new_name}' already exists")
-        except Exception as e:
-            print(f"Error renaming file: {e}")
+    def on_create_file_cancel(self):
+        """Handle create file cancellation"""
+        print("File creation cancelled")
+        self.general_dialog.hide()
+        self.needs_full_redraw = True
+    
+
+    
+
     
     def enter_batch_rename_mode(self):
         """Enter batch rename mode for multiple selected files"""
@@ -2189,9 +2045,10 @@ class FileManager:
             print("No files to archive")
             return
         
-        # Enter archive creation mode
-        self.create_archive_mode = True
-        self.create_archive_editor.clear()
+        # Enter archive creation mode using general dialog
+        DialogHelpers.create_create_archive_dialog(self.general_dialog)
+        self.general_dialog.callback = self.on_create_archive_confirm
+        self.general_dialog.cancel_callback = self.on_create_archive_cancel
         self.needs_full_redraw = True
         
         # Log what we're about to archive
@@ -2201,29 +2058,82 @@ class FileManager:
             print(f"Creating archive from {len(files_to_archive)} selected items")
         print("Enter archive filename (with .zip, .tar.gz, or .tgz extension):")
     
-    def exit_create_archive_mode(self):
-        """Exit archive creation mode"""
-        self.create_archive_mode = False
-        self.create_archive_editor.clear()
+    def on_create_archive_confirm(self, archive_name):
+        """Handle create archive confirmation"""
+        if not archive_name.strip():
+            print("Invalid archive name")
+            self.general_dialog.hide()
+            return
+        
+        current_pane = self.get_current_pane()
+        
+        # Get files to archive
+        files_to_archive = []
+        
+        if current_pane['selected_files']:
+            # Archive selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_archive.append(file_path)
+        else:
+            # Archive current file if no files are selected
+            if current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']]
+                files_to_archive.append(selected_file)
+        
+        if not files_to_archive:
+            print("No files to archive")
+            self.general_dialog.hide()
+            return
+        
+        archive_filename = archive_name.strip()
+        archive_path = current_pane['path'] / archive_filename
+        
+        # Check if archive already exists
+        if archive_path.exists():
+            print(f"Archive '{archive_filename}' already exists")
+            self.general_dialog.hide()
+            return
+        
+        try:
+            # Detect archive format and create archive
+            archive_format = self.detect_archive_format(archive_filename)
+            
+            if archive_format == 'zip':
+                self.create_zip_archive(archive_path, files_to_archive)
+            elif archive_format in ['tar.gz', 'tgz']:
+                self.create_tar_archive(archive_path, files_to_archive)
+            else:
+                print(f"Unsupported archive format. Use .zip, .tar.gz, or .tgz")
+                self.general_dialog.hide()
+                return
+            
+            print(f"Created archive: {archive_filename}")
+            
+            # Refresh the current pane
+            self.refresh_files(current_pane)
+            
+            # Try to select the new archive
+            for i, file_path in enumerate(current_pane['files']):
+                if file_path.name == archive_filename:
+                    current_pane['selected_index'] = i
+                    self.adjust_scroll_for_selection(current_pane)
+                    break
+            
+            self.general_dialog.hide()
+            
+        except Exception as e:
+            print(f"Error creating archive: {e}")
+            self.general_dialog.hide()
+    
+    def on_create_archive_cancel(self):
+        """Handle create archive cancellation"""
+        print("Archive creation cancelled")
+        self.general_dialog.hide()
         self.needs_full_redraw = True
     
-    def handle_create_archive_input(self, key):
-        """Handle input while in create archive mode"""
-        if key == 27:  # ESC - cancel archive creation
-            print("Archive creation cancelled")
-            self.exit_create_archive_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - create archive
-            self.perform_create_archive()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.create_archive_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        return False
+
     
     def perform_create_archive(self):
         """Create the archive file"""
@@ -2465,43 +2375,7 @@ class FileManager:
         # Only allow specific keys that make sense during isearch
         return True
     
-    def handle_filter_input(self, key):
-        """Handle input while in filter mode"""
-        if key == 27:  # ESC - exit filter mode without applying
-            self.exit_filter_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - apply filter and exit filter mode
-            self.apply_filter()
-            self.exit_filter_mode()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.filter_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        # In filter mode, capture most other keys to prevent unintended actions
-        return True
-    
-    def handle_rename_input(self, key):
-        """Handle input while in rename mode"""
-        if key == 27:  # ESC - cancel rename
-            print("Rename cancelled")
-            self.exit_rename_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - perform rename
-            self.perform_rename()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.rename_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        # In rename mode, capture most other keys to prevent unintended actions
-        return True
+
 
     def handle_batch_rename_input(self, key):
         """Handle input while in batch rename mode - wrapper for batch rename dialog component"""
@@ -2535,43 +2409,7 @@ class FileManager:
         
         return True  # Capture most keys in batch rename mode
     
-    def handle_create_directory_input(self, key):
-        """Handle input while in create directory mode"""
-        if key == 27:  # ESC - cancel directory creation
-            print("Directory creation cancelled")
-            self.exit_create_directory_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - create directory
-            self.perform_create_directory()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.create_dir_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        # In create directory mode, capture most other keys to prevent unintended actions
-        return True
-    
-    def handle_create_file_input(self, key):
-        """Handle input while in create file mode"""
-        if key == 27:  # ESC - cancel file creation
-            print("File creation cancelled")
-            self.exit_create_file_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - create file
-            self.perform_create_file()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.create_file_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        # In create file mode, capture most other keys to prevent unintended actions
-        return True
+
         
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
@@ -2809,19 +2647,31 @@ class FileManager:
                 self.draw_log_pane()
                 self.draw_status()
                 
-                # Draw dialog overlays on top of the interface
-                if self.list_dialog.mode:
-                    self.list_dialog.draw(self.stdscr, self.safe_addstr)
-                elif self.info_dialog.mode:
-                    self.info_dialog.draw(self.stdscr, self.safe_addstr)
-                elif self.search_dialog.mode:
-                    self.search_dialog.draw(self.stdscr, self.safe_addstr)
-                elif self.batch_rename_dialog.mode:
-                    self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
-                
                 # Refresh screen
                 self.stdscr.refresh()
                 self.needs_full_redraw = False
+            
+            # Always draw dialog overlays on top (they need to update every frame for cursor/text changes)
+            dialog_drawn = False
+            if self.general_dialog.is_active:
+                self.general_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.list_dialog.mode:
+                self.list_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.info_dialog.mode:
+                self.info_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.search_dialog.mode:
+                self.search_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.batch_rename_dialog.mode:
+                self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            
+            # Refresh screen if dialog was drawn
+            if dialog_drawn:
+                self.stdscr.refresh()
             
             # Get user input with timeout to allow timer checks
             self.stdscr.timeout(16)  # 16ms timeout
@@ -2837,30 +2687,10 @@ class FileManager:
                 if self.handle_isearch_input(key):
                     continue  # Isearch mode handled the key
             
-            # Handle filter mode input
-            if self.filter_mode:
-                if self.handle_filter_input(key):
-                    continue  # Filter mode handled the key
-            
-            # Handle rename mode input
-            if self.rename_mode:
-                if self.handle_rename_input(key):
-                    continue  # Rename mode handled the key
-            
-            # Handle create directory mode input
-            if self.create_dir_mode:
-                if self.handle_create_directory_input(key):
-                    continue  # Create directory mode handled the key
-            
-            # Handle create file mode input
-            if self.create_file_mode:
-                if self.handle_create_file_input(key):
-                    continue  # Create file mode handled the key
-            
-            # Handle create archive mode input
-            if self.create_archive_mode:
-                if self.handle_create_archive_input(key):
-                    continue  # Create archive mode handled the key
+            # Handle general dialog input
+            if self.general_dialog.is_active:
+                if self.general_dialog.handle_key(key):
+                    continue  # General dialog handled the key
             
             # Handle quick choice mode input
             if self.quick_choice_bar.mode:
@@ -2889,7 +2719,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog.mode or self.batch_rename_dialog.mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
+            if self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog.mode or self.batch_rename_dialog.mode or self.isearch_mode or self.general_dialog.is_active:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
