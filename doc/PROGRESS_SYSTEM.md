@@ -7,6 +7,7 @@ The TFM progress system provides a unified way to track and display progress for
 ## Features
 
 - **Unified Progress Tracking**: Single system for all file operations (copy, move, delete, archive creation/extraction)
+- **Fine-Grained Progress**: Tracks individual files even when processing directories recursively
 - **Real-time Updates**: Progress updates are displayed in the status bar during operations
 - **Error Tracking**: Tracks errors that occur during operations
 - **Flexible Display**: Automatically formats progress text to fit available screen space
@@ -90,7 +91,16 @@ if self.progress_manager.is_operation_active():
 
 ### Progress Threshold
 
-Progress is only shown for operations involving multiple files (> 1 file). Single file operations complete too quickly to benefit from progress display.
+Progress is only shown for operations involving multiple individual files (> 1 file). Single file operations complete too quickly to benefit from progress display.
+
+### Fine-Grained Tracking
+
+The system now counts and tracks individual files even when processing directories:
+
+- **Directory Operations**: When copying/moving/deleting a directory, progress is shown for each individual file within that directory
+- **Recursive Processing**: Files in nested subdirectories are tracked individually
+- **Accurate Counts**: Total file count includes all files in all subdirectories
+- **Detailed Display**: Shows relative paths for files in subdirectories (e.g., "src/components/header.py")
 
 ### Display Format
 
@@ -101,7 +111,10 @@ Progress text includes:
 - Percentage complete
 - Current file being processed (if space allows)
 
-Example: `Copying (to Documents)... 15/50 (30%) - large_file.pdf`
+Examples: 
+- `Copying (to Documents)... 15/50 (30%) - large_file.pdf`
+- `Copying (to Backup)... 127/200 (63%) - src/components/header.py`
+- `Moving (to Archive)... 45/78 (57%) - data/datasets/sales.csv`
 
 ## Migration from Legacy System
 

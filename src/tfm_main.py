@@ -1808,41 +1808,59 @@ class FileManager:
             print(f"Copied {len(files_to_copy)} files")
     
     def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False):
-        """Perform the actual copy operation"""
+        """Perform the actual copy operation with fine-grained progress tracking"""
         copied_count = 0
         error_count = 0
         
+        # Count total individual files for fine-grained progress
+        total_individual_files = self._count_files_recursively(files_to_copy)
+        
         # Start progress tracking for copy operation
-        total_files = len(files_to_copy)
-        if total_files > 1:  # Only show progress for multiple files
+        if total_individual_files > 1:  # Only show progress for multiple files
             self.progress_manager.start_operation(
                 OperationType.COPY, 
-                total_files, 
+                total_individual_files, 
                 f"to {destination_dir.name}",
                 self._progress_callback
             )
         
+        processed_files = 0
+        
         try:
-            for i, source_file in enumerate(files_to_copy):
-                # Update progress
-                if total_files > 1:
-                    self.progress_manager.update_progress(source_file.name, i)
-                
+            for source_file in files_to_copy:
                 try:
                     dest_path = destination_dir / source_file.name
                     
                     # Skip if file exists and we're not overwriting
                     if dest_path.exists() and not overwrite:
+                        # Still need to count skipped files for progress
+                        if source_file.is_file() or source_file.is_symlink():
+                            processed_files += 1
+                            if total_individual_files > 1:
+                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
+                        elif source_file.is_dir():
+                            # Count files in skipped directory
+                            skipped_count = self._count_files_recursively([source_file])
+                            processed_files += skipped_count
+                            if total_individual_files > 1:
+                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
                         continue
                     
                     if source_file.is_dir():
-                        # Copy directory recursively
+                        # Copy directory recursively with progress tracking
                         if dest_path.exists():
                             shutil.rmtree(dest_path)
-                        shutil.copytree(source_file, dest_path)
+                        
+                        processed_files = self._copy_directory_with_progress(
+                            source_file, dest_path, processed_files, total_individual_files
+                        )
                         print(f"Copied directory: {source_file.name}")
                     else:
-                        # Copy file
+                        # Copy single file
+                        processed_files += 1
+                        if total_individual_files > 1:
+                            self.progress_manager.update_progress(source_file.name, processed_files)
+                        
                         shutil.copy2(source_file, dest_path)
                         print(f"Copied file: {source_file.name}")
                     
@@ -1851,17 +1869,27 @@ class FileManager:
                 except PermissionError as e:
                     print(f"Permission denied copying {source_file.name}: {e}")
                     error_count += 1
-                    if total_files > 1:
+                    if total_individual_files > 1:
                         self.progress_manager.increment_errors()
+                        # Still count the file for progress tracking
+                        if source_file.is_file() or source_file.is_symlink():
+                            processed_files += 1
+                        elif source_file.is_dir():
+                            processed_files += self._count_files_recursively([source_file])
                 except Exception as e:
                     print(f"Error copying {source_file.name}: {e}")
                     error_count += 1
-                    if total_files > 1:
+                    if total_individual_files > 1:
                         self.progress_manager.increment_errors()
+                        # Still count the file for progress tracking
+                        if source_file.is_file() or source_file.is_symlink():
+                            processed_files += 1
+                        elif source_file.is_dir():
+                            processed_files += self._count_files_recursively([source_file])
         
         finally:
             # Finish progress tracking
-            if total_files > 1:
+            if total_individual_files > 1:
                 self.progress_manager.finish_operation()
         
         # Refresh both panes to show the copied files
@@ -1875,6 +1903,73 @@ class FileManager:
         
         if error_count > 0:
             print(f"Copy completed with {error_count} errors")
+    
+    def _copy_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files):
+        """Copy directory recursively with fine-grained progress updates"""
+        try:
+            # Create destination directory
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Walk through source directory and copy files one by one
+            for root, dirs, files in os.walk(source_dir):
+                root_path = Path(root)
+                
+                # Calculate relative path from source directory
+                rel_path = root_path.relative_to(source_dir)
+                dest_root = dest_dir / rel_path
+                
+                # Create subdirectories
+                dest_root.mkdir(parents=True, exist_ok=True)
+                
+                # Copy files in current directory
+                for file_name in files:
+                    source_file = root_path / file_name
+                    dest_file = dest_root / file_name
+                    
+                    processed_files += 1
+                    if total_files > 1:
+                        # Show relative path for files in subdirectories
+                        display_name = str(rel_path / file_name) if rel_path != Path('.') else file_name
+                        self.progress_manager.update_progress(display_name, processed_files)
+                    
+                    try:
+                        if source_file.is_symlink():
+                            # Copy symbolic link
+                            link_target = os.readlink(str(source_file))
+                            dest_file.symlink_to(link_target)
+                        else:
+                            # Copy regular file
+                            shutil.copy2(source_file, dest_file)
+                    except Exception as e:
+                        print(f"Error copying {source_file}: {e}")
+                        if total_files > 1:
+                            self.progress_manager.increment_errors()
+                
+                # Handle symbolic links to directories
+                for dir_name in dirs:
+                    source_subdir = root_path / dir_name
+                    if source_subdir.is_symlink():
+                        processed_files += 1
+                        if total_files > 1:
+                            display_name = str(rel_path / dir_name) if rel_path != Path('.') else dir_name
+                            self.progress_manager.update_progress(f"Link: {display_name}", processed_files)
+                        
+                        dest_subdir = dest_root / dir_name
+                        try:
+                            link_target = os.readlink(str(source_subdir))
+                            dest_subdir.symlink_to(link_target)
+                        except Exception as e:
+                            print(f"Error copying symlink {source_subdir}: {e}")
+                            if total_files > 1:
+                                self.progress_manager.increment_errors()
+            
+            return processed_files
+            
+        except Exception as e:
+            print(f"Error copying directory {source_dir}: {e}")
+            if total_files > 1:
+                self.progress_manager.increment_errors()
+            return processed_files
     
     def move_selected_files(self):
         """Move selected files to the opposite pane's directory, or create new directory if no files selected"""
@@ -1968,31 +2063,42 @@ class FileManager:
             print(f"Moved {len(files_to_move)} files")
     
     def perform_move_operation(self, files_to_move, destination_dir, overwrite=False):
-        """Perform the actual move operation"""
+        """Perform the actual move operation with fine-grained progress tracking"""
         moved_count = 0
         error_count = 0
         
+        # Count total individual files for fine-grained progress
+        total_individual_files = self._count_files_recursively(files_to_move)
+        
         # Start progress tracking for move operation
-        total_files = len(files_to_move)
-        if total_files > 1:  # Only show progress for multiple files
+        if total_individual_files > 1:  # Only show progress for multiple files
             self.progress_manager.start_operation(
                 OperationType.MOVE, 
-                total_files, 
+                total_individual_files, 
                 f"to {destination_dir.name}",
                 self._progress_callback
             )
         
+        processed_files = 0
+        
         try:
-            for i, source_file in enumerate(files_to_move):
-                # Update progress
-                if total_files > 1:
-                    self.progress_manager.update_progress(source_file.name, i)
-                
+            for source_file in files_to_move:
                 try:
                     dest_path = destination_dir / source_file.name
                     
                     # Skip if file exists and we're not overwriting
                     if dest_path.exists() and not overwrite:
+                        # Still need to count skipped files for progress
+                        if source_file.is_file() or source_file.is_symlink():
+                            processed_files += 1
+                            if total_individual_files > 1:
+                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
+                        elif source_file.is_dir():
+                            # Count files in skipped directory
+                            skipped_count = self._count_files_recursively([source_file])
+                            processed_files += skipped_count
+                            if total_individual_files > 1:
+                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
                         continue
                     
                     # Remove destination if it exists and we're overwriting
@@ -2005,16 +2111,26 @@ class FileManager:
                     # Move the file/directory
                     if source_file.is_symlink():
                         # For symbolic links, copy the link itself (not the target)
+                        processed_files += 1
+                        if total_individual_files > 1:
+                            self.progress_manager.update_progress(f"Link: {source_file.name}", processed_files)
+                        
                         link_target = os.readlink(str(source_file))
                         dest_path.symlink_to(link_target)
                         source_file.unlink()
                         print(f"Moved symbolic link: {source_file.name}")
                     elif source_file.is_dir():
-                        # Move directory recursively
-                        shutil.move(str(source_file), str(dest_path))
+                        # For directories, we need to track individual files being moved
+                        processed_files = self._move_directory_with_progress(
+                            source_file, dest_path, processed_files, total_individual_files
+                        )
                         print(f"Moved directory: {source_file.name}")
                     else:
-                        # Move file
+                        # Move single file
+                        processed_files += 1
+                        if total_individual_files > 1:
+                            self.progress_manager.update_progress(source_file.name, processed_files)
+                        
                         shutil.move(str(source_file), str(dest_path))
                         print(f"Moved file: {source_file.name}")
                     
@@ -2023,17 +2139,27 @@ class FileManager:
                 except PermissionError as e:
                     print(f"Permission denied moving {source_file.name}: {e}")
                     error_count += 1
-                    if total_files > 1:
+                    if total_individual_files > 1:
                         self.progress_manager.increment_errors()
+                        # Still count the file for progress tracking
+                        if source_file.is_file() or source_file.is_symlink():
+                            processed_files += 1
+                        elif source_file.is_dir():
+                            processed_files += self._count_files_recursively([source_file])
                 except Exception as e:
                     print(f"Error moving {source_file.name}: {e}")
                     error_count += 1
-                    if total_files > 1:
+                    if total_individual_files > 1:
                         self.progress_manager.increment_errors()
+                        # Still count the file for progress tracking
+                        if source_file.is_file() or source_file.is_symlink():
+                            processed_files += 1
+                        elif source_file.is_dir():
+                            processed_files += self._count_files_recursively([source_file])
         
         finally:
             # Finish progress tracking
-            if total_files > 1:
+            if total_individual_files > 1:
                 self.progress_manager.finish_operation()
         
         # Refresh both panes to show the moved files
@@ -2047,6 +2173,25 @@ class FileManager:
         
         if error_count > 0:
             print(f"Move completed with {error_count} errors")
+    
+    def _move_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files):
+        """Move directory using copy + delete with fine-grained progress updates"""
+        try:
+            # First copy the directory with progress tracking
+            processed_files = self._copy_directory_with_progress(
+                source_dir, dest_dir, processed_files, total_files
+            )
+            
+            # Then remove the source directory
+            shutil.rmtree(source_dir)
+            
+            return processed_files
+            
+        except Exception as e:
+            print(f"Error moving directory {source_dir}: {e}")
+            if total_files > 1:
+                self.progress_manager.increment_errors()
+            return processed_files
     
     def delete_selected_files(self):
         """Delete selected files or current file with confirmation"""
@@ -2111,37 +2256,47 @@ class FileManager:
             handle_delete_confirmation(True)
     
     def perform_delete_operation(self, files_to_delete):
-        """Perform the actual delete operation"""
+        """Perform the actual delete operation with fine-grained progress tracking"""
         deleted_count = 0
         error_count = 0
         
+        # Count total individual files for fine-grained progress
+        total_individual_files = self._count_files_recursively(files_to_delete)
+        
         # Start progress tracking for delete operation
-        total_files = len(files_to_delete)
-        if total_files > 1:  # Only show progress for multiple files
+        if total_individual_files > 1:  # Only show progress for multiple files
             self.progress_manager.start_operation(
                 OperationType.DELETE, 
-                total_files, 
+                total_individual_files, 
                 "",
                 self._progress_callback
             )
         
+        processed_files = 0
+        
         try:
-            for i, file_path in enumerate(files_to_delete):
-                # Update progress
-                if total_files > 1:
-                    self.progress_manager.update_progress(file_path.name, i)
-                
+            for file_path in files_to_delete:
                 try:
                     if file_path.is_symlink():
                         # Delete symbolic link (not its target)
+                        processed_files += 1
+                        if total_individual_files > 1:
+                            self.progress_manager.update_progress(f"Link: {file_path.name}", processed_files)
+                        
                         file_path.unlink()
                         print(f"Deleted symbolic link: {file_path.name}")
                     elif file_path.is_dir():
-                        # Delete directory recursively
-                        shutil.rmtree(file_path)
+                        # Delete directory recursively with progress tracking
+                        processed_files = self._delete_directory_with_progress(
+                            file_path, processed_files, total_individual_files
+                        )
                         print(f"Deleted directory: {file_path.name}")
                     else:
-                        # Delete file
+                        # Delete single file
+                        processed_files += 1
+                        if total_individual_files > 1:
+                            self.progress_manager.update_progress(file_path.name, processed_files)
+                        
                         file_path.unlink()
                         print(f"Deleted file: {file_path.name}")
                     
@@ -2150,22 +2305,37 @@ class FileManager:
                 except PermissionError as e:
                     print(f"Permission denied deleting {file_path.name}: {e}")
                     error_count += 1
-                    if total_files > 1:
+                    if total_individual_files > 1:
                         self.progress_manager.increment_errors()
+                        # Still count the file for progress tracking
+                        if file_path.is_file() or file_path.is_symlink():
+                            processed_files += 1
+                        elif file_path.is_dir():
+                            processed_files += self._count_files_recursively([file_path])
                 except FileNotFoundError:
                     print(f"File not found (already deleted?): {file_path.name}")
                     error_count += 1
-                    if total_files > 1:
+                    if total_individual_files > 1:
                         self.progress_manager.increment_errors()
+                        # Still count the file for progress tracking
+                        if file_path.is_file() or file_path.is_symlink():
+                            processed_files += 1
+                        elif file_path.is_dir():
+                            processed_files += self._count_files_recursively([file_path])
                 except Exception as e:
                     print(f"Error deleting {file_path.name}: {e}")
                     error_count += 1
-                    if total_files > 1:
+                    if total_individual_files > 1:
                         self.progress_manager.increment_errors()
+                        # Still count the file for progress tracking
+                        if file_path.is_file() or file_path.is_symlink():
+                            processed_files += 1
+                        elif file_path.is_dir():
+                            processed_files += self._count_files_recursively([file_path])
         
         finally:
             # Finish progress tracking
-            if total_files > 1:
+            if total_individual_files > 1:
                 self.progress_manager.finish_operation()
         
         # Refresh current pane to show the changes
@@ -2183,6 +2353,66 @@ class FileManager:
         # Report results
         if deleted_count > 0:
             print(f"Successfully deleted {deleted_count} items")
+    
+    def _delete_directory_with_progress(self, dir_path, processed_files, total_files):
+        """Delete directory recursively with fine-grained progress updates"""
+        try:
+            # Walk through directory and delete files one by one (in reverse order for safety)
+            all_paths = []
+            
+            # Collect all paths first
+            for root, dirs, files in os.walk(dir_path, topdown=False):
+                root_path = Path(root)
+                
+                # Add files first
+                for file_name in files:
+                    file_path = root_path / file_name
+                    all_paths.append(file_path)
+                
+                # Add directories (they'll be deleted after their contents)
+                for dir_name in dirs:
+                    subdir_path = root_path / dir_name
+                    # Only add empty directories or symlinks to directories
+                    if subdir_path.is_symlink() or not any(subdir_path.iterdir()):
+                        all_paths.append(subdir_path)
+            
+            # Delete files with progress updates
+            for file_path in all_paths:
+                processed_files += 1
+                if total_files > 1:
+                    # Show relative path from the main directory being deleted
+                    try:
+                        rel_path = file_path.relative_to(dir_path)
+                        display_name = str(rel_path)
+                    except ValueError:
+                        display_name = file_path.name
+                    
+                    self.progress_manager.update_progress(display_name, processed_files)
+                
+                try:
+                    if file_path.is_dir():
+                        file_path.rmdir()  # Remove empty directory
+                    else:
+                        file_path.unlink()  # Remove file or symlink
+                except Exception as e:
+                    print(f"Error deleting {file_path}: {e}")
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+            
+            # Finally remove the main directory
+            try:
+                dir_path.rmdir()
+            except OSError:
+                # If directory is not empty, use shutil.rmtree as fallback
+                shutil.rmtree(dir_path)
+            
+            return processed_files
+            
+        except Exception as e:
+            print(f"Error deleting directory {dir_path}: {e}")
+            if total_files > 1:
+                self.progress_manager.increment_errors()
+            return processed_files
         if error_count > 0:
             print(f"Delete completed with {error_count} errors")
     
@@ -2392,6 +2622,26 @@ class FileManager:
             self.stdscr.refresh()
         except:
             pass  # Ignore drawing errors during progress updates
+    
+    def _count_files_recursively(self, paths):
+        """Count total number of individual files in the given paths (including files in directories)"""
+        total_files = 0
+        for path in paths:
+            if path.is_file() or path.is_symlink():
+                total_files += 1
+            elif path.is_dir():
+                try:
+                    for root, dirs, files in os.walk(path):
+                        total_files += len(files)
+                        # Count symlinks to directories as files
+                        for d in dirs:
+                            dir_path = Path(root) / d
+                            if dir_path.is_symlink():
+                                total_files += 1
+                except (PermissionError, OSError):
+                    # If we can't walk the directory, count it as 1 item
+                    total_files += 1
+        return total_files
     
     def detect_archive_format(self, filename):
         """Detect archive format from filename extension"""
