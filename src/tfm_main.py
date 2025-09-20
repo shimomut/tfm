@@ -14,6 +14,7 @@ import fnmatch
 import shlex
 import zipfile
 import tarfile
+import time
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -172,6 +173,9 @@ class FileManager:
         # Configure curses
         curses.curs_set(0)  # Hide cursor
         self.stdscr.keypad(True)
+        
+        # Track startup time for delayed redraw
+        self.startup_time = time.time()
         
     def safe_addstr(self, y, x, text, attr=curses.A_NORMAL):
         """Safely add string to screen, handling boundary conditions"""
@@ -4977,6 +4981,11 @@ class FileManager:
             # Check if we should quit
             if self.should_quit:
                 break
+            
+            # Check for startup redraw trigger (0.1 seconds after startup)
+            if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.1:
+                self.needs_full_redraw = True
+                delattr(self, 'startup_time')  # Remove the attribute to avoid repeated triggers
                 
             # Only do full redraw when needed
             if self.needs_full_redraw:
@@ -4995,9 +5004,14 @@ class FileManager:
                 self.stdscr.refresh()
                 self.needs_full_redraw = False
             
-            # Get user input
+            # Get user input with timeout to allow timer checks
+            self.stdscr.timeout(50)  # 50ms timeout
             key = self.stdscr.getch()
             current_pane = self.get_current_pane()
+            
+            # If no key was pressed (timeout), continue to next iteration
+            if key == -1:
+                continue
             
             # Handle isearch mode input first
             if self.isearch_mode:

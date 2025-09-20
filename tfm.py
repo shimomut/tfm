@@ -13,6 +13,9 @@ from pathlib import Path
 src_dir = Path(__file__).parent / 'src'
 sys.path.insert(0, str(src_dir))
 
+# Set ESC delay to 100ms BEFORE any curses-related imports for responsive ESC key
+os.environ.setdefault('ESCDELAY', '100')
+
 # Import and run the main application
 try:
     from tfm_main import main
