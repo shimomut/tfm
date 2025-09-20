@@ -382,9 +382,6 @@ def init_colors(color_scheme=None):
             default_fg = rgb_colors['DEFAULT_FG']['color_num']
             default_bg = rgb_colors['DEFAULT_BG']['color_num']
             
-            # Print success message for RGB colors
-            print(f"Using RGB colors for {current_color_scheme} scheme ({len(rgb_colors)} colors defined)")
-            
         except curses.error:
             rgb_success = False
     
@@ -504,8 +501,6 @@ def init_colors(color_scheme=None):
             # Use a high color pair number for background
             BACKGROUND_COLOR_PAIR = 63  # Usually safe, most terminals have 64+ pairs
             curses.init_pair(BACKGROUND_COLOR_PAIR, default_fg, default_bg)
-            print(f"Created background color pair {BACKGROUND_COLOR_PAIR}: fg={default_fg}, bg={default_bg}")
-            print("Note: Application will need to explicitly use this color pair for backgrounds")
             default_colors_set = True
         except curses.error:
             pass
