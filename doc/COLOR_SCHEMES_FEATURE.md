@@ -213,7 +213,7 @@ python3 show_color_schemes.py light
 
 TFM automatically detects your terminal's color capabilities and displays informative messages:
 
-- **RGB Support**: `"Using RGB colors for dark scheme (20 colors defined)"`
+- **RGB Support**: There is no message in this case.
 - **No RGB Support**: `"Terminal does not support RGB colors - using fallback colors for dark scheme"`
 - **RGB Failed**: `"RGB color initialization failed - using fallback colors for dark scheme"`
 - **Default Colors Set**: `"Set terminal default colors: fg=0, bg=7"`
