@@ -256,60 +256,60 @@ def get_current_rgb_colors():
 # Fallback color schemes for terminals without RGB support
 FALLBACK_COLOR_SCHEMES = {
     'dark': {
-        'HEADER_BG': 23,         # Blue for headers
-        'FOOTER_BG': 17,         # Dark blue for footers  
-        'STATUS_BG': 18,         # Darker blue for status
-        'BOUNDARY_BG': 19,       # Medium blue for boundaries
-        'DIRECTORY_FG': curses.COLOR_CYAN,
-        'EXECUTABLE_FG': curses.COLOR_GREEN,
-        'SELECTED_BG': curses.COLOR_BLUE,
-        'SELECTED_INACTIVE_BG': curses.COLOR_BLACK,
-        'REGULAR_FILE_FG': curses.COLOR_WHITE,
-        'LOG_STDOUT_FG': curses.COLOR_WHITE,
-        'LOG_SYSTEM_FG': curses.COLOR_BLUE,
-        'LINE_NUMBERS_FG': curses.COLOR_WHITE,
+        'HEADER_BG': curses.COLOR_BLUE,         # Dark blue-gray → blue
+        'FOOTER_BG': curses.COLOR_BLUE,         # Dark blue-gray → blue
+        'STATUS_BG': curses.COLOR_BLUE,         # Dark blue-gray → blue
+        'BOUNDARY_BG': curses.COLOR_BLUE,       # Dark blue-gray → blue
+        'DIRECTORY_FG': curses.COLOR_YELLOW,    # (204,204,120) yellowish → yellow
+        'EXECUTABLE_FG': curses.COLOR_GREEN,    # (51,229,51) bright green → green
+        'SELECTED_BG': curses.COLOR_BLUE,       # (40,80,160) dark blue → blue
+        'SELECTED_INACTIVE_BG': curses.COLOR_BLACK,  # (80,80,80) dark gray → black
+        'REGULAR_FILE_FG': curses.COLOR_WHITE,  # (220,220,220) light gray → white
+        'LOG_STDOUT_FG': curses.COLOR_WHITE,    # (220,220,220) light gray → white
+        'LOG_SYSTEM_FG': curses.COLOR_CYAN,     # (100,200,255) light blue → cyan
+        'LINE_NUMBERS_FG': curses.COLOR_WHITE,  # (128,128,128) gray → white
         # Syntax highlighting fallback colors
-        'SYNTAX_KEYWORD_FG': curses.COLOR_YELLOW,
-        'SYNTAX_STRING_FG': curses.COLOR_GREEN,
-        'SYNTAX_COMMENT_FG': curses.COLOR_BLUE,
-        'SYNTAX_NUMBER_FG': curses.COLOR_CYAN,
-        'SYNTAX_OPERATOR_FG': curses.COLOR_MAGENTA,
-        'SYNTAX_BUILTIN_FG': curses.COLOR_CYAN,
-        'SYNTAX_NAME_FG': curses.COLOR_WHITE,
+        'SYNTAX_KEYWORD_FG': curses.COLOR_YELLOW,   # (255,119,0) orange → yellow
+        'SYNTAX_STRING_FG': curses.COLOR_GREEN,     # (0,255,0) green → green
+        'SYNTAX_COMMENT_FG': curses.COLOR_WHITE,    # (128,128,128) gray → white
+        'SYNTAX_NUMBER_FG': curses.COLOR_YELLOW,    # (255,255,0) yellow → yellow
+        'SYNTAX_OPERATOR_FG': curses.COLOR_MAGENTA, # (255,0,255) magenta → magenta
+        'SYNTAX_BUILTIN_FG': curses.COLOR_CYAN,     # (0,255,255) cyan → cyan
+        'SYNTAX_NAME_FG': curses.COLOR_WHITE,       # (220,220,220) light gray → white
         # Search highlighting fallback colors
-        'SEARCH_MATCH_BG': curses.COLOR_YELLOW,
-        'SEARCH_CURRENT_BG': curses.COLOR_RED,
+        'SEARCH_MATCH_BG': curses.COLOR_BLUE,       # (30,60,120) dark blue → blue
+        'SEARCH_CURRENT_BG': curses.COLOR_BLUE,     # (40,80,160) blue → blue
         # Default colors
-        'DEFAULT_FG': curses.COLOR_WHITE,
-        'DEFAULT_BG': curses.COLOR_BLACK
+        'DEFAULT_FG': curses.COLOR_WHITE,           # (220,220,220) light gray → white
+        'DEFAULT_BG': curses.COLOR_BLACK            # (0,0,0) black → black
     },
     'light': {
-        'HEADER_BG': curses.COLOR_WHITE,    # White for headers
-        'FOOTER_BG': curses.COLOR_WHITE,    # White for footers  
-        'STATUS_BG': curses.COLOR_WHITE,    # White for status
-        'BOUNDARY_BG': curses.COLOR_WHITE,  # White for boundaries
-        'DIRECTORY_FG': curses.COLOR_BLACK,
-        'EXECUTABLE_FG': curses.COLOR_BLACK,
-        'SELECTED_BG': curses.COLOR_WHITE,
-        'SELECTED_INACTIVE_BG': curses.COLOR_WHITE,
-        'REGULAR_FILE_FG': curses.COLOR_BLACK,
-        'LOG_STDOUT_FG': curses.COLOR_BLACK,
-        'LOG_SYSTEM_FG': curses.COLOR_BLACK,
-        'LINE_NUMBERS_FG': curses.COLOR_BLACK,
+        'HEADER_BG': curses.COLOR_WHITE,        # (220,220,220) light gray → white
+        'FOOTER_BG': curses.COLOR_WHITE,        # (220,220,220) light gray → white
+        'STATUS_BG': curses.COLOR_WHITE,        # (220,220,220) light gray → white
+        'BOUNDARY_BG': curses.COLOR_WHITE,      # (220,220,220) light gray → white
+        'DIRECTORY_FG': curses.COLOR_YELLOW,    # (160,120,0) brown/yellow → yellow
+        'EXECUTABLE_FG': curses.COLOR_GREEN,    # (0,160,0) dark green → green
+        'SELECTED_BG': curses.COLOR_CYAN,       # (120,160,255) light blue → cyan
+        'SELECTED_INACTIVE_BG': curses.COLOR_WHITE,  # (160,160,160) gray → white (closest available)
+        'REGULAR_FILE_FG': curses.COLOR_BLACK,  # (60,60,60) dark gray → black
+        'LOG_STDOUT_FG': curses.COLOR_BLACK,    # (60,60,60) dark gray → black
+        'LOG_SYSTEM_FG': curses.COLOR_BLUE,     # (50,100,160) dark blue → blue
+        'LINE_NUMBERS_FG': curses.COLOR_BLACK,  # (128,128,128) gray → black (closest available)
         # Syntax highlighting fallback colors
-        'SYNTAX_KEYWORD_FG': curses.COLOR_BLACK,
-        'SYNTAX_STRING_FG': curses.COLOR_BLACK,
-        'SYNTAX_COMMENT_FG': curses.COLOR_BLACK,
-        'SYNTAX_NUMBER_FG': curses.COLOR_BLACK,
-        'SYNTAX_OPERATOR_FG': curses.COLOR_BLACK,
-        'SYNTAX_BUILTIN_FG': curses.COLOR_BLACK,
-        'SYNTAX_NAME_FG': curses.COLOR_BLACK,
+        'SYNTAX_KEYWORD_FG': curses.COLOR_MAGENTA,  # (128,0,128) purple → magenta
+        'SYNTAX_STRING_FG': curses.COLOR_GREEN,     # (0,128,0) dark green → green
+        'SYNTAX_COMMENT_FG': curses.COLOR_BLACK,    # (128,128,128) gray → black
+        'SYNTAX_NUMBER_FG': curses.COLOR_BLUE,      # (0,0,200) blue → blue
+        'SYNTAX_OPERATOR_FG': curses.COLOR_RED,     # (200,0,0) red → red
+        'SYNTAX_BUILTIN_FG': curses.COLOR_CYAN,     # (0,128,128) teal → cyan
+        'SYNTAX_NAME_FG': curses.COLOR_BLACK,       # (64,64,64) dark gray → black
         # Search highlighting fallback colors
-        'SEARCH_MATCH_BG': curses.COLOR_WHITE,
-        'SEARCH_CURRENT_BG': curses.COLOR_WHITE,
+        'SEARCH_MATCH_BG': curses.COLOR_CYAN,       # (180,240,255) very light blue → cyan
+        'SEARCH_CURRENT_BG': curses.COLOR_CYAN,     # (140,200,255) light blue → cyan
         # Default colors
-        'DEFAULT_FG': curses.COLOR_BLACK,
-        'DEFAULT_BG': curses.COLOR_WHITE
+        'DEFAULT_FG': curses.COLOR_BLACK,           # (0,0,0) black → black
+        'DEFAULT_BG': curses.COLOR_WHITE            # (255,255,255) white → white
     }
 }
 
