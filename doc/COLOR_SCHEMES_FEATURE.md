@@ -206,7 +206,34 @@ python3 show_color_schemes.py light
 
 - **Color Palette**: Press 'c' in debug mode to see the color palette with current scheme info
 - **Log Output**: When toggling color schemes with 't', detailed information is printed to the log
+- **Initialization Messages**: TFM displays whether RGB or fallback colors are being used
 - **Help System**: Color scheme toggle is documented in the help dialog ('?' key)
+
+### Color Initialization Messages
+
+TFM automatically detects your terminal's color capabilities and displays informative messages:
+
+- **RGB Support**: `"Using RGB colors for dark scheme (20 colors defined)"`
+- **No RGB Support**: `"Terminal does not support RGB colors - using fallback colors for dark scheme"`
+- **RGB Failed**: `"RGB color initialization failed - using fallback colors for dark scheme"`
+- **Default Colors Set**: `"Set terminal default colors: fg=0, bg=7"`
+- **Default Colors Failed**: `"Warning: Could not set terminal default background color"`
+
+These messages help users understand:
+- Whether they're getting full 24-bit colors or basic 8/16 colors
+- If terminal default background is properly set for blank spaces
+- Why colors might look different on different terminals
+- When troubleshooting color-related issues
+
+### Background Color Handling
+
+TFM properly handles terminal background colors to ensure consistent appearance:
+
+- **Default Colors**: Uses `curses.assume_default_colors()` to set terminal defaults
+- **Blank Spaces**: Ensures blank areas match the color scheme background
+- **Light Scheme**: White background for all blank spaces and uncolored areas
+- **Dark Scheme**: Black background for all blank spaces and uncolored areas
+- **Fallback**: Uses color pair 0 if default color setting is not supported
 
 ## Related Files
 

@@ -75,6 +75,11 @@ def show_usage():
     print("  python3 show_color_schemes.py")
     print("  python3 show_color_schemes.py current")
     print("  python3 show_color_schemes.py light")
+    print("\nNote:")
+    print("  When running TFM, you'll see messages about color initialization:")
+    print("  - 'Using RGB colors for [scheme] scheme (20 colors defined)'")
+    print("  - 'Terminal does not support RGB colors - using fallback colors'")
+    print("  These help you understand your terminal's color capabilities.")
 
 if __name__ == "__main__":
     main()

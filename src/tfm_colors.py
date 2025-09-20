@@ -30,6 +30,10 @@ COLOR_SEARCH_CURRENT = 21    # Current search match highlighting
 # Current color scheme
 current_color_scheme = 'dark'
 
+# Default background and foreground colors for the current scheme
+default_background_color = None
+default_foreground_color = None
+
 # Color scheme definitions (RGB values 0-255)
 COLOR_SCHEMES = {
     'dark': {
@@ -118,85 +122,85 @@ COLOR_SCHEMES = {
     },
     'light': {
         'HEADER_BG': {
-            'color_num': 100,
+            'color_num': 120,
             'rgb': (255, 255, 255)  # White for file list headers
         },
         'FOOTER_BG': {
-            'color_num': 104,
+            'color_num': 124,
             'rgb': (255, 255, 255)  # White for file list footers
         },
         'STATUS_BG': {
-            'color_num': 105,
+            'color_num': 125,
             'rgb': (255, 255, 255)  # White for status bar
         },
         'BOUNDARY_BG': {
-            'color_num': 106,
+            'color_num': 126,
             'rgb': (255, 255, 255)  # White for boundaries
         },
         'DIRECTORY_FG': {
-            'color_num': 101,
-            'rgb': (0, 0, 0)        # Black for directories
+            'color_num': 121,
+            'rgb': (10, 10, 10)     # Very dark gray for directories
         },
         'EXECUTABLE_FG': {
-            'color_num': 102,
-            'rgb': (0, 0, 0)        # Black for executables
+            'color_num': 122,
+            'rgb': (10, 10, 10)     # Very dark gray for executables
         },
         'SELECTED_FG': {
-            'color_num': 103,
-            'rgb': (0, 0, 0)        # Black for selected items
+            'color_num': 123,
+            'rgb': (10, 10, 10)     # Very dark gray for selected items
         },
         'REGULAR_FILE_FG': {
-            'color_num': 107,
-            'rgb': (0, 0, 0)        # Black for regular files
+            'color_num': 127,
+            'rgb': (10, 10, 10)     # Very dark gray for regular files
         },
         'LOG_STDOUT_FG': {
-            'color_num': 108,
-            'rgb': (0, 0, 0)        # Black for stdout logs
+            'color_num': 128,
+            'rgb': (10, 10, 10)     # Very dark gray for stdout logs
         },
         'LOG_SYSTEM_FG': {
-            'color_num': 109,
-            'rgb': (0, 0, 0)        # Black for system logs
+            'color_num': 129,
+            'rgb': (10, 10, 10)     # Very dark gray for system logs
         },
         'LINE_NUMBERS_FG': {
-            'color_num': 110,
-            'rgb': (0, 0, 0)        # Black for line numbers
+            'color_num': 130,
+            'rgb': (10, 10, 10)     # Very dark gray for line numbers
         },
         # Syntax highlighting colors
         'SYNTAX_KEYWORD_FG': {
-            'color_num': 111,
-            'rgb': (0, 0, 0)        # Black for keywords
+            'color_num': 131,
+            'rgb': (10, 10, 10)     # Very dark gray for keywords
         },
         'SYNTAX_STRING_FG': {
-            'color_num': 112,
-            'rgb': (0, 0, 0)        # Black for strings
+            'color_num': 132,
+            'rgb': (10, 10, 10)     # Very dark gray for strings
         },
         'SYNTAX_COMMENT_FG': {
-            'color_num': 113,
-            'rgb': (0, 0, 0)        # Black for comments
+            'color_num': 133,
+            'rgb': (10, 10, 10)     # Very dark gray for comments
         },
         'SYNTAX_NUMBER_FG': {
-            'color_num': 114,
-            'rgb': (0, 0, 0)        # Black for numbers
+            'color_num': 134,
+            'rgb': (10, 10, 10)     # Very dark gray for numbers
         },
         'SYNTAX_OPERATOR_FG': {
-            'color_num': 115,
-            'rgb': (0, 0, 0)        # Black for operators
+            'color_num': 135,
+            'rgb': (10, 10, 10)     # Very dark gray for operators
         },
         'SYNTAX_BUILTIN_FG': {
-            'color_num': 116,
-            'rgb': (0, 0, 0)        # Black for built-ins
+            'color_num': 136,
+            'rgb': (10, 10, 10)     # Very dark gray for built-ins
         },
         'SYNTAX_NAME_FG': {
-            'color_num': 117,
-            'rgb': (0, 0, 0)        # Black for names
+            'color_num': 137,
+            'rgb': (10, 10, 10)     # Very dark gray for names
         },
         # Search highlighting colors
         'SEARCH_MATCH_BG': {
-            'color_num': 118,
+            'color_num': 138,
             'rgb': (255, 255, 255)  # White background for search matches
         },
         'SEARCH_CURRENT_BG': {
-            'color_num': 119,
+            'color_num': 139,
             'rgb': (255, 255, 255)  # White background for current search match
         }
     }
@@ -321,11 +325,23 @@ def init_colors(color_scheme=None):
             search_match_bg = rgb_colors['SEARCH_MATCH_BG']['color_num']
             search_current_bg = rgb_colors['SEARCH_CURRENT_BG']['color_num']
             
+            # Print success message for RGB colors
+            print(f"Using RGB colors for {current_color_scheme} scheme ({len(rgb_colors)} colors defined)")
+            
         except curses.error:
             rgb_success = False
     
     # Use fallback colors if RGB not supported or failed
     if not can_change_color or not rgb_success:
+        # Print message about using fallback colors
+        if not can_change_color:
+            print(f"Terminal does not support RGB colors - using fallback colors for {current_color_scheme} scheme")
+        else:
+            print(f"RGB color initialization failed - using fallback colors for {current_color_scheme} scheme")
+        
+        # For light scheme, force use of standard curses colors to avoid RGB issues
+        if current_color_scheme == 'light':
+            print("Light scheme: Using standard curses colors for better compatibility")
         header_bg = fallback_colors['HEADER_BG']
         footer_bg = fallback_colors['FOOTER_BG']
         status_bg = fallback_colors['STATUS_BG']
@@ -378,6 +394,52 @@ def init_colors(color_scheme=None):
     search_text_color = curses.COLOR_BLACK if current_color_scheme == 'light' else curses.COLOR_WHITE
     curses.init_pair(COLOR_SEARCH_MATCH, search_text_color, search_match_bg)
     curses.init_pair(COLOR_SEARCH_CURRENT, search_text_color, search_current_bg)
+    
+    # Set default terminal background color for blank spaces
+    default_fg = curses.COLOR_BLACK if current_color_scheme == 'light' else curses.COLOR_WHITE
+    default_bg = curses.COLOR_WHITE if current_color_scheme == 'light' else curses.COLOR_BLACK
+    
+    # Store the default colors globally for use by the application
+    global default_background_color, default_foreground_color
+    default_background_color = default_bg
+    default_foreground_color = default_fg
+    
+    # Try multiple methods to set default colors
+    default_colors_set = False
+    
+    # Method 1: assume_default_colors (best option)
+    try:
+        curses.assume_default_colors(default_fg, default_bg)
+        print(f"Set terminal default colors: fg={default_fg}, bg={default_bg}")
+        default_colors_set = True
+    except (curses.error, AttributeError):
+        pass
+    
+    # Method 2: Use color pair 0 (fallback)
+    if not default_colors_set:
+        try:
+            curses.init_pair(0, default_fg, default_bg)
+            print(f"Set default color pair 0: fg={default_fg}, bg={default_bg}")
+            default_colors_set = True
+        except curses.error:
+            pass
+    
+    # Method 3: Create a dedicated background color pair
+    if not default_colors_set:
+        try:
+            # Use a high color pair number for background
+            BACKGROUND_COLOR_PAIR = 63  # Usually safe, most terminals have 64+ pairs
+            curses.init_pair(BACKGROUND_COLOR_PAIR, default_fg, default_bg)
+            print(f"Created background color pair {BACKGROUND_COLOR_PAIR}: fg={default_fg}, bg={default_bg}")
+            print("Note: Application will need to explicitly use this color pair for backgrounds")
+            default_colors_set = True
+        except curses.error:
+            pass
+    
+    if not default_colors_set:
+        print("Warning: Could not set terminal default background color")
+        print("Blank spaces may not match the color scheme background")
+        print("Try using a different terminal emulator for better color support")
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """Get the appropriate color for a file based on its properties"""
@@ -500,6 +562,79 @@ def print_all_color_schemes():
                 print(f"  {color_name:15}: RGB{rgb}")
     
     print(f"\nCurrent active scheme: {current_color_scheme}")
+
+def print_color_support_info():
+    """Print information about terminal color support"""
+    try:
+        import curses
+        # This will only work if curses has been initialized
+        if hasattr(curses, 'COLORS'):
+            colors = curses.COLORS
+            pairs = curses.COLOR_PAIRS if hasattr(curses, 'COLOR_PAIRS') else 'Unknown'
+            can_change = curses.can_change_color()
+            
+            print("Terminal Color Support:")
+            print(f"  Colors available: {colors}")
+            print(f"  Color pairs: {pairs}")
+            print(f"  RGB support: {'Yes' if can_change else 'No'}")
+            print(f"  Current scheme: {current_color_scheme}")
+            
+            # Check for default color support
+            has_default_colors = hasattr(curses, 'assume_default_colors')
+            print(f"  Default colors support: {'Yes' if has_default_colors else 'No'}")
+            
+            if can_change:
+                print("  Status: Using RGB colors")
+            else:
+                print("  Status: Using fallback colors")
+        else:
+            print("Color support information not available (curses not initialized)")
+    except Exception as e:
+        print(f"Cannot determine color support: {e}")
+
+def check_default_colors_support():
+    """Check if terminal supports default color changes"""
+    try:
+        import curses
+        return hasattr(curses, 'assume_default_colors')
+    except ImportError:
+        return False
+
+def get_default_background_color():
+    """Get the default background color for the current scheme"""
+    return default_background_color
+
+def get_default_foreground_color():
+    """Get the default foreground color for the current scheme"""
+    return default_foreground_color
+
+def get_background_color_pair():
+    """Get a color pair that can be used for background areas"""
+    try:
+        import curses
+        # Try to return a color pair with the scheme's background
+        if default_background_color is not None and default_foreground_color is not None:
+            # Use color pair 63 as background pair (created in init_colors if needed)
+            return curses.color_pair(63)
+        else:
+            # Fallback to normal colors
+            return curses.color_pair(0)
+    except:
+        return 0
+
+def apply_background_to_window(window):
+    """Apply the color scheme background to a curses window"""
+    try:
+        import curses
+        if default_background_color is not None:
+            # Set the background character and color for the window
+            bg_char = ' '  # Space character
+            bg_attr = get_background_color_pair()
+            window.bkgd(bg_char, bg_attr)
+            return True
+    except:
+        pass
+    return False
 
 def define_rgb_color(color_num, red, green, blue):
     """

@@ -196,6 +196,44 @@ class FileManager:
             self.stdscr.addstr(y, x, truncated_text, attr)
         except curses.error:
             pass  # Ignore curses errors
+    
+    def clear_screen_with_background(self):
+        """Clear screen and apply proper background color for current scheme"""
+        try:
+            # Try to apply background color to the window
+            from tfm_colors import apply_background_to_window, get_background_color_pair
+            
+            # Clear the screen first
+            self.stdscr.clear()
+            
+            # Try to apply the background color
+            if apply_background_to_window(self.stdscr):
+                # Background applied successfully
+                pass
+            else:
+                # Fallback: manually fill screen with background color
+                try:
+                    height, width = self.stdscr.getmaxyx()
+                    bg_color_pair = get_background_color_pair()
+                    
+                    # Fill the screen with spaces using the background color
+                    for y in range(height):
+                        try:
+                            self.stdscr.addstr(y, 0, ' ' * (width - 1), bg_color_pair)
+                        except curses.error:
+                            pass  # Ignore errors at screen edges
+                    
+                    # Move cursor back to top
+                    self.stdscr.move(0, 0)
+                except:
+                    pass  # If all else fails, just use regular clear
+            
+        except ImportError:
+            # Fallback to regular clear if color functions not available
+            self.stdscr.clear()
+        except:
+            # Any other error, use regular clear
+            self.stdscr.clear()
         
     def add_startup_messages(self):
         """Add startup messages directly to log pane"""
@@ -5020,8 +5058,8 @@ class FileManager:
             if self.needs_full_redraw:
                 self.refresh_files()
                 
-                # Clear screen
-                self.stdscr.clear()
+                # Clear screen with proper background
+                self.clear_screen_with_background()
                 
                 # Draw interface
                 self.draw_header()
@@ -5127,7 +5165,7 @@ class FileManager:
                     self.needs_full_redraw = True
             elif key == curses.KEY_RESIZE:  # Terminal window resized
                 # Clear screen and trigger full redraw to handle new dimensions
-                self.stdscr.clear()
+                self.clear_screen_with_background()
                 self.needs_full_redraw = True
             elif key == KEY_TAB:  # Tab key - switch panes
                 self.active_pane = 'right' if self.active_pane == 'left' else 'left'
