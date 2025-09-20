@@ -270,13 +270,13 @@ class TextViewer:
                 self.isearch_pattern = self.isearch_pattern[:-1]
                 self.update_isearch_matches()
             return True
-        elif key == curses.KEY_UP or key == ord('k'):
+        elif key == curses.KEY_UP:
             # Up arrow - go to previous match
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
                 self.jump_to_match()
             return True
-        elif key == curses.KEY_DOWN or key == ord('j'):
+        elif key == curses.KEY_DOWN:
             # Down arrow - go to next match
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
@@ -540,20 +540,20 @@ class TextViewer:
         if key == ord('q') or key == ord('Q') or key == 27:  # q, Q, or ESC
             return False
             
-        elif key == curses.KEY_UP or key == ord('k'):
+        elif key == curses.KEY_UP:
             if self.scroll_offset > 0:
                 self.scroll_offset -= 1
                 
-        elif key == curses.KEY_DOWN or key == ord('j'):
+        elif key == curses.KEY_DOWN:
             max_scroll = max(0, len(self.lines) - display_height)
             if self.scroll_offset < max_scroll:
                 self.scroll_offset += 1
                 
-        elif key == curses.KEY_LEFT or key == ord('h'):
+        elif key == curses.KEY_LEFT:
             if self.horizontal_offset > 0:
                 self.horizontal_offset -= 1
                 
-        elif key == curses.KEY_RIGHT or key == ord('l'):
+        elif key == curses.KEY_RIGHT:
             self.horizontal_offset += 1
             
         elif key == curses.KEY_PPAGE:  # Page Up

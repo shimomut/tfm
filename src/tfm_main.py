@@ -2967,8 +2967,8 @@ class FileManager:
         
         # Navigation section
         help_lines.append("=== NAVIGATION ===")
-        help_lines.append("↑↓ / j k         Navigate files")
-        help_lines.append("←→ / h l         Switch panes / Navigate directories")
+        help_lines.append("↑↓               Navigate files")
+        help_lines.append("←→               Switch panes / Navigate directories")
         help_lines.append("Tab              Switch between panes")
         help_lines.append("Enter            Open directory / View file")
         help_lines.append("Backspace        Go to parent directory")
