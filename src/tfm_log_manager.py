@@ -90,6 +90,10 @@ class LogManager:
             # Draw log messages (no header)
             display_height = height  # Use full height for messages
             
+            # Reserve space for scrollbar if we have messages
+            scrollbar_width = 1 if len(self.log_messages) > display_height else 0
+            content_width = width - scrollbar_width
+            
             if self.log_messages and display_height > 0:
                 # Calculate which messages to show
                 total_messages = len(self.log_messages)
@@ -109,14 +113,61 @@ class LogManager:
                     # Format log line
                     log_line = f"{timestamp} [{source:>6}] {message}"
                     
-                    # Truncate if too long
-                    if len(log_line) > width - 1:
-                        log_line = log_line[:width - 4] + "..."
+                    # Truncate if too long (account for scrollbar)
+                    if len(log_line) > content_width - 1:
+                        log_line = log_line[:content_width - 4] + "..."
                     
                     # Get color based on source
                     color = get_log_color(source)
-                    stdscr.addstr(y, 0, log_line.ljust(width)[:width], color)
+                    stdscr.addstr(y, 0, log_line.ljust(content_width)[:content_width], color)
+                
+                # Draw scrollbar if needed
+                if scrollbar_width > 0:
+                    self._draw_scrollbar(stdscr, y_start, height, width, total_messages, display_height)
                     
+        except Exception:
+            pass  # Ignore drawing errors
+    
+    def _draw_scrollbar(self, stdscr, y_start, height, width, total_messages, display_height):
+        """Draw a scrollbar for the log pane"""
+        try:
+            from tfm_colors import get_boundary_color, get_status_color
+            
+            scrollbar_x = width - 1
+            
+            # Calculate scrollbar position and size
+            if total_messages <= display_height:
+                # No scrolling needed, fill entire scrollbar
+                for y in range(height):
+                    stdscr.addstr(y_start + y, scrollbar_x, "█", get_status_color())
+            else:
+                # Calculate thumb position and size
+                # Thumb size represents the visible portion
+                thumb_size = max(1, int((display_height / total_messages) * height))
+                
+                # Calculate thumb position based on scroll offset
+                # When scroll_offset is 0, we're at the bottom (newest messages)
+                # When scroll_offset is max, we're at the top (oldest messages)
+                max_scroll = total_messages - display_height
+                if max_scroll > 0:
+                    # Invert the scroll position since 0 means bottom in our system
+                    scroll_ratio = self.log_scroll_offset / max_scroll
+                    thumb_start = int((height - thumb_size) * (1 - scroll_ratio))
+                else:
+                    thumb_start = height - thumb_size
+                
+                thumb_end = min(height, thumb_start + thumb_size)
+                
+                # Draw scrollbar track and thumb
+                for y in range(height):
+                    y_pos = y_start + y
+                    if thumb_start <= y < thumb_end:
+                        # Draw thumb
+                        stdscr.addstr(y_pos, scrollbar_x, "█", get_status_color())
+                    else:
+                        # Draw track
+                        stdscr.addstr(y_pos, scrollbar_x, "│", get_boundary_color())
+                        
         except Exception:
             pass  # Ignore drawing errors
     

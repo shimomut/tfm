@@ -810,9 +810,7 @@ class FileManager:
         if self.file_operations.show_hidden:
             status_parts.append("showing hidden")
         
-        # Add log scroll percentage
-        log_percentage = self.get_log_scroll_percentage()
-        status_parts.append(f"log: {log_percentage}%")
+
         
         left_status = f"({', '.join(status_parts)})" if status_parts else ""
         
