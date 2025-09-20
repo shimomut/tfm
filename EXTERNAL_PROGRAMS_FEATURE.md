@@ -16,6 +16,11 @@ External programs are configured in the `PROGRAMS` list in your `config.py` file
 
 - `name`: Display name for the program
 - `command`: List of command arguments (for safe subprocess execution)
+- `options` (optional): Dictionary of program-specific options
+
+### Available Options
+
+- `auto_return`: Boolean (default: False) - If True, automatically returns to TFM after program execution without waiting for user input
 
 ### Example Configuration
 
@@ -29,6 +34,9 @@ PROGRAMS = [
     {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
     {'name': 'Python REPL', 'command': ['python3']},
     {'name': 'My Script', 'command': ['/path/to/script.sh']},
+    # Examples with options:
+    {'name': 'Quick Git Status', 'command': ['git', 'status', '--short'], 'options': {'auto_return': True}},
+    {'name': 'Compare Directories', 'command': ['./compare_script.sh'], 'options': {'auto_return': True}},
 ]
 ```
 
@@ -61,6 +69,7 @@ If no files are selected in a pane, the file under the cursor is used instead.
 ### Git Operations
 ```python
 {'name': 'Git Status', 'command': ['git', 'status']},
+{'name': 'Git Status (Quick)', 'command': ['git', 'status', '--short'], 'options': {'auto_return': True}},
 {'name': 'Git Add Selected', 'command': ['git', 'add'] + ['$TFM_THIS_SELECTED']},
 {'name': 'Git Commit', 'command': ['git', 'commit', '-m']},
 ```
@@ -69,6 +78,7 @@ If no files are selected in a pane, the file under the cursor is used instead.
 ```python
 {'name': 'File Permissions', 'command': ['ls', '-la']},
 {'name': 'Disk Usage', 'command': ['du', '-sh', '*']},
+{'name': 'Disk Usage (Quick)', 'command': ['du', '-sh', '*'], 'options': {'auto_return': True}},
 {'name': 'Find Large Files', 'command': ['find', '.', '-size', '+100M']},
 ```
 

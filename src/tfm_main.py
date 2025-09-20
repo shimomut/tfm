@@ -2583,6 +2583,9 @@ class FileManager:
             # Execute the program with the modified environment
             result = subprocess.run(program['command'], env=env)
             
+            # Check if auto_return option is enabled
+            auto_return = program.get('options', {}).get('auto_return', False)
+            
             # Show exit status
             print()
             print("=" * 50)
@@ -2590,8 +2593,14 @@ class FileManager:
                 print(f"Program '{program['name']}' completed successfully")
             else:
                 print(f"Program '{program['name']}' exited with code {result.returncode}")
-            print("Press Enter to return to TFM...")
-            input()
+            
+            if auto_return:
+                print("Auto-returning to TFM...")
+                import time
+                time.sleep(1)  # Brief pause to show the message
+            else:
+                print("Press Enter to return to TFM...")
+                input()
             
         except FileNotFoundError:
             print(f"Error: Command not found: {program['command'][0]}")

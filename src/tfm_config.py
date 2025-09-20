@@ -335,10 +335,18 @@ def get_programs():
         for prog in config.PROGRAMS:
             if isinstance(prog, dict) and 'name' in prog and 'command' in prog:
                 if isinstance(prog['command'], list) and prog['command']:
-                    programs.append({
+                    program_entry = {
                         'name': prog['name'],
                         'command': prog['command']
-                    })
+                    }
+                    
+                    # Add options if present
+                    if 'options' in prog and isinstance(prog['options'], dict):
+                        program_entry['options'] = prog['options']
+                    else:
+                        program_entry['options'] = {}
+                    
+                    programs.append(program_entry)
                 else:
                     print(f"Warning: Program command must be a non-empty list: {prog['name']}")
             else:

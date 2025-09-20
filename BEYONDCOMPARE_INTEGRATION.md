@@ -11,9 +11,9 @@ BeyondCompare has been successfully integrated as external programs in TFM. This
 
 The integration consists of:
 
-1. **Directory Wrapper Script**: `bcompare_wrapper.sh` - Launches BeyondCompare with left and right pane directories
+1. **Directory Wrapper Script**: `bcompare_dirs_wrapper.sh` - Launches BeyondCompare with left and right pane directories
 2. **File Wrapper Script**: `bcompare_files_wrapper.sh` - Launches BeyondCompare with selected files from both panes
-3. **Configuration**: Two BeyondCompare entries added to the `PROGRAMS` list in both template and user configs
+3. **Configuration**: Two BeyondCompare entries added to the `PROGRAMS` list with `auto_return: True` option enabled
 
 ## Usage
 
@@ -40,6 +40,8 @@ The integration consists of:
 
 **Note**: For file comparison, if no files are explicitly selected, the files under the cursor in each pane will be used.
 
+**Auto Return**: Both BeyondCompare programs are configured with `auto_return: True`, which means they will automatically return to TFM after BeyondCompare is closed, without requiring you to press Enter.
+
 ## Environment Variables
 
 When BeyondCompare is launched, the following TFM environment variables are available:
@@ -60,7 +62,7 @@ When BeyondCompare is launched, the following TFM environment variables are avai
 ## Files Created/Modified
 
 ### New Files
-- `bcompare_wrapper.sh`: Wrapper script for directory comparison
+- `bcompare_dirs_wrapper.sh`: Wrapper script for directory comparison
 - `bcompare_files_wrapper.sh`: Wrapper script for file comparison
 - `test_bcompare.py`: Test script to verify the integration
 - `BEYONDCOMPARE_INTEGRATION.md`: This documentation file
@@ -71,7 +73,7 @@ When BeyondCompare is launched, the following TFM environment variables are avai
 
 ## Wrapper Script Details
 
-### Directory Comparison (`bcompare_wrapper.sh`)
+### Directory Comparison (`bcompare_dirs_wrapper.sh`)
 
 1. Checks if BeyondCompare (`bcompare`) is installed and available in PATH
 2. Verifies that TFM directory environment variables are set
@@ -130,7 +132,7 @@ This will check:
 
 ### "Wrapper script not found"
 - Ensure the wrapper script path in the config is correct
-- The script should be executable: `chmod +x bcompare_wrapper.sh`
+- The script should be executable: `chmod +x bcompare_dirs_wrapper.sh`
 
 ## Customization
 

@@ -107,8 +107,10 @@ class Config:
         # Example: 'disk_usage': 'du -sh *',
     }
     
-    # External programs - each item has "name" and "command" fields
+    # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
+    # The "options" field is a dictionary with program-specific options:
+    #   - auto_return: if True, automatically returns to TFM without waiting for user input
     PROGRAMS = [
         {'name': 'Git Status', 'command': ['git', 'status']},
         {'name': 'Git Log', 'command': ['git', 'log', '--oneline', '-10']},
@@ -116,9 +118,10 @@ class Config:
         {'name': 'List Processes', 'command': ['ps', 'aux']},
         {'name': 'System Info', 'command': ['uname', '-a']},
         {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
-        {'name': 'Compare Directories (BeyondCompare)', 'command': ['./bcompare_wrapper.sh']},
-        {'name': 'Compare Files (BeyondCompare)', 'command': ['./bcompare_files_wrapper.sh']},
+        {'name': 'Compare Files (BeyondCompare)', 'command': ['./bcompare_files_wrapper.sh'], 'options': {'auto_return': True}},
+        {'name': 'Compare Directories (BeyondCompare)', 'command': ['./bcompare_dirs_wrapper.sh'], 'options': {'auto_return': True}},
         # Add your own programs here:
         # {'name': 'My Script', 'command': ['/path/to/script.sh']},
         # {'name': 'Python REPL', 'command': ['python3']},
+        # {'name': 'Quick Command', 'command': ['ls', '-la'], 'options': {'auto_return': True}},
     ]

@@ -21,7 +21,11 @@ def test_bcompare_config():
     
     print(f"Found {len(programs)} external programs:")
     for i, prog in enumerate(programs, 1):
-        print(f"  {i}. {prog['name']}: {' '.join(prog['command'])}")
+        options_str = ""
+        if prog.get('options'):
+            options_list = [f"{k}={v}" for k, v in prog['options'].items()]
+            options_str = f" (options: {', '.join(options_list)})"
+        print(f"  {i}. {prog['name']}: {' '.join(prog['command'])}{options_str}")
     
     # Check for both BeyondCompare programs
     programs_to_check = [
@@ -33,7 +37,11 @@ def test_bcompare_config():
     for prog in programs:
         if prog['name'] in programs_to_check:
             found_programs.append(prog['name'])
-            print(f"\n✓ {prog['name']} found: {' '.join(prog['command'])}")
+            options_str = ""
+            if prog.get('options'):
+                options_list = [f"{k}={v}" for k, v in prog['options'].items()]
+                options_str = f" (options: {', '.join(options_list)})"
+            print(f"\n✓ {prog['name']} found: {' '.join(prog['command'])}{options_str}")
             
             # Check if the wrapper script exists
             wrapper_path = prog['command'][0]
@@ -90,7 +98,7 @@ def test_wrapper_scripts():
     success = True
     
     # Test directory comparison wrapper
-    wrapper_path = './bcompare_wrapper.sh'
+    wrapper_path = './bcompare_dirs_wrapper.sh'
     if os.path.exists(wrapper_path):
         print(f"✓ Directory comparison wrapper ready: {wrapper_path}")
     else:
