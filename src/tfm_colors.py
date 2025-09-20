@@ -172,15 +172,15 @@ COLOR_SCHEMES = {
         },
         'REGULAR_FILE_FG': {
             'color_num': 127,
-            'rgb': (0, 0, 0)     # Very dark gray for regular files
+            'rgb': (60, 60, 60)     # Very dark gray
         },
         'LOG_STDOUT_FG': {
             'color_num': 128,
-            'rgb': (10, 10, 10)     # Very dark gray for stdout logs
+            'rgb': (60, 60, 60)     # Very dark gray
         },
         'LOG_SYSTEM_FG': {
             'color_num': 129,
-            'rgb': (10, 10, 10)     # Very dark gray for system logs
+            'rgb': (50, 100, 160)  # Light blue for system logs
         },
         'LINE_NUMBERS_FG': {
             'color_num': 130,
