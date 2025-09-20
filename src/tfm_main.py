@@ -1317,6 +1317,51 @@ class FileManager:
         )
         self.needs_full_redraw = True
         self._force_immediate_redraw()
+    
+    def show_view_options(self):
+        """Show view options dialog with toggle options"""
+        def handle_view_option(option):
+            if option is None:
+                return  # User cancelled
+            
+            if option == "Toggle hidden files":
+                old_state = self.file_operations.show_hidden
+                new_state = self.file_operations.toggle_hidden_files()
+                # Reset both panes
+                self.pane_manager.left_pane['selected_index'] = 0
+                self.pane_manager.left_pane['scroll_offset'] = 0
+                self.pane_manager.right_pane['selected_index'] = 0
+                self.pane_manager.right_pane['scroll_offset'] = 0
+                print(f"Hidden files: {'shown' if new_state else 'hidden'}")
+                self.needs_full_redraw = True
+                
+            elif option == "Toggle color scheme (dark/light)":
+                from tfm_colors import toggle_color_scheme, init_colors
+                new_scheme = toggle_color_scheme()
+                init_colors(new_scheme)
+                print(f"Switched to {new_scheme} color scheme")
+                self.print_color_scheme_info()
+                self.needs_full_redraw = True
+                
+            elif option == "Toggle fallback color scheme":
+                from tfm_colors import toggle_fallback_mode, init_colors, is_fallback_mode
+                new_state = toggle_fallback_mode()
+                # Re-initialize colors with current scheme
+                color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+                init_colors(color_scheme)
+                status = "enabled" if new_state else "disabled"
+                print(f"Fallback color mode: {status}")
+                self.needs_full_redraw = True
+        
+        # Define the view options
+        options = [
+            "Toggle hidden files",
+            "Toggle color scheme (dark/light)", 
+            "Toggle fallback color scheme"
+        ]
+        
+        self.show_list_dialog("View Options", options, handle_view_option)
+        self._force_immediate_redraw()
 
     def show_sort_menu(self):
         """Show sort options menu using the quick choice dialog"""
@@ -2721,6 +2766,8 @@ class FileManager:
                 self.show_file_type_filter()
             elif key == ord('T'):  # 'T' key (Shift+T) - toggle fallback color mode
                 self.toggle_fallback_color_mode()
+            elif key == ord('z') or key == ord('Z'):  # 'z' or 'Z' key - show view options
+                self.show_view_options()
             elif self.is_key_for_action(key, 'search'):  # Search key - enter isearch mode
                 self.enter_isearch_mode()
             elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
