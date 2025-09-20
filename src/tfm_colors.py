@@ -475,7 +475,7 @@ def get_file_color(is_dir, is_executable, is_selected, is_active):
     # Handle selected files with common background color
     if is_selected and is_active:
         if is_dir:
-            return curses.color_pair(COLOR_DIRECTORIES_SELECTED) | curses.A_BOLD
+            return curses.color_pair(COLOR_DIRECTORIES_SELECTED)
         elif is_executable:
             return curses.color_pair(COLOR_EXECUTABLES_SELECTED)
         else:
@@ -484,7 +484,7 @@ def get_file_color(is_dir, is_executable, is_selected, is_active):
     # Handle inactive selection with underline
     if is_selected:
         if is_dir:
-            base_color = curses.color_pair(COLOR_DIRECTORIES) | curses.A_BOLD
+            base_color = curses.color_pair(COLOR_DIRECTORIES)
         elif is_executable:
             base_color = curses.color_pair(COLOR_EXECUTABLES)
         else:
@@ -493,7 +493,7 @@ def get_file_color(is_dir, is_executable, is_selected, is_active):
     
     # Normal (unselected) files
     if is_dir:
-        return curses.color_pair(COLOR_DIRECTORIES) | curses.A_BOLD
+        return curses.color_pair(COLOR_DIRECTORIES)
     elif is_executable:
         return curses.color_pair(COLOR_EXECUTABLES)
     else:
