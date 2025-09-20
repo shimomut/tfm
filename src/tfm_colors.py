@@ -184,36 +184,36 @@ COLOR_SCHEMES = {
         },
         'LINE_NUMBERS_FG': {
             'color_num': 130,
-            'rgb': (10, 10, 10)     # Very dark gray for line numbers
+            'rgb': (128, 128, 128)  # Gray for line numbers
         },
         # Syntax highlighting colors
         'SYNTAX_KEYWORD_FG': {
             'color_num': 131,
-            'rgb': (10, 10, 10)     # Very dark gray for keywords
+            'rgb': (128, 0, 128)    # Purple for keywords
         },
         'SYNTAX_STRING_FG': {
             'color_num': 132,
-            'rgb': (10, 10, 10)     # Very dark gray for strings
+            'rgb': (0, 128, 0)      # Dark green for strings
         },
         'SYNTAX_COMMENT_FG': {
             'color_num': 133,
-            'rgb': (10, 10, 10)     # Very dark gray for comments
+            'rgb': (128, 128, 128)  # Gray for comments
         },
         'SYNTAX_NUMBER_FG': {
             'color_num': 134,
-            'rgb': (10, 10, 10)     # Very dark gray for numbers
+            'rgb': (0, 0, 200)      # Blue for numbers
         },
         'SYNTAX_OPERATOR_FG': {
             'color_num': 135,
-            'rgb': (10, 10, 10)     # Very dark gray for operators
+            'rgb': (200, 0, 0)      # Red for operators
         },
         'SYNTAX_BUILTIN_FG': {
             'color_num': 136,
-            'rgb': (10, 10, 10)     # Very dark gray for built-ins
+            'rgb': (0, 128, 128)    # Teal for built-ins
         },
         'SYNTAX_NAME_FG': {
             'color_num': 137,
-            'rgb': (10, 10, 10)     # Very dark gray for names
+            'rgb': (64, 64, 64)     # Dark gray for names
         },
         # Search highlighting colors
         'SEARCH_MATCH_BG': {
