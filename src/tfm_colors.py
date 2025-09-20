@@ -126,11 +126,11 @@ COLOR_SCHEMES = {
         # Search highlighting colors
         'SEARCH_MATCH_BG': {
             'color_num': 118,
-            'rgb': (30, 60, 120)    # Dark blue-purple background for selected items
+            'rgb': (30, 60, 120)    # Dark blue background for search matches
         },
         'SEARCH_CURRENT_BG': {
             'color_num': 119,
-            'rgb': (40, 80, 160)    # Dark blue-purple background for selected items
+            'rgb': (40, 80, 160)    # Medium blue background for current search match
         },
         'DEFAULT_FG': {
             'color_num': 146,
@@ -144,43 +144,43 @@ COLOR_SCHEMES = {
     'light': {
         'HEADER_BG': {
             'color_num': 120,
-            'rgb': (220, 220, 220)     # Gray 
+            'rgb': (220, 220, 220)     # Light gray for file list headers
         },
         'FOOTER_BG': {
             'color_num': 124,
-            'rgb': (220, 220, 220)     # Gray 
+            'rgb': (220, 220, 220)     # Light gray for file list footers
         },
         'STATUS_BG': {
             'color_num': 125,
-            'rgb': (220, 220, 220)     # Gray 
+            'rgb': (220, 220, 220)     # Light gray for status bar
         },
         'BOUNDARY_BG': {
             'color_num': 126,
-            'rgb': (220, 220, 220)     # Gray 
+            'rgb': (220, 220, 220)     # Light gray for boundaries
         },
         'DIRECTORY_FG': {
             'color_num': 121,
-            'rgb': (160, 120, 0)  # Yellow for directories
+            'rgb': (160, 120, 0)  # Dark yellow/brown for directories
         },
         'EXECUTABLE_FG': {
             'color_num': 122,
-            'rgb': (0, 160, 0)    # Bright green for executables
+            'rgb': (0, 160, 0)    # Dark green for executables
         },
         'SELECTED_BG': {
             'color_num': 123,
-            'rgb': (120, 160, 255)    # Dark blue-purple background for selected items
+            'rgb': (120, 160, 255)    # Light blue background for selected items
         },
         'REGULAR_FILE_FG': {
             'color_num': 127,
-            'rgb': (60, 60, 60)     # Very dark gray
+            'rgb': (60, 60, 60)     # Dark gray for regular files
         },
         'LOG_STDOUT_FG': {
             'color_num': 128,
-            'rgb': (60, 60, 60)     # Very dark gray
+            'rgb': (60, 60, 60)     # Dark gray for stdout logs
         },
         'LOG_SYSTEM_FG': {
             'color_num': 129,
-            'rgb': (50, 100, 160)  # Light blue for system logs
+            'rgb': (50, 100, 160)  # Dark blue for system logs
         },
         'LINE_NUMBERS_FG': {
             'color_num': 130,
@@ -218,11 +218,11 @@ COLOR_SCHEMES = {
         # Search highlighting colors
         'SEARCH_MATCH_BG': {
             'color_num': 138,
-            'rgb': (180, 240, 255)    # Dark blue-purple background for selected items
+            'rgb': (180, 240, 255)    # Very light blue background for search matches
         },
         'SEARCH_CURRENT_BG': {
             'color_num': 139,
-            'rgb': (140, 200, 255)    # Dark blue-purple background for selected items
+            'rgb': (140, 200, 255)    # Light blue background for current search match
         },
         'DEFAULT_FG': {
             'color_num': 148,
