@@ -36,6 +36,7 @@ from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
+from tfm_external_programs import ExternalProgramManager
 
 class FileManager:
     def __init__(self, stdscr):
@@ -57,6 +58,7 @@ class FileManager:
         self.batch_rename_dialog = BatchRenameDialog(self.config)
         self.quick_choice_bar = QuickChoiceBar(self.config)
         self.general_dialog = GeneralPurposeDialog(self.config)
+        self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -1315,130 +1317,19 @@ class FileManager:
     
     def show_programs_dialog(self):
         """Show external programs using the searchable list dialog"""
+        def execute_program_wrapper(program):
+            self.stdscr = self.external_program_manager.execute_external_program(
+                self.stdscr, self.pane_manager, program
+            )
+            self.needs_full_redraw = True
+        
         ListDialogHelpers.show_programs_dialog(
-            self.list_dialog, self.execute_external_program, print
+            self.list_dialog, execute_program_wrapper, print
         )
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
-    def execute_external_program(self, program):
-        """Execute an external program with environment variables set"""
-        # Restore stdout/stderr temporarily
-        self.restore_stdio()
-        
-        # Clear the screen and reset cursor
-        self.stdscr.clear()
-        self.stdscr.refresh()
-        
-        # Reset terminal to normal mode
-        curses.endwin()
-        
-        try:
-            # Get current pane information
-            left_pane = self.left_pane
-            right_pane = self.right_pane
-            current_pane = self.get_current_pane()
-            other_pane = self.get_inactive_pane()
-            
-            # Set environment variables with TFM_ prefix
-            env = os.environ.copy()
-            env['TFM_LEFT_DIR'] = str(left_pane['path'])
-            env['TFM_RIGHT_DIR'] = str(right_pane['path'])
-            env['TFM_THIS_DIR'] = str(current_pane['path'])
-            env['TFM_OTHER_DIR'] = str(other_pane['path'])
-            
-            # Get selected files for each pane, or cursor position if no selection
-            def get_selected_or_cursor(pane_data):
-                """Get selected files, or current cursor position if no files selected"""
-                selected = [Path(f).name for f in pane_data['selected_files']]
-                if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
-                    # No files selected, use cursor position
-                    cursor_file = pane_data['files'][pane_data['selected_index']]
-                    selected = [cursor_file.name]
-                return selected
-            
-            def quote_filenames(filenames):
-                """Quote filenames for safe shell usage"""
-                return [shlex.quote(filename) for filename in filenames]
-            
-            left_selected = quote_filenames(get_selected_or_cursor(left_pane))
-            right_selected = quote_filenames(get_selected_or_cursor(right_pane))
-            current_selected = quote_filenames(get_selected_or_cursor(current_pane))
-            other_selected = quote_filenames(get_selected_or_cursor(other_pane))
-            
-            # Set selected files environment variables (space-separated) with TFM_ prefix
-            env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
-            env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
-            env['TFM_THIS_SELECTED'] = ' '.join(current_selected)
-            env['TFM_OTHER_SELECTED'] = ' '.join(other_selected)
-            
-            # Set TFM indicator environment variable
-            env['TFM_ACTIVE'] = '1'
-            
-            # Print information about the program execution
-            print(f"TFM External Program: {program['name']}")
-            print("=" * 50)
-            print(f"Command: {' '.join(program['command'])}")
-            print(f"Working Directory: {current_pane['path']}")
-            print(f"TFM_THIS_DIR: {env['TFM_THIS_DIR']}")
-            print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
-            print("=" * 50)
-            print()
-            
-            # Change to the current directory
-            os.chdir(current_pane['path'])
-            
-            # Execute the program with the modified environment
-            result = subprocess.run(program['command'], env=env)
-            
-            # Check if auto_return option is enabled
-            auto_return = program.get('options', {}).get('auto_return', False)
-            
-            # Show exit status
-            print()
-            print("=" * 50)
-            if result.returncode == 0:
-                print(f"Program '{program['name']}' completed successfully")
-            else:
-                print(f"Program '{program['name']}' exited with code {result.returncode}")
-            
-            if auto_return:
-                print("Auto-returning to TFM...")
-                import time
-                time.sleep(1)  # Brief pause to show the message
-            else:
-                print("Press Enter to return to TFM...")
-                input()
-            
-        except FileNotFoundError:
-            print(f"Error: Command not found: {program['command'][0]}")
-            print("Press Enter to continue...")
-            input()
-        except Exception as e:
-            print(f"Error executing program '{program['name']}': {e}")
-            print("Press Enter to continue...")
-            input()
-        
-        finally:
-            # Reinitialize curses
-            self.stdscr = curses.initscr()
-            curses.curs_set(0)  # Hide cursor
-            self.stdscr.keypad(True)
-            
-            # Reinitialize colors with configured scheme
-            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-            init_colors(color_scheme)
-            
-            # Restore stdout/stderr capture
-            from tfm_log_manager import LogCapture
-            sys.stdout = LogCapture(self.log_manager.log_messages, "STDOUT")
-            sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
-            
-            # Log return from program execution
-            print(f"Returned from external program: {program['name']}")
-            
-            # Force full redraw
-            self.needs_full_redraw = True
+
     
     def show_sort_menu(self):
         """Show sort options menu using the quick choice dialog"""
@@ -1596,14 +1487,7 @@ class FileManager:
             print(f"Error viewing file: {str(e)}")
             self.needs_full_redraw = True
     
-    def suspend_curses(self):
-        """Suspend the curses system to allow external programs to run"""
-        curses.endwin()
-        
-    def resume_curses(self):
-        """Resume the curses system after external program execution"""
-        self.stdscr.refresh()
-        curses.curs_set(0)  # Hide cursor
+
         self.needs_full_redraw = True
     
     def edit_selected_file(self):
@@ -1628,7 +1512,7 @@ class FileManager:
         
         try:
             # Suspend curses
-            self.suspend_curses()
+            self.external_program_manager.suspend_curses(self.stdscr)
             
             # Launch the text editor as a subprocess
             import subprocess
@@ -1636,7 +1520,7 @@ class FileManager:
                                   cwd=str(current_pane['path']))
             
             # Resume curses
-            self.resume_curses()
+            self.external_program_manager.resume_curses(self.stdscr)
             
             if result.returncode == 0:
                 print(f"Edited file: {selected_file.name}")
@@ -1645,11 +1529,11 @@ class FileManager:
                 
         except FileNotFoundError:
             # Resume curses even if editor not found
-            self.resume_curses()
+            self.external_program_manager.resume_curses(self.stdscr)
             print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
         except Exception as e:
             # Resume curses even if there's an error
-            self.resume_curses()
+            self.external_program_manager.resume_curses(self.stdscr)
             print(f"Error launching editor: {e}")
     
     def copy_selected_files(self):
@@ -2519,128 +2403,7 @@ class FileManager:
         SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
         self.needs_full_redraw = True
 
-    def enter_subshell_mode(self):
-        """Enter sub-shell mode with environment variables set"""
-        # Restore stdout/stderr temporarily
-        self.restore_stdio()
-        
-        # Clear the screen and reset cursor
-        self.stdscr.clear()
-        self.stdscr.refresh()
-        
-        # Reset terminal to normal mode
-        curses.endwin()
-        
-        try:
-            # Get current pane information
-            left_pane = self.left_pane
-            right_pane = self.right_pane
-            current_pane = self.get_current_pane()
-            other_pane = self.get_inactive_pane()
-            
-            # Set environment variables with TFM_ prefix
-            env = os.environ.copy()
-            env['TFM_LEFT_DIR'] = str(left_pane['path'])
-            env['TFM_RIGHT_DIR'] = str(right_pane['path'])
-            env['TFM_THIS_DIR'] = str(current_pane['path'])
-            env['TFM_OTHER_DIR'] = str(other_pane['path'])
-            
-            # Get selected files for each pane, or cursor position if no selection
-            def get_selected_or_cursor(pane_data):
-                """Get selected files, or current cursor position if no files selected"""
-                selected = [Path(f).name for f in pane_data['selected_files']]
-                if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
-                    # No files selected, use cursor position
-                    cursor_file = pane_data['files'][pane_data['selected_index']]
-                    selected = [cursor_file.name]
-                return selected
-            
-            def quote_filenames(filenames):
-                """Quote filenames for safe shell usage"""
-                return [shlex.quote(filename) for filename in filenames]
-            
-            left_selected = quote_filenames(get_selected_or_cursor(left_pane))
-            right_selected = quote_filenames(get_selected_or_cursor(right_pane))
-            current_selected = quote_filenames(get_selected_or_cursor(current_pane))
-            other_selected = quote_filenames(get_selected_or_cursor(other_pane))
-            
-            # Set selected files environment variables (space-separated) with TFM_ prefix
-            # Filenames are properly quoted for shell safety
-            env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
-            env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
-            env['TFM_THIS_SELECTED'] = ' '.join(current_selected)
-            env['TFM_OTHER_SELECTED'] = ' '.join(other_selected)
-            
-            # Set TFM indicator environment variable
-            env['TFM_ACTIVE'] = '1'
-            
-            # Modify shell prompt to include [TFM] label
-            # Handle both bash (PS1) and zsh (PROMPT) prompts
-            current_ps1 = env.get('PS1', '')
-            current_prompt = env.get('PROMPT', '')
-            
-            # Modify PS1 for bash and other shells
-            if current_ps1:
-                env['PS1'] = f'[TFM] {current_ps1}'
-            else:
-                env['PS1'] = '[TFM] \\u@\\h:\\w\\$ '
-            
-            # Modify PROMPT for zsh
-            if current_prompt:
-                env['PROMPT'] = f'[TFM] {current_prompt}'
-            else:
-                env['PROMPT'] = '[TFM] %n@%m:%~%# '
-            
-            # Print information about the sub-shell environment
-            print("TFM Sub-shell Mode")
-            print("=" * 50)
-            print(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
-            print(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
-            print(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
-            print(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
-            print(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
-            print(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
-            print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
-            print(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
-            print("=" * 50)
-            print("TFM_ACTIVE environment variable is set for shell customization")
-            print("To show [TFM] in your prompt, add this to your shell config:")
-            print("  Zsh (~/.zshrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PROMPT=\"[TFM] $PROMPT\"; fi")
-            print("  Bash (~/.bashrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PS1=\"[TFM] $PS1\"; fi")
-            print("Type 'exit' to return to TFM")
-            print()
-            
-            # Change to the current directory
-            os.chdir(current_pane['path'])
-            
-            # Start the shell with the modified environment
-            shell = env.get('SHELL', '/bin/bash')
-            subprocess.run([shell], env=env)
-            
-        except Exception as e:
-            print(f"Error starting sub-shell: {e}")
-            input("Press Enter to continue...")
-        
-        finally:
-            # Reinitialize curses
-            self.stdscr = curses.initscr()
-            curses.curs_set(0)  # Hide cursor
-            self.stdscr.keypad(True)
-            
-            # Reinitialize colors with configured scheme
-            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-            init_colors(color_scheme)
-            
-            # Restore stdout/stderr capture  
-            from tfm_log_manager import LogCapture
-            sys.stdout = LogCapture(self.log_manager.log_messages, "STDOUT")
-            sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
-            
-            # Log return from sub-shell
-            print("Returned from sub-shell mode")
-            
-            # Force full redraw
-            self.needs_full_redraw = True
+
 
     def run(self):
         """Main application loop"""
@@ -2997,7 +2760,10 @@ class FileManager:
                 self.needs_full_redraw = True
                 print("Pane split reset to 50% | 50%")
             elif self.is_key_for_action(key, 'subshell'):  # Sub-shell mode
-                self.enter_subshell_mode()
+                self.stdscr = self.external_program_manager.enter_subshell_mode(
+                    self.stdscr, self.pane_manager
+                )
+                self.needs_full_redraw = True
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
