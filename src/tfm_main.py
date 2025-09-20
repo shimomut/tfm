@@ -15,6 +15,7 @@ import shlex
 import zipfile
 import tarfile
 import time
+import webbrowser
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -1361,6 +1362,107 @@ class FileManager:
         ]
         
         self.show_list_dialog("View Options", options, handle_view_option)
+        self._force_immediate_redraw()
+
+    def show_settings_menu(self):
+        """Show settings menu with configuration options"""
+        def handle_settings_option(option):
+            if option is None:
+                return  # User cancelled
+            
+            if option == "Edit config.py (~/.tfm/config.py)":
+                config_path = os.path.expanduser("~/.tfm/config.py")
+                
+                # Check if config file exists
+                if not os.path.exists(config_path):
+                    print(f"Config file not found: {config_path}")
+                    print("TFM should have created this file automatically on startup.")
+                    return
+                
+                # Try to open the config file with the configured text editor
+                try:
+                    # Get the configured text editor
+                    from tfm_const import DEFAULT_TEXT_EDITOR
+                    editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
+                    
+                    # Suspend curses
+                    self.external_program_manager.suspend_curses(self.stdscr)
+                    
+                    # Launch the text editor as a subprocess
+                    result = subprocess.run([editor, config_path])
+                    
+                    # Resume curses
+                    self.external_program_manager.resume_curses(self.stdscr)
+                    
+                    if result.returncode == 0:
+                        print(f"Edited config file: {config_path}")
+                    else:
+                        print(f"Editor exited with code {result.returncode}")
+                    
+                    self.needs_full_redraw = True
+                    
+                except FileNotFoundError:
+                    # Resume curses even if editor not found
+                    self.external_program_manager.resume_curses(self.stdscr)
+                    print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
+                    print("You can manually edit the file at: " + config_path)
+                except Exception as e:
+                    # Resume curses even if there's an error
+                    self.external_program_manager.resume_curses(self.stdscr)
+                    print(f"Error opening config file: {e}")
+                    print("You can manually edit the file at: " + config_path)
+                
+            elif option == "Reload config.py":
+                try:
+                    # Reload the configuration
+                    from tfm_config import get_config
+                    # Force reload by clearing any cached config
+                    import importlib
+                    import tfm_config
+                    importlib.reload(tfm_config)
+                    
+                    # Get the new config
+                    old_config = self.config
+                    self.config = get_config()
+                    
+                    # Apply any config changes that need immediate effect
+                    if hasattr(self.config, 'COLOR_SCHEME'):
+                        from tfm_colors import init_colors
+                        init_colors(self.config.COLOR_SCHEME)
+                        print(f"Applied color scheme: {self.config.COLOR_SCHEME}")
+                    
+                    if hasattr(self.config, 'SHOW_HIDDEN_FILES'):
+                        self.file_operations.show_hidden = self.config.SHOW_HIDDEN_FILES
+                        print(f"Hidden files setting: {'shown' if self.config.SHOW_HIDDEN_FILES else 'hidden'}")
+                    
+                    if hasattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO'):
+                        self.log_height_ratio = self.config.DEFAULT_LOG_HEIGHT_RATIO
+                        print(f"Log height ratio: {self.config.DEFAULT_LOG_HEIGHT_RATIO}")
+                    
+                    print("Configuration reloaded successfully")
+                    self.needs_full_redraw = True
+                    
+                except Exception as e:
+                    print(f"Error reloading configuration: {e}")
+                    print("Please check your config file for syntax errors")
+                
+            elif option == "Report issues":
+                try:
+                    # Open the GitHub issues page
+                    webbrowser.open("https://github.com/shimomut/tfm/issues")
+                    print("Opened GitHub issues page in your default browser")
+                except Exception as e:
+                    print(f"Error opening browser: {e}")
+                    print("Please visit: https://github.com/shimomut/tfm/issues")
+        
+        # Define the settings options
+        options = [
+            "Edit config.py (~/.tfm/config.py)",
+            "Reload config.py",
+            "Report issues"
+        ]
+        
+        self.show_list_dialog("Settings", options, handle_settings_option)
         self._force_immediate_redraw()
 
     def show_sort_menu(self):
@@ -2766,8 +2868,10 @@ class FileManager:
                 self.show_file_type_filter()
             elif key == ord('T'):  # 'T' key (Shift+T) - toggle fallback color mode
                 self.toggle_fallback_color_mode()
-            elif key == ord('z') or key == ord('Z'):  # 'z' or 'Z' key - show view options
+            elif key == ord('z'):  # 'z' key - show view options
                 self.show_view_options()
+            elif key == ord('Z'):  # 'Z' key (Shift+Z) - show settings menu
+                self.show_settings_menu()
             elif self.is_key_for_action(key, 'search'):  # Search key - enter isearch mode
                 self.enter_isearch_mode()
             elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
