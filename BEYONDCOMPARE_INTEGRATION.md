@@ -2,24 +2,43 @@
 
 ## Overview
 
-BeyondCompare has been successfully integrated as an external program in TFM. This allows you to quickly launch BeyondCompare to compare the directories shown in the left and right panes of TFM.
+BeyondCompare has been successfully integrated as external programs in TFM. This provides two comparison modes:
+
+1. **Directory Comparison**: Compare the directories shown in the left and right panes
+2. **File Comparison**: Compare selected files from the left and right panes
 
 ## Setup
 
 The integration consists of:
 
-1. **Wrapper Script**: `bcompare_wrapper.sh` - A shell script that launches BeyondCompare with the appropriate directories
-2. **Configuration**: BeyondCompare entry added to the `PROGRAMS` list in both the template config and user config
+1. **Directory Wrapper Script**: `bcompare_wrapper.sh` - Launches BeyondCompare with left and right pane directories
+2. **File Wrapper Script**: `bcompare_files_wrapper.sh` - Launches BeyondCompare with selected files from both panes
+3. **Configuration**: Two BeyondCompare entries added to the `PROGRAMS` list in both template and user configs
 
 ## Usage
+
+### Directory Comparison
 
 1. **Start TFM**: Run `python3 tfm.py` or `python3 src/tfm_main.py`
 2. **Navigate**: Use TFM to navigate to the directories you want to compare
    - Left pane: Navigate to the first directory
    - Right pane: Navigate to the second directory
-3. **Launch BeyondCompare**: Press `x` to open the external programs dialog
-4. **Select BeyondCompare**: Use the searchable list to find and select "BeyondCompare"
+3. **Launch**: Press `x` to open the external programs dialog
+4. **Select**: Choose "Compare Directories (BeyondCompare)" from the list
 5. **Compare**: BeyondCompare will launch with the left and right pane directories loaded
+
+### File Comparison
+
+1. **Start TFM**: Run `python3 tfm.py` or `python3 src/tfm_main.py`
+2. **Navigate**: Navigate to directories containing the files you want to compare
+3. **Select Files**: 
+   - In the left pane: Navigate to and select a file (using Space or cursor position)
+   - In the right pane: Navigate to and select a file to compare against
+4. **Launch**: Press `x` to open the external programs dialog
+5. **Select**: Choose "Compare Files (BeyondCompare)" from the list
+6. **Compare**: BeyondCompare will launch with the selected files loaded for comparison
+
+**Note**: For file comparison, if no files are explicitly selected, the files under the cursor in each pane will be used.
 
 ## Environment Variables
 
@@ -29,28 +48,43 @@ When BeyondCompare is launched, the following TFM environment variables are avai
 - `TFM_RIGHT_DIR`: Path of the right pane directory
 - `TFM_THIS_DIR`: Path of the current (active) pane directory
 - `TFM_OTHER_DIR`: Path of the inactive pane directory
+- `TFM_LEFT_SELECTED`: Selected files in the left pane (space-separated, quoted)
+- `TFM_RIGHT_SELECTED`: Selected files in the right pane (space-separated, quoted)
+- `TFM_THIS_SELECTED`: Selected files in the current pane (space-separated, quoted)
+- `TFM_OTHER_SELECTED`: Selected files in the other pane (space-separated, quoted)
 - `TFM_ACTIVE`: Set to '1' to indicate TFM is active
 
-The wrapper script uses `TFM_LEFT_DIR` and `TFM_RIGHT_DIR` to launch BeyondCompare with the correct directories.
+**Directory Comparison**: Uses `TFM_LEFT_DIR` and `TFM_RIGHT_DIR`
+**File Comparison**: Uses `TFM_LEFT_SELECTED`, `TFM_RIGHT_SELECTED`, `TFM_LEFT_DIR`, and `TFM_RIGHT_DIR`
 
 ## Files Created/Modified
 
 ### New Files
-- `bcompare_wrapper.sh`: Wrapper script that launches BeyondCompare
+- `bcompare_wrapper.sh`: Wrapper script for directory comparison
+- `bcompare_files_wrapper.sh`: Wrapper script for file comparison
 - `test_bcompare.py`: Test script to verify the integration
 - `BEYONDCOMPARE_INTEGRATION.md`: This documentation file
 
 ### Modified Files
-- `src/_config.py`: Added BeyondCompare to the default PROGRAMS list
-- `~/.tfm/config.py`: Added BeyondCompare to the user's PROGRAMS list
+- `src/_config.py`: Added both BeyondCompare programs to the default PROGRAMS list
+- `~/.tfm/config.py`: Added both BeyondCompare programs to the user's PROGRAMS list
 
 ## Wrapper Script Details
 
-The `bcompare_wrapper.sh` script:
+### Directory Comparison (`bcompare_wrapper.sh`)
 
 1. Checks if BeyondCompare (`bcompare`) is installed and available in PATH
-2. Verifies that TFM environment variables are set
+2. Verifies that TFM directory environment variables are set
 3. Launches BeyondCompare with the left and right directories: `bcompare "$TFM_LEFT_DIR" "$TFM_RIGHT_DIR"`
+
+### File Comparison (`bcompare_files_wrapper.sh`)
+
+1. Checks if BeyondCompare (`bcompare`) is installed and available in PATH
+2. Verifies that TFM file selection and directory environment variables are set
+3. Extracts the first selected file from each pane (removes quotes if present)
+4. Builds full file paths using directory + filename
+5. Verifies both files exist
+6. Launches BeyondCompare with the selected files: `bcompare "$LEFT_PATH" "$RIGHT_PATH"`
 
 ## Prerequisites
 
@@ -108,8 +142,15 @@ You can customize the BeyondCompare integration by:
 
 ## Example Use Cases
 
+### Directory Comparison
 - **Project Comparison**: Compare different versions of a project directory
 - **Backup Verification**: Compare original and backup directories
 - **Deployment Checking**: Compare local and deployed versions
-- **Code Review**: Compare different branches or versions of code
 - **File Synchronization**: Identify differences before syncing directories
+
+### File Comparison
+- **Code Review**: Compare different versions of the same file
+- **Configuration Comparison**: Compare config files between environments
+- **Document Comparison**: Compare different versions of documents
+- **Merge Conflict Resolution**: Compare conflicting file versions
+- **Template Comparison**: Compare template files with customized versions

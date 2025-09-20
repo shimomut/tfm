@@ -116,7 +116,8 @@ class Config:
         {'name': 'List Processes', 'command': ['ps', 'aux']},
         {'name': 'System Info', 'command': ['uname', '-a']},
         {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
-        {'name': 'BeyondCompare', 'command': ['./bcompare_wrapper.sh']},
+        {'name': 'Compare Directories (BeyondCompare)', 'command': ['./bcompare_wrapper.sh']},
+        {'name': 'Compare Files (BeyondCompare)', 'command': ['./bcompare_files_wrapper.sh']},
         # Add your own programs here:
         # {'name': 'My Script', 'command': ['/path/to/script.sh']},
         # {'name': 'Python REPL', 'command': ['python3']},
