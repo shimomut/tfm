@@ -27,11 +27,12 @@ class FileOperations:
             if not self.show_hidden:
                 all_entries = [entry for entry in all_entries if not entry.name.startswith('.')]
             
-            # Apply filename filter if active
+            # Apply filename filter if active (only to files, not directories)
             if pane_data['filter_pattern']:
                 filtered_entries = []
                 for entry in all_entries:
-                    if fnmatch.fnmatch(entry.name.lower(), pane_data['filter_pattern'].lower()):
+                    # Always include directories, only filter files
+                    if entry.is_dir() or fnmatch.fnmatch(entry.name.lower(), pane_data['filter_pattern'].lower()):
                         filtered_entries.append(entry)
                 all_entries = filtered_entries
             
