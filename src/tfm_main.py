@@ -128,13 +128,13 @@ class FileManager:
         self.list_dialog_filtered_items = []  # Filtered items based on search
         self.list_dialog_selected = 0  # Index of currently selected item in filtered list
         self.list_dialog_scroll = 0  # Scroll offset for the list
-        self.list_dialog_search = ""  # Current search pattern
+        self.list_dialog_search_editor = SingleLineTextEdit()  # Search editor for list dialog
         self.list_dialog_callback = None  # Callback function when item is selected
         
         # Search dialog state
         self.search_dialog_mode = False
         self.search_dialog_type = 'filename'  # 'filename' or 'content'
-        self.search_dialog_pattern = ""
+        self.search_dialog_pattern_editor = SingleLineTextEdit()  # Pattern editor for search dialog
         self.search_dialog_results = []  # List of search results
         self.search_dialog_selected = 0  # Index of currently selected result
         self.search_dialog_scroll = 0  # Scroll offset for results
@@ -1952,7 +1952,7 @@ class FileManager:
         self.list_dialog_filtered_items = items.copy()  # Initially show all items
         self.list_dialog_selected = 0
         self.list_dialog_scroll = 0
-        self.list_dialog_search = ""
+        self.list_dialog_search_editor.clear()
         self.list_dialog_callback = callback
         self.needs_full_redraw = True
     
@@ -1972,7 +1972,7 @@ class FileManager:
         self.list_dialog_filtered_items = []
         self.list_dialog_selected = 0
         self.list_dialog_scroll = 0
-        self.list_dialog_search = ""
+        self.list_dialog_search_editor.clear()
         self.list_dialog_callback = None
         self.needs_full_redraw = True
     
@@ -2047,17 +2047,29 @@ class FileManager:
                 self._adjust_list_dialog_scroll()
                 self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_HOME:  # Home - go to top
-            if self.list_dialog_filtered_items:
-                self.list_dialog_selected = 0
-                self.list_dialog_scroll = 0
-                self.needs_full_redraw = True
+        elif key == curses.KEY_HOME:  # Home - text cursor or list navigation
+            # If there's text in search, let editor handle it for cursor movement
+            if self.list_dialog_search_editor.text:
+                if self.list_dialog_search_editor.handle_key(key):
+                    self.needs_full_redraw = True
+            else:
+                # If no search text, use for list navigation
+                if self.list_dialog_filtered_items:
+                    self.list_dialog_selected = 0
+                    self.list_dialog_scroll = 0
+                    self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_END:  # End - go to bottom
-            if self.list_dialog_filtered_items:
-                self.list_dialog_selected = len(self.list_dialog_filtered_items) - 1
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
+        elif key == curses.KEY_END:  # End - text cursor or list navigation
+            # If there's text in search, let editor handle it for cursor movement
+            if self.list_dialog_search_editor.text:
+                if self.list_dialog_search_editor.handle_key(key):
+                    self.needs_full_redraw = True
+            else:
+                # If no search text, use for list navigation
+                if self.list_dialog_filtered_items:
+                    self.list_dialog_selected = len(self.list_dialog_filtered_items) - 1
+                    self._adjust_list_dialog_scroll()
+                    self.needs_full_redraw = True
             return True
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
             # Select current item
@@ -2070,27 +2082,32 @@ class FileManager:
                     self.list_dialog_callback(None)
             self.exit_list_dialog_mode()
             return True
+        elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
+            # Let the editor handle cursor movement keys
+            if self.list_dialog_search_editor.handle_key(key):
+                self.needs_full_redraw = True
+            return True
         elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
-            # Remove last character from search
-            if self.list_dialog_search:
-                self.list_dialog_search = self.list_dialog_search[:-1]
+            # Let the editor handle backspace
+            if self.list_dialog_search_editor.handle_key(key):
                 self._filter_list_dialog_items()
                 self.needs_full_redraw = True
             return True
         elif 32 <= key <= 126:  # Printable characters
-            # Add character to search
-            self.list_dialog_search += chr(key)
-            self._filter_list_dialog_items()
-            self.needs_full_redraw = True
+            # Let the editor handle printable characters
+            if self.list_dialog_search_editor.handle_key(key):
+                self._filter_list_dialog_items()
+                self.needs_full_redraw = True
             return True
         return False
     
     def _filter_list_dialog_items(self):
         """Filter list dialog items based on current search pattern"""
-        if not self.list_dialog_search:
+        search_text = self.list_dialog_search_editor.text
+        if not search_text:
             self.list_dialog_filtered_items = self.list_dialog_items.copy()
         else:
-            search_lower = self.list_dialog_search.lower()
+            search_lower = search_text.lower()
             self.list_dialog_filtered_items = [
                 item for item in self.list_dialog_items 
                 if search_lower in str(item).lower()
@@ -2268,15 +2285,14 @@ class FileManager:
         
         # Draw search box
         search_y = start_y + 2
-        search_label = "Search: "
-        search_text = self.list_dialog_search + "_"  # Add cursor
-        search_line = search_label + search_text
-        
+        # Draw search input using SingleLineTextEdit
         if search_y < height:
-            content_start_x = start_x + 2
-            content_width = dialog_width - 4
-            display_search = search_line[:content_width] if len(search_line) > content_width else search_line
-            self.safe_addstr(search_y, content_start_x, display_search, get_status_color())
+            max_search_width = dialog_width - 4  # Leave some margin
+            self.list_dialog_search_editor.draw(
+                self.stdscr, search_y, start_x + 2, max_search_width,
+                "Search: ",
+                is_active=True
+            )
         
         # Draw separator line
         sep_y = start_y + 3
@@ -2347,8 +2363,8 @@ class FileManager:
             else:
                 status_text = "No items found"
             
-            if self.list_dialog_search:
-                status_text += f" | Filter: '{self.list_dialog_search}'"
+            if self.list_dialog_search_editor.text:
+                status_text += f" | Filter: '{self.list_dialog_search_editor.text}'"
             
             # Center the status text
             if len(status_text) <= content_width:
@@ -4090,7 +4106,7 @@ class FileManager:
         """Show the search dialog for filename or content search"""
         self.search_dialog_mode = True
         self.search_dialog_type = search_type
-        self.search_dialog_pattern = ""
+        self.search_dialog_pattern_editor.clear()
         self.search_dialog_results = []
         self.search_dialog_selected = 0
         self.search_dialog_scroll = 0
@@ -4101,7 +4117,7 @@ class FileManager:
         """Exit search dialog mode"""
         self.search_dialog_mode = False
         self.search_dialog_type = 'filename'
-        self.search_dialog_pattern = ""
+        self.search_dialog_pattern_editor.clear()
         self.search_dialog_results = []
         self.search_dialog_selected = 0
         self.search_dialog_scroll = 0
@@ -4110,7 +4126,8 @@ class FileManager:
     
     def perform_search(self):
         """Perform the actual search based on current pattern and type"""
-        if not self.search_dialog_pattern.strip():
+        pattern_text = self.search_dialog_pattern_editor.text.strip()
+        if not pattern_text:
             self.search_dialog_results = []
             return
         
@@ -4124,7 +4141,7 @@ class FileManager:
             if self.search_dialog_type == 'filename':
                 # Recursive filename search using fnmatch
                 for file_path in search_root.rglob('*'):
-                    if fnmatch.fnmatch(file_path.name.lower(), self.search_dialog_pattern.lower()):
+                    if fnmatch.fnmatch(file_path.name.lower(), pattern_text.lower()):
                         relative_path = file_path.relative_to(search_root)
                         self.search_dialog_results.append({
                             'path': file_path,
@@ -4136,7 +4153,7 @@ class FileManager:
             elif self.search_dialog_type == 'content':
                 # Recursive grep-based content search
                 import re
-                pattern = re.compile(self.search_dialog_pattern, re.IGNORECASE)
+                pattern = re.compile(pattern_text, re.IGNORECASE)
                 
                 for file_path in search_root.rglob('*'):
                     if file_path.is_file():
@@ -4216,17 +4233,29 @@ class FileManager:
                 self._adjust_search_dialog_scroll()
                 self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_HOME:  # Home - go to top
-            if self.search_dialog_results:
-                self.search_dialog_selected = 0
-                self.search_dialog_scroll = 0
-                self.needs_full_redraw = True
+        elif key == curses.KEY_HOME:  # Home - text cursor or list navigation
+            # If there's text in pattern, let editor handle it for cursor movement
+            if self.search_dialog_pattern_editor.text:
+                if self.search_dialog_pattern_editor.handle_key(key):
+                    self.needs_full_redraw = True
+            else:
+                # If no pattern text, use for list navigation
+                if self.search_dialog_results:
+                    self.search_dialog_selected = 0
+                    self.search_dialog_scroll = 0
+                    self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_END:  # End - go to bottom
-            if self.search_dialog_results:
-                self.search_dialog_selected = len(self.search_dialog_results) - 1
-                self._adjust_search_dialog_scroll()
-                self.needs_full_redraw = True
+        elif key == curses.KEY_END:  # End - text cursor or list navigation
+            # If there's text in pattern, let editor handle it for cursor movement
+            if self.search_dialog_pattern_editor.text:
+                if self.search_dialog_pattern_editor.handle_key(key):
+                    self.needs_full_redraw = True
+            else:
+                # If no pattern text, use for list navigation
+                if self.search_dialog_results:
+                    self.search_dialog_selected = len(self.search_dialog_results) - 1
+                    self._adjust_search_dialog_scroll()
+                    self.needs_full_redraw = True
             return True
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
             # Select current result
@@ -4235,10 +4264,14 @@ class FileManager:
                 self._navigate_to_search_result(selected_result)
             self.exit_search_dialog_mode()
             return True
+        elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
+            # Let the editor handle cursor movement keys
+            if self.search_dialog_pattern_editor.handle_key(key):
+                self.needs_full_redraw = True
+            return True
         elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
-            # Remove last character from search pattern
-            if self.search_dialog_pattern:
-                self.search_dialog_pattern = self.search_dialog_pattern[:-1]
+            # Let the editor handle backspace
+            if self.search_dialog_pattern_editor.handle_key(key):
                 self.perform_search()
                 self.needs_full_redraw = True
             return True
@@ -4248,10 +4281,10 @@ class FileManager:
             self.needs_full_redraw = True
             return True
         elif 32 <= key <= 126:  # Printable characters
-            # Add character to search pattern
-            self.search_dialog_pattern += chr(key)
-            self.perform_search()
-            self.needs_full_redraw = True
+            # Let the editor handle printable characters
+            if self.search_dialog_pattern_editor.handle_key(key):
+                self.perform_search()
+                self.needs_full_redraw = True
             return True
         return False
     
@@ -4358,15 +4391,14 @@ class FileManager:
         
         # Draw search box
         search_y = start_y + 2
-        search_label = "Pattern: "
-        search_text = self.search_dialog_pattern + "_"  # Add cursor
-        search_line = search_label + search_text
-        
+        # Draw pattern input using SingleLineTextEdit
         if search_y < height:
-            content_start_x = start_x + 2
-            content_width = dialog_width - 4
-            display_search = search_line[:content_width] if len(search_line) > content_width else search_line
-            self.safe_addstr(search_y, content_start_x, display_search, get_status_color())
+            max_pattern_width = dialog_width - 4  # Leave some margin
+            self.search_dialog_pattern_editor.draw(
+                self.stdscr, search_y, start_x + 2, max_pattern_width,
+                "Pattern: ",
+                is_active=True
+            )
         
         # Draw search type indicator
         type_y = start_y + 3

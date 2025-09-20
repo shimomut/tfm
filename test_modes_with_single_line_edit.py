@@ -57,6 +57,16 @@ def test_modes_use_single_line_edit():
         assert isinstance(fm.create_archive_editor, SingleLineTextEdit), "create_archive_editor is not SingleLineTextEdit"
         print("✓ Create archive mode uses SingleLineTextEdit")
         
+        # Test list dialog search
+        assert hasattr(fm, 'list_dialog_search_editor'), "list_dialog_search_editor attribute missing"
+        assert isinstance(fm.list_dialog_search_editor, SingleLineTextEdit), "list_dialog_search_editor is not SingleLineTextEdit"
+        print("✓ List dialog search uses SingleLineTextEdit")
+        
+        # Test search dialog pattern
+        assert hasattr(fm, 'search_dialog_pattern_editor'), "search_dialog_pattern_editor attribute missing"
+        assert isinstance(fm.search_dialog_pattern_editor, SingleLineTextEdit), "search_dialog_pattern_editor is not SingleLineTextEdit"
+        print("✓ Search dialog pattern uses SingleLineTextEdit")
+        
         # Test batch rename mode (already had SingleLineTextEdit)
         assert hasattr(fm, 'batch_rename_regex_editor'), "batch_rename_regex_editor attribute missing"
         assert isinstance(fm.batch_rename_regex_editor, SingleLineTextEdit), "batch_rename_regex_editor is not SingleLineTextEdit"
@@ -77,6 +87,8 @@ def test_modes_use_single_line_edit():
         assert not hasattr(fm, 'rename_pattern'), "rename_pattern should be removed"
         assert not hasattr(fm, 'create_dir_pattern'), "create_dir_pattern should be removed"
         assert not hasattr(fm, 'create_archive_pattern'), "create_archive_pattern should be removed"
+        assert not hasattr(fm, 'list_dialog_search'), "list_dialog_search should be removed"
+        assert not hasattr(fm, 'search_dialog_pattern'), "search_dialog_pattern should be removed"
         print("✓ Old pattern variables successfully removed")
         
         return True
