@@ -38,6 +38,7 @@ from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
 from tfm_external_programs import ExternalProgramManager
+from tfm_progress_manager import ProgressManager, OperationType
 
 class FileManager:
     def __init__(self, stdscr):
@@ -60,6 +61,7 @@ class FileManager:
         self.quick_choice_bar = QuickChoiceBar(self.config)
         self.general_dialog = GeneralPurposeDialog(self.config)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
+        self.progress_manager = ProgressManager()
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -71,7 +73,7 @@ class FileManager:
         self.isearch_matches = []
         self.isearch_match_index = 0
         
-        # Archive creation progress state
+        # Archive creation progress state (deprecated - use progress_manager)
         self.archive_progress = None
         
         # Dialog state (now handled by general_dialog)
@@ -622,24 +624,28 @@ class FileManager:
         
         # All dialogs are now handled as overlays in main drawing loop
             
-        # If showing archive progress, display it
-        if self.archive_progress:
+        # If showing progress for any operation, display it
+        if self.progress_manager.is_operation_active() or self.archive_progress:
             # Fill entire status line with background color
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Show archive progress
-            current_file = self.archive_progress['current_file']
-            processed = self.archive_progress['processed']
-            total = self.archive_progress['total']
-            percentage = int((processed / total) * 100) if total > 0 else 0
-            
-            # Truncate filename if too long
-            max_filename_len = width // 2
-            if len(current_file) > max_filename_len:
-                current_file = "..." + current_file[-(max_filename_len-3):]
-            
-            progress_text = f"Creating archive... {processed}/{total} ({percentage}%) - {current_file}"
+            # Use new progress manager if available, fallback to old archive progress
+            if self.progress_manager.is_operation_active():
+                progress_text = self.progress_manager.get_progress_text(width - 4)
+            else:
+                # Legacy archive progress display
+                current_file = self.archive_progress['current_file']
+                processed = self.archive_progress['processed']
+                total = self.archive_progress['total']
+                percentage = int((processed / total) * 100) if total > 0 else 0
+                
+                # Truncate filename if too long
+                max_filename_len = width // 2
+                if len(current_file) > max_filename_len:
+                    current_file = "..." + current_file[-(max_filename_len-3):]
+                
+                progress_text = f"Creating archive... {processed}/{total} ({percentage}%) - {current_file}"
             
             # Draw progress text
             self.safe_addstr(status_y, 2, progress_text, get_status_color())
@@ -1821,33 +1827,57 @@ class FileManager:
         copied_count = 0
         error_count = 0
         
-        for source_file in files_to_copy:
-            try:
-                dest_path = destination_dir / source_file.name
+        # Start progress tracking for copy operation
+        total_files = len(files_to_copy)
+        if total_files > 1:  # Only show progress for multiple files
+            self.progress_manager.start_operation(
+                OperationType.COPY, 
+                total_files, 
+                f"to {destination_dir.name}",
+                self._progress_callback
+            )
+        
+        try:
+            for i, source_file in enumerate(files_to_copy):
+                # Update progress
+                if total_files > 1:
+                    self.progress_manager.update_progress(source_file.name, i)
                 
-                # Skip if file exists and we're not overwriting
-                if dest_path.exists() and not overwrite:
-                    continue
-                
-                if source_file.is_dir():
-                    # Copy directory recursively
-                    if dest_path.exists():
-                        shutil.rmtree(dest_path)
-                    shutil.copytree(source_file, dest_path)
-                    print(f"Copied directory: {source_file.name}")
-                else:
-                    # Copy file
-                    shutil.copy2(source_file, dest_path)
-                    print(f"Copied file: {source_file.name}")
-                
-                copied_count += 1
-                
-            except PermissionError as e:
-                print(f"Permission denied copying {source_file.name}: {e}")
-                error_count += 1
-            except Exception as e:
-                print(f"Error copying {source_file.name}: {e}")
-                error_count += 1
+                try:
+                    dest_path = destination_dir / source_file.name
+                    
+                    # Skip if file exists and we're not overwriting
+                    if dest_path.exists() and not overwrite:
+                        continue
+                    
+                    if source_file.is_dir():
+                        # Copy directory recursively
+                        if dest_path.exists():
+                            shutil.rmtree(dest_path)
+                        shutil.copytree(source_file, dest_path)
+                        print(f"Copied directory: {source_file.name}")
+                    else:
+                        # Copy file
+                        shutil.copy2(source_file, dest_path)
+                        print(f"Copied file: {source_file.name}")
+                    
+                    copied_count += 1
+                    
+                except PermissionError as e:
+                    print(f"Permission denied copying {source_file.name}: {e}")
+                    error_count += 1
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+                except Exception as e:
+                    print(f"Error copying {source_file.name}: {e}")
+                    error_count += 1
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+        
+        finally:
+            # Finish progress tracking
+            if total_files > 1:
+                self.progress_manager.finish_operation()
         
         # Refresh both panes to show the copied files
         self.refresh_files()
@@ -1957,45 +1987,69 @@ class FileManager:
         moved_count = 0
         error_count = 0
         
-        for source_file in files_to_move:
-            try:
-                dest_path = destination_dir / source_file.name
+        # Start progress tracking for move operation
+        total_files = len(files_to_move)
+        if total_files > 1:  # Only show progress for multiple files
+            self.progress_manager.start_operation(
+                OperationType.MOVE, 
+                total_files, 
+                f"to {destination_dir.name}",
+                self._progress_callback
+            )
+        
+        try:
+            for i, source_file in enumerate(files_to_move):
+                # Update progress
+                if total_files > 1:
+                    self.progress_manager.update_progress(source_file.name, i)
                 
-                # Skip if file exists and we're not overwriting
-                if dest_path.exists() and not overwrite:
-                    continue
-                
-                # Remove destination if it exists and we're overwriting
-                if dest_path.exists() and overwrite:
-                    if dest_path.is_dir():
-                        shutil.rmtree(dest_path)
+                try:
+                    dest_path = destination_dir / source_file.name
+                    
+                    # Skip if file exists and we're not overwriting
+                    if dest_path.exists() and not overwrite:
+                        continue
+                    
+                    # Remove destination if it exists and we're overwriting
+                    if dest_path.exists() and overwrite:
+                        if dest_path.is_dir():
+                            shutil.rmtree(dest_path)
+                        else:
+                            dest_path.unlink()
+                    
+                    # Move the file/directory
+                    if source_file.is_symlink():
+                        # For symbolic links, copy the link itself (not the target)
+                        link_target = os.readlink(str(source_file))
+                        dest_path.symlink_to(link_target)
+                        source_file.unlink()
+                        print(f"Moved symbolic link: {source_file.name}")
+                    elif source_file.is_dir():
+                        # Move directory recursively
+                        shutil.move(str(source_file), str(dest_path))
+                        print(f"Moved directory: {source_file.name}")
                     else:
-                        dest_path.unlink()
-                
-                # Move the file/directory
-                if source_file.is_symlink():
-                    # For symbolic links, copy the link itself (not the target)
-                    link_target = os.readlink(str(source_file))
-                    dest_path.symlink_to(link_target)
-                    source_file.unlink()
-                    print(f"Moved symbolic link: {source_file.name}")
-                elif source_file.is_dir():
-                    # Move directory recursively
-                    shutil.move(str(source_file), str(dest_path))
-                    print(f"Moved directory: {source_file.name}")
-                else:
-                    # Move file
-                    shutil.move(str(source_file), str(dest_path))
-                    print(f"Moved file: {source_file.name}")
-                
-                moved_count += 1
-                
-            except PermissionError as e:
-                print(f"Permission denied moving {source_file.name}: {e}")
-                error_count += 1
-            except Exception as e:
-                print(f"Error moving {source_file.name}: {e}")
-                error_count += 1
+                        # Move file
+                        shutil.move(str(source_file), str(dest_path))
+                        print(f"Moved file: {source_file.name}")
+                    
+                    moved_count += 1
+                    
+                except PermissionError as e:
+                    print(f"Permission denied moving {source_file.name}: {e}")
+                    error_count += 1
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+                except Exception as e:
+                    print(f"Error moving {source_file.name}: {e}")
+                    error_count += 1
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+        
+        finally:
+            # Finish progress tracking
+            if total_files > 1:
+                self.progress_manager.finish_operation()
         
         # Refresh both panes to show the moved files
         self.refresh_files()
@@ -2076,32 +2130,58 @@ class FileManager:
         deleted_count = 0
         error_count = 0
         
-        for file_path in files_to_delete:
-            try:
-                if file_path.is_symlink():
-                    # Delete symbolic link (not its target)
-                    file_path.unlink()
-                    print(f"Deleted symbolic link: {file_path.name}")
-                elif file_path.is_dir():
-                    # Delete directory recursively
-                    shutil.rmtree(file_path)
-                    print(f"Deleted directory: {file_path.name}")
-                else:
-                    # Delete file
-                    file_path.unlink()
-                    print(f"Deleted file: {file_path.name}")
+        # Start progress tracking for delete operation
+        total_files = len(files_to_delete)
+        if total_files > 1:  # Only show progress for multiple files
+            self.progress_manager.start_operation(
+                OperationType.DELETE, 
+                total_files, 
+                "",
+                self._progress_callback
+            )
+        
+        try:
+            for i, file_path in enumerate(files_to_delete):
+                # Update progress
+                if total_files > 1:
+                    self.progress_manager.update_progress(file_path.name, i)
                 
-                deleted_count += 1
-                
-            except PermissionError as e:
-                print(f"Permission denied deleting {file_path.name}: {e}")
-                error_count += 1
-            except FileNotFoundError:
-                print(f"File not found (already deleted?): {file_path.name}")
-                error_count += 1
-            except Exception as e:
-                print(f"Error deleting {file_path.name}: {e}")
-                error_count += 1
+                try:
+                    if file_path.is_symlink():
+                        # Delete symbolic link (not its target)
+                        file_path.unlink()
+                        print(f"Deleted symbolic link: {file_path.name}")
+                    elif file_path.is_dir():
+                        # Delete directory recursively
+                        shutil.rmtree(file_path)
+                        print(f"Deleted directory: {file_path.name}")
+                    else:
+                        # Delete file
+                        file_path.unlink()
+                        print(f"Deleted file: {file_path.name}")
+                    
+                    deleted_count += 1
+                    
+                except PermissionError as e:
+                    print(f"Permission denied deleting {file_path.name}: {e}")
+                    error_count += 1
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+                except FileNotFoundError:
+                    print(f"File not found (already deleted?): {file_path.name}")
+                    error_count += 1
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+                except Exception as e:
+                    print(f"Error deleting {file_path.name}: {e}")
+                    error_count += 1
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+        
+        finally:
+            # Finish progress tracking
+            if total_files > 1:
+                self.progress_manager.finish_operation()
         
         # Refresh current pane to show the changes
         self.refresh_files(self.get_current_pane())
@@ -2317,7 +2397,7 @@ class FileManager:
         self.exit_create_archive_mode()
     
     def update_archive_progress(self, current_file, processed, total):
-        """Update status bar with archive creation progress"""
+        """Update status bar with archive creation progress (legacy method)"""
         # Store progress information for status bar display
         self.archive_progress = {
             'current_file': current_file,
@@ -2325,6 +2405,15 @@ class FileManager:
             'total': total
         }
         
+        # Force a screen refresh to show progress
+        try:
+            self.draw_status()
+            self.stdscr.refresh()
+        except:
+            pass  # Ignore drawing errors during progress updates
+    
+    def _progress_callback(self, progress_data):
+        """Callback for progress manager updates"""
         # Force a screen refresh to show progress
         try:
             self.draw_status()
@@ -2356,36 +2445,48 @@ class FileManager:
                 for root, dirs, files in os.walk(file_path):
                     total_files += len(files)
         
+        # Start progress tracking
+        self.progress_manager.start_operation(
+            OperationType.ARCHIVE_CREATE, 
+            total_files, 
+            f"ZIP: {archive_path.name}",
+            self._progress_callback
+        )
+        
         processed_files = 0
         
-        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file_path in files_to_archive:
-                if file_path.is_file():
-                    # Update progress
-                    processed_files += 1
-                    self.update_archive_progress(file_path.name, processed_files, total_files)
-                    
-                    # Add file to archive
-                    zipf.write(file_path, file_path.name)
-                elif file_path.is_dir():
-                    # Add directory recursively
-                    for root, dirs, files in os.walk(file_path):
-                        root_path = Path(root)
-                        # Calculate relative path from the base directory
-                        rel_path = root_path.relative_to(file_path.parent)
+        try:
+            with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file_path in files_to_archive:
+                    if file_path.is_file():
+                        # Update progress
+                        processed_files += 1
+                        self.progress_manager.update_progress(file_path.name, processed_files)
                         
-                        # Add directory entry
-                        if rel_path != Path('.'):
-                            zipf.write(root_path, str(rel_path) + '/')
-                        
-                        # Add files in directory
-                        for file in files:
-                            processed_files += 1
-                            self.update_archive_progress(file, processed_files, total_files)
+                        # Add file to archive
+                        zipf.write(file_path, file_path.name)
+                    elif file_path.is_dir():
+                        # Add directory recursively
+                        for root, dirs, files in os.walk(file_path):
+                            root_path = Path(root)
+                            # Calculate relative path from the base directory
+                            rel_path = root_path.relative_to(file_path.parent)
                             
-                            file_full_path = root_path / file
-                            file_rel_path = file_full_path.relative_to(file_path.parent)
-                            zipf.write(file_full_path, str(file_rel_path))
+                            # Add directory entry
+                            if rel_path != Path('.'):
+                                zipf.write(root_path, str(rel_path) + '/')
+                            
+                            # Add files in directory
+                            for file in files:
+                                processed_files += 1
+                                self.progress_manager.update_progress(file, processed_files)
+                                
+                                file_full_path = root_path / file
+                                file_rel_path = file_full_path.relative_to(file_path.parent)
+                                zipf.write(file_full_path, str(file_rel_path))
+        finally:
+            # Finish progress tracking
+            self.progress_manager.finish_operation()
     
     def create_tar_archive(self, archive_path, files_to_archive):
         """Create a TAR.GZ archive with progress updates"""
@@ -2398,24 +2499,36 @@ class FileManager:
                 for root, dirs, files in os.walk(file_path):
                     total_files += len(files)
         
+        # Start progress tracking
+        self.progress_manager.start_operation(
+            OperationType.ARCHIVE_CREATE, 
+            total_files, 
+            f"TAR.GZ: {archive_path.name}",
+            self._progress_callback
+        )
+        
         processed_files = 0
         
-        with tarfile.open(archive_path, 'w:gz') as tarf:
-            for file_path in files_to_archive:
-                if file_path.is_file():
-                    processed_files += 1
-                    self.update_archive_progress(file_path.name, processed_files, total_files)
-                    tarf.add(file_path, arcname=file_path.name)
-                elif file_path.is_dir():
-                    # For directories, we need to track individual files being added
-                    def progress_filter(tarinfo):
-                        nonlocal processed_files
-                        if tarinfo.isfile():
-                            processed_files += 1
-                            self.update_archive_progress(tarinfo.name, processed_files, total_files)
-                        return tarinfo
-                    
-                    tarf.add(file_path, arcname=file_path.name, filter=progress_filter)
+        try:
+            with tarfile.open(archive_path, 'w:gz') as tarf:
+                for file_path in files_to_archive:
+                    if file_path.is_file():
+                        processed_files += 1
+                        self.progress_manager.update_progress(file_path.name, processed_files)
+                        tarf.add(file_path, arcname=file_path.name)
+                    elif file_path.is_dir():
+                        # For directories, we need to track individual files being added
+                        def progress_filter(tarinfo):
+                            nonlocal processed_files
+                            if tarinfo.isfile():
+                                processed_files += 1
+                                self.progress_manager.update_progress(tarinfo.name, processed_files)
+                            return tarinfo
+                        
+                        tarf.add(file_path, arcname=file_path.name, filter=progress_filter)
+        finally:
+            # Finish progress tracking
+            self.progress_manager.finish_operation()
     
     def extract_selected_archive(self):
         """Extract the selected archive file to the other pane"""
