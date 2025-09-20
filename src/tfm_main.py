@@ -452,6 +452,24 @@ class FileManager:
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         display_height = height - log_height - 3  # Reserve space for header, footer, and status
         
+        # Check if there are no files to display
+        if not pane_data['files']:
+            # Show "no items to show" message in the center of the pane
+            message = "No items to show"
+            message_y = 1 + display_height // 2  # Center vertically in the pane
+            message_x = start_x + (pane_width - len(message)) // 2  # Center horizontally
+            
+            try:
+                from tfm_colors import get_error_color
+                self.stdscr.addstr(message_y, message_x, message, get_error_color())
+            except (curses.error, ImportError):
+                # Fallback if color function not available or position invalid
+                try:
+                    self.stdscr.addstr(message_y, start_x + 2, message)
+                except curses.error:
+                    pass
+            return
+        
         # Calculate scroll offset
         if pane_data['selected_index'] < pane_data['scroll_offset']:
             pane_data['scroll_offset'] = pane_data['selected_index']
