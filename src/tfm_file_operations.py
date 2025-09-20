@@ -221,36 +221,70 @@ class FileOperations:
         
         return True, message
     
-    def find_matches(self, pane_data, pattern):
+    def find_matches(self, pane_data, pattern, match_all=False, return_indices_only=False):
         """Find all files matching the fnmatch patterns in current pane
         
         Args:
             pane_data: Pane data dictionary
             pattern: Search pattern (supports multiple patterns separated by spaces)
+            match_all: If True, all patterns must match (AND logic). If False, any pattern can match (OR logic)
+            return_indices_only: If True, return list of indices. If False, return list of (index, filename) tuples
             
         Returns:
-            List of (index, filename) tuples for matches
+            List of matches (either indices or (index, filename) tuples based on return_indices_only)
         """
         if not pattern or not pane_data['files']:
             return []
         
         matches = []
         
-        # Split pattern by spaces to support multiple patterns
-        patterns = pattern.lower().split()
+        # Split pattern by spaces to get individual patterns
+        patterns = pattern.strip().split()
+        if not patterns:
+            return []
+        
+        # Convert all patterns to lowercase for case-insensitive matching
+        # and wrap each pattern with wildcards to match "contains" behavior
+        wrapped_patterns = []
+        for p in patterns:
+            p_lower = p.lower()
+            # If pattern doesn't start with *, add it for "contains" matching
+            if not p_lower.startswith('*'):
+                p_lower = '*' + p_lower
+            # If pattern doesn't end with *, add it for "contains" matching  
+            if not p_lower.endswith('*'):
+                p_lower = p_lower + '*'
+            wrapped_patterns.append(p_lower)
         
         for i, file_path in enumerate(pane_data['files']):
             filename_lower = file_path.name.lower()
             
-            # Check if filename matches any of the patterns
-            match_found = False
-            for pat in patterns:
-                if fnmatch.fnmatch(filename_lower, f"*{pat}*"):
-                    match_found = True
-                    break
-            
-            if match_found:
-                matches.append((i, file_path.name))
+            if match_all:
+                # Check if filename matches ALL patterns (AND logic)
+                all_match = True
+                for wrapped_pattern in wrapped_patterns:
+                    if not fnmatch.fnmatch(filename_lower, wrapped_pattern):
+                        all_match = False
+                        break
+                
+                if all_match:
+                    if return_indices_only:
+                        matches.append(i)
+                    else:
+                        matches.append((i, file_path.name))
+            else:
+                # Check if filename matches ANY of the patterns (OR logic)
+                match_found = False
+                for wrapped_pattern in wrapped_patterns:
+                    if fnmatch.fnmatch(filename_lower, wrapped_pattern):
+                        match_found = True
+                        break
+                
+                if match_found:
+                    if return_indices_only:
+                        matches.append(i)
+                    else:
+                        matches.append((i, file_path.name))
         
         return matches
     

@@ -333,11 +333,7 @@ class FileManager:
         display_height = height - log_height - 3
         return self.pane_manager.adjust_scroll_for_selection(pane_data, display_height)
     
-    def find_matches(self, pattern):
-        """Find matches - wrapper for file_operations method"""
-        current_pane = self.get_current_pane()
-        return self.file_operations.find_matches(current_pane, pattern)
-    
+
     def apply_filter(self):
         """Apply filter - wrapper for file_operations method"""
         current_pane = self.get_current_pane()
@@ -911,44 +907,7 @@ class FileManager:
         For example: "ab*c 12?3" will match files that contain both "*ab*c*" and "*12?3*"
         """
         current_pane = self.get_current_pane()
-        matches = []
-        
-        if not pattern or not current_pane['files']:
-            return matches
-            
-        # Split pattern by spaces to get individual patterns
-        patterns = pattern.strip().split()
-        if not patterns:
-            return matches
-            
-        # Convert all patterns to lowercase for case-insensitive matching
-        # and wrap each pattern with wildcards to match "contains" behavior
-        wrapped_patterns = []
-        for p in patterns:
-            p_lower = p.lower()
-            # If pattern doesn't start with *, add it for "contains" matching
-            if not p_lower.startswith('*'):
-                p_lower = '*' + p_lower
-            # If pattern doesn't end with *, add it for "contains" matching  
-            if not p_lower.endswith('*'):
-                p_lower = p_lower + '*'
-            wrapped_patterns.append(p_lower)
-        
-        for i, file_path in enumerate(current_pane['files']):
-            # Parent directory (..) is no longer shown
-            filename = file_path.name.lower()
-            
-            # Check if filename matches ALL patterns
-            all_match = True
-            for wrapped_pattern in wrapped_patterns:
-                if not fnmatch.fnmatch(filename, wrapped_pattern):
-                    all_match = False
-                    break
-                    
-            if all_match:
-                matches.append(i)
-                
-        return matches
+        return self.file_operations.find_matches(current_pane, pattern, match_all=True, return_indices_only=True)
         
     def update_isearch_matches(self):
         """Update isearch matches and move cursor to nearest match"""
