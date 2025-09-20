@@ -20,9 +20,10 @@ This document describes the implementation of the archive creation feature in TF
 1. Navigate to desired directory in one pane
 2. Select files/directories to archive (using Space key) or position cursor on single item
 3. Press P key to enter archive creation mode
-4. Enter filename with appropriate extension (.zip, .tar.gz, or .tgz)
-5. Press Enter to create archive or ESC to cancel
-6. Archive appears in the inactive pane's directory
+4. **NEW**: For single files/directories, filename is pre-populated with basename + dot (e.g., "document.txt" → "document.")
+5. Enter or complete filename with appropriate extension (.zip, .tar.gz, or .tgz)
+6. Press Enter to create archive or ESC to cancel
+7. Archive appears in the inactive pane's directory
 
 ## Implementation Details
 
@@ -68,7 +69,8 @@ self.create_archive_pattern = ""
 
 ##### `enter_create_archive_mode()`
 - Validates that files are available for archiving
-- Enters archive creation mode
+- **NEW**: Determines default filename for single file/directory selections
+- Enters archive creation mode with pre-populated filename
 - Displays prompt for filename input
 - Logs what will be archived
 
@@ -179,16 +181,25 @@ All tests pass successfully:
 ### Creating a ZIP Archive
 1. Select multiple files in left pane
 2. Press P
-3. Enter: `backup.zip`
+3. Enter: `backup.zip` (no default for multiple files)
 4. Press Enter
 5. Archive appears in inactive pane
 
-### Creating a TAR.GZ Archive
-1. Position cursor on directory
+### Creating a TAR.GZ Archive from Single Directory
+1. Position cursor on directory named "project"
 2. Press P  
-3. Enter: `project.tar.gz`
-4. Press Enter
-5. Compressed archive created in inactive pane
+3. Dialog shows: `Archive filename: project.` (pre-populated)
+4. Type: `tar.gz` to complete as `project.tar.gz`
+5. Press Enter
+6. Compressed archive created in inactive pane
+
+### Creating Archive from Single File
+1. Position cursor on file "document.txt"
+2. Press P
+3. Dialog shows: `Archive filename: document.` (pre-populated)
+4. Type: `zip` to complete as `document.zip`
+5. Press Enter
+6. Archive created in inactive pane
 
 ### Supported Extensions
 - `project.zip` → ZIP format

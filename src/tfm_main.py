@@ -2144,10 +2144,21 @@ class FileManager:
             print("No files to archive")
             return
         
-        # Enter archive creation mode using general dialog
-        DialogHelpers.create_create_archive_dialog(self.general_dialog)
-        self.general_dialog.callback = self.on_create_archive_confirm
-        self.general_dialog.cancel_callback = self.on_create_archive_cancel
+        # Determine default filename for single file/directory
+        default_filename = ""
+        if len(files_to_archive) == 1:
+            # Use basename of the single file/directory with a dot for extension
+            basename = files_to_archive[0].stem if files_to_archive[0].is_file() else files_to_archive[0].name
+            default_filename = f"{basename}."
+        
+        # Enter archive creation mode using general dialog with default filename
+        self.general_dialog.show_status_line_input(
+            prompt="Archive filename: ",
+            help_text="ESC:cancel Enter:create (.zip/.tar.gz/.tgz)",
+            initial_text=default_filename,
+            callback=self.on_create_archive_confirm,
+            cancel_callback=self.on_create_archive_cancel
+        )
         self.needs_full_redraw = True
         
         # Log what we're about to archive
