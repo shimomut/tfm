@@ -296,7 +296,7 @@ class TextViewer:
         
         # Reserve space for header (2 lines) and status bar (1 line)
         start_y = 2
-        display_height = height - 4  # Header (2) + status bar (1) + margin (1)
+        display_height = height - 3  # Header (2) + status bar (1)
         start_x = 0
         display_width = width
         

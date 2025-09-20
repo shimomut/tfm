@@ -26,19 +26,17 @@ from tfm_colors import *
 from tfm_config import get_config, get_startup_paths, is_key_bound_to, get_favorite_directories, get_programs
 from tfm_text_viewer import view_text_file, is_text_file
 
-class LogCapture:
-    """Capture stdout/stderr and redirect to log pane"""
-    def __init__(self, log_messages, source):
-        self.log_messages = log_messages
-        self.source = source
-        
-    def write(self, text):
-        if text.strip():  # Only log non-empty messages
-            timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
-            self.log_messages.append((timestamp, self.source, text.strip()))
-    
-    def flush(self):
-        pass  # Required for file-like object interface
+# Import new modular components
+from tfm_log_manager import LogManager
+from tfm_pane_manager import PaneManager
+from tfm_file_operations import FileOperations
+from tfm_list_dialog import ListDialog, ListDialogHelpers
+from tfm_info_dialog import InfoDialog, InfoDialogHelpers
+from tfm_search_dialog import SearchDialog, SearchDialogHelpers
+from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
+from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
+from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
+from tfm_external_programs import ExternalProgramManager
 
 class FileManager:
     def __init__(self, stdscr):
@@ -50,35 +48,19 @@ class FileManager:
         # Get startup paths from configuration
         left_startup_path, right_startup_path = get_startup_paths()
         
-        # Dual pane setup with configuration
-        self.left_pane = {
-            'path': left_startup_path,
-            'selected_index': 0,
-            'scroll_offset': 0,
-            'files': [],
-            'selected_files': set(),  # Track multi-selected files
-            'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
-            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False),
-            'filter_pattern': "",  # Filename filter pattern for this pane
-            'cursor_history': deque(maxlen=100)  # Store cursor position history (filename, directory_path)
-        }
-        self.right_pane = {
-            'path': right_startup_path,
-            'selected_index': 0,
-            'scroll_offset': 0,
-            'files': [],
-            'selected_files': set(),  # Track multi-selected files
-            'sort_mode': getattr(self.config, 'DEFAULT_SORT_MODE', 'name'),
-            'sort_reverse': getattr(self.config, 'DEFAULT_SORT_REVERSE', False),
-            'filter_pattern': "",  # Filename filter pattern for this pane
-            'cursor_history': deque(maxlen=100)  # Store cursor position history (filename, directory_path)
-        }
+        # Initialize modular components
+        self.log_manager = LogManager(self.config)
+        self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path)
+        self.file_operations = FileOperations(self.config)
+        self.list_dialog = ListDialog(self.config)
+        self.info_dialog = InfoDialog(self.config)
+        self.search_dialog = SearchDialog(self.config)
+        self.batch_rename_dialog = BatchRenameDialog(self.config)
+        self.quick_choice_bar = QuickChoiceBar(self.config)
+        self.general_dialog = GeneralPurposeDialog(self.config)
+        self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
         
-        self.active_pane = 'left'  # 'left' or 'right'
-        self.show_hidden = getattr(self.config, 'SHOW_HIDDEN_FILES', False)
-        
-        # Pane layout - track left pane width ratio (0.1 to 0.9)
-        self.left_pane_ratio = getattr(self.config, 'DEFAULT_LEFT_PANE_RATIO', 0.5)
+        # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
         self.needs_full_redraw = True  # Flag to control when to redraw everything
         
@@ -88,84 +70,14 @@ class FileManager:
         self.isearch_matches = []
         self.isearch_match_index = 0
         
-        # Filter mode state
-        self.filter_mode = False
-        self.filter_editor = SingleLineTextEdit()
+        # Dialog state (now handled by general_dialog)
+        self.rename_file_path = None  # Still needed for rename operations
         
-        # Rename mode state
-        self.rename_mode = False
-        self.rename_editor = SingleLineTextEdit()
-        self.rename_original_name = ""
-        self.rename_file_path = None
-        
-        # Create directory mode state
-        self.create_dir_mode = False
-        self.create_dir_editor = SingleLineTextEdit()
-        
-        # Create file mode state
-        self.create_file_mode = False
-        self.create_file_editor = SingleLineTextEdit()
-        
-        # Create archive mode state
-        self.create_archive_mode = False
-        self.create_archive_editor = SingleLineTextEdit()
-        
-        # Quick choice dialog state
-        self.quick_choice_mode = False
-        self.quick_choice_message = ""
-        self.quick_choice_choices = []  # List of choice dictionaries: [{"text": "Yes", "key": "y", "value": True}, ...]
-        self.quick_choice_callback = None
-        self.quick_choice_selected = 0  # Index of currently selected choice
+
         self.should_quit = False  # Flag to control main loop exit
-        
-        # Info dialog state
-        self.info_dialog_mode = False
-        self.info_dialog_title = ""
-        self.info_dialog_lines = []
-        self.info_dialog_scroll = 0
-        
-        # List dialog state
-        self.list_dialog_mode = False
-        self.list_dialog_title = ""
-        self.list_dialog_items = []  # List of items to choose from
-        self.list_dialog_filtered_items = []  # Filtered items based on search
-        self.list_dialog_selected = 0  # Index of currently selected item in filtered list
-        self.list_dialog_scroll = 0  # Scroll offset for the list
-        self.list_dialog_search_editor = SingleLineTextEdit()  # Search editor for list dialog
-        self.list_dialog_callback = None  # Callback function when item is selected
-        
-        # Search dialog state
-        self.search_dialog_mode = False
-        self.search_dialog_type = 'filename'  # 'filename' or 'content'
-        self.search_dialog_pattern_editor = SingleLineTextEdit()  # Pattern editor for search dialog
-        self.search_dialog_results = []  # List of search results
-        self.search_dialog_selected = 0  # Index of currently selected result
-        self.search_dialog_scroll = 0  # Scroll offset for results
-        self.search_dialog_searching = False  # Whether search is in progress
-        
-        # Batch rename dialog state
-        self.batch_rename_mode = False
-        # Text editors for batch rename dialog
-        self.batch_rename_regex_editor = SingleLineTextEdit()
-        self.batch_rename_destination_editor = SingleLineTextEdit()
-        self.batch_rename_active_field = 'regex'  # 'regex' or 'destination'
-        self.batch_rename_files = []  # List of selected files to rename
-        self.batch_rename_preview = []  # List of preview results
-        self.batch_rename_scroll = 0  # Scroll offset for preview list
-        
-        # Log pane setup
-        max_log_messages = getattr(self.config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
-        self.log_messages = deque(maxlen=max_log_messages)
-        self.log_scroll_offset = 0
-        
-        # Redirect stdout and stderr
-        self.original_stdout = sys.stdout
-        self.original_stderr = sys.stderr
-        sys.stdout = LogCapture(self.log_messages, "STDOUT")
-        sys.stderr = LogCapture(self.log_messages, "STDERR")
-        
+
         # Add startup messages to log
-        self.add_startup_messages()
+        self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
         
         # Initialize colors with configured scheme
         color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
@@ -234,20 +146,7 @@ class FileManager:
         except:
             # Any other error, use regular clear
             self.stdscr.clear()
-        
-    def add_startup_messages(self):
-        """Add startup messages directly to log pane"""
-        timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
-        self.log_messages.append((timestamp, "SYSTEM", f"TFM {VERSION}"))
-        self.log_messages.append((timestamp, "SYSTEM", f"GitHub: {GITHUB_URL}"))
-        self.log_messages.append((timestamp, "SYSTEM", f"{APP_NAME} started successfully"))
-        
-        # Add configuration info
-        config_file = getattr(self.config, '__module__', 'built-in defaults')
-        if hasattr(self.config, '__file__'):
-            config_file = self.config.__file__
-        self.log_messages.append((timestamp, "CONFIG", f"Configuration loaded"))
-    
+
     def is_key_for_action(self, key, action):
         """Check if a key matches a configured action"""
         if 32 <= key <= 126:  # Printable ASCII
@@ -257,34 +156,19 @@ class FileManager:
         
     def count_files_and_dirs(self, pane_data):
         """Count directories and files in a pane"""
-        if not pane_data['files']:
-            return 0, 0
-            
-        files = pane_data['files']
-        # No need to skip parent directory since it's no longer added
-        
-        dir_count = 0
-        file_count = 0
-        
-        for file_path in files:
-            if file_path.is_dir():
-                dir_count += 1
-            else:
-                file_count += 1
-                
-        return dir_count, file_count
+        return self.pane_manager.count_files_and_dirs(pane_data)
         
     def draw_file_footers(self, y, left_pane_width):
         """Draw footer bars for left and right file panes"""
         # Left pane footer
-        left_dirs, left_files = self.count_files_and_dirs(self.left_pane)
-        left_selected = len(self.left_pane['selected_files'])
-        left_sort = self.get_sort_description(self.left_pane)
+        left_dirs, left_files = self.count_files_and_dirs(self.pane_manager.left_pane)
+        left_selected = len(self.pane_manager.left_pane['selected_files'])
+        left_sort = self.get_sort_description(self.pane_manager.left_pane)
         
         # Add filter info to footer if active
         left_filter_info = ""
-        if self.left_pane['filter_pattern']:
-            left_filter_info = f" | Filter: {self.left_pane['filter_pattern']}"
+        if self.pane_manager.left_pane['filter_pattern']:
+            left_filter_info = f" | Filter: {self.pane_manager.left_pane['filter_pattern']}"
         
         if left_selected > 0:
             left_footer = f" {left_dirs} dirs, {left_files} files ({left_selected} selected) | Sort: {left_sort}{left_filter_info} "
@@ -293,20 +177,20 @@ class FileManager:
         
         try:
             # Left pane footer with active indicator
-            left_color = get_footer_color(self.active_pane == 'left')
+            left_color = get_footer_color(self.pane_manager.active_pane == 'left')
             self.stdscr.addstr(y, 2, left_footer, left_color)
         except curses.error:
             pass
             
         # Right pane footer  
-        right_dirs, right_files = self.count_files_and_dirs(self.right_pane)
-        right_selected = len(self.right_pane['selected_files'])
-        right_sort = self.get_sort_description(self.right_pane)
+        right_dirs, right_files = self.count_files_and_dirs(self.pane_manager.right_pane)
+        right_selected = len(self.pane_manager.right_pane['selected_files'])
+        right_sort = self.get_sort_description(self.pane_manager.right_pane)
         
         # Add filter info to footer if active
         right_filter_info = ""
-        if self.right_pane['filter_pattern']:
-            right_filter_info = f" | Filter: {self.right_pane['filter_pattern']}"
+        if self.pane_manager.right_pane['filter_pattern']:
+            right_filter_info = f" | Filter: {self.pane_manager.right_pane['filter_pattern']}"
         
         if right_selected > 0:
             right_footer = f" {right_dirs} dirs, {right_files} files ({right_selected} selected) | Sort: {right_sort}{right_filter_info} "
@@ -315,7 +199,7 @@ class FileManager:
         
         try:
             # Right pane footer with active indicator
-            right_color = get_footer_color(self.active_pane == 'right')
+            right_color = get_footer_color(self.pane_manager.active_pane == 'right')
             self.stdscr.addstr(y, left_pane_width + 2, right_footer, right_color)
         except curses.error:
             pass
@@ -323,328 +207,147 @@ class FileManager:
     def toggle_selection(self):
         """Toggle selection of current file/directory and move to next item"""
         current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            return
-            
-        selected_file = current_pane['files'][current_pane['selected_index']]
-        
-        # Parent directory (..) is no longer shown, so no need to check for it
-        file_path_str = str(selected_file)
-        
-        if file_path_str in current_pane['selected_files']:
-            current_pane['selected_files'].remove(file_path_str)
-            print(f"Deselected: {selected_file.name}")
-        else:
-            current_pane['selected_files'].add(file_path_str)
-            print(f"Selected: {selected_file.name}")
-        
-        print(f"Total selected: {len(current_pane['selected_files'])}")
-        
-        # Move cursor to next item after selection
-        if current_pane['selected_index'] < len(current_pane['files']) - 1:
-            current_pane['selected_index'] += 1
+        success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=1)
+        if success:
+            print(message)
             
     def toggle_selection_up(self):
         """Toggle selection of current file/directory and move to previous item"""
         current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            return
-            
-        selected_file = current_pane['files'][current_pane['selected_index']]
-        
-        # Parent directory (..) is no longer shown, so no need to check for it
-        file_path_str = str(selected_file)
-        
-        if file_path_str in current_pane['selected_files']:
-            current_pane['selected_files'].remove(file_path_str)
-            print(f"Deselected: {selected_file.name}")
-        else:
-            current_pane['selected_files'].add(file_path_str)
-            print(f"Selected: {selected_file.name}")
-        
-        print(f"Total selected: {len(current_pane['selected_files'])}")
-        
-        # Move cursor to previous item after selection
-        if current_pane['selected_index'] > 0:
-            current_pane['selected_index'] -= 1
+        success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=-1)
+        if success:
+            print(message)
     
     def toggle_all_files_selection(self):
         """Toggle selection status of all files (not directories) in current pane"""
         current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            return
-        
-        # Get all files (not directories) in current pane
-        files_only = []
-        for file_path in current_pane['files']:
-            # Skip directories (parent directory no longer shown)
-            if file_path.is_dir():
-                continue
-            files_only.append(file_path)
-        
-        if not files_only:
-            print("No files to select in current directory")
-            return
-        
-        # Check if all files are currently selected
-        files_only_str = {str(f) for f in files_only}
-        currently_selected_files = current_pane['selected_files'] & files_only_str
-        
-        if len(currently_selected_files) == len(files_only):
-            # All files are selected, deselect them all
-            current_pane['selected_files'] -= files_only_str
-            print(f"Deselected all {len(files_only)} files")
-        else:
-            # Not all files are selected, select them all
-            current_pane['selected_files'].update(files_only_str)
-            print(f"Selected all {len(files_only)} files")
-        
-        print(f"Total selected: {len(current_pane['selected_files'])}")
-        self.needs_full_redraw = True
+        success, message = self.file_operations.toggle_all_files_selection(current_pane)
+        if success:
+            print(message)
+            self.needs_full_redraw = True
     
     def toggle_all_items_selection(self):
         """Toggle selection status of all items (files and directories) in current pane"""
         current_pane = self.get_current_pane()
-        
-        if not current_pane['files']:
-            return
-        
-        # Get all items (parent directory no longer shown)
-        all_items = []
-        for file_path in current_pane['files']:
-            all_items.append(file_path)
-        
-        if not all_items:
-            print("No items to select in current directory")
-            return
-        
-        # Check if all items are currently selected
-        all_items_str = {str(f) for f in all_items}
-        currently_selected_items = current_pane['selected_files'] & all_items_str
-        
-        if len(currently_selected_items) == len(all_items):
-            # All items are selected, deselect them all
-            current_pane['selected_files'] -= all_items_str
-            print(f"Deselected all {len(all_items)} items")
-        else:
-            # Not all items are selected, select them all
-            current_pane['selected_files'].update(all_items_str)
-            print(f"Selected all {len(all_items)} items")
-        
-        print(f"Total selected: {len(current_pane['selected_files'])}")
-        self.needs_full_redraw = True
+        success, message = self.file_operations.toggle_all_items_selection(current_pane)
+        if success:
+            print(message)
+            self.needs_full_redraw = True
     
     def sync_pane_directories(self):
         """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Check if both panes are already showing the same directory
-        if current_pane['path'] == other_pane['path']:
-            # Both panes show same directory, sync cursor position instead
-            # For 'o', move cursor in CURRENT pane to match other pane's cursor
-            self.sync_cursor_to_other_pane()
-            return
-        
-        # Get the other pane's directory
-        target_directory = other_pane['path']
-        
-        # Check if target directory exists and is accessible
-        if not target_directory.exists():
-            print(f"Target directory does not exist: {target_directory}")
-            return
+        if self.pane_manager.sync_pane_directories(print):
+            current_pane = self.get_current_pane()
+            self.refresh_files(current_pane)
             
-        if not target_directory.is_dir():
-            print(f"Target is not a directory: {target_directory}")
-            return
+            # Try to restore cursor position for this directory
+            height, width = self.stdscr.getmaxyx()
+            calculated_height = int(height * self.log_height_ratio)
+            log_height = calculated_height if self.log_height_ratio > 0 else 0
+            display_height = height - log_height - 3
             
-        try:
-            # Test if we can access the directory
-            list(target_directory.iterdir())
-        except PermissionError:
-            print(f"Permission denied accessing: {target_directory}")
-            return
-        except Exception as e:
-            print(f"Error accessing directory: {e}")
-            return
-        
-        # Save current cursor position before changing directory
-        self.save_cursor_position(current_pane)
-        
-        # Change current pane to the other pane's directory
-        old_directory = current_pane['path']
-        current_pane['path'] = target_directory
-        current_pane['selected_index'] = 0
-        current_pane['scroll_offset'] = 0
-        current_pane['selected_files'].clear()  # Clear selections when changing directory
-        self.refresh_files(current_pane)
-        
-        # Try to restore cursor position for this directory
-        if not self.restore_cursor_position(current_pane):
-            # If no history found, default to first item
-            current_pane['selected_index'] = 0
-            current_pane['scroll_offset'] = 0
-        
-        # Log the change
-        pane_name = "left" if self.active_pane == 'left' else "right"
-        print(f"Synchronized {pane_name} pane: {old_directory} → {target_directory}")
-        
-        self.needs_full_redraw = True
+            if not self.pane_manager.restore_cursor_position(current_pane, display_height):
+                # If no history found, default to first item
+                current_pane['selected_index'] = 0
+                current_pane['scroll_offset'] = 0
+            
+            self.needs_full_redraw = True
     
     def sync_other_pane_directory(self):
         """Change other pane's directory to match the current pane's directory, or sync cursor if already same directory"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Check if both panes are already showing the same directory
-        if current_pane['path'] == other_pane['path']:
-            # Both panes show same directory, sync cursor position instead
-            # For Shift-O, move cursor in OTHER pane to match current pane's cursor
-            self.sync_cursor_from_current_pane()
-            return
-        
-        # Get the current pane's directory
-        target_directory = current_pane['path']
-        
-        # Check if target directory exists and is accessible
-        if not target_directory.exists():
-            print(f"Current directory does not exist: {target_directory}")
-            return
+        if self.pane_manager.sync_other_pane_directory(print):
+            other_pane = self.get_inactive_pane()
+            self.refresh_files(other_pane)
             
-        if not target_directory.is_dir():
-            print(f"Current path is not a directory: {target_directory}")
-            return
+            # Try to restore cursor position for this directory
+            height, width = self.stdscr.getmaxyx()
+            calculated_height = int(height * self.log_height_ratio)
+            log_height = calculated_height if self.log_height_ratio > 0 else 0
+            display_height = height - log_height - 3
             
-        try:
-            # Test if we can access the directory
-            list(target_directory.iterdir())
-        except PermissionError:
-            print(f"Permission denied accessing: {target_directory}")
-            return
-        except Exception as e:
-            print(f"Error accessing directory: {e}")
-            return
-        
-        # Save current cursor position in other pane before changing directory
-        self.save_cursor_position(other_pane)
-        
-        # Change other pane to the current pane's directory
-        old_directory = other_pane['path']
-        other_pane['path'] = target_directory
-        other_pane['selected_index'] = 0
-        other_pane['scroll_offset'] = 0
-        other_pane['selected_files'].clear()  # Clear selections when changing directory
-        self.refresh_files(other_pane)
-        
-        # Try to restore cursor position for this directory
-        if not self.restore_cursor_position(other_pane):
-            # If no history found, default to first item
-            other_pane['selected_index'] = 0
-            other_pane['scroll_offset'] = 0
-        
-        # Log the change
-        other_pane_name = "right" if self.active_pane == 'left' else "left"
-        current_pane_name = "left" if self.active_pane == 'left' else "right"
-        print(f"Synchronized {other_pane_name} pane to {current_pane_name} pane: {old_directory} → {target_directory}")
-        
-        self.needs_full_redraw = True
+            if not self.pane_manager.restore_cursor_position(other_pane, display_height):
+                # If no history found, default to first item
+                other_pane['selected_index'] = 0
+                other_pane['scroll_offset'] = 0
+            
+            self.needs_full_redraw = True
     
     def sync_cursor_to_other_pane(self):
         """Move cursor in current pane to the same filename as the other pane's cursor"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Get the currently selected file in the other pane
-        if not other_pane['files'] or other_pane['selected_index'] >= len(other_pane['files']):
-            print("No file selected in other pane")
-            return
-            
-        other_selected_file = other_pane['files'][other_pane['selected_index']]
-        
-        # Parent directory (..) is no longer shown
-        target_filename = other_selected_file.name
-        
-        # Find the same filename in current pane
-        target_index = None
-        for i, file_path in enumerate(current_pane['files']):
-            if file_path.name == target_filename:
-                target_index = i
-                break
-        
-        if target_index is not None:
-            # Move cursor to the matching file
-            current_pane['selected_index'] = target_index
-            
+        if self.pane_manager.sync_cursor_to_other_pane(print):
             # Adjust scroll offset if needed to keep selection visible
+            current_pane = self.get_current_pane()
             height, width = self.stdscr.getmaxyx()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+            display_height = height - log_height - 3
             
-            if current_pane['selected_index'] < current_pane['scroll_offset']:
-                current_pane['scroll_offset'] = current_pane['selected_index']
-            elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
-                current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
-            
-            pane_name = "left" if self.active_pane == 'left' else "right"
-            print(f"Moved {pane_name} pane cursor to: {target_filename}")
+            self.pane_manager.adjust_scroll_for_selection(current_pane, display_height)
             self.needs_full_redraw = True
-        else:
-            print(f"File '{target_filename}' not found in current pane")
     
     def sync_cursor_from_current_pane(self):
         """Move cursor in other pane to the same filename as the current pane's cursor"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Get the currently selected file in the current pane
-        if not current_pane['files'] or current_pane['selected_index'] >= len(current_pane['files']):
-            print("No file selected in current pane")
-            return
-            
-        current_selected_file = current_pane['files'][current_pane['selected_index']]
-        
-        # Parent directory (..) is no longer shown
-        target_filename = current_selected_file.name
-        
-        # Find the same filename in other pane
-        target_index = None
-        for i, file_path in enumerate(other_pane['files']):
-            if file_path.name == target_filename:
-                target_index = i
-                break
-        
-        if target_index is not None:
-            # Move cursor to the matching file in other pane
-            other_pane['selected_index'] = target_index
-            
+        if self.pane_manager.sync_cursor_from_current_pane(print):
             # Adjust scroll offset if needed to keep selection visible
+            other_pane = self.get_inactive_pane()
             height, width = self.stdscr.getmaxyx()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+            display_height = height - log_height - 3
             
-            if other_pane['selected_index'] < other_pane['scroll_offset']:
-                other_pane['scroll_offset'] = other_pane['selected_index']
-            elif other_pane['selected_index'] >= other_pane['scroll_offset'] + display_height:
-                other_pane['scroll_offset'] = other_pane['selected_index'] - display_height + 1
-            
-            other_pane_name = "right" if self.active_pane == 'left' else "left"
-            print(f"Moved {other_pane_name} pane cursor to: {target_filename}")
+            self.pane_manager.adjust_scroll_for_selection(other_pane, display_height)
             self.needs_full_redraw = True
-        else:
-            other_pane_name = "right" if self.active_pane == 'left' else "left"
-            print(f"File '{target_filename}' not found in {other_pane_name} pane")
         
+    def restore_cursor_position(self, pane_data):
+        """Restore cursor position from history - wrapper for pane_manager method"""
+        height, width = self.stdscr.getmaxyx()
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        display_height = height - log_height - 3
+        return self.pane_manager.restore_cursor_position(pane_data, display_height)
+    
+    def save_cursor_position(self, pane_data):
+        """Save cursor position to history - wrapper for pane_manager method"""
+        return self.pane_manager.save_cursor_position(pane_data)
+    
+    def adjust_scroll_for_selection(self, pane_data):
+        """Adjust scroll for selection - wrapper for pane_manager method"""
+        height, width = self.stdscr.getmaxyx()
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        display_height = height - log_height - 3
+        return self.pane_manager.adjust_scroll_for_selection(pane_data, display_height)
+
+    def apply_filter(self):
+        """Apply filter - wrapper for file_operations method"""
+        current_pane = self.get_current_pane()
+        filter_pattern = self.filter_editor.get_text()
+        count = self.file_operations.apply_filter(current_pane, filter_pattern)
+        
+        # Log the filter action
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
+        
+        if filter_pattern:
+            print(f"Applied filter '{filter_pattern}' to {pane_name} pane")
+            print(f"Showing {count} items")
+        
+        self.needs_full_redraw = True
+    
+    def clear_filter(self):
+        """Clear filter - wrapper for file_operations method"""
+        current_pane = self.get_current_pane()
+        
+        if self.file_operations.clear_filter(current_pane):
+            # Log the clear action
+            pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
+            
+            print(f"Cleared filter from {pane_name} pane")
+            
+            self.needs_full_redraw = True
+    
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
-        if hasattr(self, 'original_stdout') and sys.stdout != self.original_stdout:
-            sys.stdout = self.original_stdout
-        if hasattr(self, 'original_stderr') and sys.stderr != self.original_stderr:
-            sys.stderr = self.original_stderr
+        self.log_manager.restore_stdio()
             
     def __del__(self):
         """Restore stdout/stderr when object is destroyed"""
@@ -652,197 +355,39 @@ class FileManager:
         
     def get_current_pane(self):
         """Get the currently active pane"""
-        return self.left_pane if self.active_pane == 'left' else self.right_pane
+        return self.pane_manager.get_current_pane()
     
     def get_inactive_pane(self):
         """Get the inactive pane"""
-        return self.right_pane if self.active_pane == 'left' else self.left_pane
-    
-    def save_cursor_position(self, pane_data):
-        """Save current cursor position to history"""
-        if not pane_data['files'] or pane_data['selected_index'] >= len(pane_data['files']):
-            return
-            
-        current_file = pane_data['files'][pane_data['selected_index']]
-        current_dir = pane_data['path']
-        
-        # Save as (filename, directory_path) tuple
-        cursor_entry = (current_file.name, str(current_dir))
-        
-        # Remove any existing entry for this directory to avoid duplicates
-        pane_data['cursor_history'] = deque(
-            [entry for entry in pane_data['cursor_history'] if entry[1] != str(current_dir)],
-            maxlen=100
-        )
-        
-        # Add the new entry
-        pane_data['cursor_history'].append(cursor_entry)
-    
-    def restore_cursor_position(self, pane_data):
-        """Restore cursor position from history when changing to a directory"""
-        current_dir = str(pane_data['path'])
-        
-        # Look for a saved cursor position for this directory
-        for filename, saved_dir in reversed(pane_data['cursor_history']):
-            if saved_dir == current_dir:
-                # Try to find this filename in current files
-                for i, file_path in enumerate(pane_data['files']):
-                    if file_path.name == filename:
-                        pane_data['selected_index'] = i
-                        
-                        # Adjust scroll offset to keep selection visible
-                        height, width = self.stdscr.getmaxyx()
-                        calculated_height = int(height * self.log_height_ratio)
-                        log_height = calculated_height if self.log_height_ratio > 0 else 0
-                        display_height = height - log_height - 4
-                        
-                        if pane_data['selected_index'] < pane_data['scroll_offset']:
-                            pane_data['scroll_offset'] = pane_data['selected_index']
-                        elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
-                            pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
-                        
-                        return True
-        
-        return False
-    
+        return self.pane_manager.get_inactive_pane()
+
     def get_log_scroll_percentage(self):
         """Calculate the current log scroll position as a percentage"""
-        if len(self.log_messages) <= 1:
-            return 100  # If no messages or only one, we're at 100%
-        
-        # When scroll_offset is 0, we're at the bottom (newest messages) = 100%
-        # When scroll_offset is max, we're at the top (oldest messages) = 0%
-        max_scroll = len(self.log_messages) - 1
-        if max_scroll == 0:
-            return 100
-        
-        # Invert the percentage since offset 0 = bottom (100%) and max offset = top (0%)
-        percentage = int(((max_scroll - self.log_scroll_offset) / max_scroll) * 100)
-        return max(0, min(100, percentage))
+        return self.log_manager.get_log_scroll_percentage()
     
     def refresh_files(self, pane=None):
         """Refresh the file list for specified pane or both panes"""
-        panes_to_refresh = [pane] if pane else [self.left_pane, self.right_pane]
+        panes_to_refresh = [pane] if pane else [self.pane_manager.left_pane, self.pane_manager.right_pane]
         
         for pane_data in panes_to_refresh:
-            try:
-                entries = list(pane_data['path'].iterdir())
-                if not self.show_hidden:
-                    entries = [e for e in entries if not e.name.startswith('.')]
-                
-                # Apply filename filter if set for this pane (only to files, not directories)
-                if pane_data['filter_pattern']:
-                    filtered_entries = []
-                    for entry in entries:
-                        # Always include directories, only filter files
-                        if entry.is_dir() or fnmatch.fnmatch(entry.name, pane_data['filter_pattern']):
-                            filtered_entries.append(entry)
-                    entries = filtered_entries
-                
-                # Sort files using the pane's sort mode
-                pane_data['files'] = self.sort_entries(entries, pane_data['sort_mode'], pane_data['sort_reverse'])
-                
-                # Parent directory (..) suppressed per user request
-                # if pane_data['path'] != pane_data['path'].parent:
-                #     pane_data['files'].insert(0, pane_data['path'].parent)
-                    
-            except PermissionError:
-                pane_data['files'] = []
-                
-            # Reset selection if out of bounds
-            if pane_data['selected_index'] >= len(pane_data['files']):
-                pane_data['selected_index'] = max(0, len(pane_data['files']) - 1)
-                
-            # Don't clear selected files here - only clear when directory actually changes
+            self.file_operations.refresh_files(pane_data)
     
     def sort_entries(self, entries, sort_mode, reverse=False):
-        """Sort file entries based on the specified mode
-        
-        Args:
-            entries: List of Path objects to sort
-            sort_mode: 'name', 'size', or 'date'
-            reverse: Whether to reverse the sort order
-            
-        Returns:
-            Sorted list with directories always first
-        """
-        def get_sort_key(entry):
-            """Generate sort key for an entry"""
-            try:
-                if sort_mode == 'name':
-                    # Sort by name (case-insensitive)
-                    return entry.name.lower()
-                elif sort_mode == 'size':
-                    # Sort by file size (directories get size 0)
-                    if entry.is_dir():
-                        return 0
-                    else:
-                        return entry.stat().st_size
-                elif sort_mode == 'date':
-                    # Sort by modification time
-                    return entry.stat().st_mtime
-                else:
-                    # Default to name sorting
-                    return entry.name.lower()
-            except (OSError, PermissionError):
-                # If we can't get file info, sort by name as fallback
-                return entry.name.lower()
-        
-        # Separate directories and files
-        directories = [e for e in entries if e.is_dir()]
-        files = [e for e in entries if not e.is_dir()]
-        
-        # Sort directories and files separately
-        sorted_dirs = sorted(directories, key=get_sort_key, reverse=reverse)
-        sorted_files = sorted(files, key=get_sort_key, reverse=reverse)
-        
-        # Always put directories first, then files
-        return sorted_dirs + sorted_files
+        """Sort file entries based on the specified mode"""
+        return self.file_operations.sort_entries(entries, sort_mode, reverse)
     
     def get_sort_description(self, pane_data):
         """Get a human-readable description of the current sort mode"""
-        mode = pane_data['sort_mode']
-        reverse = pane_data['sort_reverse']
-        
-        mode_names = {
-            'name': 'Name',
-            'size': 'Size', 
-            'date': 'Date'
-        }
-        
-        description = mode_names.get(mode, 'Name')
-        if reverse:
-            description += ' ↓'
-        else:
-            description += ' ↑'
-            
-        return description
+        return self.file_operations.get_sort_description(pane_data)
             
     def get_file_info(self, path):
         """Get file information for display"""
-        try:
-            stat_info = path.stat()
-            size = stat_info.st_size
-            mtime = datetime.fromtimestamp(stat_info.st_mtime)
-            
-            # Format size using constants
-            if size < SIZE_KB:
-                size_str = f"{size}B"
-            elif size < SIZE_MB:
-                size_str = f"{size/SIZE_KB:.1f}K"
-            elif size < SIZE_GB:
-                size_str = f"{size/SIZE_MB:.1f}M"
-            else:
-                size_str = f"{size/SIZE_GB:.1f}G"
-                
-            return size_str, mtime.strftime(DATETIME_FORMAT)
-        except (OSError, PermissionError):
-            return "---", "---"
+        return self.file_operations.get_file_info(path)
             
     def draw_header(self):
         """Draw the header with pane paths and controls"""
         height, width = self.stdscr.getmaxyx()
-        left_pane_width = int(width * self.left_pane_ratio)
+        left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         right_pane_width = width - left_pane_width
         
         # Clear header area (avoid last column)
@@ -853,12 +398,12 @@ class FileManager:
         
         # Left pane path with safety checks
         if left_pane_width > 6:  # Minimum space needed
-            left_path = str(self.left_pane['path'])
+            left_path = str(self.pane_manager.left_pane['path'])
             max_left_path_width = max(1, left_pane_width - 4)
             if len(left_path) > max_left_path_width:
                 left_path = "..." + left_path[-(max(1, max_left_path_width-3)):]
             
-            left_color = get_header_color(self.active_pane == 'left')
+            left_color = get_header_color(self.pane_manager.active_pane == 'left')
             try:
                 self.stdscr.addstr(0, 2, left_path[:max_left_path_width], left_color)
             except curses.error:
@@ -873,12 +418,12 @@ class FileManager:
         
         # Right pane path with safety checks
         if right_pane_width > 6:  # Minimum space needed
-            right_path = str(self.right_pane['path'])
+            right_path = str(self.pane_manager.right_pane['path'])
             max_right_path_width = max(1, right_pane_width - 4)
             if len(right_path) > max_right_path_width:
                 right_path = "..." + right_path[-(max(1, max_right_path_width-3)):]
                 
-            right_color = get_header_color(self.active_pane == 'right')
+            right_color = get_header_color(self.pane_manager.active_pane == 'right')
             try:
                 right_start_x = left_pane_width + 2
                 if right_start_x < width:
@@ -900,7 +445,7 @@ class FileManager:
         # Allow log pane to be completely hidden (0 height) when ratio is 0
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+        display_height = height - log_height - 3  # Reserve space for header, footer, and status
         
         # Calculate scroll offset
         if pane_data['selected_index'] < pane_data['scroll_offset']:
@@ -1001,7 +546,7 @@ class FileManager:
     def draw_files(self):
         """Draw both file panes"""
         height, width = self.stdscr.getmaxyx()
-        left_pane_width = int(width * self.left_pane_ratio)
+        left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         right_pane_width = width - left_pane_width
         # Allow log pane to be completely hidden (0 height) when ratio is 0
         calculated_height = int(height * self.log_height_ratio)
@@ -1018,10 +563,10 @@ class FileManager:
                 pass
         
         # Draw left pane
-        self.draw_pane(self.left_pane, 0, left_pane_width, self.active_pane == 'left')
+        self.draw_pane(self.pane_manager.left_pane, 0, left_pane_width, self.pane_manager.active_pane == 'left')
         
         # Draw right pane
-        self.draw_pane(self.right_pane, left_pane_width, right_pane_width, self.active_pane == 'right')
+        self.draw_pane(self.pane_manager.right_pane, left_pane_width, right_pane_width, self.pane_manager.active_pane == 'right')
         
     def draw_log_pane(self):
         """Draw the log pane at the bottom"""
@@ -1029,7 +574,7 @@ class FileManager:
         # Allow log pane to be completely hidden (0 height) when ratio is 0
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        left_pane_width = int(width * self.left_pane_ratio)
+        left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         
         # Always draw the file list footers at the correct position
         if log_height == 0:
@@ -1056,45 +601,8 @@ class FileManager:
         # Log content starts right after the footer line
         log_start_y = footer_y + 1
         
-        # Calculate visible log messages (subtract 1 for the footer line)
-        visible_lines = log_height - 1
-        total_messages = len(self.log_messages)
-        
-        if total_messages == 0:
-            try:
-                self.stdscr.addstr(log_start_y, 2, "No log messages", curses.A_DIM)
-            except curses.error:
-                pass
-            return
-        
-        # Auto-scroll to bottom if not manually scrolled
-        if self.log_scroll_offset == 0:
-            start_idx = max(0, total_messages - visible_lines)
-        else:
-            start_idx = max(0, total_messages - visible_lines - self.log_scroll_offset)
-        
-        # Draw log messages
-        for i in range(visible_lines):
-            msg_idx = start_idx + i
-            y = log_start_y + i
-            
-            if msg_idx >= total_messages:
-                break
-                
-            timestamp, source, message = self.log_messages[msg_idx]
-            
-            # Choose color based on source
-            color = get_log_color(source)
-            
-            # Format log line
-            log_line = f"{timestamp} [{source}] {message}"
-            if len(log_line) > width - 2:
-                log_line = log_line[:width-5] + "..."
-                
-            try:
-                self.stdscr.addstr(y, 2, log_line, color)
-            except curses.error:
-                pass
+        # Use log manager to draw the log content
+        self.log_manager.draw_log_pane(self.stdscr, log_start_y, log_height, width)
                 
     def draw_status(self):
         """Draw status line with file info and controls"""
@@ -1103,70 +611,12 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
-        # If in quick choice mode, show quick choice dialog
-        if self.quick_choice_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Show dialog message
-            message = f"{self.quick_choice_message} "
-            self.safe_addstr(status_y, 2, message, get_status_color())
-            
-            # Show choice buttons
-            button_start_x = len(message) + 4
-            
-            for i, choice in enumerate(self.quick_choice_choices):
-                choice_text = choice["text"]
-                if i == self.quick_choice_selected:
-                    # Highlight selected option with bold and standout
-                    button_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
-                    button_text = f"[{choice_text}]"
-                else:
-                    button_color = get_status_color()
-                    button_text = f" {choice_text} "
-                
-                if button_start_x + len(button_text) < width - 2:
-                    self.safe_addstr(status_y, button_start_x, button_text, button_color)
-                    button_start_x += len(button_text) + 1
-            
-            # Generate help text based on available quick keys
-            quick_keys = []
-            for choice in self.quick_choice_choices:
-                if "key" in choice and choice["key"]:
-                    quick_keys.append(choice["key"].upper())
-            
-            help_parts = ["←→:select", "Enter:confirm"]
-            if quick_keys:
-                help_parts.append(f"{'/'.join(quick_keys)}:quick")
-            help_parts.append("ESC:cancel")
-            help_text = " ".join(help_parts)
-            
-            if button_start_x + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > button_start_x + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+        # If in quick choice mode, show quick choice bar
+        if self.quick_choice_bar.mode:
+            self.quick_choice_bar.draw(self.stdscr, self.safe_addstr, status_y, width)
             return
         
-        # If in info dialog mode, show info dialog
-        if self.info_dialog_mode:
-            self.draw_info_dialog()
-            return
-            
-        # If in list dialog mode, show list dialog
-        if self.list_dialog_mode:
-            self.draw_list_dialog()
-            return
-            
-        # If in search dialog mode, show search dialog
-        if self.search_dialog_mode:
-            self.draw_search_dialog()
-            return
-        
-        # If in batch rename mode, show batch rename dialog
-        if self.batch_rename_mode:
-            self.draw_batch_rename_dialog()
-            return
+        # All dialogs are now handled as overlays in main drawing loop
             
         # If in isearch mode, show isearch interface
         if self.isearch_mode:
@@ -1206,144 +656,12 @@ class FileManager:
                         self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
             return
         
-        # If in filter mode, show filter interface
-        if self.filter_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw filter input using SingleLineTextEdit
-            max_input_width = width - 50  # Leave space for help text
-            self.filter_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                "Filter: ",
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:apply (files only: *.py, test_*, *.[ch])"
-            # Calculate space needed for the input field
-            input_field_width = len("Filter: ") + len(self.filter_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            else:
-                # Shorter help text for narrow terminals
-                short_help = "ESC:cancel Enter:apply"
-                if input_field_width + len(short_help) + 6 < width:
-                    help_x = width - len(short_help) - 3
-                    if help_x > input_field_width + 4:
-                        self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
-            return
-        
-        # If in rename mode, show rename interface
-        if self.rename_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw rename input using SingleLineTextEdit
-            prompt_text = f"Rename '{self.rename_original_name}' to: "
-            max_input_width = width - len(prompt_text) - 25  # Leave space for help text
-            self.rename_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                prompt_text,
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:confirm"
-            # Calculate space needed for the input field
-            input_field_width = len(prompt_text) + len(self.rename_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            return
-        
-        # If in create directory mode, show create directory interface
-        if self.create_dir_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw create directory input using SingleLineTextEdit
-            max_input_width = width - 20  # Leave space for help text
-            self.create_dir_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                "Create directory: ",
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:create"
-            # Calculate space needed for the input field
-            input_field_width = len("Create directory: ") + len(self.create_dir_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            return
-        
-        # If in create file mode, show create file interface
-        if self.create_file_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw create file input using SingleLineTextEdit
-            max_input_width = width - 20  # Leave space for help text
-            self.create_file_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                "Create file: ",
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:create"
-            # Calculate space needed for the input field
-            input_field_width = len("Create file: ") + len(self.create_file_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            return
-        
-        # If in create archive mode, show create archive interface
-        if self.create_archive_mode:
-            # Fill entire status line with background color
-            status_line = " " * (width - 1)
-            self.safe_addstr(status_y, 0, status_line, get_status_color())
-            
-            # Draw create archive input using SingleLineTextEdit
-            max_input_width = width - 35  # Leave space for help text
-            self.create_archive_editor.draw(
-                self.stdscr, status_y, 2, max_input_width,
-                "Archive filename: ",
-                is_active=True
-            )
-            
-            # Show help text on the right if there's space
-            help_text = "ESC:cancel Enter:create (.zip/.tar.gz/.tgz)"
-            # Calculate space needed for the input field
-            input_field_width = len("Archive filename: ") + len(self.create_archive_editor.text) + 2
-            if input_field_width + len(help_text) + 6 < width:
-                help_x = width - len(help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
-            return
-        
         # Normal status display
         # Left side: status info
         status_parts = []
-        if self.show_hidden:
+        if self.file_operations.show_hidden:
             status_parts.append("showing hidden")
-        
-        # Add log scroll percentage
-        log_percentage = self.get_log_scroll_percentage()
-        status_parts.append(f"log: {log_percentage}%")
-        
+
         left_status = f"({', '.join(status_parts)})" if status_parts else ""
         
         # Simple help message - detailed controls available in help dialog
@@ -1443,44 +761,7 @@ class FileManager:
         For example: "ab*c 12?3" will match files that contain both "*ab*c*" and "*12?3*"
         """
         current_pane = self.get_current_pane()
-        matches = []
-        
-        if not pattern or not current_pane['files']:
-            return matches
-            
-        # Split pattern by spaces to get individual patterns
-        patterns = pattern.strip().split()
-        if not patterns:
-            return matches
-            
-        # Convert all patterns to lowercase for case-insensitive matching
-        # and wrap each pattern with wildcards to match "contains" behavior
-        wrapped_patterns = []
-        for p in patterns:
-            p_lower = p.lower()
-            # If pattern doesn't start with *, add it for "contains" matching
-            if not p_lower.startswith('*'):
-                p_lower = '*' + p_lower
-            # If pattern doesn't end with *, add it for "contains" matching  
-            if not p_lower.endswith('*'):
-                p_lower = p_lower + '*'
-            wrapped_patterns.append(p_lower)
-        
-        for i, file_path in enumerate(current_pane['files']):
-            # Parent directory (..) is no longer shown
-            filename = file_path.name.lower()
-            
-            # Check if filename matches ALL patterns
-            all_match = True
-            for wrapped_pattern in wrapped_patterns:
-                if not fnmatch.fnmatch(filename, wrapped_pattern):
-                    all_match = False
-                    break
-                    
-            if all_match:
-                matches.append(i)
-                
-        return matches
+        return self.file_operations.find_matches(current_pane, pattern, match_all=True, return_indices_only=True)
         
     def update_isearch_matches(self):
         """Update isearch matches and move cursor to nearest match"""
@@ -1515,7 +796,7 @@ class FileManager:
         height, width = self.stdscr.getmaxyx()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 4  # Reserve space for header, log pane, and status
+        display_height = height - log_height - 3  # Reserve space for header, footer, and status
         
         # Adjust scroll offset to keep selection visible
         if pane_data['selected_index'] < pane_data['scroll_offset']:
@@ -1541,16 +822,30 @@ class FileManager:
     
     def enter_filter_mode(self):
         """Enter filename filter mode"""
-        self.filter_mode = True
         current_pane = self.get_current_pane()
-        self.filter_editor.text = current_pane['filter_pattern']  # Start with current filter
-        self.filter_editor.cursor_pos = len(self.filter_editor.text)  # Position cursor at end
+        DialogHelpers.create_filter_dialog(self.general_dialog, current_pane['filter_pattern'])
+        self.general_dialog.callback = self.on_filter_confirm
+        self.general_dialog.cancel_callback = self.on_filter_cancel
         self.needs_full_redraw = True
         
-    def exit_filter_mode(self):
-        """Exit filter mode"""
-        self.filter_mode = False
-        self.filter_editor.clear()
+    def on_filter_confirm(self, filter_text):
+        """Handle filter confirmation"""
+        current_pane = self.get_current_pane()
+        count = self.file_operations.apply_filter(current_pane, filter_text)
+        
+        # Log the filter action
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
+        
+        if filter_text:
+            print(f"Applied filter '{filter_text}' to {pane_name} pane")
+            print(f"Showing {count} items")
+        
+        self.general_dialog.hide()
+        self.needs_full_redraw = True
+    
+    def on_filter_cancel(self):
+        """Handle filter cancellation"""
+        self.general_dialog.hide()
         self.needs_full_redraw = True
     
     def apply_filter(self):
@@ -1563,7 +858,7 @@ class FileManager:
         self.refresh_files(current_pane)
         
         # Log the filter action
-        pane_name = "left" if self.active_pane == 'left' else "right"
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         if filter_pattern:
             print(f"Applied filter '{filter_pattern}' to {pane_name} pane")
         else:
@@ -1580,7 +875,7 @@ class FileManager:
         self.refresh_files(current_pane)
         
         # Log the clear action
-        pane_name = "left" if self.active_pane == 'left' else "right"
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         print(f"Cleared filter from {pane_name} pane")
         
         self.needs_full_redraw = True
@@ -1604,20 +899,78 @@ class FileManager:
         
         # Parent directory (..) is no longer shown, so no need to check for it
         
-        # Enter rename mode
-        self.rename_mode = True
+        # Enter rename mode using general dialog
         self.rename_file_path = selected_file
-        self.rename_original_name = selected_file.name
-        self.rename_editor.text = selected_file.name  # Start with current name
-        self.rename_editor.cursor_pos = len(self.rename_editor.text)  # Position cursor at end
+        DialogHelpers.create_rename_dialog(self.general_dialog, selected_file.name, selected_file.name)
+        self.general_dialog.callback = self.on_rename_confirm
+        self.general_dialog.cancel_callback = self.on_rename_cancel
         self.needs_full_redraw = True
-        print(f"Renaming: {self.rename_original_name}")
+        print(f"Renaming: {selected_file.name}")
     
-    def exit_rename_mode(self):
-        """Exit rename mode"""
-        self.rename_mode = False
-        self.rename_editor.clear()
-        self.rename_original_name = ""
+    def on_rename_confirm(self, new_name):
+        """Handle rename confirmation"""
+        if not self.rename_file_path or not new_name.strip():
+            print("Invalid rename operation")
+            self.general_dialog.hide()
+            self.rename_file_path = None
+            self.needs_full_redraw = True
+            return
+        
+        original_name = self.rename_file_path.name
+        
+        if new_name == original_name:
+            print("Name unchanged")
+            self.general_dialog.hide()
+            self.rename_file_path = None
+            self.needs_full_redraw = True
+            return
+        
+        try:
+            # Perform the rename
+            new_path = self.rename_file_path.parent / new_name
+            
+            # Check if target already exists
+            if new_path.exists():
+                print(f"File '{new_name}' already exists")
+                self.general_dialog.hide()
+                self.rename_file_path = None
+                self.needs_full_redraw = True
+                return
+            
+            # Perform the rename
+            self.rename_file_path.rename(new_path)
+            print(f"Renamed '{original_name}' to '{new_name}'")
+            
+            # Refresh the current pane
+            current_pane = self.get_current_pane()
+            self.refresh_files(current_pane)
+            
+            # Try to select the renamed file
+            for i, file_path in enumerate(current_pane['files']):
+                if file_path.name == new_name:
+                    current_pane['selected_index'] = i
+                    self.adjust_scroll_for_selection(current_pane)
+                    break
+            
+            self.general_dialog.hide()
+            self.rename_file_path = None
+            self.needs_full_redraw = True
+            
+        except PermissionError:
+            print(f"Permission denied: Cannot rename '{original_name}'")
+            self.general_dialog.hide()
+            self.rename_file_path = None
+            self.needs_full_redraw = True
+        except OSError as e:
+            print(f"Error renaming file: {e}")
+            self.general_dialog.hide()
+            self.rename_file_path = None
+            self.needs_full_redraw = True
+    
+    def on_rename_cancel(self):
+        """Handle rename cancellation"""
+        print("Rename cancelled")
+        self.general_dialog.hide()
         self.rename_file_path = None
         self.needs_full_redraw = True
     
@@ -1630,33 +983,30 @@ class FileManager:
             print(f"Permission denied: Cannot create directory in {current_pane['path']}")
             return
         
-        # Enter create directory mode
-        self.create_dir_mode = True
-        self.create_dir_editor.clear()
+        # Enter create directory mode using general dialog
+        DialogHelpers.create_create_directory_dialog(self.general_dialog)
+        self.general_dialog.callback = self.on_create_directory_confirm
+        self.general_dialog.cancel_callback = self.on_create_directory_cancel
         self.needs_full_redraw = True
         print("Creating new directory...")
     
-    def exit_create_directory_mode(self):
-        """Exit create directory mode"""
-        self.create_dir_mode = False
-        self.create_dir_editor.clear()
-        self.needs_full_redraw = True
-    
-    def perform_create_directory(self):
-        """Perform the actual directory creation"""
-        if not self.create_dir_editor.text.strip():
+    def on_create_directory_confirm(self, dir_name):
+        """Handle create directory confirmation"""
+        if not dir_name.strip():
             print("Invalid directory name")
-            self.exit_create_directory_mode()
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         current_pane = self.get_current_pane()
-        new_dir_name = self.create_dir_editor.text.strip()
+        new_dir_name = dir_name.strip()
         new_dir_path = current_pane['path'] / new_dir_name
         
         # Check if directory already exists
         if new_dir_path.exists():
             print(f"Directory '{new_dir_name}' already exists")
-            self.exit_create_directory_mode()
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         try:
@@ -1664,30 +1014,29 @@ class FileManager:
             new_dir_path.mkdir(parents=True, exist_ok=False)
             print(f"Created directory: {new_dir_name}")
             
-            # Refresh the current pane to show the new directory
+            # Refresh the current pane
             self.refresh_files(current_pane)
             
-            # Move cursor to the newly created directory
+            # Try to select the new directory
             for i, file_path in enumerate(current_pane['files']):
                 if file_path.name == new_dir_name:
                     current_pane['selected_index'] = i
-                    # Adjust scroll if needed
-                    height, width = self.stdscr.getmaxyx()
-                    calculated_height = int(height * self.log_height_ratio)
-                    log_height = calculated_height if self.log_height_ratio > 0 else 0
-                    display_height = height - log_height - 4
-                    
-                    if current_pane['selected_index'] < current_pane['scroll_offset']:
-                        current_pane['scroll_offset'] = current_pane['selected_index']
-                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
-                        current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+                    self.adjust_scroll_for_selection(current_pane)
                     break
             
-            self.exit_create_directory_mode()
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
             
         except OSError as e:
             print(f"Failed to create directory '{new_dir_name}': {e}")
-            self.exit_create_directory_mode()
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
+    
+    def on_create_directory_cancel(self):
+        """Handle create directory cancellation"""
+        print("Directory creation cancelled")
+        self.general_dialog.hide()
+        self.needs_full_redraw = True
     
     def enter_create_file_mode(self):
         """Enter create file mode"""
@@ -1698,126 +1047,65 @@ class FileManager:
             print(f"Permission denied: Cannot create file in {current_pane['path']}")
             return
         
-        # Enter create file mode
-        self.create_file_mode = True
-        self.create_file_editor.clear()
+        # Enter create file mode using general dialog
+        DialogHelpers.create_create_file_dialog(self.general_dialog)
+        self.general_dialog.callback = self.on_create_file_confirm
+        self.general_dialog.cancel_callback = self.on_create_file_cancel
         self.needs_full_redraw = True
         print("Creating new text file...")
     
-    def exit_create_file_mode(self):
-        """Exit create file mode"""
-        self.create_file_mode = False
-        self.create_file_editor.clear()
-        self.needs_full_redraw = True
-    
-    def perform_create_file(self):
-        """Perform the actual file creation"""
-        file_name = self.create_file_editor.get_text().strip()
-        if not file_name:
+    def on_create_file_confirm(self, file_name):
+        """Handle create file confirmation"""
+        if not file_name.strip():
             print("Invalid file name")
-            self.exit_create_file_mode()
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         current_pane = self.get_current_pane()
-        new_file_name = file_name
+        new_file_name = file_name.strip()
         new_file_path = current_pane['path'] / new_file_name
         
         # Check if file already exists
         if new_file_path.exists():
             print(f"File '{new_file_name}' already exists")
-            self.exit_create_file_mode()
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         try:
-            # Create the empty file
+            # Create the file
             new_file_path.touch()
             print(f"Created file: {new_file_name}")
             
-            # Refresh the current pane to show the new file
+            # Refresh the current pane
             self.refresh_files(current_pane)
             
-            # Move cursor to the newly created file
+            # Try to select the new file
             for i, file_path in enumerate(current_pane['files']):
                 if file_path.name == new_file_name:
                     current_pane['selected_index'] = i
-                    # Adjust scroll if needed
-                    height, width = self.stdscr.getmaxyx()
-                    calculated_height = int(height * self.log_height_ratio)
-                    log_height = calculated_height if self.log_height_ratio > 0 else 0
-                    display_height = height - log_height - 4
-                    
-                    if current_pane['selected_index'] < current_pane['scroll_offset']:
-                        current_pane['scroll_offset'] = current_pane['selected_index']
-                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
-                        current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+                    self.adjust_scroll_for_selection(current_pane)
                     break
             
-            # Automatically open the file in the text editor
-            self.edit_selected_file()
+            # Open the file for editing if it's a text file
+            if is_text_file(new_file_path):
+                self.edit_selected_file()
             
-            self.exit_create_file_mode()
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
             
         except OSError as e:
             print(f"Failed to create file '{new_file_name}': {e}")
-            self.exit_create_file_mode()
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
     
-    def perform_rename(self):
-        """Perform the actual rename operation"""
-        if not self.rename_file_path or not self.rename_editor.text.strip():
-            print("Invalid rename operation")
-            self.exit_rename_mode()
-            return
-        
-        new_name = self.rename_editor.text.strip()
-        
-        # Check if name actually changed
-        if new_name == self.rename_original_name:
-            print("Name unchanged")
-            self.exit_rename_mode()
-            return
-        
-        # Check for invalid characters (basic validation)
-        if '/' in new_name or '\0' in new_name:
-            print("Invalid characters in filename")
-            return
-        
-        # Check if new name is empty
-        if not new_name:
-            print("Filename cannot be empty")
-            return
-        
-        # Create new path
-        new_path = self.rename_file_path.parent / new_name
-        
-        # Check if target already exists
-        if new_path.exists():
-            print(f"File or directory '{new_name}' already exists")
-            return
-        
-        try:
-            # Perform the rename
-            self.rename_file_path.rename(new_path)
-            print(f"Renamed '{self.rename_original_name}' to '{new_name}'")
-            
-            # Refresh the current pane
-            current_pane = self.get_current_pane()
-            self.refresh_files(current_pane)
-            
-            # Try to select the renamed file
-            for i, file_path in enumerate(current_pane['files']):
-                if file_path.name == new_name:
-                    current_pane['selected_index'] = i
-                    break
-            
-            self.exit_rename_mode()
-            
-        except PermissionError:
-            print(f"Permission denied renaming '{self.rename_original_name}'")
-        except FileExistsError:
-            print(f"File '{new_name}' already exists")
-        except Exception as e:
-            print(f"Error renaming file: {e}")
-    
+    def on_create_file_cancel(self):
+        """Handle create file cancellation"""
+        print("File creation cancelled")
+        self.general_dialog.hide()
+        self.needs_full_redraw = True
+
     def enter_batch_rename_mode(self):
         """Enter batch rename mode for multiple selected files"""
         current_pane = self.get_current_pane()
@@ -1826,7 +1114,7 @@ class FileManager:
             print("Select multiple files for batch rename")
             return
         
-        # Get list of selected files (only files, not directories for safety)
+        # Get selected files using helper (only files, not directories for safety)
         selected_files = []
         for file_path_str in current_pane['selected_files']:
             file_path = Path(file_path_str)
@@ -1837,129 +1125,27 @@ class FileManager:
             print("No files selected for batch rename")
             return
         
-        self.batch_rename_mode = True
-        self.batch_rename_files = selected_files
-        self.batch_rename_regex_editor.clear()
-        self.batch_rename_destination_editor.clear()
-        self.batch_rename_active_field = 'regex'
-        self.batch_rename_preview = []
-        self.batch_rename_scroll = 0
-        
-        self.needs_full_redraw = True
-        print(f"Batch rename mode: {len(selected_files)} files selected")
+        if self.batch_rename_dialog.show(selected_files):
+            self.needs_full_redraw = True
+            self._force_immediate_redraw()
+            print(f"Batch rename mode: {len(selected_files)} files selected")
     
     def exit_batch_rename_mode(self):
-        """Exit batch rename mode"""
-        self.batch_rename_mode = False
-        self.batch_rename_files = []
-        self.batch_rename_regex_editor.clear()
-        self.batch_rename_destination_editor.clear()
-        self.batch_rename_active_field = 'regex'
-        self.batch_rename_preview = []
-        self.batch_rename_scroll = 0
+        """Exit batch rename mode - wrapper for batch rename dialog component"""
+        self.batch_rename_dialog.exit()
         self.needs_full_redraw = True
     
     def update_batch_rename_preview(self):
-        """Update the preview list for batch rename"""
-        import re
-        
-        self.batch_rename_preview = []
-        
-        regex_pattern = self.batch_rename_regex_editor.get_text()
-        destination_pattern = self.batch_rename_destination_editor.get_text()
-        
-        if not regex_pattern or not destination_pattern:
-            return
-        
-        try:
-            pattern = re.compile(regex_pattern)
-        except re.error as e:
-            # Invalid regex pattern
-            return
-        
-        for i, file_path in enumerate(self.batch_rename_files):
-            original_name = file_path.name
-            match = pattern.search(original_name)
-            
-            if match:
-                # Apply destination pattern with substitutions
-                new_name = destination_pattern
-                
-                # Replace \0 with entire original filename
-                new_name = new_name.replace('\\0', original_name)
-                
-                # Replace \1-\9 with regex groups
-                for j in range(1, 10):
-                    group_placeholder = f'\\{j}'
-                    if group_placeholder in new_name:
-                        try:
-                            group_value = match.group(j) if j <= len(match.groups()) else ''
-                            new_name = new_name.replace(group_placeholder, group_value)
-                        except IndexError:
-                            new_name = new_name.replace(group_placeholder, '')
-                
-                # Replace \d with index number
-                new_name = new_name.replace('\\d', str(i + 1))
-                
-                # Check for conflicts
-                new_path = file_path.parent / new_name
-                conflict = new_path.exists() and new_path != file_path
-                
-                self.batch_rename_preview.append({
-                    'original': original_name,
-                    'new': new_name,
-                    'conflict': conflict,
-                    'valid': bool(new_name.strip() and '/' not in new_name and '\0' not in new_name)
-                })
-            else:
-                # No match - keep original name
-                self.batch_rename_preview.append({
-                    'original': original_name,
-                    'new': original_name,
-                    'conflict': False,
-                    'valid': True
-                })
+        """Update the preview list for batch rename - wrapper for batch rename dialog component"""
+        self.batch_rename_dialog.update_preview()
     
     def perform_batch_rename(self):
-        """Perform the batch rename operation"""
-        if not self.batch_rename_preview:
-            print("No rename preview available")
-            return
+        """Perform the batch rename operation - wrapper for batch rename dialog component"""
+        success_count, errors = self.batch_rename_dialog.perform_rename()
         
-        # Check for conflicts and invalid names
-        conflicts = [p for p in self.batch_rename_preview if p['conflict']]
-        invalid = [p for p in self.batch_rename_preview if not p['valid']]
-        
-        if conflicts:
-            conflict_names = [p['new'] for p in conflicts]
-            print(f"Cannot rename: conflicts with existing files: {', '.join(conflict_names)}")
-            return
-        
-        if invalid:
-            invalid_names = [p['new'] for p in invalid]
-            print(f"Cannot rename: invalid filenames: {', '.join(invalid_names)}")
-            return
-        
-        # Perform renames
-        renamed_count = 0
-        errors = []
-        
-        for i, preview in enumerate(self.batch_rename_preview):
-            if preview['original'] != preview['new']:
-                try:
-                    old_path = self.batch_rename_files[i]
-                    new_path = old_path.parent / preview['new']
-                    old_path.rename(new_path)
-                    renamed_count += 1
-                except Exception as e:
-                    errors.append(f"{preview['original']}: {e}")
-        
-        # Report results
-        if renamed_count > 0:
-            print(f"Successfully renamed {renamed_count} files")
-        
-        if errors:
-            print(f"Errors: {'; '.join(errors)}")
+        # Report results using helper
+        result_message = BatchRenameDialogHelpers.format_rename_results(success_count, errors)
+        print(result_message)
         
         # Clear selections and refresh
         current_pane = self.get_current_pane()
@@ -1969,7 +1155,7 @@ class FileManager:
         self.exit_batch_rename_mode()
         
     def show_dialog(self, message, choices, callback):
-        """Show quick choice dialog
+        """Show quick choice dialog - wrapper for quick choice bar component
         
         Args:
             message: The message to display
@@ -1979,29 +1165,17 @@ class FileManager:
                       {"text": "Cancel", "key": "c", "value": None}]
             callback: Function to call with the selected choice's value
         """
-        self.quick_choice_mode = True
-        self.quick_choice_message = message
-        self.quick_choice_choices = choices
-        self.quick_choice_callback = callback
-        self.quick_choice_selected = 0  # Default to first choice
+        self.quick_choice_bar.show(message, choices, callback)
         self.needs_full_redraw = True
     
     def show_confirmation(self, message, callback):
         """Show confirmation dialog with Yes/No/Cancel options (backward compatibility)"""
-        choices = [
-            {"text": "Yes", "key": "y", "value": True},
-            {"text": "No", "key": "n", "value": False},
-            {"text": "Cancel", "key": "c", "value": None}
-        ]
-        self.show_dialog(message, choices, callback)
+        QuickChoiceBarHelpers.show_confirmation(self.quick_choice_bar, message, callback)
+        self.needs_full_redraw = True
         
     def exit_quick_choice_mode(self):
-        """Exit quick choice mode"""
-        self.quick_choice_mode = False
-        self.quick_choice_message = ""
-        self.quick_choice_choices = []
-        self.quick_choice_callback = None
-        self.quick_choice_selected = 0
+        """Exit quick choice mode - wrapper for quick choice bar component"""
+        self.quick_choice_bar.exit()
         self.needs_full_redraw = True
     
     def exit_confirmation_mode(self):
@@ -2009,41 +1183,27 @@ class FileManager:
         self.exit_quick_choice_mode()
         
     def handle_quick_choice_input(self, key):
-        """Handle input while in quick choice mode"""
-        if key == 27:  # ESC - cancel
-            self.exit_quick_choice_mode()
+        """Handle input while in quick choice mode - wrapper for quick choice bar component"""
+        result = self.quick_choice_bar.handle_input(key)
+        
+        if result == True:
+            self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_LEFT:
-            # Move selection left
-            if self.quick_choice_choices:
-                self.quick_choice_selected = (self.quick_choice_selected - 1) % len(self.quick_choice_choices)
+        elif isinstance(result, tuple):
+            action, data = result
+            if action == 'cancel':
+                self.exit_quick_choice_mode()
+                return True
+            elif action == 'selection_changed':
                 self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_RIGHT:
-            # Move selection right
-            if self.quick_choice_choices:
-                self.quick_choice_selected = (self.quick_choice_selected + 1) % len(self.quick_choice_choices)
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Execute selected action
-            if self.quick_choice_choices and 0 <= self.quick_choice_selected < len(self.quick_choice_choices):
-                selected_choice = self.quick_choice_choices[self.quick_choice_selected]
-                if self.quick_choice_callback:
-                    self.quick_choice_callback(selected_choice["value"])
-            self.exit_quick_choice_mode()
-            return True
-        else:
-            # Check for quick key matches
-            key_char = chr(key).lower() if 32 <= key <= 126 else None
-            if key_char:
-                for choice in self.quick_choice_choices:
-                    if "key" in choice and choice["key"] and choice["key"].lower() == key_char:
-                        # Found matching quick key
-                        if self.quick_choice_callback:
-                            self.quick_choice_callback(choice["value"])
-                        self.exit_quick_choice_mode()
-                        return True
+                return True
+            elif action == 'execute':
+                if self.quick_choice_bar.callback:
+                    self.quick_choice_bar.callback(data)
+                self.exit_quick_choice_mode()
+                return True
+        
+        return False
     
     def handle_dialog_input(self, key):
         """Handle input while in dialog mode (backward compatibility)"""
@@ -2055,706 +1215,109 @@ class FileManager:
     
 
     def show_info_dialog(self, title, info_lines):
-        """Show an information dialog with scrollable content"""
-        self.info_dialog_mode = True
-        self.info_dialog_title = title
-        self.info_dialog_lines = info_lines
-        self.info_dialog_scroll = 0
+        """Show an information dialog with scrollable content - wrapper for info dialog component"""
+        self.info_dialog.show(title, info_lines)
         self.needs_full_redraw = True
-    
-    def show_list_dialog(self, title, items, callback):
-        """Show a searchable list dialog
         
-        Args:
-            title: The title to display at the top of the dialog
-            items: List of items to choose from (strings or objects with __str__ method)
-            callback: Function to call with the selected item (or None if cancelled)
-        """
-        self.list_dialog_mode = True
-        self.list_dialog_title = title
-        self.list_dialog_items = items
-        self.list_dialog_filtered_items = items.copy()  # Initially show all items
-        self.list_dialog_selected = 0
-        self.list_dialog_scroll = 0
-        self.list_dialog_search_editor.clear()
-        self.list_dialog_callback = callback
+        # Force immediate display of the dialog
+        self._force_immediate_redraw()
+    
+    def _force_immediate_redraw(self):
+        """Force an immediate screen redraw to show dialogs instantly"""
+        # Perform the same drawing sequence as the main loop
+        self.refresh_files()
+        self.clear_screen_with_background()
+        self.draw_header()
+        self.draw_files()
+        self.draw_log_pane()
+        self.draw_status()
+        
+        # Draw dialog overlays
+        if self.list_dialog.mode:
+            self.list_dialog.draw(self.stdscr, self.safe_addstr)
+        elif self.info_dialog.mode:
+            self.info_dialog.draw(self.stdscr, self.safe_addstr)
+        elif self.search_dialog.mode:
+            self.search_dialog.draw(self.stdscr, self.safe_addstr)
+        elif self.batch_rename_dialog.mode:
+            self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
+        
+        # Refresh screen immediately
+        self.stdscr.refresh()
+        self.needs_full_redraw = False
+
+    def show_list_dialog(self, title, items, callback):
+        """Show a searchable list dialog - wrapper for list dialog component"""
+        self.list_dialog.show(title, items, callback)
         self.needs_full_redraw = True
+        
+        # Force immediate display of the dialog
+        self._force_immediate_redraw()
     
     def exit_info_dialog_mode(self):
-        """Exit info dialog mode"""
-        self.info_dialog_mode = False
-        self.info_dialog_title = ""
-        self.info_dialog_lines = []
-        self.info_dialog_scroll = 0
+        """Exit info dialog mode - wrapper for info dialog component"""
+        self.info_dialog.exit()
         self.needs_full_redraw = True
     
     def exit_list_dialog_mode(self):
-        """Exit list dialog mode"""
-        self.list_dialog_mode = False
-        self.list_dialog_title = ""
-        self.list_dialog_items = []
-        self.list_dialog_filtered_items = []
-        self.list_dialog_selected = 0
-        self.list_dialog_scroll = 0
-        self.list_dialog_search_editor.clear()
-        self.list_dialog_callback = None
+        """Exit list dialog mode - wrapper for list dialog component"""
+        self.list_dialog.exit()
         self.needs_full_redraw = True
     
     def handle_info_dialog_input(self, key):
-        """Handle input while in info dialog mode"""
-        if key == 27 or key == ord('q') or key == ord('Q'):  # ESC or Q - close
-            self.exit_info_dialog_mode()
-            return True
-        elif key == curses.KEY_UP:
-            # Scroll up
-            if self.info_dialog_scroll > 0:
-                self.info_dialog_scroll -= 1
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_DOWN:
-            # Scroll down
-            max_scroll = max(0, len(self.info_dialog_lines) - 10)  # Assuming 10 visible lines
-            if self.info_dialog_scroll < max_scroll:
-                self.info_dialog_scroll += 1
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_PPAGE:  # Page Up
-            self.info_dialog_scroll = max(0, self.info_dialog_scroll - 10)
-            self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_NPAGE:  # Page Down
-            max_scroll = max(0, len(self.info_dialog_lines) - 10)
-            self.info_dialog_scroll = min(max_scroll, self.info_dialog_scroll + 10)
-            self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_HOME:  # Home - go to top
-            self.info_dialog_scroll = 0
-            self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_END:  # End - go to bottom
-            max_scroll = max(0, len(self.info_dialog_lines) - 10)
-            self.info_dialog_scroll = max_scroll
+        """Handle input while in info dialog mode - wrapper for info dialog component"""
+        if self.info_dialog.handle_input(key):
             self.needs_full_redraw = True
             return True
         return False
     
     def handle_list_dialog_input(self, key):
-        """Handle input while in list dialog mode"""
-        if key == 27:  # ESC - cancel
-            if self.list_dialog_callback:
-                self.list_dialog_callback(None)
-            self.exit_list_dialog_mode()
-            return True
-        elif key == curses.KEY_UP:
-            # Move selection up
-            if self.list_dialog_filtered_items and self.list_dialog_selected > 0:
-                self.list_dialog_selected -= 1
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_DOWN:
-            # Move selection down
-            if self.list_dialog_filtered_items and self.list_dialog_selected < len(self.list_dialog_filtered_items) - 1:
-                self.list_dialog_selected += 1
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_PPAGE:  # Page Up
-            if self.list_dialog_filtered_items:
-                self.list_dialog_selected = max(0, self.list_dialog_selected - 10)
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_NPAGE:  # Page Down
-            if self.list_dialog_filtered_items:
-                self.list_dialog_selected = min(len(self.list_dialog_filtered_items) - 1, self.list_dialog_selected + 10)
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_HOME:  # Home - text cursor or list navigation
-            # If there's text in search, let editor handle it for cursor movement
-            if self.list_dialog_search_editor.text:
-                if self.list_dialog_search_editor.handle_key(key):
-                    self.needs_full_redraw = True
-            else:
-                # If no search text, use for list navigation
-                if self.list_dialog_filtered_items:
-                    self.list_dialog_selected = 0
-                    self.list_dialog_scroll = 0
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_END:  # End - text cursor or list navigation
-            # If there's text in search, let editor handle it for cursor movement
-            if self.list_dialog_search_editor.text:
-                if self.list_dialog_search_editor.handle_key(key):
-                    self.needs_full_redraw = True
-            else:
-                # If no search text, use for list navigation
-                if self.list_dialog_filtered_items:
-                    self.list_dialog_selected = len(self.list_dialog_filtered_items) - 1
-                    self._adjust_list_dialog_scroll()
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Select current item
-            if self.list_dialog_filtered_items and 0 <= self.list_dialog_selected < len(self.list_dialog_filtered_items):
-                selected_item = self.list_dialog_filtered_items[self.list_dialog_selected]
-                if self.list_dialog_callback:
-                    self.list_dialog_callback(selected_item)
-            else:
-                if self.list_dialog_callback:
-                    self.list_dialog_callback(None)
-            self.exit_list_dialog_mode()
-            return True
-        elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
-            # Let the editor handle cursor movement keys
-            if self.list_dialog_search_editor.handle_key(key):
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
-            # Let the editor handle backspace
-            if self.list_dialog_search_editor.handle_key(key):
-                self._filter_list_dialog_items()
-                self.needs_full_redraw = True
-            return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Let the editor handle printable characters
-            if self.list_dialog_search_editor.handle_key(key):
-                self._filter_list_dialog_items()
-                self.needs_full_redraw = True
+        """Handle input while in list dialog mode - wrapper for list dialog component"""
+        if self.list_dialog.handle_input(key):
+            self.needs_full_redraw = True
             return True
         return False
     
-    def _filter_list_dialog_items(self):
-        """Filter list dialog items based on current search pattern"""
-        search_text = self.list_dialog_search_editor.text
-        if not search_text:
-            self.list_dialog_filtered_items = self.list_dialog_items.copy()
-        else:
-            search_lower = search_text.lower()
-            self.list_dialog_filtered_items = [
-                item for item in self.list_dialog_items 
-                if search_lower in str(item).lower()
-            ]
-        
-        # Reset selection to top of filtered list
-        self.list_dialog_selected = 0
-        self.list_dialog_scroll = 0
-    
-    def _adjust_list_dialog_scroll(self):
-        """Adjust scroll offset to keep selected item visible"""
-        height, width = self.stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions
-        width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
-        height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
-        min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
-        
-        dialog_height = max(min_height, int(height * height_ratio))
-        content_height = dialog_height - 6  # Account for title, search, borders, help
-        
-        if self.list_dialog_selected < self.list_dialog_scroll:
-            self.list_dialog_scroll = self.list_dialog_selected
-        elif self.list_dialog_selected >= self.list_dialog_scroll + content_height:
-            self.list_dialog_scroll = self.list_dialog_selected - content_height + 1
-    
-    def draw_info_dialog(self):
-        """Draw the info dialog overlay"""
-        height, width = self.stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions using configuration
-        width_ratio = getattr(self.config, 'INFO_DIALOG_WIDTH_RATIO', 0.8)
-        height_ratio = getattr(self.config, 'INFO_DIALOG_HEIGHT_RATIO', 0.8)
-        min_width = getattr(self.config, 'INFO_DIALOG_MIN_WIDTH', 20)
-        min_height = getattr(self.config, 'INFO_DIALOG_MIN_HEIGHT', 10)
-        
-        dialog_width = max(min_width, int(width * width_ratio))
-        dialog_height = max(min_height, int(height * height_ratio))
-        
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
-        
-        # Draw dialog background
-        for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                self.safe_addstr(y, start_x, bg_line, get_status_color())
-        
-        # Draw border
-        border_color = get_status_color() | curses.A_BOLD
-        
-        # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
-        
-        # Side borders
-        for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                self.safe_addstr(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
-        
-        # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
-        
-        # Draw title
-        if self.info_dialog_title and start_y >= 0:
-            title_text = f" {self.info_dialog_title} "
-            title_x = start_x + (dialog_width - len(title_text)) // 2
-            if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
-                self.safe_addstr(start_y, title_x, title_text, border_color)
-        
-        # Calculate content area
-        content_start_y = start_y + 2
-        content_end_y = start_y + dialog_height - 3
-        content_start_x = start_x + 2
-        content_width = dialog_width - 4
-        content_height = content_end_y - content_start_y + 1
-        
-        # Draw content lines
-        visible_lines = self.info_dialog_lines[self.info_dialog_scroll:self.info_dialog_scroll + content_height]
-        
-        for i, line in enumerate(visible_lines):
-            y = content_start_y + i
-            if y <= content_end_y and y < height:
-                # Truncate line if too long
-                display_line = line[:content_width] if len(line) > content_width else line
-                self.safe_addstr(y, content_start_x, display_line, get_status_color())
-        
-        # Draw scroll indicators
-        if len(self.info_dialog_lines) > content_height:
-            # Show scroll position
-            total_lines = len(self.info_dialog_lines)
-            scroll_pos = self.info_dialog_scroll
-            
-            # Scroll bar on the right side
-            scrollbar_x = start_x + dialog_width - 2
-            scrollbar_start_y = content_start_y
-            scrollbar_height = content_height
-            
-            # Calculate scroll thumb position
-            if total_lines > 0:
-                thumb_pos = int((scroll_pos / max(1, total_lines - content_height)) * (scrollbar_height - 1))
-                thumb_pos = max(0, min(scrollbar_height - 1, thumb_pos))
-                
-                for i in range(scrollbar_height):
-                    y = scrollbar_start_y + i
-                    if y < height:
-                        if i == thumb_pos:
-                            self.safe_addstr(y, scrollbar_x, "█", border_color)
-                        else:
-                            self.safe_addstr(y, scrollbar_x, "░", get_status_color() | curses.A_DIM)
-        
-        # Draw help text at bottom
-        help_text = "↑↓:scroll  PgUp/PgDn:page  Home/End:top/bottom  Q/ESC:close"
-        help_y = start_y + dialog_height - 2
-        if help_y < height and len(help_text) <= content_width:
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
-    
-    def draw_list_dialog(self):
-        """Draw the searchable list dialog overlay"""
-        height, width = self.stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions using configuration
-        width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
-        height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
-        min_width = getattr(self.config, 'LIST_DIALOG_MIN_WIDTH', 40)
-        min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
-        
-        dialog_width = max(min_width, int(width * width_ratio))
-        dialog_height = max(min_height, int(height * height_ratio))
-        
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
-        
-        # Draw dialog background
-        for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                self.safe_addstr(y, start_x, bg_line, get_status_color())
-        
-        # Draw border
-        border_color = get_status_color() | curses.A_BOLD
-        
-        # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
-        
-        # Side borders
-        for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                self.safe_addstr(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
-        
-        # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
-        
-        # Draw title
-        if self.list_dialog_title and start_y >= 0:
-            title_text = f" {self.list_dialog_title} "
-            title_x = start_x + (dialog_width - len(title_text)) // 2
-            if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
-                self.safe_addstr(start_y, title_x, title_text, border_color)
-        
-        # Draw search box
-        search_y = start_y + 2
-        # Draw search input using SingleLineTextEdit
-        if search_y < height:
-            max_search_width = dialog_width - 4  # Leave some margin
-            self.list_dialog_search_editor.draw(
-                self.stdscr, search_y, start_x + 2, max_search_width,
-                "Search: ",
-                is_active=True
-            )
-        
-        # Draw separator line
-        sep_y = start_y + 3
-        if sep_y < height:
-            sep_line = "├" + "─" * (dialog_width - 2) + "┤"
-            self.safe_addstr(sep_y, start_x, sep_line[:dialog_width], border_color)
-        
-        # Calculate list area
-        list_start_y = start_y + 4
-        list_end_y = start_y + dialog_height - 3
-        content_start_x = start_x + 2
-        content_width = dialog_width - 4
-        content_height = list_end_y - list_start_y + 1
-        
-        # Draw list items
-        visible_items = self.list_dialog_filtered_items[self.list_dialog_scroll:self.list_dialog_scroll + content_height]
-        
-        for i, item in enumerate(visible_items):
-            y = list_start_y + i
-            if y <= list_end_y and y < height:
-                item_index = self.list_dialog_scroll + i
-                is_selected = item_index == self.list_dialog_selected
-                
-                # Format item text
-                item_text = str(item)
-                if len(item_text) > content_width - 2:
-                    item_text = item_text[:content_width - 5] + "..."
-                
-                # Add selection indicator
-                if is_selected:
-                    display_text = f"► {item_text}"
-                    item_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
-                else:
-                    display_text = f"  {item_text}"
-                    item_color = get_status_color()
-                
-                # Ensure text fits
-                display_text = display_text[:content_width]
-                self.safe_addstr(y, content_start_x, display_text, item_color)
-        
-        # Draw scroll indicators if needed
-        if len(self.list_dialog_filtered_items) > content_height:
-            scrollbar_x = start_x + dialog_width - 2
-            scrollbar_start_y = list_start_y
-            scrollbar_height = content_height
-            
-            # Calculate scroll thumb position
-            total_items = len(self.list_dialog_filtered_items)
-            if total_items > 0:
-                thumb_pos = int((self.list_dialog_scroll / max(1, total_items - content_height)) * (scrollbar_height - 1))
-                thumb_pos = max(0, min(scrollbar_height - 1, thumb_pos))
-                
-                for i in range(scrollbar_height):
-                    y = scrollbar_start_y + i
-                    if y < height:
-                        if i == thumb_pos:
-                            self.safe_addstr(y, scrollbar_x, "█", border_color)
-                        else:
-                            self.safe_addstr(y, scrollbar_x, "░", get_status_color() | curses.A_DIM)
-        
-        # Draw status info
-        status_y = start_y + dialog_height - 2
-        if status_y < height:
-            if self.list_dialog_filtered_items:
-                status_text = f"{self.list_dialog_selected + 1}/{len(self.list_dialog_filtered_items)} items"
-                if len(self.list_dialog_filtered_items) != len(self.list_dialog_items):
-                    status_text += f" (filtered from {len(self.list_dialog_items)})"
-            else:
-                status_text = "No items found"
-            
-            if self.list_dialog_search_editor.text:
-                status_text += f" | Filter: '{self.list_dialog_search_editor.text}'"
-            
-            # Center the status text
-            if len(status_text) <= content_width:
-                status_x = start_x + (dialog_width - len(status_text)) // 2
-                self.safe_addstr(status_y, status_x, status_text, get_status_color() | curses.A_DIM)
-        
-        # Draw help text at bottom
-        help_text = "↑↓:select  Enter:choose  Type:search  Backspace:clear  ESC:cancel"
-        help_y = start_y + dialog_height - 1
-        if help_y < height and len(help_text) <= content_width:
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
-    
     def show_list_dialog_demo(self):
         """Demo function to show the searchable list dialog"""
-        # Create a sample list of items
-        sample_items = [
-            "Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape",
-            "Honeydew", "Ice cream bean", "Jackfruit", "Kiwi", "Lemon", "Mango",
-            "Nectarine", "Orange", "Papaya", "Quince", "Raspberry", "Strawberry",
-            "Tangerine", "Ugli fruit", "Vanilla bean", "Watermelon", "Xigua",
-            "Yellow passion fruit", "Zucchini"
-        ]
-        
-        def callback(selected_item):
-            if selected_item:
-                print(f"You selected: {selected_item}")
-            else:
-                print("Selection cancelled")
-        
-        self.show_list_dialog("Choose a Fruit", sample_items, callback)
+        ListDialogHelpers.show_demo(self.list_dialog)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def show_file_type_filter(self):
         """Show file type filter using the searchable list dialog"""
         current_pane = self.get_current_pane()
-        
-        # Get all unique file extensions in current directory
-        extensions = set()
-        for file_path in current_pane['files']:
-            if file_path.is_file():
-                ext = file_path.suffix.lower()
-                if ext:
-                    extensions.add(ext)
-                else:
-                    extensions.add("(no extension)")
-        
-        if not extensions:
-            print("No files with extensions found in current directory")
-            return
-        
-        # Convert to sorted list
-        extension_list = sorted(list(extensions))
-        extension_list.insert(0, "(show all files)")  # Add option to show all
-        
-        def filter_callback(selected_ext):
-            if selected_ext:
-                if selected_ext == "(show all files)":
-                    print("Showing all files")
-                    # Reset any filtering (this would need additional implementation)
-                else:
-                    print(f"Filtering by extension: {selected_ext}")
-                    # Filter files by extension (this would need additional implementation)
-            else:
-                print("File type filter cancelled")
-        
-        self.show_list_dialog("Filter by File Type", extension_list, filter_callback)
+        ListDialogHelpers.show_file_type_filter(self.list_dialog, current_pane)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def show_favorite_directories(self):
         """Show favorite directories using the searchable list dialog"""
-        favorites = get_favorite_directories()
-        
-        if not favorites:
-            print("No favorite directories configured")
-            return
-        
-        # Create display items with name and path
-        display_items = []
-        for fav in favorites:
-            display_items.append(f"{fav['name']} ({fav['path']})")
-        
-        def favorite_callback(selected_item):
-            if selected_item:
-                # Extract the path from the selected item
-                # Format is "Name (path)"
-                try:
-                    # Find the path in parentheses
-                    start_paren = selected_item.rfind('(')
-                    end_paren = selected_item.rfind(')')
-                    if start_paren != -1 and end_paren != -1 and end_paren > start_paren:
-                        selected_path = selected_item[start_paren + 1:end_paren]
-                        
-                        # Change current pane to selected directory
-                        current_pane = self.get_current_pane()
-                        target_path = Path(selected_path)
-                        
-                        if target_path.exists() and target_path.is_dir():
-                            old_path = current_pane['path']
-                            current_pane['path'] = target_path
-                            current_pane['selected_index'] = 0
-                            current_pane['scroll_offset'] = 0
-                            current_pane['selected_files'].clear()  # Clear selections
-                            
-                            pane_name = "left" if self.active_pane == 'left' else "right"
-                            print(f"Changed {pane_name} pane to favorite: {old_path} → {target_path}")
-                            self.needs_full_redraw = True
-                        else:
-                            print(f"Error: Directory no longer exists: {selected_path}")
-                    else:
-                        print("Error: Could not parse selected favorite directory")
-                except Exception as e:
-                    print(f"Error changing to favorite directory: {e}")
-            else:
-                print("Favorite directory selection cancelled")
-        
-        self.show_list_dialog("Go to Favorite Directory", display_items, favorite_callback)
+        # Create a wrapper print function that also triggers redraw
+        def print_with_redraw(message):
+            print(message)
+            self.needs_full_redraw = True
+            
+        ListDialogHelpers.show_favorite_directories(
+            self.list_dialog, self.pane_manager, print_with_redraw
+        )
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def show_programs_dialog(self):
         """Show external programs using the searchable list dialog"""
-        programs = get_programs()
-        
-        if not programs:
-            print("No external programs configured")
-            return
-        
-        # Create display items with program names
-        display_items = []
-        for prog in programs:
-            display_items.append(prog['name'])
-        
-        def program_callback(selected_item):
-            if selected_item:
-                # Find the selected program
-                selected_program = None
-                for prog in programs:
-                    if prog['name'] == selected_item:
-                        selected_program = prog
-                        break
-                
-                if selected_program:
-                    self.execute_external_program(selected_program)
-                else:
-                    print(f"Error: Program not found: {selected_item}")
-            else:
-                print("Program selection cancelled")
-        
-        self.show_list_dialog("Execute External Program", display_items, program_callback)
-    
-    def execute_external_program(self, program):
-        """Execute an external program with environment variables set"""
-        # Restore stdout/stderr temporarily
-        self.restore_stdio()
-        
-        # Clear the screen and reset cursor
-        self.stdscr.clear()
-        self.stdscr.refresh()
-        
-        # Reset terminal to normal mode
-        curses.endwin()
-        
-        try:
-            # Get current pane information
-            left_pane = self.left_pane
-            right_pane = self.right_pane
-            current_pane = self.get_current_pane()
-            other_pane = self.get_inactive_pane()
-            
-            # Set environment variables with TFM_ prefix
-            env = os.environ.copy()
-            env['TFM_LEFT_DIR'] = str(left_pane['path'])
-            env['TFM_RIGHT_DIR'] = str(right_pane['path'])
-            env['TFM_THIS_DIR'] = str(current_pane['path'])
-            env['TFM_OTHER_DIR'] = str(other_pane['path'])
-            
-            # Get selected files for each pane, or cursor position if no selection
-            def get_selected_or_cursor(pane_data):
-                """Get selected files, or current cursor position if no files selected"""
-                selected = [Path(f).name for f in pane_data['selected_files']]
-                if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
-                    # No files selected, use cursor position
-                    cursor_file = pane_data['files'][pane_data['selected_index']]
-                    selected = [cursor_file.name]
-                return selected
-            
-            def quote_filenames(filenames):
-                """Quote filenames for safe shell usage"""
-                return [shlex.quote(filename) for filename in filenames]
-            
-            left_selected = quote_filenames(get_selected_or_cursor(left_pane))
-            right_selected = quote_filenames(get_selected_or_cursor(right_pane))
-            current_selected = quote_filenames(get_selected_or_cursor(current_pane))
-            other_selected = quote_filenames(get_selected_or_cursor(other_pane))
-            
-            # Set selected files environment variables (space-separated) with TFM_ prefix
-            env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
-            env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
-            env['TFM_THIS_SELECTED'] = ' '.join(current_selected)
-            env['TFM_OTHER_SELECTED'] = ' '.join(other_selected)
-            
-            # Set TFM indicator environment variable
-            env['TFM_ACTIVE'] = '1'
-            
-            # Print information about the program execution
-            print(f"TFM External Program: {program['name']}")
-            print("=" * 50)
-            print(f"Command: {' '.join(program['command'])}")
-            print(f"Working Directory: {current_pane['path']}")
-            print(f"TFM_THIS_DIR: {env['TFM_THIS_DIR']}")
-            print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
-            print("=" * 50)
-            print()
-            
-            # Change to the current directory
-            os.chdir(current_pane['path'])
-            
-            # Execute the program with the modified environment
-            result = subprocess.run(program['command'], env=env)
-            
-            # Check if auto_return option is enabled
-            auto_return = program.get('options', {}).get('auto_return', False)
-            
-            # Show exit status
-            print()
-            print("=" * 50)
-            if result.returncode == 0:
-                print(f"Program '{program['name']}' completed successfully")
-            else:
-                print(f"Program '{program['name']}' exited with code {result.returncode}")
-            
-            if auto_return:
-                print("Auto-returning to TFM...")
-                import time
-                time.sleep(1)  # Brief pause to show the message
-            else:
-                print("Press Enter to return to TFM...")
-                input()
-            
-        except FileNotFoundError:
-            print(f"Error: Command not found: {program['command'][0]}")
-            print("Press Enter to continue...")
-            input()
-        except Exception as e:
-            print(f"Error executing program '{program['name']}': {e}")
-            print("Press Enter to continue...")
-            input()
-        
-        finally:
-            # Reinitialize curses
-            self.stdscr = curses.initscr()
-            curses.curs_set(0)  # Hide cursor
-            self.stdscr.keypad(True)
-            
-            # Reinitialize colors with configured scheme
-            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-            init_colors(color_scheme)
-            
-            # Restore stdout/stderr capture
-            sys.stdout = LogCapture(self.log_messages, "STDOUT")
-            sys.stderr = LogCapture(self.log_messages, "STDERR")
-            
-            # Log return from program execution
-            print(f"Returned from external program: {program['name']}")
-            
-            # Force full redraw
+        def execute_program_wrapper(program):
+            self.stdscr = self.external_program_manager.execute_external_program(
+                self.stdscr, self.pane_manager, program
+            )
             self.needs_full_redraw = True
-    
+        
+        ListDialogHelpers.show_programs_dialog(
+            self.list_dialog, execute_program_wrapper, print
+        )
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
+
     def show_sort_menu(self):
         """Show sort options menu using the quick choice dialog"""
         current_pane = self.get_current_pane()
@@ -2792,14 +1355,14 @@ class FileManager:
             self.needs_full_redraw = True
         
         # Show the dialog
-        pane_name = "left" if self.active_pane == 'left' else "right"
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         message = f"Sort {pane_name} pane by:"
         self.show_dialog(message, choices, handle_sort_choice)
     
     def quick_sort(self, sort_mode):
         """Quickly change sort mode without showing dialog, or toggle reverse if already sorted by this mode"""
         current_pane = self.get_current_pane()
-        pane_name = "left" if self.active_pane == 'left' else "right"
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         
         # Check if we're already sorting by this mode
         if current_pane['sort_mode'] == sort_mode:
@@ -2815,9 +1378,7 @@ class FileManager:
         # Refresh the file list
         self.refresh_files(current_pane)
         self.needs_full_redraw = True
-    
 
-    
     def show_file_details(self):
         """Show detailed information about selected files or current file"""
         current_pane = self.get_current_pane()
@@ -2847,97 +1408,10 @@ class FileManager:
             print("No valid files to show details for")
             return
         
-        # Generate details for each file
-        details_lines = []
-        
-        for file_path in files_to_show:
-            try:
-                # Get file stats
-                stat_info = file_path.stat()
-                
-                # Basic info
-                details_lines.append(f"File: {file_path.name}")
-                details_lines.append(f"Path: {file_path}")
-                
-                # Type
-                if file_path.is_dir():
-                    details_lines.append("Type: Directory")
-                elif file_path.is_file():
-                    details_lines.append("Type: File")
-                elif file_path.is_symlink():
-                    details_lines.append("Type: Symbolic Link")
-                    try:
-                        target = file_path.readlink()
-                        details_lines.append(f"Target: {target}")
-                    except:
-                        details_lines.append("Target: <unreadable>")
-                else:
-                    details_lines.append("Type: Special")
-                
-                # Size
-                if file_path.is_file():
-                    size = stat_info.st_size
-                    if size < 1024:
-                        size_str = f"{size} bytes"
-                    elif size < 1024 * 1024:
-                        size_str = f"{size / 1024:.1f} KB"
-                    elif size < 1024 * 1024 * 1024:
-                        size_str = f"{size / (1024 * 1024):.1f} MB"
-                    else:
-                        size_str = f"{size / (1024 * 1024 * 1024):.1f} GB"
-                    details_lines.append(f"Size: {size_str}")
-                elif file_path.is_dir():
-                    # Count directory contents
-                    try:
-                        contents = list(file_path.iterdir())
-                        dir_count = sum(1 for item in contents if item.is_dir())
-                        file_count = sum(1 for item in contents if item.is_file())
-                        details_lines.append(f"Contents: {dir_count} directories, {file_count} files")
-                    except PermissionError:
-                        details_lines.append("Contents: <permission denied>")
-                    except:
-                        details_lines.append("Contents: <error reading>")
-                
-                # Timestamps
-                import time
-                mod_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat_info.st_mtime))
-                details_lines.append(f"Modified: {mod_time}")
-                
-                access_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat_info.st_atime))
-                details_lines.append(f"Accessed: {access_time}")
-                
-                # Permissions
-                import stat
-                mode = stat_info.st_mode
-                perms = stat.filemode(mode)
-                details_lines.append(f"Permissions: {perms}")
-                
-                # Owner info (Unix-like systems)
-                try:
-                    import pwd
-                    import grp
-                    owner = pwd.getpwuid(stat_info.st_uid).pw_name
-                    group = grp.getgrgid(stat_info.st_gid).gr_name
-                    details_lines.append(f"Owner: {owner}:{group}")
-                except:
-                    details_lines.append(f"Owner: UID {stat_info.st_uid}, GID {stat_info.st_gid}")
-                
-                # Add separator if multiple files
-                if len(files_to_show) > 1:
-                    details_lines.append("-" * 50)
-                
-            except Exception as e:
-                details_lines.append(f"Error reading {file_path.name}: {str(e)}")
-                if len(files_to_show) > 1:
-                    details_lines.append("-" * 50)
-        
-        # Show the details in a dialog
-        if len(files_to_show) == 1:
-            title = f"Details: {files_to_show[0].name}"
-        else:
-            title = f"Details: {len(files_to_show)} items"
-        
-        self.show_info_dialog(title, details_lines)
+        # Use the helper method to show file details
+        InfoDialogHelpers.show_file_details(self.info_dialog, files_to_show, current_pane)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def print_color_scheme_info(self):
         """Print current color scheme information to the log"""
@@ -2958,108 +1432,9 @@ class FileManager:
     
     def show_help_dialog(self):
         """Show help dialog with key bindings and usage information"""
-        help_lines = []
-        
-        # Title and version info
-        help_lines.append(f"TFM {VERSION} - Terminal File Manager")
-        help_lines.append(f"GitHub: {GITHUB_URL}")
-        help_lines.append("")
-        
-        # Navigation section
-        help_lines.append("=== NAVIGATION ===")
-        help_lines.append("↑↓               Navigate files")
-        help_lines.append("←→               Switch panes / Navigate directories")
-        help_lines.append("Tab              Switch between panes")
-        help_lines.append("Enter            Open directory / View file")
-        help_lines.append("Backspace        Go to parent directory")
-        help_lines.append("Home / End       Go to first / last file")
-        help_lines.append("Page Up/Down     Navigate by page")
-        help_lines.append("")
-        
-        # File operations section
-        help_lines.append("=== FILE OPERATIONS ===")
-        help_lines.append("Space            Select/deselect file")
-        help_lines.append("Ctrl+Space       Select file and move up")
-        help_lines.append("a                Select all files")
-        help_lines.append("A                Select all items (files + directories)")
-        help_lines.append("v / V            View text file")
-        help_lines.append("e                Edit existing file with text editor")
-        help_lines.append("E                Create new text file and edit")
-        help_lines.append("i / I            Show file details")
-        help_lines.append("c / C            Copy files to other pane")
-        help_lines.append("m / M            Move files to other pane / Create directory (no selection)")
-        help_lines.append("k / K            Delete files")
-        help_lines.append("r / R            Rename file (single) / Batch rename (multiple selected)")
-        help_lines.append("p / P            Create archive from selected files")
-        help_lines.append("u / U            Extract archive to other pane")
-        help_lines.append("")
-        
-        # Search and sorting section
-        help_lines.append("=== SEARCH & SORTING ===")
-        help_lines.append("f / F            Search files")
-        help_lines.append(";                Filter files by filename pattern")
-        help_lines.append("                 (files only, directories always shown)")
-        help_lines.append("                 (fnmatch: *.py, test_*, *.[ch], etc.)")
-        help_lines.append(": (Shift+;)      Clear filter from current pane")
-        help_lines.append("s / S            Sort menu")
-        help_lines.append("1                Quick sort by name (toggle reverse if already active)")
-        help_lines.append("2                Quick sort by size (toggle reverse if already active)")
-        help_lines.append("3                Quick sort by date (toggle reverse if already active)")
-        help_lines.append("")
-        
-        # View options section
-        help_lines.append("=== VIEW OPTIONS ===")
-        help_lines.append(".                Toggle hidden files")
-        help_lines.append("t                Toggle color scheme (Dark/Light)")
-        help_lines.append("o                Sync current pane to other pane")
-        help_lines.append("O                Sync other pane to current pane")
-        help_lines.append("-                Reset pane split to 50/50")
-        help_lines.append("Opt+← / Opt+→    Adjust pane boundary")
-        help_lines.append("")
-        
-        # Log pane controls section
-        help_lines.append("=== LOG PANE CONTROLS ===")
-        help_lines.append("Ctrl+U           Make log pane smaller")
-        help_lines.append("Ctrl+D           Make log pane larger")
-        help_lines.append("Ctrl+K           Scroll log up")
-        help_lines.append("Ctrl+L           Scroll log down")
-        help_lines.append("l                Scroll log up (alternative)")
-        help_lines.append("L                Scroll log down (alternative)")
-        help_lines.append("")
-        
-        # General controls section
-        help_lines.append("=== GENERAL ===")
-        help_lines.append("? / h            Show this help")
-        help_lines.append("q / Q            Quit TFM")
-        help_lines.append("x / X            Execute external programs")
-        help_lines.append("z / Z            Enter sub-shell mode")
-        help_lines.append("ESC              Cancel current operation")
-        help_lines.append("")
-        
-        # Configuration info
-        help_lines.append("=== CONFIGURATION ===")
-        help_lines.append("Configuration file: _config.py")
-        help_lines.append("Customize key bindings, colors, and behavior")
-        help_lines.append("See CONFIGURATION_SYSTEM.md for details")
-        help_lines.append("")
-        
-        # Tips section
-        help_lines.append("=== TIPS ===")
-        help_lines.append("• Use multi-selection with Space to operate on multiple files")
-        help_lines.append("• Batch rename (R with multiple files) supports regex and macros:")
-        help_lines.append("  \\0=full name, \\1-\\9=regex groups, \\d=index number")
-        help_lines.append("• Search supports multiple patterns separated by spaces")
-        help_lines.append("• Log pane shows operation results and system messages")
-        help_lines.append("• File details (i) shows comprehensive file information")
-        help_lines.append("• Text viewer (v) supports syntax highlighting")
-        help_lines.append("• External programs (x) execute with TFM environment variables")
-        help_lines.append("• Sub-shell mode (z) provides environment variables:")
-        help_lines.append("  TFM_LEFT_DIR, TFM_RIGHT_DIR, TFM_THIS_DIR, TFM_OTHER_DIR")
-        help_lines.append("  TFM_LEFT_SELECTED, TFM_RIGHT_SELECTED, TFM_THIS_SELECTED, TFM_OTHER_SELECTED")
-        help_lines.append("• Archive operations support ZIP, TAR.GZ, and TGZ formats")
-        help_lines.append("• Archive extraction creates directory with archive base name")
-        
-        self.show_info_dialog("TFM Help", help_lines)
+        InfoDialogHelpers.show_help_dialog(self.info_dialog)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def view_selected_text_file(self):
         """View the selected file in text viewer if it's a text file"""
@@ -3097,14 +1472,7 @@ class FileManager:
             print(f"Error viewing file: {str(e)}")
             self.needs_full_redraw = True
     
-    def suspend_curses(self):
-        """Suspend the curses system to allow external programs to run"""
-        curses.endwin()
-        
-    def resume_curses(self):
-        """Resume the curses system after external program execution"""
-        self.stdscr.refresh()
-        curses.curs_set(0)  # Hide cursor
+
         self.needs_full_redraw = True
     
     def edit_selected_file(self):
@@ -3129,7 +1497,7 @@ class FileManager:
         
         try:
             # Suspend curses
-            self.suspend_curses()
+            self.external_program_manager.suspend_curses(self.stdscr)
             
             # Launch the text editor as a subprocess
             import subprocess
@@ -3137,7 +1505,7 @@ class FileManager:
                                   cwd=str(current_pane['path']))
             
             # Resume curses
-            self.resume_curses()
+            self.external_program_manager.resume_curses(self.stdscr)
             
             if result.returncode == 0:
                 print(f"Edited file: {selected_file.name}")
@@ -3146,11 +1514,11 @@ class FileManager:
                 
         except FileNotFoundError:
             # Resume curses even if editor not found
-            self.resume_curses()
+            self.external_program_manager.resume_curses(self.stdscr)
             print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
         except Exception as e:
             # Resume curses even if there's an error
-            self.resume_curses()
+            self.external_program_manager.resume_curses(self.stdscr)
             print(f"Error launching editor: {e}")
     
     def copy_selected_files(self):
@@ -3560,9 +1928,10 @@ class FileManager:
             print("No files to archive")
             return
         
-        # Enter archive creation mode
-        self.create_archive_mode = True
-        self.create_archive_editor.clear()
+        # Enter archive creation mode using general dialog
+        DialogHelpers.create_create_archive_dialog(self.general_dialog)
+        self.general_dialog.callback = self.on_create_archive_confirm
+        self.general_dialog.cancel_callback = self.on_create_archive_cancel
         self.needs_full_redraw = True
         
         # Log what we're about to archive
@@ -3572,29 +1941,86 @@ class FileManager:
             print(f"Creating archive from {len(files_to_archive)} selected items")
         print("Enter archive filename (with .zip, .tar.gz, or .tgz extension):")
     
-    def exit_create_archive_mode(self):
-        """Exit archive creation mode"""
-        self.create_archive_mode = False
-        self.create_archive_editor.clear()
-        self.needs_full_redraw = True
-    
-    def handle_create_archive_input(self, key):
-        """Handle input while in create archive mode"""
-        if key == 27:  # ESC - cancel archive creation
-            print("Archive creation cancelled")
-            self.exit_create_archive_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - create archive
-            self.perform_create_archive()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.create_archive_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
+    def on_create_archive_confirm(self, archive_name):
+        """Handle create archive confirmation"""
+        if not archive_name.strip():
+            print("Invalid archive name")
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
+            return
         
-        return False
+        current_pane = self.get_current_pane()
+        
+        # Get files to archive
+        files_to_archive = []
+        
+        if current_pane['selected_files']:
+            # Archive selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_archive.append(file_path)
+        else:
+            # Archive current file if no files are selected
+            if current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']]
+                files_to_archive.append(selected_file)
+        
+        if not files_to_archive:
+            print("No files to archive")
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
+            return
+        
+        archive_filename = archive_name.strip()
+        archive_path = current_pane['path'] / archive_filename
+        
+        # Check if archive already exists
+        if archive_path.exists():
+            print(f"Archive '{archive_filename}' already exists")
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
+            return
+        
+        try:
+            # Detect archive format and create archive
+            archive_format = self.detect_archive_format(archive_filename)
+            
+            if archive_format == 'zip':
+                self.create_zip_archive(archive_path, files_to_archive)
+            elif archive_format in ['tar.gz', 'tgz']:
+                self.create_tar_archive(archive_path, files_to_archive)
+            else:
+                print(f"Unsupported archive format. Use .zip, .tar.gz, or .tgz")
+                self.general_dialog.hide()
+                self.needs_full_redraw = True
+                return
+            
+            print(f"Created archive: {archive_filename}")
+            
+            # Refresh the current pane
+            self.refresh_files(current_pane)
+            
+            # Try to select the new archive
+            for i, file_path in enumerate(current_pane['files']):
+                if file_path.name == archive_filename:
+                    current_pane['selected_index'] = i
+                    self.adjust_scroll_for_selection(current_pane)
+                    break
+            
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
+            
+        except Exception as e:
+            print(f"Error creating archive: {e}")
+            self.general_dialog.hide()
+            self.needs_full_redraw = True
+    
+    def on_create_archive_cancel(self):
+        """Handle create archive cancellation"""
+        print("Archive creation cancelled")
+        self.general_dialog.hide()
+        self.needs_full_redraw = True
     
     def perform_create_archive(self):
         """Create the archive file"""
@@ -3835,171 +2261,53 @@ class FileManager:
         # In isearch mode, capture most other keys to prevent unintended actions
         # Only allow specific keys that make sense during isearch
         return True
-    
-    def handle_filter_input(self, key):
-        """Handle input while in filter mode"""
-        if key == 27:  # ESC - exit filter mode without applying
-            self.exit_filter_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - apply filter and exit filter mode
-            self.apply_filter()
-            self.exit_filter_mode()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.filter_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        # In filter mode, capture most other keys to prevent unintended actions
-        return True
-    
-    def handle_rename_input(self, key):
-        """Handle input while in rename mode"""
-        if key == 27:  # ESC - cancel rename
-            print("Rename cancelled")
-            self.exit_rename_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - perform rename
-            self.perform_rename()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.rename_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        # In rename mode, capture most other keys to prevent unintended actions
-        return True
-    
-    def get_batch_rename_active_editor(self):
-        """Get the currently active batch rename text editor"""
-        return (self.batch_rename_regex_editor if self.batch_rename_active_field == 'regex' 
-                else self.batch_rename_destination_editor)
-    
-    def switch_batch_rename_field(self, field):
-        """Switch to the specified batch rename field"""
-        if field in ['regex', 'destination'] and field != self.batch_rename_active_field:
-            self.batch_rename_active_field = field
-            return True
-        return False
-    
+
     def handle_batch_rename_input(self, key):
-        """Handle input while in batch rename mode with Up/Down field navigation"""
-        if key == 27:  # ESC - cancel batch rename
-            print("Batch rename cancelled")
-            self.exit_batch_rename_mode()
-            return True
-            
-        elif key == KEY_TAB:  # Tab - switch between regex and destination input
-            if self.batch_rename_active_field == 'regex':
-                self.switch_batch_rename_field('destination')
-            else:
-                self.switch_batch_rename_field('regex')
+        """Handle input while in batch rename mode - wrapper for batch rename dialog component"""
+        result = self.batch_rename_dialog.handle_input(key)
+        
+        if result == True:
             self.needs_full_redraw = True
             return True
-            
-        elif key == curses.KEY_UP:
-            # Up arrow - move to regex field (previous field)
-            if self.switch_batch_rename_field('regex'):
+        elif isinstance(result, tuple):
+            action, data = result
+            if action == 'cancel':
+                print("Batch rename cancelled")
+                self.exit_batch_rename_mode()
+                return True
+            elif action == 'field_switch':
                 self.needs_full_redraw = True
-            return True
-            
-        elif key == curses.KEY_DOWN:
-            # Down arrow - move to destination field (next field)
-            if self.switch_batch_rename_field('destination'):
+                return True
+            elif action == 'scroll':
                 self.needs_full_redraw = True
-            return True
-            
-        elif key == curses.KEY_PPAGE:  # Page Up - scroll preview up
-            if self.batch_rename_scroll > 0:
-                self.batch_rename_scroll = max(0, self.batch_rename_scroll - 10)
-                self.needs_full_redraw = True
-            return True
-            
-        elif key == curses.KEY_NPAGE:  # Page Down - scroll preview down
-            if self.batch_rename_preview:
-                max_scroll = max(0, len(self.batch_rename_preview) - 10)
-                self.batch_rename_scroll = min(max_scroll, self.batch_rename_scroll + 10)
-                self.needs_full_redraw = True
-            return True
-            
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - perform batch rename
-            regex_text = self.batch_rename_regex_editor.get_text()
-            dest_text = self.batch_rename_destination_editor.get_text()
-            if regex_text and dest_text:
+                return True
+            elif action == 'execute':
                 self.perform_batch_rename()
-            else:
-                print("Please enter both regex pattern and destination pattern")
-            return True
-            
-        else:
-            # Let the active editor handle other keys
-            active_editor = self.get_batch_rename_active_editor()
-            if active_editor.handle_key(key):
-                # Text changed, update preview
+                return True
+            elif action == 'error':
+                print(data)
+                return True
+            elif action == 'text_changed':
                 self.update_batch_rename_preview()
                 self.needs_full_redraw = True
                 return True
         
-        # In batch rename mode, capture most other keys to prevent unintended actions
-        return True
-    
-    def handle_create_directory_input(self, key):
-        """Handle input while in create directory mode"""
-        if key == 27:  # ESC - cancel directory creation
-            print("Directory creation cancelled")
-            self.exit_create_directory_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - create directory
-            self.perform_create_directory()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.create_dir_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        # In create directory mode, capture most other keys to prevent unintended actions
-        return True
-    
-    def handle_create_file_input(self, key):
-        """Handle input while in create file mode"""
-        if key == 27:  # ESC - cancel file creation
-            print("File creation cancelled")
-            self.exit_create_file_mode()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - create file
-            self.perform_create_file()
-            return True
-        else:
-            # Let the editor handle other keys
-            if self.create_file_editor.handle_key(key):
-                self.needs_full_redraw = True
-                return True
-        
-        # In create file mode, capture most other keys to prevent unintended actions
-        return True
-        
+        return True  # Capture most keys in batch rename mode
+
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
         if direction == 'left':
             # Make left pane smaller, right pane larger
-            self.left_pane_ratio = max(MIN_PANE_RATIO, self.left_pane_ratio - PANE_ADJUST_STEP)
+            self.pane_manager.left_pane_ratio = max(MIN_PANE_RATIO, self.pane_manager.left_pane_ratio - PANE_ADJUST_STEP)
         elif direction == 'right':
             # Make left pane larger, right pane smaller  
-            self.left_pane_ratio = min(MAX_PANE_RATIO, self.left_pane_ratio + PANE_ADJUST_STEP)
+            self.pane_manager.left_pane_ratio = min(MAX_PANE_RATIO, self.pane_manager.left_pane_ratio + PANE_ADJUST_STEP)
             
         # Trigger a full redraw for the new pane layout
         self.needs_full_redraw = True
         
         # Show immediate feedback in log pane
-        left_percent = int(self.left_pane_ratio * 100)
+        left_percent = int(self.pane_manager.left_pane_ratio * 100)
         right_percent = 100 - left_percent
         print(f"Pane split: {left_percent}% | {right_percent}%")
         
@@ -4021,643 +2329,58 @@ class FileManager:
         print(f"Layout: {file_percent}% files | {log_percent}% log")
     
     def show_search_dialog(self, search_type='filename'):
-        """Show the search dialog for filename or content search"""
-        self.search_dialog_mode = True
-        self.search_dialog_type = search_type
-        self.search_dialog_pattern_editor.clear()
-        self.search_dialog_results = []
-        self.search_dialog_selected = 0
-        self.search_dialog_scroll = 0
-        self.search_dialog_searching = False
+        """Show the search dialog for filename or content search - wrapper for search dialog component"""
+        self.search_dialog.show(search_type)
         self.needs_full_redraw = True
+        
+        # Force immediate display of the dialog
+        self._force_immediate_redraw()
     
     def exit_search_dialog_mode(self):
-        """Exit search dialog mode"""
-        self.search_dialog_mode = False
-        self.search_dialog_type = 'filename'
-        self.search_dialog_pattern_editor.clear()
-        self.search_dialog_results = []
-        self.search_dialog_selected = 0
-        self.search_dialog_scroll = 0
-        self.search_dialog_searching = False
+        """Exit search dialog mode - wrapper for search dialog component"""
+        self.search_dialog.exit()
         self.needs_full_redraw = True
     
     def perform_search(self):
-        """Perform the actual search based on current pattern and type"""
-        pattern_text = self.search_dialog_pattern_editor.text.strip()
-        if not pattern_text:
-            self.search_dialog_results = []
-            return
-        
-        self.search_dialog_searching = True
-        self.search_dialog_results = []
-        
+        """Perform the actual search based on current pattern and type - wrapper for search dialog component"""
         current_pane = self.get_current_pane()
         search_root = current_pane['path']
-        
-        try:
-            if self.search_dialog_type == 'filename':
-                # Recursive filename search using fnmatch
-                for file_path in search_root.rglob('*'):
-                    if fnmatch.fnmatch(file_path.name.lower(), pattern_text.lower()):
-                        relative_path = file_path.relative_to(search_root)
-                        self.search_dialog_results.append({
-                            'path': file_path,
-                            'relative_path': str(relative_path),
-                            'type': 'file' if file_path.is_file() else 'dir',
-                            'match_info': file_path.name
-                        })
-            
-            elif self.search_dialog_type == 'content':
-                # Recursive grep-based content search
-                import re
-                pattern = re.compile(pattern_text, re.IGNORECASE)
-                
-                for file_path in search_root.rglob('*'):
-                    if file_path.is_file():
-                        try:
-                            # Only search text files
-                            if self._is_text_file(file_path):
-                                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                    for line_num, line in enumerate(f, 1):
-                                        if pattern.search(line):
-                                            relative_path = file_path.relative_to(search_root)
-                                            self.search_dialog_results.append({
-                                                'path': file_path,
-                                                'relative_path': str(relative_path),
-                                                'type': 'content',
-                                                'line_num': line_num,
-                                                'match_info': f"Line {line_num}: {line.strip()[:60]}..."
-                                            })
-                                            break  # Only show first match per file
-                        except (PermissionError, UnicodeDecodeError, OSError):
-                            continue
-        
-        except Exception as e:
-            print(f"Search error: {e}")
-        
-        self.search_dialog_searching = False
-        self.search_dialog_selected = 0
-        self.search_dialog_scroll = 0
-    
-    def _is_text_file(self, file_path):
-        """Check if a file is likely a text file"""
-        try:
-            # Check file extension
-            text_extensions = {'.txt', '.py', '.js', '.html', '.css', '.md', '.json', '.xml', '.yml', '.yaml', '.cfg', '.conf', '.ini', '.log'}
-            if file_path.suffix.lower() in text_extensions:
-                return True
-            
-            # Check if file has no extension (might be text)
-            if not file_path.suffix:
-                # Read first few bytes to check for binary content
-                with open(file_path, 'rb') as f:
-                    chunk = f.read(1024)
-                    # If it contains null bytes, it's likely binary
-                    return b'\x00' not in chunk
-            
-            return False
-        except:
-            return False
+        self.search_dialog.perform_search(search_root)
     
     def handle_search_dialog_input(self, key):
-        """Handle input while in search dialog mode"""
-        if key == 27:  # ESC - cancel
-            self.exit_search_dialog_mode()
-            return True
-        elif key == curses.KEY_UP:
-            # Move selection up
-            if self.search_dialog_results and self.search_dialog_selected > 0:
-                self.search_dialog_selected -= 1
-                self._adjust_search_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_DOWN:
-            # Move selection down
-            if self.search_dialog_results and self.search_dialog_selected < len(self.search_dialog_results) - 1:
-                self.search_dialog_selected += 1
-                self._adjust_search_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_PPAGE:  # Page Up
-            if self.search_dialog_results:
-                self.search_dialog_selected = max(0, self.search_dialog_selected - 10)
-                self._adjust_search_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_NPAGE:  # Page Down
-            if self.search_dialog_results:
-                self.search_dialog_selected = min(len(self.search_dialog_results) - 1, self.search_dialog_selected + 10)
-                self._adjust_search_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_HOME:  # Home - text cursor or list navigation
-            # If there's text in pattern, let editor handle it for cursor movement
-            if self.search_dialog_pattern_editor.text:
-                if self.search_dialog_pattern_editor.handle_key(key):
-                    self.needs_full_redraw = True
-            else:
-                # If no pattern text, use for list navigation
-                if self.search_dialog_results:
-                    self.search_dialog_selected = 0
-                    self.search_dialog_scroll = 0
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_END:  # End - text cursor or list navigation
-            # If there's text in pattern, let editor handle it for cursor movement
-            if self.search_dialog_pattern_editor.text:
-                if self.search_dialog_pattern_editor.handle_key(key):
-                    self.needs_full_redraw = True
-            else:
-                # If no pattern text, use for list navigation
-                if self.search_dialog_results:
-                    self.search_dialog_selected = len(self.search_dialog_results) - 1
-                    self._adjust_search_dialog_scroll()
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Select current result
-            if self.search_dialog_results and 0 <= self.search_dialog_selected < len(self.search_dialog_results):
-                selected_result = self.search_dialog_results[self.search_dialog_selected]
-                self._navigate_to_search_result(selected_result)
-            self.exit_search_dialog_mode()
-            return True
-        elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
-            # Let the editor handle cursor movement keys
-            if self.search_dialog_pattern_editor.handle_key(key):
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
-            # Let the editor handle backspace
-            if self.search_dialog_pattern_editor.handle_key(key):
-                self.perform_search()
-                self.needs_full_redraw = True
-            return True
-        elif key == ord('\t'):  # Tab - switch between filename and content search
-            self.search_dialog_type = 'content' if self.search_dialog_type == 'filename' else 'filename'
-            self.perform_search()
+        """Handle input while in search dialog mode - wrapper for search dialog component"""
+        result = self.search_dialog.handle_input(key)
+        
+        if result == True:
             self.needs_full_redraw = True
             return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Let the editor handle printable characters
-            if self.search_dialog_pattern_editor.handle_key(key):
+        elif isinstance(result, tuple):
+            action, data = result
+            if action == 'search':
                 self.perform_search()
                 self.needs_full_redraw = True
-            return True
+                return True
+            elif action == 'navigate':
+                if data:
+                    self._navigate_to_search_result(data)
+                self.exit_search_dialog_mode()
+                return True
+        
         return False
-    
-    def _adjust_search_dialog_scroll(self):
-        """Adjust scroll offset to keep selected item visible"""
-        height, width = self.stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions
-        dialog_height = max(20, int(height * 0.8))
-        content_height = dialog_height - 8  # Account for title, search box, borders, help
-        
-        if self.search_dialog_selected < self.search_dialog_scroll:
-            self.search_dialog_scroll = self.search_dialog_selected
-        elif self.search_dialog_selected >= self.search_dialog_scroll + content_height:
-            self.search_dialog_scroll = self.search_dialog_selected - content_height + 1
-    
-    def _navigate_to_search_result(self, result):
-        """Navigate to the selected search result"""
-        current_pane = self.get_current_pane()
-        target_path = result['path']
-        
-        if result['type'] == 'dir':
-            # Navigate to directory
-            current_pane['path'] = target_path
-            current_pane['selected_index'] = 0
-            current_pane['scroll_offset'] = 0
-            current_pane['selected_files'].clear()
-            print(f"Navigated to directory: {result['relative_path']}")
-        else:
-            # Navigate to file's directory and select the file
-            parent_dir = target_path.parent
-            current_pane['path'] = parent_dir
-            current_pane['selected_files'].clear()
-            
-            # Refresh files and find the target file
-            self.refresh_files(current_pane)
-            
-            # Find and select the target file
-            for i, file_path in enumerate(current_pane['files']):
-                if file_path == target_path:
-                    current_pane['selected_index'] = i
-                    # Adjust scroll to make selection visible
-                    height, width = self.stdscr.getmaxyx()
-                    calculated_height = int(height * self.log_height_ratio)
-                    log_height = calculated_height if self.log_height_ratio > 0 else 0
-                    display_height = height - log_height - 4
-                    
-                    if current_pane['selected_index'] < current_pane['scroll_offset']:
-                        current_pane['scroll_offset'] = current_pane['selected_index']
-                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
-                        current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
-                    break
-            
-            if result['type'] == 'content':
-                print(f"Found content match in: {result['relative_path']} at line {result['line_num']}")
-            else:
-                print(f"Navigated to file: {result['relative_path']}")
-        
-        self.needs_full_redraw = True
-    
-    def draw_search_dialog(self):
-        """Draw the search dialog overlay"""
-        height, width = self.stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions
-        dialog_width = max(60, int(width * 0.8))
-        dialog_height = max(20, int(height * 0.8))
-        
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
-        
-        # Draw dialog background
-        for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                self.safe_addstr(y, start_x, bg_line, get_status_color())
-        
-        # Draw border
-        border_color = get_status_color() | curses.A_BOLD
-        
-        # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
-        
-        # Side borders
-        for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                self.safe_addstr(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
-        
-        # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
-        
-        # Draw title
-        title_text = f" Search ({self.search_dialog_type.title()}) "
-        title_x = start_x + (dialog_width - len(title_text)) // 2
-        if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
-            self.safe_addstr(start_y, title_x, title_text, border_color)
-        
-        # Draw search box
-        search_y = start_y + 2
-        # Draw pattern input using SingleLineTextEdit
-        if search_y < height:
-            max_pattern_width = dialog_width - 4  # Leave some margin
-            self.search_dialog_pattern_editor.draw(
-                self.stdscr, search_y, start_x + 2, max_pattern_width,
-                "Pattern: ",
-                is_active=True
-            )
-        
-        # Draw search type indicator
-        type_y = start_y + 3
-        if type_y < height:
-            type_text = f"Mode: {self.search_dialog_type.title()} (Tab to switch)"
-            self.safe_addstr(type_y, start_x + 2, type_text[:dialog_width - 4], get_status_color() | curses.A_DIM)
-        
-        # Draw separator line
-        sep_y = start_y + 4
-        if sep_y < height:
-            sep_line = "├" + "─" * (dialog_width - 2) + "┤"
-            self.safe_addstr(sep_y, start_x, sep_line[:dialog_width], border_color)
-        
-        # Draw results count
-        count_y = start_y + 5
-        if count_y < height:
-            if self.search_dialog_searching:
-                count_text = "Searching..."
-            else:
-                count_text = f"Results: {len(self.search_dialog_results)}"
-            self.safe_addstr(count_y, start_x + 2, count_text, get_status_color() | curses.A_DIM)
-        
-        # Calculate results area
-        results_start_y = start_y + 6
-        results_end_y = start_y + dialog_height - 3
-        content_start_x = start_x + 2
-        content_width = dialog_width - 4
-        content_height = results_end_y - results_start_y + 1
-        
-        # Draw results
-        visible_results = self.search_dialog_results[self.search_dialog_scroll:self.search_dialog_scroll + content_height]
-        
-        for i, result in enumerate(visible_results):
-            y = results_start_y + i
-            if y <= results_end_y and y < height:
-                result_index = self.search_dialog_scroll + i
-                is_selected = result_index == self.search_dialog_selected
-                
-                # Format result text
-                if result['type'] == 'dir':
-                    result_text = f"📁 {result['relative_path']}"
-                elif result['type'] == 'content':
-                    result_text = f"📄 {result['relative_path']} - {result['match_info']}"
-                else:
-                    result_text = f"📄 {result['relative_path']}"
-                
-                if len(result_text) > content_width - 2:
-                    result_text = result_text[:content_width - 5] + "..."
-                
-                # Add selection indicator
-                if is_selected:
-                    display_text = f"► {result_text}"
-                    item_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
-                else:
-                    display_text = f"  {result_text}"
-                    item_color = get_status_color()
-                
-                # Ensure text fits
-                display_text = display_text[:content_width]
-                self.safe_addstr(y, content_start_x, display_text, item_color)
-        
-        # Draw help text
-        help_y = start_y + dialog_height - 2
-        if help_y < height:
-            help_text = "Enter: Select | Tab: Switch mode | ESC: Cancel"
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
-    
 
-    def draw_batch_rename_dialog(self):
-        """Draw the batch rename dialog overlay"""
+    def _navigate_to_search_result(self, result):
+        """Navigate to the selected search result - wrapper for search dialog helper"""
+        SearchDialogHelpers.navigate_to_result(result, self.pane_manager, self.file_operations, print)
+        
+        # Adjust scroll with proper display height
+        current_pane = self.get_current_pane()
         height, width = self.stdscr.getmaxyx()
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        display_height = height - log_height - 3
         
-        # Calculate dialog dimensions
-        dialog_width = max(80, int(width * 0.9))
-        dialog_height = max(25, int(height * 0.9))
-        
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
-        
-        # Draw dialog background
-        for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                self.safe_addstr(y, start_x, bg_line, get_status_color())
-        
-        # Draw border
-        border_color = get_status_color() | curses.A_BOLD
-        
-        # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
-        
-        # Side borders
-        for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                self.safe_addstr(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
-        
-        # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
-        
-        # Draw title
-        title_text = f" Batch Rename ({len(self.batch_rename_files)} files) "
-        title_x = start_x + (dialog_width - len(title_text)) // 2
-        if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
-            self.safe_addstr(start_y, title_x, title_text, border_color)
-        
-        # Draw regex input
-        regex_y = start_y + 2
-        regex_label = "Regex Pattern: "
-        
-        if regex_y < height:
-            content_start_x = start_x + 2
-            content_width = dialog_width - 4
-            
-            # Draw regex input field using SingleLineTextEdit
-            self.batch_rename_regex_editor.draw(
-                self.stdscr, regex_y, content_start_x, content_width,
-                regex_label,
-                is_active=(self.batch_rename_active_field == 'regex')
-            )
-        
-        # Draw destination input
-        dest_y = start_y + 3
-        dest_label = "Destination:   "
-        
-        if dest_y < height:
-            # Draw destination input field using SingleLineTextEdit
-            self.batch_rename_destination_editor.draw(
-                self.stdscr, dest_y, content_start_x, content_width,
-                dest_label,
-                is_active=(self.batch_rename_active_field == 'destination')
-            )
-        
-        # Draw navigation help
-        nav_help_y = start_y + 4
-        if nav_help_y < height:
-            nav_help_text = "Navigation: ↑/↓=Switch fields, Tab=Alt switch, PgUp/PgDn=Scroll preview"
-            self.safe_addstr(nav_help_y, content_start_x, nav_help_text[:content_width], get_status_color() | curses.A_DIM)
-        
-        # Draw help for macros
-        help_y = start_y + 5
-        if help_y < height:
-            help_text = "Macros: \\0=full name, \\1-\\9=regex groups, \\d=index"
-            self.safe_addstr(help_y, content_start_x, help_text[:content_width], get_status_color() | curses.A_DIM)
-        
-        # Draw separator line
-        sep_y = start_y + 6
-        if sep_y < height:
-            sep_line = "├" + "─" * (dialog_width - 2) + "┤"
-            self.safe_addstr(sep_y, start_x, sep_line[:dialog_width], border_color)
-        
-        # Draw preview header
-        preview_header_y = start_y + 7
-        if preview_header_y < height:
-            header_text = "Preview:"
-            self.safe_addstr(preview_header_y, content_start_x, header_text, get_status_color() | curses.A_BOLD)
-        
-        # Calculate preview area
-        preview_start_y = start_y + 8
-        preview_end_y = start_y + dialog_height - 3
-        preview_height = preview_end_y - preview_start_y + 1
-        
-        # Draw preview list
-        if self.batch_rename_preview:
-            visible_preview = self.batch_rename_preview[self.batch_rename_scroll:self.batch_rename_scroll + preview_height]
-            
-            for i, preview in enumerate(visible_preview):
-                y = preview_start_y + i
-                if y <= preview_end_y and y < height:
-                    original = preview['original']
-                    new = preview['new']
-                    conflict = preview['conflict']
-                    valid = preview['valid']
-                    
-                    # Format preview line
-                    if original == new:
-                        status = "UNCHANGED"
-                        status_color = get_status_color() | curses.A_DIM
-                    elif conflict:
-                        status = "CONFLICT!"
-                        status_color = get_status_color() | curses.A_BOLD | curses.color_pair(1)  # Red
-                    elif not valid:
-                        status = "INVALID!"
-                        status_color = get_status_color() | curses.A_BOLD | curses.color_pair(1)  # Red
-                    else:
-                        status = "OK"
-                        status_color = get_status_color() | curses.color_pair(2)  # Green
-                    
-                    # Create preview line
-                    max_name_width = (content_width - 20) // 2
-                    original_display = original[:max_name_width] if len(original) > max_name_width else original
-                    new_display = new[:max_name_width] if len(new) > max_name_width else new
-                    
-                    preview_line = f"{original_display:<{max_name_width}} → {new_display:<{max_name_width}} [{status}]"
-                    preview_line = preview_line[:content_width]
-                    
-                    self.safe_addstr(y, content_start_x, preview_line, status_color)
-        else:
-            # No preview available
-            no_preview_y = preview_start_y + 2
-            if no_preview_y < height:
-                no_preview_text = "Enter regex pattern and destination to see preview"
-                self.safe_addstr(no_preview_y, content_start_x, no_preview_text, get_status_color() | curses.A_DIM)
-        
-        # Draw help text
-        help_y = start_y + dialog_height - 2
-        if help_y < height:
-            help_text = "Tab: Switch input | ←→: Move cursor | Home/End: Start/End | Enter: Rename | ESC: Cancel | ↑↓: Scroll"
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
-        
-    def enter_subshell_mode(self):
-        """Enter sub-shell mode with environment variables set"""
-        # Restore stdout/stderr temporarily
-        self.restore_stdio()
-        
-        # Clear the screen and reset cursor
-        self.stdscr.clear()
-        self.stdscr.refresh()
-        
-        # Reset terminal to normal mode
-        curses.endwin()
-        
-        try:
-            # Get current pane information
-            left_pane = self.left_pane
-            right_pane = self.right_pane
-            current_pane = self.get_current_pane()
-            other_pane = self.get_inactive_pane()
-            
-            # Set environment variables with TFM_ prefix
-            env = os.environ.copy()
-            env['TFM_LEFT_DIR'] = str(left_pane['path'])
-            env['TFM_RIGHT_DIR'] = str(right_pane['path'])
-            env['TFM_THIS_DIR'] = str(current_pane['path'])
-            env['TFM_OTHER_DIR'] = str(other_pane['path'])
-            
-            # Get selected files for each pane, or cursor position if no selection
-            def get_selected_or_cursor(pane_data):
-                """Get selected files, or current cursor position if no files selected"""
-                selected = [Path(f).name for f in pane_data['selected_files']]
-                if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
-                    # No files selected, use cursor position
-                    cursor_file = pane_data['files'][pane_data['selected_index']]
-                    selected = [cursor_file.name]
-                return selected
-            
-            def quote_filenames(filenames):
-                """Quote filenames for safe shell usage"""
-                return [shlex.quote(filename) for filename in filenames]
-            
-            left_selected = quote_filenames(get_selected_or_cursor(left_pane))
-            right_selected = quote_filenames(get_selected_or_cursor(right_pane))
-            current_selected = quote_filenames(get_selected_or_cursor(current_pane))
-            other_selected = quote_filenames(get_selected_or_cursor(other_pane))
-            
-            # Set selected files environment variables (space-separated) with TFM_ prefix
-            # Filenames are properly quoted for shell safety
-            env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
-            env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
-            env['TFM_THIS_SELECTED'] = ' '.join(current_selected)
-            env['TFM_OTHER_SELECTED'] = ' '.join(other_selected)
-            
-            # Set TFM indicator environment variable
-            env['TFM_ACTIVE'] = '1'
-            
-            # Modify shell prompt to include [TFM] label
-            # Handle both bash (PS1) and zsh (PROMPT) prompts
-            current_ps1 = env.get('PS1', '')
-            current_prompt = env.get('PROMPT', '')
-            
-            # Modify PS1 for bash and other shells
-            if current_ps1:
-                env['PS1'] = f'[TFM] {current_ps1}'
-            else:
-                env['PS1'] = '[TFM] \\u@\\h:\\w\\$ '
-            
-            # Modify PROMPT for zsh
-            if current_prompt:
-                env['PROMPT'] = f'[TFM] {current_prompt}'
-            else:
-                env['PROMPT'] = '[TFM] %n@%m:%~%# '
-            
-            # Print information about the sub-shell environment
-            print("TFM Sub-shell Mode")
-            print("=" * 50)
-            print(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
-            print(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
-            print(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
-            print(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
-            print(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
-            print(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
-            print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
-            print(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
-            print("=" * 50)
-            print("TFM_ACTIVE environment variable is set for shell customization")
-            print("To show [TFM] in your prompt, add this to your shell config:")
-            print("  Zsh (~/.zshrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PROMPT=\"[TFM] $PROMPT\"; fi")
-            print("  Bash (~/.bashrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PS1=\"[TFM] $PS1\"; fi")
-            print("Type 'exit' to return to TFM")
-            print()
-            
-            # Change to the current directory
-            os.chdir(current_pane['path'])
-            
-            # Start the shell with the modified environment
-            shell = env.get('SHELL', '/bin/bash')
-            subprocess.run([shell], env=env)
-            
-        except Exception as e:
-            print(f"Error starting sub-shell: {e}")
-            input("Press Enter to continue...")
-        
-        finally:
-            # Reinitialize curses
-            self.stdscr = curses.initscr()
-            curses.curs_set(0)  # Hide cursor
-            self.stdscr.keypad(True)
-            
-            # Reinitialize colors with configured scheme
-            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-            init_colors(color_scheme)
-            
-            # Restore stdout/stderr capture
-            sys.stdout = LogCapture(self.log_messages, "STDOUT")
-            sys.stderr = LogCapture(self.log_messages, "STDERR")
-            
-            # Log return from sub-shell
-            print("Returned from sub-shell mode")
-            
-            # Force full redraw
-            self.needs_full_redraw = True
+        SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
+        self.needs_full_redraw = True
 
     def run(self):
         """Main application loop"""
@@ -4688,6 +2411,28 @@ class FileManager:
                 self.stdscr.refresh()
                 self.needs_full_redraw = False
             
+            # Always draw dialog overlays on top (they need to update every frame for cursor/text changes)
+            dialog_drawn = False
+            if self.general_dialog.is_active:
+                self.general_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.list_dialog.mode:
+                self.list_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.info_dialog.mode:
+                self.info_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.search_dialog.mode:
+                self.search_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.batch_rename_dialog.mode:
+                self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            
+            # Refresh screen if dialog was drawn
+            if dialog_drawn:
+                self.stdscr.refresh()
+            
             # Get user input with timeout to allow timer checks
             self.stdscr.timeout(16)  # 16ms timeout
             key = self.stdscr.getch()
@@ -4702,59 +2447,39 @@ class FileManager:
                 if self.handle_isearch_input(key):
                     continue  # Isearch mode handled the key
             
-            # Handle filter mode input
-            if self.filter_mode:
-                if self.handle_filter_input(key):
-                    continue  # Filter mode handled the key
-            
-            # Handle rename mode input
-            if self.rename_mode:
-                if self.handle_rename_input(key):
-                    continue  # Rename mode handled the key
-            
-            # Handle create directory mode input
-            if self.create_dir_mode:
-                if self.handle_create_directory_input(key):
-                    continue  # Create directory mode handled the key
-            
-            # Handle create file mode input
-            if self.create_file_mode:
-                if self.handle_create_file_input(key):
-                    continue  # Create file mode handled the key
-            
-            # Handle create archive mode input
-            if self.create_archive_mode:
-                if self.handle_create_archive_input(key):
-                    continue  # Create archive mode handled the key
+            # Handle general dialog input
+            if self.general_dialog.is_active:
+                if self.general_dialog.handle_key(key):
+                    continue  # General dialog handled the key
             
             # Handle quick choice mode input
-            if self.quick_choice_mode:
+            if self.quick_choice_bar.mode:
                 if self.handle_quick_choice_input(key):
                     continue  # Quick choice mode handled the key
             
             # Handle info dialog mode input
-            if self.info_dialog_mode:
+            if self.info_dialog.mode:
                 if self.handle_info_dialog_input(key):
                     continue  # Info dialog mode handled the key
             
             # Handle list dialog mode input
-            if self.list_dialog_mode:
+            if self.list_dialog.mode:
                 if self.handle_list_dialog_input(key):
                     continue  # List dialog mode handled the key
             
             # Handle search dialog mode input
-            if self.search_dialog_mode:
+            if self.search_dialog.mode:
                 if self.handle_search_dialog_input(key):
                     continue  # Search dialog mode handled the key
             
             # Handle batch rename dialog mode input
-            if self.batch_rename_mode:
+            if self.batch_rename_dialog.mode:
                 if self.handle_batch_rename_input(key):
                     continue  # Batch rename mode handled the key
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.batch_rename_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
+            if self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog.mode or self.batch_rename_dialog.mode or self.isearch_mode or self.general_dialog.is_active:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
@@ -4773,19 +2498,17 @@ class FileManager:
             elif key == KEY_CTRL_D:  # Ctrl+D - make log pane larger
                 self.adjust_log_boundary('down')
             elif key == 11:  # Ctrl+K - scroll log up
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    self.log_scroll_offset += 1
+                if self.log_manager.scroll_log_up(1):
                     self.needs_full_redraw = True
             elif key == 12:  # Ctrl+L - scroll log down
-                if self.log_scroll_offset > 0:
-                    self.log_scroll_offset -= 1
+                if self.log_manager.scroll_log_down(1):
                     self.needs_full_redraw = True
             elif key == curses.KEY_RESIZE:  # Terminal window resized
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()
                 self.needs_full_redraw = True
             elif key == KEY_TAB:  # Tab key - switch panes
-                self.active_pane = 'right' if self.active_pane == 'left' else 'left'
+                self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
                 self.needs_full_redraw = True
             elif key == curses.KEY_UP:
                 if current_pane['selected_index'] > 0:
@@ -4799,12 +2522,12 @@ class FileManager:
                 self.handle_enter()
                 self.needs_full_redraw = True
             elif self.is_key_for_action(key, 'toggle_hidden'):
-                self.show_hidden = not self.show_hidden
+                self.file_operations.toggle_hidden_files()
                 # Reset both panes
-                self.left_pane['selected_index'] = 0
-                self.left_pane['scroll_offset'] = 0
-                self.right_pane['selected_index'] = 0
-                self.right_pane['scroll_offset'] = 0
+                self.pane_manager.left_pane['selected_index'] = 0
+                self.pane_manager.left_pane['scroll_offset'] = 0
+                self.pane_manager.right_pane['selected_index'] = 0
+                self.pane_manager.right_pane['scroll_offset'] = 0
                 self.needs_full_redraw = True
             elif self.is_key_for_action(key, 'toggle_color_scheme'):
                 # Toggle between dark and light color schemes
@@ -4824,10 +2547,7 @@ class FileManager:
                 self.needs_full_redraw = True
             elif key == curses.KEY_PPAGE:  # Page Up - scroll log up when Ctrl is held, otherwise file navigation
                 # Check if this is Ctrl+Page Up for log scrolling
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    # Try log scrolling first, fall back to file navigation
-                    self.log_scroll_offset += 5  # Scroll multiple lines
-                    self.log_scroll_offset = min(self.log_scroll_offset, len(self.log_messages) - 1)
+                if self.log_manager.scroll_log_up(5):
                     self.needs_full_redraw = True
                 else:
                     # Regular file navigation
@@ -4835,10 +2555,7 @@ class FileManager:
                     self.needs_full_redraw = True
             elif key == curses.KEY_NPAGE:  # Page Down - scroll log down when Ctrl is held, otherwise file navigation  
                 # Check if this is Ctrl+Page Down for log scrolling
-                if self.log_scroll_offset > 0:
-                    # Try log scrolling first, fall back to file navigation
-                    self.log_scroll_offset -= 5  # Scroll multiple lines
-                    self.log_scroll_offset = max(0, self.log_scroll_offset)
+                if self.log_manager.scroll_log_down(5):
                     self.needs_full_redraw = True
                 else:
                     # Regular file navigation
@@ -4866,7 +2583,7 @@ class FileManager:
                     except PermissionError:
                         self.show_error("Permission denied")
                         self.needs_full_redraw = True
-            elif key == curses.KEY_LEFT and self.active_pane == 'left':  # Left arrow in left pane - go to parent
+            elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
                         # Save current cursor position before changing directory
@@ -4887,7 +2604,7 @@ class FileManager:
                         self.needs_full_redraw = True
                     except PermissionError:
                         self.show_error("Permission denied")
-            elif key == curses.KEY_RIGHT and self.active_pane == 'right':  # Right arrow in right pane - go to parent
+            elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
                         # Save current cursor position before changing directory
@@ -4908,26 +2625,23 @@ class FileManager:
                         self.needs_full_redraw = True
                     except PermissionError:
                         self.show_error("Permission denied")
-            elif key == curses.KEY_RIGHT and self.active_pane == 'left':  # Right arrow in left pane - switch to right pane
-                self.active_pane = 'right'
-            elif key == curses.KEY_LEFT and self.active_pane == 'right':  # Left arrow in right pane - switch to left pane
-                self.active_pane = 'left'
-
+            elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'left':  # Right arrow in left pane - switch to right pane
+                self.pane_manager.active_pane = 'right'
+                self.needs_full_redraw = True
+            elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
+                self.pane_manager.active_pane = 'left'
+                self.needs_full_redraw = True
             elif key == 337:  # Shift+Up in many terminals
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    self.log_scroll_offset += 1
+                if self.log_manager.scroll_log_up(1):
                     self.needs_full_redraw = True
             elif key == 336:  # Shift+Down in many terminals  
-                if self.log_scroll_offset > 0:
-                    self.log_scroll_offset -= 1
+                if self.log_manager.scroll_log_down(1):
                     self.needs_full_redraw = True
             elif key == 393:  # Alternative Shift+Up code
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    self.log_scroll_offset += 1
+                if self.log_manager.scroll_log_up(1):
                     self.needs_full_redraw = True
             elif key == 402:  # Alternative Shift+Down code
-                if self.log_scroll_offset > 0:
-                    self.log_scroll_offset -= 1
+                if self.log_manager.scroll_log_down(1):
                     self.needs_full_redraw = True
             elif self.is_key_for_action(key, 'select_file'):  # Toggle file selection
                 self.toggle_selection()
@@ -5020,11 +2734,14 @@ class FileManager:
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
-                self.left_pane_ratio = 0.5
+                self.pane_manager.left_pane_ratio = 0.5
                 self.needs_full_redraw = True
                 print("Pane split reset to 50% | 50%")
             elif self.is_key_for_action(key, 'subshell'):  # Sub-shell mode
-                self.enter_subshell_mode()
+                self.stdscr = self.external_program_manager.enter_subshell_mode(
+                    self.stdscr, self.pane_manager
+                )
+                self.needs_full_redraw = True
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
