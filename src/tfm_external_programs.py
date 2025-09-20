@@ -10,12 +10,92 @@ import sys
 import shlex
 from pathlib import Path
 
+
+def quote_filenames_with_double_quotes(filenames):
+    """
+    Quote filenames for safe shell usage using double quotes.
+    
+    This function replaces the previous use of shlex.quote() which used single quotes.
+    Double quotes are preferred for TFM_*_SELECTED environment variables to provide
+    consistent quoting behavior across different shell environments.
+    
+    Args:
+        filenames: List of filename strings to quote
+        
+    Returns:
+        List of quoted filename strings using double quotes
+    """
+    quoted = []
+    for filename in filenames:
+        # Use double quotes and escape any double quotes or backslashes in the filename
+        escaped = filename.replace('\\', '\\\\').replace('"', '\\"')
+        quoted.append(f'"{escaped}"')
+    return quoted
+
+
+def get_selected_or_cursor_files(pane_data):
+    """Get selected files, or current cursor position if no files selected"""
+    selected = [Path(f).name for f in pane_data['selected_files']]
+    if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
+        # No files selected, use cursor position
+        cursor_file = pane_data['files'][pane_data['selected_index']]
+        selected = [cursor_file.name]
+    return selected
+
 class ExternalProgramManager:
     """Manages external program execution and subshell functionality"""
     
     def __init__(self, config, log_manager):
         self.config = config
         self.log_manager = log_manager
+    
+    def resolve_command_path(self, command):
+        """
+        Resolve the command path, converting relative paths to absolute paths
+        based on the TFM main script location.
+        
+        This function handles the following cases:
+        - Absolute paths: Returned unchanged (e.g., '/usr/bin/git')
+        - Relative paths with separators: Resolved relative to tfm.py location (e.g., './tools/script.sh')
+        - Command names only: Returned unchanged to be found in PATH (e.g., 'git')
+        
+        Args:
+            command: List where first element is the command/program path
+            
+        Returns:
+            List with resolved command path (first element may be modified)
+            
+        Examples:
+            ['./tools/script.sh'] -> ['/path/to/tfm/tools/script.sh']
+            ['git', 'status'] -> ['git', 'status'] (unchanged)
+            ['/usr/bin/python3'] -> ['/usr/bin/python3'] (unchanged)
+        """
+        if not command or not command[0]:
+            return command
+        
+        command_path = Path(command[0])
+        
+        # If it's already an absolute path, return as-is
+        if command_path.is_absolute():
+            return command
+        
+        # If it's a relative path, resolve it relative to tfm.py location
+        if '/' in command[0] or '\\' in command[0]:  # Contains path separators
+            # Find the TFM main script directory
+            # We need to go up from src/ to the root where tfm.py is located
+            current_file = Path(__file__)  # This is tfm_external_programs.py in src/
+            tfm_root = current_file.parent.parent  # Go up from src/ to root
+            
+            # Resolve the relative path
+            resolved_path = (tfm_root / command_path).resolve()
+            
+            # Create new command list with resolved path
+            resolved_command = [str(resolved_path)] + command[1:]
+            return resolved_command
+        
+        # If it's just a command name without path separators, return as-is
+        # (let the system find it in PATH)
+        return command
     
     def execute_external_program(self, stdscr, pane_manager, program):
         """Execute an external program with environment variables set"""
@@ -44,23 +124,10 @@ class ExternalProgramManager:
             env['TFM_OTHER_DIR'] = str(other_pane['path'])
             
             # Get selected files for each pane, or cursor position if no selection
-            def get_selected_or_cursor(pane_data):
-                """Get selected files, or current cursor position if no files selected"""
-                selected = [Path(f).name for f in pane_data['selected_files']]
-                if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
-                    # No files selected, use cursor position
-                    cursor_file = pane_data['files'][pane_data['selected_index']]
-                    selected = [cursor_file.name]
-                return selected
-            
-            def quote_filenames(filenames):
-                """Quote filenames for safe shell usage"""
-                return [shlex.quote(filename) for filename in filenames]
-            
-            left_selected = quote_filenames(get_selected_or_cursor(left_pane))
-            right_selected = quote_filenames(get_selected_or_cursor(right_pane))
-            current_selected = quote_filenames(get_selected_or_cursor(current_pane))
-            other_selected = quote_filenames(get_selected_or_cursor(other_pane))
+            left_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(left_pane))
+            right_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(right_pane))
+            current_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(current_pane))
+            other_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(other_pane))
             
             # Set selected files environment variables (space-separated) with TFM_ prefix
             env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
@@ -71,10 +138,15 @@ class ExternalProgramManager:
             # Set TFM indicator environment variable
             env['TFM_ACTIVE'] = '1'
             
+            # Resolve relative paths in the command
+            resolved_command = self.resolve_command_path(program['command'])
+            
             # Print information about the program execution
             print(f"TFM External Program: {program['name']}")
             print("=" * 50)
-            print(f"Command: {' '.join(program['command'])}")
+            print(f"Original Command: {' '.join(program['command'])}")
+            if resolved_command != program['command']:
+                print(f"Resolved Command: {' '.join(resolved_command)}")
             print(f"Working Directory: {current_pane['path']}")
             print(f"TFM_THIS_DIR: {env['TFM_THIS_DIR']}")
             print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
@@ -85,7 +157,7 @@ class ExternalProgramManager:
             os.chdir(current_pane['path'])
             
             # Execute the program with the modified environment
-            result = subprocess.run(program['command'], env=env)
+            result = subprocess.run(resolved_command, env=env)
             
             # Check if auto_return option is enabled
             auto_return = program.get('options', {}).get('auto_return', False)
@@ -107,7 +179,10 @@ class ExternalProgramManager:
                 input()
             
         except FileNotFoundError:
-            print(f"Error: Command not found: {program['command'][0]}")
+            resolved_command = self.resolve_command_path(program['command'])
+            print(f"Error: Command not found: {resolved_command[0]}")
+            if resolved_command != program['command']:
+                print(f"(Resolved from: {program['command'][0]})")
             print("Press Enter to continue...")
             input()
         except Exception as e:
@@ -163,26 +238,13 @@ class ExternalProgramManager:
             env['TFM_OTHER_DIR'] = str(other_pane['path'])
             
             # Get selected files for each pane, or cursor position if no selection
-            def get_selected_or_cursor(pane_data):
-                """Get selected files, or current cursor position if no files selected"""
-                selected = [Path(f).name for f in pane_data['selected_files']]
-                if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
-                    # No files selected, use cursor position
-                    cursor_file = pane_data['files'][pane_data['selected_index']]
-                    selected = [cursor_file.name]
-                return selected
-            
-            def quote_filenames(filenames):
-                """Quote filenames for safe shell usage"""
-                return [shlex.quote(filename) for filename in filenames]
-            
-            left_selected = quote_filenames(get_selected_or_cursor(left_pane))
-            right_selected = quote_filenames(get_selected_or_cursor(right_pane))
-            current_selected = quote_filenames(get_selected_or_cursor(current_pane))
-            other_selected = quote_filenames(get_selected_or_cursor(other_pane))
+            left_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(left_pane))
+            right_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(right_pane))
+            current_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(current_pane))
+            other_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(other_pane))
             
             # Set selected files environment variables (space-separated) with TFM_ prefix
-            # Filenames are properly quoted for shell safety
+            # Filenames are properly quoted with double quotes for shell safety
             env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
             env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
             env['TFM_THIS_SELECTED'] = ' '.join(current_selected)

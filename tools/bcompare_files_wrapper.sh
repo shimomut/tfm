@@ -22,13 +22,13 @@ if [ -z "$TFM_LEFT_DIR" ] || [ -z "$TFM_RIGHT_DIR" ]; then
     exit 1
 fi
 
-# Parse selected files (remove quotes and get first file from each pane)
-LEFT_FILES=($TFM_LEFT_SELECTED)
-RIGHT_FILES=($TFM_RIGHT_SELECTED)
+# Parse selected files (properly handle quoted filenames)
+eval "LEFT_FILES=($TFM_LEFT_SELECTED)"
+eval "RIGHT_FILES=($TFM_RIGHT_SELECTED)"
 
-# Remove quotes from filenames if present
-LEFT_FILE=$(echo "${LEFT_FILES[0]}" | sed 's/^"\(.*\)"$/\1/')
-RIGHT_FILE=$(echo "${RIGHT_FILES[0]}" | sed 's/^"\(.*\)"$/\1/')
+# Get first file from each pane (quotes are already removed by eval)
+LEFT_FILE="${LEFT_FILES[0]}"
+RIGHT_FILE="${RIGHT_FILES[0]}"
 
 # Build full paths
 LEFT_PATH="$TFM_LEFT_DIR/$LEFT_FILE"

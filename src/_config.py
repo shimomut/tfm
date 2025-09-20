@@ -82,6 +82,7 @@ class Config:
     
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
+    # Relative paths in the first element are resolved relative to the TFM root directory (where tfm.py is located)
     # The "options" field is a dictionary with program-specific options:
     #   - auto_return: if True, automatically returns to TFM without waiting for user input
     PROGRAMS = [
