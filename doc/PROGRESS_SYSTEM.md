@@ -103,13 +103,14 @@ Progress text includes:
 
 Example: `Copying (to Documents)... 15/50 (30%) - large_file.pdf`
 
-## Backward Compatibility
+## Migration from Legacy System
 
-The system maintains backward compatibility with the existing archive progress system:
+The legacy archive progress system has been fully migrated to use the new ProgressManager:
 
-- Legacy `archive_progress` state is still supported
-- `update_archive_progress()` method remains functional
-- Status bar checks both new and legacy progress systems
+- Legacy `archive_progress` state has been removed
+- `update_archive_progress()` method now delegates to ProgressManager
+- Status bar uses only the new progress system
+- All archive operations use the unified progress tracking
 
 ## Error Handling
 

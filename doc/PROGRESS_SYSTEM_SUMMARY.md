@@ -40,7 +40,7 @@ Successfully generalized the TFM status bar progress updating feature from archi
 #### Archive Operations
 - **ZIP Creation**: Updated to use new progress system
 - **TAR.GZ Creation**: Updated to use new progress system
-- **Legacy Support**: Old `update_archive_progress()` method maintained for compatibility
+- **Complete Migration**: Legacy `archive_progress` system fully migrated to new ProgressManager
 
 ### 4. Smart Progress Display Logic
 

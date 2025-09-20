@@ -73,8 +73,7 @@ class FileManager:
         self.isearch_matches = []
         self.isearch_match_index = 0
         
-        # Archive creation progress state (deprecated - use progress_manager)
-        self.archive_progress = None
+
         
         # Dialog state (now handled by general_dialog)
         self.rename_file_path = None  # Still needed for rename operations
@@ -625,27 +624,13 @@ class FileManager:
         # All dialogs are now handled as overlays in main drawing loop
             
         # If showing progress for any operation, display it
-        if self.progress_manager.is_operation_active() or self.archive_progress:
+        if self.progress_manager.is_operation_active():
             # Fill entire status line with background color
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Use new progress manager if available, fallback to old archive progress
-            if self.progress_manager.is_operation_active():
-                progress_text = self.progress_manager.get_progress_text(width - 4)
-            else:
-                # Legacy archive progress display
-                current_file = self.archive_progress['current_file']
-                processed = self.archive_progress['processed']
-                total = self.archive_progress['total']
-                percentage = int((processed / total) * 100) if total > 0 else 0
-                
-                # Truncate filename if too long
-                max_filename_len = width // 2
-                if len(current_file) > max_filename_len:
-                    current_file = "..." + current_file[-(max_filename_len-3):]
-                
-                progress_text = f"Creating archive... {processed}/{total} ({percentage}%) - {current_file}"
+            # Get formatted progress text from progress manager
+            progress_text = self.progress_manager.get_progress_text(width - 4)
             
             # Draw progress text
             self.safe_addstr(status_y, 2, progress_text, get_status_color())
@@ -2306,9 +2291,6 @@ class FileManager:
             
             print(f"Created archive: {archive_filename}")
             
-            # Clear archive progress
-            self.archive_progress = None
-            
             # Refresh the other pane to show the new archive
             self.refresh_files(other_pane)
             
@@ -2324,8 +2306,6 @@ class FileManager:
             
         except Exception as e:
             print(f"Error creating archive: {e}")
-            # Clear archive progress on error too
-            self.archive_progress = None
             self.general_dialog.hide()
             self.needs_full_redraw = True
     
@@ -2382,28 +2362,20 @@ class FileManager:
             
             print(f"Archive created successfully: {archive_path}")
             
-            # Clear archive progress
-            self.archive_progress = None
-            
             # Refresh the other pane to show the new archive
             self.refresh_files(other_pane)
             self.needs_full_redraw = True
             
         except Exception as e:
             print(f"Error creating archive: {e}")
-            # Clear archive progress on error too
-            self.archive_progress = None
         
         self.exit_create_archive_mode()
     
     def update_archive_progress(self, current_file, processed, total):
-        """Update status bar with archive creation progress (legacy method)"""
-        # Store progress information for status bar display
-        self.archive_progress = {
-            'current_file': current_file,
-            'processed': processed,
-            'total': total
-        }
+        """Update status bar with archive creation progress (legacy method - now uses ProgressManager)"""
+        # Update the progress manager if an operation is active
+        if self.progress_manager.is_operation_active():
+            self.progress_manager.update_progress(current_file, processed)
         
         # Force a screen refresh to show progress
         try:

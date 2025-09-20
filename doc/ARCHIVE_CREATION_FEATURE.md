@@ -114,10 +114,10 @@ self.create_archive_pattern = ""
 - **NEW**: Provides real-time progress updates during creation
 
 ##### `update_archive_progress(current_file, processed, total)`
-- **NEW**: Updates status bar with current progress information
-- Stores progress state for status bar display
+- **MIGRATED**: Legacy method that now delegates to the unified ProgressManager
+- Maintains compatibility while using the new progress system
 - Forces screen refresh to show real-time updates
-- Handles display formatting and filename truncation
+- Progress formatting now handled by ProgressManager
 
 ### User Interface Integration
 
