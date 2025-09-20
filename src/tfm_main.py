@@ -97,7 +97,7 @@ class FileManager:
         
         # Create directory mode state
         self.create_dir_mode = False
-        self.create_dir_pattern = ""
+        self.create_dir_editor = SingleLineTextEdit()
         
         # Create file mode state
         self.create_file_mode = False
@@ -105,7 +105,7 @@ class FileManager:
         
         # Create archive mode state
         self.create_archive_mode = False
-        self.create_archive_pattern = ""
+        self.create_archive_editor = SingleLineTextEdit()
         
         # Quick choice dialog state
         self.quick_choice_mode = False
@@ -1153,20 +1153,21 @@ class FileManager:
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Show create directory prompt and pattern
-            create_prompt = f"Create directory: {self.create_dir_pattern}"
-            
-            # Add cursor indicator
-            create_prompt += "_"
-            
-            # Draw create directory prompt
-            self.safe_addstr(status_y, 2, create_prompt, get_status_color())
+            # Draw create directory input using SingleLineTextEdit
+            max_input_width = width - 20  # Leave space for help text
+            self.create_dir_editor.draw(
+                self.stdscr, status_y, 2, max_input_width,
+                "Create directory: ",
+                is_active=True
+            )
             
             # Show help text on the right if there's space
             help_text = "ESC:cancel Enter:create"
-            if len(create_prompt) + len(help_text) + 6 < width:
+            # Calculate space needed for the input field
+            input_field_width = len("Create directory: ") + len(self.create_dir_editor.text) + 2
+            if input_field_width + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
-                if help_x > len(create_prompt) + 4:  # Ensure no overlap
+                if help_x > input_field_width + 4:  # Ensure no overlap
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             return
         
@@ -1200,20 +1201,21 @@ class FileManager:
             status_line = " " * (width - 1)
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Show create archive prompt and pattern
-            create_prompt = f"Archive filename: {self.create_archive_pattern}"
-            
-            # Add cursor indicator
-            create_prompt += "_"
-            
-            # Draw create archive prompt
-            self.safe_addstr(status_y, 2, create_prompt, get_status_color())
+            # Draw create archive input using SingleLineTextEdit
+            max_input_width = width - 35  # Leave space for help text
+            self.create_archive_editor.draw(
+                self.stdscr, status_y, 2, max_input_width,
+                "Archive filename: ",
+                is_active=True
+            )
             
             # Show help text on the right if there's space
             help_text = "ESC:cancel Enter:create (.zip/.tar.gz/.tgz)"
-            if len(create_prompt) + len(help_text) + 6 < width:
+            # Calculate space needed for the input field
+            input_field_width = len("Archive filename: ") + len(self.create_archive_editor.text) + 2
+            if input_field_width + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
-                if help_x > len(create_prompt) + 4:  # Ensure no overlap
+                if help_x > input_field_width + 4:  # Ensure no overlap
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             return
         
@@ -1500,25 +1502,25 @@ class FileManager:
         
         # Enter create directory mode
         self.create_dir_mode = True
-        self.create_dir_pattern = ""
+        self.create_dir_editor.clear()
         self.needs_full_redraw = True
         print("Creating new directory...")
     
     def exit_create_directory_mode(self):
         """Exit create directory mode"""
         self.create_dir_mode = False
-        self.create_dir_pattern = ""
+        self.create_dir_editor.clear()
         self.needs_full_redraw = True
     
     def perform_create_directory(self):
         """Perform the actual directory creation"""
-        if not self.create_dir_pattern.strip():
+        if not self.create_dir_editor.text.strip():
             print("Invalid directory name")
             self.exit_create_directory_mode()
             return
         
         current_pane = self.get_current_pane()
-        new_dir_name = self.create_dir_pattern.strip()
+        new_dir_name = self.create_dir_editor.text.strip()
         new_dir_path = current_pane['path'] / new_dir_name
         
         # Check if directory already exists
@@ -3245,7 +3247,7 @@ class FileManager:
         
         # Enter archive creation mode
         self.create_archive_mode = True
-        self.create_archive_pattern = ""
+        self.create_archive_editor.clear()
         self.needs_full_redraw = True
         
         # Log what we're about to archive
@@ -3258,7 +3260,7 @@ class FileManager:
     def exit_create_archive_mode(self):
         """Exit archive creation mode"""
         self.create_archive_mode = False
-        self.create_archive_pattern = ""
+        self.create_archive_editor.clear()
         self.needs_full_redraw = True
     
     def handle_create_archive_input(self, key):
@@ -3271,22 +3273,17 @@ class FileManager:
             # Enter - create archive
             self.perform_create_archive()
             return True
-        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
-            # Backspace - remove last character
-            if self.create_archive_pattern:
-                self.create_archive_pattern = self.create_archive_pattern[:-1]
+        else:
+            # Let the editor handle other keys
+            if self.create_archive_editor.handle_key(key):
                 self.needs_full_redraw = True
-            return True
-        elif 32 <= key <= 126:  # Printable characters
-            self.create_archive_pattern += chr(key)
-            self.needs_full_redraw = True
-            return True
+                return True
         
         return False
     
     def perform_create_archive(self):
         """Create the archive file"""
-        if not self.create_archive_pattern.strip():
+        if not self.create_archive_editor.text.strip():
             print("Archive filename cannot be empty")
             return
         
@@ -3314,7 +3311,7 @@ class FileManager:
             return
         
         # Determine archive path (save to other pane's directory)
-        archive_filename = self.create_archive_pattern.strip()
+        archive_filename = self.create_archive_editor.text.strip()
         archive_path = other_pane['path'] / archive_filename
         
         # Detect archive format from extension
@@ -3658,17 +3655,11 @@ class FileManager:
             # Enter - create directory
             self.perform_create_directory()
             return True
-        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
-            # Backspace - remove last character
-            if self.create_dir_pattern:
-                self.create_dir_pattern = self.create_dir_pattern[:-1]
+        else:
+            # Let the editor handle other keys
+            if self.create_dir_editor.handle_key(key):
                 self.needs_full_redraw = True
-            return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Add character to directory name pattern
-            self.create_dir_pattern += chr(key)
-            self.needs_full_redraw = True
-            return True
+                return True
         
         # In create directory mode, capture most other keys to prevent unintended actions
         return True
