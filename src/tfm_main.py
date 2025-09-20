@@ -622,7 +622,7 @@ class FileManager:
         log_start_y = footer_y + 1
         
         # Use log manager to draw the log content
-        self.log_manager.draw_log_pane(self.stdscr, log_start_y, log_height - 1, width)
+        self.log_manager.draw_log_pane(self.stdscr, log_start_y, log_height, width)
                 
     def draw_status(self):
         """Draw status line with file info and controls"""

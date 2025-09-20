@@ -164,8 +164,7 @@ class FileOperations:
             elif direction < 0 and pane_data['selected_index'] > 0:
                 pane_data['selected_index'] -= 1
         
-        total_selected = len(pane_data['selected_files'])
-        return True, f"{message}\nTotal selected: {total_selected}"
+        return True, message
     
     def toggle_all_files_selection(self, pane_data):
         """Toggle selection status of all files (not directories) in current pane"""
@@ -194,8 +193,7 @@ class FileOperations:
             pane_data['selected_files'].update(files_only_str)
             message = f"Selected all {len(files_only)} files"
         
-        total_selected = len(pane_data['selected_files'])
-        return True, f"{message}\nTotal selected: {total_selected}"
+        return True, message
     
     def toggle_all_items_selection(self, pane_data):
         """Toggle selection status of all items (files and directories) in current pane"""
@@ -221,8 +219,7 @@ class FileOperations:
             pane_data['selected_files'].update(all_items_str)
             message = f"Selected all {len(all_items)} items"
         
-        total_selected = len(pane_data['selected_files'])
-        return True, f"{message}\nTotal selected: {total_selected}"
+        return True, message
     
     def find_matches(self, pane_data, pattern):
         """Find all files matching the fnmatch patterns in current pane
