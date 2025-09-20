@@ -4983,7 +4983,7 @@ class FileManager:
                 break
             
             # Check for startup redraw trigger (0.1 seconds after startup)
-            if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.1:
+            if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.033:
                 self.needs_full_redraw = True
                 delattr(self, 'startup_time')  # Remove the attribute to avoid repeated triggers
                 
@@ -5005,7 +5005,7 @@ class FileManager:
                 self.needs_full_redraw = False
             
             # Get user input with timeout to allow timer checks
-            self.stdscr.timeout(50)  # 50ms timeout
+            self.stdscr.timeout(16)  # 16ms timeout
             key = self.stdscr.getch()
             current_pane = self.get_current_pane()
             
