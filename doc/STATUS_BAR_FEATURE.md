@@ -19,6 +19,13 @@ Line 45/127 (35%) | 2.3K                           PY | NUM | SYNTAX
 - **Column Position**: When horizontally scrolled, shows current column
 - **File Size**: Displays file size in appropriate units (B, K, M, G)
 
+### Archive Creation Progress
+When creating archives, the status bar displays real-time progress:
+- **Format**: `Creating archive... 45/120 (37%) - filename.txt`
+- **File Counter**: Shows processed/total files
+- **Percentage**: Completion percentage
+- **Current File**: Name of file being processed (truncated if too long)
+
 ### Right Side: File Type & Active Options
 - **File Format**: File extension in uppercase (PY, JSON, MD, etc.)
 - **NUM**: Displayed when line numbers are enabled
@@ -45,6 +52,11 @@ Line 10/20 (50%) | 3.4K                             TXT | NUM | WRAP
 ### Large Markdown File at End
 ```
 Line 500/500 (100%) | 45.2K                         MD | NUM | SYNTAX
+```
+
+### Archive Creation in Progress
+```
+Creating archive... 45/120 (37%) - long_filename_that_gets_truncated.txt
 ```
 
 ## Dynamic Updates

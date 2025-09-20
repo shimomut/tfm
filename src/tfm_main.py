@@ -71,6 +71,9 @@ class FileManager:
         self.isearch_matches = []
         self.isearch_match_index = 0
         
+        # Archive creation progress state
+        self.archive_progress = None
+        
         # Dialog state (now handled by general_dialog)
         self.rename_file_path = None  # Still needed for rename operations
         
@@ -619,6 +622,29 @@ class FileManager:
         
         # All dialogs are now handled as overlays in main drawing loop
             
+        # If showing archive progress, display it
+        if self.archive_progress:
+            # Fill entire status line with background color
+            status_line = " " * (width - 1)
+            self.safe_addstr(status_y, 0, status_line, get_status_color())
+            
+            # Show archive progress
+            current_file = self.archive_progress['current_file']
+            processed = self.archive_progress['processed']
+            total = self.archive_progress['total']
+            percentage = int((processed / total) * 100) if total > 0 else 0
+            
+            # Truncate filename if too long
+            max_filename_len = width // 2
+            if len(current_file) > max_filename_len:
+                current_file = "..." + current_file[-(max_filename_len-3):]
+            
+            progress_text = f"Creating archive... {processed}/{total} ({percentage}%) - {current_file}"
+            
+            # Draw progress text
+            self.safe_addstr(status_y, 2, progress_text, get_status_color())
+            return
+        
         # If in isearch mode, show isearch interface
         if self.isearch_mode:
             # Fill entire status line with background color
@@ -2188,6 +2214,9 @@ class FileManager:
             
             print(f"Created archive: {archive_filename}")
             
+            # Clear archive progress
+            self.archive_progress = None
+            
             # Refresh the current pane
             self.refresh_files(current_pane)
             
@@ -2203,6 +2232,8 @@ class FileManager:
             
         except Exception as e:
             print(f"Error creating archive: {e}")
+            # Clear archive progress on error too
+            self.archive_progress = None
             self.general_dialog.hide()
             self.needs_full_redraw = True
     
@@ -2259,14 +2290,35 @@ class FileManager:
             
             print(f"Archive created successfully: {archive_path}")
             
+            # Clear archive progress
+            self.archive_progress = None
+            
             # Refresh the other pane to show the new archive
             self.refresh_files(other_pane)
             self.needs_full_redraw = True
             
         except Exception as e:
             print(f"Error creating archive: {e}")
+            # Clear archive progress on error too
+            self.archive_progress = None
         
         self.exit_create_archive_mode()
+    
+    def update_archive_progress(self, current_file, processed, total):
+        """Update status bar with archive creation progress"""
+        # Store progress information for status bar display
+        self.archive_progress = {
+            'current_file': current_file,
+            'processed': processed,
+            'total': total
+        }
+        
+        # Force a screen refresh to show progress
+        try:
+            self.draw_status()
+            self.stdscr.refresh()
+        except:
+            pass  # Ignore drawing errors during progress updates
     
     def detect_archive_format(self, filename):
         """Detect archive format from filename extension"""
@@ -2282,10 +2334,25 @@ class FileManager:
             return None
     
     def create_zip_archive(self, archive_path, files_to_archive):
-        """Create a ZIP archive"""
+        """Create a ZIP archive with progress updates"""
+        # Count total files for progress tracking
+        total_files = 0
+        for file_path in files_to_archive:
+            if file_path.is_file():
+                total_files += 1
+            elif file_path.is_dir():
+                for root, dirs, files in os.walk(file_path):
+                    total_files += len(files)
+        
+        processed_files = 0
+        
         with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for file_path in files_to_archive:
                 if file_path.is_file():
+                    # Update progress
+                    processed_files += 1
+                    self.update_archive_progress(file_path.name, processed_files, total_files)
+                    
                     # Add file to archive
                     zipf.write(file_path, file_path.name)
                 elif file_path.is_dir():
@@ -2301,16 +2368,42 @@ class FileManager:
                         
                         # Add files in directory
                         for file in files:
+                            processed_files += 1
+                            self.update_archive_progress(file, processed_files, total_files)
+                            
                             file_full_path = root_path / file
                             file_rel_path = file_full_path.relative_to(file_path.parent)
                             zipf.write(file_full_path, str(file_rel_path))
     
     def create_tar_archive(self, archive_path, files_to_archive):
-        """Create a TAR.GZ archive"""
+        """Create a TAR.GZ archive with progress updates"""
+        # Count total files for progress tracking
+        total_files = 0
+        for file_path in files_to_archive:
+            if file_path.is_file():
+                total_files += 1
+            elif file_path.is_dir():
+                for root, dirs, files in os.walk(file_path):
+                    total_files += len(files)
+        
+        processed_files = 0
+        
         with tarfile.open(archive_path, 'w:gz') as tarf:
             for file_path in files_to_archive:
-                # Add file or directory to archive with its name as the archive name
-                tarf.add(file_path, arcname=file_path.name)
+                if file_path.is_file():
+                    processed_files += 1
+                    self.update_archive_progress(file_path.name, processed_files, total_files)
+                    tarf.add(file_path, arcname=file_path.name)
+                elif file_path.is_dir():
+                    # For directories, we need to track individual files being added
+                    def progress_filter(tarinfo):
+                        nonlocal processed_files
+                        if tarinfo.isfile():
+                            processed_files += 1
+                            self.update_archive_progress(tarinfo.name, processed_files, total_files)
+                        return tarinfo
+                    
+                    tarf.add(file_path, arcname=file_path.name, filter=progress_filter)
     
     def extract_selected_archive(self):
         """Extract the selected archive file to the other pane"""

@@ -102,12 +102,20 @@ self.create_archive_pattern = ""
 - Handles both files and directories
 - Preserves directory structure
 - Uses ZIP_DEFLATED compression
+- **NEW**: Provides real-time progress updates during creation
 
 ##### `create_tar_archive(archive_path, files_to_archive)`
 - Creates TAR.GZ archives using tarfile module
 - Handles both files and directories
 - Uses gzip compression
 - Preserves directory structure and permissions
+- **NEW**: Provides real-time progress updates during creation
+
+##### `update_archive_progress(current_file, processed, total)`
+- **NEW**: Updates status bar with current progress information
+- Stores progress state for status bar display
+- Forces screen refresh to show real-time updates
+- Handles display formatting and filename truncation
 
 ### User Interface Integration
 
@@ -198,15 +206,40 @@ KEY_BINDINGS = {
 }
 ```
 
+## Progress Indication
+
+### Real-time Progress Updates
+When creating large archives, TFM now displays real-time progress information in the status bar:
+
+- **Current File**: Shows the name of the file currently being processed
+- **Progress Counter**: Displays processed/total files (e.g., "45/120")
+- **Percentage**: Shows completion percentage (e.g., "37%")
+- **Status Format**: `Creating archive... 45/120 (37%) - filename.txt`
+
+### Progress Features
+- **File Count Calculation**: Pre-scans directories to provide accurate total file counts
+- **Real-time Updates**: Status bar updates for each file processed
+- **Long Filename Handling**: Truncates long filenames to fit in the status bar
+- **Automatic Cleanup**: Progress display clears when archive creation completes or fails
+
+### Implementation Details
+The progress system works by:
+1. **Pre-scanning**: Counts all files that will be archived before starting
+2. **Progress Tracking**: Updates a counter for each file processed
+3. **Status Display**: Shows progress in the status bar with current filename
+4. **Screen Refresh**: Forces screen updates to show progress in real-time
+
+This enhancement significantly improves user experience when creating large archives, providing clear feedback about the operation's progress and estimated completion.
+
 ## Future Enhancements
 
 Potential improvements for future versions:
 - Support for additional formats (7z, rar, bz2)
 - Compression level selection
-- Progress indication for large archives
 - Archive extraction feature
 - Archive preview/listing feature
 - Batch archive operations
+- Progress indication for archive extraction
 
 ## Files Modified
 
