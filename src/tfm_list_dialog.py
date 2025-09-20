@@ -462,3 +462,86 @@ class ListDialogHelpers:
                 print_func("Program selection cancelled")
         
         list_dialog.show("External Programs", display_items, program_callback)
+    
+    @staticmethod
+    def show_compare_selection(list_dialog, current_pane, other_pane, print_func):
+        """Show compare selection menu to select files based on comparison with other pane"""
+        
+        # Define comparison options
+        compare_options = [
+            "By filename",
+            "By filename and size", 
+            "By filename, size, and timestamp"
+        ]
+        
+        def compare_callback(selected_option):
+            if not selected_option:
+                print_func("Compare selection cancelled")
+                return
+            
+            # Get files from other pane for comparison
+            other_files = {}
+            for file_path in other_pane['files']:
+                if file_path.is_file():  # Only compare files, not directories
+                    name = file_path.name
+                    size = file_path.stat().st_size if file_path.exists() else 0
+                    mtime = file_path.stat().st_mtime if file_path.exists() else 0
+                    other_files[name] = {'size': size, 'mtime': mtime, 'path': file_path}
+            
+            if not other_files:
+                print_func("No files in other pane to compare with")
+                return
+            
+            # Find matching files in current pane based on selected criteria
+            matching_files = []
+            total_files = 0
+            
+            for file_path in current_pane['files']:
+                if file_path.is_file():  # Only compare files, not directories
+                    total_files += 1
+                    name = file_path.name
+                    
+                    if name in other_files:
+                        other_file = other_files[name]
+                        is_match = False
+                        
+                        if selected_option == "By filename":
+                            # Just filename match
+                            is_match = True
+                            
+                        elif selected_option == "By filename and size":
+                            # Filename and size match
+                            try:
+                                current_size = file_path.stat().st_size if file_path.exists() else 0
+                                is_match = current_size == other_file['size']
+                            except:
+                                is_match = False
+                                
+                        elif selected_option == "By filename, size, and timestamp":
+                            # Filename, size, and timestamp match
+                            try:
+                                current_size = file_path.stat().st_size if file_path.exists() else 0
+                                current_mtime = file_path.stat().st_mtime if file_path.exists() else 0
+                                is_match = (current_size == other_file['size'] and 
+                                          abs(current_mtime - other_file['mtime']) < 1.0)  # Allow 1 second difference
+                            except:
+                                is_match = False
+                        
+                        if is_match:
+                            matching_files.append(str(file_path))
+            
+            # Select the matching files
+            if matching_files:
+                # Clear current selections
+                current_pane['selected_files'].clear()
+                
+                # Add matching files to selection
+                for file_path_str in matching_files:
+                    current_pane['selected_files'].add(file_path_str)
+                
+                print_func(f"Selected {len(matching_files)} files in current pane matching {selected_option.lower()}")
+                print_func(f"Criteria: {selected_option}")
+            else:
+                print_func(f"No files found matching {selected_option.lower()}")
+        
+        list_dialog.show("Compare Selection", compare_options, compare_callback)

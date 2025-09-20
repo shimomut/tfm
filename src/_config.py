@@ -52,6 +52,7 @@ class Config:
         'programs': ['x'],
         'create_archive': ['p', 'P'],
         'extract_archive': ['u', 'U'],
+        'compare_selection': ['w', 'W'],
     }
     
     # Directory settings

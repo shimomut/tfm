@@ -64,6 +64,7 @@ class DefaultConfig:
         'programs': ['x'],
         'create_archive': ['p', 'P'],
         'extract_archive': ['u', 'U'],
+        'compare_selection': ['w', 'W'],
     }
     
     # File associations (for future use)

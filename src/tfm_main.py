@@ -1319,6 +1319,22 @@ class FileManager:
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
+    def show_compare_selection_dialog(self):
+        """Show compare selection dialog to select files based on comparison with other pane"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Create a wrapper print function that also triggers redraw
+        def print_with_redraw(message):
+            print(message)
+            self.needs_full_redraw = True
+        
+        ListDialogHelpers.show_compare_selection(
+            self.list_dialog, current_pane, other_pane, print_with_redraw
+        )
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
+    
     def show_view_options(self):
         """Show view options dialog with toggle options"""
         def handle_view_option(option):
@@ -2911,6 +2927,8 @@ class FileManager:
                 self.show_favorite_directories()
             elif self.is_key_for_action(key, 'programs'):  # Show external programs
                 self.show_programs_dialog()
+            elif self.is_key_for_action(key, 'compare_selection'):  # Show compare selection menu
+                self.show_compare_selection_dialog()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50

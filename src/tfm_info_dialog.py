@@ -202,6 +202,7 @@ class InfoDialogHelpers:
         help_lines.append("• Shift+Space: Toggle selection and move up")
         help_lines.append("• Ctrl+A: Toggle all files selection")
         help_lines.append("• Shift+Ctrl+A: Toggle all items selection")
+        help_lines.append("• W: Compare selection (select files matching other pane)")
         help_lines.append("• F5: Copy selected files")
         help_lines.append("• F6: Move selected files")
         help_lines.append("• F8/Delete: Delete selected files")
