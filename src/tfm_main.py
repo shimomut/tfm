@@ -345,6 +345,58 @@ class FileManager:
             self.pane_manager.adjust_scroll_for_selection(other_pane, display_height)
             self.needs_full_redraw = True
         
+    def restore_cursor_position(self, pane_data):
+        """Restore cursor position from history - wrapper for pane_manager method"""
+        height, width = self.stdscr.getmaxyx()
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        display_height = height - log_height - 4
+        return self.pane_manager.restore_cursor_position(pane_data, display_height)
+    
+    def save_cursor_position(self, pane_data):
+        """Save cursor position to history - wrapper for pane_manager method"""
+        return self.pane_manager.save_cursor_position(pane_data)
+    
+    def adjust_scroll_for_selection(self, pane_data):
+        """Adjust scroll for selection - wrapper for pane_manager method"""
+        height, width = self.stdscr.getmaxyx()
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        display_height = height - log_height - 4
+        return self.pane_manager.adjust_scroll_for_selection(pane_data, display_height)
+    
+    def find_matches(self, pattern):
+        """Find matches - wrapper for file_operations method"""
+        current_pane = self.get_current_pane()
+        return self.file_operations.find_matches(current_pane, pattern)
+    
+    def apply_filter(self):
+        """Apply filter - wrapper for file_operations method"""
+        current_pane = self.get_current_pane()
+        filter_pattern = self.filter_editor.get_text()
+        count = self.file_operations.apply_filter(current_pane, filter_pattern)
+        
+        # Log the filter action
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
+        
+        if filter_pattern:
+            print(f"Applied filter '{filter_pattern}' to {pane_name} pane")
+            print(f"Showing {count} items")
+        
+        self.needs_full_redraw = True
+    
+    def clear_filter(self):
+        """Clear filter - wrapper for file_operations method"""
+        current_pane = self.get_current_pane()
+        
+        if self.file_operations.clear_filter(current_pane):
+            # Log the clear action
+            pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
+            
+            print(f"Cleared filter from {pane_name} pane")
+            
+            self.needs_full_redraw = True
+    
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
         self.log_manager.restore_stdio()
@@ -849,7 +901,7 @@ class FileManager:
         # Normal status display
         # Left side: status info
         status_parts = []
-        if self.show_hidden:
+        if self.file_operations.show_hidden:
             status_parts.append("showing hidden")
         
         # Add log scroll percentage
@@ -1075,7 +1127,7 @@ class FileManager:
         self.refresh_files(current_pane)
         
         # Log the filter action
-        pane_name = "left" if self.active_pane == 'left' else "right"
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         if filter_pattern:
             print(f"Applied filter '{filter_pattern}' to {pane_name} pane")
         else:
@@ -1092,7 +1144,7 @@ class FileManager:
         self.refresh_files(current_pane)
         
         # Log the clear action
-        pane_name = "left" if self.active_pane == 'left' else "right"
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         print(f"Cleared filter from {pane_name} pane")
         
         self.needs_full_redraw = True
@@ -2104,7 +2156,7 @@ class FileManager:
                             current_pane['scroll_offset'] = 0
                             current_pane['selected_files'].clear()  # Clear selections
                             
-                            pane_name = "left" if self.active_pane == 'left' else "right"
+                            pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
                             print(f"Changed {pane_name} pane to favorite: {old_path} → {target_path}")
                             self.needs_full_redraw = True
                         else:
@@ -2258,8 +2310,9 @@ class FileManager:
             init_colors(color_scheme)
             
             # Restore stdout/stderr capture
-            sys.stdout = LogCapture(self.log_messages, "STDOUT")
-            sys.stderr = LogCapture(self.log_messages, "STDERR")
+            from tfm_log_manager import LogCapture
+            sys.stdout = LogCapture(self.log_manager.log_messages, "STDOUT")
+            sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
             
             # Log return from program execution
             print(f"Returned from external program: {program['name']}")
@@ -2304,14 +2357,14 @@ class FileManager:
             self.needs_full_redraw = True
         
         # Show the dialog
-        pane_name = "left" if self.active_pane == 'left' else "right"
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         message = f"Sort {pane_name} pane by:"
         self.show_dialog(message, choices, handle_sort_choice)
     
     def quick_sort(self, sort_mode):
         """Quickly change sort mode without showing dialog, or toggle reverse if already sorted by this mode"""
         current_pane = self.get_current_pane()
-        pane_name = "left" if self.active_pane == 'left' else "right"
+        pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         
         # Check if we're already sorting by this mode
         if current_pane['sort_mode'] == sort_mode:
@@ -3502,16 +3555,16 @@ class FileManager:
         """Adjust the boundary between left and right panes"""
         if direction == 'left':
             # Make left pane smaller, right pane larger
-            self.left_pane_ratio = max(MIN_PANE_RATIO, self.left_pane_ratio - PANE_ADJUST_STEP)
+            self.pane_manager.left_pane_ratio = max(MIN_PANE_RATIO, self.pane_manager.left_pane_ratio - PANE_ADJUST_STEP)
         elif direction == 'right':
             # Make left pane larger, right pane smaller  
-            self.left_pane_ratio = min(MAX_PANE_RATIO, self.left_pane_ratio + PANE_ADJUST_STEP)
+            self.pane_manager.left_pane_ratio = min(MAX_PANE_RATIO, self.pane_manager.left_pane_ratio + PANE_ADJUST_STEP)
             
         # Trigger a full redraw for the new pane layout
         self.needs_full_redraw = True
         
         # Show immediate feedback in log pane
-        left_percent = int(self.left_pane_ratio * 100)
+        left_percent = int(self.pane_manager.left_pane_ratio * 100)
         right_percent = 100 - left_percent
         print(f"Pane split: {left_percent}% | {right_percent}%")
         
@@ -4161,9 +4214,10 @@ class FileManager:
             color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
             init_colors(color_scheme)
             
-            # Restore stdout/stderr capture
-            sys.stdout = LogCapture(self.log_messages, "STDOUT")
-            sys.stderr = LogCapture(self.log_messages, "STDERR")
+            # Restore stdout/stderr capture  
+            from tfm_log_manager import LogCapture
+            sys.stdout = LogCapture(self.log_manager.log_messages, "STDOUT")
+            sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
             
             # Log return from sub-shell
             print("Returned from sub-shell mode")
@@ -4285,19 +4339,17 @@ class FileManager:
             elif key == KEY_CTRL_D:  # Ctrl+D - make log pane larger
                 self.adjust_log_boundary('down')
             elif key == 11:  # Ctrl+K - scroll log up
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    self.log_scroll_offset += 1
+                if self.log_manager.scroll_log_up(1):
                     self.needs_full_redraw = True
             elif key == 12:  # Ctrl+L - scroll log down
-                if self.log_scroll_offset > 0:
-                    self.log_scroll_offset -= 1
+                if self.log_manager.scroll_log_down(1):
                     self.needs_full_redraw = True
             elif key == curses.KEY_RESIZE:  # Terminal window resized
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()
                 self.needs_full_redraw = True
             elif key == KEY_TAB:  # Tab key - switch panes
-                self.active_pane = 'right' if self.active_pane == 'left' else 'left'
+                self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
                 self.needs_full_redraw = True
             elif key == curses.KEY_UP:
                 if current_pane['selected_index'] > 0:
@@ -4311,12 +4363,12 @@ class FileManager:
                 self.handle_enter()
                 self.needs_full_redraw = True
             elif self.is_key_for_action(key, 'toggle_hidden'):
-                self.show_hidden = not self.show_hidden
+                self.file_operations.toggle_hidden_files()
                 # Reset both panes
-                self.left_pane['selected_index'] = 0
-                self.left_pane['scroll_offset'] = 0
-                self.right_pane['selected_index'] = 0
-                self.right_pane['scroll_offset'] = 0
+                self.pane_manager.left_pane['selected_index'] = 0
+                self.pane_manager.left_pane['scroll_offset'] = 0
+                self.pane_manager.right_pane['selected_index'] = 0
+                self.pane_manager.right_pane['scroll_offset'] = 0
                 self.needs_full_redraw = True
             elif self.is_key_for_action(key, 'toggle_color_scheme'):
                 # Toggle between dark and light color schemes
@@ -4336,10 +4388,7 @@ class FileManager:
                 self.needs_full_redraw = True
             elif key == curses.KEY_PPAGE:  # Page Up - scroll log up when Ctrl is held, otherwise file navigation
                 # Check if this is Ctrl+Page Up for log scrolling
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    # Try log scrolling first, fall back to file navigation
-                    self.log_scroll_offset += 5  # Scroll multiple lines
-                    self.log_scroll_offset = min(self.log_scroll_offset, len(self.log_messages) - 1)
+                if self.log_manager.scroll_log_up(5):
                     self.needs_full_redraw = True
                 else:
                     # Regular file navigation
@@ -4347,10 +4396,7 @@ class FileManager:
                     self.needs_full_redraw = True
             elif key == curses.KEY_NPAGE:  # Page Down - scroll log down when Ctrl is held, otherwise file navigation  
                 # Check if this is Ctrl+Page Down for log scrolling
-                if self.log_scroll_offset > 0:
-                    # Try log scrolling first, fall back to file navigation
-                    self.log_scroll_offset -= 5  # Scroll multiple lines
-                    self.log_scroll_offset = max(0, self.log_scroll_offset)
+                if self.log_manager.scroll_log_down(5):
                     self.needs_full_redraw = True
                 else:
                     # Regular file navigation
@@ -4378,7 +4424,7 @@ class FileManager:
                     except PermissionError:
                         self.show_error("Permission denied")
                         self.needs_full_redraw = True
-            elif key == curses.KEY_LEFT and self.active_pane == 'left':  # Left arrow in left pane - go to parent
+            elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
                         # Save current cursor position before changing directory
@@ -4399,7 +4445,7 @@ class FileManager:
                         self.needs_full_redraw = True
                     except PermissionError:
                         self.show_error("Permission denied")
-            elif key == curses.KEY_RIGHT and self.active_pane == 'right':  # Right arrow in right pane - go to parent
+            elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
                         # Save current cursor position before changing directory
@@ -4420,26 +4466,22 @@ class FileManager:
                         self.needs_full_redraw = True
                     except PermissionError:
                         self.show_error("Permission denied")
-            elif key == curses.KEY_RIGHT and self.active_pane == 'left':  # Right arrow in left pane - switch to right pane
-                self.active_pane = 'right'
-            elif key == curses.KEY_LEFT and self.active_pane == 'right':  # Left arrow in right pane - switch to left pane
-                self.active_pane = 'left'
+            elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'left':  # Right arrow in left pane - switch to right pane
+                self.pane_manager.active_pane = 'right'
+            elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
+                self.pane_manager.active_pane = 'left'
 
             elif key == 337:  # Shift+Up in many terminals
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    self.log_scroll_offset += 1
+                if self.log_manager.scroll_log_up(1):
                     self.needs_full_redraw = True
             elif key == 336:  # Shift+Down in many terminals  
-                if self.log_scroll_offset > 0:
-                    self.log_scroll_offset -= 1
+                if self.log_manager.scroll_log_down(1):
                     self.needs_full_redraw = True
             elif key == 393:  # Alternative Shift+Up code
-                if self.log_scroll_offset < len(self.log_messages) - 1:
-                    self.log_scroll_offset += 1
+                if self.log_manager.scroll_log_up(1):
                     self.needs_full_redraw = True
             elif key == 402:  # Alternative Shift+Down code
-                if self.log_scroll_offset > 0:
-                    self.log_scroll_offset -= 1
+                if self.log_manager.scroll_log_down(1):
                     self.needs_full_redraw = True
             elif self.is_key_for_action(key, 'select_file'):  # Toggle file selection
                 self.toggle_selection()
@@ -4532,7 +4574,7 @@ class FileManager:
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
-                self.left_pane_ratio = 0.5
+                self.pane_manager.left_pane_ratio = 0.5
                 self.needs_full_redraw = True
                 print("Pane split reset to 50% | 50%")
             elif self.is_key_for_action(key, 'subshell'):  # Sub-shell mode
