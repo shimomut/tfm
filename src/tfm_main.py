@@ -31,6 +31,7 @@ from tfm_log_manager import LogManager
 from tfm_pane_manager import PaneManager
 from tfm_file_operations import FileOperations
 from tfm_list_dialog import ListDialog, ListDialogHelpers
+from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 
 class FileManager:
     def __init__(self, stdscr):
@@ -47,6 +48,7 @@ class FileManager:
         self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path)
         self.file_operations = FileOperations(self.config)
         self.list_dialog = ListDialog(self.config)
+        self.info_dialog = InfoDialog(self.config)
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -88,11 +90,7 @@ class FileManager:
         self.quick_choice_selected = 0  # Index of currently selected choice
         self.should_quit = False  # Flag to control main loop exit
         
-        # Info dialog state
-        self.info_dialog_mode = False
-        self.info_dialog_title = ""
-        self.info_dialog_lines = []
-        self.info_dialog_scroll = 0
+
         
 
         
@@ -1595,11 +1593,8 @@ class FileManager:
     
 
     def show_info_dialog(self, title, info_lines):
-        """Show an information dialog with scrollable content"""
-        self.info_dialog_mode = True
-        self.info_dialog_title = title
-        self.info_dialog_lines = info_lines
-        self.info_dialog_scroll = 0
+        """Show an information dialog with scrollable content - wrapper for info dialog component"""
+        self.info_dialog.show(title, info_lines)
         self.needs_full_redraw = True
         
         # Force immediate display of the dialog
@@ -1618,8 +1613,8 @@ class FileManager:
         # Draw dialog overlays
         if self.list_dialog.mode:
             self.list_dialog.draw(self.stdscr, self.safe_addstr)
-        elif self.info_dialog_mode:
-            self.draw_info_dialog()
+        elif self.info_dialog.mode:
+            self.info_dialog.draw(self.stdscr, self.safe_addstr)
         elif self.search_dialog_mode:
             self.draw_search_dialog()
         elif self.batch_rename_mode:
@@ -1638,11 +1633,8 @@ class FileManager:
         self._force_immediate_redraw()
     
     def exit_info_dialog_mode(self):
-        """Exit info dialog mode"""
-        self.info_dialog_mode = False
-        self.info_dialog_title = ""
-        self.info_dialog_lines = []
-        self.info_dialog_scroll = 0
+        """Exit info dialog mode - wrapper for info dialog component"""
+        self.info_dialog.exit()
         self.needs_full_redraw = True
     
     def exit_list_dialog_mode(self):
@@ -1651,39 +1643,8 @@ class FileManager:
         self.needs_full_redraw = True
     
     def handle_info_dialog_input(self, key):
-        """Handle input while in info dialog mode"""
-        if key == 27 or key == ord('q') or key == ord('Q'):  # ESC or Q - close
-            self.exit_info_dialog_mode()
-            return True
-        elif key == curses.KEY_UP:
-            # Scroll up
-            if self.info_dialog_scroll > 0:
-                self.info_dialog_scroll -= 1
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_DOWN:
-            # Scroll down
-            max_scroll = max(0, len(self.info_dialog_lines) - 10)  # Assuming 10 visible lines
-            if self.info_dialog_scroll < max_scroll:
-                self.info_dialog_scroll += 1
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_PPAGE:  # Page Up
-            self.info_dialog_scroll = max(0, self.info_dialog_scroll - 10)
-            self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_NPAGE:  # Page Down
-            max_scroll = max(0, len(self.info_dialog_lines) - 10)
-            self.info_dialog_scroll = min(max_scroll, self.info_dialog_scroll + 10)
-            self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_HOME:  # Home - go to top
-            self.info_dialog_scroll = 0
-            self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_END:  # End - go to bottom
-            max_scroll = max(0, len(self.info_dialog_lines) - 10)
-            self.info_dialog_scroll = max_scroll
+        """Handle input while in info dialog mode - wrapper for info dialog component"""
+        if self.info_dialog.handle_input(key):
             self.needs_full_redraw = True
             return True
         return False
@@ -1697,104 +1658,7 @@ class FileManager:
     
 
     
-    def draw_info_dialog(self):
-        """Draw the info dialog overlay"""
-        height, width = self.stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions using configuration
-        width_ratio = getattr(self.config, 'INFO_DIALOG_WIDTH_RATIO', 0.8)
-        height_ratio = getattr(self.config, 'INFO_DIALOG_HEIGHT_RATIO', 0.8)
-        min_width = getattr(self.config, 'INFO_DIALOG_MIN_WIDTH', 20)
-        min_height = getattr(self.config, 'INFO_DIALOG_MIN_HEIGHT', 10)
-        
-        dialog_width = max(min_width, int(width * width_ratio))
-        dialog_height = max(min_height, int(height * height_ratio))
-        
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
-        
-        # Draw dialog background
-        for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                self.safe_addstr(y, start_x, bg_line, get_status_color())
-        
-        # Draw border
-        border_color = get_status_color() | curses.A_BOLD
-        
-        # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
-        
-        # Side borders
-        for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                self.safe_addstr(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
-        
-        # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
-        
-        # Draw title
-        if self.info_dialog_title and start_y >= 0:
-            title_text = f" {self.info_dialog_title} "
-            title_x = start_x + (dialog_width - len(title_text)) // 2
-            if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
-                self.safe_addstr(start_y, title_x, title_text, border_color)
-        
-        # Calculate content area
-        content_start_y = start_y + 2
-        content_end_y = start_y + dialog_height - 3
-        content_start_x = start_x + 2
-        content_width = dialog_width - 4
-        content_height = content_end_y - content_start_y + 1
-        
-        # Draw content lines
-        visible_lines = self.info_dialog_lines[self.info_dialog_scroll:self.info_dialog_scroll + content_height]
-        
-        for i, line in enumerate(visible_lines):
-            y = content_start_y + i
-            if y <= content_end_y and y < height:
-                # Truncate line if too long
-                display_line = line[:content_width] if len(line) > content_width else line
-                self.safe_addstr(y, content_start_x, display_line, get_status_color())
-        
-        # Draw scroll indicators
-        if len(self.info_dialog_lines) > content_height:
-            # Show scroll position
-            total_lines = len(self.info_dialog_lines)
-            scroll_pos = self.info_dialog_scroll
-            
-            # Scroll bar on the right side
-            scrollbar_x = start_x + dialog_width - 2
-            scrollbar_start_y = content_start_y
-            scrollbar_height = content_height
-            
-            # Calculate scroll thumb position
-            if total_lines > 0:
-                thumb_pos = int((scroll_pos / max(1, total_lines - content_height)) * (scrollbar_height - 1))
-                thumb_pos = max(0, min(scrollbar_height - 1, thumb_pos))
-                
-                for i in range(scrollbar_height):
-                    y = scrollbar_start_y + i
-                    if y < height:
-                        if i == thumb_pos:
-                            self.safe_addstr(y, scrollbar_x, "█", border_color)
-                        else:
-                            self.safe_addstr(y, scrollbar_x, "░", get_status_color() | curses.A_DIM)
-        
-        # Draw help text at bottom
-        help_text = "↑↓:scroll  PgUp/PgDn:page  Home/End:top/bottom  Q/ESC:close"
-        help_y = start_y + dialog_height - 2
-        if help_y < height and len(help_text) <= content_width:
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+
     
 
     
@@ -2043,97 +1907,10 @@ class FileManager:
             print("No valid files to show details for")
             return
         
-        # Generate details for each file
-        details_lines = []
-        
-        for file_path in files_to_show:
-            try:
-                # Get file stats
-                stat_info = file_path.stat()
-                
-                # Basic info
-                details_lines.append(f"File: {file_path.name}")
-                details_lines.append(f"Path: {file_path}")
-                
-                # Type
-                if file_path.is_dir():
-                    details_lines.append("Type: Directory")
-                elif file_path.is_file():
-                    details_lines.append("Type: File")
-                elif file_path.is_symlink():
-                    details_lines.append("Type: Symbolic Link")
-                    try:
-                        target = file_path.readlink()
-                        details_lines.append(f"Target: {target}")
-                    except:
-                        details_lines.append("Target: <unreadable>")
-                else:
-                    details_lines.append("Type: Special")
-                
-                # Size
-                if file_path.is_file():
-                    size = stat_info.st_size
-                    if size < 1024:
-                        size_str = f"{size} bytes"
-                    elif size < 1024 * 1024:
-                        size_str = f"{size / 1024:.1f} KB"
-                    elif size < 1024 * 1024 * 1024:
-                        size_str = f"{size / (1024 * 1024):.1f} MB"
-                    else:
-                        size_str = f"{size / (1024 * 1024 * 1024):.1f} GB"
-                    details_lines.append(f"Size: {size_str}")
-                elif file_path.is_dir():
-                    # Count directory contents
-                    try:
-                        contents = list(file_path.iterdir())
-                        dir_count = sum(1 for item in contents if item.is_dir())
-                        file_count = sum(1 for item in contents if item.is_file())
-                        details_lines.append(f"Contents: {dir_count} directories, {file_count} files")
-                    except PermissionError:
-                        details_lines.append("Contents: <permission denied>")
-                    except:
-                        details_lines.append("Contents: <error reading>")
-                
-                # Timestamps
-                import time
-                mod_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat_info.st_mtime))
-                details_lines.append(f"Modified: {mod_time}")
-                
-                access_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat_info.st_atime))
-                details_lines.append(f"Accessed: {access_time}")
-                
-                # Permissions
-                import stat
-                mode = stat_info.st_mode
-                perms = stat.filemode(mode)
-                details_lines.append(f"Permissions: {perms}")
-                
-                # Owner info (Unix-like systems)
-                try:
-                    import pwd
-                    import grp
-                    owner = pwd.getpwuid(stat_info.st_uid).pw_name
-                    group = grp.getgrgid(stat_info.st_gid).gr_name
-                    details_lines.append(f"Owner: {owner}:{group}")
-                except:
-                    details_lines.append(f"Owner: UID {stat_info.st_uid}, GID {stat_info.st_gid}")
-                
-                # Add separator if multiple files
-                if len(files_to_show) > 1:
-                    details_lines.append("-" * 50)
-                
-            except Exception as e:
-                details_lines.append(f"Error reading {file_path.name}: {str(e)}")
-                if len(files_to_show) > 1:
-                    details_lines.append("-" * 50)
-        
-        # Show the details in a dialog
-        if len(files_to_show) == 1:
-            title = f"Details: {files_to_show[0].name}"
-        else:
-            title = f"Details: {len(files_to_show)} items"
-        
-        self.show_info_dialog(title, details_lines)
+        # Use the helper method to show file details
+        InfoDialogHelpers.show_file_details(self.info_dialog, files_to_show, current_pane)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def print_color_scheme_info(self):
         """Print current color scheme information to the log"""
@@ -2154,108 +1931,9 @@ class FileManager:
     
     def show_help_dialog(self):
         """Show help dialog with key bindings and usage information"""
-        help_lines = []
-        
-        # Title and version info
-        help_lines.append(f"TFM {VERSION} - Terminal File Manager")
-        help_lines.append(f"GitHub: {GITHUB_URL}")
-        help_lines.append("")
-        
-        # Navigation section
-        help_lines.append("=== NAVIGATION ===")
-        help_lines.append("↑↓               Navigate files")
-        help_lines.append("←→               Switch panes / Navigate directories")
-        help_lines.append("Tab              Switch between panes")
-        help_lines.append("Enter            Open directory / View file")
-        help_lines.append("Backspace        Go to parent directory")
-        help_lines.append("Home / End       Go to first / last file")
-        help_lines.append("Page Up/Down     Navigate by page")
-        help_lines.append("")
-        
-        # File operations section
-        help_lines.append("=== FILE OPERATIONS ===")
-        help_lines.append("Space            Select/deselect file")
-        help_lines.append("Ctrl+Space       Select file and move up")
-        help_lines.append("a                Select all files")
-        help_lines.append("A                Select all items (files + directories)")
-        help_lines.append("v / V            View text file")
-        help_lines.append("e                Edit existing file with text editor")
-        help_lines.append("E                Create new text file and edit")
-        help_lines.append("i / I            Show file details")
-        help_lines.append("c / C            Copy files to other pane")
-        help_lines.append("m / M            Move files to other pane / Create directory (no selection)")
-        help_lines.append("k / K            Delete files")
-        help_lines.append("r / R            Rename file (single) / Batch rename (multiple selected)")
-        help_lines.append("p / P            Create archive from selected files")
-        help_lines.append("u / U            Extract archive to other pane")
-        help_lines.append("")
-        
-        # Search and sorting section
-        help_lines.append("=== SEARCH & SORTING ===")
-        help_lines.append("f / F            Search files")
-        help_lines.append(";                Filter files by filename pattern")
-        help_lines.append("                 (files only, directories always shown)")
-        help_lines.append("                 (fnmatch: *.py, test_*, *.[ch], etc.)")
-        help_lines.append(": (Shift+;)      Clear filter from current pane")
-        help_lines.append("s / S            Sort menu")
-        help_lines.append("1                Quick sort by name (toggle reverse if already active)")
-        help_lines.append("2                Quick sort by size (toggle reverse if already active)")
-        help_lines.append("3                Quick sort by date (toggle reverse if already active)")
-        help_lines.append("")
-        
-        # View options section
-        help_lines.append("=== VIEW OPTIONS ===")
-        help_lines.append(".                Toggle hidden files")
-        help_lines.append("t                Toggle color scheme (Dark/Light)")
-        help_lines.append("o                Sync current pane to other pane")
-        help_lines.append("O                Sync other pane to current pane")
-        help_lines.append("-                Reset pane split to 50/50")
-        help_lines.append("Opt+← / Opt+→    Adjust pane boundary")
-        help_lines.append("")
-        
-        # Log pane controls section
-        help_lines.append("=== LOG PANE CONTROLS ===")
-        help_lines.append("Ctrl+U           Make log pane smaller")
-        help_lines.append("Ctrl+D           Make log pane larger")
-        help_lines.append("Ctrl+K           Scroll log up")
-        help_lines.append("Ctrl+L           Scroll log down")
-        help_lines.append("l                Scroll log up (alternative)")
-        help_lines.append("L                Scroll log down (alternative)")
-        help_lines.append("")
-        
-        # General controls section
-        help_lines.append("=== GENERAL ===")
-        help_lines.append("? / h            Show this help")
-        help_lines.append("q / Q            Quit TFM")
-        help_lines.append("x / X            Execute external programs")
-        help_lines.append("z / Z            Enter sub-shell mode")
-        help_lines.append("ESC              Cancel current operation")
-        help_lines.append("")
-        
-        # Configuration info
-        help_lines.append("=== CONFIGURATION ===")
-        help_lines.append("Configuration file: _config.py")
-        help_lines.append("Customize key bindings, colors, and behavior")
-        help_lines.append("See CONFIGURATION_SYSTEM.md for details")
-        help_lines.append("")
-        
-        # Tips section
-        help_lines.append("=== TIPS ===")
-        help_lines.append("• Use multi-selection with Space to operate on multiple files")
-        help_lines.append("• Batch rename (R with multiple files) supports regex and macros:")
-        help_lines.append("  \\0=full name, \\1-\\9=regex groups, \\d=index number")
-        help_lines.append("• Search supports multiple patterns separated by spaces")
-        help_lines.append("• Log pane shows operation results and system messages")
-        help_lines.append("• File details (i) shows comprehensive file information")
-        help_lines.append("• Text viewer (v) supports syntax highlighting")
-        help_lines.append("• External programs (x) execute with TFM environment variables")
-        help_lines.append("• Sub-shell mode (z) provides environment variables:")
-        help_lines.append("  TFM_LEFT_DIR, TFM_RIGHT_DIR, TFM_THIS_DIR, TFM_OTHER_DIR")
-        help_lines.append("  TFM_LEFT_SELECTED, TFM_RIGHT_SELECTED, TFM_THIS_SELECTED, TFM_OTHER_SELECTED")
-        help_lines.append("• Archive operations support ZIP, TAR.GZ, and TGZ formats")
-        help_lines.append("• Archive extraction creates directory with archive base name")
-        
-        self.show_info_dialog("TFM Help", help_lines)
+        InfoDialogHelpers.show_help_dialog(self.info_dialog)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def view_selected_text_file(self):
         """View the selected file in text viewer if it's a text file"""
@@ -3887,8 +3565,8 @@ class FileManager:
                 # Draw dialog overlays on top of the interface
                 if self.list_dialog.mode:
                     self.list_dialog.draw(self.stdscr, self.safe_addstr)
-                elif self.info_dialog_mode:
-                    self.draw_info_dialog()
+                elif self.info_dialog.mode:
+                    self.info_dialog.draw(self.stdscr, self.safe_addstr)
                 elif self.search_dialog_mode:
                     self.draw_search_dialog()
                 elif self.batch_rename_mode:
@@ -3943,7 +3621,7 @@ class FileManager:
                     continue  # Quick choice mode handled the key
             
             # Handle info dialog mode input
-            if self.info_dialog_mode:
+            if self.info_dialog.mode:
                 if self.handle_info_dialog_input(key):
                     continue  # Info dialog mode handled the key
             
@@ -3964,7 +3642,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog.mode or self.search_dialog_mode or self.batch_rename_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
+            if self.quick_choice_mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog_mode or self.batch_rename_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
