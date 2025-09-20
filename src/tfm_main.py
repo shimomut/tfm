@@ -616,14 +616,7 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
-        # If in quick choice mode, show quick choice bar
-        if self.quick_choice_bar.mode:
-            self.quick_choice_bar.draw(self.stdscr, self.safe_addstr, status_y, width)
-            return
-        
-        # All dialogs are now handled as overlays in main drawing loop
-            
-        # If showing progress for any operation, display it
+        # Progress display takes precedence over everything else during operations
         if self.progress_manager.is_operation_active():
             # Fill entire status line with background color
             status_line = " " * (width - 1)
@@ -635,6 +628,13 @@ class FileManager:
             # Draw progress text
             self.safe_addstr(status_y, 2, progress_text, get_status_color())
             return
+
+        # If in quick choice mode, show quick choice bar
+        if self.quick_choice_bar.mode:
+            self.quick_choice_bar.draw(self.stdscr, self.safe_addstr, status_y, width)
+            return
+        
+        # All dialogs are now handled as overlays in main drawing loop
         
         # If in isearch mode, show isearch interface
         if self.isearch_mode:
@@ -2357,53 +2357,66 @@ class FileManager:
     def _delete_directory_with_progress(self, dir_path, processed_files, total_files):
         """Delete directory recursively with fine-grained progress updates"""
         try:
-            # Walk through directory and delete files one by one (in reverse order for safety)
-            all_paths = []
-            
-            # Collect all paths first
+            # Walk through directory and delete files one by one (bottom-up for safety)
             for root, dirs, files in os.walk(dir_path, topdown=False):
                 root_path = Path(root)
                 
-                # Add files first
+                # Delete files in current directory
                 for file_name in files:
                     file_path = root_path / file_name
-                    all_paths.append(file_path)
+                    processed_files += 1
+                    
+                    if total_files > 1:
+                        # Show relative path from the main directory being deleted
+                        try:
+                            rel_path = file_path.relative_to(dir_path)
+                            display_name = str(rel_path)
+                        except ValueError:
+                            display_name = file_path.name
+                        
+                        self.progress_manager.update_progress(display_name, processed_files)
+                    
+                    try:
+                        file_path.unlink()  # Remove file or symlink
+                    except Exception as e:
+                        print(f"Error deleting {file_path}: {e}")
+                        if total_files > 1:
+                            self.progress_manager.increment_errors()
                 
-                # Add directories (they'll be deleted after their contents)
+                # Delete empty subdirectories (they should be empty now since we're going bottom-up)
                 for dir_name in dirs:
                     subdir_path = root_path / dir_name
-                    # Only add empty directories or symlinks to directories
-                    if subdir_path.is_symlink() or not any(subdir_path.iterdir()):
-                        all_paths.append(subdir_path)
-            
-            # Delete files with progress updates
-            for file_path in all_paths:
-                processed_files += 1
-                if total_files > 1:
-                    # Show relative path from the main directory being deleted
                     try:
-                        rel_path = file_path.relative_to(dir_path)
-                        display_name = str(rel_path)
-                    except ValueError:
-                        display_name = file_path.name
-                    
-                    self.progress_manager.update_progress(display_name, processed_files)
-                
-                try:
-                    if file_path.is_dir():
-                        file_path.rmdir()  # Remove empty directory
-                    else:
-                        file_path.unlink()  # Remove file or symlink
-                except Exception as e:
-                    print(f"Error deleting {file_path}: {e}")
-                    if total_files > 1:
-                        self.progress_manager.increment_errors()
+                        # Only try to remove if it's empty or a symlink
+                        if subdir_path.is_symlink():
+                            # Count symlinks to directories as files for progress
+                            processed_files += 1
+                            if total_files > 1:
+                                try:
+                                    rel_path = subdir_path.relative_to(dir_path)
+                                    display_name = f"Link: {rel_path}"
+                                except ValueError:
+                                    display_name = f"Link: {subdir_path.name}"
+                                self.progress_manager.update_progress(display_name, processed_files)
+                            subdir_path.unlink()
+                        else:
+                            # Try to remove empty directory (no progress update for empty dirs)
+                            subdir_path.rmdir()
+                    except OSError:
+                        # Directory not empty or permission error - skip it
+                        # The directory will be handled by shutil.rmtree fallback if needed
+                        pass
+                    except Exception as e:
+                        print(f"Error deleting directory {subdir_path}: {e}")
+                        if total_files > 1:
+                            self.progress_manager.increment_errors()
             
             # Finally remove the main directory
             try:
                 dir_path.rmdir()
             except OSError:
                 # If directory is not empty, use shutil.rmtree as fallback
+                # This shouldn't happen if our bottom-up deletion worked correctly
                 shutil.rmtree(dir_path)
             
             return processed_files

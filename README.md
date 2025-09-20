@@ -48,7 +48,7 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 - **Create Directories**: Create new directories with 'M' key (when no selection)
 - **Create Archives**: Create ZIP, TAR.GZ, or TGZ archives with 'P' key
 - **Extract Archives**: Extract ZIP, TAR.GZ, TGZ archives with 'U' key to other pane
-- **Progress Tracking**: Real-time progress display for multi-file operations (copy, move, delete, archive)
+- **Fine-Grained Progress**: Real-time progress display for individual files in multi-file operations (copy, move, delete, archive)
 - **Multi-Selection**: Select multiple files with Space bar for batch operations
 - **Advanced Selection**: Select all files ('a'), all items ('A'), or toggle selection upward (Ctrl+Space)
 - **Conflict Resolution**: Interactive dialogs for handling existing files

@@ -22,6 +22,8 @@ class ProgressManager:
     def __init__(self):
         self.current_operation: Optional[Dict[str, Any]] = None
         self.progress_callback: Optional[Callable] = None
+        self.last_callback_time: float = 0
+        self.callback_throttle_ms: float = 50  # Minimum 50ms between callbacks
     
     def start_operation(self, operation_type: OperationType, total_items: int, 
                        description: str = "", progress_callback: Optional[Callable] = None):
@@ -64,9 +66,18 @@ class ProgressManager:
         else:
             self.current_operation['processed_items'] += 1
         
-        # Call callback with updated state
+        # Call callback with updated state (with throttling)
         if self.progress_callback:
-            self.progress_callback(self.current_operation)
+            import time
+            current_time = time.time() * 1000  # Convert to milliseconds
+            
+            # Always call callback for the first update or if enough time has passed
+            if (self.last_callback_time == 0 or 
+                current_time - self.last_callback_time >= self.callback_throttle_ms or
+                self.current_operation['processed_items'] >= self.current_operation['total_items']):
+                
+                self.progress_callback(self.current_operation)
+                self.last_callback_time = current_time
     
     def increment_errors(self):
         """Increment the error count for the current operation"""
@@ -81,6 +92,7 @@ class ProgressManager:
         
         self.current_operation = None
         self.progress_callback = None
+        self.last_callback_time = 0  # Reset throttling
     
     def is_operation_active(self) -> bool:
         """Check if an operation is currently being tracked"""
