@@ -37,7 +37,7 @@ class DefaultConfig:
     KEY_BINDINGS = {
         'quit': ['q', 'Q'],
         'help': ['?', 'h'],
-        'toggle_hidden': ['H'],
+        'toggle_hidden': ['.'],
         'search': ['f'],
         'search_dialog': ['F'],
         'search_content': ['G'],

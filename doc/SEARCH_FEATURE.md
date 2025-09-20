@@ -77,7 +77,7 @@ The search feature integrates seamlessly with TFM's existing functionality:
 - Works in both left and right panes
 - Respects the current directory context
 - Maintains file selection state
-- Compatible with hidden file toggle (`h` key)
+- Compatible with hidden file toggle (`.` key)
 - Does not interfere with other TFM operations
 
 ## Technical Details

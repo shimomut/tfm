@@ -31,7 +31,7 @@ class Config:
     KEY_BINDINGS = {
         'quit': ['q', 'Q'],
         'help': ['?', 'h'],
-        'toggle_hidden': ['H'],
+        'toggle_hidden': ['.'],
         'search': ['f', 'F'],
         'sort_menu': ['s', 'S'],
         'file_details': ['i', 'I'],

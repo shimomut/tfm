@@ -56,7 +56,7 @@ def generate_help_content():
     
     # View options section
     help_lines.append("=== VIEW OPTIONS ===")
-    help_lines.append("H                Toggle hidden files")
+    help_lines.append(".                Toggle hidden files")
     help_lines.append("o                Sync current pane to other pane")
     help_lines.append("O                Sync other pane to current pane")
     help_lines.append("-                Reset pane split to 50/50")

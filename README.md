@@ -25,7 +25,7 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 ### Navigation & Display
 - **Directory Navigation**: Browse directories with arrow keys or vim-style navigation (j/k)
 - **File Information**: View file sizes, modification dates, and permissions
-- **Hidden Files**: Toggle visibility of hidden files with 'h'
+- **Hidden Files**: Toggle visibility of hidden files with '.'
 - **Sorting**: Multiple sort options (name, size, date, type)
 - **Color Coding**: 
   - Blue/bold for directories
@@ -166,7 +166,7 @@ The help dialog is your quick reference guide - no need to memorize all key bind
 ### View Options
 | Key | Action |
 |-----|--------|
-| `H` | Toggle hidden files |
+| `.` | Toggle hidden files |
 | `o` | Sync current pane to other pane |
 | `O` | Sync other pane to current pane |
 | `-` | Reset pane split to 50/50 |
@@ -526,7 +526,7 @@ make clean
 ### Keyboard Efficiency
 - **Selection Shortcuts**: 'a' for all files, 'A' for all items, Ctrl+Space for upward selection
 - **Pane Management**: Tab to switch, '-' to reset split, Opt+arrows to adjust
-- **Quick Access**: 'J' for favorites, '?' for help, 'H' to toggle hidden files
+- **Quick Access**: 'J' for favorites, '?' for help, '.' to toggle hidden files
 
 ## Troubleshooting
 

@@ -34,7 +34,7 @@ The help dialog is organized into clear sections:
 - Sort direction toggle (r/R)
 
 #### View Options
-- Hidden files toggle (H)
+- Hidden files toggle (.)
 - Pane synchronization (o/O)
 - Layout adjustments
 
