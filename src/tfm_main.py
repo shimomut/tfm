@@ -916,6 +916,7 @@ class FileManager:
             print("Invalid rename operation")
             self.general_dialog.hide()
             self.rename_file_path = None
+            self.needs_full_redraw = True
             return
         
         original_name = self.rename_file_path.name
@@ -924,6 +925,7 @@ class FileManager:
             print("Name unchanged")
             self.general_dialog.hide()
             self.rename_file_path = None
+            self.needs_full_redraw = True
             return
         
         try:
@@ -935,6 +937,7 @@ class FileManager:
                 print(f"File '{new_name}' already exists")
                 self.general_dialog.hide()
                 self.rename_file_path = None
+                self.needs_full_redraw = True
                 return
             
             # Perform the rename
@@ -954,15 +957,18 @@ class FileManager:
             
             self.general_dialog.hide()
             self.rename_file_path = None
+            self.needs_full_redraw = True
             
         except PermissionError:
             print(f"Permission denied: Cannot rename '{original_name}'")
             self.general_dialog.hide()
             self.rename_file_path = None
+            self.needs_full_redraw = True
         except OSError as e:
             print(f"Error renaming file: {e}")
             self.general_dialog.hide()
             self.rename_file_path = None
+            self.needs_full_redraw = True
     
     def on_rename_cancel(self):
         """Handle rename cancellation"""
@@ -992,6 +998,7 @@ class FileManager:
         if not dir_name.strip():
             print("Invalid directory name")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         current_pane = self.get_current_pane()
@@ -1002,6 +1009,7 @@ class FileManager:
         if new_dir_path.exists():
             print(f"Directory '{new_dir_name}' already exists")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         try:
@@ -1020,10 +1028,12 @@ class FileManager:
                     break
             
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             
         except OSError as e:
             print(f"Failed to create directory '{new_dir_name}': {e}")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
     
     def on_create_directory_cancel(self):
         """Handle create directory cancellation"""
@@ -1054,6 +1064,7 @@ class FileManager:
         if not file_name.strip():
             print("Invalid file name")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         current_pane = self.get_current_pane()
@@ -1064,6 +1075,7 @@ class FileManager:
         if new_file_path.exists():
             print(f"File '{new_file_name}' already exists")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         try:
@@ -1086,10 +1098,12 @@ class FileManager:
                 self.edit_selected_file()
             
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             
         except OSError as e:
             print(f"Failed to create file '{new_file_name}': {e}")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
     
     def on_create_file_cancel(self):
         """Handle create file cancellation"""
@@ -2063,6 +2077,7 @@ class FileManager:
         if not archive_name.strip():
             print("Invalid archive name")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         current_pane = self.get_current_pane()
@@ -2085,6 +2100,7 @@ class FileManager:
         if not files_to_archive:
             print("No files to archive")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         archive_filename = archive_name.strip()
@@ -2094,6 +2110,7 @@ class FileManager:
         if archive_path.exists():
             print(f"Archive '{archive_filename}' already exists")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             return
         
         try:
@@ -2107,6 +2124,7 @@ class FileManager:
             else:
                 print(f"Unsupported archive format. Use .zip, .tar.gz, or .tgz")
                 self.general_dialog.hide()
+                self.needs_full_redraw = True
                 return
             
             print(f"Created archive: {archive_filename}")
@@ -2122,10 +2140,12 @@ class FileManager:
                     break
             
             self.general_dialog.hide()
+            self.needs_full_redraw = True
             
         except Exception as e:
             print(f"Error creating archive: {e}")
             self.general_dialog.hide()
+            self.needs_full_redraw = True
     
     def on_create_archive_cancel(self):
         """Handle create archive cancellation"""
