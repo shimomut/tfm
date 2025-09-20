@@ -2166,6 +2166,7 @@ class FileManager:
             return
         
         current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
         
         # Get files to archive
         files_to_archive = []
@@ -2189,7 +2190,7 @@ class FileManager:
             return
         
         archive_filename = archive_name.strip()
-        archive_path = current_pane['path'] / archive_filename
+        archive_path = other_pane['path'] / archive_filename
         
         # Check if archive already exists
         if archive_path.exists():
@@ -2217,14 +2218,14 @@ class FileManager:
             # Clear archive progress
             self.archive_progress = None
             
-            # Refresh the current pane
-            self.refresh_files(current_pane)
+            # Refresh the other pane to show the new archive
+            self.refresh_files(other_pane)
             
-            # Try to select the new archive
-            for i, file_path in enumerate(current_pane['files']):
+            # Try to select the new archive in the other pane
+            for i, file_path in enumerate(other_pane['files']):
                 if file_path.name == archive_filename:
-                    current_pane['selected_index'] = i
-                    self.adjust_scroll_for_selection(current_pane)
+                    other_pane['selected_index'] = i
+                    self.adjust_scroll_for_selection(other_pane)
                     break
             
             self.general_dialog.hide()

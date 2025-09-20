@@ -13,7 +13,7 @@ This document describes the implementation of the archive creation feature in TF
   - TAR.GZ (.tar.gz)
   - TGZ (.tgz)
 - **Source**: Selected files/directories in the focused pane, or current file if none selected
-- **Destination**: Archive is saved in the non-focused pane's directory
+- **Destination**: Archive is saved in the inactive (non-focused) pane's directory
 - **Format Detection**: Automatic based on filename extension
 
 ### User Workflow
@@ -22,7 +22,7 @@ This document describes the implementation of the archive creation feature in TF
 3. Press P key to enter archive creation mode
 4. Enter filename with appropriate extension (.zip, .tar.gz, or .tgz)
 5. Press Enter to create archive or ESC to cancel
-6. Archive appears in the opposite pane's directory
+6. Archive appears in the inactive pane's directory
 
 ## Implementation Details
 
@@ -181,14 +181,14 @@ All tests pass successfully:
 2. Press P
 3. Enter: `backup.zip`
 4. Press Enter
-5. Archive appears in right pane
+5. Archive appears in inactive pane
 
 ### Creating a TAR.GZ Archive
 1. Position cursor on directory
 2. Press P  
 3. Enter: `project.tar.gz`
 4. Press Enter
-5. Compressed archive created in opposite pane
+5. Compressed archive created in inactive pane
 
 ### Supported Extensions
 - `project.zip` → ZIP format
