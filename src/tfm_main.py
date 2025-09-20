@@ -30,6 +30,7 @@ from tfm_text_viewer import view_text_file, is_text_file
 from tfm_log_manager import LogManager
 from tfm_pane_manager import PaneManager
 from tfm_file_operations import FileOperations
+from tfm_list_dialog import ListDialog, ListDialogHelpers
 
 class FileManager:
     def __init__(self, stdscr):
@@ -45,6 +46,7 @@ class FileManager:
         self.log_manager = LogManager(self.config)
         self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path)
         self.file_operations = FileOperations(self.config)
+        self.list_dialog = ListDialog(self.config)
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -92,15 +94,7 @@ class FileManager:
         self.info_dialog_lines = []
         self.info_dialog_scroll = 0
         
-        # List dialog state
-        self.list_dialog_mode = False
-        self.list_dialog_title = ""
-        self.list_dialog_items = []  # List of items to choose from
-        self.list_dialog_filtered_items = []  # Filtered items based on search
-        self.list_dialog_selected = 0  # Index of currently selected item in filtered list
-        self.list_dialog_scroll = 0  # Scroll offset for the list
-        self.list_dialog_search_editor = SingleLineTextEdit()  # Search editor for list dialog
-        self.list_dialog_callback = None  # Callback function when item is selected
+
         
         # Search dialog state
         self.search_dialog_mode = False
@@ -712,25 +706,7 @@ class FileManager:
                     self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
             return
         
-        # If in info dialog mode, show info dialog
-        if self.info_dialog_mode:
-            self.draw_info_dialog()
-            return
-            
-        # If in list dialog mode, show list dialog
-        if self.list_dialog_mode:
-            self.draw_list_dialog()
-            return
-            
-        # If in search dialog mode, show search dialog
-        if self.search_dialog_mode:
-            self.draw_search_dialog()
-            return
-        
-        # If in batch rename mode, show batch rename dialog
-        if self.batch_rename_mode:
-            self.draw_batch_rename_dialog()
-            return
+        # All dialogs are now handled as overlays in main drawing loop
             
         # If in isearch mode, show isearch interface
         if self.isearch_mode:
@@ -1625,24 +1601,41 @@ class FileManager:
         self.info_dialog_lines = info_lines
         self.info_dialog_scroll = 0
         self.needs_full_redraw = True
-    
-    def show_list_dialog(self, title, items, callback):
-        """Show a searchable list dialog
         
-        Args:
-            title: The title to display at the top of the dialog
-            items: List of items to choose from (strings or objects with __str__ method)
-            callback: Function to call with the selected item (or None if cancelled)
-        """
-        self.list_dialog_mode = True
-        self.list_dialog_title = title
-        self.list_dialog_items = items
-        self.list_dialog_filtered_items = items.copy()  # Initially show all items
-        self.list_dialog_selected = 0
-        self.list_dialog_scroll = 0
-        self.list_dialog_search_editor.clear()
-        self.list_dialog_callback = callback
+        # Force immediate display of the dialog
+        self._force_immediate_redraw()
+    
+    def _force_immediate_redraw(self):
+        """Force an immediate screen redraw to show dialogs instantly"""
+        # Perform the same drawing sequence as the main loop
+        self.refresh_files()
+        self.clear_screen_with_background()
+        self.draw_header()
+        self.draw_files()
+        self.draw_log_pane()
+        self.draw_status()
+        
+        # Draw dialog overlays
+        if self.list_dialog.mode:
+            self.list_dialog.draw(self.stdscr, self.safe_addstr)
+        elif self.info_dialog_mode:
+            self.draw_info_dialog()
+        elif self.search_dialog_mode:
+            self.draw_search_dialog()
+        elif self.batch_rename_mode:
+            self.draw_batch_rename_dialog()
+        
+        # Refresh screen immediately
+        self.stdscr.refresh()
+        self.needs_full_redraw = False
+
+    def show_list_dialog(self, title, items, callback):
+        """Show a searchable list dialog - wrapper for list dialog component"""
+        self.list_dialog.show(title, items, callback)
         self.needs_full_redraw = True
+        
+        # Force immediate display of the dialog
+        self._force_immediate_redraw()
     
     def exit_info_dialog_mode(self):
         """Exit info dialog mode"""
@@ -1653,15 +1646,8 @@ class FileManager:
         self.needs_full_redraw = True
     
     def exit_list_dialog_mode(self):
-        """Exit list dialog mode"""
-        self.list_dialog_mode = False
-        self.list_dialog_title = ""
-        self.list_dialog_items = []
-        self.list_dialog_filtered_items = []
-        self.list_dialog_selected = 0
-        self.list_dialog_scroll = 0
-        self.list_dialog_search_editor.clear()
-        self.list_dialog_callback = None
+        """Exit list dialog mode - wrapper for list dialog component"""
+        self.list_dialog.exit()
         self.needs_full_redraw = True
     
     def handle_info_dialog_input(self, key):
@@ -1703,124 +1689,13 @@ class FileManager:
         return False
     
     def handle_list_dialog_input(self, key):
-        """Handle input while in list dialog mode"""
-        if key == 27:  # ESC - cancel
-            if self.list_dialog_callback:
-                self.list_dialog_callback(None)
-            self.exit_list_dialog_mode()
-            return True
-        elif key == curses.KEY_UP:
-            # Move selection up
-            if self.list_dialog_filtered_items and self.list_dialog_selected > 0:
-                self.list_dialog_selected -= 1
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_DOWN:
-            # Move selection down
-            if self.list_dialog_filtered_items and self.list_dialog_selected < len(self.list_dialog_filtered_items) - 1:
-                self.list_dialog_selected += 1
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_PPAGE:  # Page Up
-            if self.list_dialog_filtered_items:
-                self.list_dialog_selected = max(0, self.list_dialog_selected - 10)
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_NPAGE:  # Page Down
-            if self.list_dialog_filtered_items:
-                self.list_dialog_selected = min(len(self.list_dialog_filtered_items) - 1, self.list_dialog_selected + 10)
-                self._adjust_list_dialog_scroll()
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_HOME:  # Home - text cursor or list navigation
-            # If there's text in search, let editor handle it for cursor movement
-            if self.list_dialog_search_editor.text:
-                if self.list_dialog_search_editor.handle_key(key):
-                    self.needs_full_redraw = True
-            else:
-                # If no search text, use for list navigation
-                if self.list_dialog_filtered_items:
-                    self.list_dialog_selected = 0
-                    self.list_dialog_scroll = 0
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_END:  # End - text cursor or list navigation
-            # If there's text in search, let editor handle it for cursor movement
-            if self.list_dialog_search_editor.text:
-                if self.list_dialog_search_editor.handle_key(key):
-                    self.needs_full_redraw = True
-            else:
-                # If no search text, use for list navigation
-                if self.list_dialog_filtered_items:
-                    self.list_dialog_selected = len(self.list_dialog_filtered_items) - 1
-                    self._adjust_list_dialog_scroll()
-                    self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Select current item
-            if self.list_dialog_filtered_items and 0 <= self.list_dialog_selected < len(self.list_dialog_filtered_items):
-                selected_item = self.list_dialog_filtered_items[self.list_dialog_selected]
-                if self.list_dialog_callback:
-                    self.list_dialog_callback(selected_item)
-            else:
-                if self.list_dialog_callback:
-                    self.list_dialog_callback(None)
-            self.exit_list_dialog_mode()
-            return True
-        elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
-            # Let the editor handle cursor movement keys
-            if self.list_dialog_search_editor.handle_key(key):
-                self.needs_full_redraw = True
-            return True
-        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
-            # Let the editor handle backspace
-            if self.list_dialog_search_editor.handle_key(key):
-                self._filter_list_dialog_items()
-                self.needs_full_redraw = True
-            return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Let the editor handle printable characters
-            if self.list_dialog_search_editor.handle_key(key):
-                self._filter_list_dialog_items()
-                self.needs_full_redraw = True
+        """Handle input while in list dialog mode - wrapper for list dialog component"""
+        if self.list_dialog.handle_input(key):
+            self.needs_full_redraw = True
             return True
         return False
     
-    def _filter_list_dialog_items(self):
-        """Filter list dialog items based on current search pattern"""
-        search_text = self.list_dialog_search_editor.text
-        if not search_text:
-            self.list_dialog_filtered_items = self.list_dialog_items.copy()
-        else:
-            search_lower = search_text.lower()
-            self.list_dialog_filtered_items = [
-                item for item in self.list_dialog_items 
-                if search_lower in str(item).lower()
-            ]
-        
-        # Reset selection to top of filtered list
-        self.list_dialog_selected = 0
-        self.list_dialog_scroll = 0
-    
-    def _adjust_list_dialog_scroll(self):
-        """Adjust scroll offset to keep selected item visible"""
-        height, width = self.stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions
-        width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
-        height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
-        min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
-        
-        dialog_height = max(min_height, int(height * height_ratio))
-        content_height = dialog_height - 6  # Account for title, search, borders, help
-        
-        if self.list_dialog_selected < self.list_dialog_scroll:
-            self.list_dialog_scroll = self.list_dialog_selected
-        elif self.list_dialog_selected >= self.list_dialog_scroll + content_height:
-            self.list_dialog_scroll = self.list_dialog_selected - content_height + 1
+
     
     def draw_info_dialog(self):
         """Draw the info dialog overlay"""
@@ -1921,285 +1796,41 @@ class FileManager:
             if help_x >= start_x:
                 self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
     
-    def draw_list_dialog(self):
-        """Draw the searchable list dialog overlay"""
-        height, width = self.stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions using configuration
-        width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
-        height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
-        min_width = getattr(self.config, 'LIST_DIALOG_MIN_WIDTH', 40)
-        min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
-        
-        dialog_width = max(min_width, int(width * width_ratio))
-        dialog_height = max(min_height, int(height * height_ratio))
-        
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
-        
-        # Draw dialog background
-        for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                self.safe_addstr(y, start_x, bg_line, get_status_color())
-        
-        # Draw border
-        border_color = get_status_color() | curses.A_BOLD
-        
-        # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            self.safe_addstr(start_y, start_x, top_line[:dialog_width], border_color)
-        
-        # Side borders
-        for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                self.safe_addstr(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    self.safe_addstr(y, start_x + dialog_width - 1, "│", border_color)
-        
-        # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            self.safe_addstr(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
-        
-        # Draw title
-        if self.list_dialog_title and start_y >= 0:
-            title_text = f" {self.list_dialog_title} "
-            title_x = start_x + (dialog_width - len(title_text)) // 2
-            if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
-                self.safe_addstr(start_y, title_x, title_text, border_color)
-        
-        # Draw search box
-        search_y = start_y + 2
-        # Draw search input using SingleLineTextEdit
-        if search_y < height:
-            max_search_width = dialog_width - 4  # Leave some margin
-            self.list_dialog_search_editor.draw(
-                self.stdscr, search_y, start_x + 2, max_search_width,
-                "Search: ",
-                is_active=True
-            )
-        
-        # Draw separator line
-        sep_y = start_y + 3
-        if sep_y < height:
-            sep_line = "├" + "─" * (dialog_width - 2) + "┤"
-            self.safe_addstr(sep_y, start_x, sep_line[:dialog_width], border_color)
-        
-        # Calculate list area
-        list_start_y = start_y + 4
-        list_end_y = start_y + dialog_height - 3
-        content_start_x = start_x + 2
-        content_width = dialog_width - 4
-        content_height = list_end_y - list_start_y + 1
-        
-        # Draw list items
-        visible_items = self.list_dialog_filtered_items[self.list_dialog_scroll:self.list_dialog_scroll + content_height]
-        
-        for i, item in enumerate(visible_items):
-            y = list_start_y + i
-            if y <= list_end_y and y < height:
-                item_index = self.list_dialog_scroll + i
-                is_selected = item_index == self.list_dialog_selected
-                
-                # Format item text
-                item_text = str(item)
-                if len(item_text) > content_width - 2:
-                    item_text = item_text[:content_width - 5] + "..."
-                
-                # Add selection indicator
-                if is_selected:
-                    display_text = f"► {item_text}"
-                    item_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
-                else:
-                    display_text = f"  {item_text}"
-                    item_color = get_status_color()
-                
-                # Ensure text fits
-                display_text = display_text[:content_width]
-                self.safe_addstr(y, content_start_x, display_text, item_color)
-        
-        # Draw scroll indicators if needed
-        if len(self.list_dialog_filtered_items) > content_height:
-            scrollbar_x = start_x + dialog_width - 2
-            scrollbar_start_y = list_start_y
-            scrollbar_height = content_height
-            
-            # Calculate scroll thumb position
-            total_items = len(self.list_dialog_filtered_items)
-            if total_items > 0:
-                thumb_pos = int((self.list_dialog_scroll / max(1, total_items - content_height)) * (scrollbar_height - 1))
-                thumb_pos = max(0, min(scrollbar_height - 1, thumb_pos))
-                
-                for i in range(scrollbar_height):
-                    y = scrollbar_start_y + i
-                    if y < height:
-                        if i == thumb_pos:
-                            self.safe_addstr(y, scrollbar_x, "█", border_color)
-                        else:
-                            self.safe_addstr(y, scrollbar_x, "░", get_status_color() | curses.A_DIM)
-        
-        # Draw status info
-        status_y = start_y + dialog_height - 2
-        if status_y < height:
-            if self.list_dialog_filtered_items:
-                status_text = f"{self.list_dialog_selected + 1}/{len(self.list_dialog_filtered_items)} items"
-                if len(self.list_dialog_filtered_items) != len(self.list_dialog_items):
-                    status_text += f" (filtered from {len(self.list_dialog_items)})"
-            else:
-                status_text = "No items found"
-            
-            if self.list_dialog_search_editor.text:
-                status_text += f" | Filter: '{self.list_dialog_search_editor.text}'"
-            
-            # Center the status text
-            if len(status_text) <= content_width:
-                status_x = start_x + (dialog_width - len(status_text)) // 2
-                self.safe_addstr(status_y, status_x, status_text, get_status_color() | curses.A_DIM)
-        
-        # Draw help text at bottom
-        help_text = "↑↓:select  Enter:choose  Type:search  Backspace:clear  ESC:cancel"
-        help_y = start_y + dialog_height - 1
-        if help_y < height and len(help_text) <= content_width:
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                self.safe_addstr(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+
     
     def show_list_dialog_demo(self):
         """Demo function to show the searchable list dialog"""
-        # Create a sample list of items
-        sample_items = [
-            "Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape",
-            "Honeydew", "Ice cream bean", "Jackfruit", "Kiwi", "Lemon", "Mango",
-            "Nectarine", "Orange", "Papaya", "Quince", "Raspberry", "Strawberry",
-            "Tangerine", "Ugli fruit", "Vanilla bean", "Watermelon", "Xigua",
-            "Yellow passion fruit", "Zucchini"
-        ]
-        
-        def callback(selected_item):
-            if selected_item:
-                print(f"You selected: {selected_item}")
-            else:
-                print("Selection cancelled")
-        
-        self.show_list_dialog("Choose a Fruit", sample_items, callback)
+        ListDialogHelpers.show_demo(self.list_dialog)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def show_file_type_filter(self):
         """Show file type filter using the searchable list dialog"""
         current_pane = self.get_current_pane()
-        
-        # Get all unique file extensions in current directory
-        extensions = set()
-        for file_path in current_pane['files']:
-            if file_path.is_file():
-                ext = file_path.suffix.lower()
-                if ext:
-                    extensions.add(ext)
-                else:
-                    extensions.add("(no extension)")
-        
-        if not extensions:
-            print("No files with extensions found in current directory")
-            return
-        
-        # Convert to sorted list
-        extension_list = sorted(list(extensions))
-        extension_list.insert(0, "(show all files)")  # Add option to show all
-        
-        def filter_callback(selected_ext):
-            if selected_ext:
-                if selected_ext == "(show all files)":
-                    print("Showing all files")
-                    # Reset any filtering (this would need additional implementation)
-                else:
-                    print(f"Filtering by extension: {selected_ext}")
-                    # Filter files by extension (this would need additional implementation)
-            else:
-                print("File type filter cancelled")
-        
-        self.show_list_dialog("Filter by File Type", extension_list, filter_callback)
+        ListDialogHelpers.show_file_type_filter(self.list_dialog, current_pane)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def show_favorite_directories(self):
         """Show favorite directories using the searchable list dialog"""
-        favorites = get_favorite_directories()
-        
-        if not favorites:
-            print("No favorite directories configured")
-            return
-        
-        # Create display items with name and path
-        display_items = []
-        for fav in favorites:
-            display_items.append(f"{fav['name']} ({fav['path']})")
-        
-        def favorite_callback(selected_item):
-            if selected_item:
-                # Extract the path from the selected item
-                # Format is "Name (path)"
-                try:
-                    # Find the path in parentheses
-                    start_paren = selected_item.rfind('(')
-                    end_paren = selected_item.rfind(')')
-                    if start_paren != -1 and end_paren != -1 and end_paren > start_paren:
-                        selected_path = selected_item[start_paren + 1:end_paren]
-                        
-                        # Change current pane to selected directory
-                        current_pane = self.get_current_pane()
-                        target_path = Path(selected_path)
-                        
-                        if target_path.exists() and target_path.is_dir():
-                            old_path = current_pane['path']
-                            current_pane['path'] = target_path
-                            current_pane['selected_index'] = 0
-                            current_pane['scroll_offset'] = 0
-                            current_pane['selected_files'].clear()  # Clear selections
-                            
-                            pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
-                            print(f"Changed {pane_name} pane to favorite: {old_path} → {target_path}")
-                            self.needs_full_redraw = True
-                        else:
-                            print(f"Error: Directory no longer exists: {selected_path}")
-                    else:
-                        print("Error: Could not parse selected favorite directory")
-                except Exception as e:
-                    print(f"Error changing to favorite directory: {e}")
-            else:
-                print("Favorite directory selection cancelled")
-        
-        self.show_list_dialog("Go to Favorite Directory", display_items, favorite_callback)
+        # Create a wrapper print function that also triggers redraw
+        def print_with_redraw(message):
+            print(message)
+            self.needs_full_redraw = True
+            
+        ListDialogHelpers.show_favorite_directories(
+            self.list_dialog, self.pane_manager, print_with_redraw
+        )
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def show_programs_dialog(self):
         """Show external programs using the searchable list dialog"""
-        programs = get_programs()
-        
-        if not programs:
-            print("No external programs configured")
-            return
-        
-        # Create display items with program names
-        display_items = []
-        for prog in programs:
-            display_items.append(prog['name'])
-        
-        def program_callback(selected_item):
-            if selected_item:
-                # Find the selected program
-                selected_program = None
-                for prog in programs:
-                    if prog['name'] == selected_item:
-                        selected_program = prog
-                        break
-                
-                if selected_program:
-                    self.execute_external_program(selected_program)
-                else:
-                    print(f"Error: Program not found: {selected_item}")
-            else:
-                print("Program selection cancelled")
-        
-        self.show_list_dialog("Execute External Program", display_items, program_callback)
+        ListDialogHelpers.show_programs_dialog(
+            self.list_dialog, self.execute_external_program, print
+        )
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
     
     def execute_external_program(self, program):
         """Execute an external program with environment variables set"""
@@ -3595,6 +3226,9 @@ class FileManager:
         self.search_dialog_scroll = 0
         self.search_dialog_searching = False
         self.needs_full_redraw = True
+        
+        # Force immediate display of the dialog
+        self._force_immediate_redraw()
     
     def exit_search_dialog_mode(self):
         """Exit search dialog mode"""
@@ -4250,6 +3884,16 @@ class FileManager:
                 self.draw_log_pane()
                 self.draw_status()
                 
+                # Draw dialog overlays on top of the interface
+                if self.list_dialog.mode:
+                    self.list_dialog.draw(self.stdscr, self.safe_addstr)
+                elif self.info_dialog_mode:
+                    self.draw_info_dialog()
+                elif self.search_dialog_mode:
+                    self.draw_search_dialog()
+                elif self.batch_rename_mode:
+                    self.draw_batch_rename_dialog()
+                
                 # Refresh screen
                 self.stdscr.refresh()
                 self.needs_full_redraw = False
@@ -4304,7 +3948,7 @@ class FileManager:
                     continue  # Info dialog mode handled the key
             
             # Handle list dialog mode input
-            if self.list_dialog_mode:
+            if self.list_dialog.mode:
                 if self.handle_list_dialog_input(key):
                     continue  # List dialog mode handled the key
             
@@ -4320,7 +3964,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog_mode or self.search_dialog_mode or self.batch_rename_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
+            if self.quick_choice_mode or self.info_dialog_mode or self.list_dialog.mode or self.search_dialog_mode or self.batch_rename_mode or self.isearch_mode or self.filter_mode or self.rename_mode or self.create_dir_mode or self.create_file_mode or self.create_archive_mode:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
