@@ -118,8 +118,8 @@ class Config:
         {'name': 'List Processes', 'command': ['ps', 'aux']},
         {'name': 'System Info', 'command': ['uname', '-a']},
         {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
-        {'name': 'Compare Files (BeyondCompare)', 'command': ['./bcompare_files_wrapper.sh'], 'options': {'auto_return': True}},
-        {'name': 'Compare Directories (BeyondCompare)', 'command': ['./bcompare_dirs_wrapper.sh'], 'options': {'auto_return': True}},
+        {'name': 'Compare Files (BeyondCompare)', 'command': ['./tools/bcompare_files_wrapper.sh'], 'options': {'auto_return': True}},
+        {'name': 'Compare Directories (BeyondCompare)', 'command': ['./tools/bcompare_dirs_wrapper.sh'], 'options': {'auto_return': True}},
         # Add your own programs here:
         # {'name': 'My Script', 'command': ['/path/to/script.sh']},
         # {'name': 'Python REPL', 'command': ['python3']},
