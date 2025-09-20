@@ -93,9 +93,7 @@ class FileManager:
         self.quick_choice_callback = None
         self.quick_choice_selected = 0  # Index of currently selected choice
         self.should_quit = False  # Flag to control main loop exit
-        
 
-        
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
         
@@ -2616,9 +2614,7 @@ class FileManager:
         
         # In rename mode, capture most other keys to prevent unintended actions
         return True
-    
 
-    
     def handle_batch_rename_input(self, key):
         """Handle input while in batch rename mode - wrapper for batch rename dialog component"""
         result = self.batch_rename_dialog.handle_input(key)
@@ -2777,8 +2773,6 @@ class FileManager:
         SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
         self.needs_full_redraw = True
 
-
-        
     def enter_subshell_mode(self):
         """Enter sub-shell mode with environment variables set"""
         # Restore stdout/stderr temporarily
