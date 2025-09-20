@@ -18,10 +18,11 @@ TFM now supports multiple color schemes to provide better visual experience in d
 - Optimized for dark terminal backgrounds
 
 #### Light Scheme  
-- Light blue-gray backgrounds for headers, footers, and status bars
-- Darker colors for file types (blue directories, green executables, red selection)
-- Dark gray text for regular files
+- Pure white backgrounds for all UI elements
+- Pure black text for all foreground elements
+- High contrast monochrome design
 - Optimized for light terminal backgrounds
+- Simple and clean appearance
 
 ### Color Elements
 

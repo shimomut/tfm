@@ -119,85 +119,85 @@ COLOR_SCHEMES = {
     'light': {
         'HEADER_BG': {
             'color_num': 100,
-            'rgb': (200, 210, 220)  # Light blue-gray for file list headers
+            'rgb': (255, 255, 255)  # White for file list headers
         },
         'FOOTER_BG': {
             'color_num': 104,
-            'rgb': (200, 210, 220)  # Light blue-gray for file list footers
+            'rgb': (255, 255, 255)  # White for file list footers
         },
         'STATUS_BG': {
             'color_num': 105,
-            'rgb': (200, 210, 220)  # Light blue-gray for status bar
+            'rgb': (255, 255, 255)  # White for status bar
         },
         'BOUNDARY_BG': {
             'color_num': 106,
-            'rgb': (200, 210, 220)  # Light blue-gray for boundaries
+            'rgb': (255, 255, 255)  # White for boundaries
         },
         'DIRECTORY_FG': {
             'color_num': 101,
-            'rgb': (0, 100, 200)    # Blue for directories
+            'rgb': (0, 0, 0)        # Black for directories
         },
         'EXECUTABLE_FG': {
             'color_num': 102,
-            'rgb': (0, 150, 0)      # Green for executables
+            'rgb': (0, 0, 0)        # Black for executables
         },
         'SELECTED_FG': {
             'color_num': 103,
-            'rgb': (200, 0, 0)      # Red for selected items
+            'rgb': (0, 0, 0)        # Black for selected items
         },
         'REGULAR_FILE_FG': {
             'color_num': 107,
-            'rgb': (50, 50, 50)     # Dark gray for regular files
+            'rgb': (0, 0, 0)        # Black for regular files
         },
         'LOG_STDOUT_FG': {
             'color_num': 108,
-            'rgb': (50, 50, 50)     # Dark gray for stdout logs
+            'rgb': (0, 0, 0)        # Black for stdout logs
         },
         'LOG_SYSTEM_FG': {
             'color_num': 109,
-            'rgb': (0, 100, 200)    # Blue for system logs
+            'rgb': (0, 0, 0)        # Black for system logs
         },
         'LINE_NUMBERS_FG': {
             'color_num': 110,
-            'rgb': (120, 120, 120)  # Medium gray for line numbers
+            'rgb': (0, 0, 0)        # Black for line numbers
         },
         # Syntax highlighting colors
         'SYNTAX_KEYWORD_FG': {
             'color_num': 111,
-            'rgb': (150, 0, 150)    # Purple for keywords
+            'rgb': (0, 0, 0)        # Black for keywords
         },
         'SYNTAX_STRING_FG': {
             'color_num': 112,
-            'rgb': (0, 120, 0)      # Dark green for strings
+            'rgb': (0, 0, 0)        # Black for strings
         },
         'SYNTAX_COMMENT_FG': {
             'color_num': 113,
-            'rgb': (100, 100, 100)  # Gray for comments
+            'rgb': (0, 0, 0)        # Black for comments
         },
         'SYNTAX_NUMBER_FG': {
             'color_num': 114,
-            'rgb': (200, 100, 0)    # Orange for numbers
+            'rgb': (0, 0, 0)        # Black for numbers
         },
         'SYNTAX_OPERATOR_FG': {
             'color_num': 115,
-            'rgb': (150, 0, 0)      # Dark red for operators
+            'rgb': (0, 0, 0)        # Black for operators
         },
         'SYNTAX_BUILTIN_FG': {
             'color_num': 116,
-            'rgb': (0, 150, 150)    # Teal for built-ins
+            'rgb': (0, 0, 0)        # Black for built-ins
         },
         'SYNTAX_NAME_FG': {
             'color_num': 117,
-            'rgb': (50, 50, 50)     # Dark gray for names
+            'rgb': (0, 0, 0)        # Black for names
         },
         # Search highlighting colors
         'SEARCH_MATCH_BG': {
             'color_num': 118,
-            'rgb': (255, 255, 150)  # Light yellow background for search matches
+            'rgb': (255, 255, 255)  # White background for search matches
         },
         'SEARCH_CURRENT_BG': {
             'color_num': 119,
-            'rgb': (255, 200, 150)  # Light orange background for current search match
+            'rgb': (255, 255, 255)  # White background for current search match
         }
     }
 }
@@ -238,24 +238,24 @@ FALLBACK_COLOR_SCHEMES = {
         'FOOTER_BG': curses.COLOR_WHITE,    # White for footers  
         'STATUS_BG': curses.COLOR_WHITE,    # White for status
         'BOUNDARY_BG': curses.COLOR_WHITE,  # White for boundaries
-        'DIRECTORY_FG': curses.COLOR_BLUE,
-        'EXECUTABLE_FG': curses.COLOR_GREEN,
-        'SELECTED_FG': curses.COLOR_RED,
+        'DIRECTORY_FG': curses.COLOR_BLACK,
+        'EXECUTABLE_FG': curses.COLOR_BLACK,
+        'SELECTED_FG': curses.COLOR_BLACK,
         'REGULAR_FILE_FG': curses.COLOR_BLACK,
         'LOG_STDOUT_FG': curses.COLOR_BLACK,
-        'LOG_SYSTEM_FG': curses.COLOR_BLUE,
+        'LOG_SYSTEM_FG': curses.COLOR_BLACK,
         'LINE_NUMBERS_FG': curses.COLOR_BLACK,
         # Syntax highlighting fallback colors
-        'SYNTAX_KEYWORD_FG': curses.COLOR_MAGENTA,
-        'SYNTAX_STRING_FG': curses.COLOR_GREEN,
-        'SYNTAX_COMMENT_FG': curses.COLOR_BLUE,
-        'SYNTAX_NUMBER_FG': curses.COLOR_RED,
-        'SYNTAX_OPERATOR_FG': curses.COLOR_RED,
-        'SYNTAX_BUILTIN_FG': curses.COLOR_CYAN,
+        'SYNTAX_KEYWORD_FG': curses.COLOR_BLACK,
+        'SYNTAX_STRING_FG': curses.COLOR_BLACK,
+        'SYNTAX_COMMENT_FG': curses.COLOR_BLACK,
+        'SYNTAX_NUMBER_FG': curses.COLOR_BLACK,
+        'SYNTAX_OPERATOR_FG': curses.COLOR_BLACK,
+        'SYNTAX_BUILTIN_FG': curses.COLOR_BLACK,
         'SYNTAX_NAME_FG': curses.COLOR_BLACK,
         # Search highlighting fallback colors
-        'SEARCH_MATCH_BG': curses.COLOR_YELLOW,
-        'SEARCH_CURRENT_BG': curses.COLOR_RED
+        'SEARCH_MATCH_BG': curses.COLOR_WHITE,
+        'SEARCH_CURRENT_BG': curses.COLOR_WHITE
     }
 }
 

@@ -28,8 +28,8 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 - **Hidden Files**: Toggle visibility of hidden files with '.'
 - **Sorting**: Multiple sort options (name, size, date, type)
 - **Color Schemes**: Multiple color schemes optimized for different terminal backgrounds
-  - **Dark Scheme**: Optimized for dark terminal backgrounds (default)
-  - **Light Scheme**: Optimized for light terminal backgrounds
+  - **Dark Scheme**: Colorful interface optimized for dark terminal backgrounds (default)
+  - **Light Scheme**: High-contrast monochrome (white/black) optimized for light terminal backgrounds
   - **Runtime Toggle**: Press 't' to switch between schemes instantly
 - **Color Coding**: 
   - Blue/bold for directories
