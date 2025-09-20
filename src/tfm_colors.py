@@ -6,7 +6,6 @@ import curses
 # Color pair constants
 COLOR_DIRECTORIES = 1
 COLOR_EXECUTABLES = 2
-COLOR_SELECTED = 3
 COLOR_ERROR = 4
 COLOR_HEADER = 5        # File list headers (directory paths)
 COLOR_FOOTER = 6        # File list footers (file counts)
@@ -26,6 +25,10 @@ COLOR_SYNTAX_BUILTIN = 18    # Built-in functions/types
 COLOR_SYNTAX_NAME = 19       # Variable/function names
 COLOR_SEARCH_MATCH = 20      # Search match highlighting
 COLOR_SEARCH_CURRENT = 21    # Current search match highlighting
+# Selected items with common background
+COLOR_DIRECTORIES_SELECTED = 22    # Selected directories
+COLOR_EXECUTABLES_SELECTED = 23    # Selected executables
+COLOR_REGULAR_FILE_SELECTED = 24   # Selected regular files
 
 # Current color scheme
 current_color_scheme = 'dark'
@@ -61,9 +64,9 @@ COLOR_SCHEMES = {
             'color_num': 102,
             'rgb': (51, 229, 51)    # Bright green for executables
         },
-        'SELECTED_FG': {
+        'SELECTED_BG': {
             'color_num': 103,
-            'rgb': (255, 229, 0)    # Bright yellow for selected items
+            'rgb': (40, 80, 160)    # Dark blue-purple background for selected items
         },
         'REGULAR_FILE_FG': {
             'color_num': 107,
@@ -139,19 +142,19 @@ COLOR_SCHEMES = {
         },
         'DIRECTORY_FG': {
             'color_num': 121,
-            'rgb': (10, 10, 10)     # Very dark gray for directories
+            'rgb': (80, 80, 0)  # Yellow for directories
         },
         'EXECUTABLE_FG': {
             'color_num': 122,
-            'rgb': (10, 10, 10)     # Very dark gray for executables
+            'rgb': (0, 80, 0)    # Bright green for executables
         },
-        'SELECTED_FG': {
+        'SELECTED_BG': {
             'color_num': 123,
-            'rgb': (10, 10, 10)     # Very dark gray for selected items
+            'rgb': (120, 160, 255)    # Dark blue-purple background for selected items
         },
         'REGULAR_FILE_FG': {
             'color_num': 127,
-            'rgb': (10, 10, 10)     # Very dark gray for regular files
+            'rgb': (0, 0, 0)     # Very dark gray for regular files
         },
         'LOG_STDOUT_FG': {
             'color_num': 128,
@@ -220,7 +223,7 @@ FALLBACK_COLOR_SCHEMES = {
         'BOUNDARY_BG': 19,       # Medium blue for boundaries
         'DIRECTORY_FG': curses.COLOR_CYAN,
         'EXECUTABLE_FG': curses.COLOR_GREEN,
-        'SELECTED_FG': curses.COLOR_YELLOW,
+        'SELECTED_BG': curses.COLOR_BLUE,
         'REGULAR_FILE_FG': curses.COLOR_WHITE,
         'LOG_STDOUT_FG': curses.COLOR_WHITE,
         'LOG_SYSTEM_FG': curses.COLOR_BLUE,
@@ -244,7 +247,7 @@ FALLBACK_COLOR_SCHEMES = {
         'BOUNDARY_BG': curses.COLOR_WHITE,  # White for boundaries
         'DIRECTORY_FG': curses.COLOR_BLACK,
         'EXECUTABLE_FG': curses.COLOR_BLACK,
-        'SELECTED_FG': curses.COLOR_BLACK,
+        'SELECTED_BG': curses.COLOR_WHITE,
         'REGULAR_FILE_FG': curses.COLOR_BLACK,
         'LOG_STDOUT_FG': curses.COLOR_BLACK,
         'LOG_SYSTEM_FG': curses.COLOR_BLACK,
@@ -308,7 +311,7 @@ def init_colors(color_scheme=None):
             boundary_bg = rgb_colors['BOUNDARY_BG']['color_num']
             directory_fg = rgb_colors['DIRECTORY_FG']['color_num']
             executable_fg = rgb_colors['EXECUTABLE_FG']['color_num']
-            selected_fg = rgb_colors['SELECTED_FG']['color_num']
+            selected_bg = rgb_colors['SELECTED_BG']['color_num']
             regular_file_fg = rgb_colors['REGULAR_FILE_FG']['color_num']
             log_stdout_fg = rgb_colors['LOG_STDOUT_FG']['color_num']
             log_system_fg = rgb_colors['LOG_SYSTEM_FG']['color_num']
@@ -348,7 +351,7 @@ def init_colors(color_scheme=None):
         boundary_bg = fallback_colors['BOUNDARY_BG']
         directory_fg = fallback_colors['DIRECTORY_FG']
         executable_fg = fallback_colors['EXECUTABLE_FG']
-        selected_fg = fallback_colors['SELECTED_FG']
+        selected_bg = fallback_colors['SELECTED_BG']
         regular_file_fg = fallback_colors['REGULAR_FILE_FG']
         log_stdout_fg = fallback_colors['LOG_STDOUT_FG']
         log_system_fg = fallback_colors['LOG_SYSTEM_FG']
@@ -372,7 +375,9 @@ def init_colors(color_scheme=None):
     # Initialize color pairs
     curses.init_pair(COLOR_DIRECTORIES, directory_fg, bg_color)
     curses.init_pair(COLOR_EXECUTABLES, executable_fg, bg_color)
-    curses.init_pair(COLOR_SELECTED, selected_fg, bg_color)
+    curses.init_pair(COLOR_DIRECTORIES_SELECTED, directory_fg, selected_bg)
+    curses.init_pair(COLOR_EXECUTABLES_SELECTED, executable_fg, selected_bg)
+    curses.init_pair(COLOR_REGULAR_FILE_SELECTED, regular_file_fg, selected_bg)
     curses.init_pair(COLOR_ERROR, curses.COLOR_RED, bg_color)
     curses.init_pair(COLOR_HEADER, header_text_color, header_bg)
     curses.init_pair(COLOR_FOOTER, header_text_color, footer_bg)
@@ -443,21 +448,32 @@ def init_colors(color_scheme=None):
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """Get the appropriate color for a file based on its properties"""
-    if is_dir:
-        base_color = curses.color_pair(COLOR_DIRECTORIES) | curses.A_BOLD
-    elif is_executable:
-        base_color = curses.color_pair(COLOR_EXECUTABLES)
-    else:
-        # Regular files now use custom RGB color instead of A_NORMAL
-        base_color = curses.color_pair(COLOR_REGULAR_FILE)
-    
-    # Apply selection highlighting
+    # Handle selected files with common background color
     if is_selected and is_active:
-        return curses.color_pair(COLOR_SELECTED) | curses.A_REVERSE
-    elif is_selected:
+        if is_dir:
+            return curses.color_pair(COLOR_DIRECTORIES_SELECTED) | curses.A_BOLD
+        elif is_executable:
+            return curses.color_pair(COLOR_EXECUTABLES_SELECTED)
+        else:
+            return curses.color_pair(COLOR_REGULAR_FILE_SELECTED)
+    
+    # Handle inactive selection with underline
+    if is_selected:
+        if is_dir:
+            base_color = curses.color_pair(COLOR_DIRECTORIES) | curses.A_BOLD
+        elif is_executable:
+            base_color = curses.color_pair(COLOR_EXECUTABLES)
+        else:
+            base_color = curses.color_pair(COLOR_REGULAR_FILE)
         return base_color | curses.A_UNDERLINE
+    
+    # Normal (unselected) files
+    if is_dir:
+        return curses.color_pair(COLOR_DIRECTORIES) | curses.A_BOLD
+    elif is_executable:
+        return curses.color_pair(COLOR_EXECUTABLES)
     else:
-        return base_color
+        return curses.color_pair(COLOR_REGULAR_FILE)
 
 def get_header_color(is_active=False):
     """Get header color with optional bold for active panes"""
