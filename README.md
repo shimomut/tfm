@@ -27,6 +27,10 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 - **File Information**: View file sizes, modification dates, and permissions
 - **Hidden Files**: Toggle visibility of hidden files with '.'
 - **Sorting**: Multiple sort options (name, size, date, type)
+- **Color Schemes**: Multiple color schemes optimized for different terminal backgrounds
+  - **Dark Scheme**: Optimized for dark terminal backgrounds (default)
+  - **Light Scheme**: Optimized for light terminal backgrounds
+  - **Runtime Toggle**: Press 't' to switch between schemes instantly
 - **Color Coding**: 
   - Blue/bold for directories
   - Green for executable files
@@ -167,6 +171,7 @@ The help dialog is your quick reference guide - no need to memorize all key bind
 | Key | Action |
 |-----|--------|
 | `.` | Toggle hidden files |
+| `t` | Toggle color scheme (Dark/Light) |
 | `o` | Sync current pane to other pane |
 | `O` | Sync other pane to current pane |
 | `-` | Reset pane split to 50/50 |
@@ -407,14 +412,17 @@ TFM uses a flexible configuration system that allows you to customize key bindin
 
 ### Customizable Settings
 - **Key Bindings**: Remap any key to any action
+- **Color Schemes**: Choose between Dark and Light themes, or customize colors
 - **Favorite Directories**: Quick access to frequently used locations
 - **Text Editor**: Choose your preferred editor (vim, nano, emacs, etc.)
-- **Colors**: Customize the color scheme
 - **Pane Sizes**: Default pane ratios and minimum sizes
 
 ### Example Configuration
 ```python
 class Config:
+    # Color scheme selection
+    COLOR_SCHEME = 'dark'  # 'dark' or 'light'
+    
     # Text editor for file editing
     TEXT_EDITOR = 'nano'  # or 'vim', 'emacs', 'code', etc.
     
@@ -432,6 +440,7 @@ class Config:
         'delete_files': ['k', 'K'],
         'rename_file': ['r', 'R'],
         'favorites': ['j', 'J'],
+        'toggle_color_scheme': ['t'],
         # ... other bindings
     }
 ```
@@ -518,6 +527,7 @@ make clean
 - **Batch Rename**: Select multiple files and use regex patterns for powerful renaming
 
 ### Advanced Usage
+- **Color Scheme Switching**: Press 't' to instantly switch between Dark and Light themes
 - **Archive Workflows**: Create archives with 'P', extract with 'U' to opposite pane
 - **Text Editing**: All input fields support full cursor movement and professional editing
 - **Sub-shell Integration**: Use 'x' to access shell with TFM environment variables
@@ -526,7 +536,7 @@ make clean
 ### Keyboard Efficiency
 - **Selection Shortcuts**: 'a' for all files, 'A' for all items, Ctrl+Space for upward selection
 - **Pane Management**: Tab to switch, '-' to reset split, Opt+arrows to adjust
-- **Quick Access**: 'J' for favorites, '?' for help, '.' to toggle hidden files
+- **Quick Access**: 'J' for favorites, '?' for help, '.' to toggle hidden files, 't' to toggle colors
 
 ## Troubleshooting
 
@@ -593,6 +603,7 @@ TFM is released under the MIT License. See LICENSE file for details.
 - ✅ Enhanced text viewer with syntax highlighting
 - ✅ Searchable list dialog system
 - ✅ Sub-shell mode with environment variables
+- ✅ Multiple color schemes (Dark/Light) with runtime toggle
 - ✅ Improved configuration system
 - ✅ Comprehensive help system
 - ✅ Extensive test coverage

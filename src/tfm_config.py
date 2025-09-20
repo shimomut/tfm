@@ -26,7 +26,7 @@ class DefaultConfig:
     
     # Color settings
     USE_COLORS = True
-    COLOR_SCHEME = 'default'  # 'default', 'dark', 'light'
+    COLOR_SCHEME = 'dark'  # 'dark', 'light'
     
     # Behavior settings
     CONFIRM_DELETE = True
@@ -38,6 +38,7 @@ class DefaultConfig:
         'quit': ['q', 'Q'],
         'help': ['?'],
         'toggle_hidden': ['.'],
+        'toggle_color_scheme': ['t'],
         'search': ['f'],
         'search_dialog': ['F'],
         'search_content': ['G'],
@@ -216,8 +217,8 @@ class ConfigManager:
         
         # Validate color scheme
         if hasattr(config, 'COLOR_SCHEME'):
-            if config.COLOR_SCHEME not in ['default', 'dark', 'light']:
-                errors.append("COLOR_SCHEME must be 'default', 'dark', or 'light'")
+            if config.COLOR_SCHEME not in ['dark', 'light']:
+                errors.append("COLOR_SCHEME must be 'dark' or 'light'")
         
         return errors
     

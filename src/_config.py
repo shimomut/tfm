@@ -20,7 +20,7 @@ class Config:
     
     # Color settings
     USE_COLORS = True
-    COLOR_SCHEME = 'default'  # 'default', 'dark', 'light'
+    COLOR_SCHEME = 'dark'  # 'dark', 'light'
     
     # Behavior settings
     CONFIRM_DELETE = True
@@ -32,6 +32,7 @@ class Config:
         'quit': ['q', 'Q'],
         'help': ['?'],
         'toggle_hidden': ['.'],
+        'toggle_color_scheme': ['t'],
         'search': ['f', 'F'],
         'sort_menu': ['s', 'S'],
         'file_details': ['i', 'I'],

@@ -167,8 +167,9 @@ class FileManager:
         # Add startup messages to log
         self.add_startup_messages()
         
-        # Initialize colors
-        init_colors()
+        # Initialize colors with configured scheme
+        color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+        init_colors(color_scheme)
         
         # Configure curses
         curses.curs_set(0)  # Hide cursor
@@ -2702,8 +2703,9 @@ class FileManager:
             curses.curs_set(0)  # Hide cursor
             self.stdscr.keypad(True)
             
-            # Reinitialize colors
-            init_colors()
+            # Reinitialize colors with configured scheme
+            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+            init_colors(color_scheme)
             
             # Restore stdout/stderr capture
             sys.stdout = LogCapture(self.log_messages, "STDOUT")
@@ -2899,6 +2901,23 @@ class FileManager:
         
         self.show_info_dialog(title, details_lines)
     
+    def print_color_scheme_info(self):
+        """Print current color scheme information to the log"""
+        current_scheme = get_current_color_scheme()
+        available_schemes = get_available_color_schemes()
+        
+        print(f"Color scheme: {current_scheme}")
+        print(f"Available schemes: {', '.join(available_schemes)}")
+        
+        # Get current scheme colors for key elements
+        rgb_colors = get_current_rgb_colors()
+        key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'SELECTED_FG', 'REGULAR_FILE_FG']
+        
+        for color_name in key_colors:
+            if color_name in rgb_colors:
+                rgb = rgb_colors[color_name]['rgb']
+                print(f"  {color_name}: RGB{rgb}")
+    
     def show_help_dialog(self):
         """Show help dialog with key bindings and usage information"""
         help_lines = []
@@ -2953,6 +2972,7 @@ class FileManager:
         # View options section
         help_lines.append("=== VIEW OPTIONS ===")
         help_lines.append(".                Toggle hidden files")
+        help_lines.append("t                Toggle color scheme (Dark/Light)")
         help_lines.append("o                Sync current pane to other pane")
         help_lines.append("O                Sync other pane to current pane")
         help_lines.append("-                Reset pane split to 50/50")
@@ -3985,7 +4005,15 @@ class FileManager:
         except curses.error:
             pass
         
-        start_y = 4
+        # Show current color scheme information
+        try:
+            current_scheme = get_current_color_scheme()
+            available_schemes = ', '.join(get_available_color_schemes())
+            self.stdscr.addstr(3, 4, f"Color Scheme: {current_scheme} (Available: {available_schemes}) - Press 't' to toggle", curses.A_DIM)
+        except curses.error:
+            pass
+        
+        start_y = 5
         current_y = start_y
         
         # Show basic color constants
@@ -4962,8 +4990,9 @@ class FileManager:
             curses.curs_set(0)  # Hide cursor
             self.stdscr.keypad(True)
             
-            # Reinitialize colors
-            init_colors()
+            # Reinitialize colors with configured scheme
+            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+            init_colors(color_scheme)
             
             # Restore stdout/stderr capture
             sys.stdout = LogCapture(self.log_messages, "STDOUT")
@@ -5121,6 +5150,15 @@ class FileManager:
                 self.left_pane['scroll_offset'] = 0
                 self.right_pane['selected_index'] = 0
                 self.right_pane['scroll_offset'] = 0
+                self.needs_full_redraw = True
+            elif self.is_key_for_action(key, 'toggle_color_scheme'):
+                # Toggle between dark and light color schemes
+                new_scheme = toggle_color_scheme()
+                # Reinitialize colors with the new scheme
+                init_colors(new_scheme)
+                print(f"Switched to {new_scheme} color scheme")
+                # Print detailed color scheme info to log
+                self.print_color_scheme_info()
                 self.needs_full_redraw = True
             elif key == curses.KEY_HOME:
                 current_pane['selected_index'] = 0
