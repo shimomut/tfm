@@ -74,7 +74,7 @@ The help dialog includes 8 organized sections:
 ### Key Bindings
 ```python
 KEY_BINDINGS = {
-    'help': ['?', 'h'],  # Both keys show help dialog
+    'help': ['?'],  # ? key shows help dialog
     # ... other bindings
 }
 ```

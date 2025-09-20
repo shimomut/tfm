@@ -185,7 +185,7 @@ The help dialog is your quick reference guide - no need to memorize all key bind
 ### General
 | Key | Action |
 |-----|--------|
-| `? / h` | Show help dialog |
+| `?` | Show help dialog |
 | `q/Q` | Quit TFM |
 | `x/X` | Enter sub-shell mode |
 | `ESC` | Cancel current operation |

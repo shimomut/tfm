@@ -30,7 +30,7 @@ class Config:
     # Key bindings - customize your shortcuts
     KEY_BINDINGS = {
         'quit': ['q', 'Q'],
-        'help': ['?', 'h'],
+        'help': ['?'],
         'toggle_hidden': ['.'],
         'search': ['f', 'F'],
         'sort_menu': ['s', 'S'],

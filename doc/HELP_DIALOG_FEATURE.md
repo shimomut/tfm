@@ -101,7 +101,7 @@ The help dialog can be accessed via keys configured in `KEY_BINDINGS`:
 
 ```python
 KEY_BINDINGS = {
-    'help': ['?', 'h'],  # Both ? and h keys show help
+    'help': ['?'],  # ? key shows help
     # ... other bindings
 }
 ```

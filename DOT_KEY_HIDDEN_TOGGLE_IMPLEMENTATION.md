@@ -79,7 +79,7 @@ The implementation has been tested with:
 After this implementation, users can:
 
 1. Press the `.` (dot) key to toggle hidden files visibility
-2. See the updated help text by pressing `?` or `h`
+2. See the updated help text by pressing `?`
 3. The status bar will show `.:hidden` as the key hint
 
 ## Backward Compatibility

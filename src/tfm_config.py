@@ -36,7 +36,7 @@ class DefaultConfig:
     # Key bindings (can be customized)
     KEY_BINDINGS = {
         'quit': ['q', 'Q'],
-        'help': ['?', 'h'],
+        'help': ['?'],
         'toggle_hidden': ['.'],
         'search': ['f'],
         'search_dialog': ['F'],

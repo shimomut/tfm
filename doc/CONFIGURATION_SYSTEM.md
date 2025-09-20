@@ -95,7 +95,7 @@ class Config:
 ```python
 KEY_BINDINGS = {
     'quit': ['q', 'Q'],
-    'help': ['?', 'h'],
+    'help': ['?'],
     'toggle_hidden': ['H'],
     'search': ['f', 'F'],
     'file_operations': ['m', 'M'],
