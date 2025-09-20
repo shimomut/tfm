@@ -48,6 +48,9 @@ COLOR_SEARCH_CURRENT = 23    # Current search match highlighting
 # Current color scheme
 current_color_scheme = 'dark'
 
+# Fallback mode state - when True, forces use of fallback colors even if RGB is supported
+force_fallback_colors = False
+
 # Default background and foreground colors for the current scheme
 default_background_color = None
 default_foreground_color = None
@@ -332,10 +335,10 @@ def init_colors(color_scheme=None):
     rgb_colors = get_current_rgb_colors()
     fallback_colors = get_current_fallback_colors()
     
-    # Check if terminal supports RGB colors
-    can_change_color = curses.can_change_color()
+    # Check if terminal supports RGB colors and fallback mode is not forced
+    can_change_color = curses.can_change_color() and not force_fallback_colors
     
-    # Initialize custom RGB colors if supported
+    # Initialize custom RGB colors if supported and not in fallback mode
     if can_change_color:
         rgb_success = True
         try:
@@ -385,10 +388,12 @@ def init_colors(color_scheme=None):
         except curses.error:
             rgb_success = False
     
-    # Use fallback colors if RGB not supported or failed
-    if not can_change_color or not rgb_success:
+    # Use fallback colors if RGB not supported, failed, or fallback mode is forced
+    if not can_change_color or not rgb_success or force_fallback_colors:
         # Print message about using fallback colors
-        if not can_change_color:
+        if force_fallback_colors:
+            print(f"Fallback color mode enabled - using fallback colors for {current_color_scheme} scheme")
+        elif not curses.can_change_color():
             print(f"Terminal does not support RGB colors - using fallback colors for {current_color_scheme} scheme")
         else:
             print(f"RGB color initialization failed - using fallback colors for {current_color_scheme} scheme")
@@ -602,6 +607,23 @@ def toggle_color_scheme():
     current_color_scheme = new_scheme
     # Note: init_colors() should be called separately in the application
     return new_scheme
+
+def toggle_fallback_mode():
+    """Toggle fallback color mode on/off"""
+    global force_fallback_colors
+    force_fallback_colors = not force_fallback_colors
+    # Note: init_colors() should be called separately in the application
+    return force_fallback_colors
+
+def is_fallback_mode():
+    """Check if fallback color mode is enabled"""
+    return force_fallback_colors
+
+def set_fallback_mode(enabled):
+    """Set fallback color mode state"""
+    global force_fallback_colors
+    force_fallback_colors = enabled
+    return force_fallback_colors
 
 def print_current_color_scheme():
     """Print current color scheme information"""

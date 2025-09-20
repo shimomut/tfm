@@ -1415,11 +1415,15 @@ class FileManager:
     
     def print_color_scheme_info(self):
         """Print current color scheme information to the log"""
+        from tfm_colors import is_fallback_mode
+        
         current_scheme = get_current_color_scheme()
         available_schemes = get_available_color_schemes()
+        fallback_mode = is_fallback_mode()
         
         print(f"Color scheme: {current_scheme}")
         print(f"Available schemes: {', '.join(available_schemes)}")
+        print(f"Fallback mode: {'enabled' if fallback_mode else 'disabled'}")
         
         # Get current scheme colors for key elements
         rgb_colors = get_current_rgb_colors()
@@ -1429,6 +1433,24 @@ class FileManager:
             if color_name in rgb_colors:
                 rgb = rgb_colors[color_name]['rgb']
                 print(f"  {color_name}: RGB{rgb}")
+    
+    def toggle_fallback_color_mode(self):
+        """Toggle fallback color mode on/off"""
+        from tfm_colors import toggle_fallback_mode, init_colors, is_fallback_mode
+        
+        # Toggle the fallback mode
+        fallback_enabled = toggle_fallback_mode()
+        
+        # Reinitialize colors with the new mode
+        init_colors()
+        
+        # Log the change
+        mode_text = "enabled" if fallback_enabled else "disabled"
+        print(f"Fallback color mode {mode_text}")
+        
+        # Print detailed color scheme info to log
+        self.print_color_scheme_info()
+        self.needs_full_redraw = True
     
     def show_help_dialog(self):
         """Show help dialog with key bindings and usage information"""
@@ -2695,8 +2717,10 @@ class FileManager:
                 self.enter_create_file_mode()
             elif key == ord('L'):  # 'L' key - show list dialog demo
                 self.show_list_dialog_demo()
-            elif key == ord('T'):  # 'T' key - show file type filter
+            elif key == ord('t'):  # 't' key - show file type filter
                 self.show_file_type_filter()
+            elif key == ord('T'):  # 'T' key (Shift+T) - toggle fallback color mode
+                self.toggle_fallback_color_mode()
             elif self.is_key_for_action(key, 'search'):  # Search key - enter isearch mode
                 self.enter_isearch_mode()
             elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
