@@ -30,38 +30,49 @@ class Config:
     CONFIRM_EXTRACT_ARCHIVE = True  # Show confirmation dialog before extracting archives
     
     # Key bindings - customize your shortcuts
+    # Each action can have multiple keys assigned to it
     KEY_BINDINGS = {
-        'quit': ['q', 'Q'],
-        'help': ['?'],
-        'toggle_hidden': ['.'],
-        'toggle_color_scheme': ['t'],
-        'search': ['f', 'F'],
-        'sort_menu': ['s', 'S'],
-        'file_details': ['i', 'I'],
-        'quick_sort_name': ['1'],
-        'quick_sort_ext': ['2'],
-        'quick_sort_size': ['3'],
-        'quick_sort_date': ['4'],
-        'select_file': [' '],  # Space
-        'select_all_files': ['a'],
-        'select_all_items': ['A'],
-        'sync_panes': ['o', 'O'],
-        'view_text': ['v', 'V'],
-        'edit_file': ['e', 'E'],
-        'copy_files': ['c', 'C'],
-        'delete_files': ['k', 'K'],
-        'rename_file': ['r', 'R'],
-        'favorites': ['j', 'J'],
-        'subshell': ['X'],
-        'programs': ['x'],
-        'create_archive': ['p', 'P'],
-        'extract_archive': ['u', 'U'],
-        'compare_selection': ['w', 'W'],
-        'adjust_pane_left': ['['],  # [ - make left pane smaller
-        'adjust_pane_right': [']'],  # ] - make left pane larger
-        'adjust_log_up': ['{'],  # Shift+[ - make log pane larger
-        'adjust_log_down': ['}'],  # Shift+] - make log pane smaller
-        'reset_log_height': ['_'],  # Shift+- - reset log pane height
+        'quit': ['q', 'Q'],                    # Exit TFM application
+        'help': ['?'],                         # Show help dialog with all key bindings
+        'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
+        'toggle_color_scheme': ['t'],          # Switch between dark and light color schemes
+        'search': ['f'],                       # Enter incremental search mode (isearch)
+        'search_dialog': ['F'],                # Show filename search dialog
+        'search_content': ['G'],               # Show content search dialog (grep)
+        'filter': [';'],                       # Enter filter mode to show only matching files
+        'clear_filter': [':'],                 # Clear current file filter
+        'sort_menu': ['s', 'S'],              # Show sort options menu
+        'file_details': ['i', 'I'],           # Show detailed file information dialog
+        'quick_sort_name': ['1'],              # Quick sort by filename
+        'quick_sort_ext': ['2'],               # Quick sort by file extension
+        'quick_sort_size': ['3'],              # Quick sort by file size
+        'quick_sort_date': ['4'],              # Quick sort by modification date
+        'select_file': [' '],                  # Toggle selection of current file (Space)
+        'select_all_files': ['a'],             # Toggle selection of all files in current pane
+        'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
+        'sync_panes': ['o', 'O'],             # Sync pane directories (o=current→other, O=other→current)
+        'view_text': ['v', 'V'],              # View text file in built-in viewer
+        'edit_file': ['e'],                    # Edit selected file with configured text editor
+        'create_file': ['E'],                  # Create new file (prompts for filename)
+        'file_type_filter': ['T'],             # Show file type filter dialog
+        'toggle_fallback_colors': ['z'],       # Toggle fallback color mode for compatibility
+        'view_options': ['Z'],                 # Show view options menu
+        'settings_menu': ['L'],                # Show settings and configuration menu
+        'copy_files': ['c', 'C'],             # Copy selected files to other pane
+        'move_files': ['m', 'M'],             # Move selected files to other pane
+        'delete_files': ['k', 'K'],           # Delete selected files/directories
+        'rename_file': ['r', 'R'],            # Rename selected file/directory
+        'favorites': ['j', 'J'],              # Show favorite directories dialog
+        'subshell': ['X'],                     # Enter subshell (command line) mode
+        'programs': ['x'],                     # Show external programs menu
+        'create_archive': ['p', 'P'],         # Create archive from selected files
+        'extract_archive': ['u', 'U'],        # Extract selected archive file
+        'compare_selection': ['w', 'W'],      # Show file comparison options
+        'adjust_pane_left': ['['],            # Make left pane smaller (move boundary left)
+        'adjust_pane_right': [']'],           # Make left pane larger (move boundary right)
+        'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
+        'adjust_log_down': ['}'],             # Make log pane smaller (Shift+])
+        'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)
     }
     
     # Directory settings

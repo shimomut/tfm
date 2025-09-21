@@ -1421,12 +1421,7 @@ class FileManager:
             return True
         return False
     
-    def show_list_dialog_demo(self):
-        """Demo function to show the searchable list dialog"""
-        ListDialogHelpers.show_demo(self.list_dialog)
-        self.needs_full_redraw = True
-        self._force_immediate_redraw()
-    
+
     def show_file_type_filter(self):
         """Show file type filter using the searchable list dialog"""
         current_pane = self.get_current_pane()
@@ -3515,14 +3510,11 @@ class FileManager:
             elif self.is_key_for_action(key, 'select_file'):  # Toggle file selection
                 self.toggle_selection()
                 self.needs_full_redraw = True
-
-
             elif key == 27:  # ESC key - check for Option key sequences
                 # Option+Space sends 194 followed by 160
                 next_key = self.stdscr.getch()
                 # Log unknown ESC sequence for debugging
                 print(f"Unknown ESC sequence: 27, {next_key}")
-
             elif self.is_key_for_action(key, 'select_all_files'):  # Toggle all files selection
                 self.toggle_all_files_selection()
             elif self.is_key_for_action(key, 'select_all_items'):  # Toggle all items selection
@@ -3533,23 +3525,23 @@ class FileManager:
                     self.sync_other_pane_directory()
                 else:  # 'o' - sync current pane to other
                     self.sync_pane_directories()
-            elif key == ord('F'):  # 'F' key (Shift-F) - show search dialog (filename)
+            elif self.is_key_for_action(key, 'search_dialog'):  # Show search dialog (filename)
                 self.show_search_dialog('filename')
-            elif key == ord('G'):  # 'G' key (Shift-G) - show search dialog (content)
+            elif self.is_key_for_action(key, 'search_content'):  # Show search dialog (content)
                 self.show_search_dialog('content')
-            elif key == ord('e'):  # 'e' key - edit existing file
+            elif self.is_key_for_action(key, 'edit_file'):  # Edit existing file
                 self.edit_selected_file()
-            elif key == ord('E'):  # 'E' key (Shift-E) - create new file
+            elif self.is_key_for_action(key, 'create_file'):  # Create new file
                 self.enter_create_file_mode()
-            elif key == ord('L'):  # 'L' key - show list dialog demo
-                self.show_list_dialog_demo()
-            elif key == ord('t'):  # 't' key - show file type filter
+
+            elif self.is_key_for_action(key, 'file_type_filter'):  # Show file type filter
                 self.show_file_type_filter()
-            elif key == ord('T'):  # 'T' key (Shift+T) - toggle fallback color mode
+
+            elif self.is_key_for_action(key, 'toggle_fallback_colors'):  # Toggle fallback color mode
                 self.toggle_fallback_color_mode()
-            elif key == ord('z'):  # 'z' key - show view options
+            elif self.is_key_for_action(key, 'view_options'):  # Show view options
                 self.show_view_options()
-            elif key == ord('Z'):  # 'Z' key (Shift+Z) - show settings menu
+            elif self.is_key_for_action(key, 'settings_menu'):  # Show settings menu
                 self.show_settings_menu()
             elif self.is_key_for_action(key, 'search'):  # Search key - enter isearch mode
                 self.enter_isearch_mode()
