@@ -47,8 +47,9 @@ class DefaultConfig:
         'sort_menu': ['s', 'S'],
         'file_details': ['i', 'I'],
         'quick_sort_name': ['1'],
-        'quick_sort_size': ['2'],
-        'quick_sort_date': ['3'],
+        'quick_sort_ext': ['2'],
+        'quick_sort_size': ['3'],
+        'quick_sort_date': ['4'],
         'select_file': [' '],  # Space
         'select_all_files': ['a'],
         'select_all_items': ['A'],
@@ -217,8 +218,8 @@ class ConfigManager:
         
         # Validate sort mode
         if hasattr(config, 'DEFAULT_SORT_MODE'):
-            if config.DEFAULT_SORT_MODE not in ['name', 'size', 'date']:
-                errors.append("DEFAULT_SORT_MODE must be 'name', 'size', or 'date'")
+            if config.DEFAULT_SORT_MODE not in ['name', 'ext', 'size', 'date']:
+                errors.append("DEFAULT_SORT_MODE must be 'name', 'ext', 'size', or 'date'")
         
         # Validate color scheme
         if hasattr(config, 'COLOR_SCHEME'):

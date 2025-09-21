@@ -65,7 +65,7 @@ class FileOperations:
         
         Args:
             entries: List of Path objects to sort
-            sort_mode: 'name', 'size', 'date', or 'type'
+            sort_mode: 'name', 'ext', 'size', or 'date'
             reverse: Whether to reverse the sort order
             
         Returns:
@@ -83,6 +83,24 @@ class FileOperations:
                         return ""  # Directories first
                     else:
                         return entry.suffix.lower()
+                elif sort_mode == 'ext':
+                    if entry.is_dir():
+                        return ""  # Directories first (no extension)
+                    else:
+                        # Use the same extension logic as rendering
+                        from tfm_main import FileManager
+                        # Create a temporary instance to access the method
+                        # We'll use a simpler approach here
+                        filename = entry.name
+                        dot_index = filename.rfind('.')
+                        if dot_index <= 0:
+                            return ""  # No extension
+                        extension = filename[dot_index:]
+                        # Check extension length limit (same as rendering)
+                        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
+                        if len(extension) > max_ext_length:
+                            return ""  # Extension too long, treat as no extension
+                        return extension.lower()
                 else:  # name (default)
                     return entry.name.lower()
             except (OSError, PermissionError):
@@ -107,9 +125,9 @@ class FileOperations:
         
         descriptions = {
             'name': 'Name',
+            'ext':  'Ext',
             'size': 'Size', 
             'date': 'Date',
-            'type': 'Type'
         }
         
         description = descriptions.get(mode, 'Name')

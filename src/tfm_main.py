@@ -1623,6 +1623,7 @@ class FileManager:
         # Define the sort choices with current mode indication
         choices = [
             {"text": f"Name {'★' if current_mode == 'name' else ''}", "key": "n", "value": "name"},
+            {"text": f"Ext {'★' if current_mode == 'ext' else ''}", "key": "e", "value": "ext"},
             {"text": f"Size {'★' if current_mode == 'size' else ''}", "key": "s", "value": "size"},
             {"text": f"Date {'★' if current_mode == 'date' else ''}", "key": "d", "value": "date"},
             {"text": f"Reverse {'★' if current_reverse else ''}", "key": "r", "value": "reverse"},
@@ -1639,7 +1640,7 @@ class FileManager:
                 current_pane['sort_reverse'] = not current_pane['sort_reverse']
                 reverse_status = "enabled" if current_pane['sort_reverse'] else "disabled"
                 print(f"Reverse sorting {reverse_status}")
-            elif sort_type in ["name", "size", "date"]:
+            elif sort_type in ["name", "ext", "size", "date"]:
                 # Set new sort mode
                 current_pane['sort_mode'] = sort_type
                 print(f"Sorting by {sort_type}")
@@ -3541,6 +3542,8 @@ class FileManager:
                 self.quick_sort('size')
             elif self.is_key_for_action(key, 'quick_sort_date'):  # Quick sort by date
                 self.quick_sort('date')
+            elif self.is_key_for_action(key, 'quick_sort_ext'):  # Quick sort by extension
+                self.quick_sort('ext')
             elif self.is_key_for_action(key, 'file_details'):  # Show file details
                 self.show_file_details()
             elif self.is_key_for_action(key, 'view_text'):  # View text file
