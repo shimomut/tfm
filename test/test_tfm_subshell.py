@@ -60,7 +60,7 @@ def simulate_tfm_subshell():
     
     # Test running our verification script
     try:
-        result = subprocess.run(['bash', 'test/verify_subshell.sh'], 
+        result = subprocess.run(['bash', 'verify_subshell.sh'], 
                               env=env, 
                               capture_output=True, 
                               text=True,
