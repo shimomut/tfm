@@ -65,54 +65,27 @@ def test_create_directory_functionality():
             sys.stdout = original_stdout
             
             # Set up test directories
-            fm.left_pane['path'] = temp_path
-            fm.right_pane['path'] = temp_path
-            fm.active_pane = 'left'
+            fm.pane_manager.left_pane['path'] = temp_path
+            fm.pane_manager.right_pane['path'] = temp_path
+            fm.pane_manager.active_pane = 'left'
             
             # Clear any selected files
-            fm.left_pane['selected_files'].clear()
+            fm.pane_manager.left_pane['selected_files'].clear()
             
-            # Test that enter_create_directory_mode exists
+            # Test that create directory methods exist
             assert hasattr(fm, 'enter_create_directory_mode'), "enter_create_directory_mode method not found"
-            assert hasattr(fm, 'exit_create_directory_mode'), "exit_create_directory_mode method not found"
-            assert hasattr(fm, 'perform_create_directory'), "perform_create_directory method not found"
-            assert hasattr(fm, 'handle_create_directory_input'), "handle_create_directory_input method not found"
+            assert hasattr(fm, 'on_create_directory_confirm'), "on_create_directory_confirm method not found"
+            assert hasattr(fm, 'on_create_directory_cancel'), "on_create_directory_cancel method not found"
             
-            # Test that create_dir_mode variables exist
-            assert hasattr(fm, 'create_dir_mode'), "create_dir_mode attribute not found"
-            assert hasattr(fm, 'create_dir_pattern'), "create_dir_pattern attribute not found"
-            
-            print("✓ All create directory methods and attributes exist")
+            print("✓ All create directory methods exist")
             sys.stdout.flush()
             
-            # Test entering create directory mode
-            fm.enter_create_directory_mode()
-            assert fm.create_dir_mode == True, "create_dir_mode should be True after entering"
-            assert fm.create_dir_pattern == "", "create_dir_pattern should be empty initially"
-            
-            print("✓ Enter create directory mode works")
-            sys.stdout.flush()
-            
-            # Test exiting create directory mode
-            fm.exit_create_directory_mode()
-            assert fm.create_dir_mode == False, "create_dir_mode should be False after exiting"
-            assert fm.create_dir_pattern == "", "create_dir_pattern should be empty after exiting"
-            
-            print("✓ Exit create directory mode works")
-            sys.stdout.flush()
-            
-            # Test directory creation
-            fm.enter_create_directory_mode()
-            fm.create_dir_pattern = "test_new_directory"
-            
-            # Mock the stdscr.getmaxyx for perform_create_directory
-            original_getmaxyx = fm.stdscr.getmaxyx
-            fm.stdscr.getmaxyx = lambda: (24, 80)
-            
-            fm.perform_create_directory()
+            # Test directory creation through the callback
+            test_dir_name = "test_new_directory"
+            fm.on_create_directory_confirm(test_dir_name)
             
             # Check if directory was created
-            new_dir = temp_path / "test_new_directory"
+            new_dir = temp_path / test_dir_name
             assert new_dir.exists(), f"Directory {new_dir} should have been created"
             assert new_dir.is_dir(), f"{new_dir} should be a directory"
             
@@ -120,7 +93,7 @@ def test_create_directory_functionality():
             sys.stdout.flush()
             
             # Test that move_selected_files calls create directory mode when no files selected
-            fm.left_pane['selected_files'].clear()  # Ensure no files selected
+            fm.pane_manager.left_pane['selected_files'].clear()  # Ensure no files selected
             
             # Mock enter_create_directory_mode to track if it's called
             create_dir_called = False
@@ -129,7 +102,7 @@ def test_create_directory_functionality():
             def mock_enter_create_dir():
                 nonlocal create_dir_called
                 create_dir_called = True
-                original_enter_create_dir()
+                # Don't call the original to avoid dialog complications in test
             
             fm.enter_create_directory_mode = mock_enter_create_dir
             

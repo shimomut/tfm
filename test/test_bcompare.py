@@ -43,8 +43,12 @@ def test_bcompare_config():
                 options_str = f" (options: {', '.join(options_list)})"
             print(f"\n✓ {prog['name']} found: {' '.join(prog['command'])}{options_str}")
             
-            # Check if the wrapper script exists
+            # Check if the wrapper script exists (adjust path based on current working directory)
             wrapper_path = prog['command'][0]
+            if os.path.basename(os.getcwd()) == 'test':
+                # When running from test directory, adjust the path
+                wrapper_path = '../' + wrapper_path if wrapper_path.startswith('./') else wrapper_path
+            
             if os.path.exists(wrapper_path):
                 print(f"✓ Wrapper script exists: {wrapper_path}")
                 
@@ -97,16 +101,16 @@ def test_wrapper_scripts():
     
     success = True
     
-    # Test directory comparison wrapper
-    wrapper_path = './bcompare_dirs_wrapper.sh'
+    # Test directory comparison wrapper (adjust path based on current working directory)
+    wrapper_path = '../tools/bcompare_dirs_wrapper.sh' if os.path.basename(os.getcwd()) == 'test' else './tools/bcompare_dirs_wrapper.sh'
     if os.path.exists(wrapper_path):
         print(f"✓ Directory comparison wrapper ready: {wrapper_path}")
     else:
         print(f"✗ Directory comparison wrapper not found: {wrapper_path}")
         success = False
     
-    # Test file comparison wrapper
-    files_wrapper_path = './bcompare_files_wrapper.sh'
+    # Test file comparison wrapper (adjust path based on current working directory)
+    files_wrapper_path = '../tools/bcompare_files_wrapper.sh' if os.path.basename(os.getcwd()) == 'test' else './tools/bcompare_files_wrapper.sh'
     if os.path.exists(files_wrapper_path):
         print(f"✓ File comparison wrapper ready: {files_wrapper_path}")
     else:

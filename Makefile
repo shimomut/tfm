@@ -20,15 +20,14 @@ run:
 
 test:
 	@echo "Running TFM tests..."
-	@cd test && python3 -m pytest . -v || echo "pytest not available, running individual tests..."
-	@cd test && for test in test_*.py; do echo "Running $$test..."; python3 "$$test" || exit 1; done
+	@cd test && PYTHONPATH=../src python3 -m pytest . -v || echo "pytest not available, running individual tests..."
+	@cd test && for test in test_*.py; do echo "Running $$test..."; PYTHONPATH=../src python3 "$$test" || exit 1; done
 
 test-quick:
 	@echo "Running quick verification tests..."
-	@cd test && python3 verify_complete_implementation.py
-	@cd test && python3 verify_delete_feature.py
-	@cd test && python3 verify_navigation_changes.py
-	@cd test && python3 verify_m_key_removal.py
+	@cd test && PYTHONPATH=../src python3 test_cursor_movement.py
+	@cd test && PYTHONPATH=../src python3 test_delete_feature.py
+	@cd test && PYTHONPATH=../src python3 test_integration.py
 
 clean:
 	@echo "Cleaning up..."
