@@ -96,19 +96,28 @@ tfm/
 - **User Guides**: Usage instructions and examples
 - **Technical Specifications**: System design and architecture
 
-### Key Documents
-- `DELETE_FEATURE_IMPLEMENTATION.md`: Delete functionality
-- `COPY_FEATURE_IMPLEMENTATION.md`: Copy functionality
-- `NAVIGATION_KEYS_SIMPLIFICATION.md`: Navigation changes
-- `HELP_DIALOG_IMPLEMENTATION_SUMMARY.md`: Help system
-- `CONFIGURATION_SYSTEM.md`: Configuration management
-- `SINGLE_LINE_TEXT_EDIT_IMPLEMENTATION.md`: Single line text editor component
-- `BATCH_RENAME_FEATURE.md`: Batch rename functionality
-- `EXTERNAL_PROGRAMS_FEATURE.md`: External programs and subshell
+### Core Feature Documentation
+- `CONFIGURATION_SYSTEM.md`: Configuration management and key bindings
+- `EXTERNAL_PROGRAMS_FEATURE.md`: External programs execution
+- `SUBSHELL_FEATURE.md`: Interactive subshell mode
+- `BATCH_RENAME_FEATURE.md`: Batch file renaming with regex
+- `HELP_DIALOG_FEATURE.md`: Comprehensive help system
 - `STATUS_BAR_FEATURE.md`: Text viewer status bar
-- `HELP_DIALOG_FEATURE.md`: Help dialog system
+
+### File Operations
+- `DELETE_FEATURE_IMPLEMENTATION.md`: File deletion functionality
+- `COPY_FEATURE_IMPLEMENTATION.md`: File copying functionality
+- `MOVE_FEATURE_IMPLEMENTATION.md`: File moving functionality
+- `RENAME_FEATURE_IMPLEMENTATION.md`: File renaming functionality
+- `CREATE_DIRECTORY_FEATURE.md`: Directory creation
+- `CREATE_FILE_FEATURE.md`: File creation
+
+### Archive Operations
+- `ARCHIVE_CREATION_FEATURE.md`: Archive creation functionality
+- `ARCHIVE_EXTRACTION_FEATURE.md`: Archive extraction functionality
 
 ### Component Documentation
+- `SINGLE_LINE_TEXT_EDIT_IMPLEMENTATION.md`: Reusable text editor component
 - `GENERAL_PURPOSE_DIALOG_SYSTEM.md`: Flexible dialog framework
 - `INFO_DIALOG_COMPONENT.md`: Scrollable information dialogs
 - `LIST_DIALOG_COMPONENT.md`: Searchable list selection dialogs
@@ -119,9 +128,12 @@ tfm/
 - `SEARCH_DIALOG_COMPONENT.md`: File and content search
 - `FILE_OPERATIONS_SYSTEM.md`: File system operations
 
-### Implementation Summaries
-- `CURSOR_FIX_SUMMARY.md`: SingleLineTextEdit cursor rendering fixes
-- `DIALOG_IMPROVEMENTS_SUMMARY.md`: GeneralPurposeDialog improvements
+### Additional Features
+- `TEXT_VIEWER_FEATURE.md`: Built-in text file viewer
+- `TEXT_EDITOR_FEATURE.md`: External text editor integration
+- `FAVORITE_DIRECTORIES_FEATURE.md`: Favorite directories management
+- `COLOR_SCHEMES_FEATURE.md`: Color scheme system
+- `NAVIGATION_KEYS_SIMPLIFICATION.md`: Navigation improvements
 
 ## Entry Points
 
