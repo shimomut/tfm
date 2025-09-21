@@ -200,16 +200,21 @@ class SingleLineTextEdit:
         
         if len(self.text) > text_max_width:
             # Adjust visible window to keep cursor in view
-            if cursor_pos < text_max_width // 2:
+            # Reserve space for cursor if it's at the end of text
+            effective_max_width = text_max_width
+            if cursor_pos == len(self.text) and text_max_width > 1:
+                effective_max_width = text_max_width - 1  # Reserve space for end cursor
+            
+            if cursor_pos < effective_max_width // 2:
                 # Cursor near start, show from beginning
-                visible_end = text_max_width
-            elif cursor_pos > len(self.text) - text_max_width // 2:
+                visible_end = effective_max_width
+            elif cursor_pos >= len(self.text) - effective_max_width // 2:
                 # Cursor near end, show end portion
-                visible_start = len(self.text) - text_max_width
+                visible_start = max(0, len(self.text) - effective_max_width)
             else:
                 # Cursor in middle, center the view
-                visible_start = cursor_pos - text_max_width // 2
-                visible_end = visible_start + text_max_width
+                visible_start = cursor_pos - effective_max_width // 2
+                visible_end = visible_start + effective_max_width
         
         visible_text = self.text[visible_start:visible_end]
         cursor_in_visible = cursor_pos - visible_start
@@ -227,8 +232,15 @@ class SingleLineTextEdit:
             current_x += 1
         
         # If cursor is at the end of text and field is active, show cursor after last character
-        if cursor_in_visible >= len(visible_text) and is_active and current_x < x + max_width:
-            self._safe_addstr(stdscr, y, current_x, " ", base_color | curses.A_REVERSE)
+        if cursor_in_visible >= len(visible_text) and is_active:
+            # Make sure we have space to draw the cursor
+            if current_x < x + max_width:
+                self._safe_addstr(stdscr, y, current_x, " ", base_color | curses.A_REVERSE)
+            elif len(visible_text) > 0 and current_x == x + max_width:
+                # If we're at the edge, replace the last character with cursor
+                last_char_x = current_x - 1
+                last_char = visible_text[-1] if visible_text else " "
+                self._safe_addstr(stdscr, y, last_char_x, last_char, base_color | curses.A_REVERSE)
     
     def _safe_addstr(self, stdscr, y, x, text, attr=0):
         """Safely add string to screen, handling boundary conditions"""
