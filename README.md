@@ -2,6 +2,21 @@
 
 A powerful terminal-based file manager built with Python's curses library. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, advanced text editing, and professional-grade features.
 
+## Key Benefits
+
+🚀 **Efficiency**: Navigate and manage files faster than traditional GUI file managers with keyboard-driven operations  
+⚡ **Speed**: Instant file operations with real-time progress tracking and batch processing capabilities  
+🎯 **Precision**: Advanced selection, filtering, and search features for exact file management  
+🔧 **Customizable**: Fully configurable key bindings, color schemes, and behavior settings  
+💻 **Universal**: Works on any terminal - macOS, Linux, Windows with proper terminal support  
+🎨 **Professional**: Clean dual-pane interface with syntax highlighting and intelligent file handling  
+📦 **Complete**: Built-in text viewer, archive operations, and external program integration  
+🔍 **Smart**: Incremental search, pattern filtering, and content search capabilities
+
+## Development with Kiro
+
+This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-powered development assistant. Approximately 99% of the code was auto-generated from natural language based interactive chat sessions, demonstrating the power of AI-assisted development for creating complex, feature-rich applications.
+
 ## Features
 
 ### Core Interface
@@ -126,7 +141,9 @@ TFM includes a comprehensive help dialog that provides quick access to all key b
 
 The help dialog is your quick reference guide - no need to memorize all key bindings!
 
-## Key Bindings
+## Default Key Bindings
+
+All key bindings are fully customizable through the configuration system. Below are the default mappings:
 
 ### Navigation
 | Key | Action |
@@ -147,26 +164,31 @@ The help dialog is your quick reference guide - no need to memorize all key bind
 | `a` | Select all files |
 | `A` | Select all items (files + directories) |
 | `c/C` | Copy selected files to opposite pane |
-| `m/M` | Move selected files to opposite pane (or create directory if no selection) |
+| `m/M` | Move selected files to opposite pane |
 | `k/K` | Delete selected files (with confirmation) |
 | `r/R` | Rename file (single) / Batch rename (multiple selected) |
 | `e` | Edit existing file with text editor |
 | `E` | Create new text file and edit |
+| `F7` | Create new directory |
 | `p/P` | Create archive from selected files (.zip, .tar.gz, .tgz) |
 | `u/U` | Extract archive to other pane |
 | `v/V` | View text file in built-in viewer |
 | `i/I` | Show file details |
+| `w/W` | Compare selection (match files in other pane) |
 
 ### Search & Sorting
 | Key | Action |
 |-----|--------|
-| `f/F` | Search files |
+| `f` | Incremental search (isearch) |
+| `F` | Filename search dialog |
+| `G` | Content search dialog (grep) |
 | `;` | Filter files by filename pattern (fnmatch: *.py, test_*, etc.) |
-| `: (Shift+;)` | Clear filter from current pane |
+| `:` | Clear filter from current pane |
 | `s/S` | Sort menu |
 | `1` | Quick sort by name (toggle reverse if already active) |
-| `2` | Quick sort by size (toggle reverse if already active) |
-| `3` | Quick sort by date (toggle reverse if already active) |
+| `2` | Quick sort by extension (toggle reverse if already active) |
+| `3` | Quick sort by size (toggle reverse if already active) |
+| `4` | Quick sort by date (toggle reverse if already active) |
 
 ### View Options
 | Key | Action |
@@ -175,29 +197,38 @@ The help dialog is your quick reference guide - no need to memorize all key bind
 | `t` | Toggle color scheme (Dark/Light) |
 | `o` | Sync current pane to other pane |
 | `O` | Sync other pane to current pane |
+| `[` | Make left pane smaller (adjust boundary left) |
+| `]` | Make left pane larger (adjust boundary right) |
 | `-` | Reset pane split to 50/50 |
-| `Opt+←/→` | Adjust pane boundary |
 
 ### Log Pane Controls
 | Key | Action |
 |-----|--------|
-| `Ctrl+U` | Make log pane smaller |
-| `Ctrl+D` | Make log pane larger |
-| `Ctrl+K` | Scroll log up |
-| `Ctrl+L` | Scroll log down |
+| `{` | Make log pane larger (Shift+[) |
+| `}` | Make log pane smaller (Shift+]) |
+| `_` | Reset log pane height to default (Shift+-) |
 | `Shift+Up` | Scroll log up (toward older messages) |
 | `Shift+Down` | Scroll log down (toward newer messages) |
 | `Shift+Left` | Fast scroll up (toward older messages) |
 | `Shift+Right` | Fast scroll down (toward newer messages) |
-| `l` | Scroll log up (alternative) |
-| `L` | Scroll log down (alternative) |
+
+### Advanced Features
+| Key | Action |
+|-----|--------|
+| `j/J` | Show favorite directories |
+| `x` | Show external programs menu |
+| `X` | Enter sub-shell mode |
+| `T` | File type filter dialog |
+| `z` | Toggle fallback color mode |
+| `Z` | View options menu |
+| `L` | Settings and configuration menu |
 
 ### General
 | Key | Action |
 |-----|--------|
 | `?` | Show help dialog |
 | `q/Q` | Quit TFM |
-| `x/X` | Enter sub-shell mode |
+| `Ctrl+R` | Refresh file list |
 | `ESC` | Cancel current operation |
 
 ## Text Viewer
@@ -408,47 +439,129 @@ make install
 
 ## Configuration
 
-TFM uses a flexible configuration system that allows you to customize key bindings, colors, and behavior.
+TFM features a comprehensive configuration system that allows complete customization of behavior, key bindings, and appearance through a Python configuration file.
 
-### Configuration Files
+### Configuration File Management
+
+**Automatic Setup**: TFM automatically creates `~/.tfm/config.py` from the built-in template on first launch  
+**Easy Access**: Open configuration from the Settings menu (`L` key) or edit manually  
+**Template-Based**: Clean separation between default settings and user customizations  
+**Live Validation**: Configuration errors are reported with fallback to safe defaults
+
+### Configuration File Location
+
 - **User Config**: `~/.tfm/config.py` - Your personal customizations
-- **Default Template**: `src/_config.py` - Template for creating user config
-- **System Defaults**: `src/tfm_config.py` - Built-in default settings
+- **Template**: `src/_config.py` - Default configuration template
+- **Access Methods**:
+  - Press `L` key → Settings Menu → Edit Configuration
+  - Manually edit `~/.tfm/config.py`
+  - TFM creates the file automatically if it doesn't exist
 
 ### Customizable Settings
-- **Key Bindings**: Remap any key to any action
-- **Color Schemes**: Choose between Dark and Light themes, or customize colors
-- **Favorite Directories**: Quick access to frequently used locations
-- **Text Editor**: Choose your preferred editor (vim, nano, emacs, etc.)
-- **Pane Sizes**: Default pane ratios and minimum sizes
+
+#### Display & Behavior
+- **Color Schemes**: Dark/Light themes with runtime switching
+- **Pane Layout**: Default pane ratios and log height
+- **File Display**: Hidden files, extension separation, sorting preferences
+- **Confirmations**: Customize which operations require confirmation
+
+#### Key Bindings
+- **Fully Customizable**: Every keyboard shortcut can be remapped
+- **Multiple Keys**: Assign multiple keys to the same action
+- **Comprehensive Coverage**: All TFM features have configurable bindings
+
+#### Directories & Programs
+- **Startup Paths**: Set default directories for left and right panes
+- **Favorite Directories**: Quick access bookmarks with searchable dialog
+- **External Programs**: Custom commands and scripts integration
+- **Text Editor**: Choose your preferred editor (vim, nano, emacs, code, etc.)
 
 ### Example Configuration
+
 ```python
 class Config:
-    # Color scheme selection
+    # Display preferences
     COLOR_SCHEME = 'dark'  # 'dark' or 'light'
+    SHOW_HIDDEN_FILES = False
+    DEFAULT_LEFT_PANE_RATIO = 0.6  # 60% left, 40% right
+    DEFAULT_LOG_HEIGHT_RATIO = 0.2  # 20% log pane
     
-    # Text editor for file editing
-    TEXT_EDITOR = 'nano'  # or 'vim', 'emacs', 'code', etc.
+    # Behavior settings
+    CONFIRM_DELETE = True
+    CONFIRM_COPY = False  # Skip copy confirmations for speed
+    CONFIRM_MOVE = False  # Skip move confirmations for speed
     
-    # Favorite directories for quick access
-    FAVORITE_DIRECTORIES = [
-        {'name': 'Home', 'path': '~'},
-        {'name': 'Projects', 'path': '~/dev'},
-        {'name': 'Documents', 'path': '~/Documents'},
-    ]
+    # Startup directories
+    STARTUP_LEFT_PATH = "~/projects"
+    STARTUP_RIGHT_PATH = "~/Downloads"
+    
+    # Text editor
+    TEXT_EDITOR = 'code'  # VS Code, or 'vim', 'nano', etc.
     
     # Custom key bindings
     KEY_BINDINGS = {
-        'copy_files': ['c', 'C'],
-        'move_files': ['m', 'M'],
-        'delete_files': ['k', 'K'],
-        'rename_file': ['r', 'R'],
-        'favorites': ['j', 'J'],
-        'toggle_color_scheme': ['t'],
-        # ... other bindings
+        'quit': ['q'],  # Remove 'Q' binding
+        'search': ['/', 'f'],  # Add vim-like '/' for search
+        'file_details': ['i', 'I', 'd'],  # Add 'd' for details
+        'copy_files': ['c', 'C', 'y'],  # Add 'y' for yank/copy
+        'toggle_color_scheme': ['t', 'T'],  # Both cases
+        # ... customize any action
     }
+    
+    # Favorite directories
+    FAVORITE_DIRECTORIES = [
+        {'name': 'Home', 'path': '~'},
+        {'name': 'Projects', 'path': '~/dev'},
+        {'name': 'Work', 'path': '/work/projects'},
+        {'name': 'Config', 'path': '~/.config'},
+    ]
+    
+    # External programs
+    PROGRAMS = [
+        {'name': 'Git Status', 'command': ['git', 'status']},
+        {'name': 'My Script', 'command': ['/path/to/script.sh']},
+        {'name': 'Quick Command', 'command': ['ls', '-la'], 
+         'options': {'auto_return': True}},
+    ]
 ```
+
+### Accessing Configuration
+
+#### Through TFM Interface
+1. **Settings Menu**: Press `L` key to open the settings menu
+2. **Edit Configuration**: Select "Edit Configuration" to open `config.py` in your text editor
+3. **Automatic Creation**: If no config exists, TFM creates one from the template
+4. **Live Reload**: Changes take effect when you restart TFM
+
+#### Manual Configuration
+1. **Direct Edit**: Open `~/.tfm/config.py` in any text editor
+2. **Template Reference**: Check `src/_config.py` for all available options
+3. **Validation**: TFM validates settings and reports errors on startup
+
+### Configuration Categories
+
+#### Key Binding Actions
+All actions support multiple key assignments:
+- **Navigation**: `quit`, `help`, `toggle_hidden`, `toggle_color_scheme`
+- **File Operations**: `copy_files`, `move_files`, `delete_files`, `rename_file`, `create_file`
+- **Search & Filter**: `search`, `search_dialog`, `search_content`, `filter`, `clear_filter`
+- **Sorting**: `sort_menu`, `quick_sort_name`, `quick_sort_ext`, `quick_sort_size`, `quick_sort_date`
+- **Selection**: `select_file`, `select_all_files`, `select_all_items`, `compare_selection`
+- **Pane Management**: `sync_current_to_other`, `sync_other_to_current`, `adjust_pane_left`, `adjust_pane_right`
+- **Advanced**: `favorites`, `subshell`, `programs`, `create_archive`, `extract_archive`
+
+#### Confirmation Settings
+Control which operations require user confirmation:
+- `CONFIRM_DELETE` - File/directory deletion (recommended: True)
+- `CONFIRM_QUIT` - Application exit
+- `CONFIRM_COPY` - File copying operations
+- `CONFIRM_MOVE` - File moving operations  
+- `CONFIRM_EXTRACT_ARCHIVE` - Archive extraction
+
+#### Performance Settings
+- `MAX_LOG_MESSAGES` - Maximum log entries to keep in memory
+- `SEPARATE_EXTENSIONS` - Show file extensions in separate column
+- `MAX_EXTENSION_LENGTH` - Maximum extension length for separation
 
 ## Project Structure
 
@@ -592,27 +705,6 @@ TFM welcomes contributions! The project structure makes it easy to add new featu
 
 TFM is released under the MIT License. See LICENSE file for details.
 
-## Changelog
-
-### v0.90 (Current)
-- ✅ Comprehensive file operations (copy, move, delete, rename)
-- ✅ Advanced batch rename with regex patterns and macros
-- ✅ Professional text editing with full cursor movement
-- ✅ Archive creation and extraction (ZIP, TAR.GZ, TGZ)
-- ✅ Advanced file filtering and multi-pattern search
-- ✅ Intelligent sorting with quick sort keys (1, 2, 3)
-- ✅ Pane synchronization (directories and cursor positions)
-- ✅ Enhanced multi-selection (all files, all items, upward selection)
-- ✅ Create files and directories
-- ✅ Favorite directories with searchable dialog
-- ✅ Enhanced text viewer with syntax highlighting
-- ✅ Searchable list dialog system
-- ✅ Sub-shell mode with environment variables
-- ✅ Multiple color schemes (Dark/Light) with runtime toggle
-- ✅ Improved configuration system
-- ✅ Comprehensive help system
-- ✅ Extensive test coverage
-- ✅ Modular project structure
 
 ---
 
