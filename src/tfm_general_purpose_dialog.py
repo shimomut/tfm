@@ -105,18 +105,23 @@ class GeneralPurposeDialog:
         """Handle key input for status line input dialog"""
         # Handle ESC - cancel
         if key == 27:  # ESC
-            if self.cancel_callback:
-                self.cancel_callback()
-            else:
-                self.hide()
+            # Store callback before hiding
+            cancel_callback = self.cancel_callback
+            self.hide()
+            # Call callback after hiding to allow new dialogs
+            if cancel_callback:
+                cancel_callback()
             return True
         
         # Handle Enter - confirm
         elif key == curses.KEY_ENTER or key == 10 or key == 13:
-            if self.callback:
-                self.callback(self.text_editor.get_text())
-            else:
-                self.hide()
+            # Store callback and text before hiding
+            callback = self.callback
+            text = self.text_editor.get_text()
+            self.hide()
+            # Call callback after hiding to allow new dialogs
+            if callback:
+                callback(text)
             return True
         
         # Handle text editing

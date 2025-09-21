@@ -1373,9 +1373,13 @@ class FileManager:
                 self.needs_full_redraw = True
                 return True
             elif action == 'execute':
-                if self.quick_choice_bar.callback:
-                    self.quick_choice_bar.callback(data)
+                # Store callback before exiting mode
+                callback = self.quick_choice_bar.callback
+                # Exit quick choice mode first to allow new dialogs to be shown
                 self.exit_quick_choice_mode()
+                # Then execute the callback
+                if callback:
+                    callback(data)
                 return True
         
         return False

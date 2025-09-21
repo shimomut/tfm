@@ -59,9 +59,12 @@ class ListDialog:
     def handle_input(self, key):
         """Handle input while in list dialog mode"""
         if key == 27:  # ESC - cancel
-            if self.callback:
-                self.callback(None)
+            # Store callback before exiting
+            callback = self.callback
             self.exit()
+            # Call callback after exiting to allow new dialogs
+            if callback:
+                callback(None)
             return True
         elif key == curses.KEY_UP:
             # Move selection up
@@ -109,14 +112,18 @@ class ListDialog:
             return True
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
             # Select current item
+            callback = self.callback
             if self.filtered_items and 0 <= self.selected < len(self.filtered_items):
                 selected_item = self.filtered_items[self.selected]
-                if self.callback:
-                    self.callback(selected_item)
+                self.exit()
+                # Call callback after exiting to allow new dialogs
+                if callback:
+                    callback(selected_item)
             else:
-                if self.callback:
-                    self.callback(None)
-            self.exit()
+                self.exit()
+                # Call callback after exiting to allow new dialogs
+                if callback:
+                    callback(None)
             return True
         elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
             # Let the editor handle cursor movement keys
