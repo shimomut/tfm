@@ -70,16 +70,18 @@ class TestGeneralPurposeDialogWidthFix(unittest.TestCase):
         self.assertEqual(label, prompt)
         self.assertTrue(is_active)
         
-        # Calculate expected max_width
-        # help_space = len(help_text) + 6 = 24 + 6 = 30
-        # max_field_width = width - help_space - 4 = 80 - 30 - 4 = 46
-        expected_max_width = 46
+        # Calculate expected max_width with new improved logic
+        # help_text_width = 24, help_margin = 3, help_total_space = 27
+        # Since width (80) > help_total_space (27) + 20, help is shown
+        # reserved_help_space = 27
+        # max_field_width = width - reserved_help_space - 4 = 80 - 27 - 4 = 49
+        expected_max_width = 49
         self.assertEqual(max_width, expected_max_width)
         
         # Verify that the available text width is reasonable
-        # text_width = max_width - len(prompt) = 46 - 16 = 30
+        # text_width = max_width - len(prompt) = 49 - 16 = 33
         available_text_width = max_width - len(prompt)
-        self.assertEqual(available_text_width, 30)
+        self.assertEqual(available_text_width, 33)
         
         # This should be enough for reasonable input text
         self.assertGreaterEqual(available_text_width, 20)
@@ -162,11 +164,12 @@ class TestGeneralPurposeDialogWidthFix(unittest.TestCase):
         # Calculate available text width
         available_text_width = max_width - len(prompt)
         
-        # With the fix, there should be enough space for the long filename
-        # help_space = 24 + 6 = 30
-        # max_field_width = 100 - 30 - 4 = 66
-        # available_text_width = 66 - 11 = 55
-        self.assertEqual(available_text_width, 55)
+        # With the improved fix, there should be enough space for the long filename
+        # help_text_width = 24, help_margin = 3, help_total_space = 27
+        # reserved_help_space = 27
+        # max_field_width = 100 - 27 - 4 = 69
+        # available_text_width = 69 - 11 = 58
+        self.assertEqual(available_text_width, 58)
         
         # The long filename (51 chars) should fit in the available space (55 chars)
         self.assertGreaterEqual(available_text_width, len(long_filename))

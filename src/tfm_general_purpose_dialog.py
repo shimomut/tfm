@@ -146,9 +146,27 @@ class GeneralPurposeDialog:
         status_line = " " * (width - 1)
         safe_addstr_func(status_y, 0, status_line, get_status_color())
         
-        # Calculate available space for the entire field (prompt + input)
-        help_space = len(self.help_text) + 6 if self.help_text else 0
-        max_field_width = width - help_space - 4
+        # Calculate help text space and position first
+        help_text_width = len(self.help_text) if self.help_text else 0
+        help_margin = 3  # Space around help text
+        help_total_space = help_text_width + help_margin if self.help_text else 0
+        
+        # Reserve space for help text if it can fit
+        reserved_help_space = 0
+        show_help = False
+        if self.help_text and width > help_total_space + 20:  # Need at least 20 chars for input
+            reserved_help_space = help_total_space
+            show_help = True
+        
+        # Calculate available space for the input field (prompt + text)
+        # Leave some margin (4 chars) and space for help text if showing
+        max_field_width = width - reserved_help_space - 4
+        
+        # Ensure minimum width for the input field
+        min_field_width = len(self.prompt_text) + 5  # At least 5 chars for input
+        if max_field_width < min_field_width:
+            max_field_width = min_field_width
+            show_help = False  # Disable help if no space
         
         # Draw input field using SingleLineTextEdit
         self.text_editor.draw(
@@ -157,13 +175,13 @@ class GeneralPurposeDialog:
             is_active=True
         )
         
-        # Show help text on the right if there's space and help text is provided
-        if self.help_text:
-            input_field_width = len(self.prompt_text) + len(self.text_editor.text) + 2
-            if input_field_width + len(self.help_text) + 6 < width:
-                help_x = width - len(self.help_text) - 3
-                if help_x > input_field_width + 4:  # Ensure no overlap
-                    safe_addstr_func(status_y, help_x, self.help_text, get_status_color() | curses.A_DIM)
+        # Show help text on the right if we determined it should be shown
+        if show_help and self.help_text:
+            help_x = width - len(self.help_text) - 2
+            # Make sure help text doesn't overlap with input field
+            input_end_x = 2 + min(max_field_width, len(self.prompt_text) + len(self.text_editor.text) + 1)
+            if help_x > input_end_x + 2:  # At least 2 chars gap
+                safe_addstr_func(status_y, help_x, self.help_text, get_status_color() | curses.A_DIM)
 
 
 # Helper functions for common dialog patterns
