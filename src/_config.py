@@ -61,6 +61,7 @@ class Config:
         'adjust_pane_right': [']'],  # ] - make left pane larger
         'adjust_log_up': ['{'],  # Shift+[ - make log pane larger
         'adjust_log_down': ['}'],  # Shift+] - make log pane smaller
+        'reset_log_height': ['_'],  # Shift+- - reset log pane height
     }
     
     # Directory settings

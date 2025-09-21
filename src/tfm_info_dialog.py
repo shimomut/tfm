@@ -232,6 +232,7 @@ class InfoDialogHelpers:
         help_lines.append("• Ctrl+D: Make log pane larger")
         help_lines.append("• {: Make log pane larger")
         help_lines.append("• }: Make log pane smaller")
+        help_lines.append("• _: Reset log pane height to default")
         help_lines.append("• Ctrl+K: Scroll log up")
         help_lines.append("• Ctrl+L: Scroll log down")
         help_lines.append("• Shift+Up: Scroll log up (toward older messages)")

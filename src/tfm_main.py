@@ -3631,6 +3631,10 @@ class FileManager:
                 self.adjust_log_boundary('down')
             elif self.is_key_for_action(key, 'adjust_log_down'):  # Adjust log boundary down
                 self.adjust_log_boundary('up')
+            elif self.is_key_for_action(key, 'reset_log_height'):  # Reset log pane height
+                self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
+                self.needs_full_redraw = True
+                print(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
                 self.pane_manager.left_pane_ratio = 0.5
                 self.needs_full_redraw = True

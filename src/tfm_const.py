@@ -38,13 +38,14 @@ KEY_SHIFT_COMMA = 60      # '<' - Shift+comma
 KEY_SHIFT_PERIOD = 62     # '>' - Shift+period
 KEY_SHIFT_LBRACKET = 123  # '{' - Shift+[
 KEY_SHIFT_RBRACKET = 125  # '}' - Shift+]
+KEY_UNDERSCORE = 95       # '_' - Shift+-
 # Shift key combinations for log scrolling (terminal-dependent)
 KEY_SHIFT_UP_1 = 337      # Shift+Up in some terminals
 KEY_SHIFT_DOWN_1 = 336    # Shift+Down in some terminals  
 KEY_SHIFT_UP_2 = 393      # Alternative Shift+Up code
 KEY_SHIFT_DOWN_2 = 402    # Alternative Shift+Down code
-KEY_SHIFT_LEFT_1 = 545    # Shift+Left in some terminals (fast scroll to older messages)
-KEY_SHIFT_RIGHT_1 = 560   # Shift+Right in some terminals (fast scroll to newer messages)
+KEY_SHIFT_LEFT_1 = 545    # Shift+Left in some terminals
+KEY_SHIFT_RIGHT_1 = 560   # Shift+Right in some terminals
 KEY_SHIFT_LEFT_2 = 393    # Alternative Shift+Left code
 KEY_SHIFT_RIGHT_2 = 402   # Alternative Shift+Right code
 # Note: Shift+Arrow keys may send regular arrow codes (258/259) in some terminals
