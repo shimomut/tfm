@@ -146,13 +146,13 @@ class GeneralPurposeDialog:
         status_line = " " * (width - 1)
         safe_addstr_func(status_y, 0, status_line, get_status_color())
         
-        # Calculate available space for input
+        # Calculate available space for the entire field (prompt + input)
         help_space = len(self.help_text) + 6 if self.help_text else 0
-        max_input_width = width - len(self.prompt_text) - help_space - 4
+        max_field_width = width - help_space - 4
         
         # Draw input field using SingleLineTextEdit
         self.text_editor.draw(
-            stdscr, status_y, 2, max_input_width,
+            stdscr, status_y, 2, max_field_width,
             self.prompt_text,
             is_active=True
         )
