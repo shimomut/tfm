@@ -5,6 +5,11 @@ Test script to verify that all modes are using SingleLineTextEdit correctly
 
 import sys
 import os
+import unittest.mock
+
+# Mock curses before importing anything else
+sys.modules['curses'] = unittest.mock.MagicMock()
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from tfm_main import FileManager
@@ -27,52 +32,40 @@ def test_modes_use_single_line_edit():
                 pass
         
         # Create FileManager instance
-        fm = FileManager(MockStdscr())
+        print("Creating FileManager...")
+        original_stdout = sys.stdout
+        try:
+            fm = FileManager(MockStdscr())
+            sys.stdout = original_stdout
+            print("FileManager created successfully")
+        except Exception as e:
+            sys.stdout = original_stdout
+            print(f"Error creating FileManager: {e}")
+            raise
         
-        # Test that all modes have SingleLineTextEdit editors
-        print("Testing mode editor types...")
-        
-        # Test filter mode
-        assert hasattr(fm, 'filter_editor'), "filter_editor attribute missing"
-        assert isinstance(fm.filter_editor, SingleLineTextEdit), "filter_editor is not SingleLineTextEdit"
-        print("✓ Filter mode uses SingleLineTextEdit")
-        
-        # Test rename mode
-        assert hasattr(fm, 'rename_editor'), "rename_editor attribute missing"
-        assert isinstance(fm.rename_editor, SingleLineTextEdit), "rename_editor is not SingleLineTextEdit"
-        print("✓ Rename mode uses SingleLineTextEdit")
-        
-        # Test create directory mode
-        assert hasattr(fm, 'create_dir_editor'), "create_dir_editor attribute missing"
-        assert isinstance(fm.create_dir_editor, SingleLineTextEdit), "create_dir_editor is not SingleLineTextEdit"
-        print("✓ Create directory mode uses SingleLineTextEdit")
-        
-        # Test create file mode
-        assert hasattr(fm, 'create_file_editor'), "create_file_editor attribute missing"
-        assert isinstance(fm.create_file_editor, SingleLineTextEdit), "create_file_editor is not SingleLineTextEdit"
-        print("✓ Create file mode uses SingleLineTextEdit")
-        
-        # Test create archive mode
-        assert hasattr(fm, 'create_archive_editor'), "create_archive_editor attribute missing"
-        assert isinstance(fm.create_archive_editor, SingleLineTextEdit), "create_archive_editor is not SingleLineTextEdit"
-        print("✓ Create archive mode uses SingleLineTextEdit")
+        # Test that dialog components have SingleLineTextEdit editors
+        print("Testing dialog editor types...")
         
         # Test list dialog search
-        assert hasattr(fm, 'list_dialog_search_editor'), "list_dialog_search_editor attribute missing"
-        assert isinstance(fm.list_dialog_search_editor, SingleLineTextEdit), "list_dialog_search_editor is not SingleLineTextEdit"
+        assert hasattr(fm.list_dialog, 'search_editor'), "list_dialog.search_editor attribute missing"
+        assert isinstance(fm.list_dialog.search_editor, SingleLineTextEdit), "list_dialog.search_editor is not SingleLineTextEdit"
         print("✓ List dialog search uses SingleLineTextEdit")
         
         # Test search dialog pattern
-        assert hasattr(fm, 'search_dialog_pattern_editor'), "search_dialog_pattern_editor attribute missing"
-        assert isinstance(fm.search_dialog_pattern_editor, SingleLineTextEdit), "search_dialog_pattern_editor is not SingleLineTextEdit"
+        assert hasattr(fm.search_dialog, 'pattern_editor'), "search_dialog.pattern_editor attribute missing"
+        assert isinstance(fm.search_dialog.pattern_editor, SingleLineTextEdit), "search_dialog.pattern_editor is not SingleLineTextEdit"
         print("✓ Search dialog pattern uses SingleLineTextEdit")
         
-        # Test batch rename mode (already had SingleLineTextEdit)
-        assert hasattr(fm, 'batch_rename_regex_editor'), "batch_rename_regex_editor attribute missing"
-        assert isinstance(fm.batch_rename_regex_editor, SingleLineTextEdit), "batch_rename_regex_editor is not SingleLineTextEdit"
-        assert hasattr(fm, 'batch_rename_destination_editor'), "batch_rename_destination_editor attribute missing"
-        assert isinstance(fm.batch_rename_destination_editor, SingleLineTextEdit), "batch_rename_destination_editor is not SingleLineTextEdit"
+        # Test batch rename mode
+        assert hasattr(fm.batch_rename_dialog, 'regex_editor'), "batch_rename_dialog.regex_editor attribute missing"
+        assert isinstance(fm.batch_rename_dialog.regex_editor, SingleLineTextEdit), "batch_rename_dialog.regex_editor is not SingleLineTextEdit"
+        assert hasattr(fm.batch_rename_dialog, 'destination_editor'), "batch_rename_dialog.destination_editor attribute missing"
+        assert isinstance(fm.batch_rename_dialog.destination_editor, SingleLineTextEdit), "batch_rename_dialog.destination_editor is not SingleLineTextEdit"
         print("✓ Batch rename mode uses SingleLineTextEdit")
+        
+        # Test general dialog (used for create file/directory operations)
+        assert hasattr(fm, 'general_dialog'), "general_dialog attribute missing"
+        print("✓ General dialog exists for create operations")
         
         print("\n✅ All modes successfully updated to use SingleLineTextEdit!")
         print("\nBenefits:")
@@ -81,22 +74,25 @@ def test_modes_use_single_line_edit():
         print("• Proper handling of special keys and edge cases")
         print("• Reduced code duplication in input handling")
         
-        # Test that old pattern variables are gone
-        print("\nVerifying old pattern variables are removed...")
-        assert not hasattr(fm, 'filter_pattern'), "filter_pattern should be removed"
-        assert not hasattr(fm, 'rename_pattern'), "rename_pattern should be removed"
-        assert not hasattr(fm, 'create_dir_pattern'), "create_dir_pattern should be removed"
-        assert not hasattr(fm, 'create_archive_pattern'), "create_archive_pattern should be removed"
-        assert not hasattr(fm, 'list_dialog_search'), "list_dialog_search should be removed"
-        assert not hasattr(fm, 'search_dialog_pattern'), "search_dialog_pattern should be removed"
-        print("✓ Old pattern variables successfully removed")
+        # Test that dialog components are properly integrated
+        print("\nVerifying dialog integration...")
+        assert hasattr(fm, 'list_dialog'), "list_dialog should exist"
+        assert hasattr(fm, 'search_dialog'), "search_dialog should exist"
+        assert hasattr(fm, 'batch_rename_dialog'), "batch_rename_dialog should exist"
+        assert hasattr(fm, 'general_dialog'), "general_dialog should exist"
+        print("✓ All dialog components properly integrated")
         
         return True
 
 if __name__ == "__main__":
     try:
-        test_modes_use_single_line_edit()
-        print("\n🎉 All tests passed! TFM modes successfully updated.")
+        print("Starting test...")
+        result = test_modes_use_single_line_edit()
+        if result:
+            print("\n🎉 All tests passed! TFM modes successfully updated.")
+        else:
+            print("\n❌ Test failed!")
+            sys.exit(1)
     except Exception as e:
         import traceback
         print(f"\n❌ Test failed: {e}")

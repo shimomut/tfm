@@ -15,24 +15,23 @@ def test_log_scroll_constants():
     
     try:
         from tfm_const import (
-            KEY_CTRL_K, KEY_CTRL_L,
             KEY_SHIFT_UP_1, KEY_SHIFT_DOWN_1,
             KEY_SHIFT_UP_2, KEY_SHIFT_DOWN_2,
             KEY_SHIFT_LEFT_1, KEY_SHIFT_RIGHT_1,
             KEY_SHIFT_LEFT_2, KEY_SHIFT_RIGHT_2
         )
         
-        # Test that constants have expected values
-        assert KEY_CTRL_K == 11, f"KEY_CTRL_K should be 11, got {KEY_CTRL_K}"
-        assert KEY_CTRL_L == 12, f"KEY_CTRL_L should be 12, got {KEY_CTRL_L}"
-        
-        # Test that Shift key constants are defined
+        # Test that Shift key constants are defined and have expected values
         assert KEY_SHIFT_UP_1 == 337, f"KEY_SHIFT_UP_1 should be 337, got {KEY_SHIFT_UP_1}"
         assert KEY_SHIFT_DOWN_1 == 336, f"KEY_SHIFT_DOWN_1 should be 336, got {KEY_SHIFT_DOWN_1}"
         
         # Test new Shift+Left/Right constants
         assert KEY_SHIFT_LEFT_1 == 545, f"KEY_SHIFT_LEFT_1 should be 545, got {KEY_SHIFT_LEFT_1}"
         assert KEY_SHIFT_RIGHT_1 == 560, f"KEY_SHIFT_RIGHT_1 should be 560, got {KEY_SHIFT_RIGHT_1}"
+        
+        # Test alternative shift key constants
+        assert KEY_SHIFT_UP_2 == 393, f"KEY_SHIFT_UP_2 should be 393, got {KEY_SHIFT_UP_2}"
+        assert KEY_SHIFT_DOWN_2 == 402, f"KEY_SHIFT_DOWN_2 should be 402, got {KEY_SHIFT_DOWN_2}"
         
         print("✓ All log scrolling key constants defined correctly")
         return True
