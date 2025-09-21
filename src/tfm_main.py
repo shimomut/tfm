@@ -239,9 +239,9 @@ class FileManager:
             print(message)
             self.needs_full_redraw = True
     
-    def sync_pane_directories(self):
+    def sync_current_to_other(self):
         """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
-        if self.pane_manager.sync_pane_directories(print):
+        if self.pane_manager.sync_current_to_other(print):
             current_pane = self.get_current_pane()
             self.refresh_files(current_pane)
             
@@ -258,9 +258,9 @@ class FileManager:
             
             self.needs_full_redraw = True
     
-    def sync_other_pane_directory(self):
+    def sync_other_to_current(self):
         """Change other pane's directory to match the current pane's directory, or sync cursor if already same directory"""
-        if self.pane_manager.sync_other_pane_directory(print):
+        if self.pane_manager.sync_other_to_current(print):
             other_pane = self.get_inactive_pane()
             self.refresh_files(other_pane)
             
@@ -3519,12 +3519,10 @@ class FileManager:
                 self.toggle_all_files_selection()
             elif self.is_key_for_action(key, 'select_all_items'):  # Toggle all items selection
                 self.toggle_all_items_selection()
-            elif self.is_key_for_action(key, 'sync_panes'):  # Sync panes
-                # Handle both 'o' and 'O' for sync operations
-                if key == ord('O'):  # Shift+O - sync other pane to current
-                    self.sync_other_pane_directory()
-                else:  # 'o' - sync current pane to other
-                    self.sync_pane_directories()
+            elif self.is_key_for_action(key, 'sync_current_to_other'):  # Sync current pane to other
+                self.sync_current_to_other()
+            elif self.is_key_for_action(key, 'sync_other_to_current'):  # Sync other pane to current
+                self.sync_other_to_current()
             elif self.is_key_for_action(key, 'search_dialog'):  # Show search dialog (filename)
                 self.show_search_dialog('filename')
             elif self.is_key_for_action(key, 'search_content'):  # Show search dialog (content)
@@ -3533,10 +3531,8 @@ class FileManager:
                 self.edit_selected_file()
             elif self.is_key_for_action(key, 'create_file'):  # Create new file
                 self.enter_create_file_mode()
-
             elif self.is_key_for_action(key, 'file_type_filter'):  # Show file type filter
                 self.show_file_type_filter()
-
             elif self.is_key_for_action(key, 'toggle_fallback_colors'):  # Toggle fallback color mode
                 self.toggle_fallback_color_mode()
             elif self.is_key_for_action(key, 'view_options'):  # Show view options

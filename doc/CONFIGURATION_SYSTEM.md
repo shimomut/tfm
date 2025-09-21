@@ -91,24 +91,71 @@ class Config:
 
 ## Key Bindings Configuration
 
-### Customizable Key Bindings
+### Comprehensive Key Bindings System
+
+TFM now features a fully configurable key binding system where all keyboard shortcuts can be customized through the configuration file. Each action has a descriptive name and can be assigned multiple keys.
 
 ```python
 KEY_BINDINGS = {
-    'quit': ['q', 'Q'],
-    'help': ['?'],
-    'toggle_hidden': ['H'],
-    'search': ['f', 'F'],
-    'file_operations': ['m', 'M'],
-    'sort_menu': ['s', 'S'],
-    'file_details': ['i', 'I'],
-    'quick_sort_name': ['1'],
-    'quick_sort_size': ['2'],
-    'quick_sort_date': ['3'],
-    'select_file': [' '],  # Space
-    'select_all_files': ['a'],
-    'select_all_items': ['A'],
-    'sync_panes': ['o', 'O'],
+    # Application Control
+    'quit': ['q', 'Q'],                    # Exit TFM application
+    'help': ['?'],                         # Show help dialog with all key bindings
+    
+    # Display & Navigation
+    'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
+    'toggle_color_scheme': ['t'],          # Switch between dark and light color schemes
+    
+    # Search & Filter
+    'search': ['f'],                       # Enter incremental search mode (isearch)
+    'search_dialog': ['F'],                # Show filename search dialog
+    'search_content': ['G'],               # Show content search dialog (grep)
+    'filter': [';'],                       # Enter filter mode to show only matching files
+    'clear_filter': [':'],                 # Clear current file filter
+    
+    # Sorting
+    'sort_menu': ['s', 'S'],              # Show sort options menu
+    'quick_sort_name': ['1'],              # Quick sort by filename
+    'quick_sort_ext': ['2'],               # Quick sort by file extension
+    'quick_sort_size': ['3'],              # Quick sort by file size
+    'quick_sort_date': ['4'],              # Quick sort by modification date
+    
+    # File Selection
+    'select_file': [' '],                  # Toggle selection of current file (Space)
+    'select_all_files': ['a'],             # Toggle selection of all files in current pane
+    'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
+    
+    # Pane Management
+    'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
+    'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
+    'adjust_pane_left': ['['],            # Make left pane smaller (move boundary left)
+    'adjust_pane_right': [']'],           # Make left pane larger (move boundary right)
+    'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
+    'adjust_log_down': ['}'],             # Make log pane smaller (Shift+])
+    'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)
+    
+    # File Operations
+    'view_text': ['v', 'V'],              # View text file in built-in viewer
+    'edit_file': ['e'],                    # Edit selected file with configured text editor
+    'create_file': ['E'],                  # Create new file (prompts for filename)
+    'copy_files': ['c', 'C'],             # Copy selected files to other pane
+    'move_files': ['m', 'M'],             # Move selected files to other pane
+    'delete_files': ['k', 'K'],           # Delete selected files/directories
+    'rename_file': ['r', 'R'],            # Rename selected file/directory
+    
+    # Advanced Features
+    'file_details': ['i', 'I'],           # Show detailed file information dialog
+    'favorites': ['j', 'J'],              # Show favorite directories dialog
+    'subshell': ['X'],                     # Enter subshell (command line) mode
+    'programs': ['x'],                     # Show external programs menu
+    'create_archive': ['p', 'P'],         # Create archive from selected files
+    'extract_archive': ['u', 'U'],        # Extract selected archive file
+    'compare_selection': ['w', 'W'],      # Show file comparison options
+    
+    # Interface Options
+    'file_type_filter': ['T'],             # Show file type filter dialog
+    'toggle_fallback_colors': ['z'],       # Toggle fallback color mode for compatibility
+    'view_options': ['Z'],                 # Show view options menu
+    'settings_menu': ['L'],                # Show settings and configuration menu
 }
 ```
 
@@ -117,7 +164,19 @@ KEY_BINDINGS = {
 - **Multiple Keys**: Each action can have multiple key bindings
 - **Case Sensitive**: Separate bindings for uppercase/lowercase
 - **Special Keys**: Support for space and other special characters
+- **Descriptive Names**: Each action has a clear, descriptive name
+- **Full Configurability**: All keyboard shortcuts can be customized
 - **Validation**: Invalid key bindings are ignored with warnings
+- **Comprehensive Coverage**: Covers all TFM functionality including pane management
+
+### New Pane Adjustment Keys
+
+TFM now includes dedicated keys for adjusting pane boundaries:
+
+- **Horizontal Adjustment**: `[` and `]` keys adjust the boundary between left and right panes
+- **Vertical Adjustment**: `{` and `}` keys adjust the log pane height
+- **Reset Functions**: `-` resets horizontal split to 50/50, `_` resets log height to default
+- **Intuitive Design**: Keys visually represent the direction of adjustment
 
 ## Configuration Management
 
@@ -168,6 +227,11 @@ class Config:
         'quit': ['q'],  # Remove 'Q' binding
         'file_details': ['i', 'I', 'd'],  # Add 'd' for details
         'search': ['/', 'f'],  # Add '/' like vim
+        'sync_current_to_other': ['o', '>'],  # Add '>' for sync
+        'sync_other_to_current': ['O', '<'],  # Add '<' for reverse sync
+        'adjust_pane_left': ['[', 'h'],  # Add 'h' for left adjustment
+        'adjust_pane_right': [']', 'l'],  # Add 'l' for right adjustment
+        'toggle_color_scheme': ['t', 'c'],  # Add 'c' for color toggle
         # ... other bindings
     }
 ```
@@ -356,17 +420,47 @@ class Config:
     
     # Custom key bindings
     KEY_BINDINGS = {
+        # Application control
         'quit': ['q'],
-        'file_details': ['i', 'd'],
-        'search': ['/', 'f'],
+        'help': ['?'],
+        
+        # Navigation and display
+        'toggle_hidden': ['.'],
+        'toggle_color_scheme': ['t'],
+        
+        # Search and filter
+        'search': ['/', 'f'],  # Add vim-like '/' for search
+        'search_dialog': ['F'],
+        'filter': [';'],
+        'clear_filter': [':'],
+        
+        # File operations
+        'file_details': ['i', 'd'],  # Add 'd' for details
+        'edit_file': ['e'],
+        'view_text': ['v'],
+        'copy_files': ['c'],
+        'move_files': ['m'],
+        'delete_files': ['k'],
+        
+        # Pane management
+        'sync_current_to_other': ['o'],
+        'sync_other_to_current': ['O'],
+        'adjust_pane_left': ['['],
+        'adjust_pane_right': [']'],
+        'adjust_log_up': ['{'],
+        'adjust_log_down': ['}'],
+        'reset_log_height': ['_'],
+        
+        # Selection
+        'select_file': [' '],
+        'select_all_files': ['a'],
+        'select_all_items': ['A'],
+        
+        # Sorting
         'sort_menu': ['s'],
         'quick_sort_name': ['1'],
         'quick_sort_size': ['2'],
         'quick_sort_date': ['3'],
-        'select_file': [' '],
-        'select_all_files': ['a'],
-        'select_all_items': ['A'],
-        'sync_panes': ['o', 'O'],
     }
     
     # Performance

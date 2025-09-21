@@ -56,7 +56,8 @@ class DefaultConfig:
         'select_file': [' '],                  # Toggle selection of current file (Space)
         'select_all_files': ['a'],             # Toggle selection of all files in current pane
         'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
-        'sync_panes': ['o', 'O'],             # Sync pane directories (o=current→other, O=other→current)
+        'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
+        'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
         'view_text': ['v', 'V'],              # View text file in built-in viewer
         'edit_file': ['e'],                    # Edit selected file with configured text editor
         'create_file': ['E'],                  # Create new file (prompts for filename)

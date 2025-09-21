@@ -94,7 +94,7 @@ class PaneManager:
         
         return False
     
-    def sync_pane_directories(self, log_callback=None):
+    def sync_current_to_other(self, log_callback=None):
         """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
@@ -148,7 +148,7 @@ class PaneManager:
         
         return True
     
-    def sync_other_pane_directory(self, log_callback=None):
+    def sync_other_to_current(self, log_callback=None):
         """Change other pane's directory to match the current pane's directory, or sync cursor if already same directory"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
