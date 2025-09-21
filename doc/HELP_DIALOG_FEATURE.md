@@ -39,8 +39,8 @@ The help dialog is organized into clear sections:
 - Layout adjustments
 
 #### Log Pane Controls
-- Log pane resizing (Ctrl+U/D)
-- Log scrolling (Ctrl+K/L, l/L)
+- Log pane resizing (bracket keys)
+- Log scrolling (Shift+Up/Down)
 
 #### General Controls
 - Help access (? or h)

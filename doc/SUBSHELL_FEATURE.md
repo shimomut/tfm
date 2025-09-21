@@ -283,7 +283,7 @@ When `TFM_ACTIVE` is set:
 
 To return to TFM from sub-shell mode:
 - Type `exit` in the shell
-- Press `Ctrl+D` (EOF)
+- Press `Ctrl+D` (EOF) in the shell
 - The TFM interface will be restored automatically
 
 ## Error Handling

@@ -23,7 +23,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 - **Dual Pane Interface**: Left and right panes for easy file operations between directories
 - **Log Pane**: Bottom pane captures stdout and stderr output with timestamps
 - **Pane Switching**: Use Tab to switch between panes, active pane highlighted in header
-- **Resizable Panes**: Adjust pane sizes with Ctrl+Left/Right and Ctrl+U/D
+- **Resizable Panes**: Adjust pane sizes with bracket keys and shift+bracket keys
 - **Status Bar**: Shows current path, file count, and operation status
 
 ![main screen](doc/images/main-screen.png)
@@ -86,7 +86,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 - **Searchable Lists**: Filter and search through files and directories
 - **Configuration System**: Fully customizable key bindings and settings
 - **Help System**: Comprehensive help dialog accessible with '?' key
-- **Log Management**: Scroll through log messages with Ctrl+K/L, auto-scrolls to newest
+- **Log Management**: Scroll through log messages with Shift+Up/Down, auto-scrolls to newest
 - **Cross-platform**: Works on macOS, Linux, and Windows (with proper terminal support)
 
 ## File Operations
@@ -649,11 +649,11 @@ make clean
 - **Archive Workflows**: Create archives with 'P', extract with 'U' to opposite pane
 - **Text Editing**: All input fields support full cursor movement and professional editing
 - **Sub-shell Integration**: Use 'x' to access shell with TFM environment variables
-- **Log Monitoring**: Use Ctrl+K/L to scroll through operation logs and messages
+- **Log Monitoring**: Use Shift+Up/Down to scroll through operation logs and messages
 
 ### Keyboard Efficiency
 - **Selection Shortcuts**: 'a' for all files, 'A' for all items, Ctrl+Space for upward selection
-- **Pane Management**: Tab to switch, '-' to reset split, Opt+arrows to adjust
+- **Pane Management**: Tab to switch, '-' to reset split, bracket keys to adjust
 - **Quick Access**: 'J' for favorites, '?' for help, '.' to toggle hidden files, 't' to toggle colors
 
 ## Troubleshooting

@@ -5,11 +5,11 @@ Enhanced TFM's log pane scrolling functionality by adding Shift+Up/Down/Left/Rig
 
 ## New Key Bindings
 
-### Existing Keys (Preserved)
-- `Ctrl+K` - Scroll log up by 1 line
-- `Ctrl+L` - Scroll log down by 1 line
-- `Page Up` - Scroll log up by 5 lines
-- `Page Down` - Scroll log down by 5 lines
+### Log Scrolling Keys
+- `Shift+Up` - Scroll log up (toward older messages)
+- `Shift+Down` - Scroll log down (toward newer messages)
+- `Shift+Left` - Fast scroll up (toward older messages)
+- `Shift+Right` - Fast scroll down (toward newer messages)
 
 ### New Shift Key Bindings
 - `Shift+Up` - Scroll log up (toward older messages, precise scrolling)
@@ -135,6 +135,6 @@ elif key == 560:  # Shift+Right - fast scroll toward newer messages
 ### Combined Navigation
 1. Use `Shift+Left` for fast navigation to approximate area
 2. Use `Shift+Up/Down` for precise positioning
-3. Use existing `Ctrl+K/L` as alternative single-line scrolling
+3. Use `Shift+Up/Down` for single-line scrolling
 
 This implementation provides users with comprehensive log navigation control while maintaining TFM's intuitive and efficient interface design.

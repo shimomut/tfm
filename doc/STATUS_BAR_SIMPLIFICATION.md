@@ -11,10 +11,10 @@ The status bar previously showed extensive key binding information that varied b
 
 ```
 Wide terminals (234+ chars):
-Space/Opt+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  Opt+←→:h-resize  Ctrl+U/D:v-resize  Ctrl+K/L:log-scroll  PgUp/Dn:log-scroll  Tab:switch  ←→:nav  q:quit  .:hidden  d:debug
+Space:select  a:select-all-files  A:select-all-items  o:sync-to-other  O:sync-from-current  F:search  []:h-resize  {}:v-resize  Shift+↑↓:log-scroll  Tab:switch  ←→:nav  q:quit  .:hidden
 
 Medium terminals (120+ chars):
-Space/Opt+Space:select  a:select-all-files  A:select-all-items  o/O:sync  F:search  Opt+←→↕:resize  Tab:switch  ←→:nav  q:quit  .:hidden
+Space:select  a:select-all-files  A:select-all-items  o/O:sync  F:search  []{}_:resize  Tab:switch  ←→:nav  q:quit  .:hidden
 
 Narrow terminals (80+ chars):
 Space:select  a:select-all-files  A:select-all-items  o/O:sync  F:search  Tab:switch  q:quit  .:hidden

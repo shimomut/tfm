@@ -60,8 +60,8 @@ elif key == ord('l'):  # 'l' key - scroll log up
 elif key == ord('L'):  # 'L' key - scroll log down
 
 # Preserved:
-elif key == 11:  # Ctrl+K - scroll log up
-elif key == 12:  # Ctrl+L - scroll log down
+elif key == curses.KEY_SR:  # Shift+Up - scroll log up
+elif key == curses.KEY_SF:  # Shift+Down - scroll log down
 ```
 
 ## Preserved Functionality
@@ -71,10 +71,11 @@ The 'k' and 'K' keys are now exclusively used for the delete functionality:
 - **k/K**: Delete selected files with confirmation
 
 ### Log Scrolling
-Log scrolling is still available via:
-- **Ctrl+K**: Scroll log up
-- **Ctrl+L**: Scroll log down
-- **Shift+↑/↓**: Alternative log scrolling (terminal dependent)
+Log scrolling is available via:
+- **Shift+Up**: Scroll log up (toward older messages)
+- **Shift+Down**: Scroll log down (toward newer messages)
+- **Shift+Left**: Fast scroll up (toward older messages)
+- **Shift+Right**: Fast scroll down (toward newer messages)
 
 ### Other Navigation
 - **Tab**: Switch between left and right panes
@@ -101,7 +102,7 @@ All tests pass, confirming:
 - ✅ j/k/h/l navigation keys completely removed
 - ✅ Arrow key navigation fully preserved
 - ✅ Delete functionality (k/K) intact
-- ✅ Log scrolling (Ctrl+K/L) preserved
+- ✅ Log scrolling (Shift+Up/Down) preserved
 - ✅ All other functionality unaffected
 
 ## User Impact
@@ -114,7 +115,7 @@ All tests pass, confirming:
 - All navigation functionality is preserved
 - Arrow keys work exactly as before
 - Delete feature still uses k/K keys
-- Log scrolling still uses Ctrl+K/L
+- Log scrolling uses Shift+Up/Down keys
 
 ### Migration
 No configuration changes needed - the simplification is automatic and transparent to users who already use arrow keys.
