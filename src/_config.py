@@ -78,6 +78,10 @@ class Config:
     # Performance settings
     MAX_LOG_MESSAGES = 1000
     
+    # File display settings
+    SEPARATE_EXTENSIONS = True  # Show file extensions separately from basenames
+    MAX_EXTENSION_LENGTH = 5    # Maximum extension length to show separately
+    
     # Text editor settings
     TEXT_EDITOR = 'vim'  # Text editor command (vim, nano, emacs, code, etc.)
     

@@ -322,6 +322,43 @@ class FileManager:
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         display_height = height - log_height - 3
         return self.pane_manager.adjust_scroll_for_selection(pane_data, display_height)
+    
+    def separate_filename_extension(self, filename, is_dir=False):
+        """
+        Separate filename into basename and extension for display.
+        Returns (basename, extension) tuple.
+        
+        Args:
+            filename: The filename to separate
+            is_dir: Whether this is a directory (directories don't get extension separation)
+        
+        Returns:
+            tuple: (basename, extension) where extension includes the dot
+        """
+        # Don't separate extensions for directories
+        if is_dir:
+            return filename, ""
+        
+        # Check if extension separation is enabled
+        if not getattr(self.config, 'SEPARATE_EXTENSIONS', True):
+            return filename, ""
+        
+        # Find the last dot in the filename
+        dot_index = filename.rfind('.')
+        
+        # If no dot found, or dot is at the beginning (hidden files), don't separate
+        if dot_index <= 0:
+            return filename, ""
+        
+        basename = filename[:dot_index]
+        extension = filename[dot_index:]
+        
+        # Check extension length limit
+        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
+        if len(extension) > max_ext_length:
+            return filename, ""
+        
+        return basename, extension
 
     def apply_filter(self):
         """Apply filter - wrapper for file_operations method"""
@@ -521,6 +558,9 @@ class FileManager:
             # Add selection marker for multi-selected files
             selection_marker = "●" if is_multi_selected else " "
             
+            # Separate filename into basename and extension
+            basename, extension = self.separate_filename_extension(display_name, is_dir)
+            
             # Format line to fit pane - with safety checks for narrow panes
             datetime_width = 16  # "YYYY-MM-DD HH:MM" = 16 characters
             size_width = 8
@@ -535,31 +575,63 @@ class FileManager:
                 usable_width = pane_width - 2
                 
                 if pane_width < 60:
-                    # For narrow panes: "● filename size" (no datetime)
-                    # Reserve space for: marker(2) + space(1) + size(8) = 11
-                    name_width = usable_width - 11
-                    
-                    # Truncate filename only if necessary
-                    if len(display_name) > name_width:
-                        truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
-                        display_name = display_name[:truncate_at] + "..."
-                    
-                    # Pad filename to maintain column alignment
-                    padded_name = display_name.ljust(name_width)
-                    line = f"{selection_marker} {padded_name}{size_str:>8}"
+                    # For narrow panes: "● basename ext size" (no datetime)
+                    if extension:
+                        # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) = 12 + ext_width
+                        ext_width = len(extension)
+                        name_width = usable_width - (12 + ext_width)
+                        
+                        # Truncate basename only if necessary
+                        if len(basename) > name_width:
+                            truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
+                            basename = basename[:truncate_at] + "..."
+                        
+                        # Pad basename to maintain column alignment
+                        padded_basename = basename.ljust(name_width)
+                        padded_extension = extension.ljust(ext_width)
+                        line = f"{selection_marker} {padded_basename} {padded_extension}{size_str:>8}"
+                    else:
+                        # No extension separation - use full width for filename
+                        # Reserve space for: marker(2) + space(1) + size(8) = 11
+                        name_width = usable_width - 11
+                        
+                        # Truncate filename only if necessary
+                        if len(display_name) > name_width:
+                            truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
+                            display_name = display_name[:truncate_at] + "..."
+                        
+                        # Pad filename to maintain column alignment
+                        padded_name = display_name.ljust(name_width)
+                        line = f"{selection_marker} {padded_name}{size_str:>8}"
                 else:
-                    # For wider panes: "● filename size datetime"
-                    # Reserve space for: marker(2) + space(1) + size(8) + space(1) + datetime(len) = 12 + datetime_width
-                    name_width = usable_width - (12 + datetime_width)
-                    
-                    # Truncate filename only if necessary
-                    if len(display_name) > name_width:
-                        truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
-                        display_name = display_name[:truncate_at] + "..."
-                    
-                    # Pad filename to maintain column alignment
-                    padded_name = display_name.ljust(name_width)
-                    line = f"{selection_marker} {padded_name} {size_str:>8} {mtime_str}"
+                    # For wider panes: "● basename ext size datetime"
+                    if extension:
+                        # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) + space(1) + datetime(len) = 13 + ext_width + datetime_width
+                        ext_width = len(extension)
+                        name_width = usable_width - (13 + ext_width + datetime_width)
+                        
+                        # Truncate basename only if necessary
+                        if len(basename) > name_width:
+                            truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
+                            basename = basename[:truncate_at] + "..."
+                        
+                        # Pad basename to maintain column alignment
+                        padded_basename = basename.ljust(name_width)
+                        padded_extension = extension.ljust(ext_width)
+                        line = f"{selection_marker} {padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
+                    else:
+                        # No extension separation - use full width for filename
+                        # Reserve space for: marker(2) + space(1) + size(8) + space(1) + datetime(len) = 12 + datetime_width
+                        name_width = usable_width - (12 + datetime_width)
+                        
+                        # Truncate filename only if necessary
+                        if len(display_name) > name_width:
+                            truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
+                            display_name = display_name[:truncate_at] + "..."
+                        
+                        # Pad filename to maintain column alignment
+                        padded_name = display_name.ljust(name_width)
+                        line = f"{selection_marker} {padded_name} {size_str:>8} {mtime_str}"
             
             try:
                 self.stdscr.addstr(y, start_x + 1, line[:pane_width-2], color)

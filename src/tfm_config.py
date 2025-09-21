@@ -94,6 +94,10 @@ class DefaultConfig:
     MAX_LOG_MESSAGES = 1000
     REFRESH_INTERVAL = 1.0  # seconds
     
+    # File display settings
+    SEPARATE_EXTENSIONS = True  # Show file extensions separately from basenames
+    MAX_EXTENSION_LENGTH = 5    # Maximum extension length to show separately
+    
     # Text editor settings
     TEXT_EDITOR = 'vim'  # Default text editor command
     
