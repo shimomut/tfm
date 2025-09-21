@@ -120,6 +120,7 @@ class Config:
         {'name': 'Compare Files (BeyondCompare)', 'command': ['./tools/bcompare_files_wrapper.sh'], 'options': {'auto_return': True}},
         {'name': 'Compare Directories (BeyondCompare)', 'command': ['./tools/bcompare_dirs_wrapper.sh'], 'options': {'auto_return': True}},
         {'name': 'Tail Files (Last 10 Lines)', 'command': ['./tools/tail_files.sh'], 'options': {'auto_return': False}},
+        {'name': 'Open in VSCode', 'command': ['./tools/vscode_wrapper.sh'], 'options': {'auto_return': True}},
         # Add your own programs here:
         # {'name': 'My Script', 'command': ['/path/to/script.sh']},
         # {'name': 'Python REPL', 'command': ['python3']},
