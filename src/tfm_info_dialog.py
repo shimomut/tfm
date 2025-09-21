@@ -6,6 +6,7 @@ Provides scrollable information dialog functionality
 
 import curses
 from tfm_colors import get_status_color
+from tfm_config import config_manager
 
 
 class InfoDialog:
@@ -184,11 +185,21 @@ class InfoDialogHelpers:
     """Helper functions for common info dialog use cases"""
     
     @staticmethod
+    def _format_key_bindings(action):
+        """Get formatted key bindings for an action"""
+        keys = config_manager.get_key_for_action(action)
+        if not keys:
+            return "Not configured"
+        return "/".join(keys)
+    
+    @staticmethod
     def show_help_dialog(info_dialog):
         """Show the help dialog with TFM usage information"""
         help_lines = []
         help_lines.append("TFM (TUI File Manager) - Keyboard Shortcuts")
         help_lines.append("")
+        
+        # Navigation (non-configurable system keys)
         help_lines.append("Navigation:")
         help_lines.append("• ↑↓ or j/k: Move cursor up/down")
         help_lines.append("• ←→ or h/l: Switch between panes")
@@ -196,52 +207,81 @@ class InfoDialogHelpers:
         help_lines.append("• Backspace: Go to parent directory")
         help_lines.append("• Home/End: Go to first/last item")
         help_lines.append("• Page Up/Down: Scroll by page")
-        help_lines.append("")
-        help_lines.append("File Operations:")
-        help_lines.append("• Space: Toggle file selection")
-        help_lines.append("• Shift+Space: Toggle selection and move up")
-        help_lines.append("• Ctrl+A: Toggle all files selection")
-        help_lines.append("• Shift+Ctrl+A: Toggle all items selection")
-        help_lines.append("• W: Compare selection (select files matching other pane)")
-        help_lines.append("• F5: Copy selected files")
-        help_lines.append("• F6: Move selected files")
-        help_lines.append("• F8/Delete: Delete selected files")
-        help_lines.append("• F7: Create new directory")
-        help_lines.append("• Shift+F4: Create new file")
-        help_lines.append("• F2: Rename file/directory")
-        help_lines.append("")
-        help_lines.append("View & Search:")
-        help_lines.append("• F3: View file content")
-        help_lines.append("• F4: Edit file")
-        help_lines.append("• /: Search files (isearch)")
-        help_lines.append("• Ctrl+F: Filter files by pattern")
-        help_lines.append("• Ctrl+S: Advanced search dialog")
-        help_lines.append("")
-        help_lines.append("Pane Operations:")
         help_lines.append("• Tab: Switch active pane")
-        help_lines.append("• o: Sync current pane directory to other pane")
-        help_lines.append("• O: Sync other pane directory to current pane")
-        help_lines.append("• <: Make left pane smaller (adjust boundary left)")
-        help_lines.append("• >: Make left pane larger (adjust boundary right)")
+        help_lines.append("")
+        
+        # File Operations (configurable)
+        help_lines.append("File Operations:")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_file')}: Toggle file selection")
+        help_lines.append("• Shift+Space: Toggle selection and move up")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all_files')}: Toggle all files selection")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all_items')}: Toggle all items selection")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('compare_selection')}: Compare selection (select files matching other pane)")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('copy_files')}: Copy selected files")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('move_files')}: Move selected files")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('delete_files')}: Delete selected files")
+        help_lines.append("• F7: Create new directory")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('create_file')}: Create new file")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('rename_file')}: Rename file/directory")
+        help_lines.append("")
+        
+        # View & Search (configurable)
+        help_lines.append("View & Search:")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('view_text')}: View file content")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('edit_file')}: Edit file")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('search')}: Search files (isearch)")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('filter')}: Filter files by pattern")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('clear_filter')}: Clear file filter")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('search_dialog')}: Filename search dialog")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('search_content')}: Content search dialog")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('file_details')}: Show file details")
+        help_lines.append("")
+        
+        # Pane Operations (configurable)
+        help_lines.append("Pane Operations:")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('sync_current_to_other')}: Sync current pane directory to other pane")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('sync_other_to_current')}: Sync other pane directory to current pane")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('adjust_pane_left')}: Make left pane smaller (adjust boundary left)")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('adjust_pane_right')}: Make left pane larger (adjust boundary right)")
         help_lines.append("• -: Reset pane split to 50% | 50%")
         help_lines.append("")
+        
+        # Log Pane Controls (configurable)
         help_lines.append("Log Pane Controls:")
-        help_lines.append("• {: Make log pane larger")
-        help_lines.append("• }: Make log pane smaller")
-        help_lines.append("• _: Reset log pane height to default")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('adjust_log_up')}: Make log pane larger")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('adjust_log_down')}: Make log pane smaller")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('reset_log_height')}: Reset log pane height to default")
         help_lines.append("• Shift+Up: Scroll log up (toward older messages)")
         help_lines.append("• Shift+Down: Scroll log down (toward newer messages)")
         help_lines.append("• Shift+Left: Fast scroll up (toward older messages)")
         help_lines.append("• Shift+Right: Fast scroll down (toward newer messages)")
         help_lines.append("")
-        help_lines.append("Other:")
-        help_lines.append("• F1: Show this help")
-        help_lines.append("• F10/Ctrl+Q: Quit")
-        help_lines.append("• Ctrl+R: Refresh file list")
+        
+        # Sorting (configurable)
+        help_lines.append("Sorting:")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('sort_menu')}: Show sort options menu")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('quick_sort_name')}: Quick sort by filename")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('quick_sort_ext')}: Quick sort by file extension")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('quick_sort_size')}: Quick sort by file size")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('quick_sort_date')}: Quick sort by modification date")
         help_lines.append("")
+        
+        # Other Operations (configurable)
+        help_lines.append("Other Operations:")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('help')}: Show this help")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('quit')}: Quit TFM")
+        help_lines.append("• Ctrl+R: Refresh file list")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('toggle_hidden')}: Toggle visibility of hidden files")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('toggle_color_scheme')}: Switch color schemes")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('favorites')}: Show favorite directories")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('programs')}: Show external programs menu")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('subshell')}: Enter subshell (command line) mode")
+        help_lines.append("")
+        
+        # Archive Operations (configurable)
         help_lines.append("Archive Operations:")
-        help_lines.append("• Ctrl+A on archive: Create archive from selected files")
-        help_lines.append("• Enter on archive: Extract archive contents")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('create_archive')}: Create archive from selected files")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('extract_archive')}: Extract selected archive")
         help_lines.append("• Archive extraction creates directory with archive base name")
         
         info_dialog.show("TFM Help", help_lines)
