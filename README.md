@@ -94,7 +94,7 @@ TFM includes a comprehensive help dialog that provides quick access to all key b
 - **Access**: Press `?` to open the help dialog
 - **Content**: Organized sections covering navigation, file operations, search, sorting, and more
 - **Navigation**: Scroll through help content with arrow keys, Page Up/Down, Home/End
-- **Always Available**: Accessible from any screen in TFM
+- **Main Screen Access**: Accessible from the main file manager screen
 - **Context-Sensitive**: Shows relevant shortcuts for current mode
 
 The help dialog is your quick reference guide - no need to memorize all key bindings!
