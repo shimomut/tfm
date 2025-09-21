@@ -38,7 +38,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 </div>
 
 ### Navigation & Display
-- **Directory Navigation**: Browse directories with arrow keys or vim-style navigation (j/k)
+- **Directory Navigation**: Browse directories with arrow keys
 - **File Information**: View file sizes, modification dates, and permissions
 - **Hidden Files**: Toggle visibility of hidden files with '.'
 - **Sorting**: Multiple sort options (name, size, date, type)
@@ -148,8 +148,8 @@ All key bindings are fully customizable through the configuration system. Below 
 ### Navigation
 | Key | Action |
 |-----|--------|
-| `↑↓ / j k` | Navigate files up/down |
-| `←→ / h l` | Switch panes / Navigate directories |
+| `↑↓` | Navigate files up/down |
+| `←→` | Switch panes / Navigate directories |
 | `Tab` | Switch between left and right panes |
 | `Enter` | Enter directory or view text file with syntax highlighting |
 | `Backspace` | Go to parent directory |
@@ -247,8 +247,8 @@ TFM includes a built-in text file viewer with syntax highlighting support. When 
 | Key | Action |
 |-----|--------|
 | `q` or `ESC` | Exit viewer |
-| `↑↓` or `j/k` | Scroll up/down |
-| `←→` or `h/l` | Scroll left/right |
+| `↑↓` | Scroll up/down |
+| `←→` | Scroll left/right |
 | `Page Up/Down` | Page scrolling |
 | `Home/End` | Jump to start/end |
 | `n` | Toggle line numbers |
@@ -501,7 +501,7 @@ class Config:
     # Custom key bindings
     KEY_BINDINGS = {
         'quit': ['q'],  # Remove 'Q' binding
-        'search': ['/', 'f'],  # Add vim-like '/' for search
+        'search': ['/', 'f'],  # Add '/' for search
         'file_details': ['i', 'I', 'd'],  # Add 'd' for details
         'copy_files': ['c', 'C', 'y'],  # Add 'y' for yank/copy
         'toggle_color_scheme': ['t', 'T'],  # Both cases

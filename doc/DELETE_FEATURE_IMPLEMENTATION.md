@@ -55,7 +55,7 @@ The delete feature shows context-aware confirmation messages:
 
 ## Usage
 
-1. **Navigate** to files/directories using arrow keys or j/k
+1. **Navigate** to files/directories using arrow keys
 2. **Select** files with SPACE (optional - works on current file if none selected)
 3. **Delete** by pressing 'k' or 'K'
 4. **Confirm** deletion in the dialog (Yes/No)

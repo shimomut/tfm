@@ -111,7 +111,7 @@ self.show_dialog("Set priority:", choices, handle_priority)
 ## User Interface
 
 ### Navigation
-- **←→ or h/l**: Navigate between choices
+- **←→**: Navigate between choices
 - **Enter**: Confirm selected choice
 - **Quick keys**: Instantly select choice (if defined)
 - **ESC**: Cancel dialog

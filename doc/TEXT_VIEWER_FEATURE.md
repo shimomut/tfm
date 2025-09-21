@@ -13,8 +13,8 @@ TFM now includes a built-in text file viewer with syntax highlighting support fo
 - **Support for 20+ file formats** including Python, JavaScript, JSON, Markdown, YAML, and more
 
 ### ✅ Navigation Controls
-- **Vertical scrolling**: `↑↓` arrow keys or `j/k` (vim-style)
-- **Horizontal scrolling**: `←→` arrow keys or `h/l` (vim-style)
+- **Vertical scrolling**: `↑↓` arrow keys
+- **Horizontal scrolling**: `←→` arrow keys
 - **Page navigation**: `Page Up/Down` for faster scrolling
 - **Jump to start/end**: `Home/End` keys
 - **Smooth scrolling** with proper boundary handling
@@ -68,8 +68,8 @@ TFM now includes a built-in text file viewer with syntax highlighting support fo
 | Key | Action |
 |-----|--------|
 | `q` or `ESC` | Exit viewer and return to TFM |
-| `↑↓` or `j/k` | Scroll up/down |
-| `←→` or `h/l` | Scroll left/right |
+| `↑↓` | Scroll up/down |
+| `←→` | Scroll left/right |
 | `Page Up/Down` | Page scrolling |
 | `Home/End` | Jump to start/end of file |
 | `n` | Toggle line numbers on/off |

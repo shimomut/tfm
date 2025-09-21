@@ -15,7 +15,7 @@ TFM now includes a comprehensive file details viewer that shows detailed informa
 
 | Key | Action |
 |-----|--------|
-| **↑/↓** or **j/k** | Scroll up/down line by line |
+| **↑/↓** | Scroll up/down line by line |
 | **Page Up/Down** | Scroll by page |
 | **Home** | Go to top |
 | **End** | Go to bottom |
@@ -203,7 +203,7 @@ When multiple files are selected, details are shown for each file with separator
 - **I**: Show file details dialog
 
 ### Dialog Navigation
-- **↑/↓** or **j/k**: Line-by-line scrolling
+- **↑/↓**: Line-by-line scrolling
 - **Page Up/Down**: Page scrolling
 - **Home**: Jump to top
 - **End**: Jump to bottom

@@ -122,7 +122,7 @@ PROGRAMS = [
 #### Better without auto_return
 ```python
 {'name': 'Git Log', 'command': ['git', 'log', '--oneline', '-50']},  # Lots of output to read
-{'name': 'Vim Editor', 'command': ['vim']},  # Interactive
+{'name': 'Text Editor', 'command': ['nano']},  # Interactive
 {'name': 'System Monitor', 'command': ['htop']},  # Interactive
 {'name': 'Git Interactive Rebase', 'command': ['git', 'rebase', '-i']},  # Interactive
 ```

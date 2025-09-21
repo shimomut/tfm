@@ -8,7 +8,7 @@ TFM now includes a comprehensive help dialog that shows all key bindings and usa
 
 - **? Key** or **h Key**: Show help dialog with all key bindings
 - **ESC** or **q**: Close help dialog
-- **↑/↓** or **j/k**: Scroll through help content
+- **↑/↓**: Scroll through help content
 - **Page Up/Down**: Scroll by page
 - **Home/End**: Jump to top/bottom of help
 
@@ -17,7 +17,7 @@ TFM now includes a comprehensive help dialog that shows all key bindings and usa
 The help dialog is organized into clear sections:
 
 #### Navigation
-- Arrow keys and vim-style navigation (j/k)
+- Arrow keys for navigation
 - Pane switching and directory navigation
 - File selection and movement
 

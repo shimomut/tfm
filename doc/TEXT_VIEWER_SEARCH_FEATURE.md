@@ -38,7 +38,7 @@ Search: [your pattern] (current_match/total_matches) [ESC:exit ↑↓:navigate]
 
 ### Smart Navigation
 - When entering search mode, automatically finds the closest match to your current position
-- Use arrow keys or j/k to cycle through matches
+- Use arrow keys to cycle through matches
 - Matches wrap around (after last match, goes to first)
 
 ### Visual Highlighting

@@ -8,7 +8,7 @@ TFM now includes an incremental search mode that allows users to quickly find fi
 
 1. **Enter Search Mode**: Press `F` key while in the file manager
 2. **Type Pattern**: Start typing your search pattern using fnmatch syntax
-3. **Navigate Results**: Use ↑/↓ arrow keys or j/k to move between matches
+3. **Navigate Results**: Use ↑/↓ arrow keys to move between matches
 4. **Exit Search**: Press `Enter` to accept current position or `ESC` to cancel
 
 ## Pattern Syntax

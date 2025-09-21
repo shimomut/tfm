@@ -226,7 +226,7 @@ class Config:
     KEY_BINDINGS = {
         'quit': ['q'],  # Remove 'Q' binding
         'file_details': ['i', 'I', 'd'],  # Add 'd' for details
-        'search': ['/', 'f'],  # Add '/' like vim
+        'search': ['/', 'f'],  # Add '/' for search
         'sync_current_to_other': ['o', '>'],  # Add '>' for sync
         'sync_other_to_current': ['O', '<'],  # Add '<' for reverse sync
         'adjust_pane_left': ['[', 'h'],  # Add 'h' for left adjustment
@@ -429,7 +429,7 @@ class Config:
         'toggle_color_scheme': ['t'],
         
         # Search and filter
-        'search': ['/', 'f'],  # Add vim-like '/' for search
+        'search': ['/', 'f'],  # Add '/' for search
         'search_dialog': ['F'],
         'filter': [';'],
         'clear_filter': [':'],
