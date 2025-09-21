@@ -469,6 +469,15 @@ tfm/
 ## Contributing
 TFM welcomes contributions! The project structure makes it easy to add new features:
 
+## Contact Author
+
+Have questions, suggestions, or found a bug? Get in touch:
+
+- **GitHub Issues**: [Report bugs or request features](https://github.com/shimomut/tfm/issues)
+- **Author's X (Twitter)**: [@smmrtmnr](https://x.com/smmrtmnr)
+
+We welcome feedback and contributions to make TFM even better!
+
 ## License
 TFM is released under the MIT License. See LICENSE file for details.
 
