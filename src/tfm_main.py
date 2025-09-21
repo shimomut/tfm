@@ -241,41 +241,73 @@ class FileManager:
     
     def sync_current_to_other(self):
         """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
-        if self.pane_manager.sync_current_to_other(print):
-            current_pane = self.get_current_pane()
-            self.refresh_files(current_pane)
-            
-            # Try to restore cursor position for this directory
-            height, width = self.stdscr.getmaxyx()
-            calculated_height = int(height * self.log_height_ratio)
-            log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 3
-            
-            if not self.pane_manager.restore_cursor_position(current_pane, display_height):
-                # If no history found, default to first item
-                current_pane['selected_index'] = 0
-                current_pane['scroll_offset'] = 0
-            
-            self.needs_full_redraw = True
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Check if both panes are already showing the same directory
+        if current_pane['path'] == other_pane['path']:
+            # Both panes show same directory, just sync cursor position
+            if self.pane_manager.sync_cursor_to_other_pane(print):
+                # Adjust scroll offset if needed to keep selection visible
+                height, width = self.stdscr.getmaxyx()
+                calculated_height = int(height * self.log_height_ratio)
+                log_height = calculated_height if self.log_height_ratio > 0 else 0
+                display_height = height - log_height - 3
+                
+                self.pane_manager.adjust_scroll_for_selection(current_pane, display_height)
+                self.needs_full_redraw = True
+        else:
+            # Different directories, sync directory
+            if self.pane_manager.sync_current_to_other(print):
+                self.refresh_files(current_pane)
+                
+                # Try to restore cursor position for this directory
+                height, width = self.stdscr.getmaxyx()
+                calculated_height = int(height * self.log_height_ratio)
+                log_height = calculated_height if self.log_height_ratio > 0 else 0
+                display_height = height - log_height - 3
+                
+                if not self.pane_manager.restore_cursor_position(current_pane, display_height):
+                    # If no history found, default to first item
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                
+                self.needs_full_redraw = True
     
     def sync_other_to_current(self):
         """Change other pane's directory to match the current pane's directory, or sync cursor if already same directory"""
-        if self.pane_manager.sync_other_to_current(print):
-            other_pane = self.get_inactive_pane()
-            self.refresh_files(other_pane)
-            
-            # Try to restore cursor position for this directory
-            height, width = self.stdscr.getmaxyx()
-            calculated_height = int(height * self.log_height_ratio)
-            log_height = calculated_height if self.log_height_ratio > 0 else 0
-            display_height = height - log_height - 3
-            
-            if not self.pane_manager.restore_cursor_position(other_pane, display_height):
-                # If no history found, default to first item
-                other_pane['selected_index'] = 0
-                other_pane['scroll_offset'] = 0
-            
-            self.needs_full_redraw = True
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        # Check if both panes are already showing the same directory
+        if current_pane['path'] == other_pane['path']:
+            # Both panes show same directory, just sync cursor position
+            if self.pane_manager.sync_cursor_from_current_pane(print):
+                # Adjust scroll offset if needed to keep selection visible
+                height, width = self.stdscr.getmaxyx()
+                calculated_height = int(height * self.log_height_ratio)
+                log_height = calculated_height if self.log_height_ratio > 0 else 0
+                display_height = height - log_height - 3
+                
+                self.pane_manager.adjust_scroll_for_selection(other_pane, display_height)
+                self.needs_full_redraw = True
+        else:
+            # Different directories, sync directory
+            if self.pane_manager.sync_other_to_current(print):
+                self.refresh_files(other_pane)
+                
+                # Try to restore cursor position for this directory
+                height, width = self.stdscr.getmaxyx()
+                calculated_height = int(height * self.log_height_ratio)
+                log_height = calculated_height if self.log_height_ratio > 0 else 0
+                display_height = height - log_height - 3
+                
+                if not self.pane_manager.restore_cursor_position(other_pane, display_height):
+                    # If no history found, default to first item
+                    other_pane['selected_index'] = 0
+                    other_pane['scroll_offset'] = 0
+                
+                self.needs_full_redraw = True
     
     def sync_cursor_to_other_pane(self):
         """Move cursor in current pane to the same filename as the other pane's cursor"""

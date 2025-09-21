@@ -95,15 +95,16 @@ class PaneManager:
         return False
     
     def sync_current_to_other(self, log_callback=None):
-        """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
+        """Change current pane's directory to match the other pane's directory"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
         
         # Check if both panes are already showing the same directory
         if current_pane['path'] == other_pane['path']:
-            # Both panes show same directory, sync cursor position instead
-            # For 'o', move cursor in CURRENT pane to match other pane's cursor
-            return self.sync_cursor_to_other_pane(log_callback)
+            # Both panes show same directory, nothing to sync
+            if log_callback:
+                log_callback("Both panes already show the same directory")
+            return False
         
         # Get the other pane's directory
         target_directory = other_pane['path']
@@ -149,15 +150,16 @@ class PaneManager:
         return True
     
     def sync_other_to_current(self, log_callback=None):
-        """Change other pane's directory to match the current pane's directory, or sync cursor if already same directory"""
+        """Change other pane's directory to match the current pane's directory"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
         
         # Check if both panes are already showing the same directory
         if current_pane['path'] == other_pane['path']:
-            # Both panes show same directory, sync cursor position instead
-            # For Shift-O, move cursor in OTHER pane to match current pane's cursor
-            return self.sync_cursor_from_current_pane(log_callback)
+            # Both panes show same directory, nothing to sync
+            if log_callback:
+                log_callback("Both panes already show the same directory")
+            return False
         
         # Get the current pane's directory
         target_directory = current_pane['path']
