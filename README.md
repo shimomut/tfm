@@ -65,7 +65,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 - **Extract Archives**: Extract ZIP, TAR.GZ, TGZ archives with 'U' key to other pane
 - **Fine-Grained Progress**: Real-time progress display for individual files in multi-file operations (copy, move, delete, archive)
 - **Multi-Selection**: Select multiple files with Space bar for batch operations
-- **Advanced Selection**: Select all files ('a'), all items ('A'), or toggle selection upward (Ctrl+Space)
+- **Advanced Selection**: Select all files ('a'), all items ('A')
 - **Conflict Resolution**: Interactive dialogs for handling existing files
 
 ### Text Handling
@@ -160,7 +160,7 @@ All key bindings are fully customizable through the configuration system. Below 
 | Key | Action |
 |-----|--------|
 | `Space` | Select/deselect file (for multi-selection) |
-| `Ctrl+Space` | Select file and move up |
+
 | `a` | Select all files |
 | `A` | Select all items (files + directories) |
 | `c/C` | Copy selected files to opposite pane |
@@ -652,7 +652,7 @@ make clean
 - **Log Monitoring**: Use Shift+Up/Down to scroll through operation logs and messages
 
 ### Keyboard Efficiency
-- **Selection Shortcuts**: 'a' for all files, 'A' for all items, Ctrl+Space for upward selection
+- **Selection Shortcuts**: 'a' for all files, 'A' for all items
 - **Pane Management**: Tab to switch, '-' to reset split, bracket keys to adjust
 - **Quick Access**: 'J' for favorites, '?' for help, '.' to toggle hidden files, 't' to toggle colors
 

@@ -22,7 +22,7 @@ The help dialog is organized into clear sections:
 - File selection and movement
 
 #### File Operations
-- File selection (Space, Ctrl+Space)
+- File selection (Space)
 - Bulk operations (a, A for select all)
 - File operations menu (m/M)
 - Text viewing and editing (v/V, e/E)

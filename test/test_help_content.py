@@ -36,7 +36,7 @@ def generate_help_content():
     # File operations section
     help_lines.append("=== FILE OPERATIONS ===")
     help_lines.append("Space            Select/deselect file")
-    help_lines.append("Ctrl+Space       Select file and move up")
+
     help_lines.append("a                Select all files")
     help_lines.append("A                Select all items (files + directories)")
     help_lines.append("m / M            File operations menu (copy/move/delete/rename)")
