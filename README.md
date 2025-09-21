@@ -48,12 +48,6 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
   - **Dark Scheme**: Colorful interface optimized for dark terminal backgrounds (default)
   - **Light Scheme**: High-contrast monochrome (white/black) optimized for light terminal backgrounds
   - **Runtime Toggle**: Press 't' to switch between schemes instantly
-- **Color Coding**: 
-  - Blue/bold for directories
-  - Green for executable files
-  - Yellow highlight for selected items in active pane
-  - Underline for selected items in inactive pane
-  - Red text for stderr messages in log pane
 
 ### File Operations
 - **Basic Operations**: Copy (C), Move (M), Delete (K), Rename (R) files and directories
