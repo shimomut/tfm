@@ -11,8 +11,8 @@ def test_subshell_environment():
     """Test that the sub-shell environment variables are set correctly"""
     
     # Check if we're in a TFM sub-shell
-    required_vars = ['LEFT_DIR', 'RIGHT_DIR', 'THIS_DIR', 'OTHER_DIR', 
-                     'LEFT_SELECTED', 'RIGHT_SELECTED', 'THIS_SELECTED', 'OTHER_SELECTED']
+    required_vars = ['TFM_LEFT_DIR', 'TFM_RIGHT_DIR', 'TFM_THIS_DIR', 'TFM_OTHER_DIR', 
+                     'TFM_LEFT_SELECTED', 'TFM_RIGHT_SELECTED', 'TFM_THIS_SELECTED', 'TFM_OTHER_SELECTED']
     
     print("TFM Sub-shell Environment Test")
     print("=" * 40)
@@ -37,7 +37,7 @@ def test_subshell_environment():
         
         # Test directory access
         print("\nTesting directory access:")
-        for var in ['LEFT_DIR', 'RIGHT_DIR', 'THIS_DIR', 'OTHER_DIR']:
+        for var in ['TFM_LEFT_DIR', 'TFM_RIGHT_DIR', 'TFM_THIS_DIR', 'TFM_OTHER_DIR']:
             path = Path(os.environ[var])
             if path.exists() and path.is_dir():
                 print(f"✅ {var} is accessible")
@@ -48,7 +48,7 @@ def test_subshell_environment():
         print("\nTesting shell command access:")
         try:
             import subprocess
-            result = subprocess.run(['bash', '-c', 'echo "Current directory from shell: $THIS_DIR"'], 
+            result = subprocess.run(['bash', '-c', 'echo "Current directory from shell: $TFM_THIS_DIR"'], 
                                   capture_output=True, text=True)
             if result.stdout.strip():
                 print(f"✅ Shell command output: {result.stdout.strip()}")

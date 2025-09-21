@@ -25,16 +25,16 @@ def simulate_tfm_subshell():
     current_dir = Path.cwd()
     home_dir = Path.home()
     
-    env['LEFT_DIR'] = str(current_dir)
-    env['RIGHT_DIR'] = str(home_dir)
-    env['THIS_DIR'] = str(current_dir)
-    env['OTHER_DIR'] = str(home_dir)
+    env['TFM_LEFT_DIR'] = str(current_dir)
+    env['TFM_RIGHT_DIR'] = str(home_dir)
+    env['TFM_THIS_DIR'] = str(current_dir)
+    env['TFM_OTHER_DIR'] = str(home_dir)
     
     # Set up selected files (simulate some selections)
-    env['LEFT_SELECTED'] = 'tfm.py README.md'
-    env['RIGHT_SELECTED'] = ''
-    env['THIS_SELECTED'] = 'tfm.py README.md'
-    env['OTHER_SELECTED'] = ''
+    env['TFM_LEFT_SELECTED'] = 'tfm.py README.md'
+    env['TFM_RIGHT_SELECTED'] = ''
+    env['TFM_THIS_SELECTED'] = 'tfm.py README.md'
+    env['TFM_OTHER_SELECTED'] = ''
     
     # Add prompt modification like TFM does (both PS1 and PROMPT)
     current_ps1 = env.get('PS1', '')
@@ -51,8 +51,8 @@ def simulate_tfm_subshell():
         env['PROMPT'] = '[TFM] %n@%m:%~%# '
     
     print("Environment variables set:")
-    for var in ['LEFT_DIR', 'RIGHT_DIR', 'THIS_DIR', 'OTHER_DIR', 
-                'LEFT_SELECTED', 'RIGHT_SELECTED', 'THIS_SELECTED', 'OTHER_SELECTED']:
+    for var in ['TFM_LEFT_DIR', 'TFM_RIGHT_DIR', 'TFM_THIS_DIR', 'TFM_OTHER_DIR', 
+                'TFM_LEFT_SELECTED', 'TFM_RIGHT_SELECTED', 'TFM_THIS_SELECTED', 'TFM_OTHER_SELECTED']:
         print(f"  {var}: {env[var]}")
     
     print("\n" + "=" * 50)
@@ -95,14 +95,14 @@ def test_python_script():
     current_dir = Path.cwd()
     home_dir = Path.home()
     
-    env['LEFT_DIR'] = str(current_dir)
-    env['RIGHT_DIR'] = str(home_dir)
-    env['THIS_DIR'] = str(current_dir)
-    env['OTHER_DIR'] = str(home_dir)
-    env['LEFT_SELECTED'] = 'test1.txt test2.txt'
-    env['RIGHT_SELECTED'] = ''
-    env['THIS_SELECTED'] = 'test1.txt test2.txt'
-    env['OTHER_SELECTED'] = ''
+    env['TFM_LEFT_DIR'] = str(current_dir)
+    env['TFM_RIGHT_DIR'] = str(home_dir)
+    env['TFM_THIS_DIR'] = str(current_dir)
+    env['TFM_OTHER_DIR'] = str(home_dir)
+    env['TFM_LEFT_SELECTED'] = 'test1.txt test2.txt'
+    env['TFM_RIGHT_SELECTED'] = ''
+    env['TFM_THIS_SELECTED'] = 'test1.txt test2.txt'
+    env['TFM_OTHER_SELECTED'] = ''
     
     # Add prompt modification like TFM does (both PS1 and PROMPT)
     current_ps1 = env.get('PS1', '')

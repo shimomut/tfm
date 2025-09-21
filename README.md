@@ -240,44 +240,19 @@ TFM's sub-shell mode allows you to temporarily suspend the interface and enter a
 When entering sub-shell mode, these environment variables are automatically set:
 
 #### Directory Variables
-- `LEFT_DIR`: Absolute path of the left file pane directory
-- `RIGHT_DIR`: Absolute path of the right file pane directory  
-- `THIS_DIR`: Absolute path of the currently focused pane directory
-- `OTHER_DIR`: Absolute path of the non-focused pane directory
+- `TFM_LEFT_DIR`: Absolute path of the left file pane directory
+- `TFM_RIGHT_DIR`: Absolute path of the right file pane directory  
+- `TFM_THIS_DIR`: Absolute path of the currently focused pane directory
+- `TFM_OTHER_DIR`: Absolute path of the non-focused pane directory
 
 #### Selected Files Variables
-- `LEFT_SELECTED`: Space-separated list of selected file names in the left pane
-- `RIGHT_SELECTED`: Space-separated list of selected file names in the right pane
-- `THIS_SELECTED`: Space-separated list of selected file names in the focused pane
-- `OTHER_SELECTED`: Space-separated list of selected file names in the non-focused pane
+- `TFM_LEFT_SELECTED`: Space-separated list of selected file names in the left pane
+- `TFM_RIGHT_SELECTED`: Space-separated list of selected file names in the right pane
+- `TFM_THIS_SELECTED`: Space-separated list of selected file names in the focused pane
+- `TFM_OTHER_SELECTED`: Space-separated list of selected file names in the non-focused pane
 
-### Usage Examples
-
-```bash
-# List files in both panes
-ls -la "$LEFT_DIR" "$RIGHT_DIR"
-
-# Copy selected files from current pane to other pane
-for file in $THIS_SELECTED; do
-    cp "$THIS_DIR/$file" "$OTHER_DIR/"
-done
-
-# Compare directory sizes
-du -sh "$LEFT_DIR" "$RIGHT_DIR"
-
-# Find files in both directories
-find "$LEFT_DIR" "$RIGHT_DIR" -name "*.py"
-
-# Archive selected files
-if [ -n "$THIS_SELECTED" ]; then
-    cd "$THIS_DIR"
-    tar -czf selected_files.tar.gz $THIS_SELECTED
-fi
-```
-
-### Test Scripts
-- `python3 test_subshell.py` - Test environment variables
-- `python3 demo_subshell.py` - See usage examples
+#### Additional Variables
+- `TFM_ACTIVE`: Set to '1' to indicate TFM sub-shell mode is active
 
 ## Advanced Features
 
