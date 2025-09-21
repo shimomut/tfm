@@ -54,19 +54,13 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
   - Red text for stderr messages in log pane
 
 ### File Operations
-- **Copy Files**: Copy files/directories between panes with 'C' key
-- **Move Files**: Move files/directories between panes with 'M' key
-- **Delete Files**: Delete files/directories with 'K' key (with confirmation)
-- **Rename Files**: Single file rename with 'R' key, batch rename for multiple selections
-- **Batch Rename**: Advanced regex-based renaming with macros (\0, \1-\9, \d for indexing)
-- **Create Files**: Create new text files with 'E' key and auto-edit
-- **Create Directories**: Create new directories with 'M' key (when no selection)
-- **Create Archives**: Create ZIP, TAR.GZ, or TGZ archives with 'P' key
-- **Extract Archives**: Extract ZIP, TAR.GZ, TGZ archives with 'U' key to other pane
-- **Fine-Grained Progress**: Real-time progress display for individual files in multi-file operations (copy, move, delete, archive)
-- **Multi-Selection**: Select multiple files with Space bar for batch operations
-- **Advanced Selection**: Select all files ('a'), all items ('A')
-- **Conflict Resolution**: Interactive dialogs for handling existing files
+- **Basic Operations**: Copy (C), Move (M), Delete (K), Rename (R) files and directories
+- **Batch Operations**: Multi-selection with Space bar, select all files (a) or all items (A)
+- **Advanced Rename**: Regex-based batch renaming with macros (\0, \1-\9, \d for indexing)
+- **File Creation**: Create new text files (E) and directories (F7) with auto-editing
+- **Archive Support**: Create (P) and extract (U) ZIP, TAR.GZ, TGZ archives between panes
+- **Progress Tracking**: Real-time progress display for multi-file operations
+- **Safety Features**: Confirmation dialogs, permission checks, conflict resolution
 
 ### Text Handling
 - **Text File Viewer**: Built-in text viewer with syntax highlighting for 20+ file formats
@@ -75,50 +69,14 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 - **Line Numbers**: Toggle line numbers in text viewer
 - **Search in Files**: Search functionality within viewed text files
 
-### Advanced Features
-- **Sub-shell Mode**: Suspend TFM and enter shell with environment variables for current state
-- **Favorite Directories**: Quick access to frequently used directories with 'J' key
-- **Advanced Search**: Filename search ('f') and content search with multiple patterns
-- **File Filtering**: Filter files by pattern (';') with fnmatch support (*.py, test_*, etc.)
-- **Intelligent Sorting**: Quick sort by name (1), size (2), date (3) with reverse toggle
-- **Pane Synchronization**: Sync directories ('o'/'O') and cursor positions between panes
-- **Professional Text Editing**: Full cursor movement, insertion, deletion in all input fields
-- **Searchable Lists**: Filter and search through files and directories
-- **Configuration System**: Fully customizable key bindings and settings
+### System Integration
+- **Sub-shell Mode**: Suspend TFM and enter shell with environment variables (X key)
+- **External Programs**: Integration with custom commands and scripts (x key)
+- **Configuration System**: Fully customizable key bindings and settings (L key)
 - **Help System**: Comprehensive help dialog accessible with '?' key
-- **Log Management**: Scroll through log messages with Shift+Up/Down, auto-scrolls to newest
-- **Cross-platform**: Works on macOS, Linux, and Windows (with proper terminal support)
+- **Cross-platform**: Works on macOS, Linux, and Windows with proper terminal support
 
-## File Operations
 
-TFM provides comprehensive file management capabilities with intuitive keyboard shortcuts:
-
-### Basic Operations
-- **Copy**: Select files with Space, press 'C' to copy to opposite pane
-- **Move**: Select files with Space, press 'M' to move to opposite pane  
-- **Delete**: Select files with Space, press 'K' to delete (with confirmation)
-- **Rename**: Navigate to file, press 'R' to rename in-place
-
-### Advanced Operations
-- **Multi-Selection**: Use Space to select multiple files for batch operations
-- **Conflict Resolution**: Interactive dialogs handle existing files during copy/move
-- **Directory Operations**: All operations work on directories (recursive)
-- **Symbolic Links**: Proper handling of symbolic links (preserved during operations)
-- **Archive Creation**: Create compressed archives from selected files/directories
-
-### File Creation & Archives
-- **New Files**: Press 'E' to create and immediately edit new text files
-- **New Directories**: Press 'M' with no selection to create new directories
-- **Create Archives**: Press 'P' to create ZIP, TAR.GZ, or TGZ archives from selected files
-- **Extract Archives**: Press 'U' to extract archives to the opposite pane
-- **Smart Extraction**: Creates directory named after archive (without extension)
-- **Auto-Editor**: New files automatically open in your configured text editor
-
-### Safety Features
-- **Confirmation Dialogs**: All destructive operations require confirmation
-- **Permission Checks**: Operations validate permissions before execution
-- **Error Handling**: Clear error messages for failed operations
-- **Undo Protection**: Parent directory (..) cannot be accidentally modified
 
 ## Favorite Directories
 
@@ -160,7 +118,6 @@ All key bindings are fully customizable through the configuration system. Below 
 | Key | Action |
 |-----|--------|
 | `Space` | Select/deselect file (for multi-selection) |
-
 | `a` | Select all files |
 | `A` | Select all items (files + directories) |
 | `c/C` | Copy selected files to opposite pane |
@@ -322,77 +279,31 @@ fi
 - `python3 test_subshell.py` - Test environment variables
 - `python3 demo_subshell.py` - See usage examples
 
-## Advanced Features Detail
+## Advanced Features
 
 ### Batch Rename System
-TFM includes a powerful batch rename feature for multiple selected files:
-
-#### Activation
-- Select multiple files with Space bar
-- Press 'R' to enter batch rename mode
-- Use Tab to switch between regex pattern and destination pattern fields
-
-#### Regex Patterns & Macros
-- **Full Regex Support**: Use Python regex syntax for pattern matching
-- **Capture Groups**: `\1` to `\9` for regex capture groups
-- **Full Filename**: `\0` for entire original filename
-- **Sequential Numbering**: `\d` for index numbers (1, 2, 3, ...)
-
-#### Examples
-```
-Files: file1.txt, file2.txt, file3.txt
-Regex: (.*)
-Destination: backup_\1
-Result: backup_file1.txt, backup_file2.txt, backup_file3.txt
-
-Files: doc1.txt, doc2.txt
-Regex: (.*)\.txt
-Destination: \1.md
-Result: doc1.md, doc2.md
-
-Files: photo.jpg, image.jpg
-Regex: (.*)\.(.*) 
-Destination: \1_\d.\2
-Result: photo_1.jpg, image_2.jpg
-```
-
-#### Professional Text Editing
-- **Full Cursor Movement**: Left/Right arrows, Home/End keys
-- **Visual Cursor**: Reversed color highlighting shows exact cursor position
-- **Insert/Delete**: Edit at any position, not just at the end
+Powerful regex-based renaming for multiple files:
+- **Regex Support**: Full Python regex syntax with capture groups (\1-\9)
+- **Macros**: Use \0 for full filename, \d for sequential numbering
 - **Real-time Preview**: See rename results before executing
+- **Professional Editing**: Full cursor movement in input fields
 
-### Archive Operations
-- **Create Archives**: Select files, press 'P', choose ZIP, TAR.GZ, or TGZ format
-- **Extract Archives**: Press 'U' on any archive to extract to opposite pane
-- **Smart Directory Creation**: Extraction creates directory named after archive
-- **Conflict Handling**: Prompts for confirmation if target directory exists
+### Search & Filtering
+- **Incremental Search**: Real-time file filtering as you type (f key)
+- **Pattern Filtering**: Use ';' with fnmatch patterns (*.py, test_*, etc.)
+- **Content Search**: Search within files with grep-like functionality (G key)
+- **Multi-pattern Support**: Space-separated search patterns
 
-### File Filtering & Search
-- **Pattern Filtering**: Use ';' to filter files by pattern (directories always shown)
-- **Fnmatch Support**: `*.py`, `test_*`, `*.[ch]`, etc.
-- **Multi-pattern Search**: Search supports multiple space-separated patterns
-- **Clear Filters**: Use ':' (Shift+;) to clear current pane filter
-
-### Pane Synchronization
-- **Directory Sync**: 'o' syncs current pane to other, 'O' syncs other to current
-- **Cursor Sync**: When both panes show same directory, syncs cursor positions
-- **Smart Behavior**: Automatically detects same directory and switches to cursor sync
+### Pane Management
+- **Directory Sync**: Sync pane directories (o/O keys) and cursor positions
+- **Smart Behavior**: Auto-detects same directory for cursor synchronization
+- **Resizable Layout**: Adjust pane boundaries with bracket keys ([, ], {, })
 
 ### Searchable Dialogs
-TFM features powerful searchable list dialogs for various operations:
-
-#### Features
-- **Real-time Filtering**: Type to filter items as you search
-- **Keyboard Navigation**: Full keyboard control with arrow keys
-- **Fast Scrolling**: Page Up/Down for large lists
-- **Visual Selection**: Clear indication of selected item
-- **Cancel Support**: ESC to cancel any dialog
-
-#### Used For
-- **Favorite Directories**: Quick navigation to bookmarked locations
-- **File Operations**: Conflict resolution during copy/move operations
+All list interfaces support real-time filtering:
+- **Favorite Directories**: Quick navigation with search
 - **Sort Options**: Interactive sorting menu
+- **Conflict Resolution**: Searchable file operation dialogs
 
 ## Installation & Usage
 
@@ -638,23 +549,18 @@ make clean
 ## Tips & Best Practices
 
 ### Efficient Workflows
-- **Multi-Selection**: Use Space to select multiple files, then perform batch operations
-- **Quick Navigation**: Use 'o'/'O' to sync panes for easy comparison
+- **Multi-Selection**: Use Space to select files, then perform batch operations (C/M/K/R)
+- **Quick Navigation**: Use 'o'/'O' to sync panes, 'J' for favorites, Tab to switch panes
 - **Pattern Filtering**: Use ';' with patterns like `*.py` or `test_*` to focus on specific files
-- **Quick Sorting**: Use number keys 1, 2, 3 for instant sorting by name, size, date
-- **Batch Rename**: Select multiple files and use regex patterns for powerful renaming
+- **Quick Sorting**: Use number keys 1-4 for instant sorting by name, extension, size, date
+- **Batch Operations**: Select multiple files and use regex patterns for powerful renaming
 
-### Advanced Usage
-- **Color Scheme Switching**: Press 't' to instantly switch between Dark and Light themes
-- **Archive Workflows**: Create archives with 'P', extract with 'U' to opposite pane
-- **Text Editing**: All input fields support full cursor movement and professional editing
-- **Sub-shell Integration**: Use 'x' to access shell with TFM environment variables
-- **Log Monitoring**: Use Shift+Up/Down to scroll through operation logs and messages
-
-### Keyboard Efficiency
-- **Selection Shortcuts**: 'a' for all files, 'A' for all items
-- **Pane Management**: Tab to switch, '-' to reset split, bracket keys to adjust
-- **Quick Access**: 'J' for favorites, '?' for help, '.' to toggle hidden files, 't' to toggle colors
+### Power Features
+- **Archive Workflows**: Create archives (P) and extract (U) between panes
+- **Sub-shell Integration**: Use 'X' to access shell with TFM environment variables
+- **Color Schemes**: Press 't' to switch between Dark and Light themes
+- **External Programs**: Press 'x' to run custom commands and scripts
+- **Advanced Search**: Use 'f' for incremental search, 'F' for filename search, 'G' for content search
 
 ## Troubleshooting
 
