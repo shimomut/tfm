@@ -63,6 +63,9 @@ class Config:
 |---------|------|---------|-------------|
 | `CONFIRM_DELETE` | bool | `True` | Show confirmation for delete operations |
 | `CONFIRM_QUIT` | bool | `True` | Show confirmation when quitting |
+| `CONFIRM_COPY` | bool | `True` | Show confirmation for copy operations |
+| `CONFIRM_MOVE` | bool | `True` | Show confirmation for move operations |
+| `CONFIRM_EXTRACT_ARCHIVE` | bool | `True` | Show confirmation for archive extraction |
 
 ### Directory Settings
 
@@ -76,7 +79,6 @@ class Config:
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `MAX_LOG_MESSAGES` | int | `1000` | Maximum log messages to keep |
-| `REFRESH_INTERVAL` | float | `1.0` | File refresh interval in seconds |
 
 ### Info Dialog Settings
 
@@ -116,19 +118,6 @@ KEY_BINDINGS = {
 - **Case Sensitive**: Separate bindings for uppercase/lowercase
 - **Special Keys**: Support for space and other special characters
 - **Validation**: Invalid key bindings are ignored with warnings
-
-## File Associations (Future Use)
-
-```python
-FILE_ASSOCIATIONS = {
-    '.txt': 'text_editor',
-    '.py': 'python_editor',
-    '.md': 'markdown_viewer',
-    '.jpg': 'image_viewer',
-    '.png': 'image_viewer',
-    '.pdf': 'pdf_viewer',
-}
-```
 
 ## Configuration Management
 
@@ -198,6 +187,13 @@ class Config:
     
     # Disable quit confirmation
     CONFIRM_QUIT = False
+    
+    # Disable copy and move confirmations for faster workflow
+    CONFIRM_COPY = False
+    CONFIRM_MOVE = False
+    
+    # Keep extract confirmation for safety
+    CONFIRM_EXTRACT_ARCHIVE = True
 ```
 
 ### Example 4: Performance Tuning
@@ -207,12 +203,31 @@ class Config:
     # Keep more log messages
     MAX_LOG_MESSAGES = 5000
     
-    # Faster refresh
-    REFRESH_INTERVAL = 0.5
-    
     # Larger info dialogs
     INFO_DIALOG_WIDTH_RATIO = 0.9
     INFO_DIALOG_HEIGHT_RATIO = 0.9
+```
+
+### Example 5: Confirmation Settings
+
+```python
+class Config:
+    # Safety-first approach - confirm all operations
+    CONFIRM_DELETE = True
+    CONFIRM_QUIT = True
+    CONFIRM_COPY = True
+    CONFIRM_MOVE = True
+    CONFIRM_EXTRACT_ARCHIVE = True
+```
+
+```python
+class Config:
+    # Speed-focused approach - minimal confirmations
+    CONFIRM_DELETE = True      # Keep for safety
+    CONFIRM_QUIT = False       # Quick exit
+    CONFIRM_COPY = False       # Fast copying
+    CONFIRM_MOVE = False       # Fast moving
+    CONFIRM_EXTRACT_ARCHIVE = False  # Quick extraction
 ```
 
 ## Configuration Validation
@@ -331,6 +346,9 @@ class Config:
     # Behavior
     CONFIRM_DELETE = True
     CONFIRM_QUIT = False
+    CONFIRM_COPY = True
+    CONFIRM_MOVE = True
+    CONFIRM_EXTRACT_ARCHIVE = False
     
     # Startup directories
     STARTUP_LEFT_PATH = \"~/projects\"

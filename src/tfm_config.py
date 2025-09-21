@@ -31,7 +31,9 @@ class DefaultConfig:
     # Behavior settings
     CONFIRM_DELETE = True
     CONFIRM_QUIT = True
-    AUTO_REFRESH = True
+    CONFIRM_COPY = True
+    CONFIRM_MOVE = True
+    CONFIRM_EXTRACT_ARCHIVE = True
     
     # Key bindings (can be customized)
     KEY_BINDINGS = {
@@ -68,13 +70,6 @@ class DefaultConfig:
         'compare_selection': ['w', 'W'],
     }
     
-    # File associations (for future use)
-    FILE_ASSOCIATIONS = {
-        '.txt': 'text_editor',
-        '.py': 'python_editor',
-        '.md': 'markdown_viewer',
-    }
-    
     # Directory settings
     STARTUP_LEFT_PATH = None  # None = current directory
     STARTUP_RIGHT_PATH = None  # None = home directory
@@ -93,7 +88,6 @@ class DefaultConfig:
     
     # Performance settings
     MAX_LOG_MESSAGES = 1000
-    REFRESH_INTERVAL = 1.0  # seconds
     
     # File display settings
     SEPARATE_EXTENSIONS = True  # Show file extensions separately from basenames

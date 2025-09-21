@@ -1871,8 +1871,24 @@ class FileManager:
             print(f"Permission denied: Cannot write to {destination_dir}")
             return
         
-        # Start copying files
-        self.copy_files_to_directory(files_to_copy, destination_dir)
+        # Check if copy confirmation is enabled
+        if getattr(self.config, 'CONFIRM_COPY', True):
+            # Show confirmation dialog
+            if len(files_to_copy) == 1:
+                message = f"Copy '{files_to_copy[0].name}' to {destination_dir}?"
+            else:
+                message = f"Copy {len(files_to_copy)} items to {destination_dir}?"
+            
+            def copy_callback(confirmed):
+                if confirmed:
+                    self.copy_files_to_directory(files_to_copy, destination_dir)
+                else:
+                    print("Copy operation cancelled")
+            
+            self.show_confirmation(message, copy_callback)
+        else:
+            # Start copying files without confirmation
+            self.copy_files_to_directory(files_to_copy, destination_dir)
     
     def copy_files_to_directory(self, files_to_copy, destination_dir):
         """Copy a list of files to the destination directory with conflict resolution"""
@@ -2126,8 +2142,24 @@ class FileManager:
                 files_to_move = [f for f in files_to_move if f.parent != destination_dir]
                 print(f"Skipping {len(same_dir_files)} files already in destination directory")
         
-        # Start moving files
-        self.move_files_to_directory(files_to_move, destination_dir)
+        # Check if move confirmation is enabled
+        if getattr(self.config, 'CONFIRM_MOVE', True):
+            # Show confirmation dialog
+            if len(files_to_move) == 1:
+                message = f"Move '{files_to_move[0].name}' to {destination_dir}?"
+            else:
+                message = f"Move {len(files_to_move)} items to {destination_dir}?"
+            
+            def move_callback(confirmed):
+                if confirmed:
+                    self.move_files_to_directory(files_to_move, destination_dir)
+                else:
+                    print("Move operation cancelled")
+            
+            self.show_confirmation(message, move_callback)
+        else:
+            # Start moving files without confirmation
+            self.move_files_to_directory(files_to_move, destination_dir)
     
     def move_files_to_directory(self, files_to_move, destination_dir):
         """Move a list of files to the destination directory with conflict resolution"""
@@ -2908,6 +2940,24 @@ class FileManager:
         archive_basename = self.get_archive_basename(selected_file.name)
         extract_dir = other_pane['path'] / archive_basename
         
+        # Check if extract confirmation is enabled
+        if getattr(self.config, 'CONFIRM_EXTRACT_ARCHIVE', True):
+            # Show confirmation dialog
+            message = f"Extract '{selected_file.name}' to {other_pane['path']}?"
+            
+            def extract_callback(confirmed):
+                if confirmed:
+                    self._proceed_with_extraction(selected_file, extract_dir, archive_format, other_pane, archive_basename)
+                else:
+                    print("Extraction cancelled")
+            
+            self.show_confirmation(message, extract_callback)
+        else:
+            # Proceed with extraction without confirmation
+            self._proceed_with_extraction(selected_file, extract_dir, archive_format, other_pane, archive_basename)
+    
+    def _proceed_with_extraction(self, selected_file, extract_dir, archive_format, other_pane, archive_basename):
+        """Proceed with extraction after confirmation (if enabled)"""
         # Check if extraction directory already exists
         if extract_dir.exists():
             def overwrite_callback(confirmed):
