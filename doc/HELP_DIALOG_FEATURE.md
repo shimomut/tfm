@@ -6,7 +6,7 @@ TFM now includes a comprehensive help dialog that shows all key bindings and usa
 
 ### Basic Operation
 
-- **? Key** or **h Key**: Show help dialog with all key bindings
+- **? Key**: Show help dialog with all key bindings
 - **ESC** or **q**: Close help dialog
 - **↑/↓**: Scroll through help content
 - **Page Up/Down**: Scroll by page
@@ -74,7 +74,7 @@ The help dialog is organized into clear sections:
 
 ### 4. Always Accessible
 - Available from any screen in TFM
-- Multiple key bindings (? and h)
+- Accessible via ? key
 - No prerequisites or special modes required
 
 ## Implementation Details
@@ -113,7 +113,7 @@ Users can customize which keys trigger the help dialog by modifying the `help` k
 
 ### Quick Help Access
 ```
-1. Press '?' or 'h' from anywhere in TFM
+1. Press '?' from anywhere in TFM
 2. Help dialog opens with full key reference
 3. Scroll through sections using arrow keys
 4. Press 'q' or ESC to close and return

@@ -13,6 +13,18 @@ tfm/
 │   ├── tfm_const.py       # Constants and definitions
 │   ├── tfm_colors.py      # Color management
 │   ├── tfm_text_viewer.py # Text file viewer
+│   ├── tfm_single_line_text_edit.py # Single line text editor component
+│   ├── tfm_batch_rename_dialog.py   # Batch rename dialog component
+│   ├── tfm_external_programs.py     # External programs and subshell functionality
+│   ├── tfm_file_operations.py       # File operations handler
+│   ├── tfm_general_purpose_dialog.py # General purpose dialog system
+│   ├── tfm_info_dialog.py           # Information dialog component
+│   ├── tfm_list_dialog.py           # Searchable list dialog component
+│   ├── tfm_log_manager.py           # Log management system
+│   ├── tfm_pane_manager.py          # Pane management functionality
+│   ├── tfm_progress_manager.py      # Progress tracking system
+│   ├── tfm_quick_choice_bar.py      # Quick choice bar component
+│   ├── tfm_search_dialog.py         # Search dialog component
 │   └── _config.py         # Default configuration template
 ├── test/                   # Test files and demos
 │   ├── test_*.py          # Unit and integration tests
@@ -38,6 +50,20 @@ tfm/
 - **`tfm_colors.py`**: Color scheme and terminal color management
 - **`tfm_text_viewer.py`**: Text file viewing functionality
 - **`_config.py`**: Template configuration file for users
+
+### Component Files
+- **`tfm_single_line_text_edit.py`**: Reusable single-line text editor component
+- **`tfm_batch_rename_dialog.py`**: Batch file renaming dialog with regex support
+- **`tfm_external_programs.py`**: External program execution and subshell functionality
+- **`tfm_file_operations.py`**: File system operations and file management
+- **`tfm_general_purpose_dialog.py`**: Flexible dialog system for various inputs
+- **`tfm_info_dialog.py`**: Scrollable information display dialog
+- **`tfm_list_dialog.py`**: Searchable list selection dialog
+- **`tfm_log_manager.py`**: Logging system and output capture
+- **`tfm_pane_manager.py`**: Dual pane management and navigation
+- **`tfm_progress_manager.py`**: Progress tracking for long operations
+- **`tfm_quick_choice_bar.py`**: Quick choice selection in status bar
+- **`tfm_search_dialog.py`**: File and content search functionality
 
 ### Key Components
 - **FileManager Class**: Main application controller
@@ -76,6 +102,26 @@ tfm/
 - `NAVIGATION_KEYS_SIMPLIFICATION.md`: Navigation changes
 - `HELP_DIALOG_IMPLEMENTATION_SUMMARY.md`: Help system
 - `CONFIGURATION_SYSTEM.md`: Configuration management
+- `SINGLE_LINE_TEXT_EDIT_IMPLEMENTATION.md`: Single line text editor component
+- `BATCH_RENAME_FEATURE.md`: Batch rename functionality
+- `EXTERNAL_PROGRAMS_FEATURE.md`: External programs and subshell
+- `STATUS_BAR_FEATURE.md`: Text viewer status bar
+- `HELP_DIALOG_FEATURE.md`: Help dialog system
+
+### Component Documentation
+- `GENERAL_PURPOSE_DIALOG_SYSTEM.md`: Flexible dialog framework
+- `INFO_DIALOG_COMPONENT.md`: Scrollable information dialogs
+- `LIST_DIALOG_COMPONENT.md`: Searchable list selection dialogs
+- `LOG_MANAGER_SYSTEM.md`: Logging and output management
+- `PANE_MANAGER_COMPONENT.md`: Dual pane management
+- `PROGRESS_MANAGER_SYSTEM.md`: Progress tracking system
+- `QUICK_CHOICE_BAR_COMPONENT.md`: Quick choice dialogs
+- `SEARCH_DIALOG_COMPONENT.md`: File and content search
+- `FILE_OPERATIONS_SYSTEM.md`: File system operations
+
+### Implementation Summaries
+- `CURSOR_FIX_SUMMARY.md`: SingleLineTextEdit cursor rendering fixes
+- `DIALOG_IMPROVEMENTS_SUMMARY.md`: GeneralPurposeDialog improvements
 
 ## Entry Points
 
