@@ -29,12 +29,14 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 ![main screen](doc/images/main-screen.png)
 
 <div align="center">
-<img src="doc/images/incremental-search.png" alt="incremental search" width="300">
-<img src="doc/images/favorite-directories.png" alt="favorite directories" width="300">
-<img src="doc/images/grep-dialog.png" alt="grep dialog" width="300">
-<img src="doc/images/search-dialog.png" alt="search dialog" width="300">
-<img src="doc/images/file-info-dialog.png" alt="file info dialog" width="300">
-<img src="doc/images/text-viewer.png" alt="built-in text viewer" width="300">
+<img src="doc/images/incremental-search.png" alt="incremental search" width="250">
+<img src="doc/images/favorite-directories.png" alt="favorite directories" width="250">
+<img src="doc/images/grep-dialog.png" alt="grep dialog" width="250">
+<img src="doc/images/search-dialog.png" alt="search dialog" width="250">
+<img src="doc/images/batch-rename.png" alt="batch rename" width="250">
+<img src="doc/images/text-viewer.png" alt="built-in text viewer" width="250">
+<img src="doc/images/external-programs.png" alt="external programs" width="250">
+<img src="doc/images/color-schemes.png" alt="color schemes" width="250">
 </div>
 
 ### Navigation & Display
