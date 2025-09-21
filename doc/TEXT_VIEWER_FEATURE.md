@@ -75,6 +75,7 @@ TFM now includes a built-in text file viewer with syntax highlighting support fo
 | `n` | Toggle line numbers on/off |
 | `w` | Toggle line wrapping on/off |
 | `s` | Toggle syntax highlighting on/off |
+| `f` or `F` | Enter search mode |
 
 ### Status Information
 The viewer interface provides comprehensive status information:
@@ -179,14 +180,33 @@ key = value
 debug = true
 ```
 
+### ✅ Search Functionality
+- **Incremental search**: Press `f` to search within the current file
+- **Real-time highlighting**: Search matches highlighted as you type
+- **Case-insensitive**: Finds matches regardless of case
+- **Navigation**: Use `↑↓` to move between matches
+- **Visual feedback**: Current match highlighted differently from other matches
+- **Match counter**: Shows current match position and total matches
+
+### Search Controls
+| Key | Action |
+|-----|--------|
+| `f` or `F` | Enter search mode |
+| `ESC` or `Enter` | Exit search mode |
+| `Backspace` | Remove last search character |
+| `↑` or `k` | Previous match |
+| `↓` or `j` | Next match |
+| Type characters | Add to search pattern (incremental) |
+
 ## Future Enhancements
 
 Planned improvements for future versions:
-- **Search functionality** within viewed files
+- **Regular expression search** for advanced pattern matching
 - **Bookmarks** for large files
 - **Split view** for comparing files
 - **Custom color themes** for syntax highlighting
 - **Plugin system** for additional file format support
+- **Search history** and replace functionality
 
 ## Troubleshooting
 

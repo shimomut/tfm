@@ -105,12 +105,9 @@ tfm/
 - `STATUS_BAR_FEATURE.md`: Text viewer status bar
 
 ### File Operations
-- `DELETE_FEATURE_IMPLEMENTATION.md`: File deletion functionality
-- `COPY_FEATURE_IMPLEMENTATION.md`: File copying functionality
-- `MOVE_FEATURE_IMPLEMENTATION.md`: File moving functionality
-- `RENAME_FEATURE_IMPLEMENTATION.md`: File renaming functionality
 - `CREATE_DIRECTORY_FEATURE.md`: Directory creation
 - `CREATE_FILE_FEATURE.md`: File creation
+- `FILE_DETAILS_FEATURE.md`: File information display
 
 ### Archive Operations
 - `ARCHIVE_CREATION_FEATURE.md`: Archive creation functionality
@@ -129,11 +126,15 @@ tfm/
 - `FILE_OPERATIONS_SYSTEM.md`: File system operations
 
 ### Additional Features
-- `TEXT_VIEWER_FEATURE.md`: Built-in text file viewer
+- `TEXT_VIEWER_FEATURE.md`: Built-in text file viewer with search
 - `TEXT_EDITOR_FEATURE.md`: External text editor integration
 - `FAVORITE_DIRECTORIES_FEATURE.md`: Favorite directories management
 - `COLOR_SCHEMES_FEATURE.md`: Color scheme system
 - `NAVIGATION_KEYS_SIMPLIFICATION.md`: Navigation improvements
+
+### Integration Documentation
+- `BEYONDCOMPARE_INTEGRATION.md`: BeyondCompare integration setup
+- `VSCODE_INTEGRATION.md`: Visual Studio Code integration
 
 ## Entry Points
 
