@@ -3167,6 +3167,15 @@ class FileManager:
         # Only allow specific keys that make sense during isearch
         return True
 
+    def get_batch_rename_active_editor(self):
+        """Get the currently active editor in batch rename mode"""
+        return self.batch_rename_dialog.get_active_editor()
+    
+    def switch_batch_rename_field(self, field):
+        """Switch the active field in batch rename mode"""
+        self.batch_rename_dialog.switch_field(field)
+        self.needs_full_redraw = True
+    
     def handle_batch_rename_input(self, key):
         """Handle input while in batch rename mode - wrapper for batch rename dialog component"""
         result = self.batch_rename_dialog.handle_input(key)

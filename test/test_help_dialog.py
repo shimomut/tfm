@@ -42,12 +42,12 @@ def test_help_dialog(stdscr):
             key = stdscr.getch()
             
             # Handle dialog input
-            if fm.info_dialog_mode:
+            if fm.info_dialog.mode:
                 if fm.handle_info_dialog_input(key):
                     continue
             
             # Exit on 'q' or if dialog is closed
-            if key == ord('q') or not fm.info_dialog_mode:
+            if key == ord('q') or not fm.info_dialog.mode:
                 break
                 
     except Exception as e:

@@ -21,6 +21,8 @@ class MockTFM:
     
     def __init__(self):
         self.progress_manager = ProgressManager()
+        # Disable throttling for testing by setting throttle to 0
+        self.progress_manager.callback_throttle_ms = 0
         self.stdscr = Mock()
         self.needs_full_redraw = False
         self.progress_updates = []  # Track progress updates for testing
