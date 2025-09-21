@@ -105,12 +105,12 @@ def test_key_binding():
     print("=" * 50)
     
     try:
-        from tfm_config import get_config
-        config = get_config()
+        from tfm_config import config_manager
         
-        # Check if move_files key binding exists
-        if hasattr(config, 'KEY_BINDINGS') and 'move_files' in config.KEY_BINDINGS:
-            move_keys = config.KEY_BINDINGS['move_files']
+        # Use the config manager to get key bindings (includes fallback to defaults)
+        move_keys = config_manager.get_key_for_action('move_files')
+        
+        if move_keys:
             print(f"✓ Move key binding found: {move_keys}")
             
             # Check if 'm' and 'M' are in the binding

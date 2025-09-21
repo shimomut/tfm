@@ -4,7 +4,13 @@ Test script for SingleLineTextEdit class
 """
 
 import curses
-from src.tfm_single_line_text_edit import SingleLineTextEdit
+import sys
+import os
+
+# Add src directory to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from tfm_single_line_text_edit import SingleLineTextEdit
 
 
 def test_basic_functionality():
