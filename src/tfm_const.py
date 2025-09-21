@@ -4,11 +4,11 @@ TUI File Manager - Constants and Configuration
 """
 
 # Version information
-VERSION = "1.00"
+VERSION = "0.95"
 
 # Application metadata
 APP_NAME = "TUI File Manager"
-APP_DESCRIPTION = "A terminal-based file manager using curses"
+APP_DESCRIPTION = "A terminal-based file manager"
 GITHUB_URL = "https://github.com/shimomut/tfm"  # Update with actual repository URL
 
 # Display constants
