@@ -30,10 +30,8 @@ KEY_CTRL_S = 19      # Ctrl+S
 KEY_OPTION_SPACE_1 = 194  # Option+Space first byte (macOS)
 KEY_OPTION_SPACE_2 = 160  # Option+Space second byte (macOS)
 KEY_ESC = 27              # ESC key
-KEY_CTRL_U = 21           # Ctrl+U (vertical resize up)
-KEY_CTRL_D = 4            # Ctrl+D (vertical resize down)
-KEY_CTRL_K = 11           # Ctrl+K (log scroll up)
-KEY_CTRL_L = 12           # Ctrl+L (log scroll down)
+
+
 KEY_SHIFT_COMMA = 60      # '<' - Shift+comma
 KEY_SHIFT_PERIOD = 62     # '>' - Shift+period
 KEY_SHIFT_LBRACKET = 123  # '{' - Shift+[

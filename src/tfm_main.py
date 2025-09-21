@@ -3379,16 +3379,8 @@ class FileManager:
                     self.show_confirmation("Are you sure you want to quit TFM?", quit_callback)
                 else:
                     quit_callback(True)
-            elif key == KEY_CTRL_U:  # Ctrl+U - make log pane smaller
-                self.adjust_log_boundary('up')
-            elif key == KEY_CTRL_D:  # Ctrl+D - make log pane larger
-                self.adjust_log_boundary('down')
-            elif key == 11:  # Ctrl+K - scroll log up
-                if self.log_manager.scroll_log_up(1):
-                    self.needs_full_redraw = True
-            elif key == 12:  # Ctrl+L - scroll log down
-                if self.log_manager.scroll_log_down(1):
-                    self.needs_full_redraw = True
+
+
             elif key == curses.KEY_RESIZE:  # Terminal window resized
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()
