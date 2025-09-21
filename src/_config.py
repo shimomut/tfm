@@ -120,6 +120,7 @@ class Config:
         {'name': 'Compare Files (BeyondCompare)', 'command': ['./tools/bcompare_files_wrapper.sh'], 'options': {'auto_return': True}},
         {'name': 'Compare Directories (BeyondCompare)', 'command': ['./tools/bcompare_dirs_wrapper.sh'], 'options': {'auto_return': True}},
         {'name': 'Open in VSCode', 'command': ['./tools/vscode_wrapper.sh'], 'options': {'auto_return': True}},
+        {'name': 'Preview Files', 'command': ['./tools/preview_files.sh'], 'options': {'auto_return': True}},
         # Add your own programs here:
         # {'name': 'My Script', 'command': ['/path/to/script.sh']},
         # {'name': 'Python REPL', 'command': ['python3']},
