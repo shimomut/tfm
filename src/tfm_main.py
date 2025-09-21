@@ -359,6 +359,22 @@ class FileManager:
             return filename, ""
         
         return basename, extension
+    
+    def calculate_max_extension_width(self, pane_data):
+        """
+        Calculate the maximum extension width for files in the current pane.
+        Returns the width needed for the extension column.
+        """
+        max_width = 0
+        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
+        
+        for file_path in pane_data['files']:
+            if file_path.is_file():
+                _, extension = self.separate_filename_extension(file_path.name, file_path.is_dir())
+                if extension and len(extension) <= max_ext_length:
+                    max_width = max(max_width, len(extension))
+        
+        return max_width
 
     def apply_filter(self):
         """Apply filter - wrapper for file_operations method"""
@@ -577,10 +593,12 @@ class FileManager:
                 if pane_width < 60:
                     # For narrow panes: "● basename ext size" (no datetime)
                     if extension:
+                        # Calculate actual maximum extension width for this pane
+                        ext_width = self.calculate_max_extension_width(pane_data)
+                        if ext_width == 0:  # No extensions in this pane
+                            ext_width = len(extension)
+                        
                         # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) = 12 + ext_width
-                        # Use fixed extension column width for proper alignment
-                        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
-                        ext_width = max_ext_length + 1  # +1 for the dot
                         name_width = usable_width - (12 + ext_width)
                         
                         # Truncate basename only if necessary
@@ -608,10 +626,12 @@ class FileManager:
                 else:
                     # For wider panes: "● basename ext size datetime"
                     if extension:
+                        # Calculate actual maximum extension width for this pane
+                        ext_width = self.calculate_max_extension_width(pane_data)
+                        if ext_width == 0:  # No extensions in this pane
+                            ext_width = len(extension)
+                        
                         # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) + space(1) + datetime(len) = 13 + ext_width + datetime_width
-                        # Use fixed extension column width for proper alignment
-                        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
-                        ext_width = max_ext_length + 1  # +1 for the dot
                         name_width = usable_width - (13 + ext_width + datetime_width)
                         
                         # Truncate basename only if necessary
