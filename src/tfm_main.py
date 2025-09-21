@@ -578,7 +578,9 @@ class FileManager:
                     # For narrow panes: "● basename ext size" (no datetime)
                     if extension:
                         # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) = 12 + ext_width
-                        ext_width = len(extension)
+                        # Use fixed extension column width for proper alignment
+                        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
+                        ext_width = max_ext_length + 1  # +1 for the dot
                         name_width = usable_width - (12 + ext_width)
                         
                         # Truncate basename only if necessary
@@ -607,7 +609,9 @@ class FileManager:
                     # For wider panes: "● basename ext size datetime"
                     if extension:
                         # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) + space(1) + datetime(len) = 13 + ext_width + datetime_width
-                        ext_width = len(extension)
+                        # Use fixed extension column width for proper alignment
+                        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
+                        ext_width = max_ext_length + 1  # +1 for the dot
                         name_width = usable_width - (13 + ext_width + datetime_width)
                         
                         # Truncate basename only if necessary
