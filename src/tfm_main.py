@@ -421,7 +421,11 @@ class FileManager:
 
     def get_log_scroll_percentage(self):
         """Calculate the current log scroll position as a percentage"""
-        return self.log_manager.get_log_scroll_percentage()
+        # Calculate display height for accurate scroll percentage
+        height, width = self.stdscr.getmaxyx()
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        return self.log_manager.get_log_scroll_percentage(log_height)
     
     def _get_log_pane_height(self):
         """Calculate the current log pane height in lines"""

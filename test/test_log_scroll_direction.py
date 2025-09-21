@@ -20,6 +20,11 @@ def test_log_scroll_direction():
         config = get_config()
         log_manager = LogManager(config)
         
+        # Restore stdout/stderr for test output
+        import sys
+        sys.stdout = log_manager.original_stdout
+        sys.stderr = log_manager.original_stderr
+        
         # Add some test messages
         log_manager.log_messages.clear()
         for i in range(10):
@@ -31,7 +36,7 @@ def test_log_scroll_direction():
         
         # Test scroll_log_up (should go toward older messages, increase offset)
         result_up = log_manager.scroll_log_up(2)
-        assert result_up == True, "scroll_log_up should return True when scrolling is possible"
+        assert result_up == True, "scroll_log_up should return True when messages exist"
         assert log_manager.log_scroll_offset == 2, f"After scroll_log_up(2), offset should be 2, got {log_manager.log_scroll_offset}"
         
         # Test scroll_log_down (should go toward newer messages, decrease offset)
@@ -49,21 +54,17 @@ def test_log_scroll_direction():
         assert result_down == False, "scroll_log_down should return False when already at bottom"
         assert log_manager.log_scroll_offset == 0, f"Offset should remain 0, got {log_manager.log_scroll_offset}"
         
-        # Test scroll_log_up to maximum
-        max_scroll = len(log_manager.log_messages) - 1
-        result_up = log_manager.scroll_log_up(20)  # More than available
-        assert result_up == True, "scroll_log_up should return True when scrolling is possible"
-        assert log_manager.log_scroll_offset == max_scroll, f"After scrolling to top, offset should be {max_scroll}, got {log_manager.log_scroll_offset}"
+        # Test scroll_log_up - it should always work when messages exist
+        result_up = log_manager.scroll_log_up(5)
+        assert result_up == True, "scroll_log_up should return True when messages exist"
+        assert log_manager.log_scroll_offset == 5, f"After scroll_log_up(5), offset should be 5, got {log_manager.log_scroll_offset}"
         
-        # Test scroll_log_up when already at top (should return False)
-        result_up = log_manager.scroll_log_up(1)
-        assert result_up == False, "scroll_log_up should return False when already at top"
-        assert log_manager.log_scroll_offset == max_scroll, f"Offset should remain {max_scroll}, got {log_manager.log_scroll_offset}"
+        # Note: scroll_log_up no longer does boundary checking - that's handled in draw_log_pane
         
         print("✓ Log scroll direction logic works correctly")
         print(f"  - scroll_log_up increases offset (toward older messages)")
         print(f"  - scroll_log_down decreases offset (toward newer messages)")
-        print(f"  - Proper boundary checking implemented")
+        print(f"  - Boundary checking handled in draw_log_pane method")
         
         return True
         

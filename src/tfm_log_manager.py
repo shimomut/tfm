@@ -50,14 +50,18 @@ class LogManager:
         self.log_messages.append((timestamp, "SYSTEM", f"{app_name} started successfully"))
         self.log_messages.append((timestamp, "CONFIG", "Configuration loaded"))
     
-    def get_log_scroll_percentage(self):
+    def get_log_scroll_percentage(self, display_height=None):
         """Calculate the current log scroll position as a percentage"""
         if len(self.log_messages) <= 1:
             return 0
         
-        # Calculate how many messages we can display
-        # This will be updated when we know the actual display height
-        max_scroll = max(0, len(self.log_messages) - 1)
+        # Calculate max scroll based on display height if available
+        total_messages = len(self.log_messages)
+        if display_height is not None:
+            max_scroll = max(0, total_messages - display_height)
+        else:
+            # Fallback to conservative estimate
+            max_scroll = max(0, total_messages - 1)
         
         if max_scroll == 0:
             return 0
@@ -68,9 +72,12 @@ class LogManager:
     
     def scroll_log_up(self, lines=1):
         """Scroll log up by specified number of lines (toward older messages)"""
-        max_scroll = max(0, len(self.log_messages) - 1)
-        if self.log_scroll_offset < max_scroll:
-            self.log_scroll_offset = min(max_scroll, self.log_scroll_offset + lines)
+        # Use a conservative estimate for max scroll - final capping happens in draw_log_pane
+        total_messages = len(self.log_messages)
+        if total_messages > 0:
+            # Allow scrolling up to the total number of messages
+            # The draw method will cap this properly based on display height
+            self.log_scroll_offset += lines
             return True
         return False
     
@@ -97,6 +104,11 @@ class LogManager:
             if self.log_messages and display_height > 0:
                 # Calculate which messages to show
                 total_messages = len(self.log_messages)
+                
+                # Cap scroll offset to prevent scrolling beyond available content
+                max_scroll = max(0, total_messages - display_height)
+                self.log_scroll_offset = min(self.log_scroll_offset, max_scroll)
+                
                 start_idx = max(0, total_messages - display_height - self.log_scroll_offset)
                 end_idx = min(total_messages, start_idx + display_height)
                 
