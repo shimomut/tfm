@@ -25,10 +25,6 @@ KEY_ENTER_2 = 13
 KEY_BACKSPACE_1 = 8
 KEY_BACKSPACE_2 = 127
 # Modifier key combinations
-KEY_CTRL_SPACE = 0   # Ctrl+Space
-KEY_CTRL_S = 19      # Ctrl+S
-KEY_OPTION_SPACE_1 = 194  # Option+Space first byte (macOS)
-KEY_OPTION_SPACE_2 = 160  # Option+Space second byte (macOS)
 KEY_ESC = 27              # ESC key
 
 

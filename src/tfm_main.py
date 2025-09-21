@@ -3380,7 +3380,6 @@ class FileManager:
                 else:
                     quit_callback(True)
 
-
             elif key == curses.KEY_RESIZE:  # Terminal window resized
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()
@@ -3423,22 +3422,12 @@ class FileManager:
             elif key == curses.KEY_END:
                 current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
                 self.needs_full_redraw = True
-            elif key == curses.KEY_PPAGE:  # Page Up - scroll log up when Ctrl is held, otherwise file navigation
-                # Check if this is Ctrl+Page Up for log scrolling
-                if self.log_manager.scroll_log_up(5):
-                    self.needs_full_redraw = True
-                else:
-                    # Regular file navigation
-                    current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
-                    self.needs_full_redraw = True
-            elif key == curses.KEY_NPAGE:  # Page Down - scroll log down when Ctrl is held, otherwise file navigation  
-                # Check if this is Ctrl+Page Down for log scrolling
-                if self.log_manager.scroll_log_down(5):
-                    self.needs_full_redraw = True
-                else:
-                    # Regular file navigation
-                    current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
-                    self.needs_full_redraw = True
+            elif key == curses.KEY_PPAGE:  # Page Up - file navigation only
+                current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
+                self.needs_full_redraw = True
+            elif key == curses.KEY_NPAGE:  # Page Down - file navigation only
+                current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
+                self.needs_full_redraw = True
             elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
                 if current_pane['path'] != current_pane['path'].parent:
                     try:
@@ -3527,26 +3516,13 @@ class FileManager:
                 self.toggle_selection()
                 self.needs_full_redraw = True
 
-            elif key == 0:  # Ctrl+Space - toggle selection and move up
-                self.toggle_selection_up()
-                self.needs_full_redraw = True
-            elif key == 19:  # Ctrl+S - toggle selection and move up  
-                self.toggle_selection_up()
-                self.needs_full_redraw = True
+
             elif key == 27:  # ESC key - check for Option key sequences
                 # Option+Space sends 194 followed by 160
                 next_key = self.stdscr.getch()
                 # Log unknown ESC sequence for debugging
                 print(f"Unknown ESC sequence: 27, {next_key}")
-            elif key == 194:  # Option+Space sequence (first byte)
-                # Option+Space sends 194 followed by 160 on macOS
-                next_key = self.stdscr.getch()
-                if next_key == 160:  # Option+Space
-                    self.toggle_selection_up()
-                    self.needs_full_redraw = True
-                else:
-                    # Log unknown Option key sequence for debugging
-                    print(f"Unknown Option key sequence: 194, {next_key}")
+
             elif self.is_key_for_action(key, 'select_all_files'):  # Toggle all files selection
                 self.toggle_all_files_selection()
             elif self.is_key_for_action(key, 'select_all_items'):  # Toggle all items selection
