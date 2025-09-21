@@ -123,7 +123,7 @@ def test_python_script():
                               env=env, 
                               capture_output=True, 
                               text=True,
-                              cwd=current_dir / 'test')
+                              cwd=current_dir)
         
         print("Python test output:")
         print(result.stdout)
