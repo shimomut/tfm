@@ -57,6 +57,10 @@ class Config:
         'create_archive': ['p', 'P'],
         'extract_archive': ['u', 'U'],
         'compare_selection': ['w', 'W'],
+        'adjust_pane_left': ['['],  # [ - make left pane smaller
+        'adjust_pane_right': [']'],  # ] - make left pane larger
+        'adjust_log_up': ['{'],  # Shift+[ - make log pane larger
+        'adjust_log_down': ['}'],  # Shift+] - make log pane smaller
     }
     
     # Directory settings

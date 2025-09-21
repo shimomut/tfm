@@ -3542,18 +3542,10 @@ class FileManager:
                 self.toggle_selection_up()
                 self.needs_full_redraw = True
             elif key == 27:  # ESC key - check for Option key sequences
-                # Option+Left sends 27 followed by 'b' (98)
-                # Option+Right sends 27 followed by 'f' (102)
                 # Option+Space sends 194 followed by 160
                 next_key = self.stdscr.getch()
-                if next_key == 98:  # Option+Left (ESC + 'b')
-                    self.adjust_pane_boundary('left')
-                elif next_key == 102:  # Option+Right (ESC + 'f')
-                    self.adjust_pane_boundary('right')
-
-                else:
-                    # Log unknown ESC sequence for debugging
-                    print(f"Unknown ESC sequence: 27, {next_key}")
+                # Log unknown ESC sequence for debugging
+                print(f"Unknown ESC sequence: 27, {next_key}")
             elif key == 194:  # Option+Space sequence (first byte)
                 # Option+Space sends 194 followed by 160 on macOS
                 next_key = self.stdscr.getch()
@@ -3631,6 +3623,14 @@ class FileManager:
                 self.show_compare_selection_dialog()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
+            elif self.is_key_for_action(key, 'adjust_pane_left'):  # Adjust pane boundary left
+                self.adjust_pane_boundary('left')
+            elif self.is_key_for_action(key, 'adjust_pane_right'):  # Adjust pane boundary right
+                self.adjust_pane_boundary('right')
+            elif self.is_key_for_action(key, 'adjust_log_up'):  # Adjust log boundary up
+                self.adjust_log_boundary('down')
+            elif self.is_key_for_action(key, 'adjust_log_down'):  # Adjust log boundary down
+                self.adjust_log_boundary('up')
             elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
                 self.pane_manager.left_pane_ratio = 0.5
                 self.needs_full_redraw = True
