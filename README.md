@@ -185,6 +185,10 @@ The help dialog is your quick reference guide - no need to memorize all key bind
 | `Ctrl+D` | Make log pane larger |
 | `Ctrl+K` | Scroll log up |
 | `Ctrl+L` | Scroll log down |
+| `Shift+Up` | Scroll log up (toward older messages) |
+| `Shift+Down` | Scroll log down (toward newer messages) |
+| `Shift+Left` | Fast scroll up (toward older messages) |
+| `Shift+Right` | Fast scroll down (toward newer messages) |
 | `l` | Scroll log up (alternative) |
 | `L` | Scroll log down (alternative) |
 

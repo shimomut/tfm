@@ -423,6 +423,13 @@ class FileManager:
         """Calculate the current log scroll position as a percentage"""
         return self.log_manager.get_log_scroll_percentage()
     
+    def _get_log_pane_height(self):
+        """Calculate the current log pane height in lines"""
+        height, width = self.stdscr.getmaxyx()
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        return log_height
+    
     def refresh_files(self, pane=None):
         """Refresh the file list for specified pane or both panes"""
         panes_to_refresh = [pane] if pane else [self.pane_manager.left_pane, self.pane_manager.right_pane]
@@ -3506,17 +3513,19 @@ class FileManager:
             elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
                 self.pane_manager.active_pane = 'left'
                 self.needs_full_redraw = True
-            elif key == 337:  # Shift+Up in many terminals
+            elif key in (KEY_SHIFT_UP_1,KEY_SHIFT_UP_2):  # Shift+Up
                 if self.log_manager.scroll_log_up(1):
                     self.needs_full_redraw = True
-            elif key == 336:  # Shift+Down in many terminals  
+            elif key in (KEY_SHIFT_DOWN_1, KEY_SHIFT_DOWN_2):  # Shift+Down
                 if self.log_manager.scroll_log_down(1):
                     self.needs_full_redraw = True
-            elif key == 393:  # Alternative Shift+Up code
-                if self.log_manager.scroll_log_up(1):
+            elif key in (KEY_SHIFT_LEFT_1, KEY_SHIFT_LEFT_2):  # Shift+Left - fast scroll to older messages
+                log_height = self._get_log_pane_height()
+                if self.log_manager.scroll_log_up(max(1, log_height)):
                     self.needs_full_redraw = True
-            elif key == 402:  # Alternative Shift+Down code
-                if self.log_manager.scroll_log_down(1):
+            elif key in (KEY_SHIFT_RIGHT_1, KEY_SHIFT_RIGHT_2):  # Shift+Right - fast scroll to newer messages
+                log_height = self._get_log_pane_height()
+                if self.log_manager.scroll_log_down(max(1, log_height)):
                     self.needs_full_redraw = True
             elif self.is_key_for_action(key, 'select_file'):  # Toggle file selection
                 self.toggle_selection()

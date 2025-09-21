@@ -67,17 +67,17 @@ class LogManager:
         return max(0, min(100, percentage))
     
     def scroll_log_up(self, lines=1):
-        """Scroll log up by specified number of lines"""
-        if self.log_scroll_offset > 0:
-            self.log_scroll_offset = max(0, self.log_scroll_offset - lines)
+        """Scroll log up by specified number of lines (toward older messages)"""
+        max_scroll = max(0, len(self.log_messages) - 1)
+        if self.log_scroll_offset < max_scroll:
+            self.log_scroll_offset = min(max_scroll, self.log_scroll_offset + lines)
             return True
         return False
     
     def scroll_log_down(self, lines=1):
-        """Scroll log down by specified number of lines"""
-        max_scroll = max(0, len(self.log_messages) - 1)
-        if self.log_scroll_offset < max_scroll:
-            self.log_scroll_offset = min(max_scroll, self.log_scroll_offset + lines)
+        """Scroll log down by specified number of lines (toward newer messages)"""
+        if self.log_scroll_offset > 0:
+            self.log_scroll_offset = max(0, self.log_scroll_offset - lines)
             return True
         return False
     
