@@ -1452,15 +1452,7 @@ class FileManager:
             self.needs_full_redraw = True
             return True
         return False
-    
 
-    def show_file_type_filter(self):
-        """Show file type filter using the searchable list dialog"""
-        current_pane = self.get_current_pane()
-        ListDialogHelpers.show_file_type_filter(self.list_dialog, current_pane)
-        self.needs_full_redraw = True
-        self._force_immediate_redraw()
-    
     def show_favorite_directories(self):
         """Show favorite directories using the searchable list dialog"""
         # Create a wrapper print function that also triggers redraw
@@ -3563,8 +3555,6 @@ class FileManager:
                 self.edit_selected_file()
             elif self.is_key_for_action(key, 'create_file'):  # Create new file
                 self.enter_create_file_mode()
-            elif self.is_key_for_action(key, 'file_type_filter'):  # Show file type filter
-                self.show_file_type_filter()
             elif self.is_key_for_action(key, 'toggle_fallback_colors'):  # Toggle fallback color mode
                 self.toggle_fallback_color_mode()
             elif self.is_key_for_action(key, 'view_options'):  # Show view options

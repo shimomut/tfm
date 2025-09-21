@@ -349,40 +349,6 @@ class ListDialogHelpers:
         list_dialog.show("Choose a Fruit", sample_items, callback)
     
     @staticmethod
-    def show_file_type_filter(list_dialog, current_pane):
-        """Show file type filter using the searchable list dialog"""
-        # Get all unique file extensions in current directory
-        extensions = set()
-        for file_path in current_pane['files']:
-            if file_path.is_file():
-                ext = file_path.suffix.lower()
-                if ext:
-                    extensions.add(ext)
-                else:
-                    extensions.add("(no extension)")
-        
-        if not extensions:
-            print("No files with extensions found in current directory")
-            return
-        
-        # Convert to sorted list
-        extension_list = sorted(list(extensions))
-        extension_list.insert(0, "(show all files)")  # Add option to show all
-        
-        def filter_callback(selected_ext):
-            if selected_ext:
-                if selected_ext == "(show all files)":
-                    print("Showing all files")
-                    # Reset any filtering (this would need additional implementation)
-                else:
-                    print(f"Filtering by extension: {selected_ext}")
-                    # Filter files by extension (this would need additional implementation)
-            else:
-                print("File type filter cancelled")
-        
-        list_dialog.show("Filter by File Type", extension_list, filter_callback)
-    
-    @staticmethod
     def show_favorite_directories(list_dialog, pane_manager, print_func):
         """Show favorite directories using the searchable list dialog"""
         favorites = get_favorite_directories()

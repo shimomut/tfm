@@ -72,7 +72,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 ### System Integration
 - **Sub-shell Mode**: Suspend TFM and enter shell with environment variables (X key)
 - **External Programs**: Integration with custom commands and scripts (x key)
-- **Configuration System**: Fully customizable key bindings and settings (L key)
+- **Configuration System**: Fully customizable key bindings and settings (Z key)
 - **Help System**: Comprehensive help dialog accessible with '?' key
 - **Cross-platform**: Works on macOS, Linux, and Windows with proper terminal support
 
@@ -175,10 +175,10 @@ All key bindings are fully customizable through the configuration system. Below 
 | `j/J` | Show favorite directories |
 | `x` | Show external programs menu |
 | `X` | Enter sub-shell mode |
-| `T` | File type filter dialog |
-| `z` | Toggle fallback color mode |
-| `Z` | View options menu |
-| `L` | Settings and configuration menu |
+
+| `T` | Toggle fallback color mode |
+| `z` | View options menu |
+| `Z` | Settings and configuration menu |
 
 ### General
 | Key | Action |
@@ -290,25 +290,13 @@ All list interfaces support real-time filtering:
    python3 tfm.py
    ```
 
-### Package Installation
+### Package Installation (coming soon)
 ```bash
 # Install from source
 python3 setup.py install
 
 # Run installed version
 tfm
-```
-
-### Using Make
-```bash
-# Run TFM
-make run
-
-# Run tests
-make test
-
-# Install package
-make install
 ```
 
 ### Dependencies
@@ -330,7 +318,7 @@ TFM features a comprehensive configuration system that allows complete customiza
 ### Configuration File Management
 
 **Automatic Setup**: TFM automatically creates `~/.tfm/config.py` from the built-in template on first launch  
-**Easy Access**: Open configuration from the Settings menu (`L` key) or edit manually  
+**Easy Access**: Open configuration from the Settings menu (`Z` key) or edit manually  
 **Template-Based**: Clean separation between default settings and user customizations  
 **Live Validation**: Configuration errors are reported with fallback to safe defaults
 
@@ -339,7 +327,7 @@ TFM features a comprehensive configuration system that allows complete customiza
 - **User Config**: `~/.tfm/config.py` - Your personal customizations
 - **Template**: `src/_config.py` - Default configuration template
 - **Access Methods**:
-  - Press `L` key → Settings Menu → Edit Configuration
+  - Press `Z` key → Settings Menu → Edit Configuration
   - Manually edit `~/.tfm/config.py`
   - TFM creates the file automatically if it doesn't exist
 
@@ -414,7 +402,7 @@ class Config:
 ### Accessing Configuration
 
 #### Through TFM Interface
-1. **Settings Menu**: Press `L` key to open the settings menu
+1. **Settings Menu**: Press `Z` key to open the settings menu
 2. **Edit Configuration**: Select "Edit Configuration" to open `config.py` in your text editor
 3. **Automatic Creation**: If no config exists, TFM creates one from the template
 4. **Live Reload**: Changes take effect when you restart TFM
@@ -474,118 +462,15 @@ tfm/
 └── README.md              # This file
 ```
 
-## Architecture
-
-### Core Components
-- **FileManager Class**: Main application controller in `tfm_main.py`
-- **Configuration System**: User-customizable settings in `tfm_config.py`
-- **Color Management**: Terminal color support in `tfm_colors.py`
-- **Text Viewer**: Built-in file viewer in `tfm_text_viewer.py`
-- **Dialog System**: User interaction dialogs for operations
-
-### Key Features
-- **Modular Design**: Clean separation between components
-- **Event-Driven**: Keyboard input drives all operations
-- **State Management**: Proper state handling for all modes and dialogs
-- **Error Handling**: Comprehensive error reporting and recovery
-- **Extensible**: Easy to add new features and operations
-
-## Development & Testing
-
-TFM includes comprehensive testing and development tools:
-
-### Running Tests
-```bash
-# Run all tests
-make test
-
-# Run specific feature tests
-python3 test/test_copy_integration.py
-python3 test/test_move_integration.py
-python3 test/test_delete_integration.py
-
-# Interactive demos
-python3 test/demo_favorites.py
-python3 test/demo_create_file.py
-```
-
-### Development Setup
-```bash
-# Development installation
-make dev-install
-
-# Run from source
-python3 tfm.py
-
-# Clean temporary files
-make clean
-```
-
-## Tips & Best Practices
-
-### Efficient Workflows
-- **Multi-Selection**: Use Space to select files, then perform batch operations (C/M/K/R)
-- **Quick Navigation**: Use 'o'/'O' to sync panes, 'J' for favorites, Tab to switch panes
-- **Pattern Filtering**: Use ';' with patterns like `*.py` or `test_*` to focus on specific files
-- **Quick Sorting**: Use number keys 1-4 for instant sorting by name, extension, size, date
-- **Batch Operations**: Select multiple files and use regex patterns for powerful renaming
-
-### Power Features
-- **Archive Workflows**: Create archives (P) and extract (U) between panes
-- **Sub-shell Integration**: Use 'X' to access shell with TFM environment variables
-- **Color Schemes**: Press 't' to switch between Dark and Light themes
-- **External Programs**: Press 'x' to run custom commands and scripts
-- **Advanced Search**: Use 'f' for incremental search, 'F' for filename search, 'G' for content search
-
-## Troubleshooting
-
-### Common Issues
-
-**Terminal Display Problems**
-- Ensure your terminal supports curses
-- Try resizing the terminal window
-- Check terminal color support
-
-**Key Binding Conflicts**
-- Customize key bindings in `~/.tfm/config.py`
-- Check for terminal-specific key mappings
-- Use the help dialog (?) to verify current bindings
-
-**Permission Errors**
-- Ensure write permissions for target directories
-- Check file ownership and permissions
-- Run with appropriate user privileges
-
-**Configuration Issues**
-- Delete `~/.tfm/config.py` to reset to defaults
-- Check configuration syntax in your custom config
-- Refer to `src/_config.py` for template
-
 ### Getting Help
 - Press `?` in TFM for built-in help
 - Check documentation in the `doc/` directory
-- Review test files for usage examples
 
 ## Contributing
-
 TFM welcomes contributions! The project structure makes it easy to add new features:
 
-### Adding Features
-1. Implement in `src/` directory
-2. Add tests in `test/` directory  
-3. Document in `doc/` directory
-4. Update README.md if needed
-
-### Code Style
-- Follow existing patterns and conventions
-- Add comprehensive error handling
-- Include tests for new functionality
-- Document new features thoroughly
-
 ## License
-
 TFM is released under the MIT License. See LICENSE file for details.
-
 
 ---
 

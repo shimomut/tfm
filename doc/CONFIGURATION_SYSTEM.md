@@ -152,10 +152,9 @@ KEY_BINDINGS = {
     'compare_selection': ['w', 'W'],      # Show file comparison options
     
     # Interface Options
-    'file_type_filter': ['T'],             # Show file type filter dialog
-    'toggle_fallback_colors': ['z'],       # Toggle fallback color mode for compatibility
-    'view_options': ['Z'],                 # Show view options menu
-    'settings_menu': ['L'],                # Show settings and configuration menu
+    'toggle_fallback_colors': ['T'],       # Toggle fallback color mode for compatibility
+    'view_options': ['z'],                 # Show view options menu
+    'settings_menu': ['Z'],                # Show settings and configuration menu
 }
 ```
 

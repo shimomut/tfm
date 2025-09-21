@@ -55,10 +55,9 @@ class Config:
         'view_text': ['v', 'V'],              # View text file in built-in viewer
         'edit_file': ['e'],                    # Edit selected file with configured text editor
         'create_file': ['E'],                  # Create new file (prompts for filename)
-        'file_type_filter': ['T'],             # Show file type filter dialog
-        'toggle_fallback_colors': ['z'],       # Toggle fallback color mode for compatibility
-        'view_options': ['Z'],                 # Show view options menu
-        'settings_menu': ['L'],                # Show settings and configuration menu
+        'toggle_fallback_colors': ['T'],       # Toggle fallback color mode for compatibility
+        'view_options': ['z'],                 # Show view options menu
+        'settings_menu': ['Z'],                # Show settings and configuration menu
         'copy_files': ['c', 'C'],             # Copy selected files to other pane
         'move_files': ['m', 'M'],             # Move selected files to other pane
         'delete_files': ['k', 'K'],           # Delete selected files/directories
