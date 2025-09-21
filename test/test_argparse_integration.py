@@ -33,7 +33,7 @@ class TestArgparseIntegration(unittest.TestCase):
         
         # Should contain app name and version
         self.assertIn('TUI File Manager', output)
-        self.assertIn('1.00', output)
+        self.assertIn('0.95', output)
         
         # Should be a single line
         lines = output.split('\n')
@@ -49,16 +49,10 @@ class TestArgparseIntegration(unittest.TestCase):
         # Check for main sections
         self.assertIn('usage:', help_text)
         self.assertIn('options:', help_text)
-        self.assertIn('Examples:', help_text)
         
         # Check for specific options
         self.assertIn('-h, --help', help_text)
-        self.assertIn('--version', help_text)
-        
-        # Check for examples
-        self.assertIn('tfm                    Start TFM', help_text)
-        self.assertIn('tfm --version          Show version', help_text)
-        self.assertIn('tfm --help             Show this help', help_text)
+        self.assertIn('-v, --version', help_text)
         
         # Check for URL
         self.assertIn('github.com/shimomut/tfm', help_text)

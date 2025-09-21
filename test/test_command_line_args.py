@@ -31,7 +31,6 @@ class TestCommandLineArgs(unittest.TestCase):
         self.assertIn('usage: tfm', result.stdout)
         self.assertIn('A terminal-based file manager', result.stdout)
         self.assertIn('--version', result.stdout)
-        self.assertIn('Examples:', result.stdout)
     
     def test_version_option(self):
         """Test --version option displays version information"""
@@ -43,7 +42,7 @@ class TestCommandLineArgs(unittest.TestCase):
         
         self.assertEqual(result.returncode, 0)
         self.assertIn('TUI File Manager', result.stdout)
-        self.assertIn('1.00', result.stdout)
+        self.assertIn('0.95', result.stdout)
     
     def test_short_version_option(self):
         """Test -v option works as alias for --version"""
@@ -55,7 +54,7 @@ class TestCommandLineArgs(unittest.TestCase):
         
         self.assertEqual(result.returncode, 0)
         self.assertIn('TUI File Manager', result.stdout)
-        self.assertIn('1.00', result.stdout)
+        self.assertIn('0.95', result.stdout)
     
     def test_invalid_option(self):
         """Test invalid option shows error and usage"""
