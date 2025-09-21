@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2, KEY_TAB
-from tfm_colors import get_status_color
+from tfm_colors import get_status_color, COLOR_ERROR
 
 
 class BatchRenameDialog:
@@ -353,25 +353,13 @@ class BatchRenameDialog:
                         status_color = get_status_color() | curses.A_DIM
                     elif conflict:
                         status = "CONFLICT!"
-                        status_color = get_status_color() | curses.A_BOLD
-                        try:
-                            status_color |= curses.color_pair(1)  # Red if available
-                        except:
-                            pass
+                        status_color = curses.color_pair(COLOR_ERROR) | curses.A_BOLD
                     elif not valid:
                         status = "INVALID!"
-                        status_color = get_status_color() | curses.A_BOLD
-                        try:
-                            status_color |= curses.color_pair(1)  # Red if available
-                        except:
-                            pass
+                        status_color = curses.color_pair(COLOR_ERROR) | curses.A_BOLD
                     else:
                         status = "OK"
                         status_color = get_status_color()
-                        try:
-                            status_color |= curses.color_pair(2)  # Green if available
-                        except:
-                            pass
                     
                     # Create preview line
                     max_name_width = (content_width - 20) // 2
