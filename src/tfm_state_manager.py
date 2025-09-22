@@ -606,9 +606,9 @@ class TFMStateManager(StateManager):
         
         return self.save_search_history(history, max_count)
     
-    def save_pane_position(self, pane_name: str, directory_path: str, filename: str, max_entries: Optional[int] = None) -> bool:
+    def save_pane_cursor_position(self, pane_name: str, directory_path: str, filename: str, max_entries: Optional[int] = None) -> bool:
         """
-        Save position for a specific pane and directory path.
+        Save cursor position for a specific pane and directory path.
         
         Args:
             pane_name: Name of the pane ('left' or 'right')
@@ -658,9 +658,9 @@ class TFMStateManager(StateManager):
             print(f"Warning: Could not save position for {pane_name} pane: {e}")
             return False
     
-    def load_pane_position(self, pane_name: str, directory_path: str) -> Optional[str]:
+    def load_pane_cursor_position(self, pane_name: str, directory_path: str) -> Optional[str]:
         """
-        Load position for a specific pane and directory path.
+        Load cursor position for a specific pane and directory path.
         
         Args:
             pane_name: Name of the pane ('left' or 'right')

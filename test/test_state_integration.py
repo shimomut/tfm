@@ -85,8 +85,8 @@ def test_state_manager_integration():
         
         # Test multiple cursor positions for different panes
         assert state_manager.save_pane_cursor_position('right', '/another/path', 'another_file.py')
-        left_cursors = state_manager.get_pane_cursor_positions('left')
-        right_cursors = state_manager.get_pane_cursor_positions('right')
+        left_cursors = state_manager.get_pane_positions('left')
+        right_cursors = state_manager.get_pane_positions('right')
         assert '/test/path' in left_cursors
         assert '/another/path' in right_cursors
         assert left_cursors['/test/path'] == 'cursor_file.txt'

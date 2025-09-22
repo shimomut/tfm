@@ -414,8 +414,8 @@ def test_quit_saving_separate_pane_histories():
         saved_positions = fm.save_application_state()
         
         # Verify separate histories
-        left_history = state_manager.get_pane_cursor_positions('left')
-        right_history = state_manager.get_pane_cursor_positions('right')
+        left_history = state_manager.get_pane_positions('left')
+        right_history = state_manager.get_pane_positions('right')
         
         assert str(left_dir) in left_history
         assert str(right_dir) in right_history

@@ -63,13 +63,13 @@ def test_separate_pane_histories_basic():
             print(f"  {i+1}. {path} -> {filename}")
         
         # Verify left pane history
-        left_history = state_manager.get_ordered_pane_cursor_history('left')
+        left_history = state_manager.get_ordered_pane_history('left')
         left_paths = [entry['path'] for entry in left_history]
         expected_left_paths = [path for path, _ in left_entries]
         assert left_paths == expected_left_paths
         
         # Verify right pane history
-        right_history = state_manager.get_ordered_pane_cursor_history('right')
+        right_history = state_manager.get_ordered_pane_history('right')
         right_paths = [entry['path'] for entry in right_history]
         expected_right_paths = [path for path, _ in right_entries]
         assert right_paths == expected_right_paths
@@ -203,8 +203,8 @@ def test_pane_manager_integration_separate():
             print(f"  ✓ {directory} -> {restored_file} (index {expected_file_index})")
         
         # Verify histories are separate
-        left_history = state_manager.get_ordered_pane_cursor_history('left')
-        right_history = state_manager.get_ordered_pane_cursor_history('right')
+        left_history = state_manager.get_ordered_pane_history('left')
+        right_history = state_manager.get_ordered_pane_history('right')
         
         left_paths = [entry['path'] for entry in left_history]
         right_paths = [entry['path'] for entry in right_history]
@@ -256,7 +256,7 @@ def test_pane_history_size_limits():
             time.sleep(0.01)
         
         # Check left pane history size
-        left_history = state_manager.get_ordered_pane_cursor_history('left')
+        left_history = state_manager.get_ordered_pane_history('left')
         assert len(left_history) == max_entries
         
         # Should contain the last 3 entries (paths 2, 3, 4)
@@ -265,7 +265,7 @@ def test_pane_history_size_limits():
         assert left_paths == expected_left
         
         # Check right pane history size
-        right_history = state_manager.get_ordered_pane_cursor_history('right')
+        right_history = state_manager.get_ordered_pane_history('right')
         assert len(right_history) == max_entries
         
         # Should contain the last 3 entries (paths 1, 2, 3)
@@ -317,8 +317,8 @@ def test_pane_history_persistence():
             time.sleep(0.01)
         
         # Get histories from session 1
-        left_history1 = state_manager1.get_ordered_pane_cursor_history('left')
-        right_history1 = state_manager1.get_ordered_pane_cursor_history('right')
+        left_history1 = state_manager1.get_ordered_pane_history('left')
+        right_history1 = state_manager1.get_ordered_pane_history('right')
         
         # Clean up session 1
         state_manager1.cleanup_session()
@@ -330,8 +330,8 @@ def test_pane_history_persistence():
         state_manager2.db_path = db_path
         
         # Load histories from session 2
-        left_history2 = state_manager2.get_ordered_pane_cursor_history('left')
-        right_history2 = state_manager2.get_ordered_pane_cursor_history('right')
+        left_history2 = state_manager2.get_ordered_pane_history('left')
+        right_history2 = state_manager2.get_ordered_pane_history('right')
         
         # Verify left pane history persisted
         left_paths1 = [entry['path'] for entry in left_history1]
@@ -377,20 +377,20 @@ def test_clear_individual_pane_histories():
         state_manager.save_pane_cursor_position('right', '/right/path2', 'right_file2.txt')
         
         # Verify both panes have entries
-        left_history = state_manager.get_ordered_pane_cursor_history('left')
-        right_history = state_manager.get_ordered_pane_cursor_history('right')
+        left_history = state_manager.get_ordered_pane_history('left')
+        right_history = state_manager.get_ordered_pane_history('right')
         
         assert len(left_history) == 2
         assert len(right_history) == 2
         print("✓ Both panes have entries")
         
         # Clear only left pane
-        success = state_manager.clear_pane_cursor_history('left')
+        success = state_manager.clear_pane_history('left')
         assert success
         
         # Verify left pane is cleared but right pane is intact
-        left_history_after = state_manager.get_ordered_pane_cursor_history('left')
-        right_history_after = state_manager.get_ordered_pane_cursor_history('right')
+        left_history_after = state_manager.get_ordered_pane_history('left')
+        right_history_after = state_manager.get_ordered_pane_history('right')
         
         assert len(left_history_after) == 0
         assert len(right_history_after) == 2
@@ -398,11 +398,11 @@ def test_clear_individual_pane_histories():
         print("✓ Left pane cleared, right pane intact")
         
         # Clear right pane
-        success = state_manager.clear_pane_cursor_history('right')
+        success = state_manager.clear_pane_history('right')
         assert success
         
         # Verify right pane is now cleared
-        right_history_final = state_manager.get_ordered_pane_cursor_history('right')
+        right_history_final = state_manager.get_ordered_pane_history('right')
         assert len(right_history_final) == 0
         
         print("✓ Right pane cleared")

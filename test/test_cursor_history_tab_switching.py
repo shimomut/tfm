@@ -64,8 +64,8 @@ def test_cursor_history_tab_switching():
             time.sleep(0.01)
         
         # Test that histories are separate
-        left_history = state_manager.get_ordered_pane_cursor_history('left')
-        right_history = state_manager.get_ordered_pane_cursor_history('right')
+        left_history = state_manager.get_ordered_pane_history('left')
+        right_history = state_manager.get_ordered_pane_history('right')
         
         assert len(left_history) == 3, f"Expected 3 left history entries, got {len(left_history)}"
         assert len(right_history) == 3, f"Expected 3 right history entries, got {len(right_history)}"
@@ -134,7 +134,7 @@ def test_cursor_history_tab_switching():
             
             def _show_cursor_history_for_pane(self, pane_name):
                 # Copy the implementation from TFMMain
-                history = self.state_manager.get_ordered_pane_cursor_history(pane_name)
+                history = self.state_manager.get_ordered_pane_history(pane_name)
                 
                 history_paths = []
                 seen_paths = set()
@@ -213,7 +213,7 @@ def test_cursor_history_tab_switching():
         
         # Test with empty history
         print("\nTesting with empty history:")
-        state_manager.clear_pane_cursor_history('left')
+        state_manager.clear_pane_history('left')
         mock_tfm._show_cursor_history_for_pane('left')
         
         assert len(mock_tfm.list_dialog.items) == 1

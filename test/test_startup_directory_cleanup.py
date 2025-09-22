@@ -119,8 +119,8 @@ def test_startup_directory_cleanup():
         fm.state_manager.save_pane_state('right', {'path': str(existing_dir2)})
         
         # Verify all entries exist in history before cleanup
-        left_history_before = fm.state_manager.get_pane_cursor_positions("left")
-        right_history_before = fm.state_manager.get_pane_cursor_positions("right")
+        left_history_before = fm.state_manager.get_pane_positions("left")
+        right_history_before = fm.state_manager.get_pane_positions("right")
         
         print(f"Before startup - Left history: {len(left_history_before)} entries")
         print(f"Before startup - Right history: {len(right_history_before)} entries")
@@ -137,8 +137,8 @@ def test_startup_directory_cleanup():
         fm.load_application_state()
         
         # Verify cleanup occurred
-        left_history_after = fm.state_manager.get_pane_cursor_positions("left")
-        right_history_after = fm.state_manager.get_pane_cursor_positions("right")
+        left_history_after = fm.state_manager.get_pane_positions("left")
+        right_history_after = fm.state_manager.get_pane_positions("right")
         
         print(f"\nAfter startup - Left history: {len(left_history_after)} entries")
         print(f"After startup - Right history: {len(right_history_after)} entries")
@@ -182,8 +182,8 @@ def test_startup_with_no_cleanup_needed():
         fm.state_manager.save_pane_cursor_position("right", str(existing_dir1), "file3.txt")
         
         # Verify entries before startup
-        left_history_before = fm.state_manager.get_pane_cursor_positions("left")
-        right_history_before = fm.state_manager.get_pane_cursor_positions("right")
+        left_history_before = fm.state_manager.get_pane_positions("left")
+        right_history_before = fm.state_manager.get_pane_positions("right")
         
         assert len(left_history_before) == 2
         assert len(right_history_before) == 1
@@ -193,8 +193,8 @@ def test_startup_with_no_cleanup_needed():
         fm.load_application_state()
         
         # Verify no entries were removed
-        left_history_after = fm.state_manager.get_pane_cursor_positions("left")
-        right_history_after = fm.state_manager.get_pane_cursor_positions("right")
+        left_history_after = fm.state_manager.get_pane_positions("left")
+        right_history_after = fm.state_manager.get_pane_positions("right")
         
         assert len(left_history_after) == 2
         assert len(right_history_after) == 1

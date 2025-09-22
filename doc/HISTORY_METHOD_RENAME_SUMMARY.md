@@ -102,8 +102,8 @@ Comprehensive tests verify:
 
 ### Additional Changes Made
 - **State Manager Methods**: 
-  - `save_pane_cursor_position()` → `save_pane_position()`
-  - `load_pane_cursor_position()` → `load_pane_position()`
+  - `save_pane_cursor_position()` → **kept original name**
+  - `load_pane_cursor_position()` → **kept original name**
   - `get_pane_cursor_positions()` → `get_pane_positions()`
   - `get_ordered_pane_cursor_history()` → `get_ordered_pane_history()`
   - `clear_pane_cursor_history()` → `clear_pane_history()`

@@ -76,8 +76,8 @@ def test_real_startup_cleanup():
         state_manager.save_window_layout(0.5, 0.25)
         
         # Verify initial state
-        left_history_before = state_manager.get_pane_cursor_positions("left")
-        right_history_before = state_manager.get_pane_cursor_positions("right")
+        left_history_before = state_manager.get_pane_positions("left")
+        right_history_before = state_manager.get_pane_positions("right")
         
         print(f"Initial cursor history - Left: {len(left_history_before)}, Right: {len(right_history_before)}")
         assert len(left_history_before) == 4
@@ -95,8 +95,8 @@ def test_real_startup_cleanup():
         assert cleanup_result, "Cleanup should succeed"
         
         # Verify cleanup worked
-        left_history_after = state_manager.get_pane_cursor_positions("left")
-        right_history_after = state_manager.get_pane_cursor_positions("right")
+        left_history_after = state_manager.get_pane_positions("left")
+        right_history_after = state_manager.get_pane_positions("right")
         
         print(f"After cleanup - Left: {len(left_history_after)}, Right: {len(right_history_after)}")
         

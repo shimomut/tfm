@@ -65,7 +65,7 @@ class MockFileManager:
         pane_name = 'left' if current_pane is self.pane_manager.left_pane else 'right'
         
         # Get cursor history for the current pane
-        history = self.state_manager.get_ordered_pane_cursor_history(pane_name)
+        history = self.state_manager.get_ordered_pane_history(pane_name)
         
         if not history:
             print(f"No cursor history available for {pane_name} pane")
