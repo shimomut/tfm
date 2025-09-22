@@ -3739,6 +3739,9 @@ class FileManager:
             self.state_manager.save_pane_state('left', self.pane_manager.left_pane)
             self.state_manager.save_pane_state('right', self.pane_manager.right_pane)
             
+            # Save current cursor positions before quitting
+            self.save_quit_cursor_positions()
+            
             # Add current directories to recent directories
             left_path = str(self.pane_manager.left_pane['path'])
             right_path = str(self.pane_manager.right_pane['path'])
@@ -3754,6 +3757,32 @@ class FileManager:
             
         except Exception as e:
             print(f"Warning: Could not save application state: {e}")
+    
+    def save_quit_cursor_positions(self):
+        """Save current cursor positions when quitting TFM."""
+        try:
+            # Save left pane cursor position
+            if (self.pane_manager.left_pane['files'] and 
+                self.pane_manager.left_pane['selected_index'] < len(self.pane_manager.left_pane['files'])):
+                
+                self.pane_manager.save_cursor_position(self.pane_manager.left_pane)
+                
+                left_path = self.pane_manager.left_pane['path']
+                selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['selected_index']].name
+                print(f"Saved left pane cursor position: {left_path} -> {selected_file}")
+            
+            # Save right pane cursor position
+            if (self.pane_manager.right_pane['files'] and 
+                self.pane_manager.right_pane['selected_index'] < len(self.pane_manager.right_pane['files'])):
+                
+                self.pane_manager.save_cursor_position(self.pane_manager.right_pane)
+                
+                right_path = self.pane_manager.right_pane['path']
+                selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['selected_index']].name
+                print(f"Saved right pane cursor position: {right_path} -> {selected_file}")
+                
+        except Exception as e:
+            print(f"Warning: Could not save cursor positions on quit: {e}")
     
     def get_recent_directories(self):
         """Get list of recent directories for quick navigation."""

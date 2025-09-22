@@ -200,6 +200,9 @@ def save_application_state(self):
     self.state_manager.save_pane_state('left', self.pane_manager.left_pane)
     self.state_manager.save_pane_state('right', self.pane_manager.right_pane)
     
+    # Save current cursor positions before quitting
+    self.save_quit_cursor_positions()
+    
     # Add current directories to recent directories
     self.state_manager.add_recent_directory(str(self.pane_manager.left_pane['path']))
     self.state_manager.add_recent_directory(str(self.pane_manager.right_pane['path']))
@@ -274,6 +277,26 @@ def restore_startup_cursor_positions(self):
         self.needs_full_redraw = True
 ```
 
+#### Quit Cursor Saving
+
+Cursor positions are automatically saved when TFM quits:
+
+```python
+def save_quit_cursor_positions(self):
+    """Save current cursor positions when quitting TFM."""
+    # Save left pane cursor position
+    if (self.pane_manager.left_pane['files'] and 
+        self.pane_manager.left_pane['selected_index'] < len(self.pane_manager.left_pane['files'])):
+        
+        self.pane_manager.save_cursor_position(self.pane_manager.left_pane)
+    
+    # Save right pane cursor position  
+    if (self.pane_manager.right_pane['files'] and 
+        self.pane_manager.right_pane['selected_index'] < len(self.pane_manager.right_pane['files'])):
+        
+        self.pane_manager.save_cursor_position(self.pane_manager.right_pane)
+```
+
 #### Separate Pane Cursor History Features
 
 - **Independent Histories**: Left and right panes maintain completely separate cursor histories
@@ -283,6 +306,7 @@ def restore_startup_cursor_positions(self):
 - **LRU Behavior**: Oldest entries are automatically removed when limit is exceeded per pane
 - **No Cross-Contamination**: Navigation in one pane never affects the other pane's history
 - **Startup Restoration**: Cursor positions are automatically restored when TFM starts up
+- **Quit Saving**: Cursor positions are automatically saved when TFM quits
 - **Backward Compatibility**: Automatically converts old dictionary format to new ordered format
 
 ## Multi-Instance Safety
