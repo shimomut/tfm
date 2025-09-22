@@ -27,14 +27,16 @@ class ListDialog:
         self.scroll = 0  # Scroll offset for the list
         self.search_editor = SingleLineTextEdit()  # Search editor for list dialog
         self.callback = None  # Callback function when item is selected
+        self.custom_key_handler = None  # Custom key handler function
         
-    def show(self, title, items, callback):
+    def show(self, title, items, callback, custom_key_handler=None):
         """Show a searchable list dialog
         
         Args:
             title: The title to display at the top of the dialog
             items: List of items to choose from (strings or objects with __str__ method)
             callback: Function to call with the selected item (or None if cancelled)
+            custom_key_handler: Optional function to handle custom keys (key) -> bool
         """
         self.mode = True
         self.title = title
@@ -44,6 +46,7 @@ class ListDialog:
         self.scroll = 0
         self.search_editor.clear()
         self.callback = callback
+        self.custom_key_handler = custom_key_handler
         
     def exit(self):
         """Exit list dialog mode"""
@@ -55,9 +58,14 @@ class ListDialog:
         self.scroll = 0
         self.search_editor.clear()
         self.callback = None
+        self.custom_key_handler = None
         
     def handle_input(self, key):
         """Handle input while in list dialog mode"""
+        # Check custom key handler first
+        if self.custom_key_handler and self.custom_key_handler(key):
+            return True
+            
         if key == 27:  # ESC - cancel
             # Store callback before exiting
             callback = self.callback

@@ -1476,40 +1476,55 @@ class FileManager:
         self._force_immediate_redraw()
     
     def show_cursor_history(self):
-        """Show cursor history for the current pane using the searchable list dialog"""
+        """Show cursor history with TAB switching between left and right pane histories"""
         current_pane = self.get_current_pane()
-        pane_name = 'left' if current_pane is self.pane_manager.left_pane else 'right'
+        initial_pane_name = 'left' if current_pane is self.pane_manager.left_pane else 'right'
         
-        # Get cursor history for the current pane
+        # Start with the current pane's history
+        self._show_cursor_history_for_pane(initial_pane_name)
+    
+    def _show_cursor_history_for_pane(self, pane_name):
+        """Show cursor history for a specific pane with TAB switching support"""
+        # Get cursor history for the specified pane
         history = self.state_manager.get_ordered_pane_cursor_history(pane_name)
-        
-        if not history:
-            print(f"No cursor history available for {pane_name} pane")
-            return
         
         # Extract just the paths (no timestamps or filenames needed in dialog)
         history_paths = []
         seen_paths = set()
         
-        # Reverse to show most recent first, and deduplicate
-        for entry in reversed(history):
-            path = entry['path']
-            if path not in seen_paths:
-                history_paths.append(path)
-                seen_paths.add(path)
+        if history:
+            # Reverse to show most recent first, and deduplicate
+            for entry in reversed(history):
+                path = entry['path']
+                if path not in seen_paths:
+                    history_paths.append(path)
+                    seen_paths.add(path)
         
+        # If no history, show empty list with message
         if not history_paths:
-            print(f"No cursor history available for {pane_name} pane")
-            return
+            history_paths = [f"No history available for {pane_name} pane"]
         
         # Create callback function to handle selection
         def on_history_selected(selected_path):
-            if selected_path:
+            if selected_path and not selected_path.startswith("No history available"):
                 self.navigate_to_history_path(selected_path)
         
-        # Show the list dialog
-        title = f"History - {pane_name.title()}"
-        self.list_dialog.show(title, history_paths, on_history_selected)
+        # Create custom key handler for TAB switching
+        def handle_custom_keys(key):
+            if key == 9:  # TAB key
+                # Switch to the other pane's history
+                other_pane = 'right' if pane_name == 'left' else 'left'
+                # Exit current dialog and show the other pane's history
+                self.list_dialog.exit()
+                self._show_cursor_history_for_pane(other_pane)
+                self.needs_full_redraw = True
+                self._force_immediate_redraw()
+                return True
+            return False
+        
+        # Show the list dialog with TAB switching support
+        title = f"History - {pane_name.title()} (TAB: Switch to {('Right' if pane_name == 'left' else 'Left')})"
+        self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     

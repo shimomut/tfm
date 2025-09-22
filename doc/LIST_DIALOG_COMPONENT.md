@@ -26,17 +26,24 @@ The List Dialog Component provides a searchable, selectable list interface for T
 ```python
 class ListDialog:
     def __init__(self, config)
-    def show(self, title, items, callback)
+    def show(self, title, items, callback, custom_key_handler=None)
     def handle_input(self, key)
     def draw(self, stdscr, safe_addstr_func)
     def exit()
 ```
 
 ### Key Methods
-- **`show(title, items, callback)`**: Display list with title and selection callback
+- **`show(title, items, callback, custom_key_handler=None)`**: Display list with title, selection callback, and optional custom key handler
 - **`handle_input(key)`**: Process keyboard input for navigation and search
 - **`draw(stdscr, safe_addstr_func)`**: Render the dialog
 - **`exit()`**: Close the dialog and return to main interface
+
+### Custom Key Handler
+The `custom_key_handler` parameter allows dialogs to handle special keys:
+- **Function signature**: `custom_key_handler(key) -> bool`
+- **Return True**: Key was handled, stop further processing
+- **Return False**: Key not handled, continue with default processing
+- **Use cases**: TAB switching, special navigation, custom shortcuts
 
 ## Usage Examples
 
@@ -77,6 +84,27 @@ def program_callback(program_name):
 list_dialog.show("External Programs", programs, program_callback)
 ```
 
+### Custom Key Handler Example (Cursor History TAB Switching)
+```python
+def show_cursor_history_with_tab_switching(pane_name):
+    history_paths = get_pane_history(pane_name)
+    
+    def on_history_selected(selected_path):
+        navigate_to_path(selected_path)
+    
+    def handle_custom_keys(key):
+        if key == 9:  # TAB key
+            # Switch to other pane's history
+            other_pane = 'right' if pane_name == 'left' else 'left'
+            list_dialog.exit()
+            show_cursor_history_with_tab_switching(other_pane)
+            return True
+        return False
+    
+    title = f"History - {pane_name.title()} (TAB: Switch to {'Right' if pane_name == 'left' else 'Left'})"
+    list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys)
+```
+
 ## Navigation Controls
 
 ### Keyboard Shortcuts
@@ -85,6 +113,7 @@ list_dialog.show("External Programs", programs, program_callback)
 - **Home/End**: Jump to first/last item in list
 - **Enter**: Select current item and execute callback
 - **ESC**: Cancel selection and close dialog
+- **TAB**: Custom key handling (e.g., switch between pane histories)
 - **Printable Characters**: Add to search term for filtering
 
 ### Search Controls
