@@ -39,6 +39,7 @@ from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
 from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
+from tfm_state_manager import get_state_manager, cleanup_state_manager
 
 class FileManager:
     def __init__(self, stdscr):
@@ -62,6 +63,7 @@ class FileManager:
         self.general_dialog = GeneralPurposeDialog(self.config)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
         self.progress_manager = ProgressManager()
+        self.state_manager = get_state_manager()
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -94,6 +96,9 @@ class FileManager:
         
         # Track startup time for delayed redraw
         self.startup_time = time.time()
+        
+        # Load saved state
+        self.load_application_state()
         
     def safe_addstr(self, y, x, text, attr=curses.A_NORMAL):
         """Safely add string to screen, handling boundary conditions"""
@@ -3281,6 +3286,12 @@ class FileManager:
             elif action == 'navigate':
                 if data:
                     self._navigate_to_search_result(data)
+                    
+                # Save search term to history if it's not empty
+                search_term = self.search_dialog.pattern_editor.text.strip()
+                if search_term:
+                    self.add_search_to_history(search_term)
+                    
                 self.exit_search_dialog_mode()
                 return True
         
@@ -3638,6 +3649,99 @@ class FileManager:
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
+        
+        # Save application state before exiting
+        self.save_application_state()
+    
+    def load_application_state(self):
+        """Load saved application state from persistent storage."""
+        try:
+            # Update session heartbeat
+            self.state_manager.update_session_heartbeat()
+            
+            # Load window layout
+            layout = self.state_manager.load_window_layout()
+            if layout:
+                self.pane_manager.left_pane_ratio = layout.get('left_pane_ratio', 0.5)
+                self.log_height_ratio = layout.get('log_height_ratio', 0.25)
+                print(f"Restored window layout: panes {int(self.pane_manager.left_pane_ratio*100)}%/{int((1-self.pane_manager.left_pane_ratio)*100)}%, log {int(self.log_height_ratio*100)}%")
+            
+            # Load pane states
+            left_state = self.state_manager.load_pane_state('left')
+            if left_state and Path(left_state['path']).exists():
+                # Only restore if the directory still exists
+                self.pane_manager.left_pane['path'] = Path(left_state['path'])
+                self.pane_manager.left_pane['sort_mode'] = left_state.get('sort_mode', 'name')
+                self.pane_manager.left_pane['sort_reverse'] = left_state.get('sort_reverse', False)
+                self.pane_manager.left_pane['filter_pattern'] = left_state.get('filter_pattern', '')
+                print(f"Restored left pane: {left_state['path']}")
+            
+            right_state = self.state_manager.load_pane_state('right')
+            if right_state and Path(right_state['path']).exists():
+                # Only restore if the directory still exists
+                self.pane_manager.right_pane['path'] = Path(right_state['path'])
+                self.pane_manager.right_pane['sort_mode'] = right_state.get('sort_mode', 'name')
+                self.pane_manager.right_pane['sort_reverse'] = right_state.get('sort_reverse', False)
+                self.pane_manager.right_pane['filter_pattern'] = right_state.get('filter_pattern', '')
+                print(f"Restored right pane: {right_state['path']}")
+            
+            # Refresh file lists after loading state
+            self.refresh_files()
+            
+        except Exception as e:
+            print(f"Warning: Could not load application state: {e}")
+    
+    def save_application_state(self):
+        """Save current application state to persistent storage."""
+        try:
+            # Save window layout
+            self.state_manager.save_window_layout(
+                self.pane_manager.left_pane_ratio,
+                self.log_height_ratio
+            )
+            
+            # Save pane states
+            self.state_manager.save_pane_state('left', self.pane_manager.left_pane)
+            self.state_manager.save_pane_state('right', self.pane_manager.right_pane)
+            
+            # Add current directories to recent directories
+            left_path = str(self.pane_manager.left_pane['path'])
+            right_path = str(self.pane_manager.right_pane['path'])
+            
+            self.state_manager.add_recent_directory(left_path)
+            if left_path != right_path:  # Don't add duplicate
+                self.state_manager.add_recent_directory(right_path)
+            
+            # Clean up session
+            self.state_manager.cleanup_session()
+            
+            print("Application state saved")
+            
+        except Exception as e:
+            print(f"Warning: Could not save application state: {e}")
+    
+    def get_recent_directories(self):
+        """Get list of recent directories for quick navigation."""
+        try:
+            return self.state_manager.load_recent_directories()
+        except Exception as e:
+            print(f"Warning: Could not load recent directories: {e}")
+            return []
+    
+    def add_search_to_history(self, search_term):
+        """Add a search term to the search history."""
+        try:
+            self.state_manager.add_search_term(search_term)
+        except Exception as e:
+            print(f"Warning: Could not save search term: {e}")
+    
+    def get_search_history(self):
+        """Get search history for auto-completion."""
+        try:
+            return self.state_manager.load_search_history()
+        except Exception as e:
+            print(f"Warning: Could not load search history: {e}")
+            return []
 
 def main(stdscr):
     """Main function to run the file manager"""
@@ -3666,6 +3770,9 @@ def main(stdscr):
         # Always restore stdout/stderr in case of any exit path
         if fm is not None:
             fm.restore_stdio()
+        
+        # Clean up state manager
+        cleanup_state_manager()
 
 if __name__ == "__main__":
     curses.wrapper(main)
