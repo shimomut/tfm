@@ -52,8 +52,8 @@ def test_cursor_history_persistence():
         pane_manager.save_cursor_position(pane_manager.left_pane)
         print(f"✓ Saved cursor position for {test_dir} at file2.py")
         
-        # Verify it was saved to state manager
-        saved_filename = state_manager.load_path_cursor_position(str(test_dir))
+        # Verify it was saved to state manager (test with left pane)
+        saved_filename = state_manager.load_pane_cursor_position('left', str(test_dir))
         assert saved_filename == "file2.py"
         print("✓ Cursor position correctly saved to state manager")
         
@@ -87,13 +87,18 @@ def test_cursor_history_persistence():
         pane_manager.save_cursor_position(pane_manager.right_pane)
         print(f"✓ Saved cursor position for {test_dir2} at gamma.log")
         
-        # Verify both positions are saved
-        cursor_positions = state_manager.get_all_path_cursor_positions()
-        assert str(test_dir) in cursor_positions
-        assert str(test_dir2) in cursor_positions
-        assert cursor_positions[str(test_dir)] == "file2.py"
-        assert cursor_positions[str(test_dir2)] == "gamma.log"
-        print("✓ Multiple cursor positions saved correctly")
+        # Verify both positions are saved in their respective panes
+        left_positions = state_manager.get_pane_cursor_positions('left')
+        right_positions = state_manager.get_pane_cursor_positions('right')
+        assert str(test_dir) in left_positions
+        assert str(test_dir2) in right_positions
+        assert left_positions[str(test_dir)] == "file2.py"
+        assert right_positions[str(test_dir2)] == "gamma.log"
+        
+        # Verify separation - each pane should only have its own entries
+        assert str(test_dir2) not in left_positions
+        assert str(test_dir) not in right_positions
+        print("✓ Multiple cursor positions saved correctly in separate panes")
         
         # Clean up
         state_manager.cleanup_session()
@@ -152,8 +157,8 @@ def test_cursor_history_with_missing_files():
         for filename in initial_files:
             (test_dir / filename).touch()
         
-        # Save cursor position at file2.py
-        state_manager.save_path_cursor_position(str(test_dir), "file2.py")
+        # Save cursor position at file2.py (test with left pane)
+        state_manager.save_pane_cursor_position('left', str(test_dir), "file2.py")
         
         # Simulate file being deleted
         (test_dir / "file2.py").unlink()
@@ -190,14 +195,14 @@ def test_cursor_history_size_limit():
         state_manager.db_path = db_path
         state_manager._initialize_database()
         
-        # Add more than 100 directories to test size limit
+        # Add more than 100 directories to test size limit (test with left pane)
         for i in range(105):
             dir_path = f"/test/directory/{i}"
             filename = f"file_{i}.txt"
-            state_manager.save_path_cursor_position(dir_path, filename)
+            state_manager.save_pane_cursor_position('left', dir_path, filename)
         
         # Check that only 100 entries are kept
-        cursor_positions = state_manager.get_all_path_cursor_positions()
+        cursor_positions = state_manager.get_pane_cursor_positions('left')
         assert len(cursor_positions) <= 100
         print(f"✓ Cursor history size limited to {len(cursor_positions)} entries")
         
@@ -223,32 +228,43 @@ def test_state_manager_convenience_methods():
         state_manager.db_path = db_path
         state_manager._initialize_database()
         
-        # Test save_path_cursor_position
-        assert state_manager.save_path_cursor_position("/test/path1", "file1.txt")
-        assert state_manager.save_path_cursor_position("/test/path2", "file2.py")
+        # Test pane-specific cursor position methods
+        assert state_manager.save_pane_cursor_position('left', "/test/path1", "file1.txt")
+        assert state_manager.save_pane_cursor_position('right', "/test/path2", "file2.py")
         
-        # Test load_path_cursor_position
-        filename1 = state_manager.load_path_cursor_position("/test/path1")
-        filename2 = state_manager.load_path_cursor_position("/test/path2")
+        # Test load_pane_cursor_position
+        filename1 = state_manager.load_pane_cursor_position('left', "/test/path1")
+        filename2 = state_manager.load_pane_cursor_position('right', "/test/path2")
         
         assert filename1 == "file1.txt"
         assert filename2 == "file2.py"
         
         # Test non-existent path
-        filename3 = state_manager.load_path_cursor_position("/nonexistent/path")
+        filename3 = state_manager.load_pane_cursor_position('left', "/nonexistent/path")
         assert filename3 is None
         
-        # Test get_all_path_cursor_positions
-        all_positions = state_manager.get_all_path_cursor_positions()
-        assert "/test/path1" in all_positions
-        assert "/test/path2" in all_positions
-        assert all_positions["/test/path1"] == "file1.txt"
-        assert all_positions["/test/path2"] == "file2.py"
+        # Test cross-pane queries (should return None)
+        filename4 = state_manager.load_pane_cursor_position('right', "/test/path1")  # Left path in right pane
+        assert filename4 is None
         
-        # Test clear_path_cursor_history
-        assert state_manager.clear_path_cursor_history()
-        all_positions_after_clear = state_manager.get_all_path_cursor_positions()
-        assert len(all_positions_after_clear) == 0
+        # Test get_pane_cursor_positions
+        left_positions = state_manager.get_pane_cursor_positions('left')
+        right_positions = state_manager.get_pane_cursor_positions('right')
+        assert "/test/path1" in left_positions
+        assert "/test/path2" in right_positions
+        assert left_positions["/test/path1"] == "file1.txt"
+        assert right_positions["/test/path2"] == "file2.py"
+        
+        # Verify separation
+        assert "/test/path2" not in left_positions
+        assert "/test/path1" not in right_positions
+        
+        # Test clear_pane_cursor_history
+        assert state_manager.clear_pane_cursor_history('left')
+        left_positions_after_clear = state_manager.get_pane_cursor_positions('left')
+        right_positions_after_clear = state_manager.get_pane_cursor_positions('right')
+        assert len(left_positions_after_clear) == 0
+        assert len(right_positions_after_clear) == 1  # Right pane should still have its entry
         
         print("✓ All convenience methods work correctly")
         

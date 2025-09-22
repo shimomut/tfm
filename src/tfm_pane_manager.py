@@ -66,11 +66,14 @@ class PaneManager:
         if not self.state_manager:
             return
         
+        # Determine which pane this is
+        pane_name = 'left' if pane_data is self.left_pane else 'right'
+        
         # Get max entries from config
         max_entries = getattr(self.config, 'MAX_CURSOR_HISTORY_ENTRIES', 100)
         
-        # Use the StateManager's method which handles ordering and limits
-        self.state_manager.save_path_cursor_position(current_dir, current_file.name, max_entries)
+        # Use the StateManager's method with pane-specific key
+        self.state_manager.save_pane_cursor_position(pane_name, current_dir, current_file.name, max_entries)
     
     def restore_cursor_position(self, pane_data, display_height):
         """Restore cursor position from persistent history when changing to a directory"""
@@ -80,8 +83,11 @@ class PaneManager:
         if not self.state_manager:
             return False
         
-        # Use the StateManager's method to load cursor position
-        target_filename = self.state_manager.load_path_cursor_position(current_dir)
+        # Determine which pane this is
+        pane_name = 'left' if pane_data is self.left_pane else 'right'
+        
+        # Use the StateManager's method to load cursor position for this specific pane
+        target_filename = self.state_manager.load_pane_cursor_position(pane_name, current_dir)
         
         if target_filename:
             # Try to find this filename in current files

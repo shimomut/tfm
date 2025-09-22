@@ -19,7 +19,7 @@ The TFM State Manager provides persistent application state management using SQL
 - **Window Layout**: Pane width ratios, log pane height
 - **Recent Directories**: History of visited directories for quick navigation
 - **Search History**: Previously used search terms for auto-completion
-- **Path Cursor History**: Cursor positions for each visited directory path
+- **Path Cursor History**: Separate cursor positions for left and right panes
 - **Session Information**: Active TFM instances with heartbeat tracking
 
 ## Architecture
@@ -124,12 +124,12 @@ recent_dirs = state_manager.load_recent_directories()
 state_manager.add_search_term('*.py')
 search_history = state_manager.load_search_history()
 
-# Path cursor history
-state_manager.save_path_cursor_position('/home/user/projects', 'main.py')
-cursor_filename = state_manager.load_path_cursor_position('/home/user/projects')
-all_cursor_positions = state_manager.get_all_path_cursor_positions()
-ordered_history = state_manager.get_ordered_path_cursor_history()  # Chronological order
-state_manager.clear_path_cursor_history()  # Clear all cursor positions
+# Pane-specific cursor history
+state_manager.save_pane_cursor_position('left', '/home/user/projects', 'main.py')
+cursor_filename = state_manager.load_pane_cursor_position('left', '/home/user/projects')
+left_positions = state_manager.get_pane_cursor_positions('left')
+left_history = state_manager.get_ordered_pane_cursor_history('left')  # Chronological order
+state_manager.clear_pane_cursor_history('left')  # Clear left pane cursor history
 ```
 
 ### Session Management
@@ -244,12 +244,14 @@ def restore_cursor_position(self, pane_data, display_height):
             # ... find and restore cursor to target_filename
 ```
 
-#### Ordered Cursor History Features
+#### Separate Pane Cursor History Features
 
-- **Chronological Ordering**: Cursor history maintains the order of directory visits
+- **Independent Histories**: Left and right panes maintain completely separate cursor histories
+- **Chronological Ordering**: Each pane's history maintains the order of directory visits
 - **Duplicate Handling**: Revisiting a directory updates the existing entry and moves it to the end
 - **Configurable Limits**: Maximum entries controlled by `MAX_CURSOR_HISTORY_ENTRIES` in config
-- **LRU Behavior**: Oldest entries are automatically removed when limit is exceeded
+- **LRU Behavior**: Oldest entries are automatically removed when limit is exceeded per pane
+- **No Cross-Contamination**: Navigation in one pane never affects the other pane's history
 - **Backward Compatibility**: Automatically converts old dictionary format to new ordered format
 
 ## Multi-Instance Safety

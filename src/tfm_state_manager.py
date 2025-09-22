@@ -759,6 +759,182 @@ class TFMStateManager(StateManager):
         except Exception as e:
             print(f"Warning: Could not clear cursor history: {e}")
             return False
+    
+    def save_pane_cursor_position(self, pane_name: str, directory_path: str, filename: str, max_entries: Optional[int] = None) -> bool:
+        """
+        Save cursor position for a specific pane and directory path.
+        
+        Args:
+            pane_name: Name of the pane ('left' or 'right')
+            directory_path: Directory path
+            filename: Filename where cursor was positioned
+            max_entries: Maximum number of entries to keep (uses config if None)
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            # Use pane-specific key
+            state_key = f"path_cursor_history_{pane_name}"
+            
+            # Get current cursor history for this pane (list of [timestamp, path, filename])
+            cursor_history = self.get_state(state_key, [])
+            
+            # Ensure it's a list (for backward compatibility with old dict format)
+            if isinstance(cursor_history, dict):
+                # Convert old dict format to new list format
+                cursor_history = [[time.time(), path, fname] for path, fname in cursor_history.items()]
+            
+            # Remove any existing entry for this directory path
+            cursor_history = [entry for entry in cursor_history if entry[1] != directory_path]
+            
+            # Add new entry at the end (most recent)
+            current_time = time.time()
+            cursor_history.append([current_time, directory_path, filename])
+            
+            # Determine maximum entries from config or parameter
+            if max_entries is None:
+                # Try to get from config, default to 100
+                try:
+                    from tfm_config import get_config
+                    config = get_config()
+                    max_entries = getattr(config, 'MAX_CURSOR_HISTORY_ENTRIES', 100)
+                except:
+                    max_entries = 100
+            
+            # Limit the size of the history (keep most recent entries)
+            if len(cursor_history) > max_entries:
+                cursor_history = cursor_history[-max_entries:]
+            
+            return self.set_state(state_key, cursor_history, self.instance_id)
+            
+        except Exception as e:
+            print(f"Warning: Could not save cursor position for {pane_name} pane: {e}")
+            return False
+    
+    def load_pane_cursor_position(self, pane_name: str, directory_path: str) -> Optional[str]:
+        """
+        Load cursor position for a specific pane and directory path.
+        
+        Args:
+            pane_name: Name of the pane ('left' or 'right')
+            directory_path: Directory path
+            
+        Returns:
+            Optional[str]: Filename where cursor was positioned, or None if not found
+        """
+        try:
+            # Use pane-specific key
+            state_key = f"path_cursor_history_{pane_name}"
+            cursor_history = self.get_state(state_key, [])
+            
+            # Handle backward compatibility with old dict format
+            if isinstance(cursor_history, dict):
+                return cursor_history.get(directory_path)
+            
+            # Search through the list for the directory path
+            for entry in cursor_history:
+                if len(entry) >= 3 and entry[1] == directory_path:
+                    return entry[2]  # Return filename
+            
+            return None
+            
+        except Exception as e:
+            print(f"Warning: Could not load cursor position for {pane_name} pane: {e}")
+            return None
+    
+    def get_pane_cursor_positions(self, pane_name: str) -> Dict[str, str]:
+        """
+        Get all saved cursor positions for a specific pane as a dictionary.
+        
+        Args:
+            pane_name: Name of the pane ('left' or 'right')
+            
+        Returns:
+            Dict[str, str]: Dictionary mapping directory paths to filenames
+        """
+        try:
+            # Use pane-specific key
+            state_key = f"path_cursor_history_{pane_name}"
+            cursor_history = self.get_state(state_key, [])
+            
+            # Handle backward compatibility with old dict format
+            if isinstance(cursor_history, dict):
+                return cursor_history
+            
+            # Convert list format to dictionary
+            result = {}
+            for entry in cursor_history:
+                if len(entry) >= 3:
+                    result[entry[1]] = entry[2]  # path -> filename
+            
+            return result
+            
+        except Exception as e:
+            print(f"Warning: Could not load cursor positions for {pane_name} pane: {e}")
+            return {}
+    
+    def get_ordered_pane_cursor_history(self, pane_name: str) -> List[Dict[str, Any]]:
+        """
+        Get cursor history for a specific pane in chronological order (oldest to newest).
+        
+        Args:
+            pane_name: Name of the pane ('left' or 'right')
+            
+        Returns:
+            List[Dict[str, Any]]: List of cursor history entries with timestamp, path, and filename
+        """
+        try:
+            # Use pane-specific key
+            state_key = f"path_cursor_history_{pane_name}"
+            cursor_history = self.get_state(state_key, [])
+            
+            # Handle backward compatibility with old dict format
+            if isinstance(cursor_history, dict):
+                # Convert to list format with current timestamp
+                current_time = time.time()
+                return [
+                    {
+                        'timestamp': current_time,
+                        'path': path,
+                        'filename': filename
+                    }
+                    for path, filename in cursor_history.items()
+                ]
+            
+            # Convert list format to structured format
+            result = []
+            for entry in cursor_history:
+                if len(entry) >= 3:
+                    result.append({
+                        'timestamp': entry[0],
+                        'path': entry[1],
+                        'filename': entry[2]
+                    })
+            
+            return result
+            
+        except Exception as e:
+            print(f"Warning: Could not load cursor history for {pane_name} pane: {e}")
+            return []
+    
+    def clear_pane_cursor_history(self, pane_name: str) -> bool:
+        """
+        Clear all saved cursor positions for a specific pane.
+        
+        Args:
+            pane_name: Name of the pane ('left' or 'right')
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            # Use pane-specific key
+            state_key = f"path_cursor_history_{pane_name}"
+            return self.set_state(state_key, [], self.instance_id)
+        except Exception as e:
+            print(f"Warning: Could not clear cursor history for {pane_name} pane: {e}")
+            return False
 
 
 # Global state manager instance

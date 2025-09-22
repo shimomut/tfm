@@ -84,17 +84,25 @@ def demo_cursor_history_persistence():
         # Save cursor position for downloads directory
         pane_manager.save_cursor_position(pane_manager.left_pane)
         
-        # Show saved cursor positions in chronological order
-        cursor_history = state_manager.get_ordered_path_cursor_history()
-        print(f"\nSaved cursor positions (chronological order):")
-        for i, entry in enumerate(cursor_history, 1):
+        # Show saved cursor positions for each pane separately
+        left_history = state_manager.get_ordered_pane_cursor_history('left')
+        right_history = state_manager.get_ordered_pane_cursor_history('right')
+        
+        print(f"\nSaved cursor positions:")
+        print(f"Left pane history ({len(left_history)} entries):")
+        for i, entry in enumerate(left_history, 1):
             print(f"  {i}. {entry['path']} -> {entry['filename']}")
             
-        # Also show as dictionary for comparison
-        cursor_positions = state_manager.get_all_path_cursor_positions()
-        print(f"\nAs dictionary (for reference):")
-        for path, filename in cursor_positions.items():
-            print(f"  {path} -> {filename}")
+        print(f"Right pane history ({len(right_history)} entries):")
+        for i, entry in enumerate(right_history, 1):
+            print(f"  {i}. {entry['path']} -> {entry['filename']}")
+            
+        # Show combined view for reference
+        left_positions = state_manager.get_pane_cursor_positions('left')
+        right_positions = state_manager.get_pane_cursor_positions('right')
+        print(f"\nAs dictionaries (for reference):")
+        print(f"Left pane: {left_positions}")
+        print(f"Right pane: {right_positions}")
         
         # Clean up session 1
         state_manager.cleanup_session()
@@ -197,6 +205,7 @@ def demo_cursor_history_benefits():
     print("  • Intelligent size management (configurable, default 100 most recent)")
     print("  • Proper chronological ordering maintained")
     print("  • Duplicate path handling (updates existing entries)")
+    print("  • Separate histories for left and right panes")
     
     print("\nUse cases:")
     print("  • Working on a project, restart TFM, cursor returns to last edited file")
