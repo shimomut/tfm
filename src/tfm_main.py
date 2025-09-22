@@ -3765,6 +3765,9 @@ class FileManager:
             # Update session heartbeat
             self.state_manager.update_session_heartbeat()
             
+            # Clean up non-existing directories from cursor history before restoring state
+            self.state_manager.cleanup_non_existing_directories()
+            
             # Load window layout
             layout = self.state_manager.load_window_layout()
             if layout:

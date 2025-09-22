@@ -783,6 +783,68 @@ class TFMStateManager(StateManager):
         except Exception as e:
             print(f"Warning: Could not clear cursor history for {pane_name} pane: {e}")
             return False
+    
+    def cleanup_non_existing_directories(self) -> bool:
+        """
+        Remove cursor history entries for directories that no longer exist.
+        
+        This method checks all saved cursor positions and removes entries
+        for directories that no longer exist on the filesystem.
+        
+        Returns:
+            bool: True if cleanup was successful
+        """
+        try:
+            from pathlib import Path
+            
+            success = True
+            cleaned_count = 0
+            
+            # Clean up both left and right pane histories
+            for pane_name in ['left', 'right']:
+                try:
+                    # Get current cursor history for this pane
+                    state_key = f"path_cursor_history_{pane_name}"
+                    cursor_history = self.get_state(state_key, [])
+                    
+                    if not cursor_history:
+                        continue
+                    
+                    # Handle backward compatibility with old dict format
+                    if isinstance(cursor_history, dict):
+                        # Convert to list format and filter
+                        filtered_entries = []
+                        for path, filename in cursor_history.items():
+                            if Path(path).exists():
+                                filtered_entries.append([time.time(), path, filename])
+                            else:
+                                cleaned_count += 1
+                        cursor_history = filtered_entries
+                    else:
+                        # Filter list format
+                        original_count = len(cursor_history)
+                        cursor_history = [
+                            entry for entry in cursor_history 
+                            if len(entry) >= 3 and Path(entry[1]).exists()
+                        ]
+                        cleaned_count += original_count - len(cursor_history)
+                    
+                    # Save the cleaned history back
+                    if not self.set_state(state_key, cursor_history, self.instance_id):
+                        success = False
+                        
+                except Exception as e:
+                    print(f"Warning: Could not clean cursor history for {pane_name} pane: {e}")
+                    success = False
+            
+            if cleaned_count > 0:
+                print(f"Cleaned up {cleaned_count} non-existing directory entries from cursor history")
+            
+            return success
+            
+        except Exception as e:
+            print(f"Warning: Could not cleanup non-existing directories: {e}")
+            return False
 
 
 # Global state manager instance
