@@ -24,7 +24,7 @@ from tfm_single_line_text_edit import SingleLineTextEdit
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, get_startup_paths, is_key_bound_to, get_favorite_directories, get_programs
+from tfm_config import get_config, get_startup_paths, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, get_favorite_directories, get_programs
 from tfm_text_viewer import view_text_file, is_text_file
 
 # Import new modular components
@@ -162,6 +162,15 @@ class FileManager:
         if 32 <= key <= 126:  # Printable ASCII
             key_char = chr(key)
             return is_key_bound_to(key_char, action)
+        return False
+    
+    def is_key_for_action_with_selection(self, key, action):
+        """Check if a key matches a configured action and is available for current selection status"""
+        if 32 <= key <= 126:  # Printable ASCII
+            key_char = chr(key)
+            current_pane = self.get_current_pane()
+            has_selection = len(current_pane['selected_files']) > 0
+            return is_key_bound_to_with_selection(key_char, action, has_selection)
         return False
         
     def count_files_and_dirs(self, pane_data):
@@ -3709,13 +3718,13 @@ class FileManager:
                 self.show_file_details()
             elif self.is_key_for_action(key, 'view_text'):  # View text file
                 self.view_selected_text_file()
-            elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
+            elif self.is_key_for_action_with_selection(key, 'copy_files'):  # Copy selected files
                 self.copy_selected_files()
-            elif self.is_key_for_action(key, 'move_files'):  # Move selected files
+            elif self.is_key_for_action_with_selection(key, 'move_files'):  # Move selected files
                 self.move_selected_files()
-            elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
+            elif self.is_key_for_action_with_selection(key, 'delete_files'):  # Delete selected files
                 self.delete_selected_files()
-            elif self.is_key_for_action(key, 'create_archive'):  # Create archive
+            elif self.is_key_for_action_with_selection(key, 'create_archive'):  # Create archive
                 self.enter_create_archive_mode()
             elif self.is_key_for_action(key, 'extract_archive'):  # Extract archive
                 self.extract_selected_archive()
@@ -3727,7 +3736,7 @@ class FileManager:
                 self.show_cursor_history()
             elif self.is_key_for_action(key, 'programs'):  # Show external programs
                 self.show_programs_dialog()
-            elif self.is_key_for_action(key, 'compare_selection'):  # Show compare selection menu
+            elif self.is_key_for_action_with_selection(key, 'compare_selection'):  # Show compare selection menu
                 self.show_compare_selection_dialog()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()

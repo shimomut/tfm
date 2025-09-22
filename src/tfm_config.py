@@ -240,16 +240,64 @@ class ConfigManager:
     def get_key_for_action(self, action):
         """Get the key binding for a specific action"""
         config = self.get_config()
+        binding = None
+        
         if hasattr(config, 'KEY_BINDINGS') and action in config.KEY_BINDINGS:
-            return config.KEY_BINDINGS[action]
+            binding = config.KEY_BINDINGS[action]
         elif hasattr(DefaultConfig, 'KEY_BINDINGS') and action in DefaultConfig.KEY_BINDINGS:
-            return DefaultConfig.KEY_BINDINGS[action]
+            binding = DefaultConfig.KEY_BINDINGS[action]
+        
+        if binding is None:
+            return []
+        
+        # Handle both simple and extended formats
+        if isinstance(binding, list):
+            return binding
+        elif isinstance(binding, dict) and 'keys' in binding:
+            return binding['keys']
+        
         return []
+    
+    def get_selection_requirement(self, action):
+        """Get the selection requirement for a specific action"""
+        config = self.get_config()
+        binding = None
+        
+        if hasattr(config, 'KEY_BINDINGS') and action in config.KEY_BINDINGS:
+            binding = config.KEY_BINDINGS[action]
+        elif hasattr(DefaultConfig, 'KEY_BINDINGS') and action in DefaultConfig.KEY_BINDINGS:
+            binding = DefaultConfig.KEY_BINDINGS[action]
+        
+        if binding is None:
+            return 'any'
+        
+        # Handle extended format
+        if isinstance(binding, dict) and 'selection' in binding:
+            return binding['selection']
+        
+        # Simple format defaults to 'any'
+        return 'any'
+    
+    def is_action_available(self, action, has_selection):
+        """Check if action is available based on current selection status"""
+        requirement = self.get_selection_requirement(action)
+        if requirement == 'required':
+            return has_selection
+        elif requirement == 'none':
+            return not has_selection
+        else:  # 'any'
+            return True
     
     def is_key_bound_to_action(self, key_char, action):
         """Check if a key is bound to a specific action"""
         keys = self.get_key_for_action(action)
         return key_char in keys
+    
+    def is_key_bound_to_action_with_selection(self, key_char, action, has_selection):
+        """Check if a key is bound to a specific action and available for current selection status"""
+        if not self.is_key_bound_to_action(key_char, action):
+            return False
+        return self.is_action_available(action, has_selection)
 
 
 # Global configuration manager instance
@@ -269,6 +317,16 @@ def reload_config():
 def is_key_bound_to(key_char, action):
     """Check if a key is bound to a specific action"""
     return config_manager.is_key_bound_to_action(key_char, action)
+
+
+def is_key_bound_to_with_selection(key_char, action, has_selection):
+    """Check if a key is bound to a specific action and available for current selection status"""
+    return config_manager.is_key_bound_to_action_with_selection(key_char, action, has_selection)
+
+
+def is_action_available(action, has_selection):
+    """Check if action is available based on current selection status"""
+    return config_manager.is_action_available(action, has_selection)
 
 
 def get_startup_paths():
