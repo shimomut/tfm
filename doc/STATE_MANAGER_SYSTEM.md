@@ -230,24 +230,23 @@ The PaneManager now uses persistent cursor history with proper ordering instead 
 # PaneManager initialization with state manager
 self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path, self.state_manager)
 
-# Cursor positions are automatically saved when navigating
+# Cursor positions are automatically saved when navigating (pane-specific)
 def save_cursor_position(self, pane_data):
     current_file = pane_data['files'][pane_data['selected_index']]
     current_dir = str(pane_data['path'])
+    pane_name = 'left' if pane_data is self.left_pane else 'right'
     
     if self.state_manager:
-        cursor_history = self.state_manager.get_state("path_cursor_history", {})
-        cursor_history[current_dir] = current_file.name
-        self.state_manager.set_state("path_cursor_history", cursor_history)
+        self.state_manager.save_pane_cursor_position(pane_name, current_dir, current_file.name)
 
-# Cursor positions are automatically restored when entering directories
+# Cursor positions are automatically restored when entering directories (pane-specific)
 def restore_cursor_position(self, pane_data, display_height):
     current_dir = str(pane_data['path'])
+    pane_name = 'left' if pane_data is self.left_pane else 'right'
     
     if self.state_manager:
-        cursor_history = self.state_manager.get_state("path_cursor_history", {})
-        if current_dir in cursor_history:
-            target_filename = cursor_history[current_dir]
+        target_filename = self.state_manager.load_pane_cursor_position(pane_name, current_dir)
+        if target_filename:
             # ... find and restore cursor to target_filename
 ```
 
