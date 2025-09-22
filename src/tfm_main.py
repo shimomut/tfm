@@ -3688,8 +3688,43 @@ class FileManager:
             # Refresh file lists after loading state
             self.refresh_files()
             
+            # Restore cursor positions after files are loaded
+            self.restore_startup_cursor_positions()
+            
         except Exception as e:
             print(f"Warning: Could not load application state: {e}")
+    
+    def restore_startup_cursor_positions(self):
+        """Restore cursor positions for both panes during startup."""
+        try:
+            # Calculate display height for cursor restoration
+            height, width = self.stdscr.getmaxyx()
+            calculated_height = int(height * self.log_height_ratio)
+            log_height = calculated_height if self.log_height_ratio > 0 else 0
+            display_height = height - log_height - 3
+            
+            # Restore left pane cursor position
+            left_restored = self.pane_manager.restore_cursor_position(self.pane_manager.left_pane, display_height)
+            if left_restored:
+                left_path = self.pane_manager.left_pane['path']
+                if self.pane_manager.left_pane['files']:
+                    selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['selected_index']].name
+                    print(f"Restored left pane cursor: {left_path} -> {selected_file}")
+            
+            # Restore right pane cursor position
+            right_restored = self.pane_manager.restore_cursor_position(self.pane_manager.right_pane, display_height)
+            if right_restored:
+                right_path = self.pane_manager.right_pane['path']
+                if self.pane_manager.right_pane['files']:
+                    selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['selected_index']].name
+                    print(f"Restored right pane cursor: {right_path} -> {selected_file}")
+            
+            # If either cursor was restored, trigger a redraw
+            if left_restored or right_restored:
+                self.needs_full_redraw = True
+                
+        except Exception as e:
+            print(f"Warning: Could not restore startup cursor positions: {e}")
     
     def save_application_state(self):
         """Save current application state to persistent storage."""

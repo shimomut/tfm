@@ -178,6 +178,10 @@ def load_application_state(self):
     if left_state and Path(left_state['path']).exists():
         self.pane_manager.left_pane['path'] = Path(left_state['path'])
         # ... restore other pane settings
+    
+    # Refresh file lists and restore cursor positions
+    self.refresh_files()
+    self.restore_startup_cursor_positions()
 ```
 
 ### State Saving
@@ -244,6 +248,32 @@ def restore_cursor_position(self, pane_data, display_height):
             # ... find and restore cursor to target_filename
 ```
 
+#### Startup Cursor Restoration
+
+Cursor positions are automatically restored when TFM starts up:
+
+```python
+def restore_startup_cursor_positions(self):
+    """Restore cursor positions for both panes during startup."""
+    # Calculate display height for proper scroll adjustment
+    height, width = self.stdscr.getmaxyx()
+    display_height = height - log_height - 3
+    
+    # Restore left pane cursor position
+    left_restored = self.pane_manager.restore_cursor_position(
+        self.pane_manager.left_pane, display_height
+    )
+    
+    # Restore right pane cursor position  
+    right_restored = self.pane_manager.restore_cursor_position(
+        self.pane_manager.right_pane, display_height
+    )
+    
+    # Trigger redraw if any cursors were restored
+    if left_restored or right_restored:
+        self.needs_full_redraw = True
+```
+
 #### Separate Pane Cursor History Features
 
 - **Independent Histories**: Left and right panes maintain completely separate cursor histories
@@ -252,6 +282,7 @@ def restore_cursor_position(self, pane_data, display_height):
 - **Configurable Limits**: Maximum entries controlled by `MAX_CURSOR_HISTORY_ENTRIES` in config
 - **LRU Behavior**: Oldest entries are automatically removed when limit is exceeded per pane
 - **No Cross-Contamination**: Navigation in one pane never affects the other pane's history
+- **Startup Restoration**: Cursor positions are automatically restored when TFM starts up
 - **Backward Compatibility**: Automatically converts old dictionary format to new ordered format
 
 ## Multi-Instance Safety
