@@ -23,9 +23,10 @@ class TestCreateDirectoryKeyBinding(unittest.TestCase):
     def test_create_directory_key_binding_exists(self):
         """Test that create_directory action is properly configured."""
         keys = self.config_manager.get_key_for_action('create_directory')
-        self.assertEqual(keys, ['M'])
+        self.assertEqual(keys, ['m', 'M'])
         
-        # Test that the key is bound
+        # Test that the keys are bound
+        self.assertTrue(self.config_manager.is_key_bound_to_action('m', 'create_directory'))
         self.assertTrue(self.config_manager.is_key_bound_to_action('M', 'create_directory'))
         self.assertFalse(self.config_manager.is_key_bound_to_action('D', 'create_directory'))
     
@@ -63,10 +64,11 @@ class TestCreateDirectoryKeyBinding(unittest.TestCase):
         dir_keys = self.config_manager.get_key_for_action('create_directory')
         file_keys = self.config_manager.get_key_for_action('create_file')
         
-        self.assertEqual(dir_keys, ['M'])
+        self.assertEqual(dir_keys, ['m', 'M'])
         self.assertEqual(file_keys, ['E'])
         
         # Different keys should be bound to different actions
+        self.assertTrue(self.config_manager.is_key_bound_to_action('m', 'create_directory'))
         self.assertTrue(self.config_manager.is_key_bound_to_action('M', 'create_directory'))
         self.assertFalse(self.config_manager.is_key_bound_to_action('M', 'create_file'))
         
@@ -99,12 +101,16 @@ class TestCreateDirectoryKeyBinding(unittest.TestCase):
         
         # Test without selection
         fm.left_pane['selected_files'] = set()
+        self.assertTrue(fm.is_key_for_action(ord('m'), 'create_directory'))  # Should work
         self.assertTrue(fm.is_key_for_action(ord('M'), 'create_directory'))  # Should work
+        self.assertFalse(fm.is_key_for_action(ord('m'), 'move_files'))  # Should not work (same key, different selection)
         self.assertFalse(fm.is_key_for_action(ord('M'), 'move_files'))  # Should not work (same key, different selection)
         
         # Test with selection
         fm.left_pane['selected_files'] = {'/path/to/file.txt'}
+        self.assertFalse(fm.is_key_for_action(ord('m'), 'create_directory'))  # Should not work
         self.assertFalse(fm.is_key_for_action(ord('M'), 'create_directory'))  # Should not work
+        self.assertTrue(fm.is_key_for_action(ord('m'), 'move_files'))  # Should now work (same key, different selection)
         self.assertTrue(fm.is_key_for_action(ord('M'), 'move_files'))  # Should now work (same key, different selection)
 
 

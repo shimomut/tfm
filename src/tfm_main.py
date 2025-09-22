@@ -2252,17 +2252,20 @@ class FileManager:
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
         
-        # Check if any files are selected
-        if not current_pane['selected_files']:
-            print("No files selected to move")
-            return
-        
-        # Get files to move - selected files
+        # Get files to move - either selected files or current file if none selected
         files_to_move = []
-        for file_path_str in current_pane['selected_files']:
-            file_path = Path(file_path_str)
-            if file_path.exists():
-                files_to_move.append(file_path)
+        
+        if current_pane['selected_files']:
+            # Move all selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_move.append(file_path)
+        else:
+            # Move current file if no files are selected
+            if current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']]
+                files_to_move.append(selected_file)
         
         if not files_to_move:
             print("No files to move")

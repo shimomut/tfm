@@ -61,20 +61,20 @@ class DefaultConfig:
         'view_text': ['v', 'V'],              # View text file in built-in viewer
         'edit_file': ['e'],                    # Edit selected file with configured text editor
         'create_file': ['E'],                  # Create new file (prompts for filename)
+        'create_directory': {'keys': ['m', 'M'], 'selection': 'none'},  # Create new directory (only when no files selected)
         'toggle_fallback_colors': ['T'],       # Toggle fallback color mode for compatibility
         'view_options': ['z'],                 # Show view options menu
         'settings_menu': ['Z'],                # Show settings and configuration menu
-        'copy_files': ['c', 'C'],             # Copy selected files to other pane
-        'move_files': ['m', 'M'],             # Move selected files to other pane
-        'delete_files': ['k', 'K'],           # Delete selected files/directories
+        'copy_files': {'keys': ['c', 'C'], 'selection': 'required'},  # Copy selected files to other pane
+        'move_files': {'keys': ['m', 'M'], 'selection': 'required'},  # Move selected files to other pane
+        'delete_files': {'keys': ['k', 'K'], 'selection': 'required'}, # Delete selected files/directories
         'rename_file': ['r', 'R'],            # Rename selected file/directory
         'favorites': ['j', 'J'],              # Show favorite directories dialog
-        'history': ['h', 'H'],                # Show cursor history for current pane
         'subshell': ['X'],                     # Enter subshell (command line) mode
         'programs': ['x'],                     # Show external programs menu
-        'create_archive': ['p', 'P'],         # Create archive from selected files
+        'create_archive': {'keys': ['p', 'P'], 'selection': 'required'}, # Create archive from selected files
         'extract_archive': ['u', 'U'],        # Extract selected archive file
-        'compare_selection': ['w', 'W'],      # Show file comparison options
+        'compare_selection': {'keys': ['w', 'W'], 'selection': 'required'}, # Show file comparison options
         'adjust_pane_left': ['['],            # Make left pane smaller (move boundary left)
         'adjust_pane_right': [']'],           # Make left pane larger (move boundary right)
         'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)

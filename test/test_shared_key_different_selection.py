@@ -32,7 +32,7 @@ class TestSharedKeyDifferentSelection(unittest.TestCase):
         # Test create_directory configuration
         create_keys = self.config_manager.get_key_for_action('create_directory')
         create_requirement = self.config_manager.get_selection_requirement('create_directory')
-        self.assertEqual(create_keys, ['M'])
+        self.assertEqual(create_keys, ['m', 'M'])
         self.assertEqual(create_requirement, 'none')
     
     def test_m_key_availability_with_no_selection(self):
@@ -42,11 +42,15 @@ class TestSharedKeyDifferentSelection(unittest.TestCase):
         # - move_files should NOT be available (requires selection)
         # - create_directory should be available (requires no selection)
         
-        move_available = self.config_manager.is_key_bound_to_action_with_selection('M', 'move_files', False)
-        create_available = self.config_manager.is_key_bound_to_action_with_selection('M', 'create_directory', False)
+        move_available_m = self.config_manager.is_key_bound_to_action_with_selection('m', 'move_files', False)
+        move_available_M = self.config_manager.is_key_bound_to_action_with_selection('M', 'move_files', False)
+        create_available_m = self.config_manager.is_key_bound_to_action_with_selection('m', 'create_directory', False)
+        create_available_M = self.config_manager.is_key_bound_to_action_with_selection('M', 'create_directory', False)
         
-        self.assertFalse(move_available, "move_files should not be available without selection")
-        self.assertTrue(create_available, "create_directory should be available without selection")
+        self.assertFalse(move_available_m, "move_files should not be available without selection")
+        self.assertFalse(move_available_M, "move_files should not be available without selection")
+        self.assertTrue(create_available_m, "create_directory should be available without selection")
+        self.assertTrue(create_available_M, "create_directory should be available without selection")
     
     def test_m_key_availability_with_selection(self):
         """Test 'M' key behavior when files are selected."""
@@ -55,11 +59,15 @@ class TestSharedKeyDifferentSelection(unittest.TestCase):
         # - move_files should be available (requires selection)
         # - create_directory should NOT be available (requires no selection)
         
-        move_available = self.config_manager.is_key_bound_to_action_with_selection('M', 'move_files', True)
-        create_available = self.config_manager.is_key_bound_to_action_with_selection('M', 'create_directory', True)
+        move_available_m = self.config_manager.is_key_bound_to_action_with_selection('m', 'move_files', True)
+        move_available_M = self.config_manager.is_key_bound_to_action_with_selection('M', 'move_files', True)
+        create_available_m = self.config_manager.is_key_bound_to_action_with_selection('m', 'create_directory', True)
+        create_available_M = self.config_manager.is_key_bound_to_action_with_selection('M', 'create_directory', True)
         
-        self.assertTrue(move_available, "move_files should be available with selection")
-        self.assertFalse(create_available, "create_directory should not be available with selection")
+        self.assertTrue(move_available_m, "move_files should be available with selection")
+        self.assertTrue(move_available_M, "move_files should be available with selection")
+        self.assertFalse(create_available_m, "create_directory should not be available with selection")
+        self.assertFalse(create_available_M, "create_directory should not be available with selection")
     
     def test_unified_key_handling_simulation(self):
         """Test that unified key handling correctly routes to the right action."""
@@ -85,32 +93,42 @@ class TestSharedKeyDifferentSelection(unittest.TestCase):
         
         fm = MockFileManager(self.config_manager)
         
-        # Scenario 1: No files selected - 'M' should trigger create_directory
+        # Scenario 1: No files selected - both 'm' and 'M' should trigger create_directory
         fm.left_pane['selected_files'] = set()
         
-        move_triggered = fm.is_key_for_action(ord('M'), 'move_files')
-        create_triggered = fm.is_key_for_action(ord('M'), 'create_directory')
+        move_triggered_m = fm.is_key_for_action(ord('m'), 'move_files')
+        move_triggered_M = fm.is_key_for_action(ord('M'), 'move_files')
+        create_triggered_m = fm.is_key_for_action(ord('m'), 'create_directory')
+        create_triggered_M = fm.is_key_for_action(ord('M'), 'create_directory')
         
-        self.assertFalse(move_triggered, "move_files should not be triggered without selection")
-        self.assertTrue(create_triggered, "create_directory should be triggered without selection")
+        self.assertFalse(move_triggered_m, "move_files should not be triggered without selection")
+        self.assertFalse(move_triggered_M, "move_files should not be triggered without selection")
+        self.assertTrue(create_triggered_m, "create_directory should be triggered without selection")
+        self.assertTrue(create_triggered_M, "create_directory should be triggered without selection")
         
-        # Scenario 2: Files selected - 'M' should trigger move_files
+        # Scenario 2: Files selected - both 'm' and 'M' should trigger move_files
         fm.left_pane['selected_files'] = {'/path/file1.txt', '/path/file2.txt'}
         
-        move_triggered = fm.is_key_for_action(ord('M'), 'move_files')
-        create_triggered = fm.is_key_for_action(ord('M'), 'create_directory')
+        move_triggered_m = fm.is_key_for_action(ord('m'), 'move_files')
+        move_triggered_M = fm.is_key_for_action(ord('M'), 'move_files')
+        create_triggered_m = fm.is_key_for_action(ord('m'), 'create_directory')
+        create_triggered_M = fm.is_key_for_action(ord('M'), 'create_directory')
         
-        self.assertTrue(move_triggered, "move_files should be triggered with selection")
-        self.assertFalse(create_triggered, "create_directory should not be triggered with selection")
+        self.assertTrue(move_triggered_m, "move_files should be triggered with selection")
+        self.assertTrue(move_triggered_M, "move_files should be triggered with selection")
+        self.assertFalse(create_triggered_m, "create_directory should not be triggered with selection")
+        self.assertFalse(create_triggered_M, "create_directory should not be triggered with selection")
     
     def test_key_conflict_resolution(self):
         """Test that there's no actual conflict - selection requirements resolve it."""
         
-        # Both actions use 'M' key
+        # Both actions use 'm' and 'M' keys
         move_keys = self.config_manager.get_key_for_action('move_files')
         create_keys = self.config_manager.get_key_for_action('create_directory')
         
+        self.assertIn('m', move_keys)
         self.assertIn('M', move_keys)
+        self.assertIn('m', create_keys)
         self.assertIn('M', create_keys)
         
         # But they have different selection requirements
