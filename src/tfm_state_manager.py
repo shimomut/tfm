@@ -606,26 +606,47 @@ class TFMStateManager(StateManager):
         
         return self.save_search_history(history, max_count)
     
-    def save_path_cursor_position(self, directory_path: str, filename: str) -> bool:
+    def save_path_cursor_position(self, directory_path: str, filename: str, max_entries: Optional[int] = None) -> bool:
         """
-        Save cursor position for a specific directory path.
+        Save cursor position for a specific directory path with proper ordering.
         
         Args:
             directory_path: Directory path
             filename: Filename where cursor was positioned
+            max_entries: Maximum number of entries to keep (uses config if None)
             
         Returns:
             bool: True if successful
         """
         try:
-            cursor_history = self.get_state("path_cursor_history", {})
-            cursor_history[directory_path] = filename
+            # Get current cursor history (list of [timestamp, path, filename])
+            cursor_history = self.get_state("path_cursor_history", [])
             
-            # Limit the size of the history (keep most recent 100 directories)
-            if len(cursor_history) > 100:
-                items = list(cursor_history.items())
-                items = items[-100:]  # Keep the last 100 entries
-                cursor_history = dict(items)
+            # Ensure it's a list (for backward compatibility with old dict format)
+            if isinstance(cursor_history, dict):
+                # Convert old dict format to new list format
+                cursor_history = [[time.time(), path, fname] for path, fname in cursor_history.items()]
+            
+            # Remove any existing entry for this directory path
+            cursor_history = [entry for entry in cursor_history if entry[1] != directory_path]
+            
+            # Add new entry at the end (most recent)
+            current_time = time.time()
+            cursor_history.append([current_time, directory_path, filename])
+            
+            # Determine maximum entries from config or parameter
+            if max_entries is None:
+                # Try to get from config, default to 100
+                try:
+                    from tfm_config import get_config
+                    config = get_config()
+                    max_entries = getattr(config, 'MAX_CURSOR_HISTORY_ENTRIES', 100)
+                except:
+                    max_entries = 100
+            
+            # Limit the size of the history (keep most recent entries)
+            if len(cursor_history) > max_entries:
+                cursor_history = cursor_history[-max_entries:]
             
             return self.set_state("path_cursor_history", cursor_history, self.instance_id)
             
@@ -644,8 +665,18 @@ class TFMStateManager(StateManager):
             Optional[str]: Filename where cursor was positioned, or None if not found
         """
         try:
-            cursor_history = self.get_state("path_cursor_history", {})
-            return cursor_history.get(directory_path)
+            cursor_history = self.get_state("path_cursor_history", [])
+            
+            # Handle backward compatibility with old dict format
+            if isinstance(cursor_history, dict):
+                return cursor_history.get(directory_path)
+            
+            # Search through the list for the directory path
+            for entry in cursor_history:
+                if len(entry) >= 3 and entry[1] == directory_path:
+                    return entry[2]  # Return filename
+            
+            return None
             
         except Exception as e:
             print(f"Warning: Could not load cursor position: {e}")
@@ -653,16 +684,68 @@ class TFMStateManager(StateManager):
     
     def get_all_path_cursor_positions(self) -> Dict[str, str]:
         """
-        Get all saved cursor positions.
+        Get all saved cursor positions as a dictionary.
         
         Returns:
             Dict[str, str]: Dictionary mapping directory paths to filenames
         """
         try:
-            return self.get_state("path_cursor_history", {})
+            cursor_history = self.get_state("path_cursor_history", [])
+            
+            # Handle backward compatibility with old dict format
+            if isinstance(cursor_history, dict):
+                return cursor_history
+            
+            # Convert list format to dictionary
+            result = {}
+            for entry in cursor_history:
+                if len(entry) >= 3:
+                    result[entry[1]] = entry[2]  # path -> filename
+            
+            return result
+            
         except Exception as e:
             print(f"Warning: Could not load cursor positions: {e}")
             return {}
+    
+    def get_ordered_path_cursor_history(self) -> List[Dict[str, Any]]:
+        """
+        Get cursor history in chronological order (oldest to newest).
+        
+        Returns:
+            List[Dict[str, Any]]: List of cursor history entries with timestamp, path, and filename
+        """
+        try:
+            cursor_history = self.get_state("path_cursor_history", [])
+            
+            # Handle backward compatibility with old dict format
+            if isinstance(cursor_history, dict):
+                # Convert to list format with current timestamp
+                current_time = time.time()
+                return [
+                    {
+                        'timestamp': current_time,
+                        'path': path,
+                        'filename': filename
+                    }
+                    for path, filename in cursor_history.items()
+                ]
+            
+            # Convert list format to structured format
+            result = []
+            for entry in cursor_history:
+                if len(entry) >= 3:
+                    result.append({
+                        'timestamp': entry[0],
+                        'path': entry[1],
+                        'filename': entry[2]
+                    })
+            
+            return result
+            
+        except Exception as e:
+            print(f"Warning: Could not load cursor history: {e}")
+            return []
     
     def clear_path_cursor_history(self) -> bool:
         """
@@ -672,7 +755,7 @@ class TFMStateManager(StateManager):
             bool: True if successful
         """
         try:
-            return self.set_state("path_cursor_history", {}, self.instance_id)
+            return self.set_state("path_cursor_history", [], self.instance_id)
         except Exception as e:
             print(f"Warning: Could not clear cursor history: {e}")
             return False

@@ -100,6 +100,9 @@ class DefaultConfig:
     # Performance settings
     MAX_LOG_MESSAGES = 1000
     
+    # Cursor history settings
+    MAX_CURSOR_HISTORY_ENTRIES = 100  # Maximum number of cursor history entries to keep
+    
     # File display settings
     SEPARATE_EXTENSIONS = True  # Show file extensions separately from basenames
     MAX_EXTENSION_LENGTH = 5    # Maximum extension length to show separately

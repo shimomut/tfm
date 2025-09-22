@@ -84,9 +84,15 @@ def demo_cursor_history_persistence():
         # Save cursor position for downloads directory
         pane_manager.save_cursor_position(pane_manager.left_pane)
         
-        # Show saved cursor positions
+        # Show saved cursor positions in chronological order
+        cursor_history = state_manager.get_ordered_path_cursor_history()
+        print(f"\nSaved cursor positions (chronological order):")
+        for i, entry in enumerate(cursor_history, 1):
+            print(f"  {i}. {entry['path']} -> {entry['filename']}")
+            
+        # Also show as dictionary for comparison
         cursor_positions = state_manager.get_all_path_cursor_positions()
-        print(f"\nSaved cursor positions:")
+        print(f"\nAs dictionary (for reference):")
         for path, filename in cursor_positions.items():
             print(f"  {path} -> {filename}")
         
@@ -188,7 +194,9 @@ def demo_cursor_history_benefits():
     print("  • Automatic restoration when entering directories")
     print("  • Seamless workflow continuation after restart")
     print("  • Shared cursor history across multiple TFM instances")
-    print("  • Intelligent size management (keeps 100 most recent)")
+    print("  • Intelligent size management (configurable, default 100 most recent)")
+    print("  • Proper chronological ordering maintained")
+    print("  • Duplicate path handling (updates existing entries)")
     
     print("\nUse cases:")
     print("  • Working on a project, restart TFM, cursor returns to last edited file")

@@ -128,6 +128,7 @@ search_history = state_manager.load_search_history()
 state_manager.save_path_cursor_position('/home/user/projects', 'main.py')
 cursor_filename = state_manager.load_path_cursor_position('/home/user/projects')
 all_cursor_positions = state_manager.get_all_path_cursor_positions()
+ordered_history = state_manager.get_ordered_path_cursor_history()  # Chronological order
 state_manager.clear_path_cursor_history()  # Clear all cursor positions
 ```
 
@@ -216,7 +217,7 @@ def handle_search_dialog_input(self, key):
 
 ### Cursor History Integration
 
-The PaneManager now uses persistent cursor history instead of in-memory storage:
+The PaneManager now uses persistent cursor history with proper ordering instead of in-memory storage:
 
 ```python
 # PaneManager initialization with state manager
@@ -242,6 +243,14 @@ def restore_cursor_position(self, pane_data, display_height):
             target_filename = cursor_history[current_dir]
             # ... find and restore cursor to target_filename
 ```
+
+#### Ordered Cursor History Features
+
+- **Chronological Ordering**: Cursor history maintains the order of directory visits
+- **Duplicate Handling**: Revisiting a directory updates the existing entry and moves it to the end
+- **Configurable Limits**: Maximum entries controlled by `MAX_CURSOR_HISTORY_ENTRIES` in config
+- **LRU Behavior**: Oldest entries are automatically removed when limit is exceeded
+- **Backward Compatibility**: Automatically converts old dictionary format to new ordered format
 
 ## Multi-Instance Safety
 
@@ -335,6 +344,7 @@ except Exception as e:
 ### Limits and Defaults
 - **Recent Directories**: 50 entries (configurable)
 - **Search History**: 100 entries (configurable)
+- **Cursor History**: 100 entries (configurable via `MAX_CURSOR_HISTORY_ENTRIES`)
 - **Session Timeout**: 5 minutes (300 seconds)
 - **Connection Timeout**: 30 seconds
 - **Retry Attempts**: 3 with exponential backoff

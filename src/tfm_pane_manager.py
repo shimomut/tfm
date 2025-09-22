@@ -13,6 +13,7 @@ class PaneManager:
     def __init__(self, config, left_startup_path, right_startup_path, state_manager=None):
         # Store reference to state manager for persistent cursor history
         self.state_manager = state_manager
+        self.config = config
         
         # Dual pane setup with configuration
         self.left_pane = {
@@ -65,26 +66,11 @@ class PaneManager:
         if not self.state_manager:
             return
         
-        try:
-            # Load existing cursor history
-            cursor_history = self.state_manager.get_state("path_cursor_history", {})
-            
-            # Save the cursor position for this directory
-            cursor_history[current_dir] = current_file.name
-            
-            # Limit the size of the history (keep most recent 100 directories)
-            if len(cursor_history) > 100:
-                # Convert to list of (dir, filename) tuples, sort by directory name, keep last 100
-                items = list(cursor_history.items())
-                items = items[-100:]  # Keep the last 100 entries
-                cursor_history = dict(items)
-            
-            # Save back to state manager
-            self.state_manager.set_state("path_cursor_history", cursor_history)
-            
-        except Exception as e:
-            # If state saving fails, continue silently (graceful degradation)
-            pass
+        # Get max entries from config
+        max_entries = getattr(self.config, 'MAX_CURSOR_HISTORY_ENTRIES', 100)
+        
+        # Use the StateManager's method which handles ordering and limits
+        self.state_manager.save_path_cursor_position(current_dir, current_file.name, max_entries)
     
     def restore_cursor_position(self, pane_data, display_height):
         """Restore cursor position from persistent history when changing to a directory"""
@@ -94,30 +80,22 @@ class PaneManager:
         if not self.state_manager:
             return False
         
-        try:
-            # Load cursor history from state manager
-            cursor_history = self.state_manager.get_state("path_cursor_history", {})
-            
-            # Look for a saved cursor position for this directory
-            if current_dir in cursor_history:
-                target_filename = cursor_history[current_dir]
-                
-                # Try to find this filename in current files
-                for i, file_path in enumerate(pane_data['files']):
-                    if file_path.name == target_filename:
-                        pane_data['selected_index'] = i
-                        
-                        # Adjust scroll offset to keep selection visible
-                        if pane_data['selected_index'] < pane_data['scroll_offset']:
-                            pane_data['scroll_offset'] = pane_data['selected_index']
-                        elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
-                            pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
-                        
-                        return True
-            
-        except Exception as e:
-            # If state loading fails, continue silently (graceful degradation)
-            pass
+        # Use the StateManager's method to load cursor position
+        target_filename = self.state_manager.load_path_cursor_position(current_dir)
+        
+        if target_filename:
+            # Try to find this filename in current files
+            for i, file_path in enumerate(pane_data['files']):
+                if file_path.name == target_filename:
+                    pane_data['selected_index'] = i
+                    
+                    # Adjust scroll offset to keep selection visible
+                    if pane_data['selected_index'] < pane_data['scroll_offset']:
+                        pane_data['scroll_offset'] = pane_data['selected_index']
+                    elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
+                        pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
+                    
+                    return True
         
         return False
     
