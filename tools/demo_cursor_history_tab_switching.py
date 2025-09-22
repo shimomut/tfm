@@ -115,8 +115,9 @@ def demo_cursor_history_tab_switching():
         right_history = state_manager.get_ordered_pane_cursor_history('right')
         
         # Show left pane history
-        print("📋 History - Left (TAB: Switch to Right)")
-        print("=" * 50)
+        print("📋 History - Left")
+        print("💡 Help: ↑↓:select  Enter:choose  TAB:switch to Right  Type:search  ESC:cancel")
+        print("=" * 70)
         left_paths = []
         seen_paths = set()
         for entry in reversed(left_history):
@@ -133,8 +134,9 @@ def demo_cursor_history_tab_switching():
         print()
         
         # Show right pane history
-        print("📋 History - Right (TAB: Switch to Left)")
-        print("=" * 50)
+        print("📋 History - Right")
+        print("💡 Help: ↑↓:select  Enter:choose  TAB:switch to Left  Type:search  ESC:cancel")
+        print("=" * 70)
         right_paths = []
         seen_paths = set()
         for entry in reversed(right_history):
@@ -156,17 +158,20 @@ def demo_cursor_history_tab_switching():
         print()
         
         print("1️⃣ Developer presses 'H' while left pane is active:")
-        print("   📋 Shows: History - Left (TAB: Switch to Right)")
+        print("   📋 Shows: History - Left")
+        print("   💡 Help: ↑↓:select  Enter:choose  TAB:switch to Right  Type:search  ESC:cancel")
         print("   📂 Displays: backend, config, frontend, docs, tests")
         print()
         
         print("2️⃣ Developer presses TAB to see right pane history:")
-        print("   📋 Shows: History - Right (TAB: Switch to Left)")  
+        print("   📋 Shows: History - Right")
+        print("   💡 Help: ↑↓:select  Enter:choose  TAB:switch to Left  Type:search  ESC:cancel")
         print("   📂 Displays: frontend, backend, tests, docs, config")
         print()
         
         print("3️⃣ Developer presses TAB again to return to left pane history:")
-        print("   📋 Shows: History - Left (TAB: Switch to Right)")
+        print("   📋 Shows: History - Left")
+        print("   💡 Help: ↑↓:select  Enter:choose  TAB:switch to Right  Type:search  ESC:cancel")
         print("   📂 Back to: backend, config, frontend, docs, tests")
         print()
         

@@ -26,14 +26,14 @@ The List Dialog Component provides a searchable, selectable list interface for T
 ```python
 class ListDialog:
     def __init__(self, config)
-    def show(self, title, items, callback, custom_key_handler=None)
+    def show(self, title, items, callback, custom_key_handler=None, custom_help_text=None)
     def handle_input(self, key)
     def draw(self, stdscr, safe_addstr_func)
     def exit()
 ```
 
 ### Key Methods
-- **`show(title, items, callback, custom_key_handler=None)`**: Display list with title, selection callback, and optional custom key handler
+- **`show(title, items, callback, custom_key_handler=None, custom_help_text=None)`**: Display list with title, selection callback, optional custom key handler, and optional custom help text
 - **`handle_input(key)`**: Process keyboard input for navigation and search
 - **`draw(stdscr, safe_addstr_func)`**: Render the dialog
 - **`exit()`**: Close the dialog and return to main interface
@@ -44,6 +44,12 @@ The `custom_key_handler` parameter allows dialogs to handle special keys:
 - **Return True**: Key was handled, stop further processing
 - **Return False**: Key not handled, continue with default processing
 - **Use cases**: TAB switching, special navigation, custom shortcuts
+
+### Custom Help Text
+The `custom_help_text` parameter allows dialogs to display custom help messages:
+- **Default help**: "↑↓:select  Enter:choose  Type:search  Backspace:clear  ESC:cancel"
+- **Custom help**: Override with dialog-specific instructions
+- **Use cases**: Show TAB switching hints, special key instructions
 
 ## Usage Examples
 
@@ -101,8 +107,10 @@ def show_cursor_history_with_tab_switching(pane_name):
             return True
         return False
     
-    title = f"History - {pane_name.title()} (TAB: Switch to {'Right' if pane_name == 'left' else 'Left'})"
-    list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys)
+    title = f"History - {pane_name.title()}"
+    other_pane_name = 'Right' if pane_name == 'left' else 'Left'
+    help_text = f"↑↓:select  Enter:choose  TAB:switch to {other_pane_name}  Type:search  ESC:cancel"
+    list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys, help_text)
 ```
 
 ## Navigation Controls

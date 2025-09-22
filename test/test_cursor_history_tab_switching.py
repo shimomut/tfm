@@ -96,18 +96,21 @@ def test_cursor_history_tab_switching():
                         self.items = []
                         self.callback = None
                         self.custom_key_handler = None
+                        self.custom_help_text = None
                         self.last_shown_data = None
                     
-                    def show(self, title, items, callback, custom_key_handler=None):
+                    def show(self, title, items, callback, custom_key_handler=None, custom_help_text=None):
                         self.mode = True
                         self.title = title
                         self.items = items
                         self.callback = callback
                         self.custom_key_handler = custom_key_handler
+                        self.custom_help_text = custom_help_text
                         self.last_shown_data = {
                             'title': title,
                             'items': items.copy(),
-                            'has_custom_handler': custom_key_handler is not None
+                            'has_custom_handler': custom_key_handler is not None,
+                            'custom_help_text': custom_help_text
                         }
                     
                     def exit(self):
@@ -116,6 +119,7 @@ def test_cursor_history_tab_switching():
                         self.items = []
                         self.callback = None
                         self.custom_key_handler = None
+                        self.custom_help_text = None
                 
                 self.list_dialog = MockListDialog()
             
@@ -158,8 +162,10 @@ def test_cursor_history_tab_switching():
                         return True
                     return False
                 
-                title = f"History - {pane_name.title()} (TAB: Switch to {('Right' if pane_name == 'left' else 'Left')})"
-                self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys)
+                title = f"History - {pane_name.title()}"
+                other_pane_name = 'Right' if pane_name == 'left' else 'Left'
+                help_text = f"↑↓:select  Enter:choose  TAB:switch to {other_pane_name}  Type:search  ESC:cancel"
+                self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys, help_text)
                 self.needs_full_redraw = True
         
         mock_tfm = MockTFMMain(pane_manager, state_manager)
@@ -169,8 +175,8 @@ def test_cursor_history_tab_switching():
         mock_tfm._show_cursor_history_for_pane('left')
         
         assert mock_tfm.list_dialog.mode == True
-        assert "History - Left" in mock_tfm.list_dialog.title
-        assert "TAB: Switch to Right" in mock_tfm.list_dialog.title
+        assert mock_tfm.list_dialog.title == "History - Left"
+        assert "TAB:switch to Right" in mock_tfm.list_dialog.custom_help_text
         assert mock_tfm.list_dialog.custom_key_handler is not None
         assert len(mock_tfm.list_dialog.items) == 3
         
@@ -182,8 +188,8 @@ def test_cursor_history_tab_switching():
         tab_handled = mock_tfm.list_dialog.custom_key_handler(9)  # TAB key
         
         assert tab_handled == True, "TAB key should be handled by custom handler"
-        assert "History - Right" in mock_tfm.list_dialog.title
-        assert "TAB: Switch to Left" in mock_tfm.list_dialog.title
+        assert mock_tfm.list_dialog.title == "History - Right"
+        assert "TAB:switch to Left" in mock_tfm.list_dialog.custom_help_text
         assert len(mock_tfm.list_dialog.items) == 3
         
         right_dialog_items = mock_tfm.list_dialog.items.copy()
@@ -197,8 +203,8 @@ def test_cursor_history_tab_switching():
         tab_handled = mock_tfm.list_dialog.custom_key_handler(9)  # TAB key
         
         assert tab_handled == True, "TAB key should be handled by custom handler"
-        assert "History - Left" in mock_tfm.list_dialog.title
-        assert "TAB: Switch to Right" in mock_tfm.list_dialog.title
+        assert mock_tfm.list_dialog.title == "History - Left"
+        assert "TAB:switch to Right" in mock_tfm.list_dialog.custom_help_text
         
         back_to_left_items = mock_tfm.list_dialog.items.copy()
         assert back_to_left_items == left_dialog_items, "Should return to original left pane items"

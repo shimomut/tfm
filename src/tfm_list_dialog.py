@@ -28,8 +28,9 @@ class ListDialog:
         self.search_editor = SingleLineTextEdit()  # Search editor for list dialog
         self.callback = None  # Callback function when item is selected
         self.custom_key_handler = None  # Custom key handler function
+        self.custom_help_text = None  # Custom help text to display at bottom
         
-    def show(self, title, items, callback, custom_key_handler=None):
+    def show(self, title, items, callback, custom_key_handler=None, custom_help_text=None):
         """Show a searchable list dialog
         
         Args:
@@ -37,6 +38,7 @@ class ListDialog:
             items: List of items to choose from (strings or objects with __str__ method)
             callback: Function to call with the selected item (or None if cancelled)
             custom_key_handler: Optional function to handle custom keys (key) -> bool
+            custom_help_text: Optional custom help text to display at bottom
         """
         self.mode = True
         self.title = title
@@ -47,6 +49,7 @@ class ListDialog:
         self.search_editor.clear()
         self.callback = callback
         self.custom_key_handler = custom_key_handler
+        self.custom_help_text = custom_help_text
         
     def exit(self):
         """Exit list dialog mode"""
@@ -59,6 +62,7 @@ class ListDialog:
         self.search_editor.clear()
         self.callback = None
         self.custom_key_handler = None
+        self.custom_help_text = None
         
     def handle_input(self, key):
         """Handle input while in list dialog mode"""
@@ -331,7 +335,11 @@ class ListDialog:
                 safe_addstr_func(status_y, status_x, status_text, get_status_color() | curses.A_DIM)
         
         # Draw help text at bottom
-        help_text = "↑↓:select  Enter:choose  Type:search  Backspace:clear  ESC:cancel"
+        if self.custom_help_text:
+            help_text = self.custom_help_text
+        else:
+            help_text = "↑↓:select  Enter:choose  Type:search  Backspace:clear  ESC:cancel"
+        
         help_y = start_y + dialog_height - 1
         content_width = dialog_width - 4
         if help_y < height and len(help_text) <= content_width:

@@ -1523,8 +1523,10 @@ class FileManager:
             return False
         
         # Show the list dialog with TAB switching support
-        title = f"History - {pane_name.title()} (TAB: Switch to {('Right' if pane_name == 'left' else 'Left')})"
-        self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys)
+        title = f"History - {pane_name.title()}"
+        other_pane_name = 'Right' if pane_name == 'left' else 'Left'
+        help_text = f"↑↓:select  Enter:choose  TAB:switch to {other_pane_name}  Type:search  ESC:cancel"
+        self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys, help_text)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
