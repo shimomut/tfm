@@ -1475,6 +1475,93 @@ class FileManager:
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
+    def show_cursor_history(self):
+        """Show cursor history for the current pane using the searchable list dialog"""
+        current_pane = self.get_current_pane()
+        pane_name = 'left' if current_pane is self.pane_manager.left_pane else 'right'
+        
+        # Get cursor history for the current pane
+        history = self.state_manager.get_ordered_pane_cursor_history(pane_name)
+        
+        if not history:
+            print(f"No cursor history available for {pane_name} pane")
+            return
+        
+        # Extract just the paths (no timestamps or filenames needed in dialog)
+        history_paths = []
+        seen_paths = set()
+        
+        # Reverse to show most recent first, and deduplicate
+        for entry in reversed(history):
+            path = entry['path']
+            if path not in seen_paths:
+                history_paths.append(path)
+                seen_paths.add(path)
+        
+        if not history_paths:
+            print(f"No cursor history available for {pane_name} pane")
+            return
+        
+        # Create callback function to handle selection
+        def on_history_selected(selected_path):
+            if selected_path:
+                self.navigate_to_history_path(selected_path)
+        
+        # Show the list dialog
+        title = f"History - {pane_name.title()}"
+        self.list_dialog.show(title, history_paths, on_history_selected)
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
+    
+    def navigate_to_history_path(self, selected_path):
+        """Navigate the current pane to the selected history path"""
+        try:
+            target_path = Path(selected_path)
+            
+            # Check if the path still exists
+            if not target_path.exists():
+                print(f"Directory no longer exists: {selected_path}")
+                return
+            
+            if not target_path.is_dir():
+                print(f"Path is not a directory: {selected_path}")
+                return
+            
+            # Get current pane and save cursor position before navigating
+            current_pane = self.get_current_pane()
+            self.pane_manager.save_cursor_position(current_pane)
+            
+            # Navigate to the selected path
+            old_path = current_pane['path']
+            current_pane['path'] = target_path
+            current_pane['selected_index'] = 0
+            current_pane['scroll_offset'] = 0
+            current_pane['selected_files'].clear()  # Clear selections when changing directory
+            
+            # Refresh files and restore cursor position for the new directory
+            self.refresh_files(current_pane)
+            
+            # Try to restore cursor position for this directory
+            height, width = self.stdscr.getmaxyx()
+            calculated_height = int(height * self.log_height_ratio)
+            log_height = calculated_height if self.log_height_ratio > 0 else 0
+            display_height = height - log_height - 3
+            
+            restored = self.pane_manager.restore_cursor_position(current_pane, display_height)
+            
+            # Log the navigation
+            pane_name = "left" if current_pane is self.pane_manager.left_pane else "right"
+            if restored and current_pane['files']:
+                selected_file = current_pane['files'][current_pane['selected_index']].name
+                print(f"Navigated {pane_name} pane: {old_path} → {target_path} (cursor: {selected_file})")
+            else:
+                print(f"Navigated {pane_name} pane: {old_path} → {target_path}")
+            
+            self.needs_full_redraw = True
+            
+        except Exception as e:
+            print(f"Error navigating to {selected_path}: {e}")
+    
     def show_programs_dialog(self):
         """Show external programs using the searchable list dialog"""
         def execute_program_wrapper(program):
@@ -3619,6 +3706,8 @@ class FileManager:
                 self.enter_rename_mode()
             elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
                 self.show_favorite_directories()
+            elif self.is_key_for_action(key, 'history'):  # Show cursor history
+                self.show_cursor_history()
             elif self.is_key_for_action(key, 'programs'):  # Show external programs
                 self.show_programs_dialog()
             elif self.is_key_for_action(key, 'compare_selection'):  # Show compare selection menu
