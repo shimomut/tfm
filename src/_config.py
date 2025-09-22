@@ -31,6 +31,12 @@ class Config:
     
     # Key bindings - customize your shortcuts
     # Each action can have multiple keys assigned to it
+    # Extended format supports selection requirements:
+    # - Simple format: 'action': ['key1', 'key2'] (works regardless of selection status)
+    # - Extended format: 'action': {'keys': ['key1', 'key2'], 'selection': 'any|required|none'}
+    #   - 'any': works regardless of selection status (default)
+    #   - 'required': only works when at least one item is explicitly selected
+    #   - 'none': only works when no items are explicitly selected
     KEY_BINDINGS = {
         'quit': ['q', 'Q'],                    # Exit TFM application
         'help': ['?'],                         # Show help dialog with all key bindings
@@ -58,16 +64,16 @@ class Config:
         'toggle_fallback_colors': ['T'],       # Toggle fallback color mode for compatibility
         'view_options': ['z'],                 # Show view options menu
         'settings_menu': ['Z'],                # Show settings and configuration menu
-        'copy_files': ['c', 'C'],             # Copy selected files to other pane
-        'move_files': ['m', 'M'],             # Move selected files to other pane
-        'delete_files': ['k', 'K'],           # Delete selected files/directories
+        'copy_files': {'keys': ['c', 'C'], 'selection': 'required'},  # Copy selected files to other pane
+        'move_files': {'keys': ['m', 'M'], 'selection': 'required'},  # Move selected files to other pane
+        'delete_files': {'keys': ['k', 'K'], 'selection': 'required'}, # Delete selected files/directories
         'rename_file': ['r', 'R'],            # Rename selected file/directory
         'favorites': ['j', 'J'],              # Show favorite directories dialog
         'subshell': ['X'],                     # Enter subshell (command line) mode
         'programs': ['x'],                     # Show external programs menu
-        'create_archive': ['p', 'P'],         # Create archive from selected files
+        'create_archive': {'keys': ['p', 'P'], 'selection': 'required'}, # Create archive from selected files
         'extract_archive': ['u', 'U'],        # Extract selected archive file
-        'compare_selection': ['w', 'W'],      # Show file comparison options
+        'compare_selection': {'keys': ['w', 'W'], 'selection': 'required'}, # Show file comparison options
         'adjust_pane_left': ['['],            # Make left pane smaller (move boundary left)
         'adjust_pane_right': [']'],           # Make left pane larger (move boundary right)
         'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
