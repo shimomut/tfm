@@ -67,9 +67,9 @@ KEY_BINDINGS = {
    - Module-level convenience functions for backward compatibility
 
 4. **Main TFM Integration** (`src/tfm_main.py`)
-   - Added `is_key_for_action_with_selection()` method
-   - Updated key handling loop to use selection-aware checking
-   - Actions requiring selection now properly check selection status
+   - Updated `is_key_for_action()` method to be selection-aware by default
+   - All key handling automatically respects selection requirements
+   - No need to manually choose between different methods
 
 ### Usage in TFM Code
 
@@ -89,8 +89,8 @@ if is_key_bound_to_with_selection('c', 'copy_files', has_selection):
     # Key is bound and action is available
     pass
 
-# In main TFM loop (already implemented)
-elif self.is_key_for_action_with_selection(key, 'copy_files'):
+# In main TFM loop (unified approach)
+elif self.is_key_for_action(key, 'copy_files'):  # Automatically respects selection requirements
     self.copy_selected_files()
 ```
 
@@ -116,6 +116,8 @@ elif self.is_key_for_action_with_selection(key, 'copy_files'):
 3. **Context Awareness**: UI can show/hide actions based on selection
 4. **Backward Compatibility**: Existing simple format still works
 5. **Flexible Configuration**: Easy to change requirements per action
+6. **Unified Implementation**: Single `is_key_for_action()` method handles all cases
+7. **User Configurable**: Users can set selection requirements for any action
 
 ## Testing
 
@@ -138,6 +140,25 @@ No changes needed - simple format continues to work.
 'my_action': {'keys': ['x', 'X'], 'selection': 'required'}
 ```
 
+### User Configuration Examples
+Users can now configure any action with selection requirements:
+
+```python
+KEY_BINDINGS = {
+    # Make view_text require selection
+    'view_text': {'keys': ['v', 'V'], 'selection': 'required'},
+    
+    # Make create_file only work when nothing is selected
+    'create_file': {'keys': ['E'], 'selection': 'none'},
+    
+    # Keep search working regardless of selection (explicit)
+    'search': {'keys': ['f'], 'selection': 'any'},
+    
+    # Traditional format still works (defaults to 'any')
+    'quit': ['q', 'Q'],
+}
+```
+
 ### For TFM Core Integration
 ```python
 # In your key handler
@@ -154,18 +175,21 @@ def handle_key(key, selected_files):
 
 ## Implementation Status
 
-✅ **COMPLETE** - The extended key bindings format with selection requirements is fully implemented and integrated into TFM.
+✅ **COMPLETE** - The unified key bindings system with dynamic selection requirements is fully implemented and integrated into TFM.
 
 ### What's Working
 - ✅ Extended KEY_BINDINGS format in configuration
 - ✅ Selection requirement checking ('any', 'required', 'none')
 - ✅ Integration with tfm_config.py
-- ✅ Integration with main TFM key handling loop
+- ✅ **Unified key handling** - single `is_key_for_action()` method for all actions
+- ✅ **User-configurable selection requirements** for ANY action
 - ✅ Backward compatibility with existing simple format
-- ✅ Comprehensive test coverage (28 tests passing)
+- ✅ Automatic selection requirement enforcement
+- ✅ Comprehensive test coverage (33+ tests passing)
 - ✅ Utility functions and helper classes
 - ✅ Configuration validation
 - ✅ Documentation and examples
+- ✅ Live demos and integration tests
 
 ### Actions Currently Using Selection Requirements
 - `copy_files` - requires selection

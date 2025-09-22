@@ -158,14 +158,7 @@ class FileManager:
             self.stdscr.clear()
 
     def is_key_for_action(self, key, action):
-        """Check if a key matches a configured action"""
-        if 32 <= key <= 126:  # Printable ASCII
-            key_char = chr(key)
-            return is_key_bound_to(key_char, action)
-        return False
-    
-    def is_key_for_action_with_selection(self, key, action):
-        """Check if a key matches a configured action and is available for current selection status"""
+        """Check if a key matches a configured action and respects selection requirements"""
         if 32 <= key <= 126:  # Printable ASCII
             key_char = chr(key)
             current_pane = self.get_current_pane()
@@ -3718,13 +3711,13 @@ class FileManager:
                 self.show_file_details()
             elif self.is_key_for_action(key, 'view_text'):  # View text file
                 self.view_selected_text_file()
-            elif self.is_key_for_action_with_selection(key, 'copy_files'):  # Copy selected files
+            elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
                 self.copy_selected_files()
-            elif self.is_key_for_action_with_selection(key, 'move_files'):  # Move selected files
+            elif self.is_key_for_action(key, 'move_files'):  # Move selected files
                 self.move_selected_files()
-            elif self.is_key_for_action_with_selection(key, 'delete_files'):  # Delete selected files
+            elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
                 self.delete_selected_files()
-            elif self.is_key_for_action_with_selection(key, 'create_archive'):  # Create archive
+            elif self.is_key_for_action(key, 'create_archive'):  # Create archive
                 self.enter_create_archive_mode()
             elif self.is_key_for_action(key, 'extract_archive'):  # Extract archive
                 self.extract_selected_archive()
@@ -3736,7 +3729,7 @@ class FileManager:
                 self.show_cursor_history()
             elif self.is_key_for_action(key, 'programs'):  # Show external programs
                 self.show_programs_dialog()
-            elif self.is_key_for_action_with_selection(key, 'compare_selection'):  # Show compare selection menu
+            elif self.is_key_for_action(key, 'compare_selection'):  # Show compare selection menu
                 self.show_compare_selection_dialog()
             elif self.is_key_for_action(key, 'help'):  # Show help dialog
                 self.show_help_dialog()
