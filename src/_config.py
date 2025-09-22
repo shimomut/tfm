@@ -61,6 +61,7 @@ class Config:
         'view_text': ['v', 'V'],              # View text file in built-in viewer
         'edit_file': ['e'],                    # Edit selected file with configured text editor
         'create_file': ['E'],                  # Create new file (prompts for filename)
+        'create_directory': {'keys': ['M'], 'selection': 'none'},  # Create new directory (only when no files selected)
         'toggle_fallback_colors': ['T'],       # Toggle fallback color mode for compatibility
         'view_options': ['z'],                 # Show view options menu
         'settings_menu': ['Z'],                # Show settings and configuration menu

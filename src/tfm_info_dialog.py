@@ -231,7 +231,7 @@ class InfoDialogHelpers:
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('copy_files')} Copy selected files")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('move_files')} Move selected files")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('delete_files')} Delete selected files")
-        help_lines.append(f"• {'F7'.ljust(12)} Create new directory")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('create_directory')} Create new directory")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('create_file')} Create new file")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('rename_file')} Rename file/directory")
         help_lines.append("")

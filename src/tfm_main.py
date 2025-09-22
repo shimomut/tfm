@@ -2248,14 +2248,13 @@ class FileManager:
             return processed_files
     
     def move_selected_files(self):
-        """Move selected files to the opposite pane's directory, or create new directory if no files selected"""
+        """Move selected files to the opposite pane's directory"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
         
         # Check if any files are selected
         if not current_pane['selected_files']:
-            # No files selected - create new directory instead
-            self.enter_create_directory_mode()
+            print("No files selected to move")
             return
         
         # Get files to move - selected files
@@ -3685,6 +3684,8 @@ class FileManager:
                 self.edit_selected_file()
             elif self.is_key_for_action(key, 'create_file'):  # Create new file
                 self.enter_create_file_mode()
+            elif self.is_key_for_action(key, 'create_directory'):  # Create new directory
+                self.enter_create_directory_mode()
             elif self.is_key_for_action(key, 'toggle_fallback_colors'):  # Toggle fallback color mode
                 self.toggle_fallback_color_mode()
             elif self.is_key_for_action(key, 'view_options'):  # Show view options
