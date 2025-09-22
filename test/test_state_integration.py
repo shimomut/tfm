@@ -78,6 +78,20 @@ def test_state_manager_integration():
         assert history[0] == search_terms[-1]  # Most recent should be first
         print("✓ Search history managed successfully")
         
+        # Test cursor history methods
+        assert state_manager.save_path_cursor_position('/test/path', 'cursor_file.txt')
+        loaded_cursor = state_manager.load_path_cursor_position('/test/path')
+        assert loaded_cursor == 'cursor_file.txt'
+        
+        # Test multiple cursor positions
+        assert state_manager.save_path_cursor_position('/another/path', 'another_file.py')
+        all_cursors = state_manager.get_all_path_cursor_positions()
+        assert '/test/path' in all_cursors
+        assert '/another/path' in all_cursors
+        assert all_cursors['/test/path'] == 'cursor_file.txt'
+        assert all_cursors['/another/path'] == 'another_file.py'
+        print("✓ Cursor history managed successfully")
+        
         # Test session management
         sessions = state_manager.get_active_sessions()
         assert len(sessions) >= 1

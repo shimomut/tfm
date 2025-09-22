@@ -53,7 +53,8 @@ class FileManager:
         
         # Initialize modular components
         self.log_manager = LogManager(self.config)
-        self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path)
+        self.state_manager = get_state_manager()
+        self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path, self.state_manager)
         self.file_operations = FileOperations(self.config)
         self.list_dialog = ListDialog(self.config)
         self.info_dialog = InfoDialog(self.config)
@@ -63,7 +64,6 @@ class FileManager:
         self.general_dialog = GeneralPurposeDialog(self.config)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
         self.progress_manager = ProgressManager()
-        self.state_manager = get_state_manager()
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)

@@ -10,7 +10,10 @@ from collections import deque
 class PaneManager:
     """Manages dual pane functionality and navigation"""
     
-    def __init__(self, config, left_startup_path, right_startup_path):
+    def __init__(self, config, left_startup_path, right_startup_path, state_manager=None):
+        # Store reference to state manager for persistent cursor history
+        self.state_manager = state_manager
+        
         # Dual pane setup with configuration
         self.left_pane = {
             'path': left_startup_path,
@@ -21,7 +24,6 @@ class PaneManager:
             'sort_mode': getattr(config, 'DEFAULT_SORT_MODE', 'name'),
             'sort_reverse': getattr(config, 'DEFAULT_SORT_REVERSE', False),
             'filter_pattern': "",  # Filename filter pattern for this pane
-            'cursor_history': deque(maxlen=100)  # Store cursor position history (filename, directory_path)
         }
         self.right_pane = {
             'path': right_startup_path,
@@ -32,7 +34,6 @@ class PaneManager:
             'sort_mode': getattr(config, 'DEFAULT_SORT_MODE', 'name'),
             'sort_reverse': getattr(config, 'DEFAULT_SORT_REVERSE', False),
             'filter_pattern': "",  # Filename filter pattern for this pane
-            'cursor_history': deque(maxlen=100)  # Store cursor position history (filename, directory_path)
         }
         
         self.active_pane = 'left'  # 'left' or 'right'
@@ -53,35 +54,57 @@ class PaneManager:
         self.active_pane = 'right' if self.active_pane == 'left' else 'left'
     
     def save_cursor_position(self, pane_data):
-        """Save current cursor position to history"""
+        """Save current cursor position to persistent history"""
         if not pane_data['files'] or pane_data['selected_index'] >= len(pane_data['files']):
             return
             
         current_file = pane_data['files'][pane_data['selected_index']]
-        current_dir = pane_data['path']
-        
-        # Save as (filename, directory_path) tuple
-        cursor_entry = (current_file.name, str(current_dir))
-        
-        # Remove any existing entry for this directory to avoid duplicates
-        pane_data['cursor_history'] = deque(
-            [entry for entry in pane_data['cursor_history'] if entry[1] != str(current_dir)],
-            maxlen=100
-        )
-        
-        # Add the new entry
-        pane_data['cursor_history'].append(cursor_entry)
-    
-    def restore_cursor_position(self, pane_data, display_height):
-        """Restore cursor position from history when changing to a directory"""
         current_dir = str(pane_data['path'])
         
-        # Look for a saved cursor position for this directory
-        for filename, saved_dir in reversed(pane_data['cursor_history']):
-            if saved_dir == current_dir:
+        # If no state manager available, skip saving
+        if not self.state_manager:
+            return
+        
+        try:
+            # Load existing cursor history
+            cursor_history = self.state_manager.get_state("path_cursor_history", {})
+            
+            # Save the cursor position for this directory
+            cursor_history[current_dir] = current_file.name
+            
+            # Limit the size of the history (keep most recent 100 directories)
+            if len(cursor_history) > 100:
+                # Convert to list of (dir, filename) tuples, sort by directory name, keep last 100
+                items = list(cursor_history.items())
+                items = items[-100:]  # Keep the last 100 entries
+                cursor_history = dict(items)
+            
+            # Save back to state manager
+            self.state_manager.set_state("path_cursor_history", cursor_history)
+            
+        except Exception as e:
+            # If state saving fails, continue silently (graceful degradation)
+            pass
+    
+    def restore_cursor_position(self, pane_data, display_height):
+        """Restore cursor position from persistent history when changing to a directory"""
+        current_dir = str(pane_data['path'])
+        
+        # If no state manager available, skip restoration
+        if not self.state_manager:
+            return False
+        
+        try:
+            # Load cursor history from state manager
+            cursor_history = self.state_manager.get_state("path_cursor_history", {})
+            
+            # Look for a saved cursor position for this directory
+            if current_dir in cursor_history:
+                target_filename = cursor_history[current_dir]
+                
                 # Try to find this filename in current files
                 for i, file_path in enumerate(pane_data['files']):
-                    if file_path.name == filename:
+                    if file_path.name == target_filename:
                         pane_data['selected_index'] = i
                         
                         # Adjust scroll offset to keep selection visible
@@ -91,6 +114,10 @@ class PaneManager:
                             pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
                         
                         return True
+            
+        except Exception as e:
+            # If state loading fails, continue silently (graceful degradation)
+            pass
         
         return False
     

@@ -19,6 +19,7 @@ The TFM State Manager provides persistent application state management using SQL
 - **Window Layout**: Pane width ratios, log pane height
 - **Recent Directories**: History of visited directories for quick navigation
 - **Search History**: Previously used search terms for auto-completion
+- **Path Cursor History**: Cursor positions for each visited directory path
 - **Session Information**: Active TFM instances with heartbeat tracking
 
 ## Architecture
@@ -122,6 +123,12 @@ recent_dirs = state_manager.load_recent_directories()
 # Search history
 state_manager.add_search_term('*.py')
 search_history = state_manager.load_search_history()
+
+# Path cursor history
+state_manager.save_path_cursor_position('/home/user/projects', 'main.py')
+cursor_filename = state_manager.load_path_cursor_position('/home/user/projects')
+all_cursor_positions = state_manager.get_all_path_cursor_positions()
+state_manager.clear_path_cursor_history()  # Clear all cursor positions
 ```
 
 ### Session Management
@@ -205,6 +212,35 @@ def handle_search_dialog_input(self, key):
         search_term = self.search_dialog.pattern_editor.text.strip()
         if search_term:
             self.add_search_to_history(search_term)
+```
+
+### Cursor History Integration
+
+The PaneManager now uses persistent cursor history instead of in-memory storage:
+
+```python
+# PaneManager initialization with state manager
+self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path, self.state_manager)
+
+# Cursor positions are automatically saved when navigating
+def save_cursor_position(self, pane_data):
+    current_file = pane_data['files'][pane_data['selected_index']]
+    current_dir = str(pane_data['path'])
+    
+    if self.state_manager:
+        cursor_history = self.state_manager.get_state("path_cursor_history", {})
+        cursor_history[current_dir] = current_file.name
+        self.state_manager.set_state("path_cursor_history", cursor_history)
+
+# Cursor positions are automatically restored when entering directories
+def restore_cursor_position(self, pane_data, display_height):
+    current_dir = str(pane_data['path'])
+    
+    if self.state_manager:
+        cursor_history = self.state_manager.get_state("path_cursor_history", {})
+        if current_dir in cursor_history:
+            target_filename = cursor_history[current_dir]
+            # ... find and restore cursor to target_filename
 ```
 
 ## Multi-Instance Safety

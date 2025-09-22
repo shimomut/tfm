@@ -605,6 +605,77 @@ class TFMStateManager(StateManager):
         history = history[:max_count]
         
         return self.save_search_history(history, max_count)
+    
+    def save_path_cursor_position(self, directory_path: str, filename: str) -> bool:
+        """
+        Save cursor position for a specific directory path.
+        
+        Args:
+            directory_path: Directory path
+            filename: Filename where cursor was positioned
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            cursor_history = self.get_state("path_cursor_history", {})
+            cursor_history[directory_path] = filename
+            
+            # Limit the size of the history (keep most recent 100 directories)
+            if len(cursor_history) > 100:
+                items = list(cursor_history.items())
+                items = items[-100:]  # Keep the last 100 entries
+                cursor_history = dict(items)
+            
+            return self.set_state("path_cursor_history", cursor_history, self.instance_id)
+            
+        except Exception as e:
+            print(f"Warning: Could not save cursor position: {e}")
+            return False
+    
+    def load_path_cursor_position(self, directory_path: str) -> Optional[str]:
+        """
+        Load cursor position for a specific directory path.
+        
+        Args:
+            directory_path: Directory path
+            
+        Returns:
+            Optional[str]: Filename where cursor was positioned, or None if not found
+        """
+        try:
+            cursor_history = self.get_state("path_cursor_history", {})
+            return cursor_history.get(directory_path)
+            
+        except Exception as e:
+            print(f"Warning: Could not load cursor position: {e}")
+            return None
+    
+    def get_all_path_cursor_positions(self) -> Dict[str, str]:
+        """
+        Get all saved cursor positions.
+        
+        Returns:
+            Dict[str, str]: Dictionary mapping directory paths to filenames
+        """
+        try:
+            return self.get_state("path_cursor_history", {})
+        except Exception as e:
+            print(f"Warning: Could not load cursor positions: {e}")
+            return {}
+    
+    def clear_path_cursor_history(self) -> bool:
+        """
+        Clear all saved cursor positions.
+        
+        Returns:
+            bool: True if successful
+        """
+        try:
+            return self.set_state("path_cursor_history", {}, self.instance_id)
+        except Exception as e:
+            print(f"Warning: Could not clear cursor history: {e}")
+            return False
 
 
 # Global state manager instance
