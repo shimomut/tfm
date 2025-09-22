@@ -1477,18 +1477,18 @@ class FileManager:
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
-    def show_cursor_history(self):
-        """Show cursor history with TAB switching between left and right pane histories"""
+    def show_history(self):
+        """Show history with TAB switching between left and right pane histories"""
         current_pane = self.get_current_pane()
         initial_pane_name = 'left' if current_pane is self.pane_manager.left_pane else 'right'
         
         # Start with the current pane's history
-        self._show_cursor_history_for_pane(initial_pane_name)
+        self._show_history_for_pane(initial_pane_name)
     
-    def _show_cursor_history_for_pane(self, pane_name):
-        """Show cursor history for a specific pane with TAB switching support"""
-        # Get cursor history for the specified pane
-        history = self.state_manager.get_ordered_pane_cursor_history(pane_name)
+    def _show_history_for_pane(self, pane_name):
+        """Show history for a specific pane with TAB switching support"""
+        # Get history for the specified pane
+        history = self.state_manager.get_ordered_pane_history(pane_name)
         
         # Extract just the paths (no timestamps or filenames needed in dialog)
         history_paths = []
@@ -1518,7 +1518,7 @@ class FileManager:
                 other_pane = 'right' if pane_name == 'left' else 'left'
                 # Exit current dialog and show the other pane's history
                 self.list_dialog.exit()
-                self._show_cursor_history_for_pane(other_pane)
+                self._show_history_for_pane(other_pane)
                 self.needs_full_redraw = True
                 self._force_immediate_redraw()
                 return True
@@ -3729,8 +3729,8 @@ class FileManager:
                 self.enter_rename_mode()
             elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
                 self.show_favorite_directories()
-            elif self.is_key_for_action(key, 'history'):  # Show cursor history
-                self.show_cursor_history()
+            elif self.is_key_for_action(key, 'history'):  # Show history
+                self.show_history()
             elif self.is_key_for_action(key, 'programs'):  # Show external programs
                 self.show_programs_dialog()
             elif self.is_key_for_action(key, 'compare_selection'):  # Show compare selection menu
@@ -3771,7 +3771,7 @@ class FileManager:
             # Update session heartbeat
             self.state_manager.update_session_heartbeat()
             
-            # Clean up non-existing directories from cursor history before restoring state
+            # Clean up non-existing directories from history before restoring state
             self.state_manager.cleanup_non_existing_directories()
             
             # Load window layout

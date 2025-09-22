@@ -70,6 +70,7 @@ class DefaultConfig:
         'delete_files': {'keys': ['k', 'K'], 'selection': 'required'}, # Delete selected files/directories
         'rename_file': ['r', 'R'],            # Rename selected file/directory
         'favorites': ['j', 'J'],              # Show favorite directories dialog
+        'history': ['h', 'H'],                # Show history for current pane
         'subshell': ['X'],                     # Enter subshell (command line) mode
         'programs': ['x'],                     # Show external programs menu
         'create_archive': {'keys': ['p', 'P'], 'selection': 'required'}, # Create archive from selected files
@@ -101,8 +102,8 @@ class DefaultConfig:
     # Performance settings
     MAX_LOG_MESSAGES = 1000
     
-    # Cursor history settings
-    MAX_CURSOR_HISTORY_ENTRIES = 100  # Maximum number of cursor history entries to keep
+    # History settings
+    MAX_HISTORY_ENTRIES = 100  # Maximum number of history entries to keep
     
     # File display settings
     SEPARATE_EXTENSIONS = True  # Show file extensions separately from basenames

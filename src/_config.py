@@ -70,6 +70,7 @@ class Config:
         'delete_files': {'keys': ['k', 'K'], 'selection': 'required'}, # Delete selected files/directories
         'rename_file': ['r', 'R'],            # Rename selected file/directory
         'favorites': ['j', 'J'],              # Show favorite directories dialog
+        'history': ['h', 'H'],                # Show history for current pane
         'subshell': ['X'],                     # Enter subshell (command line) mode
         'programs': ['x'],                     # Show external programs menu
         'create_archive': {'keys': ['p', 'P'], 'selection': 'required'}, # Create archive from selected files
