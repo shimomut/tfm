@@ -53,7 +53,7 @@ def test_search_integration():
         
         # Test filename search
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*.txt"
+        search_dialog.text_editor.text = "*.txt"
         search_dialog.perform_search(test_dir)
         
         # Wait for search to complete
@@ -88,7 +88,7 @@ def test_search_integration():
         
         # Test content search
         search_dialog.show('content')
-        search_dialog.pattern_editor.text = "test"
+        search_dialog.text_editor.text = "test"
         search_dialog.perform_search(test_dir)
         
         # Wait for search to complete

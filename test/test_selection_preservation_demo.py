@@ -89,7 +89,7 @@ def demo_selection_preservation():
         
         # Apply filter that includes the selected directory
         print("\n4. Applying filter 'beta' (should preserve selection)...")
-        jump_dialog.search_editor.text = "beta"
+        jump_dialog.text_editor.text = "beta"
         jump_dialog._filter_directories()
         
         with jump_dialog.scan_lock:
@@ -110,7 +110,7 @@ def demo_selection_preservation():
         
         # Apply filter that excludes the selected directory
         print("\n5. Applying filter 'gamma' (should reset selection)...")
-        jump_dialog.search_editor.text = "gamma"
+        jump_dialog.text_editor.text = "gamma"
         jump_dialog._filter_directories()
         
         with jump_dialog.scan_lock:
@@ -127,7 +127,7 @@ def demo_selection_preservation():
         
         # Clear filter to show all directories again
         print("\n6. Clearing filter (should show all directories)...")
-        jump_dialog.search_editor.text = ""
+        jump_dialog.text_editor.text = ""
         jump_dialog._filter_directories()
         
         with jump_dialog.scan_lock:

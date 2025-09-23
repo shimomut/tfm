@@ -198,7 +198,7 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
             time.sleep(0.1)
         
         # Test filtering by "project1"
-        jump_dialog.search_editor.text = "project1"
+        jump_dialog.text_editor.text = "project1"
         jump_dialog._filter_directories()
         
         with jump_dialog.scan_lock:
@@ -209,7 +209,7 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
             self.assertIn("project1", str(directory).lower())
         
         # Test filtering by "src"
-        jump_dialog.search_editor.text = "src"
+        jump_dialog.text_editor.text = "src"
         jump_dialog._filter_directories()
         
         with jump_dialog.scan_lock:
@@ -266,7 +266,7 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
         # Perform concurrent operations
         def concurrent_filtering():
             for i in range(20):
-                jump_dialog.search_editor.text = f"project{i % 2 + 1}"
+                jump_dialog.text_editor.text = f"project{i % 2 + 1}"
                 jump_dialog._filter_directories()
                 time.sleep(0.01)
         

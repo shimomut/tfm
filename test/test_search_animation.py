@@ -152,7 +152,7 @@ def test_animation_with_actual_search():
             (temp_dir / f"test_file_{i:03d}.txt").write_text(f"Test content {i}")
         
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*.txt"
+        search_dialog.text_editor.text = "*.txt"
         
         # Start search
         search_dialog.perform_search(temp_dir)

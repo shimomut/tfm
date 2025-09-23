@@ -52,7 +52,7 @@ def test_empty_pattern_cancels_search():
         search_dialog.show('filename')
         
         # Start a search that will take some time
-        search_dialog.pattern_editor.text = "*"  # Use broader pattern to ensure longer search
+        search_dialog.text_editor.text = "*"  # Use broader pattern to ensure longer search
         search_dialog.perform_search(test_dir)
         
         # Wait for search to actually start and be running
@@ -65,7 +65,7 @@ def test_empty_pattern_cancels_search():
         
         if search_dialog.searching:
             # Clear the pattern (simulate user deleting all characters)
-            search_dialog.pattern_editor.text = ""
+            search_dialog.text_editor.text = ""
             search_dialog.perform_search(test_dir)
             
             # Verify search was cancelled immediately
@@ -88,7 +88,7 @@ def test_empty_pattern_cancels_search():
             
             if result_count > 0:
                 # Clear the pattern
-                search_dialog.pattern_editor.text = ""
+                search_dialog.text_editor.text = ""
                 search_dialog.perform_search(test_dir)
                 
                 # Verify results are cleared
@@ -118,7 +118,7 @@ def test_empty_pattern_during_content_search():
         search_dialog.show('content')
         
         # Start a content search that will take some time
-        search_dialog.pattern_editor.text = "content"
+        search_dialog.text_editor.text = "content"
         search_dialog.perform_search(test_dir)
         
         # Wait for search to actually start
@@ -131,7 +131,7 @@ def test_empty_pattern_during_content_search():
         
         if search_dialog.searching:
             # Clear the pattern
-            search_dialog.pattern_editor.text = ""
+            search_dialog.text_editor.text = ""
             search_dialog.perform_search(test_dir)
             
             # Verify search was cancelled immediately
@@ -150,7 +150,7 @@ def test_empty_pattern_during_content_search():
                 result_count = len(search_dialog.results)
             
             # Clear the pattern
-            search_dialog.pattern_editor.text = ""
+            search_dialog.text_editor.text = ""
             search_dialog.perform_search(test_dir)
             
             # Verify results are cleared
@@ -176,7 +176,7 @@ def test_pattern_change_sequence():
         search_dialog.show('filename')
         
         # Start with a pattern
-        search_dialog.pattern_editor.text = "*"
+        search_dialog.text_editor.text = "*"
         search_dialog.perform_search(test_dir)
         
         # Wait for search to start
@@ -190,7 +190,7 @@ def test_pattern_change_sequence():
         print(f"First search started: {was_searching}")
         
         # Change to empty pattern
-        search_dialog.pattern_editor.text = ""
+        search_dialog.text_editor.text = ""
         search_dialog.perform_search(test_dir)
         
         assert not search_dialog.searching, "Search should be cancelled"
@@ -200,7 +200,7 @@ def test_pattern_change_sequence():
             assert len(search_dialog.results) == 0, "Results should be cleared"
         
         # Change to new pattern
-        search_dialog.pattern_editor.text = "test_file_0001.txt"
+        search_dialog.text_editor.text = "test_file_0001.txt"
         search_dialog.perform_search(test_dir)
         
         # Wait for new search to start or complete
@@ -215,7 +215,7 @@ def test_pattern_change_sequence():
         print(f"New search found {result_count} results")
         
         # Change back to empty
-        search_dialog.pattern_editor.text = ""
+        search_dialog.text_editor.text = ""
         search_dialog.perform_search(test_dir)
         
         assert not search_dialog.searching, "Search should be cancelled again"
@@ -243,7 +243,7 @@ def test_empty_pattern_with_existing_results():
         search_dialog.show('filename')
         
         # Start search and wait for completion - use pattern that will definitely match
-        search_dialog.pattern_editor.text = "test_file_0001.txt"  # This file should exist
+        search_dialog.text_editor.text = "test_file_0001.txt"  # This file should exist
         search_dialog.perform_search(test_dir)
         
         # Wait for search to complete
@@ -257,7 +257,7 @@ def test_empty_pattern_with_existing_results():
         
         if original_result_count == 0:
             # Try a broader pattern
-            search_dialog.pattern_editor.text = "*.txt"
+            search_dialog.text_editor.text = "*.txt"
             search_dialog.perform_search(test_dir)
             
             # Wait for search to complete
@@ -272,7 +272,7 @@ def test_empty_pattern_with_existing_results():
         
         if original_result_count > 0:
             # Clear pattern
-            search_dialog.pattern_editor.text = ""
+            search_dialog.text_editor.text = ""
             search_dialog.perform_search(test_dir)
             
             # Verify results are cleared

@@ -47,13 +47,13 @@ def test_modes_use_single_line_edit():
         print("Testing dialog editor types...")
         
         # Test list dialog search
-        assert hasattr(fm.list_dialog, 'search_editor'), "list_dialog.search_editor attribute missing"
-        assert isinstance(fm.list_dialog.search_editor, SingleLineTextEdit), "list_dialog.search_editor is not SingleLineTextEdit"
+        assert hasattr(fm.list_dialog, 'text_editor'), "list_dialog.text_editor attribute missing"
+        assert isinstance(fm.list_dialog.text_editor, SingleLineTextEdit), "list_dialog.text_editor is not SingleLineTextEdit"
         print("✓ List dialog search uses SingleLineTextEdit")
         
         # Test search dialog pattern
-        assert hasattr(fm.search_dialog, 'pattern_editor'), "search_dialog.pattern_editor attribute missing"
-        assert isinstance(fm.search_dialog.pattern_editor, SingleLineTextEdit), "search_dialog.pattern_editor is not SingleLineTextEdit"
+        assert hasattr(fm.search_dialog, 'text_editor'), "search_dialog.text_editor attribute missing"
+        assert isinstance(fm.search_dialog.text_editor, SingleLineTextEdit), "search_dialog.text_editor is not SingleLineTextEdit"
         print("✓ Search dialog pattern uses SingleLineTextEdit")
         
         # Test batch rename mode

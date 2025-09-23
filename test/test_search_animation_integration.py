@@ -65,7 +65,7 @@ def test_animation_with_full_integration():
         
         # Test filename search with animation
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*.txt"
+        search_dialog.text_editor.text = "*.txt"
         
         # Verify animation resets on show
         assert search_dialog.progress_animator.frame_index == 0
@@ -165,7 +165,7 @@ def test_animation_thread_safety_integration():
     
     try:
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*"
+        search_dialog.text_editor.text = "*"
         
         # Start search
         search_dialog.perform_search(test_dir)
@@ -221,7 +221,7 @@ def test_animation_with_search_cancellation():
     
     try:
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*"
+        search_dialog.text_editor.text = "*"
         
         # Start search
         search_dialog.perform_search(test_dir)
@@ -233,7 +233,7 @@ def test_animation_with_search_cancellation():
         frame_before_cancel = search_dialog.progress_animator.frame_index
         
         # Cancel search by clearing pattern
-        search_dialog.pattern_editor.text = ""
+        search_dialog.text_editor.text = ""
         search_dialog.perform_search(test_dir)
         
         # Verify search is cancelled
@@ -247,7 +247,7 @@ def test_animation_with_search_cancellation():
         assert frame is not None
         
         # Start new search
-        search_dialog.pattern_editor.text = "*.py"
+        search_dialog.text_editor.text = "*.py"
         search_dialog.perform_search(test_dir)
         
         # Animation should reset for new search
@@ -279,7 +279,7 @@ def test_animation_performance_impact():
         # Time search with animation
         search_dialog_animated = SearchDialog(config_with_animation)
         search_dialog_animated.show('filename')
-        search_dialog_animated.pattern_editor.text = "*"
+        search_dialog_animated.text_editor.text = "*"
         
         start_time = time.time()
         search_dialog_animated.perform_search(test_dir)
@@ -297,7 +297,7 @@ def test_animation_performance_impact():
         # Time search without animation
         search_dialog_no_anim = SearchDialog(NoAnimationConfig())
         search_dialog_no_anim.show('filename')
-        search_dialog_no_anim.pattern_editor.text = "*"
+        search_dialog_no_anim.text_editor.text = "*"
         
         start_time = time.time()
         search_dialog_no_anim.perform_search(test_dir)
