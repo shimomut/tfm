@@ -88,9 +88,17 @@ class Config:
 
 ### Visual Feedback
 - "Searching..." indicator during active searches
+- Animated progress indicators (configurable patterns)
 - Result count with progress information
 - Limit reached notification
 - Thread status indication
+
+### Animated Progress Indicators
+- Three animation patterns: spinner, dots, progress bar
+- Configurable animation speed
+- Visual feedback during search operations
+- Thread-safe animation updates
+- See [SEARCH_ANIMATION_FEATURE.md](SEARCH_ANIMATION_FEATURE.md) for details
 
 ## Performance Benefits
 

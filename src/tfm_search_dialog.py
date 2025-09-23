@@ -15,6 +15,61 @@ from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
 
 
+class SearchProgressAnimator:
+    """Handles animated progress indicators for search operations"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.animation_pattern = getattr(config, 'SEARCH_ANIMATION_PATTERN', 'spinner')
+        self.animation_speed = getattr(config, 'SEARCH_ANIMATION_SPEED', 0.2)
+        
+        # Animation patterns
+        self.patterns = {
+            'spinner': ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
+            'dots': ['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈'],
+            'progress': ['▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
+        }
+        
+        # Animation state
+        self.frame_index = 0
+        self.last_update_time = 0
+        
+    def get_current_frame(self):
+        """Get the current animation frame"""
+        current_time = time.time()
+        
+        # Update frame if enough time has passed
+        if current_time - self.last_update_time >= self.animation_speed:
+            pattern = self.patterns.get(self.animation_pattern, self.patterns['spinner'])
+            self.frame_index = (self.frame_index + 1) % len(pattern)
+            self.last_update_time = current_time
+        
+        pattern = self.patterns.get(self.animation_pattern, self.patterns['spinner'])
+        return pattern[self.frame_index]
+    
+    def reset(self):
+        """Reset animation to first frame"""
+        self.frame_index = 0
+        self.last_update_time = 0
+    
+    def get_progress_indicator(self, result_count, is_searching):
+        """Get formatted progress indicator text"""
+        if not is_searching:
+            return ""
+        
+        frame = self.get_current_frame()
+        
+        if self.animation_pattern == 'progress':
+            # For progress pattern, show a progress bar effect
+            progress_length = 8
+            filled = (self.frame_index * progress_length) // len(self.patterns['progress'])
+            bar = '█' * filled + '░' * (progress_length - filled)
+            return f" [{bar}] "
+        else:
+            # For spinner and dots, show rotating indicator
+            return f" {frame} "
+
+
 class SearchDialog:
     """Search dialog component for filename and content search with threading support"""
     
@@ -35,6 +90,9 @@ class SearchDialog:
         self.search_lock = threading.Lock()
         self.cancel_search = threading.Event()
         self.last_search_pattern = ""
+        
+        # Animation support
+        self.progress_animator = SearchProgressAnimator(config)
         
         # Get configurable search result limit
         self.max_search_results = getattr(config, 'MAX_SEARCH_RESULTS', 10000)
@@ -57,6 +115,9 @@ class SearchDialog:
         self.searching = False
         self.last_search_pattern = ""
         
+        # Reset animation
+        self.progress_animator.reset()
+        
     def exit(self):
         """Exit search dialog mode"""
         # Cancel any running search
@@ -70,6 +131,9 @@ class SearchDialog:
         self.scroll = 0
         self.searching = False
         self.last_search_pattern = ""
+        
+        # Reset animation
+        self.progress_animator.reset()
         
     def handle_input(self, key):
         """Handle input while in search dialog mode"""
@@ -182,6 +246,9 @@ class SearchDialog:
         self.cancel_search.clear()
         self.searching = True
         self.last_search_pattern = pattern_text
+        
+        # Reset animation for new search
+        self.progress_animator.reset()
         
         self.search_thread = threading.Thread(
             target=self._search_worker,
@@ -413,22 +480,33 @@ class SearchDialog:
             sep_line = "├" + "─" * (dialog_width - 2) + "┤"
             safe_addstr_func(sep_y, start_x, sep_line[:dialog_width], border_color)
         
-        # Draw results count (thread-safe)
+        # Draw results count with animated progress indicator (thread-safe)
         count_y = start_y + 5
         if count_y < height:
             with self.search_lock:
                 result_count = len(self.results)
-                if self.searching:
+                is_searching = self.searching
+                
+                if is_searching:
+                    # Get animated progress indicator
+                    progress_indicator = self.progress_animator.get_progress_indicator(result_count, is_searching)
+                    
                     if result_count >= self.max_search_results:
-                        count_text = f"Searching... (limit reached: {result_count})"
+                        count_text = f"Searching{progress_indicator}(limit reached: {result_count})"
                     else:
-                        count_text = f"Searching... ({result_count} found)"
+                        count_text = f"Searching{progress_indicator}({result_count} found)"
+                    
+                    # Use brighter color for active search
+                    count_color = get_status_color() | curses.A_BOLD
                 else:
                     if result_count >= self.max_search_results:
                         count_text = f"Results: {result_count} (limit reached)"
                     else:
                         count_text = f"Results: {result_count}"
-            safe_addstr_func(count_y, start_x + 2, count_text, get_status_color() | curses.A_DIM)
+                    
+                    count_color = get_status_color() | curses.A_DIM
+            
+            safe_addstr_func(count_y, start_x + 2, count_text[:dialog_width - 4], count_color)
         
         # Calculate results area
         results_start_y = start_y + 6
