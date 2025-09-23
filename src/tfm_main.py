@@ -34,6 +34,7 @@ from tfm_file_operations import FileOperations
 from tfm_list_dialog import ListDialog, ListDialogHelpers
 from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
+from tfm_jump_dialog import JumpDialog, JumpDialogHelpers
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
@@ -59,6 +60,7 @@ class FileManager:
         self.list_dialog = ListDialog(self.config)
         self.info_dialog = InfoDialog(self.config)
         self.search_dialog = SearchDialog(self.config)
+        self.jump_dialog = JumpDialog(self.config)
         self.batch_rename_dialog = BatchRenameDialog(self.config)
         self.quick_choice_bar = QuickChoiceBar(self.config)
         self.general_dialog = GeneralPurposeDialog(self.config)
@@ -1425,6 +1427,8 @@ class FileManager:
             self.info_dialog.draw(self.stdscr, self.safe_addstr)
         elif self.search_dialog.mode:
             self.search_dialog.draw(self.stdscr, self.safe_addstr)
+        elif self.jump_dialog.mode:
+            self.jump_dialog.draw(self.stdscr, self.safe_addstr)
         elif self.batch_rename_dialog.mode:
             self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
         
@@ -3419,6 +3423,39 @@ class FileManager:
         SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
         self.needs_full_redraw = True
 
+    def show_jump_dialog(self):
+        """Show the jump dialog - wrapper for jump dialog component"""
+        current_pane = self.get_current_pane()
+        root_directory = current_pane['path']
+        self.jump_dialog.show(root_directory)
+        self.needs_full_redraw = True
+        
+        # Force immediate redraw to show dialog
+        self._force_immediate_redraw()
+    
+    def exit_jump_dialog_mode(self):
+        """Exit jump dialog mode - wrapper for jump dialog component"""
+        self.jump_dialog.exit()
+        self.needs_full_redraw = True
+    
+    def handle_jump_dialog_input(self, key):
+        """Handle input while in jump dialog mode - wrapper for jump dialog component"""
+        result = self.jump_dialog.handle_input(key)
+        
+        if result == True:
+            self.needs_full_redraw = True
+            return True
+        elif isinstance(result, tuple):
+            action, data = result
+            if action == 'navigate':
+                if data:
+                    JumpDialogHelpers.navigate_to_directory(data, self.pane_manager, print)
+                    
+                self.exit_jump_dialog_mode()
+                return True
+        
+        return False
+
     def run(self):
         """Main application loop"""
         while True:
@@ -3461,6 +3498,9 @@ class FileManager:
                 dialog_drawn = True
             elif self.search_dialog.mode:
                 self.search_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.jump_dialog.mode:
+                self.jump_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
             elif self.batch_rename_dialog.mode:
                 self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
@@ -3509,6 +3549,11 @@ class FileManager:
                 if self.handle_search_dialog_input(key):
                     continue  # Search dialog mode handled the key
             
+            # Handle jump dialog mode input
+            if self.jump_dialog.mode:
+                if self.handle_jump_dialog_input(key):
+                    continue  # Jump dialog mode handled the key
+            
             # Handle batch rename dialog mode input
             if self.batch_rename_dialog.mode:
                 if self.handle_batch_rename_input(key):
@@ -3516,7 +3561,7 @@ class FileManager:
             
             # Skip regular key processing if any dialog is open
             # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog.mode or self.batch_rename_dialog.mode or self.isearch_mode or self.general_dialog.is_active:
+            if self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog.mode or self.jump_dialog.mode or self.batch_rename_dialog.mode or self.isearch_mode or self.general_dialog.is_active:
                 continue
             
             if self.is_key_for_action(key, 'quit'):
@@ -3681,6 +3726,8 @@ class FileManager:
                 self.sync_other_to_current()
             elif self.is_key_for_action(key, 'search_dialog'):  # Show search dialog (filename)
                 self.show_search_dialog('filename')
+            elif self.is_key_for_action(key, 'jump_dialog'):  # Show jump dialog (Shift+J)
+                self.show_jump_dialog()
             elif self.is_key_for_action(key, 'search_content'):  # Show search dialog (content)
                 self.show_search_dialog('content')
             elif self.is_key_for_action(key, 'edit_file'):  # Edit existing file

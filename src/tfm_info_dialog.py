@@ -244,6 +244,7 @@ class InfoDialogHelpers:
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('filter')} Filter files by pattern")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('clear_filter')} Clear file filter")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('search_dialog')} Filename search dialog")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('jump_dialog')} Jump to directory dialog")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('search_content')} Content search dialog")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('file_details')} Show file details")
         help_lines.append("")

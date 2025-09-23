@@ -69,7 +69,8 @@ class Config:
         'move_files': {'keys': ['m', 'M'], 'selection': 'required'},  # Move selected files to other pane
         'delete_files': {'keys': ['k', 'K'], 'selection': 'required'}, # Delete selected files/directories
         'rename_file': ['r', 'R'],            # Rename selected file/directory
-        'favorites': ['j', 'J'],              # Show favorite directories dialog
+        'favorites': ['j'],                   # Show favorite directories dialog
+        'jump_dialog': ['J'],                 # Show jump to directory dialog (Shift+J)
         'history': ['h', 'H'],                # Show history for current pane
         'subshell': ['X'],                     # Enter subshell (command line) mode
         'programs': ['x'],                     # Show external programs menu
@@ -105,6 +106,7 @@ class Config:
     
     # Performance settings
     MAX_LOG_MESSAGES = 1000
+    MAX_JUMP_DIRECTORIES = 5000  # Maximum directories to scan for jump dialog
     
     # Progress animation settings
     PROGRESS_ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow'
