@@ -45,7 +45,7 @@ def test_directory_existence_check():
         state_manager.save_pane_cursor_position("left", str(non_existing_dir), "file2.txt")
         
         # Verify both entries exist in history
-        history_before = state_manager.get_pane_positions("left")
+        history_before = state_manager.get_pane_cursor_positions("left")
         assert str(existing_dir) in history_before
         assert str(non_existing_dir) in history_before
         print(f"Before cleanup - History entries: {len(history_before)}")
@@ -56,7 +56,7 @@ def test_directory_existence_check():
         
         # This is where we need to implement the cleanup
         # For now, let's verify the current behavior
-        history_after = state_manager.get_pane_positions("left")
+        history_after = state_manager.get_pane_cursor_positions("left")
         print(f"After directory removal - History entries: {len(history_after)}")
         
         # Currently, both entries still exist (this is the problem we need to fix)
@@ -104,8 +104,8 @@ def test_cleanup_non_existing_directories():
         state_manager.save_pane_cursor_position("right", str(non_existing_dir1), "file6.txt")
         
         # Verify all entries exist in history
-        left_history_before = state_manager.get_pane_positions("left")
-        right_history_before = state_manager.get_pane_positions("right")
+        left_history_before = state_manager.get_pane_cursor_positions("left")
+        right_history_before = state_manager.get_pane_cursor_positions("right")
         
         assert len(left_history_before) == 4
         assert len(right_history_before) == 2
@@ -118,8 +118,8 @@ def test_cleanup_non_existing_directories():
         state_manager.cleanup_non_existing_directories()
         
         # Verify only existing directories remain
-        left_history_after = state_manager.get_pane_positions("left")
-        right_history_after = state_manager.get_pane_positions("right")
+        left_history_after = state_manager.get_pane_cursor_positions("left")
+        right_history_after = state_manager.get_pane_cursor_positions("right")
         
         assert len(left_history_after) == 2
         assert len(right_history_after) == 1

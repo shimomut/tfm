@@ -689,9 +689,9 @@ class TFMStateManager(StateManager):
             print(f"Warning: Could not load position for {pane_name} pane: {e}")
             return None
     
-    def get_pane_positions(self, pane_name: str) -> Dict[str, str]:
+    def get_pane_cursor_positions(self, pane_name: str) -> Dict[str, str]:
         """
-        Get all saved positions for a specific pane as a dictionary.
+        Get all saved cursor positions for a specific pane as a dictionary.
         
         Args:
             pane_name: Name of the pane ('left' or 'right')
