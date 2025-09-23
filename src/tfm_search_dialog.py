@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 TUI File Manager - Search Dialog Component
-Provides file and content search functionality
+Provides file and content search functionality with threading support
 """
 
 import curses
 import fnmatch
 import re
+import threading
+import time
 from pathlib import Path
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2
@@ -14,7 +16,7 @@ from tfm_colors import get_status_color
 
 
 class SearchDialog:
-    """Search dialog component for filename and content search"""
+    """Search dialog component for filename and content search with threading support"""
     
     def __init__(self, config):
         self.config = config
@@ -28,12 +30,24 @@ class SearchDialog:
         self.scroll = 0  # Scroll offset for results
         self.searching = False  # Whether search is in progress
         
+        # Threading support
+        self.search_thread = None
+        self.search_lock = threading.Lock()
+        self.cancel_search = threading.Event()
+        self.last_search_pattern = ""
+        
+        # Get configurable search result limit
+        self.max_search_results = getattr(config, 'MAX_SEARCH_RESULTS', 10000)
+        
     def show(self, search_type='filename'):
         """Show the search dialog for filename or content search
         
         Args:
             search_type: 'filename' or 'content' search mode
         """
+        # Cancel any existing search first
+        self._cancel_current_search()
+        
         self.mode = True
         self.search_type = search_type
         self.pattern_editor.clear()
@@ -41,9 +55,13 @@ class SearchDialog:
         self.selected = 0
         self.scroll = 0
         self.searching = False
+        self.last_search_pattern = ""
         
     def exit(self):
         """Exit search dialog mode"""
+        # Cancel any running search
+        self._cancel_current_search()
+        
         self.mode = False
         self.search_type = 'filename'
         self.pattern_editor.clear()
@@ -51,33 +69,40 @@ class SearchDialog:
         self.selected = 0
         self.scroll = 0
         self.searching = False
+        self.last_search_pattern = ""
         
     def handle_input(self, key):
         """Handle input while in search dialog mode"""
         if key == 27:  # ESC - cancel
+            # Cancel search before exiting
+            self._cancel_current_search()
             self.exit()
             return True
         elif key == curses.KEY_UP:
-            # Move selection up
-            if self.results and self.selected > 0:
-                self.selected -= 1
-                self._adjust_scroll()
+            # Move selection up (thread-safe)
+            with self.search_lock:
+                if self.results and self.selected > 0:
+                    self.selected -= 1
+                    self._adjust_scroll()
             return True
         elif key == curses.KEY_DOWN:
-            # Move selection down
-            if self.results and self.selected < len(self.results) - 1:
-                self.selected += 1
-                self._adjust_scroll()
+            # Move selection down (thread-safe)
+            with self.search_lock:
+                if self.results and self.selected < len(self.results) - 1:
+                    self.selected += 1
+                    self._adjust_scroll()
             return True
         elif key == curses.KEY_PPAGE:  # Page Up
-            if self.results:
-                self.selected = max(0, self.selected - 10)
-                self._adjust_scroll()
+            with self.search_lock:
+                if self.results:
+                    self.selected = max(0, self.selected - 10)
+                    self._adjust_scroll()
             return True
         elif key == curses.KEY_NPAGE:  # Page Down
-            if self.results:
-                self.selected = min(len(self.results) - 1, self.selected + 10)
-                self._adjust_scroll()
+            with self.search_lock:
+                if self.results:
+                    self.selected = min(len(self.results) - 1, self.selected + 10)
+                    self._adjust_scroll()
             return True
         elif key == curses.KEY_HOME:  # Home - text cursor or list navigation
             # If there's text in pattern, let editor handle it for cursor movement
@@ -85,10 +110,11 @@ class SearchDialog:
                 if self.pattern_editor.handle_key(key):
                     return True
             else:
-                # If no pattern text, use for list navigation
-                if self.results:
-                    self.selected = 0
-                    self.scroll = 0
+                # If no pattern text, use for list navigation (thread-safe)
+                with self.search_lock:
+                    if self.results:
+                        self.selected = 0
+                        self.scroll = 0
             return True
         elif key == curses.KEY_END:  # End - text cursor or list navigation
             # If there's text in pattern, let editor handle it for cursor movement
@@ -96,16 +122,21 @@ class SearchDialog:
                 if self.pattern_editor.handle_key(key):
                     return True
             else:
-                # If no pattern text, use for list navigation
-                if self.results:
-                    self.selected = len(self.results) - 1
-                    self._adjust_scroll()
+                # If no pattern text, use for list navigation (thread-safe)
+                with self.search_lock:
+                    if self.results:
+                        self.selected = len(self.results) - 1
+                        self._adjust_scroll()
             return True
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Return the selected result for navigation
-            if self.results and 0 <= self.selected < len(self.results):
-                selected_result = self.results[self.selected]
-                return ('navigate', selected_result)
+            # Cancel search before navigating
+            self._cancel_current_search()
+            
+            # Return the selected result for navigation (thread-safe)
+            with self.search_lock:
+                if self.results and 0 <= self.selected < len(self.results):
+                    selected_result = self.results[self.selected]
+                    return ('navigate', selected_result)
             return ('navigate', None)
         elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
             # Let the editor handle cursor movement keys
@@ -128,7 +159,7 @@ class SearchDialog:
         return False
         
     def perform_search(self, search_root):
-        """Perform the actual search based on current pattern and type
+        """Start asynchronous search based on current pattern and type
         
         Args:
             search_root: Path object representing the root directory to search from
@@ -136,43 +167,117 @@ class SearchDialog:
         pattern_text = self.pattern_editor.text.strip()
         
         if not pattern_text:
-            self.results = []
+            with self.search_lock:
+                self.results = []
+                self.selected = 0
+                self.scroll = 0
             return
         
+        # Cancel any existing search
+        self._cancel_current_search()
+        
+        # Start new search thread
+        self.cancel_search.clear()
         self.searching = True
-        self.results = []
+        self.last_search_pattern = pattern_text
+        
+        self.search_thread = threading.Thread(
+            target=self._search_worker,
+            args=(search_root, pattern_text, self.search_type),
+            daemon=True
+        )
+        self.search_thread.start()
+    
+    def _cancel_current_search(self):
+        """Cancel the current search operation"""
+        if self.search_thread and self.search_thread.is_alive():
+            self.cancel_search.set()
+            # Give the thread a moment to finish
+            self.search_thread.join(timeout=0.1)
+        
+        self.searching = False
+        self.search_thread = None
+    
+    def _search_worker(self, search_root, pattern_text, search_type):
+        """Worker thread for performing the actual search
+        
+        Args:
+            search_root: Path object representing the root directory to search from
+            pattern_text: The search pattern text
+            search_type: 'filename' or 'content'
+        """
+        temp_results = []
         
         try:
-            if self.search_type == 'filename':
+            if search_type == 'filename':
                 # Recursive filename search using fnmatch
                 for file_path in search_root.rglob('*'):
+                    # Check for cancellation
+                    if self.cancel_search.is_set():
+                        return
+                    
+                    # Check result limit
+                    if len(temp_results) >= self.max_search_results:
+                        break
+                    
                     if fnmatch.fnmatch(file_path.name.lower(), pattern_text.lower()):
                         relative_path = file_path.relative_to(search_root)
-                        self.results.append({
+                        result = {
                             'type': 'dir' if file_path.is_dir() else 'file',
                             'path': file_path,
                             'relative_path': str(relative_path),
                             'match_info': file_path.name
-                        })
+                        }
+                        temp_results.append(result)
+                        
+                        # Update results periodically for real-time display
+                        if len(temp_results) % 50 == 0:
+                            with self.search_lock:
+                                self.results = temp_results.copy()
+                                if self.selected >= len(self.results):
+                                    self.selected = max(0, len(self.results) - 1)
+                                    self._adjust_scroll()
             
-            elif self.search_type == 'content':
+            elif search_type == 'content':
                 # Recursive grep-based content search
                 pattern = re.compile(pattern_text, re.IGNORECASE)
                 
                 for file_path in search_root.rglob('*'):
+                    # Check for cancellation
+                    if self.cancel_search.is_set():
+                        return
+                    
+                    # Check result limit
+                    if len(temp_results) >= self.max_search_results:
+                        break
+                    
                     if file_path.is_file() and self._is_text_file(file_path):
                         try:
                             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                                 for line_num, line in enumerate(f, 1):
+                                    # Check for cancellation periodically
+                                    if line_num % 100 == 0 and self.cancel_search.is_set():
+                                        return
+                                    
                                     if pattern.search(line):
                                         relative_path = file_path.relative_to(search_root)
-                                        self.results.append({
+                                        result = {
                                             'type': 'content',
                                             'path': file_path,
                                             'relative_path': str(relative_path),
                                             'line_num': line_num,
                                             'match_info': f"Line {line_num}: {line.strip()[:50]}"
-                                        })
+                                        }
+                                        temp_results.append(result)
+                                        
+                                        # Update results periodically for real-time display
+                                        if len(temp_results) % 10 == 0:
+                                            with self.search_lock:
+                                                self.results = temp_results.copy()
+                                                if self.selected >= len(self.results):
+                                                    self.selected = max(0, len(self.results) - 1)
+                                                    self._adjust_scroll()
+                                        
                                         break  # Only show first match per file
                         except (IOError, UnicodeDecodeError):
                             continue
@@ -181,9 +286,14 @@ class SearchDialog:
             # Handle search errors gracefully
             pass
         
-        self.searching = False
-        self.selected = 0
-        self.scroll = 0
+        # Final update of results if not cancelled
+        if not self.cancel_search.is_set():
+            with self.search_lock:
+                self.results = temp_results
+                if self.selected >= len(self.results):
+                    self.selected = max(0, len(self.results) - 1)
+                    self._adjust_scroll()
+                self.searching = False
         
     def _is_text_file(self, file_path):
         """Check if a file is likely to be a text file"""
@@ -301,13 +411,21 @@ class SearchDialog:
             sep_line = "├" + "─" * (dialog_width - 2) + "┤"
             safe_addstr_func(sep_y, start_x, sep_line[:dialog_width], border_color)
         
-        # Draw results count
+        # Draw results count (thread-safe)
         count_y = start_y + 5
         if count_y < height:
-            if self.searching:
-                count_text = "Searching..."
-            else:
-                count_text = f"Results: {len(self.results)}"
+            with self.search_lock:
+                result_count = len(self.results)
+                if self.searching:
+                    if result_count >= self.max_search_results:
+                        count_text = f"Searching... (limit reached: {result_count})"
+                    else:
+                        count_text = f"Searching... ({result_count} found)"
+                else:
+                    if result_count >= self.max_search_results:
+                        count_text = f"Results: {result_count} (limit reached)"
+                    else:
+                        count_text = f"Results: {result_count}"
             safe_addstr_func(count_y, start_x + 2, count_text, get_status_color() | curses.A_DIM)
         
         # Calculate results area
@@ -317,18 +435,20 @@ class SearchDialog:
         content_width = dialog_width - 4
         content_height = results_end_y - results_start_y + 1
         
-        # Draw results
-        visible_results = self.results[self.scroll:self.scroll + content_height]
+        # Draw results (thread-safe)
+        with self.search_lock:
+            visible_results = self.results[self.scroll:self.scroll + content_height]
+            current_selected = self.selected
         
         for i, result in enumerate(visible_results):
             y = results_start_y + i
             if y <= results_end_y and y < height:
                 result_index = self.scroll + i
-                is_selected = result_index == self.selected
+                is_selected = result_index == current_selected
                 
                 # Format result text
                 if result['type'] == 'dir':
-                    result_text = f"📁 {result['relative_path']}"
+                    result_text = f"� {result['relative_path']}"
                 elif result['type'] == 'content':
                     result_text = f"📄 {result['relative_path']} - {result['match_info']}"
                 else:
