@@ -6,26 +6,22 @@ Provides searchable list dialog functionality
 
 import curses
 from pathlib import Path
-from tfm_single_line_text_edit import SingleLineTextEdit
+from tfm_base_list_dialog import BaseListDialog
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
 from tfm_config import get_favorite_directories, get_programs
 
 
-class ListDialog:
+class ListDialog(BaseListDialog):
     """Searchable list dialog component"""
     
     def __init__(self, config):
-        self.config = config
+        super().__init__(config)
         
-        # List dialog state
-        self.mode = False
+        # List dialog specific state
         self.title = ""
         self.items = []  # List of items to choose from
         self.filtered_items = []  # Filtered items based on search
-        self.selected = 0  # Index of currently selected item in filtered list
-        self.scroll = 0  # Scroll offset for the list
-        self.search_editor = SingleLineTextEdit()  # Search editor for list dialog
         self.callback = None  # Callback function when item is selected
         self.custom_key_handler = None  # Custom key handler function
         self.custom_help_text = None  # Custom help text to display at bottom
@@ -46,20 +42,17 @@ class ListDialog:
         self.filtered_items = items.copy()  # Initially show all items
         self.selected = 0
         self.scroll = 0
-        self.search_editor.clear()
+        self.text_editor.clear()
         self.callback = callback
         self.custom_key_handler = custom_key_handler
         self.custom_help_text = custom_help_text
         
     def exit(self):
         """Exit list dialog mode"""
-        self.mode = False
+        super().exit()
         self.title = ""
         self.items = []
         self.filtered_items = []
-        self.selected = 0
-        self.scroll = 0
-        self.search_editor.clear()
         self.callback = None
         self.custom_key_handler = None
         self.custom_help_text = None
@@ -70,7 +63,10 @@ class ListDialog:
         if self.custom_key_handler and self.custom_key_handler(key):
             return True
             
-        if key == 27:  # ESC - cancel
+        # Use base class navigation handling
+        result = self.handle_common_navigation(key, self.filtered_items)
+        
+        if result == 'cancel':
             # Store callback before exiting
             callback = self.callback
             self.exit()
@@ -78,51 +74,7 @@ class ListDialog:
             if callback:
                 callback(None)
             return True
-        elif key == curses.KEY_UP:
-            # Move selection up
-            if self.filtered_items and self.selected > 0:
-                self.selected -= 1
-                self._adjust_scroll()
-            return True
-        elif key == curses.KEY_DOWN:
-            # Move selection down
-            if self.filtered_items and self.selected < len(self.filtered_items) - 1:
-                self.selected += 1
-                self._adjust_scroll()
-            return True
-        elif key == curses.KEY_PPAGE:  # Page Up
-            if self.filtered_items:
-                self.selected = max(0, self.selected - 10)
-                self._adjust_scroll()
-            return True
-        elif key == curses.KEY_NPAGE:  # Page Down
-            if self.filtered_items:
-                self.selected = min(len(self.filtered_items) - 1, self.selected + 10)
-                self._adjust_scroll()
-            return True
-        elif key == curses.KEY_HOME:  # Home - text cursor or list navigation
-            # If there's text in search, let editor handle it for cursor movement
-            if self.search_editor.text:
-                if self.search_editor.handle_key(key):
-                    return True
-            else:
-                # If no search text, use for list navigation
-                if self.filtered_items:
-                    self.selected = 0
-                    self.scroll = 0
-            return True
-        elif key == curses.KEY_END:  # End - text cursor or list navigation
-            # If there's text in search, let editor handle it for cursor movement
-            if self.search_editor.text:
-                if self.search_editor.handle_key(key):
-                    return True
-            else:
-                # If no search text, use for list navigation
-                if self.filtered_items:
-                    self.selected = len(self.filtered_items) - 1
-                    self._adjust_scroll()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+        elif result == 'select':
             # Select current item
             callback = self.callback
             if self.filtered_items and 0 <= self.selected < len(self.filtered_items):
@@ -137,26 +89,17 @@ class ListDialog:
                 if callback:
                     callback(None)
             return True
-        elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
-            # Let the editor handle cursor movement keys
-            if self.search_editor.handle_key(key):
-                return True
+        elif result == 'text_changed':
+            self._filter_items()
             return True
-        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
-            # Let the editor handle backspace
-            if self.search_editor.handle_key(key):
-                self._filter_items()
+        elif result:
             return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Let the editor handle printable characters
-            if self.search_editor.handle_key(key):
-                self._filter_items()
-            return True
+            
         return False
         
     def _filter_items(self):
         """Filter list dialog items based on current search pattern"""
-        search_text = self.search_editor.text
+        search_text = self.text_editor.text
         if not search_text:
             self.filtered_items = self.items.copy()
         else:
@@ -169,155 +112,48 @@ class ListDialog:
         # Reset selection to top of filtered list
         self.selected = 0
         self.scroll = 0
-        
-    def _adjust_scroll(self):
-        """Adjust scroll offset to keep selected item visible"""
-        # Get dialog dimensions from config
-        height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
-        min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
-        
-        # We need the screen height to calculate dialog height
-        # This will be passed from the main class when drawing
-        # For now, use a reasonable default
-        screen_height = 24  # Default terminal height
-        dialog_height = max(min_height, int(screen_height * height_ratio))
-        content_height = dialog_height - 6  # Account for title, search, borders, help
-        
-        if self.selected < self.scroll:
-            self.scroll = self.selected
-        elif self.selected >= self.scroll + content_height:
-            self.scroll = self.selected - content_height + 1
+
             
     def draw(self, stdscr, safe_addstr_func):
         """Draw the searchable list dialog overlay"""
-        height, width = stdscr.getmaxyx()
-        
-        # Calculate dialog dimensions using configuration
+        # Get configuration values
         width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
         height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
         min_width = getattr(self.config, 'LIST_DIALOG_MIN_WIDTH', 40)
         min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
         
-        dialog_width = max(min_width, int(width * width_ratio))
-        dialog_height = max(min_height, int(height * height_ratio))
+        # Draw dialog frame
+        start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
+            stdscr, safe_addstr_func, self.title, width_ratio, height_ratio, min_width, min_height
+        )
         
-        # Update scroll adjustment with actual screen height
-        content_height = dialog_height - 6
-        if self.selected < self.scroll:
-            self.scroll = self.selected
-        elif self.selected >= self.scroll + content_height:
-            self.scroll = self.selected - content_height + 1
-        
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
-        
-        # Draw dialog background
-        for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                safe_addstr_func(y, start_x, bg_line, get_status_color())
-        
-        # Draw border
-        border_color = get_status_color() | curses.A_BOLD
-        
-        # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            safe_addstr_func(start_y, start_x, top_line[:dialog_width], border_color)
-        
-        # Side borders
-        for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                safe_addstr_func(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    safe_addstr_func(y, start_x + dialog_width - 1, "│", border_color)
-        
-        # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            safe_addstr_func(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
-        
-        # Draw title
-        if self.title and start_y >= 0:
-            title_text = f" {self.title} "
-            title_x = start_x + (dialog_width - len(title_text)) // 2
-            if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
-                safe_addstr_func(start_y, title_x, title_text, border_color)
-        
-        # Draw search box
+        # Draw search input
         search_y = start_y + 2
-        # Draw search input using SingleLineTextEdit
-        if search_y < height:
-            max_search_width = dialog_width - 4  # Leave some margin
-            self.search_editor.draw(
-                stdscr, search_y, start_x + 2, max_search_width,
-                "Search: ",
-                is_active=True
-            )
+        self.draw_text_input(stdscr, safe_addstr_func, search_y, start_x, dialog_width, "Search: ")
         
-        # Draw separator line
+        # Draw separator
         sep_y = start_y + 3
-        if sep_y < height:
-            sep_line = "├" + "─" * (dialog_width - 2) + "┤"
-            safe_addstr_func(sep_y, start_x, sep_line[:dialog_width], border_color)
+        self.draw_separator(stdscr, safe_addstr_func, sep_y, start_x, dialog_width)
         
         # Calculate list area
         list_start_y = start_y + 4
         list_end_y = start_y + dialog_height - 3
         content_start_x = start_x + 2
         content_width = dialog_width - 4
-        content_height = list_end_y - list_start_y + 1
         
         # Draw list items
-        visible_items = self.filtered_items[self.scroll:self.scroll + content_height]
+        self.draw_list_items(stdscr, safe_addstr_func, self.filtered_items, 
+                           list_start_y, list_end_y, content_start_x, content_width)
         
-        for i, item in enumerate(visible_items):
-            y = list_start_y + i
-            if y <= list_end_y and y < height:
-                item_index = self.scroll + i
-                is_selected = item_index == self.selected
-                
-                # Format item text
-                item_text = str(item)
-                if len(item_text) > content_width - 2:
-                    item_text = item_text[:content_width - 5] + "..."
-                
-                # Add selection indicator
-                if is_selected:
-                    display_text = f"► {item_text}"
-                    item_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
-                else:
-                    display_text = f"  {item_text}"
-                    item_color = get_status_color()
-                
-                # Ensure text fits
-                display_text = display_text[:content_width]
-                safe_addstr_func(y, content_start_x, display_text, item_color)
-        
-        # Draw scroll indicators if needed
-        if len(self.filtered_items) > content_height:
-            scrollbar_x = start_x + dialog_width - 2
-            scrollbar_start_y = list_start_y
-            scrollbar_height = content_height
-            
-            # Calculate scroll thumb position
-            total_items = len(self.filtered_items)
-            if total_items > 0:
-                thumb_pos = int((self.scroll / max(1, total_items - content_height)) * (scrollbar_height - 1))
-                thumb_pos = max(0, min(scrollbar_height - 1, thumb_pos))
-                
-                for i in range(scrollbar_height):
-                    y = scrollbar_start_y + i
-                    if y < height:
-                        if i == thumb_pos:
-                            safe_addstr_func(y, scrollbar_x, "█", border_color)
-                        else:
-                            safe_addstr_func(y, scrollbar_x, "░", get_status_color() | curses.A_DIM)
+        # Draw scrollbar
+        scrollbar_x = start_x + dialog_width - 2
+        content_height = list_end_y - list_start_y + 1
+        self.draw_scrollbar(stdscr, safe_addstr_func, self.filtered_items, 
+                          list_start_y, content_height, scrollbar_x)
         
         # Draw status info
         status_y = start_y + dialog_height - 2
-        if status_y < height:
+        if status_y < stdscr.getmaxyx()[0]:
             if self.filtered_items:
                 status_text = f"{self.selected + 1}/{len(self.filtered_items)} items"
                 if len(self.filtered_items) != len(self.items):
@@ -325,8 +161,8 @@ class ListDialog:
             else:
                 status_text = "No items found"
             
-            if self.search_editor.text:
-                status_text += f" | Filter: '{self.search_editor.text}'"
+            if self.text_editor.text:
+                status_text += f" | Filter: '{self.text_editor.text}'"
             
             # Center the status text
             content_width = dialog_width - 4
@@ -334,18 +170,14 @@ class ListDialog:
                 status_x = start_x + (dialog_width - len(status_text)) // 2
                 safe_addstr_func(status_y, status_x, status_text, get_status_color() | curses.A_DIM)
         
-        # Draw help text at bottom
+        # Draw help text
         if self.custom_help_text:
             help_text = self.custom_help_text
         else:
             help_text = "↑↓:select  Enter:choose  Type:search  Backspace:clear  ESC:cancel"
         
         help_y = start_y + dialog_height - 1
-        content_width = dialog_width - 4
-        if help_y < height and len(help_text) <= content_width:
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+        self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
 
 
 class ListDialogHelpers:

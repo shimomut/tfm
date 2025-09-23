@@ -157,7 +157,7 @@ class TestJumpDialog(unittest.TestCase):
             time.sleep(0.1)
         
         # Apply filter
-        self.jump_dialog.search_editor.text = "dir1"
+        self.jump_dialog.text_editor.text = "dir1"
         self.jump_dialog._filter_directories()
         
         with self.jump_dialog.scan_lock:
@@ -193,7 +193,7 @@ class TestJumpDialog(unittest.TestCase):
         self.assertIsNotNone(target_dir, "Should find a directory containing 'dir1'")
         
         # Apply filter that should still include the selected directory
-        self.jump_dialog.search_editor.text = "dir1"
+        self.jump_dialog.text_editor.text = "dir1"
         self.jump_dialog._filter_directories()
         
         with self.jump_dialog.scan_lock:
@@ -223,7 +223,7 @@ class TestJumpDialog(unittest.TestCase):
                 self.jump_dialog.selected = 1  # Select second item
         
         # Apply filter that won't include the selected directory
-        self.jump_dialog.search_editor.text = "nonexistent_filter_term"
+        self.jump_dialog.text_editor.text = "nonexistent_filter_term"
         self.jump_dialog._filter_directories()
         
         with self.jump_dialog.scan_lock:
@@ -272,7 +272,7 @@ class TestJumpDialog(unittest.TestCase):
         # Perform concurrent operations
         def concurrent_filter():
             for i in range(10):
-                self.jump_dialog.search_editor.text = f"test{i}"
+                self.jump_dialog.text_editor.text = f"test{i}"
                 self.jump_dialog._filter_directories()
                 time.sleep(0.01)
         

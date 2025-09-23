@@ -10,25 +10,21 @@ import re
 import threading
 import time
 from pathlib import Path
-from tfm_single_line_text_edit import SingleLineTextEdit
+from tfm_base_list_dialog import BaseListDialog
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
 
 
-class SearchDialog:
+class SearchDialog(BaseListDialog):
     """Search dialog component for filename and content search with threading support"""
     
     def __init__(self, config):
-        self.config = config
+        super().__init__(config)
         
-        # Search dialog state
-        self.mode = False
+        # Search dialog specific state
         self.search_type = 'filename'  # 'filename' or 'content'
-        self.pattern_editor = SingleLineTextEdit()  # Pattern editor for search dialog
         self.results = []  # List of search results
-        self.selected = 0  # Index of currently selected result
-        self.scroll = 0  # Scroll offset for results
         self.searching = False  # Whether search is in progress
         
         # Threading support
@@ -54,7 +50,7 @@ class SearchDialog:
         
         self.mode = True
         self.search_type = search_type
-        self.pattern_editor.clear()
+        self.text_editor.clear()
         self.results = []
         self.selected = 0
         self.scroll = 0
@@ -69,12 +65,9 @@ class SearchDialog:
         # Cancel any running search
         self._cancel_current_search()
         
-        self.mode = False
+        super().exit()
         self.search_type = 'filename'
-        self.pattern_editor.clear()
         self.results = []
-        self.selected = 0
-        self.scroll = 0
         self.searching = False
         self.last_search_pattern = ""
         
@@ -83,62 +76,23 @@ class SearchDialog:
         
     def handle_input(self, key):
         """Handle input while in search dialog mode"""
-        if key == 27:  # ESC - cancel
+        # Handle Tab key for search type switching first
+        if key == ord('\t'):  # Tab - switch between filename and content search
+            self.search_type = 'content' if self.search_type == 'filename' else 'filename'
+            return ('search', None)
+            
+        # Use base class navigation handling with thread safety
+        with self.search_lock:
+            current_results = self.results.copy()
+        
+        result = self.handle_common_navigation(key, current_results)
+        
+        if result == 'cancel':
             # Cancel search before exiting
             self._cancel_current_search()
             self.exit()
             return True
-        elif key == curses.KEY_UP:
-            # Move selection up (thread-safe)
-            with self.search_lock:
-                if self.results and self.selected > 0:
-                    self.selected -= 1
-                    self._adjust_scroll()
-            return True
-        elif key == curses.KEY_DOWN:
-            # Move selection down (thread-safe)
-            with self.search_lock:
-                if self.results and self.selected < len(self.results) - 1:
-                    self.selected += 1
-                    self._adjust_scroll()
-            return True
-        elif key == curses.KEY_PPAGE:  # Page Up
-            with self.search_lock:
-                if self.results:
-                    self.selected = max(0, self.selected - 10)
-                    self._adjust_scroll()
-            return True
-        elif key == curses.KEY_NPAGE:  # Page Down
-            with self.search_lock:
-                if self.results:
-                    self.selected = min(len(self.results) - 1, self.selected + 10)
-                    self._adjust_scroll()
-            return True
-        elif key == curses.KEY_HOME:  # Home - text cursor or list navigation
-            # If there's text in pattern, let editor handle it for cursor movement
-            if self.pattern_editor.text:
-                if self.pattern_editor.handle_key(key):
-                    return True
-            else:
-                # If no pattern text, use for list navigation (thread-safe)
-                with self.search_lock:
-                    if self.results:
-                        self.selected = 0
-                        self.scroll = 0
-            return True
-        elif key == curses.KEY_END:  # End - text cursor or list navigation
-            # If there's text in pattern, let editor handle it for cursor movement
-            if self.pattern_editor.text:
-                if self.pattern_editor.handle_key(key):
-                    return True
-            else:
-                # If no pattern text, use for list navigation (thread-safe)
-                with self.search_lock:
-                    if self.results:
-                        self.selected = len(self.results) - 1
-                        self._adjust_scroll()
-            return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+        elif result == 'select':
             # Cancel search before navigating
             self._cancel_current_search()
             
@@ -148,24 +102,16 @@ class SearchDialog:
                     selected_result = self.results[self.selected]
                     return ('navigate', selected_result)
             return ('navigate', None)
-        elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
-            # Let the editor handle cursor movement keys
-            if self.pattern_editor.handle_key(key):
-                return ('search', None)
-            return True
-        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
-            # Let the editor handle backspace
-            if self.pattern_editor.handle_key(key):
-                return ('search', None)
-            return True
-        elif key == ord('\t'):  # Tab - switch between filename and content search
-            self.search_type = 'content' if self.search_type == 'filename' else 'filename'
+        elif result == 'text_changed':
             return ('search', None)
-        elif 32 <= key <= 126:  # Printable characters
-            # Let the editor handle printable characters
-            if self.pattern_editor.handle_key(key):
-                return ('search', None)
+        elif result:
+            # Update selection in thread-safe manner for navigation keys
+            if key in [curses.KEY_UP, curses.KEY_DOWN, curses.KEY_PPAGE, curses.KEY_NPAGE, curses.KEY_HOME, curses.KEY_END]:
+                with self.search_lock:
+                    # The base class already updated self.selected, just need to adjust scroll
+                    self._adjust_scroll(len(self.results))
             return True
+            
         return False
         
     def perform_search(self, search_root):
@@ -174,7 +120,7 @@ class SearchDialog:
         Args:
             search_root: Path object representing the root directory to search from
         """
-        pattern_text = self.pattern_editor.text.strip()
+        pattern_text = self.text_editor.text.strip()
         
         if not pattern_text:
             # Cancel any running search when pattern becomes empty
@@ -257,7 +203,7 @@ class SearchDialog:
                                 self.results = temp_results.copy()
                                 if self.selected >= len(self.results):
                                     self.selected = max(0, len(self.results) - 1)
-                                    self._adjust_scroll()
+                                    self._adjust_scroll(len(self.results))
             
             elif search_type == 'content':
                 # Recursive grep-based content search
@@ -297,7 +243,7 @@ class SearchDialog:
                                                 self.results = temp_results.copy()
                                                 if self.selected >= len(self.results):
                                                     self.selected = max(0, len(self.results) - 1)
-                                                    self._adjust_scroll()
+                                                    self._adjust_scroll(len(self.results))
                                         
                                         break  # Only show first match per file
                         except (IOError, UnicodeDecodeError):
@@ -313,7 +259,7 @@ class SearchDialog:
                 self.results = temp_results
                 if self.selected >= len(self.results):
                     self.selected = max(0, len(self.results) - 1)
-                    self._adjust_scroll()
+                    self._adjust_scroll(len(self.results))
                 self.searching = False
         
     def _is_text_file(self, file_path):
@@ -347,94 +293,33 @@ class SearchDialog:
         except:
             return False
             
-    def _adjust_scroll(self):
-        """Adjust scroll offset to keep selected item visible"""
-        # Use default dialog dimensions for scroll calculation
-        dialog_height = 20  # Default height
-        content_height = dialog_height - 8  # Account for title, search box, borders, help
-        
-        if self.selected < self.scroll:
-            self.scroll = self.selected
-        elif self.selected >= self.scroll + content_height:
-            self.scroll = self.selected - content_height + 1
+
             
     def draw(self, stdscr, safe_addstr_func):
         """Draw the search dialog overlay"""
-        height, width = stdscr.getmaxyx()
+        # Draw dialog frame
+        title_text = f"Search ({self.search_type.title()})"
+        start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
+            stdscr, safe_addstr_func, title_text, 0.8, 0.8, 60, 20
+        )
         
-        # Calculate dialog dimensions
-        dialog_width = max(60, int(width * 0.8))
-        dialog_height = max(20, int(height * 0.8))
-        
-        # Update scroll calculation with actual dimensions
-        content_height = dialog_height - 8
-        if self.selected < self.scroll:
-            self.scroll = self.selected
-        elif self.selected >= self.scroll + content_height:
-            self.scroll = self.selected - content_height + 1
-        
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
-        
-        # Draw dialog background
-        for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                safe_addstr_func(y, start_x, bg_line, get_status_color())
-        
-        # Draw border
-        border_color = get_status_color() | curses.A_BOLD
-        
-        # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            safe_addstr_func(start_y, start_x, top_line[:dialog_width], border_color)
-        
-        # Side borders
-        for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                safe_addstr_func(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    safe_addstr_func(y, start_x + dialog_width - 1, "│", border_color)
-        
-        # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            safe_addstr_func(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
-        
-        # Draw title
-        title_text = f" Search ({self.search_type.title()}) "
-        title_x = start_x + (dialog_width - len(title_text)) // 2
-        if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
-            safe_addstr_func(start_y, title_x, title_text, border_color)
-        
-        # Draw search box
+        # Draw pattern input
         search_y = start_y + 2
-        # Draw pattern input using SingleLineTextEdit
-        if search_y < height:
-            max_pattern_width = dialog_width - 4  # Leave some margin
-            self.pattern_editor.draw(
-                stdscr, search_y, start_x + 2, max_pattern_width,
-                "Pattern: ",
-                is_active=True
-            )
+        self.draw_text_input(stdscr, safe_addstr_func, search_y, start_x, dialog_width, "Pattern: ")
         
         # Draw search type indicator
         type_y = start_y + 3
-        if type_y < height:
+        if type_y < stdscr.getmaxyx()[0]:
             type_text = f"Mode: {self.search_type.title()} (Tab to switch)"
             safe_addstr_func(type_y, start_x + 2, type_text[:dialog_width - 4], get_status_color() | curses.A_DIM)
         
-        # Draw separator line
+        # Draw separator
         sep_y = start_y + 4
-        if sep_y < height:
-            sep_line = "├" + "─" * (dialog_width - 2) + "┤"
-            safe_addstr_func(sep_y, start_x, sep_line[:dialog_width], border_color)
+        self.draw_separator(stdscr, safe_addstr_func, sep_y, start_x, dialog_width)
         
         # Draw results count with animated progress indicator (thread-safe)
         count_y = start_y + 5
-        if count_y < height:
+        if count_y < stdscr.getmaxyx()[0]:
             with self.search_lock:
                 result_count = len(self.results)
                 is_searching = self.searching
@@ -465,49 +350,33 @@ class SearchDialog:
         results_end_y = start_y + dialog_height - 3
         content_start_x = start_x + 2
         content_width = dialog_width - 4
-        content_height = results_end_y - results_start_y + 1
+        
+        # Format search results for display
+        def format_result(result):
+            if result['type'] == 'dir':
+                return f"📁 {result['relative_path']}"
+            elif result['type'] == 'content':
+                return f"📄 {result['relative_path']} - {result['match_info']}"
+            else:
+                return f"📄 {result['relative_path']}"
         
         # Draw results (thread-safe)
         with self.search_lock:
-            visible_results = self.results[self.scroll:self.scroll + content_height]
-            current_selected = self.selected
+            current_results = self.results.copy()
         
-        for i, result in enumerate(visible_results):
-            y = results_start_y + i
-            if y <= results_end_y and y < height:
-                result_index = self.scroll + i
-                is_selected = result_index == current_selected
-                
-                # Format result text
-                if result['type'] == 'dir':
-                    result_text = f"📁 {result['relative_path']}"
-                elif result['type'] == 'content':
-                    result_text = f"📄 {result['relative_path']} - {result['match_info']}"
-                else:
-                    result_text = f"📄 {result['relative_path']}"
-                
-                if len(result_text) > content_width - 2:
-                    result_text = result_text[:content_width - 5] + "..."
-                
-                # Add selection indicator
-                if is_selected:
-                    display_text = f"► {result_text}"
-                    item_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
-                else:
-                    display_text = f"  {result_text}"
-                    item_color = get_status_color()
-                
-                # Ensure text fits
-                display_text = display_text[:content_width]
-                safe_addstr_func(y, content_start_x, display_text, item_color)
+        self.draw_list_items(stdscr, safe_addstr_func, current_results, 
+                           results_start_y, results_end_y, content_start_x, content_width, format_result)
+        
+        # Draw scrollbar
+        scrollbar_x = start_x + dialog_width - 2
+        content_height = results_end_y - results_start_y + 1
+        self.draw_scrollbar(stdscr, safe_addstr_func, current_results, 
+                          results_start_y, content_height, scrollbar_x)
         
         # Draw help text
+        help_text = "Enter: Select | Tab: Switch mode | ESC: Cancel"
         help_y = start_y + dialog_height - 2
-        if help_y < height:
-            help_text = "Enter: Select | Tab: Switch mode | ESC: Cancel"
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+        self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
 
 
 class SearchDialogHelpers:
