@@ -188,6 +188,12 @@ class SearchDialog:
         # Cancel any existing search
         self._cancel_current_search()
         
+        # Clear previous results immediately when starting new search
+        with self.search_lock:
+            self.results = []
+            self.selected = 0
+            self.scroll = 0
+        
         # Start new search thread
         self.cancel_search.clear()
         self.searching = True
