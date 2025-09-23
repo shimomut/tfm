@@ -1,8 +1,8 @@
-# SearchDialog Animation Feature
+# Progress Animation System
 
 ## Overview
 
-The SearchDialog component now includes animated progress indicators that provide visual feedback during search operations. Users can choose from three different animation patterns and configure the animation speed through the configuration system.
+TFM now includes a generalized progress animation system that provides visual feedback for various long-running operations. The system is built around the `ProgressAnimator` class and can be used for search operations, file operations, network tasks, and any other operations that benefit from animated progress indicators.
 
 ## Features
 
@@ -26,25 +26,54 @@ The SearchDialog component now includes animated progress indicators that provid
    - Shows filling progress bar effect
    - Visual representation of activity
 
+4. **Bounce** (`'bounce'`)
+   - Simple bouncing dot animation
+   - Frames: `⠁ ⠂ ⠄ ⠂`
+   - Minimal and rhythmic
+   - Good for subtle feedback
+
+5. **Pulse** (`'pulse'`)
+   - Pulsing circle animation
+   - Frames: `● ◐ ◑ ◒ ◓ ◔ ◕ ○`
+   - Breathing effect
+   - Calming and smooth
+
+6. **Wave** (`'wave'`)
+   - Wave-like vertical bars
+   - Frames: `▁ ▂ ▃ ▄ ▅ ▆ ▇ █ ▇ ▆ ▅ ▄ ▃ ▂`
+   - Flowing motion
+   - Dynamic and engaging
+
+7. **Clock** (`'clock'`)
+   - Clock face animation
+   - Frames: `🕐 🕑 🕒 🕓 🕔 🕕 🕖 🕗 🕘 🕙 🕚 🕛`
+   - Time-based metaphor
+   - Clear progression indication
+
+8. **Arrow** (`'arrow'`)
+   - Rotating arrow animation
+   - Frames: `← ↖ ↑ ↗ → ↘ ↓ ↙`
+   - Directional movement
+   - Clear motion indication
+
 ### Configuration Options
 
 Add these settings to your TFM configuration file (`~/.tfm/config.py`):
 
 ```python
 class Config(DefaultConfig):
-    # Search animation settings
-    SEARCH_ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', or 'progress'
-    SEARCH_ANIMATION_SPEED = 0.2          # Animation frame update interval in seconds
+    # Animation settings (used by all components)
+    ANIMATION_PATTERN = 'spinner'  # Default pattern for all animations
+    ANIMATION_SPEED = 0.2          # Default speed for all animations
 ```
 
 #### Configuration Details
 
-- **SEARCH_ANIMATION_PATTERN**: Choose the animation style
-  - `'spinner'`: Rotating spinner (default)
-  - `'dots'`: Dot-based animation
-  - `'progress'`: Progress bar animation
+- **ANIMATION_PATTERN**: Animation pattern for all components
+  - Available patterns: `'spinner'`, `'dots'`, `'progress'`, `'bounce'`, `'pulse'`, `'wave'`, `'clock'`, `'arrow'`
+  - Default: `'spinner'`
 
-- **SEARCH_ANIMATION_SPEED**: Control animation speed
+- **ANIMATION_SPEED**: Animation speed for all components
   - Value in seconds between frame updates
   - Default: `0.2` seconds
   - Smaller values = faster animation
@@ -55,17 +84,24 @@ class Config(DefaultConfig):
 
 ### Architecture
 
-The animation system consists of two main components:
+The animation system consists of several components:
 
-1. **SearchProgressAnimator**: Handles animation logic
+1. **ProgressAnimator**: Core animation engine
    - Manages animation patterns and timing
    - Provides thread-safe frame updates
    - Generates formatted progress indicators
+   - Supports dynamic pattern and speed changes
 
-2. **SearchDialog Integration**: Incorporates animation into search UI
-   - Displays animated indicators during search
-   - Resets animation on new searches
-   - Thread-safe integration with search operations
+2. **ProgressAnimatorFactory**: Factory for common use cases
+   - `create_search_animator()`: Optimized for search operations
+   - `create_loading_animator()`: Optimized for loading operations
+   - `create_processing_animator()`: Optimized for processing operations
+   - `create_custom_animator()`: Custom pattern and speed
+
+3. **Component Integration**: Used throughout TFM
+   - SearchDialog: Animated search progress
+   - Future: File operations, network tasks, etc.
+   - Consistent animation experience across all operations
 
 ### Thread Safety
 
@@ -85,7 +121,30 @@ The animation system has minimal performance impact:
 
 ### Basic Usage
 
-The animation runs automatically when searches are active. No user interaction is required beyond configuration.
+Animations run automatically in supported operations. For search operations, no user interaction is required beyond configuration.
+
+### Programmatic Usage
+
+```python
+from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
+
+# Use factory for common scenarios
+search_animator = ProgressAnimatorFactory.create_search_animator(config)
+loading_animator = ProgressAnimatorFactory.create_loading_animator(config)
+
+# Create custom animators
+file_copy_animator = ProgressAnimatorFactory.create_custom_animator(
+    config, 'progress', 0.3
+)
+
+# Generate status text
+status = animator.get_status_text("Processing", "42 items", True)
+# Output: "Processing ⠋ (42 items)"
+
+# Dynamic configuration
+animator.set_pattern('wave')  # Change pattern at runtime
+animator.set_speed(0.1)       # Change speed at runtime
+```
 
 ### Visual Examples
 
@@ -183,22 +242,38 @@ Potential future improvements:
 
 ## API Reference
 
-### SearchProgressAnimator Class
+### ProgressAnimator Class
 
 ```python
-class SearchProgressAnimator:
-    def __init__(self, config)
+class ProgressAnimator:
+    def __init__(self, config, pattern_override=None, speed_override=None)
     def get_current_frame() -> str
     def reset() -> None
-    def get_progress_indicator(result_count: int, is_searching: bool) -> str
+    def set_pattern(pattern: str) -> None
+    def set_speed(speed: float) -> None
+    def get_available_patterns() -> List[str]
+    def get_pattern_preview(pattern=None) -> List[str]
+    def get_progress_indicator(context_info=None, is_active=True, style='default') -> str
+    def get_status_text(operation_name: str, context_info=None, is_active=True) -> str
+```
+
+### ProgressAnimatorFactory Class
+
+```python
+class ProgressAnimatorFactory:
+    @staticmethod
+    def create_search_animator(config) -> ProgressAnimator
+    def create_loading_animator(config) -> ProgressAnimator
+    def create_processing_animator(config) -> ProgressAnimator
+    def create_custom_animator(config, pattern='spinner', speed=0.2) -> ProgressAnimator
 ```
 
 ### Configuration Constants
 
 ```python
 # Default values
-SEARCH_ANIMATION_PATTERN = 'spinner'
-SEARCH_ANIMATION_SPEED = 0.2
+ANIMATION_PATTERN = 'spinner'
+ANIMATION_SPEED = 0.2
 ```
 
 ### Animation Patterns
@@ -207,6 +282,11 @@ SEARCH_ANIMATION_SPEED = 0.2
 patterns = {
     'spinner': ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
     'dots': ['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈'],
-    'progress': ['▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
+    'progress': ['▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'],
+    'bounce': ['⠁', '⠂', '⠄', '⠂'],
+    'pulse': ['●', '◐', '◑', '◒', '◓', '◔', '◕', '○'],
+    'wave': ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█', '▇', '▆', '▅', '▄', '▃', '▂'],
+    'clock': ['🕐', '🕑', '🕒', '🕓', '🕔', '🕕', '🕖', '🕗', '🕘', '🕙', '🕚', '🕛'],
+    'arrow': ['←', '↖', '↑', '↗', '→', '↘', '↓', '↙']
 }
 ```

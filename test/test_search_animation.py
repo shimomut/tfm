@@ -13,33 +13,34 @@ from pathlib import Path
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from tfm_search_dialog import SearchDialog, SearchProgressAnimator
+from tfm_search_dialog import SearchDialog
+from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
 from tfm_config import DefaultConfig
 
 
 class AnimationTestConfig(DefaultConfig):
     """Test configuration for animation testing"""
     MAX_SEARCH_RESULTS = 100
-    SEARCH_ANIMATION_PATTERN = 'spinner'
-    SEARCH_ANIMATION_SPEED = 0.1  # Faster for testing
+    ANIMATION_PATTERN = 'spinner'
+    ANIMATION_SPEED = 0.1  # Faster for testing
 
 
 class SpinnerTestConfig(DefaultConfig):
     """Test configuration for spinner animation"""
-    SEARCH_ANIMATION_PATTERN = 'spinner'
-    SEARCH_ANIMATION_SPEED = 0.1
+    ANIMATION_PATTERN = 'spinner'
+    ANIMATION_SPEED = 0.1
 
 
 class DotsTestConfig(DefaultConfig):
     """Test configuration for dots animation"""
-    SEARCH_ANIMATION_PATTERN = 'dots'
-    SEARCH_ANIMATION_SPEED = 0.1
+    ANIMATION_PATTERN = 'dots'
+    ANIMATION_SPEED = 0.1
 
 
 class ProgressTestConfig(DefaultConfig):
     """Test configuration for progress animation"""
-    SEARCH_ANIMATION_PATTERN = 'progress'
-    SEARCH_ANIMATION_SPEED = 0.1
+    ANIMATION_PATTERN = 'progress'
+    ANIMATION_SPEED = 0.1
 
 
 def test_progress_animator_basic():
@@ -47,7 +48,7 @@ def test_progress_animator_basic():
     print("Testing basic progress animator functionality...")
     
     config = AnimationTestConfig()
-    animator = SearchProgressAnimator(config)
+    animator = ProgressAnimator(config)
     
     # Test initial state
     assert animator.frame_index == 0
@@ -85,7 +86,7 @@ def test_animation_patterns():
     for pattern_name, config in patterns_to_test:
         print(f"  Testing {pattern_name} pattern...")
         
-        animator = SearchProgressAnimator(config)
+        animator = ProgressAnimatorFactory.create_search_animator(config)
         assert animator.animation_pattern == pattern_name
         
         # Test that we get valid frames
@@ -100,12 +101,12 @@ def test_animation_patterns():
         assert len(frames_seen) > 1, f"Should see multiple frames for {pattern_name}"
         
         # Test progress indicator formatting
-        progress_text = animator.get_progress_indicator(5, True)
+        progress_text = animator.get_progress_indicator(context_info="5 found", is_active=True)
         assert isinstance(progress_text, str)
         assert len(progress_text) > 0
         
-        # Test when not searching
-        no_progress_text = animator.get_progress_indicator(5, False)
+        # Test when not active
+        no_progress_text = animator.get_progress_indicator(context_info="5 found", is_active=False)
         assert no_progress_text == ""
         
         print(f"    ✓ {pattern_name} pattern works correctly")
@@ -122,7 +123,7 @@ def test_search_dialog_animation_integration():
     
     # Verify animator is created
     assert hasattr(search_dialog, 'progress_animator')
-    assert isinstance(search_dialog.progress_animator, SearchProgressAnimator)
+    assert isinstance(search_dialog.progress_animator, ProgressAnimator)
     
     # Test show resets animation
     search_dialog.show('filename')
@@ -186,7 +187,7 @@ def test_animation_frame_cycling():
     print("Testing animation frame cycling...")
     
     config = SpinnerTestConfig()
-    animator = SearchProgressAnimator(config)
+    animator = ProgressAnimatorFactory.create_search_animator(config)
     
     pattern = animator.patterns['spinner']
     pattern_length = len(pattern)
@@ -218,14 +219,14 @@ def test_animation_speed_configuration():
     
     # Test fast animation
     class FastConfig(DefaultConfig):
-        SEARCH_ANIMATION_SPEED = 0.05
+        ANIMATION_SPEED = 0.05
     
     # Test slow animation  
     class SlowConfig(DefaultConfig):
-        SEARCH_ANIMATION_SPEED = 0.3
+        ANIMATION_SPEED = 0.3
     
-    fast_animator = SearchProgressAnimator(FastConfig())
-    slow_animator = SearchProgressAnimator(SlowConfig())
+    fast_animator = ProgressAnimatorFactory.create_search_animator(FastConfig())
+    slow_animator = ProgressAnimatorFactory.create_search_animator(SlowConfig())
     
     assert fast_animator.animation_speed == 0.05
     assert slow_animator.animation_speed == 0.3
@@ -246,6 +247,80 @@ def test_animation_speed_configuration():
     print("✓ Animation speed configuration test passed")
 
 
+def test_generalized_progress_animator():
+    """Test the generalized ProgressAnimator features"""
+    print("Testing generalized ProgressAnimator features...")
+    
+    config = AnimationTestConfig()
+    animator = ProgressAnimator(config)
+    
+    # Test available patterns
+    patterns = animator.get_available_patterns()
+    assert 'spinner' in patterns
+    assert 'dots' in patterns
+    assert 'progress' in patterns
+    assert 'bounce' in patterns
+    assert 'pulse' in patterns
+    
+    # Test pattern switching
+    animator.set_pattern('dots')
+    assert animator.animation_pattern == 'dots'
+    frame = animator.get_current_frame()
+    assert frame in animator.patterns['dots']
+    
+    # Test speed changing
+    animator.set_speed(0.05)
+    assert animator.animation_speed == 0.05
+    
+    # Test pattern preview
+    preview = animator.get_pattern_preview('pulse')
+    assert len(preview) > 0
+    assert all(frame in animator.patterns['pulse'] for frame in preview)
+    
+    # Test status text generation
+    status = animator.get_status_text("Loading", "50%", True)
+    assert "Loading" in status
+    assert "50%" in status
+    
+    status_complete = animator.get_status_text("Loading", "100%", False)
+    assert "complete" in status_complete
+    
+    print("✓ Generalized ProgressAnimator features test passed")
+
+
+def test_progress_animator_factory():
+    """Test the ProgressAnimatorFactory"""
+    print("Testing ProgressAnimatorFactory...")
+    
+    config = AnimationTestConfig()
+    
+    # Test different factory methods
+    search_animator = ProgressAnimatorFactory.create_search_animator(config)
+    loading_animator = ProgressAnimatorFactory.create_loading_animator(config)
+    processing_animator = ProgressAnimatorFactory.create_processing_animator(config)
+    custom_animator = ProgressAnimatorFactory.create_custom_animator(config, 'pulse', 0.1)
+    
+    # Verify they're all ProgressAnimator instances
+    assert isinstance(search_animator, ProgressAnimator)
+    assert isinstance(loading_animator, ProgressAnimator)
+    assert isinstance(processing_animator, ProgressAnimator)
+    assert isinstance(custom_animator, ProgressAnimator)
+    
+    # Verify custom settings
+    assert custom_animator.animation_pattern == 'pulse'
+    assert custom_animator.animation_speed == 0.1
+    
+    # Verify loading animator defaults
+    assert loading_animator.animation_pattern == 'spinner'
+    assert loading_animator.animation_speed == 0.15
+    
+    # Verify processing animator defaults
+    assert processing_animator.animation_pattern == 'progress'
+    assert processing_animator.animation_speed == 0.25
+    
+    print("✓ ProgressAnimatorFactory test passed")
+
+
 def main():
     """Run all animation tests"""
     print("Running SearchDialog animation tests...")
@@ -258,6 +333,8 @@ def main():
         test_animation_with_actual_search()
         test_animation_frame_cycling()
         test_animation_speed_configuration()
+        test_generalized_progress_animator()
+        test_progress_animator_factory()
         
         print("=" * 50)
         print("✓ All animation tests passed!")

@@ -13,61 +13,7 @@ from pathlib import Path
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
-
-
-class SearchProgressAnimator:
-    """Handles animated progress indicators for search operations"""
-    
-    def __init__(self, config):
-        self.config = config
-        self.animation_pattern = getattr(config, 'SEARCH_ANIMATION_PATTERN', 'spinner')
-        self.animation_speed = getattr(config, 'SEARCH_ANIMATION_SPEED', 0.2)
-        
-        # Animation patterns
-        self.patterns = {
-            'spinner': ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
-            'dots': ['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈'],
-            'progress': ['▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
-        }
-        
-        # Animation state
-        self.frame_index = 0
-        self.last_update_time = 0
-        
-    def get_current_frame(self):
-        """Get the current animation frame"""
-        current_time = time.time()
-        
-        # Update frame if enough time has passed
-        if current_time - self.last_update_time >= self.animation_speed:
-            pattern = self.patterns.get(self.animation_pattern, self.patterns['spinner'])
-            self.frame_index = (self.frame_index + 1) % len(pattern)
-            self.last_update_time = current_time
-        
-        pattern = self.patterns.get(self.animation_pattern, self.patterns['spinner'])
-        return pattern[self.frame_index]
-    
-    def reset(self):
-        """Reset animation to first frame"""
-        self.frame_index = 0
-        self.last_update_time = 0
-    
-    def get_progress_indicator(self, result_count, is_searching):
-        """Get formatted progress indicator text"""
-        if not is_searching:
-            return ""
-        
-        frame = self.get_current_frame()
-        
-        if self.animation_pattern == 'progress':
-            # For progress pattern, show a progress bar effect
-            progress_length = 8
-            filled = (self.frame_index * progress_length) // len(self.patterns['progress'])
-            bar = '█' * filled + '░' * (progress_length - filled)
-            return f" [{bar}] "
-        else:
-            # For spinner and dots, show rotating indicator
-            return f" {frame} "
+from tfm_progress_animator import ProgressAnimatorFactory
 
 
 class SearchDialog:
@@ -92,7 +38,7 @@ class SearchDialog:
         self.last_search_pattern = ""
         
         # Animation support
-        self.progress_animator = SearchProgressAnimator(config)
+        self.progress_animator = ProgressAnimatorFactory.create_search_animator(config)
         
         # Get configurable search result limit
         self.max_search_results = getattr(config, 'MAX_SEARCH_RESULTS', 10000)
@@ -488,13 +434,13 @@ class SearchDialog:
                 is_searching = self.searching
                 
                 if is_searching:
-                    # Get animated progress indicator
-                    progress_indicator = self.progress_animator.get_progress_indicator(result_count, is_searching)
-                    
+                    # Get animated status text
                     if result_count >= self.max_search_results:
-                        count_text = f"Searching{progress_indicator}(limit reached: {result_count})"
+                        context_info = f"limit reached: {result_count}"
                     else:
-                        count_text = f"Searching{progress_indicator}({result_count} found)"
+                        context_info = f"{result_count} found"
+                    
+                    count_text = self.progress_animator.get_status_text("Searching", context_info, is_searching)
                     
                     # Use brighter color for active search
                     count_color = get_status_color() | curses.A_BOLD

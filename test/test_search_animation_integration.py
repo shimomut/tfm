@@ -13,7 +13,8 @@ from pathlib import Path
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from tfm_search_dialog import SearchDialog, SearchDialogHelpers, SearchProgressAnimator
+from tfm_search_dialog import SearchDialog, SearchDialogHelpers
+from tfm_progress_animator import ProgressAnimator
 from tfm_config import DefaultConfig
 from tfm_pane_manager import PaneManager
 from tfm_file_operations import FileOperations
@@ -22,8 +23,8 @@ from tfm_file_operations import FileOperations
 class IntegrationTestConfig(DefaultConfig):
     """Test configuration for integration testing"""
     MAX_SEARCH_RESULTS = 100
-    SEARCH_ANIMATION_PATTERN = 'spinner'
-    SEARCH_ANIMATION_SPEED = 0.1
+    ANIMATION_PATTERN = 'spinner'
+    ANIMATION_SPEED = 0.1
 
 
 def create_integration_test_structure():
@@ -59,7 +60,7 @@ def test_animation_with_full_integration():
         
         # Verify animation system is properly initialized
         assert hasattr(search_dialog, 'progress_animator')
-        assert isinstance(search_dialog.progress_animator, SearchProgressAnimator)
+        assert isinstance(search_dialog.progress_animator, ProgressAnimator)
         assert search_dialog.progress_animator.animation_pattern == 'spinner'
         
         # Test filename search with animation
@@ -130,8 +131,8 @@ def test_animation_configuration_integration():
     
     for pattern, speed in configs_to_test:
         class TestConfig(DefaultConfig):
-            SEARCH_ANIMATION_PATTERN = pattern
-            SEARCH_ANIMATION_SPEED = speed
+            ANIMATION_PATTERN = pattern
+            ANIMATION_SPEED = speed
         
         config = TestConfig()
         search_dialog = SearchDialog(config)
@@ -268,8 +269,8 @@ def test_animation_performance_impact():
     
     # Test without animation (simulate by using very slow speed)
     class NoAnimationConfig(DefaultConfig):
-        SEARCH_ANIMATION_PATTERN = 'spinner'
-        SEARCH_ANIMATION_SPEED = 999  # Very slow, effectively no animation
+        ANIMATION_PATTERN = 'spinner'
+        ANIMATION_SPEED = 999  # Very slow, effectively no animation
         MAX_SEARCH_RESULTS = 100
     
     test_dir = create_integration_test_structure()

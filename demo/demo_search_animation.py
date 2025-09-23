@@ -13,28 +13,29 @@ from pathlib import Path
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from tfm_search_dialog import SearchDialog, SearchProgressAnimator
+from tfm_search_dialog import SearchDialog
+from tfm_progress_animator import ProgressAnimator
 from tfm_config import DefaultConfig
 
 
 class SpinnerConfig(DefaultConfig):
     """Configuration for spinner animation"""
-    SEARCH_ANIMATION_PATTERN = 'spinner'
-    SEARCH_ANIMATION_SPEED = 0.15
+    ANIMATION_PATTERN = 'spinner'
+    ANIMATION_SPEED = 0.15
     MAX_SEARCH_RESULTS = 2000
 
 
 class DotsConfig(DefaultConfig):
     """Configuration for dots animation"""
-    SEARCH_ANIMATION_PATTERN = 'dots'
-    SEARCH_ANIMATION_SPEED = 0.2
+    ANIMATION_PATTERN = 'dots'
+    ANIMATION_SPEED = 0.2
     MAX_SEARCH_RESULTS = 2000
 
 
 class ProgressConfig(DefaultConfig):
     """Configuration for progress bar animation"""
-    SEARCH_ANIMATION_PATTERN = 'progress'
-    SEARCH_ANIMATION_SPEED = 0.25
+    ANIMATION_PATTERN = 'progress'
+    ANIMATION_SPEED = 0.25
     MAX_SEARCH_RESULTS = 2000
 
 
@@ -68,11 +69,12 @@ def demo_animation_pattern(pattern_name, config_class, demo_dir):
     
     try:
         # Show pattern details
-        animator = SearchProgressAnimator(config)
-        pattern_frames = animator.patterns[config.SEARCH_ANIMATION_PATTERN]
-        print(f"Pattern: {config.SEARCH_ANIMATION_PATTERN}")
+        animator = ProgressAnimator(config)
+        pattern_name = getattr(config, 'ANIMATION_PATTERN', 'spinner')
+        pattern_frames = animator.patterns[pattern_name]
+        print(f"Pattern: {pattern_name}")
         print(f"Frames: {' '.join(pattern_frames)}")
-        print(f"Speed: {config.SEARCH_ANIMATION_SPEED}s per frame")
+        print(f"Speed: {getattr(config, 'ANIMATION_SPEED', 0.2)}s per frame")
         
         # Test filename search
         print(f"\n1. Testing {pattern_name} with filename search...")
@@ -89,7 +91,7 @@ def demo_animation_pattern(pattern_name, config_class, demo_dir):
                 is_searching = search_dialog.searching
             
             if is_searching:
-                progress_indicator = search_dialog.progress_animator.get_progress_indicator(result_count, is_searching)
+                progress_indicator = search_dialog.progress_animator.get_progress_indicator(f"{result_count} found", is_searching)
                 frame = search_dialog.progress_animator.get_current_frame()
                 
                 if frame not in frames_shown:
@@ -150,27 +152,29 @@ def demo_animation_comparison():
     
     print("\nAnimation frame sequences:")
     for name, config in configs:
-        animator = SearchProgressAnimator(config)
-        pattern_frames = animator.patterns[config.SEARCH_ANIMATION_PATTERN]
+        pattern_name = getattr(config, 'ANIMATION_PATTERN', 'spinner')
+        animator = ProgressAnimator(config)
+        pattern_frames = animator.patterns[pattern_name]
         print(f"{name:>8}: {' → '.join(pattern_frames)}")
     
     print("\nProgress indicator examples:")
     for name, config in configs:
-        animator = SearchProgressAnimator(config)
+        pattern_name = getattr(config, 'ANIMATION_PATTERN', 'spinner')
+        animator = ProgressAnimator(config)
         
         # Show a few frames of progress indicator
         examples = []
-        for i in range(min(5, len(animator.patterns[config.SEARCH_ANIMATION_PATTERN]))):
-            progress_text = animator.get_progress_indicator(42, True)
+        for i in range(min(5, len(animator.patterns[pattern_name]))):
+            progress_text = animator.get_progress_indicator("42 found", True)
             examples.append(progress_text.strip())
-            animator.frame_index = (animator.frame_index + 1) % len(animator.patterns[config.SEARCH_ANIMATION_PATTERN])
+            animator.frame_index = (animator.frame_index + 1) % len(animator.patterns[pattern_name])
         
         print(f"{name:>8}: {' | '.join(examples)}")
     
     print("\nConfiguration options:")
     for name, config in configs:
-        print(f"{name:>8}: SEARCH_ANIMATION_PATTERN = '{config.SEARCH_ANIMATION_PATTERN}'")
-        print(f"{'':>8}  SEARCH_ANIMATION_SPEED = {config.SEARCH_ANIMATION_SPEED}")
+        print(f"{name:>8}: ANIMATION_PATTERN = '{getattr(config, 'ANIMATION_PATTERN', 'spinner')}'")
+        print(f"{'':>8}  ANIMATION_SPEED = {getattr(config, 'ANIMATION_SPEED', 0.2)}")
 
 
 def main():
@@ -201,8 +205,9 @@ def main():
         print("• Thread-safe animation updates")
         
         print(f"\nTo use in your config:")
-        print("SEARCH_ANIMATION_PATTERN = 'spinner'  # or 'dots' or 'progress'")
-        print("SEARCH_ANIMATION_SPEED = 0.2          # seconds per frame")
+        print("# Animation settings")
+        print("ANIMATION_PATTERN = 'spinner'  # or 'dots', 'progress', 'bounce', 'pulse', etc.")
+        print("ANIMATION_SPEED = 0.2          # seconds per frame")
         
     except Exception as e:
         print(f"\nDemo failed: {e}")
