@@ -3400,7 +3400,7 @@ class FileManager:
                     self._navigate_to_search_result(data)
                     
                 # Save search term to history if it's not empty
-                search_term = self.search_dialog.pattern_editor.text.strip()
+                search_term = self.search_dialog.text_editor.text.strip()
                 if search_term:
                     self.add_search_to_history(search_term)
                     

@@ -153,7 +153,7 @@ search_dialog = SearchDialog(config)
 search_dialog.show('filename')
 
 # Set pattern and start search
-search_dialog.pattern_editor.text = "*.py"
+search_dialog.text_editor.text = "*.py"
 search_dialog.perform_search(search_root)
 
 # Results appear automatically as found

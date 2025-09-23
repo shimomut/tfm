@@ -58,7 +58,7 @@ def test_threaded_filename_search():
     try:
         # Test basic filename search
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*.txt"
+        search_dialog.text_editor.text = "*.txt"
         
         # Start search
         search_dialog.perform_search(test_dir)
@@ -79,7 +79,7 @@ def test_threaded_filename_search():
         assert len(results) <= config.MAX_SEARCH_RESULTS, f"Results should be limited to {config.MAX_SEARCH_RESULTS}"
         
         # Test search cancellation
-        search_dialog.pattern_editor.text = "*"
+        search_dialog.text_editor.text = "*"
         search_dialog.perform_search(test_dir)
         
         # Cancel immediately
@@ -106,7 +106,7 @@ def test_threaded_content_search():
     try:
         # Test content search
         search_dialog.show('content')
-        search_dialog.pattern_editor.text = "test"
+        search_dialog.text_editor.text = "test"
         
         # Start search
         search_dialog.perform_search(test_dir)
@@ -148,7 +148,7 @@ def test_search_restart_on_pattern_change():
         search_dialog.show('filename')
         
         # Start first search
-        search_dialog.pattern_editor.text = "*.txt"
+        search_dialog.text_editor.text = "*.txt"
         search_dialog.perform_search(test_dir)
         
         # Wait a bit for search to start
@@ -156,7 +156,7 @@ def test_search_restart_on_pattern_change():
         first_thread = search_dialog.search_thread
         
         # Change pattern (should restart search)
-        search_dialog.pattern_editor.text = "*.py"
+        search_dialog.text_editor.text = "*.py"
         search_dialog.perform_search(test_dir)
         
         # Verify new thread was created
@@ -192,7 +192,7 @@ def test_thread_safety():
     
     try:
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*"
+        search_dialog.text_editor.text = "*"
         
         # Start search
         search_dialog.perform_search(test_dir)
@@ -239,7 +239,7 @@ def test_navigation_during_search():
     
     try:
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*"
+        search_dialog.text_editor.text = "*"
         
         # Start search
         search_dialog.perform_search(test_dir)

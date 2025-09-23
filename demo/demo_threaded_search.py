@@ -110,7 +110,7 @@ def demo_threaded_search(stdscr):
         
         # Start search dialog
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*"
+        search_dialog.text_editor.text = "*"
         
         # Demo loop
         demo_running = True

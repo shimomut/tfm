@@ -79,7 +79,7 @@ def demo_animation_pattern(pattern_name, config_class, demo_dir):
         # Test filename search
         print(f"\n1. Testing {pattern_name} with filename search...")
         search_dialog.show('filename')
-        search_dialog.pattern_editor.text = "*.txt"
+        search_dialog.text_editor.text = "*.txt"
         search_dialog.perform_search(demo_dir)
         
         # Show animation frames while searching
@@ -109,7 +109,7 @@ def demo_animation_pattern(pattern_name, config_class, demo_dir):
         # Test content search
         print(f"\n2. Testing {pattern_name} with content search...")
         search_dialog.show('content')
-        search_dialog.pattern_editor.text = "demo"
+        search_dialog.text_editor.text = "demo"
         search_dialog.perform_search(demo_dir)
         
         # Show a few animation frames

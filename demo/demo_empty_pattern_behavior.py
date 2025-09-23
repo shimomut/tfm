@@ -54,7 +54,7 @@ def demo_empty_pattern_cancellation():
         search_dialog.show('filename')
         
         print("\n1. Starting filename search with pattern '*'...")
-        search_dialog.pattern_editor.text = "*"
+        search_dialog.text_editor.text = "*"
         search_dialog.perform_search(demo_dir)
         
         # Wait for search to start
@@ -65,7 +65,7 @@ def demo_empty_pattern_cancellation():
             print("   Search is running, now clearing pattern...")
             
             # Clear pattern to simulate user deleting all characters
-            search_dialog.pattern_editor.text = ""
+            search_dialog.text_editor.text = ""
             search_dialog.perform_search(demo_dir)
             
             print(f"   Search after clearing pattern: {search_dialog.searching}")
@@ -80,7 +80,7 @@ def demo_empty_pattern_cancellation():
         
         print("\n2. Testing content search cancellation...")
         search_dialog.show('content')
-        search_dialog.pattern_editor.text = "demo"
+        search_dialog.text_editor.text = "demo"
         search_dialog.perform_search(demo_dir)
         
         time.sleep(0.1)
@@ -88,7 +88,7 @@ def demo_empty_pattern_cancellation():
         
         if search_dialog.searching:
             print("   Content search is running, now clearing pattern...")
-            search_dialog.pattern_editor.text = ""
+            search_dialog.text_editor.text = ""
             search_dialog.perform_search(demo_dir)
             
             print(f"   Content search after clearing: {search_dialog.searching}")
@@ -100,7 +100,7 @@ def demo_empty_pattern_cancellation():
         search_dialog.show('filename')
         
         # Start with pattern
-        search_dialog.pattern_editor.text = "*.txt"
+        search_dialog.text_editor.text = "*.txt"
         search_dialog.perform_search(demo_dir)
         time.sleep(0.2)
         
@@ -109,7 +109,7 @@ def demo_empty_pattern_cancellation():
         print(f"   Found {txt_results} .txt files")
         
         # Clear pattern
-        search_dialog.pattern_editor.text = ""
+        search_dialog.text_editor.text = ""
         search_dialog.perform_search(demo_dir)
         
         with search_dialog.search_lock:
@@ -117,7 +117,7 @@ def demo_empty_pattern_cancellation():
         print(f"   Results after clearing pattern: {empty_results}")
         
         # New pattern
-        search_dialog.pattern_editor.text = "*.py"
+        search_dialog.text_editor.text = "*.py"
         search_dialog.perform_search(demo_dir)
         time.sleep(0.2)
         
@@ -126,7 +126,7 @@ def demo_empty_pattern_cancellation():
         print(f"   Found {py_results} .py files with new pattern")
         
         # Clear again
-        search_dialog.pattern_editor.text = ""
+        search_dialog.text_editor.text = ""
         search_dialog.perform_search(demo_dir)
         
         with search_dialog.search_lock:

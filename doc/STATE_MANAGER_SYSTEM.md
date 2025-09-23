@@ -217,7 +217,7 @@ def handle_search_dialog_input(self, key):
     # ... handle search input
     if action == 'navigate':
         # Save search term to history
-        search_term = self.search_dialog.pattern_editor.text.strip()
+        search_term = self.search_dialog.text_editor.text.strip()
         if search_term:
             self.add_search_to_history(search_term)
 ```
