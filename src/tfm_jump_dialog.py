@@ -252,6 +252,11 @@ class JumpDialog:
     
     def _filter_directories_internal(self):
         """Internal method to filter directories (must be called with lock held)"""
+        # Remember currently selected directory if any
+        currently_selected_dir = None
+        if self.filtered_directories and 0 <= self.selected < len(self.filtered_directories):
+            currently_selected_dir = self.filtered_directories[self.selected]
+        
         search_text = self.search_editor.text.strip()
         if not search_text:
             self.filtered_directories = self.directories.copy()
@@ -262,9 +267,17 @@ class JumpDialog:
                 if search_lower in str(directory).lower()
             ]
         
-        # Reset selection to top of filtered list
-        self.selected = 0
-        self.scroll = 0
+        # Try to preserve selection if the previously selected directory is still in filtered results
+        new_selected = 0
+        if currently_selected_dir and currently_selected_dir in self.filtered_directories:
+            try:
+                new_selected = self.filtered_directories.index(currently_selected_dir)
+            except ValueError:
+                new_selected = 0
+        
+        # Update selection and adjust scroll
+        self.selected = new_selected
+        self._adjust_scroll()
         
     def _adjust_scroll(self):
         """Adjust scroll offset to keep selected item visible"""

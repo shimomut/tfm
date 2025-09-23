@@ -25,6 +25,7 @@ The Jump Dialog feature provides a fast and efficient way to navigate to any dir
 ### 🎯 **User-Friendly Interface**
 - **Keyboard Navigation**: Full keyboard control with arrow keys, page up/down
 - **Visual Selection**: Clear indication of currently selected directory
+- **Selection Preservation**: User selection is maintained during filtering and scanning
 - **Status Information**: Shows scan progress and result counts
 - **Responsive Design**: Adapts to different terminal sizes
 
@@ -50,6 +51,12 @@ The Jump Dialog feature provides a fast and efficient way to navigate to any dir
 - **Result Counter**: Shows number of directories found
 - **Filter Display**: Shows current filter text
 - **Help Text**: Contextual help at bottom of dialog
+
+### Selection Behavior
+- **Preserved During Filtering**: When you filter results, your selection stays on the same directory if it matches the filter
+- **Preserved During Scanning**: As new directories are discovered during scanning, your current selection is maintained
+- **Smart Reset**: Selection only resets to the top when the previously selected directory is no longer in the filtered results
+- **Responsive Navigation**: You can navigate and change selection even while scanning is in progress
 
 ## Technical Implementation
 
@@ -91,7 +98,7 @@ The Jump Dialog feature provides a fast and efficient way to navigate to any dir
 - **Scan Worker Thread**: Performs recursive directory scanning
 - **Cancellation Support**: Clean cancellation of running scans
 - **Thread Synchronization**: Uses locks for thread-safe operations
-- **Real-time Updates**: Periodic updates during scanning
+- **Real-time Updates**: Periodic updates during scanning with selection preservation
 
 #### 4. **Progress Animation**
 - Integrates with existing `ProgressAnimatorFactory`
@@ -172,10 +179,10 @@ The jump dialog feature includes comprehensive testing:
 
 ### Test Results
 ```
-✅ Unit Tests: 9/9 passed
+✅ Unit Tests: 11/11 passed (including selection preservation tests)
 ✅ Integration Tests: 6/6 passed  
 ✅ End-to-End Tests: 6/6 passed
-✅ Total: 21/21 tests passed
+✅ Total: 23/23 tests passed
 ```
 
 ## Demo

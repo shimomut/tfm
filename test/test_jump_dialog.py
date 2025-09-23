@@ -167,6 +167,71 @@ class TestJumpDialog(unittest.TestCase):
         for directory in filtered_directories:
             self.assertIn("dir1", str(directory).lower())
     
+    def test_selection_preservation_during_filtering(self):
+        """Test that user selection is preserved during filtering when possible"""
+        test_path = self.create_test_directory_structure()
+        
+        # Show dialog and wait for scanning to complete
+        self.jump_dialog.show(test_path)
+        
+        # Wait for scanning to complete
+        max_wait = 5.0
+        start_time = time.time()
+        
+        while self.jump_dialog.searching and (time.time() - start_time) < max_wait:
+            time.sleep(0.1)
+        
+        with self.jump_dialog.scan_lock:
+            # Find a directory that contains "dir1" and select it
+            target_dir = None
+            for i, directory in enumerate(self.jump_dialog.filtered_directories):
+                if "dir1" in str(directory).lower():
+                    target_dir = directory
+                    self.jump_dialog.selected = i
+                    break
+        
+        self.assertIsNotNone(target_dir, "Should find a directory containing 'dir1'")
+        
+        # Apply filter that should still include the selected directory
+        self.jump_dialog.search_editor.text = "dir1"
+        self.jump_dialog._filter_directories()
+        
+        with self.jump_dialog.scan_lock:
+            # The selected directory should still be selected after filtering
+            if self.jump_dialog.filtered_directories:
+                currently_selected = self.jump_dialog.filtered_directories[self.jump_dialog.selected]
+                self.assertEqual(currently_selected, target_dir, 
+                               "Selected directory should be preserved after filtering")
+    
+    def test_selection_reset_when_not_in_filtered_results(self):
+        """Test that selection resets to 0 when selected item is not in filtered results"""
+        test_path = self.create_test_directory_structure()
+        
+        # Show dialog and wait for scanning to complete
+        self.jump_dialog.show(test_path)
+        
+        # Wait for scanning to complete
+        max_wait = 5.0
+        start_time = time.time()
+        
+        while self.jump_dialog.searching and (time.time() - start_time) < max_wait:
+            time.sleep(0.1)
+        
+        with self.jump_dialog.scan_lock:
+            # Select a directory that doesn't contain "nonexistent"
+            if len(self.jump_dialog.filtered_directories) > 1:
+                self.jump_dialog.selected = 1  # Select second item
+        
+        # Apply filter that won't include the selected directory
+        self.jump_dialog.search_editor.text = "nonexistent_filter_term"
+        self.jump_dialog._filter_directories()
+        
+        with self.jump_dialog.scan_lock:
+            # Selection should reset to 0 since no directories match
+            self.assertEqual(self.jump_dialog.selected, 0)
+            # And there should be no filtered directories
+            self.assertEqual(len(self.jump_dialog.filtered_directories), 0)
+    
     def test_navigation_selection(self):
         """Test navigation selection functionality"""
         test_path = self.create_test_directory_structure()
