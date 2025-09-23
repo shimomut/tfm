@@ -474,7 +474,7 @@ class SearchDialog:
                 
                 # Format result text
                 if result['type'] == 'dir':
-                    result_text = f"� {result['relative_path']}"
+                    result_text = f"📁 {result['relative_path']}"
                 elif result['type'] == 'content':
                     result_text = f"📄 {result['relative_path']} - {result['match_info']}"
                 else:
