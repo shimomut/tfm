@@ -24,7 +24,7 @@ from tfm_single_line_text_edit import SingleLineTextEdit
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, get_startup_paths, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, get_favorite_directories, get_programs
+from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, get_favorite_directories, get_programs
 from tfm_text_viewer import view_text_file, is_text_file
 
 # Import new modular components
@@ -49,13 +49,11 @@ class FileManager:
         # Load configuration
         self.config = get_config()
         
-        # Get startup paths from configuration
-        left_startup_path, right_startup_path = get_startup_paths()
-        
         # Initialize modular components
         self.log_manager = LogManager(self.config)
         self.state_manager = get_state_manager()
-        self.pane_manager = PaneManager(self.config, left_startup_path, right_startup_path, self.state_manager)
+        # Use simple defaults since TFM loads previous state anyway
+        self.pane_manager = PaneManager(self.config, Path.cwd(), Path.home(), self.state_manager)
         self.file_operations = FileOperations(self.config)
         self.list_dialog = ListDialog(self.config)
         self.info_dialog = InfoDialog(self.config)

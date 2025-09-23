@@ -84,10 +84,6 @@ class DefaultConfig:
         'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)
     }
     
-    # Directory settings
-    STARTUP_LEFT_PATH = None  # None = current directory
-    STARTUP_RIGHT_PATH = None  # None = home directory
-    
     # Favorite directories - list of dictionaries with 'name' and 'path' keys
     FAVORITE_DIRECTORIES = [
         {'name': 'Home', 'path': '~'},
@@ -342,41 +338,6 @@ def is_action_available(action, has_selection):
     """Check if action is available based on current selection status"""
     return config_manager.is_action_available(action, has_selection)
 
-
-def get_startup_paths():
-    """Get the configured startup paths for left and right panes"""
-    config = get_config()
-    
-    left_path = None
-    right_path = None
-    
-    if hasattr(config, 'STARTUP_LEFT_PATH') and config.STARTUP_LEFT_PATH:
-        try:
-            left_path = Path(config.STARTUP_LEFT_PATH).expanduser().resolve()
-            if not left_path.exists() or not left_path.is_dir():
-                print(f"Warning: Configured left startup path does not exist: {left_path}")
-                left_path = None
-        except Exception as e:
-            print(f"Warning: Invalid left startup path: {e}")
-            left_path = None
-    
-    if hasattr(config, 'STARTUP_RIGHT_PATH') and config.STARTUP_RIGHT_PATH:
-        try:
-            right_path = Path(config.STARTUP_RIGHT_PATH).expanduser().resolve()
-            if not right_path.exists() or not right_path.is_dir():
-                print(f"Warning: Configured right startup path does not exist: {right_path}")
-                right_path = None
-        except Exception as e:
-            print(f"Warning: Invalid right startup path: {e}")
-            right_path = None
-    
-    # Use defaults if not configured or invalid
-    if left_path is None:
-        left_path = Path.cwd()
-    if right_path is None:
-        right_path = Path.home()
-    
-    return left_path, right_path
 
 
 def get_favorite_directories():

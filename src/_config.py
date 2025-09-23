@@ -84,10 +84,6 @@ class Config:
         'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)
     }
     
-    # Directory settings
-    STARTUP_LEFT_PATH = None  # None = current directory, or specify path like "/home/user/projects"
-    STARTUP_RIGHT_PATH = None  # None = home directory, or specify path
-    
     # Favorite directories - customize your frequently used directories
     # Each entry should have 'name' and 'path' keys
     FAVORITE_DIRECTORIES = [
