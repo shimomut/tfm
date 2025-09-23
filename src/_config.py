@@ -106,7 +106,11 @@ class Config:
     
     # Performance settings
     MAX_LOG_MESSAGES = 1000
+    MAX_SEARCH_RESULTS = 10000  # Maximum number of search results to prevent memory issues
     MAX_JUMP_DIRECTORIES = 5000  # Maximum directories to scan for jump dialog
+    
+    # History settings
+    MAX_HISTORY_ENTRIES = 100  # Maximum number of history entries to keep
     
     # Progress animation settings
     PROGRESS_ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow'

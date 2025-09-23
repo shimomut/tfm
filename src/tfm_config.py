@@ -119,11 +119,17 @@ class DefaultConfig:
     # Text editor settings
     TEXT_EDITOR = 'vim'  # Default text editor command
     
-    # Info dialog settings
+    # Dialog settings
     INFO_DIALOG_WIDTH_RATIO = 0.8
     INFO_DIALOG_HEIGHT_RATIO = 0.8
     INFO_DIALOG_MIN_WIDTH = 20
     INFO_DIALOG_MIN_HEIGHT = 10
+    
+    # List dialog settings
+    LIST_DIALOG_WIDTH_RATIO = 0.6
+    LIST_DIALOG_HEIGHT_RATIO = 0.7
+    LIST_DIALOG_MIN_WIDTH = 40
+    LIST_DIALOG_MIN_HEIGHT = 15
 
 
 class ConfigManager:
