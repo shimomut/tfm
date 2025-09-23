@@ -17,8 +17,8 @@ from tfm_config import DefaultConfig
 
 class DemoConfig(DefaultConfig):
     """Demo configuration"""
-    ANIMATION_PATTERN = 'pulse'
-    ANIMATION_SPEED = 0.2
+    PROGRESS_ANIMATION_PATTERN = 'pulse'
+    PROGRESS_ANIMATION_SPEED = 0.2
 
 
 def demo_all_patterns():
@@ -258,9 +258,9 @@ class Config(DefaultConfig):
     ANIMATION_PATTERN = 'spinner'  # Default pattern for all animations
     ANIMATION_SPEED = 0.2          # Default speed for all animations
     
-    # Animation settings
-    ANIMATION_PATTERN = 'spinner'  # Default pattern for all animations
-    ANIMATION_SPEED = 0.2          # Default speed for all animations
+    # Progress animation settings
+    PROGRESS_ANIMATION_PATTERN = 'spinner'  # Default pattern for all animations
+    PROGRESS_ANIMATION_SPEED = 0.2          # Default speed for all animations
 """)
     
     print("\nAdvanced usage in code:")

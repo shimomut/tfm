@@ -20,22 +20,22 @@ from tfm_config import DefaultConfig
 
 class SpinnerConfig(DefaultConfig):
     """Configuration for spinner animation"""
-    ANIMATION_PATTERN = 'spinner'
-    ANIMATION_SPEED = 0.15
+    PROGRESS_ANIMATION_PATTERN = 'spinner'
+    PROGRESS_ANIMATION_SPEED = 0.15
     MAX_SEARCH_RESULTS = 2000
 
 
 class DotsConfig(DefaultConfig):
     """Configuration for dots animation"""
-    ANIMATION_PATTERN = 'dots'
-    ANIMATION_SPEED = 0.2
+    PROGRESS_ANIMATION_PATTERN = 'dots'
+    PROGRESS_ANIMATION_SPEED = 0.2
     MAX_SEARCH_RESULTS = 2000
 
 
 class ProgressConfig(DefaultConfig):
     """Configuration for progress bar animation"""
-    ANIMATION_PATTERN = 'progress'
-    ANIMATION_SPEED = 0.25
+    PROGRESS_ANIMATION_PATTERN = 'progress'
+    PROGRESS_ANIMATION_SPEED = 0.25
     MAX_SEARCH_RESULTS = 2000
 
 
@@ -70,11 +70,11 @@ def demo_animation_pattern(pattern_name, config_class, demo_dir):
     try:
         # Show pattern details
         animator = ProgressAnimator(config)
-        pattern_name = getattr(config, 'ANIMATION_PATTERN', 'spinner')
+        pattern_name = getattr(config, 'PROGRESS_ANIMATION_PATTERN', 'spinner')
         pattern_frames = animator.patterns[pattern_name]
         print(f"Pattern: {pattern_name}")
         print(f"Frames: {' '.join(pattern_frames)}")
-        print(f"Speed: {getattr(config, 'ANIMATION_SPEED', 0.2)}s per frame")
+        print(f"Speed: {getattr(config, 'PROGRESS_ANIMATION_SPEED', 0.2)}s per frame")
         
         # Test filename search
         print(f"\n1. Testing {pattern_name} with filename search...")
@@ -152,14 +152,14 @@ def demo_animation_comparison():
     
     print("\nAnimation frame sequences:")
     for name, config in configs:
-        pattern_name = getattr(config, 'ANIMATION_PATTERN', 'spinner')
+        pattern_name = getattr(config, 'PROGRESS_ANIMATION_PATTERN', 'spinner')
         animator = ProgressAnimator(config)
         pattern_frames = animator.patterns[pattern_name]
         print(f"{name:>8}: {' → '.join(pattern_frames)}")
     
     print("\nProgress indicator examples:")
     for name, config in configs:
-        pattern_name = getattr(config, 'ANIMATION_PATTERN', 'spinner')
+        pattern_name = getattr(config, 'PROGRESS_ANIMATION_PATTERN', 'spinner')
         animator = ProgressAnimator(config)
         
         # Show a few frames of progress indicator
@@ -173,8 +173,8 @@ def demo_animation_comparison():
     
     print("\nConfiguration options:")
     for name, config in configs:
-        print(f"{name:>8}: ANIMATION_PATTERN = '{getattr(config, 'ANIMATION_PATTERN', 'spinner')}'")
-        print(f"{'':>8}  ANIMATION_SPEED = {getattr(config, 'ANIMATION_SPEED', 0.2)}")
+        print(f"{name:>8}: PROGRESS_ANIMATION_PATTERN = '{getattr(config, 'PROGRESS_ANIMATION_PATTERN', 'spinner')}'")
+        print(f"{'':>8}  PROGRESS_ANIMATION_SPEED = {getattr(config, 'PROGRESS_ANIMATION_SPEED', 0.2)}")
 
 
 def main():
@@ -205,9 +205,9 @@ def main():
         print("• Thread-safe animation updates")
         
         print(f"\nTo use in your config:")
-        print("# Animation settings")
-        print("ANIMATION_PATTERN = 'spinner'  # or 'dots', 'progress', 'bounce', 'pulse', etc.")
-        print("ANIMATION_SPEED = 0.2          # seconds per frame")
+        print("# Progress animation settings")
+        print("PROGRESS_ANIMATION_PATTERN = 'spinner'  # or 'dots', 'progress', 'bounce', 'pulse', etc.")
+        print("PROGRESS_ANIMATION_SPEED = 0.2          # seconds per frame")
         
     except Exception as e:
         print(f"\nDemo failed: {e}")

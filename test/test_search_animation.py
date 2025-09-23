@@ -21,26 +21,26 @@ from tfm_config import DefaultConfig
 class AnimationTestConfig(DefaultConfig):
     """Test configuration for animation testing"""
     MAX_SEARCH_RESULTS = 100
-    ANIMATION_PATTERN = 'spinner'
-    ANIMATION_SPEED = 0.1  # Faster for testing
+    PROGRESS_ANIMATION_PATTERN = 'spinner'
+    PROGRESS_ANIMATION_SPEED = 0.1  # Faster for testing
 
 
 class SpinnerTestConfig(DefaultConfig):
     """Test configuration for spinner animation"""
-    ANIMATION_PATTERN = 'spinner'
-    ANIMATION_SPEED = 0.1
+    PROGRESS_ANIMATION_PATTERN = 'spinner'
+    PROGRESS_ANIMATION_SPEED = 0.1
 
 
 class DotsTestConfig(DefaultConfig):
     """Test configuration for dots animation"""
-    ANIMATION_PATTERN = 'dots'
-    ANIMATION_SPEED = 0.1
+    PROGRESS_ANIMATION_PATTERN = 'dots'
+    PROGRESS_ANIMATION_SPEED = 0.1
 
 
 class ProgressTestConfig(DefaultConfig):
     """Test configuration for progress animation"""
-    ANIMATION_PATTERN = 'progress'
-    ANIMATION_SPEED = 0.1
+    PROGRESS_ANIMATION_PATTERN = 'progress'
+    PROGRESS_ANIMATION_SPEED = 0.1
 
 
 def test_progress_animator_basic():
@@ -219,11 +219,11 @@ def test_animation_speed_configuration():
     
     # Test fast animation
     class FastConfig(DefaultConfig):
-        ANIMATION_SPEED = 0.05
+        PROGRESS_ANIMATION_SPEED = 0.05
     
     # Test slow animation  
     class SlowConfig(DefaultConfig):
-        ANIMATION_SPEED = 0.3
+        PROGRESS_ANIMATION_SPEED = 0.3
     
     fast_animator = ProgressAnimatorFactory.create_search_animator(FastConfig())
     slow_animator = ProgressAnimatorFactory.create_search_animator(SlowConfig())

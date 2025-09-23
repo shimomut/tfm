@@ -21,8 +21,8 @@ class ProgressAnimator:
         self.config = config
         
         # Use overrides if provided, otherwise fall back to config
-        self.animation_pattern = pattern_override or getattr(config, 'ANIMATION_PATTERN', 'spinner')
-        self.animation_speed = speed_override or getattr(config, 'ANIMATION_SPEED', 0.2)
+        self.animation_pattern = pattern_override or getattr(config, 'PROGRESS_ANIMATION_PATTERN', 'spinner')
+        self.animation_speed = speed_override or getattr(config, 'PROGRESS_ANIMATION_SPEED', 0.2)
         
         # Animation patterns
         self.patterns = {

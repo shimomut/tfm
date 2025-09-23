@@ -23,8 +23,8 @@ from tfm_file_operations import FileOperations
 class IntegrationTestConfig(DefaultConfig):
     """Test configuration for integration testing"""
     MAX_SEARCH_RESULTS = 100
-    ANIMATION_PATTERN = 'spinner'
-    ANIMATION_SPEED = 0.1
+    PROGRESS_ANIMATION_PATTERN = 'spinner'
+    PROGRESS_ANIMATION_SPEED = 0.1
 
 
 def create_integration_test_structure():
@@ -131,8 +131,8 @@ def test_animation_configuration_integration():
     
     for pattern, speed in configs_to_test:
         class TestConfig(DefaultConfig):
-            ANIMATION_PATTERN = pattern
-            ANIMATION_SPEED = speed
+            PROGRESS_ANIMATION_PATTERN = pattern
+            PROGRESS_ANIMATION_SPEED = speed
         
         config = TestConfig()
         search_dialog = SearchDialog(config)
@@ -269,8 +269,8 @@ def test_animation_performance_impact():
     
     # Test without animation (simulate by using very slow speed)
     class NoAnimationConfig(DefaultConfig):
-        ANIMATION_PATTERN = 'spinner'
-        ANIMATION_SPEED = 999  # Very slow, effectively no animation
+        PROGRESS_ANIMATION_PATTERN = 'spinner'
+        PROGRESS_ANIMATION_SPEED = 999  # Very slow, effectively no animation
         MAX_SEARCH_RESULTS = 100
     
     test_dir = create_integration_test_structure()

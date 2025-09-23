@@ -106,9 +106,9 @@ class Config:
     # Performance settings
     MAX_LOG_MESSAGES = 1000
     
-    # Animation settings
-    ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow'
-    ANIMATION_SPEED = 0.2  # Animation frame update interval in seconds
+    # Progress animation settings
+    PROGRESS_ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow'
+    PROGRESS_ANIMATION_SPEED = 0.2  # Animation frame update interval in seconds
     
     # File display settings
     SEPARATE_EXTENSIONS = True  # Show file extensions separately from basenames

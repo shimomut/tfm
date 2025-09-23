@@ -38,9 +38,9 @@ SEARCH_ANIMATION_SPEED = 0.2
 
 **After:**
 ```python
-# General animation configuration
-ANIMATION_PATTERN = 'spinner'  # Default for all components
-ANIMATION_SPEED = 0.2          # Default for all components
+# General progress animation configuration
+PROGRESS_ANIMATION_PATTERN = 'spinner'  # Default for all components
+PROGRESS_ANIMATION_SPEED = 0.2          # Default for all components
 ```
 
 ### 3. New Animation Patterns
@@ -74,7 +74,7 @@ class ProgressAnimatorFactory:
 
 The SearchDialog continues to work exactly as before:
 - Uses `ProgressAnimatorFactory.create_search_animator(config)`
-- Uses general `ANIMATION_PATTERN` and `ANIMATION_SPEED` settings
+- Uses general `PROGRESS_ANIMATION_PATTERN` and `PROGRESS_ANIMATION_SPEED` settings
 - All existing functionality preserved
 
 ### Configuration Compatibility
@@ -83,8 +83,8 @@ The SearchDialog continues to work exactly as before:
 ```python
 # Clean, unified configuration
 class Config(DefaultConfig):
-    ANIMATION_PATTERN = 'pulse'        # Used by all operations
-    ANIMATION_SPEED = 0.2              # Used by all operations
+    PROGRESS_ANIMATION_PATTERN = 'pulse'        # Used by all operations
+    PROGRESS_ANIMATION_SPEED = 0.2              # Used by all operations
 ```
 
 ## New Capabilities

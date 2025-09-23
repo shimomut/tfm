@@ -62,18 +62,18 @@ Add these settings to your TFM configuration file (`~/.tfm/config.py`):
 
 ```python
 class Config(DefaultConfig):
-    # Animation settings (used by all components)
-    ANIMATION_PATTERN = 'spinner'  # Default pattern for all animations
-    ANIMATION_SPEED = 0.2          # Default speed for all animations
+    # Progress animation settings (used by all components)
+    PROGRESS_ANIMATION_PATTERN = 'spinner'  # Default pattern for all animations
+    PROGRESS_ANIMATION_SPEED = 0.2          # Default speed for all animations
 ```
 
 #### Configuration Details
 
-- **ANIMATION_PATTERN**: Animation pattern for all components
+- **PROGRESS_ANIMATION_PATTERN**: Animation pattern for all components
   - Available patterns: `'spinner'`, `'dots'`, `'progress'`, `'bounce'`, `'pulse'`, `'wave'`, `'clock'`, `'arrow'`
   - Default: `'spinner'`
 
-- **ANIMATION_SPEED**: Animation speed for all components
+- **PROGRESS_ANIMATION_SPEED**: Animation speed for all components
   - Value in seconds between frame updates
   - Default: `0.2` seconds
   - Smaller values = faster animation
@@ -215,7 +215,7 @@ The animation system includes comprehensive tests:
    - Ensure animation speed isn't too slow
 
 2. **Animation Too Fast/Slow**
-   - Adjust `SEARCH_ANIMATION_SPEED` value
+   - Adjust `PROGRESS_ANIMATION_SPEED` value
    - Recommended range: 0.1 to 0.5 seconds
 
 3. **Character Display Issues**
@@ -272,8 +272,8 @@ class ProgressAnimatorFactory:
 
 ```python
 # Default values
-ANIMATION_PATTERN = 'spinner'
-ANIMATION_SPEED = 0.2
+PROGRESS_ANIMATION_PATTERN = 'spinner'
+PROGRESS_ANIMATION_SPEED = 0.2
 ```
 
 ### Animation Patterns

@@ -17,8 +17,8 @@ from tfm_config import DefaultConfig
 
 class GeneralizedTestConfig(DefaultConfig):
     """Test configuration for generalized animation testing"""
-    ANIMATION_PATTERN = 'pulse'
-    ANIMATION_SPEED = 0.1
+    PROGRESS_ANIMATION_PATTERN = 'pulse'
+    PROGRESS_ANIMATION_SPEED = 0.1
 
 
 def test_all_animation_patterns():
@@ -193,8 +193,8 @@ def test_configuration_fallbacks():
     
     # Test with partial config
     class PartialConfig:
-        ANIMATION_PATTERN = 'dots'
-        # No ANIMATION_SPEED defined
+        PROGRESS_ANIMATION_PATTERN = 'dots'
+        # No PROGRESS_ANIMATION_SPEED defined
     
     partial_config = PartialConfig()
     animator2 = ProgressAnimator(partial_config)

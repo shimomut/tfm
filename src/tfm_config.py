@@ -103,9 +103,9 @@ class DefaultConfig:
     MAX_LOG_MESSAGES = 1000
     MAX_SEARCH_RESULTS = 10000  # Maximum number of search results to prevent memory issues
     
-    # Animation settings
-    ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow'
-    ANIMATION_SPEED = 0.2  # Animation frame update interval in seconds
+    # Progress animation settings
+    PROGRESS_ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow'
+    PROGRESS_ANIMATION_SPEED = 0.2  # Animation frame update interval in seconds
     
     # History settings
     MAX_HISTORY_ENTRIES = 100  # Maximum number of history entries to keep
