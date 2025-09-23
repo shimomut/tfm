@@ -167,6 +167,8 @@ class SearchDialog:
         pattern_text = self.pattern_editor.text.strip()
         
         if not pattern_text:
+            # Cancel any running search when pattern becomes empty
+            self._cancel_current_search()
             with self.search_lock:
                 self.results = []
                 self.selected = 0
