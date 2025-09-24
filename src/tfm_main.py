@@ -1412,17 +1412,17 @@ class FileManager:
     def _check_dialog_content_changed(self):
         """Check if any active dialog content has changed and needs redraw"""
         if self.general_dialog.is_active:
-            return getattr(self.general_dialog, 'content_changed', True)
+            return self.general_dialog.content_changed
         elif self.list_dialog.mode:
-            return getattr(self.list_dialog, 'content_changed', True)
+            return self.list_dialog.content_changed
         elif self.info_dialog.mode:
-            return getattr(self.info_dialog, 'content_changed', True)
+            return self.info_dialog.content_changed
         elif self.search_dialog.mode:
-            return getattr(self.search_dialog, 'content_changed', True)
+            return self.search_dialog.content_changed
         elif self.jump_dialog.mode:
-            return getattr(self.jump_dialog, 'content_changed', True)
+            return self.jump_dialog.content_changed
         elif self.batch_rename_dialog.mode:
-            return getattr(self.batch_rename_dialog, 'content_changed', True)
+            return self.batch_rename_dialog.content_changed
         return False
     
     def _mark_dialog_content_unchanged(self):
