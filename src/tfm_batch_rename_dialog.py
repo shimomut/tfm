@@ -243,6 +243,10 @@ class BatchRenameDialog:
         
         return success_count, errors
         
+    def needs_redraw(self):
+        """Check if this dialog needs to be redrawn"""
+        return self.content_changed
+    
     def draw(self, stdscr, safe_addstr_func):
         """Draw the batch rename dialog overlay"""
         height, width = stdscr.getmaxyx()
@@ -393,6 +397,9 @@ class BatchRenameDialog:
             help_x = start_x + (dialog_width - len(help_text)) // 2
             if help_x >= start_x:
                 safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+        
+        # Automatically mark as not needing redraw after drawing
+        self.content_changed = False
 
 
 class BatchRenameDialogHelpers:

@@ -1412,33 +1412,19 @@ class FileManager:
     def _check_dialog_content_changed(self):
         """Check if any active dialog content has changed and needs redraw"""
         if self.general_dialog.is_active:
-            return self.general_dialog.content_changed
+            return self.general_dialog.needs_redraw()
         elif self.list_dialog.mode:
-            return self.list_dialog.content_changed
+            return self.list_dialog.needs_redraw()
         elif self.info_dialog.mode:
-            return self.info_dialog.content_changed
+            return self.info_dialog.needs_redraw()
         elif self.search_dialog.mode:
-            return self.search_dialog.content_changed
+            return self.search_dialog.needs_redraw()
         elif self.jump_dialog.mode:
-            return self.jump_dialog.content_changed
+            return self.jump_dialog.needs_redraw()
         elif self.batch_rename_dialog.mode:
-            return self.batch_rename_dialog.content_changed
+            return self.batch_rename_dialog.needs_redraw()
         return False
     
-    def _mark_dialog_content_unchanged(self):
-        """Mark all active dialogs as having unchanged content"""
-        if self.general_dialog.is_active:
-            self.general_dialog.content_changed = False
-        elif self.list_dialog.mode:
-            self.list_dialog.content_changed = False
-        elif self.info_dialog.mode:
-            self.info_dialog.content_changed = False
-        elif self.search_dialog.mode:
-            self.search_dialog.content_changed = False
-        elif self.jump_dialog.mode:
-            self.jump_dialog.content_changed = False
-        elif self.batch_rename_dialog.mode:
-            self.batch_rename_dialog.content_changed = False
 
     def _draw_dialogs_if_needed(self):
         """Draw dialog overlays if content has changed or full redraw is needed. Returns True if any dialog was drawn."""
@@ -1465,10 +1451,7 @@ class FileManager:
                 self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
             
-            # Mark dialog content as unchanged after drawing
-            if dialog_drawn:
-                self._mark_dialog_content_unchanged()
-        
+            
         # Refresh screen if dialog was drawn or full redraw occurred
         if dialog_drawn or self.needs_full_redraw:
             self.stdscr.refresh()

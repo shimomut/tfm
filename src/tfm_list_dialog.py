@@ -119,6 +119,10 @@ class ListDialog(BaseListDialog):
         self.scroll = 0
 
             
+    def needs_redraw(self):
+        """Check if this dialog needs to be redrawn"""
+        return self.content_changed
+    
     def draw(self, stdscr, safe_addstr_func):
         """Draw the searchable list dialog overlay"""
         # Get configuration values
@@ -183,6 +187,9 @@ class ListDialog(BaseListDialog):
         
         help_y = start_y + dialog_height - 1
         self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
+        
+        # Automatically mark as not needing redraw after drawing
+        self.content_changed = False
 
 
 class ListDialogHelpers:

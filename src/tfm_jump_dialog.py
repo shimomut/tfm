@@ -238,6 +238,11 @@ class JumpDialog(BaseListDialog):
         
 
             
+    def needs_redraw(self):
+        """Check if this dialog needs to be redrawn"""
+        # Always redraw when scanning to animate progress indicator
+        return self.content_changed or self.searching
+    
     def draw(self, stdscr, safe_addstr_func):
         """Draw the jump dialog overlay"""
         # Draw dialog frame
@@ -312,6 +317,10 @@ class JumpDialog(BaseListDialog):
         help_text = "Enter: Jump | Type: Filter | ESC: Cancel"
         help_y = start_y + dialog_height - 2
         self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
+        
+        # Automatically mark as not needing redraw after drawing (unless still searching)
+        if not self.searching:
+            self.content_changed = False
 
 
 class JumpDialogHelpers:

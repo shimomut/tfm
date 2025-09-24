@@ -135,6 +135,10 @@ class GeneralPurposeDialog:
                 self.content_changed = True  # Mark content as changed
             return handled
     
+    def needs_redraw(self):
+        """Check if this dialog needs to be redrawn"""
+        return self.content_changed
+    
     def draw(self, stdscr, safe_addstr_func):
         """
         Draw the dialog
@@ -148,6 +152,9 @@ class GeneralPurposeDialog:
         
         if self.dialog_type == DialogType.STATUS_LINE_INPUT:
             self._draw_status_line_input(stdscr, safe_addstr_func)
+        
+        # Automatically mark as not needing redraw after drawing
+        self.content_changed = False
     
     def _draw_status_line_input(self, stdscr, safe_addstr_func):
         """Draw status line input dialog"""
