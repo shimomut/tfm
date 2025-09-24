@@ -597,24 +597,29 @@ class TextViewer:
     def run(self):
         """Main viewer loop"""
         curses.curs_set(0)  # Hide cursor
+        self.stdscr.timeout(-1)  # Block indefinitely for input
+        
+        # Initial draw
+        self.stdscr.clear()
+        self.draw_header()
+        self.draw_content()
+        self.draw_status_bar()
+        self.stdscr.refresh()
         
         while True:
-            # Clear screen
-            self.stdscr.clear()
-            
-            # Draw components
-            self.draw_header()
-            self.draw_content()
-            self.draw_status_bar()
-            
-            # Refresh screen
-            self.stdscr.refresh()
-            
-            # Handle input
+            # Handle input - this will block until a key is pressed
             try:
                 key = self.stdscr.getch()
                 if not self.handle_key(key):
                     break
+                    
+                # Only redraw after handling input
+                self.stdscr.clear()
+                self.draw_header()
+                self.draw_content()
+                self.draw_status_bar()
+                self.stdscr.refresh()
+                
             except KeyboardInterrupt:
                 break
 
