@@ -3342,7 +3342,6 @@ class FileManager:
         # Show immediate feedback in log pane
         left_percent = int(self.pane_manager.left_pane_ratio * 100)
         right_percent = 100 - left_percent
-        print(f"Pane split: {left_percent}% | {right_percent}%")
         
     def adjust_log_boundary(self, direction):
         """Adjust the boundary between file panes and log pane"""
@@ -3359,7 +3358,6 @@ class FileManager:
         # Show immediate feedback in log pane
         log_percent = int(self.log_height_ratio * 100)
         file_percent = 100 - log_percent
-        print(f"Layout: {file_percent}% files | {log_percent}% log")
     
     def show_search_dialog(self, search_type='filename'):
         """Show the search dialog for filename or content search - wrapper for search dialog component"""
