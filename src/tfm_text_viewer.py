@@ -306,12 +306,10 @@ class TextViewer:
         """Draw the viewer header"""
         height, width = self.stdscr.getmaxyx()
         
-        # Clear header area efficiently
+        # Clear header area with colored background
         try:
-            self.stdscr.move(0, 0)
-            self.stdscr.clrtoeol()
-            self.stdscr.move(1, 0)
-            self.stdscr.clrtoeol()
+            self.stdscr.addstr(0, 0, " " * (width - 1), get_header_color())
+            self.stdscr.addstr(1, 0, " " * (width - 1), get_header_color())
         except curses.error:
             pass
         
@@ -357,10 +355,9 @@ class TextViewer:
         height, width = self.stdscr.getmaxyx()
         status_y = height - 1  # Bottom line
         
-        # Clear status bar area efficiently
+        # Clear status bar area with colored background
         try:
-            self.stdscr.move(status_y, 0)
-            self.stdscr.clrtoeol()
+            self.stdscr.addstr(status_y, 0, " " * (width - 1), get_status_color())
         except curses.error:
             pass
         
