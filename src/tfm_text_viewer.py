@@ -306,10 +306,12 @@ class TextViewer:
         """Draw the viewer header"""
         height, width = self.stdscr.getmaxyx()
         
-        # Clear header area
+        # Clear header area efficiently
         try:
-            self.stdscr.addstr(0, 0, " " * (width - 1), get_header_color())
-            self.stdscr.addstr(1, 0, " " * (width - 1), get_header_color())
+            self.stdscr.move(0, 0)
+            self.stdscr.clrtoeol()
+            self.stdscr.move(1, 0)
+            self.stdscr.clrtoeol()
         except curses.error:
             pass
         
@@ -355,9 +357,10 @@ class TextViewer:
         height, width = self.stdscr.getmaxyx()
         status_y = height - 1  # Bottom line
         
-        # Clear status bar area
+        # Clear status bar area efficiently
         try:
-            self.stdscr.addstr(status_y, 0, " " * (width - 1), get_status_color())
+            self.stdscr.move(status_y, 0)
+            self.stdscr.clrtoeol()
         except curses.error:
             pass
         
@@ -451,9 +454,10 @@ class TextViewer:
             line_index = self.scroll_offset + i
             y_pos = start_y + i
             
-            # Clear the line
+            # Move to start of line and clear to end of line (more efficient)
             try:
-                self.stdscr.addstr(y_pos, start_x, " " * (display_width - 1))
+                self.stdscr.move(y_pos, start_x)
+                self.stdscr.clrtoeol()
             except curses.error:
                 pass
             
@@ -613,8 +617,7 @@ class TextViewer:
                 if not self.handle_key(key):
                     break
                     
-                # Only redraw after handling input
-                self.stdscr.clear()
+                # Only redraw after handling input - no full clear to avoid flicker
                 self.draw_header()
                 self.draw_content()
                 self.draw_status_bar()
