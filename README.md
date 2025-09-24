@@ -5,13 +5,14 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 ## Key Benefits
 
 🚀 **Efficiency**: Navigate and manage files faster than traditional GUI file managers with keyboard-driven operations  
-⚡ **Speed**: Instant file operations with real-time progress tracking and batch processing capabilities  
+⚡ **Speed**: Instant file operations with real-time progress tracking and threaded search capabilities  
 🎯 **Precision**: Advanced selection, filtering, and search features for exact file management  
 🔧 **Customizable**: Fully configurable key bindings, color schemes, and behavior settings  
 💻 **Universal**: Works on any terminal - macOS, Linux, Windows with proper terminal support  
 🎨 **Professional**: Clean dual-pane interface with syntax highlighting and intelligent file handling  
 📦 **Complete**: Built-in text viewer, archive operations, and external program integration  
-🔍 **Smart**: Incremental search, pattern filtering, and content search capabilities
+🔍 **Smart**: Incremental search, pattern filtering, threaded content search, and remote log monitoring  
+🔗 **Integrated**: VSCode integration, Beyond Compare support, and extensible external program system
 
 ## Development with Kiro
 
