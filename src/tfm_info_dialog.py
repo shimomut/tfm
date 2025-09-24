@@ -290,6 +290,14 @@ class InfoDialogHelpers:
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('subshell')} Enter subshell (command line) mode")
         help_lines.append("")
         
+        # Remote Log Monitoring
+        help_lines.append("Remote Log Monitoring:")
+        help_lines.append(f"• {'--remote-log-port'.ljust(12)} Start TFM with remote log monitoring")
+        help_lines.append(f"• {''.ljust(12)} Example: python tfm.py --remote-log-port 8888")
+        help_lines.append(f"• {''.ljust(12)} Connect with: python tfm_log_client.py localhost 8888")
+        help_lines.append(f"• {''.ljust(12)} Monitor logs from other terminals or remote machines")
+        help_lines.append("")
+        
         # Archive Operations (configurable)
         help_lines.append("Archive Operations:")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('create_archive')} Create archive from selected files")

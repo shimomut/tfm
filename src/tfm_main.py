@@ -43,14 +43,14 @@ from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
 
 class FileManager:
-    def __init__(self, stdscr):
+    def __init__(self, stdscr, remote_log_port=None):
         self.stdscr = stdscr
         
         # Load configuration
         self.config = get_config()
         
         # Initialize modular components
-        self.log_manager = LogManager(self.config)
+        self.log_manager = LogManager(self.config, remote_port=remote_log_port)
         self.state_manager = get_state_manager()
         # Use simple defaults since TFM loads previous state anyway
         self.pane_manager = PaneManager(self.config, Path.cwd(), Path.home(), self.state_manager)
@@ -3967,11 +3967,11 @@ class FileManager:
             print(f"Warning: Could not load search history: {e}")
             return []
 
-def main(stdscr):
+def main(stdscr, remote_log_port=None):
     """Main function to run the file manager"""
     fm = None
     try:
-        fm = FileManager(stdscr)
+        fm = FileManager(stdscr, remote_log_port=remote_log_port)
         fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
