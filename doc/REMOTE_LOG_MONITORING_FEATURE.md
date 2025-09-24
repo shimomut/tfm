@@ -38,13 +38,13 @@ Use the provided client script to connect and monitor logs:
 
 ```bash
 # Connect to local TFM instance
-python tfm_log_client.py localhost 8888
+python tools/tfm_log_client.py localhost 8888
 
 # Connect to remote TFM instance
-python tfm_log_client.py 192.168.1.100 8888
+python tools/tfm_log_client.py 192.168.1.100 8888
 
 # Use default values (localhost:8888)
-python tfm_log_client.py
+python tools/tfm_log_client.py
 ```
 
 ### Client Options
@@ -53,10 +53,10 @@ The log client supports several options:
 
 ```bash
 # Disable colored output
-python tfm_log_client.py --no-color localhost 8888
+python tools/tfm_log_client.py --no-color localhost 8888
 
 # Show help
-python tfm_log_client.py --help
+python tools/tfm_log_client.py --help
 ```
 
 ## Message Format
@@ -111,7 +111,7 @@ The `LogManager` class has been extended with:
 - **Message Broadcasting**: Sends log messages to all connected clients
 - **Thread Safety**: Uses threading for non-blocking client handling
 
-### Client Side (tfm_log_client.py)
+### Client Side (tools/tfm_log_client.py)
 
 The client application provides:
 
@@ -138,7 +138,7 @@ python tfm.py --remote-log-port 8888
 
 Terminal 2 (Client):
 ```bash
-python tfm_log_client.py
+python tools/tfm_log_client.py
 ```
 
 ### Multiple Clients
@@ -152,12 +152,12 @@ python tfm.py --remote-log-port 8888
 
 Terminal 2 (Client 1):
 ```bash
-python tfm_log_client.py localhost 8888
+python tools/tfm_log_client.py localhost 8888
 ```
 
 Terminal 3 (Client 2):
 ```bash
-python tfm_log_client.py localhost 8888
+python tools/tfm_log_client.py localhost 8888
 ```
 
 ### Remote Monitoring
@@ -171,7 +171,7 @@ python tfm.py --remote-log-port 8888
 
 Client machine:
 ```bash
-python tfm_log_client.py server.example.com 8888
+python tools/tfm_log_client.py server.example.com 8888
 ```
 
 ## Demo
@@ -180,10 +180,10 @@ A demo script is provided to test the functionality:
 
 ```bash
 # Terminal 1: Start demo server
-python demo_remote_log.py
+python demo/demo_remote_log.py
 
 # Terminal 2: Connect client
-python tfm_log_client.py localhost 8888
+python tools/tfm_log_client.py localhost 8888
 ```
 
 ## Testing

@@ -44,7 +44,7 @@ Successfully implemented TCP-based remote log monitoring for TFM, allowing users
 - Modified `FileManager.__init__()` to pass port to LogManager
 - Maintains full backward compatibility
 
-### 5. Remote Log Client (`tfm_log_client.py`)
+### 5. Remote Log Client (`tools/tfm_log_client.py`)
 
 **Features:**
 - Standalone client application for monitoring logs
@@ -56,11 +56,11 @@ Successfully implemented TCP-based remote log monitoring for TFM, allowing users
 
 **Usage:**
 ```bash
-python tfm_log_client.py [host] [port]
-python tfm_log_client.py --no-color localhost 8888
+python tools/tfm_log_client.py [host] [port]
+python tools/tfm_log_client.py --no-color localhost 8888
 ```
 
-### 6. Demo Application (`demo_remote_log.py`)
+### 6. Demo Application (`demo/demo_remote_log.py`)
 
 **Purpose:**
 - Demonstrates remote log monitoring functionality
@@ -77,12 +77,12 @@ python tfm_log_client.py --no-color localhost 8888
 ## Files Created/Modified
 
 ### New Files:
-- `tfm_log_client.py` - Remote log monitoring client
-- `demo_remote_log.py` - Demo application
+- `tools/tfm_log_client.py` - Remote log monitoring client
+- `demo/demo_remote_log.py` - Demo application
 - `test/test_remote_log_monitoring.py` - Unit tests
 - `test/test_remote_log_integration.py` - Integration tests
 - `doc/REMOTE_LOG_MONITORING_FEATURE.md` - Feature documentation
-- `REMOTE_LOG_MONITORING_SUMMARY.md` - This summary
+- `doc/REMOTE_LOG_MONITORING_SUMMARY.md` - This summary
 
 ### Modified Files:
 - `src/tfm_log_manager.py` - Added TCP server functionality
@@ -101,7 +101,7 @@ python tfm.py --remote-log-port 8888
 
 **Terminal 2 (Connect client):**
 ```bash
-python tfm_log_client.py localhost 8888
+python tools/tfm_log_client.py localhost 8888
 ```
 
 ### Multiple Clients
@@ -110,13 +110,13 @@ Multiple clients can connect to the same TFM instance simultaneously:
 
 ```bash
 # Client 1
-python tfm_log_client.py localhost 8888
+python tools/tfm_log_client.py localhost 8888
 
 # Client 2  
-python tfm_log_client.py localhost 8888
+python tools/tfm_log_client.py localhost 8888
 
 # Client 3 (no colors)
-python tfm_log_client.py --no-color localhost 8888
+python tools/tfm_log_client.py --no-color localhost 8888
 ```
 
 ### Remote Monitoring
@@ -128,7 +128,7 @@ Monitor TFM running on a different machine:
 python tfm.py --remote-log-port 8888
 
 # On client machine
-python tfm_log_client.py 192.168.1.100 8888
+python tools/tfm_log_client.py 192.168.1.100 8888
 ```
 
 ## Technical Features
@@ -179,10 +179,10 @@ python test/test_remote_log_integration.py
 ### Demo
 ```bash
 # Terminal 1
-python demo_remote_log.py
+python demo/demo_remote_log.py
 
 # Terminal 2
-python tfm_log_client.py localhost 8888
+python tools/tfm_log_client.py localhost 8888
 ```
 
 ## Performance Impact

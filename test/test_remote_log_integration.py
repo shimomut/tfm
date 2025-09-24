@@ -41,7 +41,7 @@ def test_client_script():
     
     try:
         result = subprocess.run([
-            sys.executable, 'tfm_log_client.py', '--help'
+            sys.executable, 'tools/tfm_log_client.py', '--help'
         ], capture_output=True, text=True, timeout=10)
         
         if result.returncode == 0 and 'TFM Remote Log Client' in result.stdout:
@@ -63,7 +63,7 @@ def test_client_connection_failure():
     try:
         # Try to connect to a port that should be closed
         result = subprocess.run([
-            sys.executable, 'tfm_log_client.py', 'localhost', '9876'
+            sys.executable, 'tools/tfm_log_client.py', 'localhost', '9876'
         ], capture_output=True, text=True, timeout=5)
         
         if 'Could not connect' in result.stdout or 'Connection refused' in result.stderr:
@@ -86,7 +86,7 @@ def test_demo_script():
         # Test that the demo script can be imported
         result = subprocess.run([
             sys.executable, '-c', 
-            'import demo_remote_log; print("Demo script imports successfully")'
+            'import sys; sys.path.insert(0, "demo"); import demo_remote_log; print("Demo script imports successfully")'
         ], capture_output=True, text=True, timeout=10)
         
         if result.returncode == 0:
@@ -104,7 +104,7 @@ def test_file_permissions():
     """Test that scripts have correct permissions"""
     print("\nTesting file permissions...")
     
-    scripts = ['tfm_log_client.py', 'demo_remote_log.py']
+    scripts = ['tools/tfm_log_client.py', 'demo/demo_remote_log.py']
     
     for script in scripts:
         script_path = Path(script)

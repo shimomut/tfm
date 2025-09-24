@@ -5,7 +5,7 @@ Demo: Remote Log Monitoring
 This demo shows how to use the remote log monitoring feature.
 
 1. Run this script: python demo_remote_log.py
-2. In another terminal, run: python tfm_log_client.py localhost 8888
+2. In another terminal, run: python tools/tfm_log_client.py localhost 8888
 3. Watch the log messages appear in the client terminal
 """
 
@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 # Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_log_manager import LogManager
 
@@ -27,7 +27,7 @@ def main():
     print("TFM Remote Log Monitoring Demo")
     print("=" * 40)
     print("Starting log server on port 8888...")
-    print("Connect with: python tfm_log_client.py localhost 8888")
+    print("Connect with: python tools/tfm_log_client.py localhost 8888")
     print("Press Ctrl+C to stop")
     print()
     
