@@ -18,6 +18,12 @@ help:
 run:
 	@python3 tfm.py
 
+run-debug:
+	@python3 tfm.py --remote-log-port 8123
+
+monitor-log:
+	@python3 tools/tfm_log_client.py localhost 8123
+
 test:
 	@echo "Running TFM tests..."
 	@cd test && PYTHONPATH=../src python3 -m pytest . -v || echo "pytest not available, running individual tests..."
