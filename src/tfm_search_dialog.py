@@ -170,6 +170,7 @@ class SearchDialog(BaseListDialog):
         
         self.searching = False
         self.search_thread = None
+        self.content_changed = True  # Mark content as changed when search is canceled
     
     def _search_worker(self, search_root, pattern_text, search_type):
         """Worker thread for performing the actual search
@@ -187,6 +188,9 @@ class SearchDialog(BaseListDialog):
                 for file_path in search_root.rglob('*'):
                     # Check for cancellation
                     if self.cancel_search.is_set():
+                        with self.search_lock:
+                            self.searching = False
+                            self.content_changed = True  # Mark content as changed when search is canceled
                         return
                     
                     # Check result limit
@@ -219,6 +223,9 @@ class SearchDialog(BaseListDialog):
                 for file_path in search_root.rglob('*'):
                     # Check for cancellation
                     if self.cancel_search.is_set():
+                        with self.search_lock:
+                            self.searching = False
+                            self.content_changed = True  # Mark content as changed when search is canceled
                         return
                     
                     # Check result limit
@@ -231,6 +238,9 @@ class SearchDialog(BaseListDialog):
                                 for line_num, line in enumerate(f, 1):
                                     # Check for cancellation periodically
                                     if line_num % 100 == 0 and self.cancel_search.is_set():
+                                        with self.search_lock:
+                                            self.searching = False
+                                            self.content_changed = True  # Mark content as changed when search is canceled
                                         return
                                     
                                     if pattern.search(line):
@@ -306,6 +316,9 @@ class SearchDialog(BaseListDialog):
             
     def draw(self, stdscr, safe_addstr_func):
         """Draw the search dialog overlay"""
+
+        print("SearchDialog.draw() called")
+
         # Draw dialog frame
         title_text = f"Search ({self.search_type.title()})"
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(

@@ -72,6 +72,32 @@ Content is marked as changed in the following scenarios:
 4. **Search Results**: When search results are updated (threaded operations)
 5. **Directory Scanning**: When directory lists are updated (threaded operations)
 6. **Field Switching**: When switching between input fields in batch rename dialog
+7. **Search/Scan Completion**: When background search or directory scan completes
+8. **Search/Scan Cancellation**: When user cancels ongoing search or directory scan
+
+## Background Thread Update Fix
+
+### Problem with Background Updates
+
+Initially, there was an issue where background threads (in SearchDialog and JumpDialog) would update results and mark `content_changed = True`, but the main loop wouldn't detect these changes until the next user input. This caused search results and directory scans to appear "frozen" until the user pressed a key.
+
+### Solution
+
+Modified the main loop to check for dialog content changes during timeout periods:
+
+```python
+# Get user input with timeout to allow timer checks
+self.stdscr.timeout(16)  # 16ms timeout
+key = self.stdscr.getch()
+
+# If no key was pressed (timeout), check for background content changes
+if key == -1:
+    # Check and draw dialogs if content changed from background threads
+    self._draw_dialogs_if_needed()
+    continue
+```
+
+This ensures that background updates are detected and rendered in real-time, providing a smooth user experience during search operations and directory scanning.
 
 ## Implementation Details
 
@@ -107,7 +133,8 @@ Special attention was paid to threaded operations in `SearchDialog` and `JumpDia
 
 - Search result updates in background threads mark content as changed
 - Directory scanning updates mark content as changed
-- Thread-safe access to the `content_changed` flag using existing locks
+- Main loop checks for background updates during timeout periods for real-time display
+- Boolean flag access is atomic in Python due to GIL, so no additional locking needed
 
 ## Performance Impact
 
@@ -126,6 +153,8 @@ The demo script (`demo/demo_dialog_rendering_optimization.py`) shows:
 3. **Reduced Screen Flicker**: Fewer screen updates mean smoother visual experience
 4. **Network Efficiency**: Important for remote terminal sessions
 5. **Battery Life**: Lower CPU usage on laptops
+6. **Real-time Updates**: Background search and directory scan results appear immediately
+7. **Accurate Status Display**: Search/scan completion and cancellation update UI instantly
 
 ## Testing
 

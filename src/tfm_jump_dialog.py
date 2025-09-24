@@ -152,6 +152,7 @@ class JumpDialog(BaseListDialog):
         
         self.searching = False
         self.scan_thread = None
+        self.content_changed = True  # Mark content as changed when scan is canceled
     
     def _scan_worker(self, root_directory):
         """Worker thread for performing the actual directory scan
@@ -169,6 +170,9 @@ class JumpDialog(BaseListDialog):
             for dir_path in root_directory.rglob('*'):
                 # Check for cancellation
                 if self.cancel_scan.is_set():
+                    with self.scan_lock:
+                        self.searching = False
+                        self.content_changed = True  # Mark content as changed when scan is canceled
                     return
                 
                 # Check directory limit

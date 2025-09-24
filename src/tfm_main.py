@@ -1440,6 +1440,41 @@ class FileManager:
         elif self.batch_rename_dialog.mode:
             self.batch_rename_dialog.content_changed = False
 
+    def _draw_dialogs_if_needed(self):
+        """Draw dialog overlays if content has changed or full redraw is needed. Returns True if any dialog was drawn."""
+        dialog_drawn = False
+        dialog_content_changed = self._check_dialog_content_changed()
+        
+        if dialog_content_changed or self.needs_full_redraw:
+            if self.general_dialog.is_active:
+                self.general_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.list_dialog.mode:
+                self.list_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.info_dialog.mode:
+                self.info_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.search_dialog.mode:
+                self.search_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.jump_dialog.mode:
+                self.jump_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.batch_rename_dialog.mode:
+                self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            
+            # Mark dialog content as unchanged after drawing
+            if dialog_drawn:
+                self._mark_dialog_content_unchanged()
+        
+        # Refresh screen if dialog was drawn or full redraw occurred
+        if dialog_drawn or self.needs_full_redraw:
+            self.stdscr.refresh()
+            
+        return dialog_drawn
+
     def _force_immediate_redraw(self):
         """Force an immediate screen redraw to show dialogs instantly"""
         # Perform the same drawing sequence as the main loop
@@ -3515,37 +3550,8 @@ class FileManager:
                 self.stdscr.refresh()
                 self.needs_full_redraw = False
             
-            # Only draw dialog overlays when content has changed or full redraw is needed
-            dialog_drawn = False
-            dialog_content_changed = self._check_dialog_content_changed()
-            
-            if dialog_content_changed or self.needs_full_redraw:
-                if self.general_dialog.is_active:
-                    self.general_dialog.draw(self.stdscr, self.safe_addstr)
-                    dialog_drawn = True
-                elif self.list_dialog.mode:
-                    self.list_dialog.draw(self.stdscr, self.safe_addstr)
-                    dialog_drawn = True
-                elif self.info_dialog.mode:
-                    self.info_dialog.draw(self.stdscr, self.safe_addstr)
-                    dialog_drawn = True
-                elif self.search_dialog.mode:
-                    self.search_dialog.draw(self.stdscr, self.safe_addstr)
-                    dialog_drawn = True
-                elif self.jump_dialog.mode:
-                    self.jump_dialog.draw(self.stdscr, self.safe_addstr)
-                    dialog_drawn = True
-                elif self.batch_rename_dialog.mode:
-                    self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
-                    dialog_drawn = True
-                
-                # Mark dialog content as unchanged after drawing
-                if dialog_drawn:
-                    self._mark_dialog_content_unchanged()
-            
-            # Refresh screen if dialog was drawn or full redraw occurred
-            if dialog_drawn or self.needs_full_redraw:
-                self.stdscr.refresh()
+            # Draw dialogs if needed
+            self._draw_dialogs_if_needed()
             
             # Get user input with timeout to allow timer checks
             self.stdscr.timeout(16)  # 16ms timeout
