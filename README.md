@@ -22,10 +22,11 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 
 ### Core Interface
 - **Dual Pane Interface**: Left and right panes for easy file operations between directories
-- **Log Pane**: Bottom pane captures stdout and stderr output with timestamps
+- **Log Pane**: Bottom pane captures stdout and stderr output with timestamps and remote monitoring
 - **Pane Switching**: Use Tab to switch between panes, active pane highlighted in header
 - **Resizable Panes**: Adjust pane sizes with bracket keys and shift+bracket keys
 - **Status Bar**: Shows current path, file count, and operation status
+- **State Management**: Automatic saving and restoration of pane positions, cursor locations, and settings
 
 ![main screen](doc/images/main-screen.png)
 
@@ -54,10 +55,11 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 - **Basic Operations**: Copy (C), Move (M), Delete (K), Rename (R) files and directories
 - **Batch Operations**: Multi-selection with Space bar, select all files (a) or all items (A)
 - **Advanced Rename**: Regex-based batch renaming with macros (\0, \1-\9, \d for indexing)
-- **File Creation**: Create new text files (E) and directories (F7) with auto-editing
+- **File Creation**: Create new text files (E) and directories (M when no selection) with auto-editing
 - **Archive Support**: Create (P) and extract (U) ZIP, TAR.GZ, TGZ archives between panes
-- **Progress Tracking**: Real-time progress display for multi-file operations
+- **Progress Tracking**: Real-time progress display with configurable animations (spinner, dots, progress bar, etc.)
 - **Safety Features**: Confirmation dialogs, permission checks, conflict resolution
+- **Smart Selection**: Context-aware operations based on selection state (required/none/any)
 
 ### Text Handling
 - **Text File Viewer**: Built-in text viewer with syntax highlighting for 20+ file formats
@@ -69,6 +71,9 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 ### System Integration
 - **Sub-shell Mode**: Suspend TFM and enter shell with environment variables (X key)
 - **External Programs**: Integration with custom commands and scripts (x key)
+- **VSCode Integration**: Direct integration to open directories and files in Visual Studio Code
+- **Beyond Compare Integration**: File and directory comparison with Beyond Compare
+- **Remote Log Monitoring**: Real-time log streaming to remote terminals for debugging
 - **Configuration System**: Fully customizable key bindings and settings (Z key)
 - **Help System**: Comprehensive help dialog accessible with '?' key
 - **Cross-platform**: Works on macOS, Linux, and Windows with proper terminal support
@@ -133,12 +138,12 @@ All key bindings are fully customizable through the configuration system. Below 
 ### Search & Sorting
 | Key | Action |
 |-----|--------|
-| `f` | Incremental search (isearch) |
-| `F` | Filename search dialog |
-| `G` | Content search dialog (grep) |
+| `f` | Incremental search (isearch) with real-time filtering |
+| `F` | Threaded filename search dialog with live results |
+| `G` | Threaded content search dialog (grep) with progress tracking |
 | `;` | Filter files by filename pattern (fnmatch: *.py, test_*, etc.) |
 | `:` | Clear filter from current pane |
-| `s/S` | Sort menu |
+| `s/S` | Sort menu with searchable options |
 | `1` | Quick sort by name (toggle reverse if already active) |
 | `2` | Quick sort by extension (toggle reverse if already active) |
 | `3` | Quick sort by size (toggle reverse if already active) |
@@ -169,10 +174,11 @@ All key bindings are fully customizable through the configuration system. Below 
 ### Advanced Features
 | Key | Action |
 |-----|--------|
-| `j/J` | Show favorite directories |
+| `j` | Show favorite directories with search |
+| `J` | Jump to directory dialog with intelligent scanning |
+| `h/H` | Show directory history for current pane |
 | `x` | Show external programs menu |
-| `X` | Enter sub-shell mode |
-
+| `X` | Enter sub-shell mode with environment variables |
 | `T` | Toggle fallback color mode |
 | `z` | View options menu |
 | `Z` | Settings and configuration menu |
@@ -258,24 +264,36 @@ Powerful regex-based renaming for multiple files:
 - **Regex Support**: Full Python regex syntax with capture groups (\1-\9)
 - **Macros**: Use \0 for full filename, \d for sequential numbering
 - **Real-time Preview**: See rename results before executing
-- **Professional Editing**: Full cursor movement in input fields
+- **Professional Editing**: Full cursor movement in input fields with Tab navigation
 
-### Search & Filtering
+### Threaded Search & Filtering
 - **Incremental Search**: Real-time file filtering as you type (f key)
 - **Pattern Filtering**: Use ';' with fnmatch patterns (*.py, test_*, etc.)
-- **Content Search**: Search within files with grep-like functionality (G key)
-- **Multi-pattern Support**: Space-separated search patterns
+- **Threaded Content Search**: Non-blocking search within files with progress tracking (G key)
+- **Threaded Filename Search**: Asynchronous filename search with live results (F key)
+- **Search Cancellation**: Automatic cancellation and restart when patterns change
+- **Result Limiting**: Configurable maximum results to prevent memory issues
 
-### Pane Management
+### Pane Management & State
 - **Directory Sync**: Sync pane directories (o/O keys) and cursor positions
 - **Smart Behavior**: Auto-detects same directory for cursor synchronization
 - **Resizable Layout**: Adjust pane boundaries with bracket keys ([, ], {, })
+- **State Persistence**: Automatic saving and restoration of window state, cursor positions
+- **History Management**: Per-pane directory history with configurable limits
 
-### Searchable Dialogs
+### Searchable Dialogs & Components
 All list interfaces support real-time filtering:
-- **Favorite Directories**: Quick navigation with search
-- **Sort Options**: Interactive sorting menu
+- **Favorite Directories**: Quick navigation with search and customizable bookmarks
+- **Jump Dialog**: Intelligent directory scanning with search capabilities
+- **Sort Options**: Interactive sorting menu with search
+- **External Programs**: Searchable program menu with custom commands
 - **Conflict Resolution**: Searchable file operation dialogs
+
+### Remote Monitoring & Integration
+- **Remote Log Monitoring**: Stream TFM logs to remote terminals for debugging
+- **VSCode Integration**: Open current directory and selected files in VS Code
+- **Beyond Compare Integration**: Compare files and directories with Beyond Compare
+- **External Program Framework**: Extensible system for custom tool integration
 
 ## Installation & Usage
 
@@ -287,13 +305,25 @@ All list interfaces support real-time filtering:
    python3 tfm.py
    ```
 
-### Package Installation (coming soon)
+### Advanced Usage
+```bash
+# Enable remote log monitoring on port 8888
+python3 tfm.py --remote-log-port 8888
+
+# Connect to remote logs from another terminal
+python3 tools/tfm_log_client.py localhost 8888
+```
+
+### Package Installation
 ```bash
 # Install from source
 python3 setup.py install
 
 # Run installed version
 tfm
+
+# Or with remote monitoring
+tfm --remote-log-port 8888
 ```
 
 ### Dependencies
@@ -307,6 +337,11 @@ tfm
 - Python 3.6+
 - Terminal with curses support (most Unix terminals, Windows Terminal, etc.)
 - Write permissions for configuration directory (`~/.tfm/`)
+
+### External Tool Integration
+- **VSCode**: Install `code` command for VSCode integration
+- **Beyond Compare**: Install Beyond Compare for file/directory comparison
+- **Custom Tools**: Add your own external programs via configuration
 
 ## Configuration
 
@@ -327,6 +362,22 @@ TFM features a comprehensive configuration system that allows complete customiza
   - Press `Z` key → Settings Menu → Edit Configuration
   - Manually edit `~/.tfm/config.py`
   - TFM creates the file automatically if it doesn't exist
+
+### New Configuration Options
+
+#### Performance & Threading
+- **MAX_SEARCH_RESULTS**: Maximum search results (default: 10,000)
+- **MAX_JUMP_DIRECTORIES**: Maximum directories for jump dialog (default: 5,000)
+- **MAX_HISTORY_ENTRIES**: Maximum history entries per pane (default: 100)
+
+#### Progress Animation
+- **PROGRESS_ANIMATION_PATTERN**: Animation style ('spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow')
+- **PROGRESS_ANIMATION_SPEED**: Animation frame update interval (default: 0.2 seconds)
+
+#### Advanced Key Bindings
+- **Selection-aware bindings**: Actions can require specific selection states
+- **Multiple key support**: Assign multiple keys to the same action
+- **Context-sensitive operations**: Different behavior based on selection state
 
 ### Customizable Settings
 
@@ -355,12 +406,21 @@ class Config:
     COLOR_SCHEME = 'dark'  # 'dark' or 'light'
     SHOW_HIDDEN_FILES = False
     DEFAULT_LEFT_PANE_RATIO = 0.6  # 60% left, 40% right
-    DEFAULT_LOG_HEIGHT_RATIO = 0.2  # 20% log pane
+    DEFAULT_LOG_HEIGHT_RATIO = 0.25  # 25% log pane
     
     # Behavior settings
     CONFIRM_DELETE = True
     CONFIRM_COPY = False  # Skip copy confirmations for speed
     CONFIRM_MOVE = False  # Skip move confirmations for speed
+    
+    # Performance settings
+    MAX_SEARCH_RESULTS = 10000  # Maximum search results
+    MAX_JUMP_DIRECTORIES = 5000  # Maximum directories for jump dialog
+    MAX_HISTORY_ENTRIES = 100  # Maximum history entries per pane
+    
+    # Progress animation
+    PROGRESS_ANIMATION_PATTERN = 'spinner'  # Animation style
+    PROGRESS_ANIMATION_SPEED = 0.2  # Update interval in seconds
     
     # Startup directories
     STARTUP_LEFT_PATH = "~/projects"
@@ -369,12 +429,13 @@ class Config:
     # Text editor
     TEXT_EDITOR = 'code'  # VS Code, or 'vim', 'nano', etc.
     
-    # Custom key bindings
+    # Selection-aware key bindings
     KEY_BINDINGS = {
         'quit': ['q'],  # Remove 'Q' binding
         'search': ['/', 'f'],  # Add '/' for search
         'file_details': ['i', 'I', 'd'],  # Add 'd' for details
-        'copy_files': ['c', 'C', 'y'],  # Add 'y' for yank/copy
+        'copy_files': {'keys': ['c', 'C', 'y'], 'selection': 'required'},  # Requires selection
+        'create_directory': {'keys': ['m', 'M'], 'selection': 'none'},  # Only when no selection
         'toggle_color_scheme': ['t', 'T'],  # Both cases
         # ... customize any action
     }
@@ -387,12 +448,16 @@ class Config:
         {'name': 'Config', 'path': '~/.config'},
     ]
     
-    # External programs
+    # External programs with VSCode and Beyond Compare integration
     PROGRAMS = [
-        {'name': 'Git Status', 'command': ['git', 'status']},
-        {'name': 'My Script', 'command': ['/path/to/script.sh']},
-        {'name': 'Quick Command', 'command': ['ls', '-la'], 
+        {'name': 'Open in VSCode', 'command': ['./tools/vscode_wrapper.sh'], 
          'options': {'auto_return': True}},
+        {'name': 'Compare Files (Beyond Compare)', 'command': ['./tools/bcompare_files_wrapper.sh'], 
+         'options': {'auto_return': True}},
+        {'name': 'Compare Directories (Beyond Compare)', 'command': ['./tools/bcompare_dirs_wrapper.sh'], 
+         'options': {'auto_return': True}},
+        {'name': 'Git Status', 'command': ['git', 'status']},
+        {'name': 'Preview Files', 'command': ['./tools/preview_files.sh']},
     ]
 ```
 
@@ -412,14 +477,15 @@ class Config:
 ### Configuration Categories
 
 #### Key Binding Actions
-All actions support multiple key assignments:
+All actions support multiple key assignments and selection-aware behavior:
 - **Navigation**: `quit`, `help`, `toggle_hidden`, `toggle_color_scheme`
-- **File Operations**: `copy_files`, `move_files`, `delete_files`, `rename_file`, `create_file`
+- **File Operations**: `copy_files`, `move_files`, `delete_files`, `rename_file`, `create_file`, `create_directory`
 - **Search & Filter**: `search`, `search_dialog`, `search_content`, `filter`, `clear_filter`
 - **Sorting**: `sort_menu`, `quick_sort_name`, `quick_sort_ext`, `quick_sort_size`, `quick_sort_date`
 - **Selection**: `select_file`, `select_all_files`, `select_all_items`, `compare_selection`
-- **Pane Management**: `sync_current_to_other`, `sync_other_to_current`, `adjust_pane_left`, `adjust_pane_right`
-- **Advanced**: `favorites`, `subshell`, `programs`, `create_archive`, `extract_archive`
+- **Pane Management**: `sync_current_to_other`, `sync_other_to_current`, `adjust_pane_left`, `adjust_pane_right`, `adjust_log_up`, `adjust_log_down`, `reset_log_height`
+- **Advanced**: `favorites`, `jump_dialog`, `history`, `subshell`, `programs`, `create_archive`, `extract_archive`
+- **View Options**: `view_text`, `edit_file`, `file_details`, `view_options`, `settings_menu`, `toggle_fallback_colors`
 
 #### Confirmation Settings
 Control which operations require user confirmation:
@@ -444,18 +510,29 @@ tfm/
 │   ├── tfm_const.py       # Constants and version information
 │   ├── tfm_colors.py      # Color management and terminal colors
 │   ├── tfm_text_viewer.py # Text file viewer with syntax highlighting
+│   ├── tfm_*_dialog.py    # Modular dialog components (list, search, batch rename, etc.)
+│   ├── tfm_*_manager.py   # Core managers (log, pane, file operations, progress, state)
+│   ├── tfm_external_programs.py # External program integration
 │   └── _config.py         # User configuration template
 ├── test/                   # Test files and demos
 │   ├── test_*.py          # Unit and integration tests
 │   ├── demo_*.py          # Interactive feature demonstrations
 │   └── verify_*.py        # Feature verification scripts
 ├── doc/                    # Documentation
-│   ├── *.md               # Feature documentation and guides
+│   ├── *_FEATURE.md       # Feature documentation and guides
+│   ├── *_SYSTEM.md        # System component documentation
 │   └── PROJECT_STRUCTURE.md # Detailed project organization
-├── tfm.py                  # Main entry point
+├── tools/                  # External integration tools
+│   ├── vscode_wrapper.sh  # VSCode integration script
+│   ├── bcompare_*.sh      # Beyond Compare integration scripts
+│   ├── tfm_log_client.py  # Remote log monitoring client
+│   └── preview_files.sh   # File preview script
+├── demo/                   # Interactive demonstrations
+│   └── demo_*.py          # Feature demonstration scripts
+├── tfm.py                  # Main entry point with argument parsing
 ├── setup.py               # Package setup for pip installation
 ├── Makefile               # Build automation and common tasks
-├── requirements.txt       # Python dependencies
+├── requirements.txt       # Python dependencies (pygments)
 └── README.md              # This file
 ```
 
@@ -463,13 +540,60 @@ tfm/
 - Press `?` in TFM for built-in help
 - Check documentation in the `doc/` directory
 
+## Remote Log Monitoring
+
+TFM includes a powerful remote log monitoring feature for debugging and system monitoring:
+
+### Usage
+```bash
+# Start TFM with remote log monitoring
+python3 tfm.py --remote-log-port 8888
+
+# Connect from another terminal
+python3 tools/tfm_log_client.py localhost 8888
+```
+
+### Features
+- **Real-time streaming**: Log messages sent to connected clients immediately
+- **Multiple clients**: Support for multiple monitoring terminals
+- **Network capable**: Works locally and across networks
+- **JSON format**: Structured data for easy parsing
+- **Color-coded output**: Different log sources displayed in different colors
+- **Automatic management**: Handles client connections and disconnections gracefully
+
+## VSCode Integration
+
+Direct integration with Visual Studio Code for seamless development workflow:
+
+### Features
+- **Smart directory opening**: Opens current directory or git repository root
+- **File selection**: Opens selected files directly in VSCode
+- **Git repository detection**: Automatically finds and opens repository root
+- **Safe handling**: Properly handles files with spaces and special characters
+
+### Usage
+1. Navigate to desired directory in TFM
+2. Optionally select files to open
+3. Press `x` → "Open in VSCode"
+
+## Beyond Compare Integration
+
+Professional file and directory comparison with Beyond Compare:
+
+### Features
+- **File comparison**: Compare selected files between panes
+- **Directory comparison**: Compare entire directories
+- **Integration scripts**: Wrapper scripts handle TFM environment variables
+- **Automatic detection**: Uses TFM's current pane and selection state
+
 ## Contributing
-TFM welcomes contributions! The project structure makes it easy to add new features:
+TFM welcomes contributions! The modular project structure makes it easy to add new features:
 
 ## Contact Author
 
 Have questions, suggestions, or found a bug? Get in touch:
 
+- **GitHub Repository**: [https://github.com/shimomut/tfm](https://github.com/shimomut/tfm)
 - **GitHub Issues**: [Report bugs or request features](https://github.com/shimomut/tfm/issues)
 - **Author's X (Twitter)**: [@smmrtmnr](https://x.com/smmrtmnr)
 
@@ -480,4 +604,4 @@ TFM is released under the MIT License. See LICENSE file for details.
 
 ---
 
-**TFM - Terminal File Manager**: Efficient, keyboard-driven file management for the terminal.
+**TFM - Terminal File Manager**: Efficient, keyboard-driven file management for the terminal with advanced features, threading support, and professional integrations.
