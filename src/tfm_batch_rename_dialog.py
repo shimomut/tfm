@@ -26,6 +26,7 @@ class BatchRenameDialog:
         self.files = []  # List of selected files to rename
         self.preview = []  # List of preview results
         self.scroll = 0  # Scroll offset for preview list
+        self.content_changed = True  # Track if content needs redraw
         
     def show(self, selected_files):
         """Show the batch rename dialog for multiple selected files
@@ -43,11 +44,13 @@ class BatchRenameDialog:
         self.active_field = 'regex'
         self.preview = []
         self.scroll = 0
+        self.content_changed = True  # Mark content as changed when showing
         return True
         
     def exit(self):
         """Exit batch rename mode"""
         self.mode = False
+        self.content_changed = True  # Mark content as changed when exiting
         self.files = []
         self.regex_editor.clear()
         self.destination_editor.clear()
@@ -76,23 +79,27 @@ class BatchRenameDialog:
                 self.switch_field('destination')
             else:
                 self.switch_field('regex')
+            self.content_changed = True  # Mark content as changed when switching fields
             return ('field_switch', None)
             
         elif key == curses.KEY_UP:
             # Up arrow - move to regex field (previous field)
             if self.switch_field('regex'):
+                self.content_changed = True  # Mark content as changed when switching fields
                 return ('field_switch', None)
             return True
             
         elif key == curses.KEY_DOWN:
             # Down arrow - move to destination field (next field)
             if self.switch_field('destination'):
+                self.content_changed = True  # Mark content as changed when switching fields
                 return ('field_switch', None)
             return True
             
         elif key == curses.KEY_PPAGE:  # Page Up - scroll preview up
             if self.scroll > 0:
                 self.scroll = max(0, self.scroll - 10)
+                self.content_changed = True  # Mark content as changed when scrolling
                 return ('scroll', None)
             return True
             
@@ -100,6 +107,7 @@ class BatchRenameDialog:
             if self.preview:
                 max_scroll = max(0, len(self.preview) - 10)
                 self.scroll = min(max_scroll, self.scroll + 10)
+                self.content_changed = True  # Mark content as changed when scrolling
                 return ('scroll', None)
             return True
             
@@ -117,6 +125,7 @@ class BatchRenameDialog:
             active_editor = self.get_active_editor()
             if active_editor.handle_key(key):
                 # Text changed, update preview
+                self.content_changed = True  # Mark content as changed when text changes
                 return ('text_changed', None)
         
         # In batch rename mode, capture most other keys to prevent unintended actions

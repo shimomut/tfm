@@ -24,6 +24,7 @@ class JumpDialog(BaseListDialog):
         self.directories = []  # List of all directories found
         self.filtered_directories = []  # Filtered directories based on search
         self.searching = False  # Whether directory scan is in progress
+        self.content_changed = True  # Track if content needs redraw
         
         # Threading support
         self.scan_thread = None
@@ -48,6 +49,7 @@ class JumpDialog(BaseListDialog):
         self.mode = True
         self.text_editor.clear()
         self.directories = []
+        self.content_changed = True  # Mark content as changed when showing
         self.filtered_directories = []
         self.selected = 0
         self.scroll = 0
@@ -68,6 +70,7 @@ class JumpDialog(BaseListDialog):
         self.directories = []
         self.filtered_directories = []
         self.searching = False
+        self.content_changed = True  # Mark content as changed when exiting
         
         # Reset animation
         self.progress_animator.reset()
@@ -97,6 +100,7 @@ class JumpDialog(BaseListDialog):
             return ('navigate', None)
         elif result == 'text_changed':
             self._filter_directories()
+            self.content_changed = True  # Mark content as changed when filtering
             return True
         elif result:
             # Update selection in thread-safe manner for navigation keys
@@ -104,6 +108,7 @@ class JumpDialog(BaseListDialog):
                 with self.scan_lock:
                     # The base class already updated self.selected, just need to adjust scroll
                     self._adjust_scroll(len(self.filtered_directories))
+                self.content_changed = True  # Mark content as changed when navigating
             return True
             
         return False
@@ -178,6 +183,7 @@ class JumpDialog(BaseListDialog):
                         with self.scan_lock:
                             self.directories = temp_directories.copy()
                             self._filter_directories_internal()
+                            self.content_changed = True  # Mark content as changed when directories update
                             
         except Exception as e:
             # Handle scan errors gracefully
@@ -189,11 +195,13 @@ class JumpDialog(BaseListDialog):
                 self.directories = temp_directories
                 self._filter_directories_internal()
                 self.searching = False
+                self.content_changed = True  # Mark content as changed when scan completes
         
     def _filter_directories(self):
         """Filter directories based on current search pattern (thread-safe)"""
         with self.scan_lock:
             self._filter_directories_internal()
+            self.content_changed = True  # Mark content as changed when filtering
     
     def _filter_directories_internal(self):
         """Internal method to filter directories (must be called with lock held)"""

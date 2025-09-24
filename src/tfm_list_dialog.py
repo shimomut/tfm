@@ -25,6 +25,7 @@ class ListDialog(BaseListDialog):
         self.callback = None  # Callback function when item is selected
         self.custom_key_handler = None  # Custom key handler function
         self.custom_help_text = None  # Custom help text to display at bottom
+        self.content_changed = True  # Track if content needs redraw
         
     def show(self, title, items, callback, custom_key_handler=None, custom_help_text=None):
         """Show a searchable list dialog
@@ -46,6 +47,7 @@ class ListDialog(BaseListDialog):
         self.callback = callback
         self.custom_key_handler = custom_key_handler
         self.custom_help_text = custom_help_text
+        self.content_changed = True  # Mark content as changed when showing
         
     def exit(self):
         """Exit list dialog mode"""
@@ -56,6 +58,7 @@ class ListDialog(BaseListDialog):
         self.callback = None
         self.custom_key_handler = None
         self.custom_help_text = None
+        self.content_changed = True  # Mark content as changed when exiting
         
     def handle_input(self, key):
         """Handle input while in list dialog mode"""
@@ -91,8 +94,10 @@ class ListDialog(BaseListDialog):
             return True
         elif result == 'text_changed':
             self._filter_items()
+            self.content_changed = True  # Mark content as changed when filtering
             return True
         elif result:
+            self.content_changed = True  # Mark content as changed for navigation
             return True
             
         return False
