@@ -5,14 +5,15 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 ## Key Benefits
 
 🚀 **Efficiency**: Navigate and manage files faster than traditional GUI file managers with keyboard-driven operations  
-⚡ **Speed**: Instant file operations with real-time progress tracking and threaded search capabilities  
+⚡ **Speed**: Threaded search capabilities and configurable progress tracking  
 🎯 **Precision**: Advanced selection, filtering, and search features for exact file management  
 🔧 **Customizable**: Fully configurable key bindings, color schemes, and behavior settings  
 💻 **Universal**: Works on any terminal - macOS, Linux, Windows with proper terminal support  
 🎨 **Professional**: Clean dual-pane interface with syntax highlighting and intelligent file handling  
 📦 **Complete**: Built-in text viewer, archive operations, and external program integration  
 🔍 **Smart**: Incremental search, pattern filtering, threaded content search, and remote log monitoring  
-🔗 **Integrated**: VSCode integration, Beyond Compare support, and extensible external program system
+🔗 **Integrated**: VSCode integration, Beyond Compare support, and extensible external program system  
+🎛️ **Flexible**: Command line directory specification and workflow customization
 
 ## Development with Kiro
 
@@ -22,6 +23,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 
 ### Core Interface
 - **Dual Pane Interface**: Left and right panes for easy file operations between directories
+- **Command Line Directory Control**: Specify initial directories with `--left` and `--right` arguments
 - **Log Pane**: Bottom pane captures stdout and stderr output with timestamps and remote monitoring
 - **Pane Switching**: Use Tab to switch between panes, active pane highlighted in header
 - **Resizable Panes**: Adjust pane sizes with bracket keys and shift+bracket keys
@@ -57,7 +59,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 - **Advanced Rename**: Regex-based batch renaming with macros (\0, \1-\9, \d for indexing)
 - **File Creation**: Create new text files (E) and directories (M when no selection) with auto-editing
 - **Archive Support**: Create (P) and extract (U) ZIP, TAR.GZ, TGZ archives between panes
-- **Progress Tracking**: Real-time progress display with configurable animations (spinner, dots, progress bar, etc.)
+- **Progress Tracking**: Configurable animations (spinner, dots, progress bar, etc.)
 - **Safety Features**: Confirmation dialogs, permission checks, conflict resolution
 - **Smart Selection**: Context-aware operations based on selection state (required/none/any)
 
@@ -73,7 +75,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 - **External Programs**: Integration with custom commands and scripts (x key)
 - **VSCode Integration**: Direct integration to open directories and files in Visual Studio Code
 - **Beyond Compare Integration**: File and directory comparison with Beyond Compare
-- **Remote Log Monitoring**: Real-time log streaming to remote terminals for debugging
+- **Remote Log Monitoring**: Stream logs to remote terminals for debugging
 - **Configuration System**: Fully customizable key bindings and settings (Z key)
 - **Help System**: Comprehensive help dialog accessible with '?' key
 - **Cross-platform**: Works on macOS, Linux, and Windows with proper terminal support
@@ -138,7 +140,7 @@ All key bindings are fully customizable through the configuration system. Below 
 ### Search & Sorting
 | Key | Action |
 |-----|--------|
-| `f` | Incremental search (isearch) with real-time filtering |
+| `f` | Incremental search (isearch) with filtering |
 | `F` | Threaded filename search dialog with live results |
 | `G` | Threaded content search dialog (grep) with progress tracking |
 | `;` | Filter files by filename pattern (fnmatch: *.py, test_*, etc.) |
@@ -170,6 +172,8 @@ All key bindings are fully customizable through the configuration system. Below 
 | `Shift+Down` | Scroll log down (toward newer messages) |
 | `Shift+Left` | Fast scroll up (toward older messages) |
 | `Shift+Right` | Fast scroll down (toward newer messages) |
+
+
 
 ### Advanced Features
 | Key | Action |
@@ -263,11 +267,11 @@ When entering sub-shell mode, these environment variables are automatically set:
 Powerful regex-based renaming for multiple files:
 - **Regex Support**: Full Python regex syntax with capture groups (\1-\9)
 - **Macros**: Use \0 for full filename, \d for sequential numbering
-- **Real-time Preview**: See rename results before executing
+- **Preview**: See rename results before executing
 - **Professional Editing**: Full cursor movement in input fields with Tab navigation
 
 ### Threaded Search & Filtering
-- **Incremental Search**: Real-time file filtering as you type (f key)
+- **Incremental Search**: File filtering as you type (f key)
 - **Pattern Filtering**: Use ';' with fnmatch patterns (*.py, test_*, etc.)
 - **Threaded Content Search**: Non-blocking search within files with progress tracking (G key)
 - **Threaded Filename Search**: Asynchronous filename search with live results (F key)
@@ -282,7 +286,7 @@ Powerful regex-based renaming for multiple files:
 - **History Management**: Per-pane directory history with configurable limits
 
 ### Searchable Dialogs & Components
-All list interfaces support real-time filtering:
+All list interfaces support filtering:
 - **Favorite Directories**: Quick navigation with search and customizable bookmarks
 - **Jump Dialog**: Intelligent directory scanning with search capabilities
 - **Sort Options**: Interactive sorting menu with search
@@ -291,9 +295,60 @@ All list interfaces support real-time filtering:
 
 ### Remote Monitoring & Integration
 - **Remote Log Monitoring**: Stream TFM logs to remote terminals for debugging
+- **Command Line Directory Specification**: Override saved history with `--left` and `--right` arguments
 - **VSCode Integration**: Open current directory and selected files in VS Code
 - **Beyond Compare Integration**: Compare files and directories with Beyond Compare
 - **External Program Framework**: Extensible system for custom tool integration
+
+## Command Line Options
+
+TFM supports several command line arguments for customizing startup behavior:
+
+### Directory Specification
+```bash
+# Specify left pane directory
+python3 tfm.py --left /path/to/projects
+
+# Specify right pane directory  
+python3 tfm.py --right /path/to/documents
+
+# Specify both panes
+python3 tfm.py --left ./src --right ./test
+
+# Use relative paths
+python3 tfm.py --left . --right ..
+```
+
+### Remote Log Monitoring
+```bash
+# Enable remote log monitoring on specified port
+python3 tfm.py --remote-log-port 8888
+```
+
+### Combined Usage
+```bash
+# Development workflow: source code on left, tests on right, with remote monitoring
+python3 tfm.py --left ./src --right ./test --remote-log-port 8888
+
+# File organization: downloads on left, documents on right
+python3 tfm.py --left ~/Downloads --right ~/Documents
+```
+
+### Command Line Features
+- **Directory Override**: Command line directories override saved history/state
+- **Path Validation**: Invalid paths fall back to defaults with warning messages
+- **Flexible Paths**: Supports absolute, relative, and home directory paths (`~/`)
+- **History Preservation**: Other pane settings (sort mode, filters) are still restored from history
+- **Backward Compatible**: Works with existing usage patterns when no arguments provided
+
+### Help and Version
+```bash
+# Show help with all available options
+python3 tfm.py --help
+
+# Show version information
+python3 tfm.py --version
+```
 
 ## Installation & Usage
 
@@ -310,6 +365,12 @@ All list interfaces support real-time filtering:
 # Enable remote log monitoring on port 8888
 python3 tfm.py --remote-log-port 8888
 
+# Start with specific directories for left and right panes
+python3 tfm.py --left /path/to/projects --right /path/to/documents
+
+# Combine options for development workflow
+python3 tfm.py --left ./src --right ./test --remote-log-port 8888
+
 # Connect to remote logs from another terminal
 python3 tools/tfm_log_client.py localhost 8888
 ```
@@ -322,8 +383,8 @@ python3 setup.py install
 # Run installed version
 tfm
 
-# Or with remote monitoring
-tfm --remote-log-port 8888
+# With specific directories and remote monitoring
+tfm --left ~/projects --right ~/documents --remote-log-port 8888
 ```
 
 ### Dependencies
@@ -369,6 +430,7 @@ TFM features a comprehensive configuration system that allows complete customiza
 - **MAX_SEARCH_RESULTS**: Maximum search results (default: 10,000)
 - **MAX_JUMP_DIRECTORIES**: Maximum directories for jump dialog (default: 5,000)
 - **MAX_HISTORY_ENTRIES**: Maximum history entries per pane (default: 100)
+- **MAX_LOG_MESSAGES**: Maximum log entries to keep in memory (default: 1,000)
 
 #### Progress Animation
 - **PROGRESS_ANIMATION_PATTERN**: Animation style ('spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow')
@@ -517,15 +579,19 @@ tfm/
 ├── test/                   # Test files and demos
 │   ├── test_*.py          # Unit and integration tests
 │   ├── demo_*.py          # Interactive feature demonstrations
-│   └── verify_*.py        # Feature verification scripts
+│   ├── verify_*.py        # Feature verification scripts
+│   ├── test_command_line_*.py # Command line argument tests
+│   └── test_log_*.py      # Log redraw trigger tests
 ├── doc/                    # Documentation
 │   ├── *_FEATURE.md       # Feature documentation and guides
 │   ├── *_SYSTEM.md        # System component documentation
+│   ├── COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md # Command line directory specification
+│   ├── LOG_REDRAW_TRIGGER_FEATURE.md # Log update system
 │   └── PROJECT_STRUCTURE.md # Detailed project organization
 ├── tools/                  # External integration tools
 │   ├── vscode_wrapper.sh  # VSCode integration script
 │   ├── bcompare_*.sh      # Beyond Compare integration scripts
-│   ├── tfm_log_client.py  # Remote log monitoring client
+│   ├── tfm_log_client.py  # Remote log monitoring client with color-coded output
 │   └── preview_files.sh   # File preview script
 ├── demo/                   # Interactive demonstrations
 │   └── demo_*.py          # Feature demonstration scripts
@@ -553,8 +619,41 @@ python3 tfm.py --remote-log-port 8888
 python3 tools/tfm_log_client.py localhost 8888
 ```
 
+### TFM Log Client (`tfm_log_client.py`)
+
+The included log client provides a dedicated terminal interface for monitoring TFM logs remotely:
+
+#### Features
+- **Color-coded Output**: Different log sources (SYSTEM, ERROR, STDOUT, STDERR) displayed in distinct colors
+- **Network Connectivity**: Connect to TFM instances on local or remote machines
+- **JSON Processing**: Handles structured log data with automatic parsing
+- **Graceful Handling**: Manages connection errors and server disconnections
+- **Keyboard Interrupt**: Clean exit with Ctrl+C
+
+#### Usage Examples
+```bash
+# Connect to local TFM instance
+python3 tools/tfm_log_client.py localhost 8888
+
+# Connect to remote TFM instance
+python3 tools/tfm_log_client.py 192.168.1.100 8888
+
+# Connect with default parameters (localhost:8888)
+python3 tools/tfm_log_client.py
+
+# Disable colored output
+python3 tools/tfm_log_client.py --no-color localhost 8888
+```
+
+#### Use Cases
+- **Development Debugging**: Monitor file operations and errors during development
+- **Remote System Administration**: Watch TFM activity on remote servers
+- **Multi-terminal Workflows**: Keep logs visible while working in TFM
+- **Automated Monitoring**: Script-friendly output for log processing
+- **Team Collaboration**: Multiple developers can monitor the same TFM session
+
 ### Features
-- **Real-time streaming**: Log messages sent to connected clients immediately
+- **Network streaming**: Log messages sent to connected clients
 - **Multiple clients**: Support for multiple monitoring terminals
 - **Network capable**: Works locally and across networks
 - **JSON format**: Structured data for easy parsing
