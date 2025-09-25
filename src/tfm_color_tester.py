@@ -1,0 +1,654 @@
+#!/usr/bin/env python3
+"""
+TFM Color Testing Module
+
+Provides comprehensive color debugging and testing functionality to help diagnose
+color rendering issues across different terminals and environments.
+"""
+
+import curses
+import sys
+import os
+import time
+from pathlib import Path
+
+# Import TFM color modules
+from tfm_colors import (
+    init_colors, get_color_capabilities, get_current_color_scheme,
+    get_available_color_schemes, set_color_scheme, toggle_fallback_mode,
+    is_fallback_mode, set_fallback_mode, print_color_support_info,
+    get_file_color, get_header_color, get_footer_color, get_status_color,
+    get_error_color, get_boundary_color, COLOR_SCHEMES, FALLBACK_COLOR_SCHEMES
+)
+
+def print_basic_info():
+    """Print basic color information without curses initialization"""
+    print("TFM Color Testing - Basic Information")
+    print("=" * 50)
+    print()
+    
+    # Terminal environment info
+    print("Terminal Environment:")
+    print(f"  TERM: {os.environ.get('TERM', 'not set')}")
+    print(f"  COLORTERM: {os.environ.get('COLORTERM', 'not set')}")
+    print(f"  TERM_PROGRAM: {os.environ.get('TERM_PROGRAM', 'not set')}")
+    print(f"  TERM_PROGRAM_VERSION: {os.environ.get('TERM_PROGRAM_VERSION', 'not set')}")
+    print()
+    
+    # Available color schemes
+    print("Available Color Schemes:")
+    for scheme in get_available_color_schemes():
+        marker = " (current)" if scheme == get_current_color_scheme() else ""
+        print(f"  - {scheme}{marker}")
+    print()
+    
+    # RGB color definitions
+    print("RGB Color Definitions:")
+    for scheme_name, colors in COLOR_SCHEMES.items():
+        print(f"  {scheme_name.upper()} scheme: {len(colors)} colors defined")
+    print()
+    
+    # Fallback color definitions
+    print("Fallback Color Definitions:")
+    for scheme_name, colors in FALLBACK_COLOR_SCHEMES.items():
+        print(f"  {scheme_name.upper()} scheme: {len(colors)} colors defined")
+    print()
+
+def test_color_capabilities(stdscr):
+    """Test and display terminal color capabilities"""
+    stdscr.clear()
+    
+    # Initialize colors first
+    init_colors()
+    
+    # Get capabilities
+    caps = get_color_capabilities()
+    
+    y = 0
+    stdscr.addstr(y, 0, "TFM Color Capabilities Test", curses.A_BOLD)
+    y += 2
+    
+    stdscr.addstr(y, 0, f"Colors available: {caps['colors']}")
+    y += 1
+    stdscr.addstr(y, 0, f"Color pairs: {caps['color_pairs']}")
+    y += 1
+    stdscr.addstr(y, 0, f"RGB support: {'Yes' if caps['can_change_color'] else 'No'}")
+    y += 1
+    stdscr.addstr(y, 0, f"Current scheme: {get_current_color_scheme()}")
+    y += 1
+    stdscr.addstr(y, 0, f"Fallback mode: {'Enabled' if is_fallback_mode() else 'Disabled'}")
+    y += 2
+    
+    # Test basic colors
+    stdscr.addstr(y, 0, "Basic Color Test:")
+    y += 1
+    
+    basic_colors = [
+        (curses.COLOR_BLACK, "BLACK"),
+        (curses.COLOR_RED, "RED"),
+        (curses.COLOR_GREEN, "GREEN"),
+        (curses.COLOR_YELLOW, "YELLOW"),
+        (curses.COLOR_BLUE, "BLUE"),
+        (curses.COLOR_MAGENTA, "MAGENTA"),
+        (curses.COLOR_CYAN, "CYAN"),
+        (curses.COLOR_WHITE, "WHITE")
+    ]
+    
+    for i, (color, name) in enumerate(basic_colors):
+        try:
+            curses.init_pair(50 + i, color, curses.COLOR_BLACK)
+            stdscr.addstr(y, i * 10, f"{name:8}", curses.color_pair(50 + i))
+        except curses.error:
+            stdscr.addstr(y, i * 10, f"{name:8}")
+    
+    y += 2
+    
+    # Test TFM file colors
+    stdscr.addstr(y, 0, "TFM File Colors Test:")
+    y += 1
+    
+    file_tests = [
+        (False, False, False, True, "Regular file (active)"),
+        (True, False, False, True, "Directory (active)"),
+        (False, True, False, True, "Executable (active)"),
+        (False, False, True, True, "Selected file (active)"),
+        (True, False, True, True, "Selected directory (active)"),
+        (False, True, True, True, "Selected executable (active)"),
+        (False, False, True, False, "Selected file (inactive)"),
+        (True, False, True, False, "Selected directory (inactive)"),
+        (False, True, True, False, "Selected executable (inactive)"),
+    ]
+    
+    for is_dir, is_exec, is_selected, is_active, description in file_tests:
+        try:
+            color = get_file_color(is_dir, is_exec, is_selected, is_active)
+            stdscr.addstr(y, 0, f"{description:30}", color)
+        except curses.error:
+            stdscr.addstr(y, 0, f"{description:30} [ERROR]")
+        y += 1
+    
+    y += 1
+    
+    # Test interface colors
+    stdscr.addstr(y, 0, "Interface Colors Test:")
+    y += 1
+    
+    interface_tests = [
+        (get_header_color(True), "Header (active)"),
+        (get_header_color(False), "Header (inactive)"),
+        (get_footer_color(True), "Footer (active)"),
+        (get_footer_color(False), "Footer (inactive)"),
+        (get_status_color(), "Status bar"),
+        (get_error_color(), "Error message"),
+        (get_boundary_color(), "Boundary"),
+    ]
+    
+    for color_func, description in interface_tests:
+        try:
+            stdscr.addstr(y, 0, f"{description:20}", color_func)
+        except curses.error:
+            stdscr.addstr(y, 0, f"{description:20} [ERROR]")
+        y += 1
+    
+    y += 2
+    stdscr.addstr(y, 0, "Press any key to continue...")
+    stdscr.refresh()
+    stdscr.getch()
+
+def test_color_schemes(stdscr):
+    """Test all available color schemes"""
+    schemes = get_available_color_schemes()
+    current_scheme_index = 0
+    
+    while True:
+        stdscr.clear()
+        
+        # Set current scheme
+        current_scheme = schemes[current_scheme_index]
+        set_color_scheme(current_scheme)
+        init_colors()
+        
+        y = 0
+        stdscr.addstr(y, 0, f"Color Scheme Test: {current_scheme.upper()}", curses.A_BOLD)
+        y += 1
+        stdscr.addstr(y, 0, f"Scheme {current_scheme_index + 1} of {len(schemes)}")
+        y += 2
+        
+        # Show sample file listing
+        stdscr.addstr(y, 0, "Sample File Listing:", curses.A_UNDERLINE)
+        y += 1
+        
+        sample_files = [
+            ("Documents/", True, False, False),
+            ("script.py", False, True, False),
+            ("readme.txt", False, False, False),
+            ("config.json", False, False, True),  # Selected
+            ("Photos/", True, False, True),       # Selected directory
+            ("backup.sh", False, True, True),     # Selected executable
+        ]
+        
+        for i, (filename, is_dir, is_exec, is_selected) in enumerate(sample_files):
+            # Test both active and inactive selection
+            for is_active in [True, False]:
+                if is_selected:
+                    color = get_file_color(is_dir, is_exec, is_selected, is_active)
+                    marker = ">" if is_active else " "
+                    pane_label = "active" if is_active else "inactive"
+                    stdscr.addstr(y, 0, f"{marker} {filename:15} ({pane_label})", color)
+                    y += 1
+                elif is_active:  # Only show unselected files once
+                    color = get_file_color(is_dir, is_exec, is_selected, is_active)
+                    stdscr.addstr(y, 0, f"  {filename:15}", color)
+                    y += 1
+        
+        y += 1
+        
+        # Show interface elements
+        stdscr.addstr(y, 0, "Interface Elements:", curses.A_UNDERLINE)
+        y += 1
+        
+        try:
+            stdscr.addstr(y, 0, "/home/user/documents", get_header_color(True))
+            stdscr.addstr(y, 25, "│", get_boundary_color())
+            stdscr.addstr(y, 26, "/home/user/downloads", get_header_color(False))
+            y += 1
+            
+            stdscr.addstr(y, 0, "5 dirs, 12 files", get_footer_color(True))
+            stdscr.addstr(y, 25, "│", get_boundary_color())
+            stdscr.addstr(y, 26, "3 dirs, 8 files", get_footer_color(False))
+            y += 1
+            
+            stdscr.addstr(y, 0, "Status: Ready", get_status_color())
+            y += 1
+            
+            stdscr.addstr(y, 0, "Error: File not found", get_error_color())
+            y += 2
+        except curses.error:
+            stdscr.addstr(y, 0, "[Interface color test failed]")
+            y += 3
+        
+        # Instructions
+        stdscr.addstr(y, 0, "Controls:")
+        y += 1
+        stdscr.addstr(y, 0, "  Left/Right arrows: Change scheme")
+        y += 1
+        stdscr.addstr(y, 0, "  F: Toggle fallback mode")
+        y += 1
+        stdscr.addstr(y, 0, "  Q: Quit")
+        y += 1
+        
+        fallback_status = "ON" if is_fallback_mode() else "OFF"
+        stdscr.addstr(y, 0, f"Fallback mode: {fallback_status}")
+        
+        stdscr.refresh()
+        
+        # Handle input
+        key = stdscr.getch()
+        
+        if key == ord('q') or key == ord('Q'):
+            break
+        elif key == curses.KEY_RIGHT:
+            current_scheme_index = (current_scheme_index + 1) % len(schemes)
+        elif key == curses.KEY_LEFT:
+            current_scheme_index = (current_scheme_index - 1) % len(schemes)
+        elif key == ord('f') or key == ord('F'):
+            toggle_fallback_mode()
+
+def test_rgb_colors(stdscr):
+    """Test RGB color functionality"""
+    stdscr.clear()
+    
+    # Force RGB mode
+    set_fallback_mode(False)
+    init_colors()
+    
+    y = 0
+    stdscr.addstr(y, 0, "RGB Color Test (Forced RGB Mode)", curses.A_BOLD)
+    y += 2
+    
+    caps = get_color_capabilities()
+    stdscr.addstr(y, 0, f"RGB support: {'Yes' if caps['can_change_color'] else 'No'}")
+    y += 1
+    stdscr.addstr(y, 0, f"Fallback mode: {'Enabled' if is_fallback_mode() else 'Disabled'}")
+    y += 2
+    
+    if not caps['can_change_color']:
+        stdscr.addstr(y, 0, "WARNING: Terminal does not support RGB colors!", get_error_color())
+        y += 1
+        stdscr.addstr(y, 0, "This test will show fallback colors instead.")
+        y += 2
+    
+    # Test RGB gradient
+    stdscr.addstr(y, 0, "RGB Gradient Test:")
+    y += 1
+    
+    try:
+        # Create a simple gradient
+        for i in range(16):
+            color_num = 200 + i
+            r = int((i / 15.0) * 255)
+            g = 128
+            b = int(((15 - i) / 15.0) * 255)
+            
+            # Convert to curses scale
+            r_curses = int((r / 255.0) * 1000)
+            g_curses = int((g / 255.0) * 1000)
+            b_curses = int((b / 255.0) * 1000)
+            
+            try:
+                curses.init_color(color_num, r_curses, g_curses, b_curses)
+                curses.init_pair(60 + i, color_num, curses.COLOR_BLACK)
+                stdscr.addstr(y, i * 2, "██", curses.color_pair(60 + i))
+            except curses.error:
+                stdscr.addstr(y, i * 2, "XX")
+        
+        y += 2
+    except curses.error:
+        stdscr.addstr(y, 0, "RGB gradient test failed")
+        y += 2
+    
+    # Show current scheme colors
+    current_scheme = get_current_color_scheme()
+    rgb_colors = COLOR_SCHEMES.get(current_scheme, {})
+    
+    stdscr.addstr(y, 0, f"Current scheme ({current_scheme}) RGB values:")
+    y += 1
+    
+    key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'REGULAR_FILE_FG', 'SELECTED_BG']
+    for color_name in key_colors:
+        if color_name in rgb_colors:
+            rgb = rgb_colors[color_name]['rgb']
+            stdscr.addstr(y, 0, f"  {color_name:20}: RGB{rgb}")
+            y += 1
+    
+    y += 1
+    stdscr.addstr(y, 0, "Press any key to continue...")
+    stdscr.refresh()
+    stdscr.getch()
+
+def test_fallback_colors(stdscr):
+    """Test fallback color functionality"""
+    stdscr.clear()
+    
+    # Force fallback mode
+    set_fallback_mode(True)
+    init_colors()
+    
+    y = 0
+    stdscr.addstr(y, 0, "Fallback Color Test (Forced Fallback Mode)", curses.A_BOLD)
+    y += 2
+    
+    caps = get_color_capabilities()
+    stdscr.addstr(y, 0, f"RGB support: {'Yes' if caps['can_change_color'] else 'No'}")
+    y += 1
+    stdscr.addstr(y, 0, f"Fallback mode: {'Enabled' if is_fallback_mode() else 'Disabled'}")
+    y += 2
+    
+    stdscr.addstr(y, 0, "This test forces the use of fallback colors even if RGB is supported.")
+    y += 2
+    
+    # Show current scheme fallback colors
+    current_scheme = get_current_color_scheme()
+    fallback_colors = FALLBACK_COLOR_SCHEMES.get(current_scheme, {})
+    
+    stdscr.addstr(y, 0, f"Current scheme ({current_scheme}) fallback values:")
+    y += 1
+    
+    color_names = {
+        curses.COLOR_BLACK: "BLACK",
+        curses.COLOR_RED: "RED",
+        curses.COLOR_GREEN: "GREEN",
+        curses.COLOR_YELLOW: "YELLOW",
+        curses.COLOR_BLUE: "BLUE",
+        curses.COLOR_MAGENTA: "MAGENTA",
+        curses.COLOR_CYAN: "CYAN",
+        curses.COLOR_WHITE: "WHITE"
+    }
+    
+    key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'REGULAR_FILE_FG', 'SELECTED_BG']
+    for color_name in key_colors:
+        if color_name in fallback_colors:
+            color_val = fallback_colors[color_name]
+            color_str = color_names.get(color_val, f"COLOR_{color_val}")
+            stdscr.addstr(y, 0, f"  {color_name:20}: {color_str}")
+            y += 1
+    
+    y += 1
+    
+    # Test file colors with fallback
+    stdscr.addstr(y, 0, "File color test with fallback colors:")
+    y += 1
+    
+    sample_files = [
+        ("regular.txt", False, False, False, False),
+        ("directory/", True, False, False, False),
+        ("script.py", False, True, False, False),
+        ("selected.txt", False, False, True, True),
+        ("sel_dir/", True, False, True, True),
+        ("sel_script.sh", False, True, True, True),
+    ]
+    
+    for filename, is_dir, is_exec, is_selected, is_active in sample_files:
+        try:
+            color = get_file_color(is_dir, is_exec, is_selected, is_active)
+            stdscr.addstr(y, 0, f"  {filename:15}", color)
+        except curses.error:
+            stdscr.addstr(y, 0, f"  {filename:15} [ERROR]")
+        y += 1
+    
+    y += 1
+    stdscr.addstr(y, 0, "Press any key to continue...")
+    stdscr.refresh()
+    stdscr.getch()
+
+def interactive_color_tester(stdscr):
+    """Interactive color testing interface"""
+    current_scheme_index = 0
+    schemes = get_available_color_schemes()
+    fallback_mode = False
+    
+    while True:
+        stdscr.clear()
+        
+        # Apply current settings
+        current_scheme = schemes[current_scheme_index]
+        set_color_scheme(current_scheme)
+        set_fallback_mode(fallback_mode)
+        init_colors()
+        
+        y = 0
+        stdscr.addstr(y, 0, "TFM Interactive Color Tester", curses.A_BOLD)
+        y += 2
+        
+        # Current settings
+        stdscr.addstr(y, 0, f"Color scheme: {current_scheme}")
+        y += 1
+        stdscr.addstr(y, 0, f"Fallback mode: {'ON' if fallback_mode else 'OFF'}")
+        y += 1
+        
+        caps = get_color_capabilities()
+        stdscr.addstr(y, 0, f"Terminal RGB support: {'Yes' if caps['can_change_color'] else 'No'}")
+        y += 1
+        stdscr.addstr(y, 0, f"Colors available: {caps['colors']}")
+        y += 2
+        
+        # Sample display
+        stdscr.addstr(y, 0, "Sample File Manager Display:", curses.A_UNDERLINE)
+        y += 1
+        
+        # Header
+        try:
+            stdscr.addstr(y, 0, "/home/user/documents", get_header_color(True))
+            stdscr.addstr(y, 25, "│", get_boundary_color())
+            stdscr.addstr(y, 27, "/home/user/projects", get_header_color(False))
+            y += 1
+        except curses.error:
+            y += 1
+        
+        # File listing
+        sample_files = [
+            ("../", True, False, False, True, "Parent directory"),
+            ("Documents/", True, False, False, True, "Directory"),
+            ("Photos/", True, False, True, True, "Selected directory"),
+            ("script.py", False, True, False, True, "Executable file"),
+            ("readme.txt", False, False, False, True, "Regular file"),
+            ("config.json", False, False, True, True, "Selected file"),
+            ("backup.sh", False, True, True, False, "Selected executable (inactive)"),
+        ]
+        
+        for filename, is_dir, is_exec, is_selected, is_active, description in sample_files:
+            try:
+                color = get_file_color(is_dir, is_exec, is_selected, is_active)
+                marker = ">" if is_selected and is_active else " "
+                stdscr.addstr(y, 0, f"{marker} {filename:15}", color)
+                stdscr.addstr(y, 20, f"({description})")
+            except curses.error:
+                stdscr.addstr(y, 0, f"  {filename:15} [ERROR]")
+            y += 1
+        
+        # Footer
+        try:
+            stdscr.addstr(y, 0, "3 dirs, 4 files (2 selected)", get_footer_color(True))
+            stdscr.addstr(y, 25, "│", get_boundary_color())
+            stdscr.addstr(y, 27, "2 dirs, 3 files", get_footer_color(False))
+            y += 1
+        except curses.error:
+            y += 1
+        
+        # Status bar
+        try:
+            stdscr.addstr(y, 0, "Status: Color test mode active", get_status_color())
+            y += 1
+        except curses.error:
+            y += 1
+        
+        y += 1
+        
+        # Controls
+        stdscr.addstr(y, 0, "Controls:", curses.A_UNDERLINE)
+        y += 1
+        stdscr.addstr(y, 0, "  S: Next color scheme")
+        y += 1
+        stdscr.addstr(y, 0, "  F: Toggle fallback mode")
+        y += 1
+        stdscr.addstr(y, 0, "  I: Show detailed info")
+        y += 1
+        stdscr.addstr(y, 0, "  Q: Quit")
+        y += 1
+        
+        # Additional info
+        y += 1
+        if fallback_mode:
+            stdscr.addstr(y, 0, "Note: Fallback mode forces basic colors", get_error_color())
+        elif not caps['can_change_color']:
+            stdscr.addstr(y, 0, "Note: Terminal doesn't support RGB, using fallback", get_error_color())
+        else:
+            stdscr.addstr(y, 0, "Note: Using RGB colors")
+        
+        stdscr.refresh()
+        
+        # Handle input
+        key = stdscr.getch()
+        
+        if key == ord('q') or key == ord('Q'):
+            break
+        elif key == ord('s') or key == ord('S'):
+            current_scheme_index = (current_scheme_index + 1) % len(schemes)
+        elif key == ord('f') or key == ord('F'):
+            fallback_mode = not fallback_mode
+        elif key == ord('i') or key == ord('I'):
+            show_detailed_info(stdscr)
+
+def show_detailed_info(stdscr):
+    """Show detailed color information"""
+    stdscr.clear()
+    
+    y = 0
+    stdscr.addstr(y, 0, "Detailed Color Information", curses.A_BOLD)
+    y += 2
+    
+    # Terminal info
+    stdscr.addstr(y, 0, "Terminal Environment:")
+    y += 1
+    env_vars = ['TERM', 'COLORTERM', 'TERM_PROGRAM', 'TERM_PROGRAM_VERSION']
+    for var in env_vars:
+        value = os.environ.get(var, 'not set')
+        stdscr.addstr(y, 0, f"  {var}: {value}")
+        y += 1
+    
+    y += 1
+    
+    # Color capabilities
+    caps = get_color_capabilities()
+    stdscr.addstr(y, 0, "Color Capabilities:")
+    y += 1
+    stdscr.addstr(y, 0, f"  Colors: {caps['colors']}")
+    y += 1
+    stdscr.addstr(y, 0, f"  Color pairs: {caps['color_pairs']}")
+    y += 1
+    stdscr.addstr(y, 0, f"  RGB support: {'Yes' if caps['can_change_color'] else 'No'}")
+    y += 1
+    
+    # Current settings
+    y += 1
+    stdscr.addstr(y, 0, "Current Settings:")
+    y += 1
+    stdscr.addstr(y, 0, f"  Scheme: {get_current_color_scheme()}")
+    y += 1
+    stdscr.addstr(y, 0, f"  Fallback mode: {'Enabled' if is_fallback_mode() else 'Disabled'}")
+    y += 1
+    
+    # Color scheme details
+    current_scheme = get_current_color_scheme()
+    rgb_colors = COLOR_SCHEMES.get(current_scheme, {})
+    fallback_colors = FALLBACK_COLOR_SCHEMES.get(current_scheme, {})
+    
+    y += 1
+    stdscr.addstr(y, 0, f"RGB Colors in {current_scheme} scheme:")
+    y += 1
+    
+    max_lines = stdscr.getmaxyx()[0] - y - 3
+    color_count = 0
+    
+    for color_name, color_def in rgb_colors.items():
+        if color_count >= max_lines:
+            stdscr.addstr(y, 0, "  ... (more colors available)")
+            break
+        rgb = color_def['rgb']
+        stdscr.addstr(y, 0, f"  {color_name:20}: RGB{rgb}")
+        y += 1
+        color_count += 1
+    
+    y += 1
+    stdscr.addstr(y, 0, "Press any key to return...")
+    stdscr.refresh()
+    stdscr.getch()
+
+def run_color_test(test_mode):
+    """Main entry point for color testing"""
+    if test_mode == 'info':
+        print_basic_info()
+        
+    elif test_mode == 'schemes':
+        print_basic_info()
+        print("\nDetailed Color Scheme Information:")
+        print("=" * 50)
+        
+        for scheme_name in get_available_color_schemes():
+            print(f"\n{scheme_name.upper()} SCHEME:")
+            print("-" * 20)
+            
+            # RGB colors
+            rgb_colors = COLOR_SCHEMES.get(scheme_name, {})
+            print(f"RGB colors: {len(rgb_colors)}")
+            
+            # Show key colors
+            key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'REGULAR_FILE_FG', 'SELECTED_BG']
+            for color_name in key_colors:
+                if color_name in rgb_colors:
+                    rgb = rgb_colors[color_name]['rgb']
+                    print(f"  {color_name:20}: RGB{rgb}")
+            
+            # Fallback colors
+            fallback_colors = FALLBACK_COLOR_SCHEMES.get(scheme_name, {})
+            print(f"Fallback colors: {len(fallback_colors)}")
+        
+    elif test_mode == 'capabilities':
+        print_basic_info()
+        print("\nTesting terminal capabilities...")
+        
+        # Test without curses first
+        print(f"TERM environment: {os.environ.get('TERM', 'not set')}")
+        print(f"COLORTERM environment: {os.environ.get('COLORTERM', 'not set')}")
+        
+        # Test with curses
+        def test_caps(stdscr):
+            test_color_capabilities(stdscr)
+        
+        curses.wrapper(test_caps)
+        
+    elif test_mode == 'rgb-test':
+        print("Testing RGB color support...")
+        curses.wrapper(test_rgb_colors)
+        
+    elif test_mode == 'fallback-test':
+        print("Testing fallback color support...")
+        curses.wrapper(test_fallback_colors)
+        
+    elif test_mode == 'interactive':
+        print("Starting interactive color tester...")
+        print("Use the controls shown in the interface to test different settings.")
+        curses.wrapper(interactive_color_tester)
+    
+    else:
+        print(f"Unknown test mode: {test_mode}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    # Allow running this module directly for testing
+    import sys
+    if len(sys.argv) > 1:
+        run_color_test(sys.argv[1])
+    else:
+        print("Usage: python tfm_color_tester.py <test_mode>")
+        print("Available modes: info, schemes, capabilities, rgb-test, fallback-test, interactive")

@@ -57,6 +57,16 @@ def create_parser():
         help='Specify directory path for right pane (default: home directory)'
     )
     
+    parser.add_argument(
+        '--color-test',
+        type=str,
+        metavar='MODE',
+        choices=['info', 'schemes', 'capabilities', 'rgb-test', 'fallback-test', 'interactive'],
+        help='Run color debugging tests: info (show current colors), schemes (list all schemes), '
+             'capabilities (terminal color support), rgb-test (force RGB mode), '
+             'fallback-test (force fallback mode), interactive (interactive color tester)'
+    )
+    
     return parser
 
 def main():
@@ -66,6 +76,16 @@ def main():
     try:
         # Parse arguments
         args = parser.parse_args()
+        
+        # Handle color testing mode
+        if args.color_test:
+            # Set ESC delay for color tests that use curses
+            os.environ.setdefault('ESCDELAY', '100')
+            
+            # Import color testing module
+            from tfm_color_tester import run_color_test
+            run_color_test(args.color_test)
+            return
         
         # Set ESC delay to 100ms BEFORE any curses-related imports for responsive ESC key
         os.environ.setdefault('ESCDELAY', '100')
