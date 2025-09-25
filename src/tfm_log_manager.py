@@ -15,16 +15,21 @@ from tfm_colors import get_log_color, get_status_color
 
 class LogCapture:
     """Capture stdout/stderr and redirect to log pane"""
-    def __init__(self, log_messages, source, remote_callback=None):
+    def __init__(self, log_messages, source, remote_callback=None, update_callback=None):
         self.log_messages = log_messages
         self.source = source
         self.remote_callback = remote_callback
+        self.update_callback = update_callback
         
     def write(self, text):
         if text.strip():  # Only log non-empty messages
             timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
             log_entry = (timestamp, self.source, text.strip())
             self.log_messages.append(log_entry)
+            
+            # Notify about new message for redraw triggering
+            if self.update_callback:
+                self.update_callback()
             
             # Send to remote clients if callback is available
             if self.remote_callback:
@@ -43,6 +48,10 @@ class LogManager:
         self.log_messages = deque(maxlen=max_log_messages)
         self.log_scroll_offset = 0
         
+        # Track log updates for redraw triggering
+        self.has_new_messages = False
+        self.last_message_count = 0
+        
         # Remote monitoring setup
         self.remote_port = remote_port
         self.remote_clients = []
@@ -60,8 +69,9 @@ class LogManager:
         
         # Redirect stdout and stderr
         remote_callback = self._broadcast_to_clients if self.remote_port else None
-        sys.stdout = LogCapture(self.log_messages, "STDOUT", remote_callback)
-        sys.stderr = LogCapture(self.log_messages, "STDERR", remote_callback)
+        update_callback = self._on_message_added
+        sys.stdout = LogCapture(self.log_messages, "STDOUT", remote_callback, update_callback)
+        sys.stderr = LogCapture(self.log_messages, "STDERR", remote_callback, update_callback)
         
     def _start_remote_server(self):
         """Start TCP server for remote log monitoring"""
@@ -185,6 +195,35 @@ class LogManager:
         except Exception:
             raise  # Re-raise to handle in calling method
 
+    def _on_message_added(self):
+        """Called when a new message is added to the log"""
+        self.has_new_messages = True
+    
+    def has_log_updates(self):
+        """Check if there are new log messages since last check"""
+        current_count = len(self.log_messages)
+        if current_count != self.last_message_count or self.has_new_messages:
+            return True
+        return False
+    
+    def mark_log_updates_processed(self):
+        """Mark that log updates have been processed (redraw completed)"""
+        self.has_new_messages = False
+        self.last_message_count = len(self.log_messages)
+    
+    def add_message(self, source, message):
+        """Add a message directly to the log (bypasses stdout/stderr capture)"""
+        timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
+        log_entry = (timestamp, source, message)
+        self.log_messages.append(log_entry)
+        
+        # Trigger update notification
+        self._on_message_added()
+        
+        # Broadcast to remote clients if available
+        if self.remote_port:
+            self._broadcast_to_clients(log_entry)
+    
     def add_startup_messages(self, version, github_url, app_name):
         """Add startup messages directly to log pane"""
         timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
@@ -201,6 +240,9 @@ class LogManager:
             # Broadcast to remote clients if available
             if self.remote_port:
                 self._broadcast_to_clients(log_entry)
+        
+        # Trigger update notification for startup messages
+        self._on_message_added()
     
     def get_log_scroll_percentage(self, display_height=None):
         """Calculate the current log scroll position as a percentage"""
@@ -288,9 +330,13 @@ class LogManager:
                 # Draw scrollbar if needed
                 if scrollbar_width > 0:
                     self._draw_scrollbar(stdscr, y_start, height, width, total_messages, display_height)
-                    
+            
         except Exception:
             pass  # Ignore drawing errors
+        finally:
+            # Always mark log updates as processed when draw_log_pane is called
+            # This ensures updates are marked as processed even if drawing fails
+            self.mark_log_updates_processed()
     
     def _draw_scrollbar(self, stdscr, y_start, height, width, total_messages, display_height):
         """Draw a scrollbar for the log pane"""

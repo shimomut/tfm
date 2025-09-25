@@ -3533,6 +3533,10 @@ class FileManager:
             if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.033:
                 self.needs_full_redraw = True
                 delattr(self, 'startup_time')  # Remove the attribute to avoid repeated triggers
+            
+            # Check for log updates and trigger redraw if needed
+            if self.log_manager.has_log_updates():
+                self.needs_full_redraw = True
                 
             # Only do full redraw when needed
             if self.needs_full_redraw:
