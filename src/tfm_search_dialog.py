@@ -26,6 +26,7 @@ class SearchDialog(BaseListDialog):
         self.search_type = 'filename'  # 'filename' or 'content'
         self.results = []  # List of search results
         self.searching = False  # Whether search is in progress
+        self.content_changed = True  # Track if content needs redraw
         
         # Threading support
         self.search_thread = None
@@ -47,6 +48,7 @@ class SearchDialog(BaseListDialog):
         """
         # Cancel any existing search first
         self._cancel_current_search()
+        self.content_changed = True  # Mark content as changed when showing
         
         self.mode = True
         self.search_type = search_type
@@ -70,6 +72,7 @@ class SearchDialog(BaseListDialog):
         self.results = []
         self.searching = False
         self.last_search_pattern = ""
+        self.content_changed = True  # Mark content as changed when exiting
         
         # Reset animation
         self.progress_animator.reset()
@@ -79,6 +82,7 @@ class SearchDialog(BaseListDialog):
         # Handle Tab key for search type switching first
         if key == ord('\t'):  # Tab - switch between filename and content search
             self.search_type = 'content' if self.search_type == 'filename' else 'filename'
+            self.content_changed = True  # Mark content as changed when switching search type
             return ('search', None)
             
         # Use base class navigation handling with thread safety
@@ -103,6 +107,7 @@ class SearchDialog(BaseListDialog):
                     return ('navigate', selected_result)
             return ('navigate', None)
         elif result == 'text_changed':
+            self.content_changed = True  # Mark content as changed when text changes
             return ('search', None)
         elif result:
             # Update selection in thread-safe manner for navigation keys
@@ -110,6 +115,9 @@ class SearchDialog(BaseListDialog):
                 with self.search_lock:
                     # The base class already updated self.selected, just need to adjust scroll
                     self._adjust_scroll(len(self.results))
+            
+            # Mark content as changed for ANY handled key to ensure continued rendering
+            self.content_changed = True
             return True
             
         return False
@@ -164,6 +172,7 @@ class SearchDialog(BaseListDialog):
         
         self.searching = False
         self.search_thread = None
+        self.content_changed = True  # Mark content as changed when search is canceled
     
     def _search_worker(self, search_root, pattern_text, search_type):
         """Worker thread for performing the actual search
@@ -181,6 +190,9 @@ class SearchDialog(BaseListDialog):
                 for file_path in search_root.rglob('*'):
                     # Check for cancellation
                     if self.cancel_search.is_set():
+                        with self.search_lock:
+                            self.searching = False
+                            self.content_changed = True  # Mark content as changed when search is canceled
                         return
                     
                     # Check result limit
@@ -204,6 +216,7 @@ class SearchDialog(BaseListDialog):
                                 if self.selected >= len(self.results):
                                     self.selected = max(0, len(self.results) - 1)
                                     self._adjust_scroll(len(self.results))
+                                self.content_changed = True  # Mark content as changed when results update
             
             elif search_type == 'content':
                 # Recursive grep-based content search
@@ -212,6 +225,9 @@ class SearchDialog(BaseListDialog):
                 for file_path in search_root.rglob('*'):
                     # Check for cancellation
                     if self.cancel_search.is_set():
+                        with self.search_lock:
+                            self.searching = False
+                            self.content_changed = True  # Mark content as changed when search is canceled
                         return
                     
                     # Check result limit
@@ -224,6 +240,9 @@ class SearchDialog(BaseListDialog):
                                 for line_num, line in enumerate(f, 1):
                                     # Check for cancellation periodically
                                     if line_num % 100 == 0 and self.cancel_search.is_set():
+                                        with self.search_lock:
+                                            self.searching = False
+                                            self.content_changed = True  # Mark content as changed when search is canceled
                                         return
                                     
                                     if pattern.search(line):
@@ -244,6 +263,7 @@ class SearchDialog(BaseListDialog):
                                                 if self.selected >= len(self.results):
                                                     self.selected = max(0, len(self.results) - 1)
                                                     self._adjust_scroll(len(self.results))
+                                                self.content_changed = True  # Mark content as changed when results update
                                         
                                         break  # Only show first match per file
                         except (IOError, UnicodeDecodeError):
@@ -261,6 +281,7 @@ class SearchDialog(BaseListDialog):
                     self.selected = max(0, len(self.results) - 1)
                     self._adjust_scroll(len(self.results))
                 self.searching = False
+                self.content_changed = True  # Mark content as changed when search completes
         
     def _is_text_file(self, file_path):
         """Check if a file is likely to be a text file"""
@@ -295,8 +316,14 @@ class SearchDialog(BaseListDialog):
             
 
             
+    def needs_redraw(self):
+        """Check if this dialog needs to be redrawn"""
+        # Always redraw when searching to animate progress indicator
+        return self.content_changed or self.searching
+    
     def draw(self, stdscr, safe_addstr_func):
         """Draw the search dialog overlay"""
+
         # Draw dialog frame
         title_text = f"Search ({self.search_type.title()})"
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
@@ -377,6 +404,10 @@ class SearchDialog(BaseListDialog):
         help_text = "Enter: Select | Tab: Switch mode | ESC: Cancel"
         help_y = start_y + dialog_height - 2
         self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
+        
+        # Automatically mark as not needing redraw after drawing (unless still searching)
+        if not self.searching:
+            self.content_changed = False
 
 
 class SearchDialogHelpers:

@@ -35,6 +35,7 @@ class GeneralPurposeDialog:
         self.config = config
         self.is_active = False
         self.dialog_type = None
+        self.content_changed = True  # Track if content needs redraw
         
         # Status line input dialog state
         self.text_editor = SingleLineTextEdit()
@@ -61,6 +62,7 @@ class GeneralPurposeDialog:
         self.help_text = help_text
         self.callback = callback
         self.cancel_callback = cancel_callback
+        self.content_changed = True  # Mark content as changed when showing
         
         self.text_editor.set_text(initial_text)
         self.text_editor.set_cursor_pos(len(initial_text))
@@ -69,6 +71,7 @@ class GeneralPurposeDialog:
         """Hide the dialog"""
         self.is_active = False
         self.dialog_type = None
+        self.content_changed = True  # Mark content as changed when hiding
         self.text_editor.clear()
         self.prompt_text = ""
         self.help_text = ""
@@ -126,7 +129,15 @@ class GeneralPurposeDialog:
         
         # Handle text editing
         else:
-            return self.text_editor.handle_key(key)
+            # Check if text editor handled the key (content changed)
+            handled = self.text_editor.handle_key(key)
+            if handled:
+                self.content_changed = True  # Mark content as changed
+            return handled
+    
+    def needs_redraw(self):
+        """Check if this dialog needs to be redrawn"""
+        return self.content_changed
     
     def draw(self, stdscr, safe_addstr_func):
         """
@@ -141,6 +152,9 @@ class GeneralPurposeDialog:
         
         if self.dialog_type == DialogType.STATUS_LINE_INPUT:
             self._draw_status_line_input(stdscr, safe_addstr_func)
+        
+        # Automatically mark as not needing redraw after drawing
+        self.content_changed = False
     
     def _draw_status_line_input(self, stdscr, safe_addstr_func):
         """Draw status line input dialog"""

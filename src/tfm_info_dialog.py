@@ -20,6 +20,7 @@ class InfoDialog:
         self.title = ""
         self.lines = []
         self.scroll = 0
+        self.content_changed = True  # Track if content needs redraw
         
     def show(self, title, info_lines):
         """Show an information dialog with scrollable content
@@ -32,6 +33,7 @@ class InfoDialog:
         self.title = title
         self.lines = info_lines
         self.scroll = 0
+        self.content_changed = True  # Mark content as changed when showing
         
     def exit(self):
         """Exit info dialog mode"""
@@ -39,6 +41,7 @@ class InfoDialog:
         self.title = ""
         self.lines = []
         self.scroll = 0
+        self.content_changed = True  # Mark content as changed when exiting
         
     def handle_input(self, key):
         """Handle input while in info dialog mode"""
@@ -49,6 +52,8 @@ class InfoDialog:
             # Scroll up
             if self.scroll > 0:
                 self.scroll -= 1
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
         elif key == curses.KEY_DOWN:
             # Scroll down - calculate max scroll based on current content
@@ -57,25 +62,43 @@ class InfoDialog:
             max_scroll = max(0, len(self.lines) - content_height)
             if self.scroll < max_scroll:
                 self.scroll += 1
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
         elif key == curses.KEY_PPAGE:  # Page Up
+            old_scroll = self.scroll
             self.scroll = max(0, self.scroll - 10)
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
         elif key == curses.KEY_NPAGE:  # Page Down
             content_height = 10  # Default, will be calculated properly in draw()
             max_scroll = max(0, len(self.lines) - content_height)
+            old_scroll = self.scroll
             self.scroll = min(max_scroll, self.scroll + 10)
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
         elif key == curses.KEY_HOME:  # Home - go to top
-            self.scroll = 0
+            if self.scroll != 0:
+                self.scroll = 0
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
         elif key == curses.KEY_END:  # End - go to bottom
             content_height = 10  # Default, will be calculated properly in draw()
             max_scroll = max(0, len(self.lines) - content_height)
-            self.scroll = max_scroll
+            if self.scroll != max_scroll:
+                self.scroll = max_scroll
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
         return False
         
+    def needs_redraw(self):
+        """Check if this dialog needs to be redrawn"""
+        return self.content_changed
+    
     def draw(self, stdscr, safe_addstr_func):
         """Draw the info dialog overlay"""
         height, width = stdscr.getmaxyx()
@@ -179,6 +202,9 @@ class InfoDialog:
             help_x = start_x + (dialog_width - len(help_text)) // 2
             if help_x >= start_x:
                 safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+        
+        # Automatically mark as not needing redraw after drawing
+        self.content_changed = False
 
 
 class InfoDialogHelpers:

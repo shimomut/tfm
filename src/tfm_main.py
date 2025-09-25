@@ -68,6 +68,7 @@ class FileManager:
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
         self.needs_full_redraw = True  # Flag to control when to redraw everything
+        self.needs_dialog_redraw = False  # Flag to control when to redraw dialogs
         
         # Isearch mode state
         self.isearch_mode = False
@@ -1408,6 +1409,55 @@ class FileManager:
         # Force immediate display of the dialog
         self._force_immediate_redraw()
     
+    def _check_dialog_content_changed(self):
+        """Check if any active dialog content has changed and needs redraw"""
+        if self.general_dialog.is_active:
+            return self.general_dialog.needs_redraw()
+        elif self.list_dialog.mode:
+            return self.list_dialog.needs_redraw()
+        elif self.info_dialog.mode:
+            return self.info_dialog.needs_redraw()
+        elif self.search_dialog.mode:
+            return self.search_dialog.needs_redraw()
+        elif self.jump_dialog.mode:
+            return self.jump_dialog.needs_redraw()
+        elif self.batch_rename_dialog.mode:
+            return self.batch_rename_dialog.needs_redraw()
+        return False
+    
+
+    def _draw_dialogs_if_needed(self):
+        """Draw dialog overlays if content has changed or full redraw is needed. Returns True if any dialog was drawn."""
+        dialog_drawn = False
+        dialog_content_changed = self._check_dialog_content_changed()
+        
+        if dialog_content_changed or self.needs_full_redraw:
+            if self.general_dialog.is_active:
+                self.general_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.list_dialog.mode:
+                self.list_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.info_dialog.mode:
+                self.info_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.search_dialog.mode:
+                self.search_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.jump_dialog.mode:
+                self.jump_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.batch_rename_dialog.mode:
+                self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            
+            
+        # Refresh screen if dialog was drawn or full redraw occurred
+        if dialog_drawn or self.needs_full_redraw:
+            self.stdscr.refresh()
+            
+        return dialog_drawn
+
     def _force_immediate_redraw(self):
         """Force an immediate screen redraw to show dialogs instantly"""
         # Perform the same drawing sequence as the main loop
@@ -1433,6 +1483,7 @@ class FileManager:
         # Refresh screen immediately
         self.stdscr.refresh()
         self.needs_full_redraw = False
+        self.needs_dialog_redraw = False
 
     def show_list_dialog(self, title, items, callback):
         """Show a searchable list dialog - wrapper for list dialog component"""
@@ -3481,30 +3532,8 @@ class FileManager:
                 self.stdscr.refresh()
                 self.needs_full_redraw = False
             
-            # Always draw dialog overlays on top (they need to update every frame for cursor/text changes)
-            dialog_drawn = False
-            if self.general_dialog.is_active:
-                self.general_dialog.draw(self.stdscr, self.safe_addstr)
-                dialog_drawn = True
-            elif self.list_dialog.mode:
-                self.list_dialog.draw(self.stdscr, self.safe_addstr)
-                dialog_drawn = True
-            elif self.info_dialog.mode:
-                self.info_dialog.draw(self.stdscr, self.safe_addstr)
-                dialog_drawn = True
-            elif self.search_dialog.mode:
-                self.search_dialog.draw(self.stdscr, self.safe_addstr)
-                dialog_drawn = True
-            elif self.jump_dialog.mode:
-                self.jump_dialog.draw(self.stdscr, self.safe_addstr)
-                dialog_drawn = True
-            elif self.batch_rename_dialog.mode:
-                self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
-                dialog_drawn = True
-            
-            # Refresh screen if dialog was drawn
-            if dialog_drawn:
-                self.stdscr.refresh()
+            # Draw dialogs if needed
+            self._draw_dialogs_if_needed()
             
             # Get user input with timeout to allow timer checks
             self.stdscr.timeout(16)  # 16ms timeout
