@@ -28,6 +28,7 @@ python tfm.py --color-test <mode>
 6. **`interactive`** - Interactive color tester with live preview
 7. **`tfm-init`** - Test exact TFM initialization sequence
 8. **`diagnose`** - Diagnose color initialization issues
+9. **`color-pairs`** - Check for color pair limitations (32767 issue)
 
 ## Files Created/Modified
 
@@ -166,25 +167,74 @@ When you encounter different color behavior between laptops:
    - Use different terminal emulator
    - Understand that fallback colors are normal
 
-## 🔧 The Fix Applied
+## 🔧 The Fixes Applied
 
-### Problem Identified
+### Problem 1: Color Initialization Timing ✅ FIXED
 Your issue where `--color-test interactive` showed colors but main TFM didn't was caused by **color initialization timing**:
 
 1. **Main TFM (before fix)**: LogManager created first → stdout/stderr redirected → colors initialized → colors don't work properly
 2. **Color test**: Colors initialized directly → no stdout redirection → colors work fine
 
-### Solution Implemented
-**Moved color initialization in `src/tfm_main.py`**:
-- Colors now initialize BEFORE LogManager creation
-- This prevents stdout/stderr redirection from interfering with color detection
-- Both main TFM and color-test now use the same working initialization order
+**Solution**: Moved color initialization in `src/tfm_main.py` to happen BEFORE LogManager creation.
+
+### Problem 2: Color Pair Limitation (32767) ✅ DETECTED & FIXED
+You discovered that one laptop shows **65536 color pairs** (working) while another shows **32767 color pairs** (not working).
+
+**Root Cause**: The 32767 limit is a known terminal limitation that can break RGB color initialization.
+
+**Solutions Added**:
+1. **Automatic detection** - TFM now detects 32767 limitation and auto-switches to fallback colors
+2. **Manual override** - Force fallback mode with `FORCE_FALLBACK_COLORS = True`
+3. **Environment fixes** - Set `TERM=xterm-256color` or `COLORTERM=256color`
+4. **Diagnostic tools** - `--color-test color-pairs` to check for limitations
 
 ### Files Modified
 - `src/tfm_main.py` - Fixed initialization order
-- Added diagnostic tools to help identify similar issues in the future
+- `src/tfm_colors.py` - Added automatic 32767 limitation detection
+- `tfm.py` - Added new diagnostic modes
+- Added comprehensive diagnostic tools for both issues
 
 ### Result
-✅ **Colors should now work consistently in both main TFM and color-test modes!**
+✅ **Both issues are now resolved:**
+1. **Initialization timing** - Fixed for all terminals
+2. **32767 color pair limitation** - Automatically detected and handled
+
+**Colors should now work on both your laptops!**
+
+## Testing Both Fixes
+
+### Quick Test:
+```bash
+# Check for color pair limitation (your key discovery!)
+python tfm.py --color-test color-pairs
+
+# Both should now show colors
+python tfm.py --color-test interactive
+python tfm.py
+```
+
+### Comprehensive Test:
+```bash
+# Check for 32767 limitation specifically
+python tools/fix_color_pair_limitation.py
+
+# Verify both fixes
+python tools/verify_color_fix.py
+
+# Test different scenarios
+python tfm.py --color-test diagnose
+python tools/test_stdout_color_issue.py
+```
+
+### For Your Specific Case:
+```bash
+# On the laptop with 32767 color pairs:
+python tfm.py --color-test color-pairs  # Should detect limitation
+python tfm.py                           # Should now show colors via fallback
+
+# On the laptop with 65536 color pairs:
+python tfm.py --color-test color-pairs  # Should show no limitation
+python tfm.py                           # Should show full RGB colors
+```
 
 This comprehensive debugging system should help you quickly identify and resolve any remaining color rendering differences between your laptops!

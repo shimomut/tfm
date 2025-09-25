@@ -61,11 +61,12 @@ def create_parser():
         '--color-test',
         type=str,
         metavar='MODE',
-        choices=['info', 'schemes', 'capabilities', 'rgb-test', 'fallback-test', 'interactive', 'tfm-init', 'diagnose'],
+        choices=['info', 'schemes', 'capabilities', 'rgb-test', 'fallback-test', 'interactive', 'tfm-init', 'diagnose', 'color-pairs'],
         help='Run color debugging tests: info (show current colors), schemes (list all schemes), '
              'capabilities (terminal color support), rgb-test (force RGB mode), '
              'fallback-test (force fallback mode), interactive (interactive color tester), '
-             'tfm-init (test exact TFM initialization sequence), diagnose (diagnose color issues)'
+             'tfm-init (test exact TFM initialization sequence), diagnose (diagnose color issues), '
+             'color-pairs (check color pair limitations)'
     )
     
     return parser

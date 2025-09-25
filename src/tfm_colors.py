@@ -323,13 +323,19 @@ def get_current_fallback_colors():
 
 def init_colors(color_scheme=None):
     """Initialize all color pairs for the application"""
-    global current_color_scheme
+    global current_color_scheme, force_fallback_colors
     
     # Set color scheme from parameter or use current
     if color_scheme:
         current_color_scheme = color_scheme
     
     curses.start_color()
+    
+    # Check for 32767 color pair limitation that can cause RGB issues
+    if hasattr(curses, 'COLOR_PAIRS') and curses.COLOR_PAIRS == 32767:
+        if not force_fallback_colors:
+            print("Detected 32767 color pair limitation - using fallback colors for compatibility")
+            force_fallback_colors = True
     
     # Get colors for current scheme
     rgb_colors = get_current_rgb_colors()

@@ -495,6 +495,8 @@ def interactive_color_tester(stdscr):
         y += 1
         stdscr.addstr(y, 0, "  D: Diagnose color issues")
         y += 1
+        stdscr.addstr(y, 0, "  P: Check color pair limitations")
+        y += 1
         stdscr.addstr(y, 0, "  Q: Quit")
         y += 1
         
@@ -522,6 +524,119 @@ def interactive_color_tester(stdscr):
             show_detailed_info(stdscr)
         elif key == ord('d') or key == ord('D'):
             diagnose_color_initialization_issue(stdscr)
+        elif key == ord('p') or key == ord('P'):
+            diagnose_color_pair_limitations(stdscr)
+
+def diagnose_color_pair_limitations(stdscr):
+    """Diagnose color pair limitations that might cause color issues"""
+    stdscr.clear()
+    
+    y = 0
+    stdscr.addstr(y, 0, "Color Pair Limitation Diagnosis", curses.A_BOLD)
+    y += 2
+    
+    stdscr.addstr(y, 0, "Checking for color pair limitations that cause color issues...")
+    y += 2
+    
+    # Get color capabilities
+    caps = get_color_capabilities()
+    color_pairs = caps.get('color_pairs', 0)
+    colors = caps.get('colors', 0)
+    
+    stdscr.addstr(y, 0, f"Color pairs available: {color_pairs}")
+    y += 1
+    stdscr.addstr(y, 0, f"Colors available: {colors}")
+    y += 2
+    
+    # Analyze the color pair count
+    if color_pairs == 32767:
+        stdscr.addstr(y, 0, "⚠️  ISSUE DETECTED: Limited color pairs (32767)", get_error_color())
+        y += 1
+        stdscr.addstr(y, 0, "This is a known limitation that can cause color issues.")
+        y += 2
+        
+        stdscr.addstr(y, 0, "SOLUTIONS:", curses.A_UNDERLINE)
+        y += 1
+        stdscr.addstr(y, 0, "1. Use fewer color pairs in TFM color scheme")
+        y += 1
+        stdscr.addstr(y, 0, "2. Force fallback color mode")
+        y += 1
+        stdscr.addstr(y, 0, "3. Try different terminal emulator")
+        y += 1
+        stdscr.addstr(y, 0, "4. Set TERM=xterm-256color")
+        y += 2
+        
+    elif color_pairs >= 65536:
+        stdscr.addstr(y, 0, "✓ Good: High color pair count (no limitation)")
+        y += 2
+        
+    elif color_pairs < 64:
+        stdscr.addstr(y, 0, "⚠️  WARNING: Very low color pairs", get_error_color())
+        y += 1
+        stdscr.addstr(y, 0, "This terminal has very limited color support.")
+        y += 2
+        
+    else:
+        stdscr.addstr(y, 0, f"Moderate color pair count: {color_pairs}")
+        y += 2
+    
+    # Test color pair usage
+    stdscr.addstr(y, 0, "Testing color pair allocation...")
+    y += 1
+    
+    # Try to allocate color pairs like TFM does
+    try:
+        # Test basic color pairs (like TFM uses)
+        test_pairs = [
+            (1, curses.COLOR_WHITE, curses.COLOR_BLACK),
+            (2, curses.COLOR_YELLOW, curses.COLOR_BLACK),
+            (3, curses.COLOR_GREEN, curses.COLOR_BLACK),
+            (4, curses.COLOR_WHITE, curses.COLOR_BLUE),
+            (5, curses.COLOR_YELLOW, curses.COLOR_BLUE),
+            (6, curses.COLOR_GREEN, curses.COLOR_BLUE),
+        ]
+        
+        for pair_num, fg, bg in test_pairs:
+            curses.init_pair(pair_num, fg, bg)
+        
+        stdscr.addstr(y, 0, "✓ Basic color pair allocation works")
+        y += 1
+        
+        # Test if we can use the allocated pairs
+        stdscr.addstr(y, 0, "Regular file", curses.color_pair(1))
+        stdscr.addstr(y, 15, "Directory", curses.color_pair(2))
+        stdscr.addstr(y, 25, "Executable", curses.color_pair(3))
+        y += 1
+        stdscr.addstr(y, 0, "Selected file", curses.color_pair(4))
+        stdscr.addstr(y, 15, "Selected dir", curses.color_pair(5))
+        stdscr.addstr(y, 25, "Selected exec", curses.color_pair(6))
+        y += 2
+        
+    except curses.error as e:
+        stdscr.addstr(y, 0, f"✗ Color pair allocation failed: {e}", get_error_color())
+        y += 2
+    
+    # Test RGB color support with limited pairs
+    if curses.can_change_color() and color_pairs == 32767:
+        stdscr.addstr(y, 0, "Testing RGB colors with limited pairs...")
+        y += 1
+        
+        try:
+            # Try to define a custom RGB color
+            curses.init_color(100, 500, 500, 500)  # Gray
+            curses.init_pair(50, 100, curses.COLOR_BLACK)
+            stdscr.addstr(y, 0, "Custom RGB color test", curses.color_pair(50))
+            y += 1
+            stdscr.addstr(y, 0, "✓ RGB colors work despite pair limitation")
+            y += 2
+        except curses.error:
+            stdscr.addstr(y, 0, "✗ RGB colors fail with pair limitation", get_error_color())
+            y += 2
+    
+    y += 1
+    stdscr.addstr(y, 0, "Press any key to continue...")
+    stdscr.refresh()
+    stdscr.getch()
 
 def diagnose_color_initialization_issue(stdscr):
     """Diagnose potential color initialization issues"""
@@ -919,6 +1034,11 @@ def run_color_test(test_mode):
         print("Diagnosing color initialization issues...")
         print("This test helps identify why colors work in --color-test but not in main TFM.")
         curses.wrapper(diagnose_color_initialization_issue)
+        
+    elif test_mode == 'color-pairs':
+        print("Diagnosing color pair limitations...")
+        print("This test checks for color pair limitations that cause color issues.")
+        curses.wrapper(diagnose_color_pair_limitations)
     
     else:
         print(f"Unknown test mode: {test_mode}")
