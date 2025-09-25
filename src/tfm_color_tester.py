@@ -493,6 +493,8 @@ def interactive_color_tester(stdscr):
         y += 1
         stdscr.addstr(y, 0, "  I: Show detailed info")
         y += 1
+        stdscr.addstr(y, 0, "  D: Diagnose color issues")
+        y += 1
         stdscr.addstr(y, 0, "  Q: Quit")
         y += 1
         
@@ -518,6 +520,169 @@ def interactive_color_tester(stdscr):
             fallback_mode = not fallback_mode
         elif key == ord('i') or key == ord('I'):
             show_detailed_info(stdscr)
+        elif key == ord('d') or key == ord('D'):
+            diagnose_color_initialization_issue(stdscr)
+
+def diagnose_color_initialization_issue(stdscr):
+    """Diagnose potential color initialization issues"""
+    stdscr.clear()
+    
+    y = 0
+    stdscr.addstr(y, 0, "Color Initialization Issue Diagnosis", curses.A_BOLD)
+    y += 2
+    
+    stdscr.addstr(y, 0, "This test helps diagnose why colors work in --color-test but not in main TFM")
+    y += 2
+    
+    # Test 1: Basic curses color support
+    stdscr.addstr(y, 0, "Test 1: Basic curses color support")
+    y += 1
+    
+    try:
+        if curses.has_colors():
+            stdscr.addstr(y, 0, "  ✓ Terminal supports colors")
+        else:
+            stdscr.addstr(y, 0, "  ✗ Terminal does NOT support colors")
+        y += 1
+        
+        if curses.can_change_color():
+            stdscr.addstr(y, 0, "  ✓ Terminal supports RGB color changes")
+        else:
+            stdscr.addstr(y, 0, "  ✗ Terminal does NOT support RGB color changes")
+        y += 1
+        
+        stdscr.addstr(y, 0, f"  Colors available: {curses.COLORS}")
+        y += 1
+        stdscr.addstr(y, 0, f"  Color pairs available: {curses.COLOR_PAIRS}")
+        y += 1
+        
+    except Exception as e:
+        stdscr.addstr(y, 0, f"  Error checking color support: {e}")
+        y += 1
+    
+    y += 1
+    
+    # Test 2: Color initialization timing
+    stdscr.addstr(y, 0, "Test 2: Color initialization timing")
+    y += 1
+    
+    # Test colors before init_colors
+    try:
+        curses.init_pair(90, curses.COLOR_RED, curses.COLOR_BLACK)
+        stdscr.addstr(y, 0, "  Before init_colors: ", curses.color_pair(90))
+        stdscr.addstr(y, 22, "Basic color works", curses.color_pair(90))
+        y += 1
+    except Exception as e:
+        stdscr.addstr(y, 0, f"  Before init_colors: Basic color failed ({e})")
+        y += 1
+    
+    # Initialize colors
+    try:
+        init_colors('dark')
+        stdscr.addstr(y, 0, "  ✓ init_colors('dark') completed")
+        y += 1
+    except Exception as e:
+        stdscr.addstr(y, 0, f"  ✗ init_colors failed: {e}")
+        y += 1
+    
+    # Test colors after init_colors
+    try:
+        color = get_file_color(True, False, False, True)  # Directory color
+        stdscr.addstr(y, 0, "  After init_colors: ", color)
+        stdscr.addstr(y, 21, "Directory color works", color)
+        y += 1
+    except Exception as e:
+        stdscr.addstr(y, 0, f"  After init_colors: TFM color failed ({e})")
+        y += 1
+    
+    y += 1
+    
+    # Test 3: Check for color pair conflicts
+    stdscr.addstr(y, 0, "Test 3: Color pair usage analysis")
+    y += 1
+    
+    # Check which color pairs are in use
+    used_pairs = []
+    for i in range(1, min(64, curses.COLOR_PAIRS)):
+        try:
+            # Try to get color pair info (this might not work on all systems)
+            used_pairs.append(i)
+        except:
+            pass
+    
+    stdscr.addstr(y, 0, f"  Color pairs potentially in use: {len(used_pairs)}")
+    y += 1
+    
+    # Test 4: Environment variables that might affect colors
+    stdscr.addstr(y, 0, "Test 4: Environment variables")
+    y += 1
+    
+    env_vars = {
+        'TERM': 'Terminal type',
+        'COLORTERM': 'Color support indicator', 
+        'TERM_PROGRAM': 'Terminal program',
+        'NO_COLOR': 'Disable colors flag',
+        'FORCE_COLOR': 'Force colors flag',
+        'CLICOLOR': 'CLI color support',
+        'CLICOLOR_FORCE': 'Force CLI colors'
+    }
+    
+    for var, description in env_vars.items():
+        value = os.environ.get(var, 'not set')
+        if value != 'not set':
+            stdscr.addstr(y, 0, f"  {var}: {value}")
+            y += 1
+    
+    y += 1
+    
+    # Test 5: Check for potential interference
+    stdscr.addstr(y, 0, "Test 5: Potential interference checks")
+    y += 1
+    
+    # Check if stdout/stderr redirection might affect colors
+    if not sys.stdout.isatty():
+        stdscr.addstr(y, 0, "  ⚠ stdout is not a TTY (might affect colors)")
+        y += 1
+    else:
+        stdscr.addstr(y, 0, "  ✓ stdout is a TTY")
+        y += 1
+    
+    if not sys.stderr.isatty():
+        stdscr.addstr(y, 0, "  ⚠ stderr is not a TTY (might affect colors)")
+        y += 1
+    else:
+        stdscr.addstr(y, 0, "  ✓ stderr is a TTY")
+        y += 1
+    
+    y += 2
+    
+    # Recommendations
+    stdscr.addstr(y, 0, "Recommendations:", curses.A_UNDERLINE)
+    y += 1
+    
+    recommendations = [
+        "1. If colors work here but not in main TFM:",
+        "   - Check if TFM's stdout/stderr redirection affects colors",
+        "   - Look for code that calls curses functions after init_colors",
+        "   - Check if background color setting interferes",
+        "",
+        "2. Try running main TFM with different settings:",
+        "   - Set TERM=xterm-256color",
+        "   - Unset NO_COLOR if it's set",
+        "   - Try different terminal emulator",
+        "",
+        "3. Compare this output with main TFM behavior"
+    ]
+    
+    for rec in recommendations:
+        if y < stdscr.getmaxyx()[0] - 2:
+            stdscr.addstr(y, 0, rec)
+            y += 1
+    
+    y += 1
+    stdscr.addstr(y, 0, "Press any key to continue...")
+    stdscr.refresh()
+    stdscr.getch()
 
 def show_detailed_info(stdscr):
     """Show detailed color information"""
@@ -584,6 +749,111 @@ def show_detailed_info(stdscr):
     stdscr.refresh()
     stdscr.getch()
 
+def test_tfm_initialization_sequence(stdscr):
+    """Test the exact same initialization sequence as main TFM"""
+    stdscr.clear()
+    
+    y = 0
+    stdscr.addstr(y, 0, "TFM Initialization Sequence Test", curses.A_BOLD)
+    y += 2
+    
+    # Step 1: Import config (simulate)
+    stdscr.addstr(y, 0, "Step 1: Loading configuration...")
+    y += 1
+    
+    try:
+        from tfm_config import get_config
+        config = get_config()
+        color_scheme = getattr(config, 'COLOR_SCHEME', 'dark')
+        stdscr.addstr(y, 0, f"  Config loaded, color scheme: {color_scheme}")
+        y += 1
+    except Exception as e:
+        stdscr.addstr(y, 0, f"  Config load failed: {e}")
+        y += 1
+        color_scheme = 'dark'
+    
+    y += 1
+    
+    # Step 2: Initialize colors (same as TFM)
+    stdscr.addstr(y, 0, "Step 2: Initializing colors...")
+    y += 1
+    
+    try:
+        init_colors(color_scheme)
+        stdscr.addstr(y, 0, f"  Colors initialized with scheme: {color_scheme}")
+        y += 1
+    except Exception as e:
+        stdscr.addstr(y, 0, f"  Color initialization failed: {e}")
+        y += 1
+    
+    y += 1
+    
+    # Step 3: Configure curses (same as TFM)
+    stdscr.addstr(y, 0, "Step 3: Configuring curses...")
+    y += 1
+    
+    try:
+        curses.curs_set(0)  # Hide cursor
+        stdscr.keypad(True)
+        stdscr.addstr(y, 0, "  Curses configured successfully")
+        y += 1
+    except Exception as e:
+        stdscr.addstr(y, 0, f"  Curses configuration failed: {e}")
+        y += 1
+    
+    y += 2
+    
+    # Step 4: Test colors
+    stdscr.addstr(y, 0, "Step 4: Testing colors after TFM-style initialization...")
+    y += 1
+    
+    # Test file colors
+    sample_files = [
+        ("regular.txt", False, False, False, True, "Regular file"),
+        ("directory/", True, False, False, True, "Directory"),
+        ("script.py", False, True, False, True, "Executable"),
+        ("selected.txt", False, False, True, True, "Selected file"),
+    ]
+    
+    for filename, is_dir, is_exec, is_selected, is_active, description in sample_files:
+        try:
+            color = get_file_color(is_dir, is_exec, is_selected, is_active)
+            stdscr.addstr(y, 0, f"  {filename:15}", color)
+            stdscr.addstr(y, 20, f"({description})")
+        except Exception as e:
+            stdscr.addstr(y, 0, f"  {filename:15} [ERROR: {e}]")
+        y += 1
+    
+    y += 2
+    
+    # Step 5: Compare with current terminal state
+    stdscr.addstr(y, 0, "Step 5: Terminal state comparison...")
+    y += 1
+    
+    caps = get_color_capabilities()
+    stdscr.addstr(y, 0, f"  Colors available: {caps['colors']}")
+    y += 1
+    stdscr.addstr(y, 0, f"  RGB support: {'Yes' if caps['can_change_color'] else 'No'}")
+    y += 1
+    stdscr.addstr(y, 0, f"  Fallback mode: {'Enabled' if is_fallback_mode() else 'Disabled'}")
+    y += 1
+    
+    # Check if colors are actually working
+    try:
+        # Try to use a basic color
+        curses.init_pair(99, curses.COLOR_RED, curses.COLOR_BLACK)
+        stdscr.addstr(y, 0, "  Basic color test: ", curses.color_pair(99))
+        stdscr.addstr(y, 20, "SUCCESS", curses.color_pair(99))
+        y += 1
+    except Exception as e:
+        stdscr.addstr(y, 0, f"  Basic color test: FAILED ({e})")
+        y += 1
+    
+    y += 2
+    stdscr.addstr(y, 0, "Analysis complete. Press any key to continue...")
+    stdscr.refresh()
+    stdscr.getch()
+
 def run_color_test(test_mode):
     """Main entry point for color testing"""
     if test_mode == 'info':
@@ -639,6 +909,16 @@ def run_color_test(test_mode):
         print("Starting interactive color tester...")
         print("Use the controls shown in the interface to test different settings.")
         curses.wrapper(interactive_color_tester)
+        
+    elif test_mode == 'tfm-init':
+        print("Testing TFM initialization sequence...")
+        print("This test replicates the exact same initialization as main TFM.")
+        curses.wrapper(test_tfm_initialization_sequence)
+        
+    elif test_mode == 'diagnose':
+        print("Diagnosing color initialization issues...")
+        print("This test helps identify why colors work in --color-test but not in main TFM.")
+        curses.wrapper(diagnose_color_initialization_issue)
     
     else:
         print(f"Unknown test mode: {test_mode}")

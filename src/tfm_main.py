@@ -49,6 +49,11 @@ class FileManager:
         # Load configuration
         self.config = get_config()
         
+        # Initialize colors BEFORE any stdout/stderr redirection
+        # This prevents issues where LogManager's stdout redirection interferes with color detection
+        color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+        init_colors(color_scheme)
+        
         # Initialize modular components
         self.log_manager = LogManager(self.config, remote_port=remote_log_port)
         self.state_manager = get_state_manager()
@@ -106,9 +111,8 @@ class FileManager:
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
         
-        # Initialize colors with configured scheme
-        color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-        init_colors(color_scheme)
+        # Colors already initialized before LogManager creation to prevent
+        # stdout/stderr redirection from interfering with color detection
         
         # Configure curses
         curses.curs_set(0)  # Hide cursor

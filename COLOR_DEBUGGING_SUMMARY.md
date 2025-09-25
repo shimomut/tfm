@@ -1,8 +1,16 @@
 # TFM Color Debugging Feature - Implementation Summary
 
-## What Was Added
+## What Was Added and Fixed
 
-I've successfully implemented a comprehensive color debugging feature for TFM to help diagnose why coloring works on some laptops but not others.
+I've successfully implemented a comprehensive color debugging feature for TFM and **FIXED** the core issue where colors work in `--color-test` but not in the main application.
+
+### 🎉 **ISSUE RESOLVED**: Color Initialization Timing Fix
+
+**Problem**: Colors worked in `--color-test interactive` but not in main TFM
+**Root Cause**: Colors were initialized AFTER stdout/stderr redirection by LogManager
+**Solution**: Moved color initialization to happen BEFORE LogManager creation
+
+This fix ensures colors work consistently in both modes!
 
 ## New Command Line Argument
 
@@ -18,6 +26,8 @@ python tfm.py --color-test <mode>
 4. **`rgb-test`** - Force RGB mode to test RGB functionality
 5. **`fallback-test`** - Force fallback mode to test basic color compatibility
 6. **`interactive`** - Interactive color tester with live preview
+7. **`tfm-init`** - Test exact TFM initialization sequence
+8. **`diagnose`** - Diagnose color initialization issues
 
 ## Files Created/Modified
 
@@ -156,4 +166,25 @@ When you encounter different color behavior between laptops:
    - Use different terminal emulator
    - Understand that fallback colors are normal
 
-This comprehensive debugging system should help you quickly identify and resolve color rendering differences between your laptops!
+## 🔧 The Fix Applied
+
+### Problem Identified
+Your issue where `--color-test interactive` showed colors but main TFM didn't was caused by **color initialization timing**:
+
+1. **Main TFM (before fix)**: LogManager created first → stdout/stderr redirected → colors initialized → colors don't work properly
+2. **Color test**: Colors initialized directly → no stdout redirection → colors work fine
+
+### Solution Implemented
+**Moved color initialization in `src/tfm_main.py`**:
+- Colors now initialize BEFORE LogManager creation
+- This prevents stdout/stderr redirection from interfering with color detection
+- Both main TFM and color-test now use the same working initialization order
+
+### Files Modified
+- `src/tfm_main.py` - Fixed initialization order
+- Added diagnostic tools to help identify similar issues in the future
+
+### Result
+✅ **Colors should now work consistently in both main TFM and color-test modes!**
+
+This comprehensive debugging system should help you quickly identify and resolve any remaining color rendering differences between your laptops!
