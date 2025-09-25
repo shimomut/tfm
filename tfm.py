@@ -43,6 +43,20 @@ def create_parser():
         help='Enable remote log monitoring on specified port (e.g., --remote-log-port 8888)'
     )
     
+    parser.add_argument(
+        '--left',
+        type=str,
+        metavar='PATH',
+        help='Specify directory path for left pane (default: current directory)'
+    )
+    
+    parser.add_argument(
+        '--right',
+        type=str,
+        metavar='PATH',
+        help='Specify directory path for right pane (default: home directory)'
+    )
+    
     return parser
 
 def main():
@@ -60,11 +74,11 @@ def main():
         from tfm_main import main as tfm_main
         import curses
         
-        # Pass remote port to main function if specified
-        if args.remote_log_port:
-            curses.wrapper(tfm_main, remote_log_port=args.remote_log_port)
-        else:
-            curses.wrapper(tfm_main)
+        # Pass arguments to main function
+        curses.wrapper(tfm_main, 
+                      remote_log_port=args.remote_log_port,
+                      left_dir=args.left,
+                      right_dir=args.right)
         
     except ImportError as e:
         print(f"Error importing TFM modules: {e}", file=sys.stderr)

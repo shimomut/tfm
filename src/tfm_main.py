@@ -43,7 +43,7 @@ from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
 
 class FileManager:
-    def __init__(self, stdscr, remote_log_port=None):
+    def __init__(self, stdscr, remote_log_port=None, left_dir=None, right_dir=None):
         self.stdscr = stdscr
         
         # Load configuration
@@ -52,8 +52,27 @@ class FileManager:
         # Initialize modular components
         self.log_manager = LogManager(self.config, remote_port=remote_log_port)
         self.state_manager = get_state_manager()
+        
+        # Track whether command line directories were provided
+        self.cmdline_left_dir_provided = left_dir is not None
+        self.cmdline_right_dir_provided = right_dir is not None
+        
+        # Set up initial directories
+        # Use command line arguments if provided, otherwise use defaults
+        initial_left_dir = Path(left_dir) if left_dir else Path.cwd()
+        initial_right_dir = Path(right_dir) if right_dir else Path.home()
+        
+        # Validate directories exist, fall back to defaults if not
+        if not initial_left_dir.exists() or not initial_left_dir.is_dir():
+            self.log_manager.add_message(f"Warning: Left directory '{initial_left_dir}' does not exist, using current directory")
+            initial_left_dir = Path.cwd()
+            
+        if not initial_right_dir.exists() or not initial_right_dir.is_dir():
+            self.log_manager.add_message(f"Warning: Right directory '{initial_right_dir}' does not exist, using home directory")
+            initial_right_dir = Path.home()
+        
         # Use simple defaults since TFM loads previous state anyway
-        self.pane_manager = PaneManager(self.config, Path.cwd(), Path.home(), self.state_manager)
+        self.pane_manager = PaneManager(self.config, initial_left_dir, initial_right_dir, self.state_manager)
         self.file_operations = FileOperations(self.config)
         self.list_dialog = ListDialog(self.config)
         self.info_dialog = InfoDialog(self.config)
@@ -3855,22 +3874,36 @@ class FileManager:
             
             # Load pane states
             left_state = self.state_manager.load_pane_state('left')
-            if left_state and Path(left_state['path']).exists():
-                # Only restore if the directory still exists
+            if left_state and Path(left_state['path']).exists() and not self.cmdline_left_dir_provided:
+                # Only restore if the directory still exists and no command line argument was provided
                 self.pane_manager.left_pane['path'] = Path(left_state['path'])
                 self.pane_manager.left_pane['sort_mode'] = left_state.get('sort_mode', 'name')
                 self.pane_manager.left_pane['sort_reverse'] = left_state.get('sort_reverse', False)
                 self.pane_manager.left_pane['filter_pattern'] = left_state.get('filter_pattern', '')
                 print(f"Restored left pane: {left_state['path']}")
+            elif self.cmdline_left_dir_provided:
+                # Load other settings but keep command line directory
+                if left_state:
+                    self.pane_manager.left_pane['sort_mode'] = left_state.get('sort_mode', 'name')
+                    self.pane_manager.left_pane['sort_reverse'] = left_state.get('sort_reverse', False)
+                    self.pane_manager.left_pane['filter_pattern'] = left_state.get('filter_pattern', '')
+                print(f"Using command line left directory: {self.pane_manager.left_pane['path']}")
             
             right_state = self.state_manager.load_pane_state('right')
-            if right_state and Path(right_state['path']).exists():
-                # Only restore if the directory still exists
+            if right_state and Path(right_state['path']).exists() and not self.cmdline_right_dir_provided:
+                # Only restore if the directory still exists and no command line argument was provided
                 self.pane_manager.right_pane['path'] = Path(right_state['path'])
                 self.pane_manager.right_pane['sort_mode'] = right_state.get('sort_mode', 'name')
                 self.pane_manager.right_pane['sort_reverse'] = right_state.get('sort_reverse', False)
                 self.pane_manager.right_pane['filter_pattern'] = right_state.get('filter_pattern', '')
                 print(f"Restored right pane: {right_state['path']}")
+            elif self.cmdline_right_dir_provided:
+                # Load other settings but keep command line directory
+                if right_state:
+                    self.pane_manager.right_pane['sort_mode'] = right_state.get('sort_mode', 'name')
+                    self.pane_manager.right_pane['sort_reverse'] = right_state.get('sort_reverse', False)
+                    self.pane_manager.right_pane['filter_pattern'] = right_state.get('filter_pattern', '')
+                print(f"Using command line right directory: {self.pane_manager.right_pane['path']}")
             
             # Refresh file lists after loading state
             self.refresh_files()
@@ -3994,11 +4027,11 @@ class FileManager:
             print(f"Warning: Could not load search history: {e}")
             return []
 
-def main(stdscr, remote_log_port=None):
+def main(stdscr, remote_log_port=None, left_dir=None, right_dir=None):
     """Main function to run the file manager"""
     fm = None
     try:
-        fm = FileManager(stdscr, remote_log_port=remote_log_port)
+        fm = FileManager(stdscr, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir)
         fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
