@@ -87,6 +87,8 @@ class BatchRenameDialog:
             if self.switch_field('regex'):
                 self.content_changed = True  # Mark content as changed when switching fields
                 return ('field_switch', None)
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
             
         elif key == curses.KEY_DOWN:
@@ -94,6 +96,8 @@ class BatchRenameDialog:
             if self.switch_field('destination'):
                 self.content_changed = True  # Mark content as changed when switching fields
                 return ('field_switch', None)
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
             
         elif key == curses.KEY_PPAGE:  # Page Up - scroll preview up
@@ -101,6 +105,8 @@ class BatchRenameDialog:
                 self.scroll = max(0, self.scroll - 10)
                 self.content_changed = True  # Mark content as changed when scrolling
                 return ('scroll', None)
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
             
         elif key == curses.KEY_NPAGE:  # Page Down - scroll preview down
@@ -109,6 +115,8 @@ class BatchRenameDialog:
                 self.scroll = min(max_scroll, self.scroll + 10)
                 self.content_changed = True  # Mark content as changed when scrolling
                 return ('scroll', None)
+            # Always mark content as changed for any handled key to ensure continued rendering
+            self.content_changed = True
             return True
             
         elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
@@ -129,6 +137,8 @@ class BatchRenameDialog:
                 return ('text_changed', None)
         
         # In batch rename mode, capture most other keys to prevent unintended actions
+        # Always mark content as changed for any handled key to ensure continued rendering
+        self.content_changed = True
         return True
         
     def update_preview(self):
