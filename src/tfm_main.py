@@ -1484,7 +1484,6 @@ class FileManager:
         self.stdscr.refresh()
         self.needs_full_redraw = False
         self.needs_dialog_redraw = False
-        self._mark_dialog_content_unchanged()
 
     def show_list_dialog(self, title, items, callback):
         """Show a searchable list dialog - wrapper for list dialog component"""

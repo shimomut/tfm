@@ -115,7 +115,9 @@ class SearchDialog(BaseListDialog):
                 with self.search_lock:
                     # The base class already updated self.selected, just need to adjust scroll
                     self._adjust_scroll(len(self.results))
-                self.content_changed = True  # Mark content as changed when navigating
+            
+            # Mark content as changed for ANY handled key to ensure continued rendering
+            self.content_changed = True
             return True
             
         return False
