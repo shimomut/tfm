@@ -17,6 +17,9 @@ if requirements_path.exists():
     requirements = requirements_path.read_text().strip().split('\n')
     requirements = [req.strip() for req in requirements if req.strip() and not req.startswith('#')]
 
+# Add Windows-specific requirements using environment markers
+requirements.append('windows-curses; sys_platform == "win32"')
+
 setup(
     name="tfm",
     version="0.10.0",
