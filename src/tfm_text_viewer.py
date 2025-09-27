@@ -446,15 +446,18 @@ class TextViewer:
         # Available width for content
         content_width = display_width - line_num_width
         
+        # Get background color for filling empty areas
+        bg_color_pair = get_background_color_pair()
+        
         # Draw visible lines
         for i in range(display_height):
             line_index = self.scroll_offset + i
             y_pos = start_y + i
             
-            # Move to start of line and clear to end of line (more efficient)
+            # Fill the entire line with background color instead of using clrtoeol()
             try:
+                self.stdscr.addstr(y_pos, start_x, ' ' * (display_width - 1), bg_color_pair)
                 self.stdscr.move(y_pos, start_x)
-                self.stdscr.clrtoeol()
             except curses.error:
                 pass
             
