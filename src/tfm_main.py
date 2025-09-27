@@ -3590,10 +3590,7 @@ class FileManager:
             else:
                 quit_callback(True)
 
-        elif key == curses.KEY_RESIZE:  # Terminal window resized
-            # Clear screen and trigger full redraw to handle new dimensions
-            self.clear_screen_with_background()
-            self.needs_full_redraw = True
+
         elif key == KEY_TAB:  # Tab key - switch panes
             self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
             self.needs_full_redraw = True
@@ -3869,8 +3866,15 @@ class FileManager:
             self.stdscr.timeout(16)  # 16ms timeout
             key = self.stdscr.getch()
             
-            # Handle key input first (including terminal resize events)
-            if key != -1:  # If a key was pressed
+            # If no key was pressed (timeout), continue to next iteration
+            if key == -1:
+                pass  # Continue to drawing
+            elif key == curses.KEY_RESIZE:  # Terminal window resized - handle at top level
+                # Clear screen and trigger full redraw to handle new dimensions
+                self.clear_screen_with_background()
+                self.needs_full_redraw = True
+            else:
+                # Handle other key input
                 self.handle_key_input(key)
             
             # Draw interface after handling input
