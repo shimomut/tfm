@@ -3526,6 +3526,329 @@ class FileManager:
         
         return False
 
+    def handle_key_input(self, key):
+        """Handle key input and return True if the key was processed"""
+        current_pane = self.get_current_pane()
+        
+        # Handle isearch mode input first
+        if self.isearch_mode:
+            if self.handle_isearch_input(key):
+                return True  # Isearch mode handled the key
+        
+        # Handle general dialog input
+        if self.general_dialog.is_active:
+            if self.general_dialog.handle_key(key):
+                return True  # General dialog handled the key
+        
+        # Handle quick choice mode input
+        if self.quick_choice_bar.mode:
+            if self.handle_quick_choice_input(key):
+                return True  # Quick choice mode handled the key
+        
+        # Handle info dialog mode input
+        if self.info_dialog.mode:
+            if self.handle_info_dialog_input(key):
+                return True  # Info dialog mode handled the key
+        
+        # Handle list dialog mode input
+        if self.list_dialog.mode:
+            if self.handle_list_dialog_input(key):
+                return True  # List dialog mode handled the key
+        
+        # Handle search dialog mode input
+        if self.search_dialog.mode:
+            if self.handle_search_dialog_input(key):
+                return True  # Search dialog mode handled the key
+        
+        # Handle jump dialog mode input
+        if self.jump_dialog.mode:
+            if self.handle_jump_dialog_input(key):
+                return True  # Jump dialog mode handled the key
+        
+        # Handle batch rename dialog mode input
+        if self.batch_rename_dialog.mode:
+            if self.handle_batch_rename_input(key):
+                return True  # Batch rename mode handled the key
+        
+        # Skip regular key processing if any dialog is open
+        # This prevents conflicts like starting isearch mode while help dialog is open
+        if (self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or 
+            self.search_dialog.mode or self.jump_dialog.mode or self.batch_rename_dialog.mode or 
+            self.isearch_mode or self.general_dialog.is_active):
+            return True
+        
+        # Handle main application keys
+        if self.is_key_for_action(key, 'quit'):
+            def quit_callback(confirmed):
+                if confirmed:
+                    # Set a flag to exit the main loop
+                    self.should_quit = True
+            
+            # Check if quit confirmation is enabled
+            if getattr(self.config, 'CONFIRM_QUIT', True):
+                self.show_confirmation("Are you sure you want to quit TFM?", quit_callback)
+            else:
+                quit_callback(True)
+
+        elif key == curses.KEY_RESIZE:  # Terminal window resized
+            # Clear screen and trigger full redraw to handle new dimensions
+            self.clear_screen_with_background()
+            self.needs_full_redraw = True
+        elif key == KEY_TAB:  # Tab key - switch panes
+            self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
+            self.needs_full_redraw = True
+        elif key == curses.KEY_UP:
+            if current_pane['selected_index'] > 0:
+                current_pane['selected_index'] -= 1
+                self.needs_full_redraw = True
+        elif key == curses.KEY_DOWN:
+            if current_pane['selected_index'] < len(current_pane['files']) - 1:
+                current_pane['selected_index'] += 1
+                self.needs_full_redraw = True
+        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+            self.handle_enter()
+            self.needs_full_redraw = True
+        elif self.is_key_for_action(key, 'toggle_hidden'):
+            self.file_operations.toggle_hidden_files()
+            # Reset both panes
+            self.pane_manager.left_pane['selected_index'] = 0
+            self.pane_manager.left_pane['scroll_offset'] = 0
+            self.pane_manager.right_pane['selected_index'] = 0
+            self.pane_manager.right_pane['scroll_offset'] = 0
+            self.needs_full_redraw = True
+        elif self.is_key_for_action(key, 'toggle_color_scheme'):
+            # Toggle between dark and light color schemes
+            new_scheme = toggle_color_scheme()
+            # Reinitialize colors with the new scheme
+            init_colors(new_scheme)
+            print(f"Switched to {new_scheme} color scheme")
+            # Print detailed color scheme info to log
+            self.print_color_scheme_info()
+            self.needs_full_redraw = True
+        elif key == curses.KEY_HOME:
+            current_pane['selected_index'] = 0
+            current_pane['scroll_offset'] = 0
+            self.needs_full_redraw = True
+        elif key == curses.KEY_END:
+            current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
+            self.needs_full_redraw = True
+        elif key == curses.KEY_PPAGE:  # Page Up - file navigation only
+            current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
+            self.needs_full_redraw = True
+        elif key == curses.KEY_NPAGE:  # Page Down - file navigation only
+            current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
+            self.needs_full_redraw = True
+        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
+            if current_pane['path'] != current_pane['path'].parent:
+                try:
+                    # Save current cursor position before changing directory
+                    self.save_cursor_position(current_pane)
+                    
+                    current_pane['path'] = current_pane['path'].parent
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                    current_pane['selected_files'].clear()  # Clear selections when changing directory
+                    self.refresh_files(current_pane)
+                    
+                    # Try to restore cursor position for this directory
+                    if not self.restore_cursor_position(current_pane):
+                        # If no history found, default to first item
+                        current_pane['selected_index'] = 0
+                        current_pane['scroll_offset'] = 0
+                    
+                    self.needs_full_redraw = True
+                except PermissionError:
+                    self.show_error("Permission denied")
+                    self.needs_full_redraw = True
+        elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
+            if current_pane['path'] != current_pane['path'].parent:
+                try:
+                    # Save current cursor position before changing directory
+                    self.save_cursor_position(current_pane)
+                    
+                    current_pane['path'] = current_pane['path'].parent
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                    current_pane['selected_files'].clear()  # Clear selections when changing directory
+                    self.refresh_files(current_pane)
+                    
+                    # Try to restore cursor position for this directory
+                    if not self.restore_cursor_position(current_pane):
+                        # If no history found, default to first item
+                        current_pane['selected_index'] = 0
+                        current_pane['scroll_offset'] = 0
+                    
+                    self.needs_full_redraw = True
+                except PermissionError:
+                    self.show_error("Permission denied")
+        elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
+            if current_pane['path'] != current_pane['path'].parent:
+                try:
+                    # Save current cursor position before changing directory
+                    self.save_cursor_position(current_pane)
+                    
+                    current_pane['path'] = current_pane['path'].parent
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                    current_pane['selected_files'].clear()  # Clear selections when changing directory
+                    self.refresh_files(current_pane)
+                    
+                    # Try to restore cursor position for this directory
+                    if not self.restore_cursor_position(current_pane):
+                        # If no history found, default to first item
+                        current_pane['selected_index'] = 0
+                        current_pane['scroll_offset'] = 0
+                    
+                    self.needs_full_redraw = True
+                except PermissionError:
+                    self.show_error("Permission denied")
+        elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'left':  # Right arrow in left pane - switch to right pane
+            self.pane_manager.active_pane = 'right'
+            self.needs_full_redraw = True
+        elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
+            self.pane_manager.active_pane = 'left'
+            self.needs_full_redraw = True
+        elif key in (KEY_SHIFT_UP_1,KEY_SHIFT_UP_2):  # Shift+Up
+            if self.log_manager.scroll_log_up(1):
+                self.needs_full_redraw = True
+        elif key in (KEY_SHIFT_DOWN_1, KEY_SHIFT_DOWN_2):  # Shift+Down
+            if self.log_manager.scroll_log_down(1):
+                self.needs_full_redraw = True
+        elif key in (KEY_SHIFT_LEFT_1, KEY_SHIFT_LEFT_2):  # Shift+Left - fast scroll to older messages
+            log_height = self._get_log_pane_height()
+            if self.log_manager.scroll_log_up(max(1, log_height)):
+                self.needs_full_redraw = True
+        elif key in (KEY_SHIFT_RIGHT_1, KEY_SHIFT_RIGHT_2):  # Shift+Right - fast scroll to newer messages
+            log_height = self._get_log_pane_height()
+            if self.log_manager.scroll_log_down(max(1, log_height)):
+                self.needs_full_redraw = True
+        elif self.is_key_for_action(key, 'select_file'):  # Toggle file selection
+            self.toggle_selection()
+            self.needs_full_redraw = True
+        elif key == 27:  # ESC key - check for Option key sequences
+            # Option+Space sends 194 followed by 160
+            next_key = self.stdscr.getch()
+            # Log unknown ESC sequence for debugging
+            print(f"Unknown ESC sequence: 27, {next_key}")
+        elif self.is_key_for_action(key, 'select_all_files'):  # Toggle all files selection
+            self.toggle_all_files_selection()
+        elif self.is_key_for_action(key, 'select_all_items'):  # Toggle all items selection
+            self.toggle_all_items_selection()
+        elif self.is_key_for_action(key, 'sync_current_to_other'):  # Sync current pane to other
+            self.sync_current_to_other()
+        elif self.is_key_for_action(key, 'sync_other_to_current'):  # Sync other pane to current
+            self.sync_other_to_current()
+        elif self.is_key_for_action(key, 'search_dialog'):  # Show search dialog (filename)
+            self.show_search_dialog('filename')
+        elif self.is_key_for_action(key, 'jump_dialog'):  # Show jump dialog (Shift+J)
+            self.show_jump_dialog()
+        elif self.is_key_for_action(key, 'search_content'):  # Show search dialog (content)
+            self.show_search_dialog('content')
+        elif self.is_key_for_action(key, 'edit_file'):  # Edit existing file
+            self.edit_selected_file()
+        elif self.is_key_for_action(key, 'create_file'):  # Create new file
+            self.enter_create_file_mode()
+        elif self.is_key_for_action(key, 'create_directory'):  # Create new directory
+            self.enter_create_directory_mode()
+        elif self.is_key_for_action(key, 'toggle_fallback_colors'):  # Toggle fallback color mode
+            self.toggle_fallback_color_mode()
+        elif self.is_key_for_action(key, 'view_options'):  # Show view options
+            self.show_view_options()
+        elif self.is_key_for_action(key, 'settings_menu'):  # Show settings menu
+            self.show_settings_menu()
+        elif self.is_key_for_action(key, 'search'):  # Search key - enter isearch mode
+            self.enter_isearch_mode()
+        elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
+            self.enter_filter_mode()
+        elif self.is_key_for_action(key, 'clear_filter'):  # Clear filter key
+            self.clear_filter()
+        elif self.is_key_for_action(key, 'sort_menu'):  # Sort menu
+            self.show_sort_menu()
+        elif self.is_key_for_action(key, 'quick_sort_name'):  # Quick sort by name
+            self.quick_sort('name')
+        elif self.is_key_for_action(key, 'quick_sort_size'):  # Quick sort by size
+            self.quick_sort('size')
+        elif self.is_key_for_action(key, 'quick_sort_date'):  # Quick sort by date
+            self.quick_sort('date')
+        elif self.is_key_for_action(key, 'quick_sort_ext'):  # Quick sort by extension
+            self.quick_sort('ext')
+        elif self.is_key_for_action(key, 'file_details'):  # Show file details
+            self.show_file_details()
+        elif self.is_key_for_action(key, 'view_text'):  # View text file
+            self.view_selected_text_file()
+        elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
+            self.copy_selected_files()
+        elif self.is_key_for_action(key, 'move_files'):  # Move selected files
+            self.move_selected_files()
+        elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
+            self.delete_selected_files()
+        elif self.is_key_for_action(key, 'create_archive'):  # Create archive
+            self.enter_create_archive_mode()
+        elif self.is_key_for_action(key, 'extract_archive'):  # Extract archive
+            self.extract_selected_archive()
+        elif self.is_key_for_action(key, 'rename_file'):  # Rename file
+            self.enter_rename_mode()
+        elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
+            self.show_favorite_directories()
+        elif self.is_key_for_action(key, 'history'):  # Show history
+            self.show_history()
+        elif self.is_key_for_action(key, 'programs'):  # Show external programs
+            self.show_programs_dialog()
+        elif self.is_key_for_action(key, 'compare_selection'):  # Show compare selection menu
+            self.show_compare_selection_dialog()
+        elif self.is_key_for_action(key, 'help'):  # Show help dialog
+            self.show_help_dialog()
+        elif self.is_key_for_action(key, 'adjust_pane_left'):  # Adjust pane boundary left
+            self.adjust_pane_boundary('left')
+        elif self.is_key_for_action(key, 'adjust_pane_right'):  # Adjust pane boundary right
+            self.adjust_pane_boundary('right')
+        elif self.is_key_for_action(key, 'adjust_log_up'):  # Adjust log boundary up
+            self.adjust_log_boundary('down')
+        elif self.is_key_for_action(key, 'adjust_log_down'):  # Adjust log boundary down
+            self.adjust_log_boundary('up')
+        elif self.is_key_for_action(key, 'reset_log_height'):  # Reset log pane height
+            self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
+            self.needs_full_redraw = True
+            print(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
+        elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
+            self.pane_manager.left_pane_ratio = 0.5
+            self.needs_full_redraw = True
+            print("Pane split reset to 50% | 50%")
+        elif self.is_key_for_action(key, 'subshell'):  # Sub-shell mode
+            self.stdscr = self.external_program_manager.enter_subshell_mode(
+                self.stdscr, self.pane_manager
+            )
+            self.needs_full_redraw = True
+        else:
+            return False  # Key was not handled
+        
+        return True  # Key was handled
+
+    def draw_interface(self):
+        """Draw the complete interface"""
+        # Only do full redraw when needed
+        if self.needs_full_redraw:
+            self.refresh_files()
+            
+            # Clear screen with proper background
+            self.clear_screen_with_background()
+            
+            # Draw interface
+            self.draw_header()
+            self.draw_files()
+            self.draw_log_pane()
+            self.draw_status()
+            
+            # Refresh screen
+            self.stdscr.refresh()
+        
+        # Draw dialogs if needed
+        self._draw_dialogs_if_needed()
+        
+        # Reset full redraw flag after both main screen and dialogs are rendered
+        if self.needs_full_redraw:
+            self.needs_full_redraw = False
+
     def run(self):
         """Main application loop"""
         while True:
@@ -3541,325 +3864,17 @@ class FileManager:
             # Check for log updates and trigger redraw if needed
             if self.log_manager.has_log_updates():
                 self.needs_full_redraw = True
-                
-            # Only do full redraw when needed
-            if self.needs_full_redraw:
-                self.refresh_files()
-                
-                # Clear screen with proper background
-                self.clear_screen_with_background()
-                
-                # Draw interface
-                self.draw_header()
-                self.draw_files()
-                self.draw_log_pane()
-                self.draw_status()
-                
-                # Refresh screen
-                self.stdscr.refresh()
-            
-            # Draw dialogs if needed
-            self._draw_dialogs_if_needed()
-            
-            # Reset full redraw flag after both main screen and dialogs are rendered
-            if self.needs_full_redraw:
-                self.needs_full_redraw = False
             
             # Get user input with timeout to allow timer checks
             self.stdscr.timeout(16)  # 16ms timeout
             key = self.stdscr.getch()
-            current_pane = self.get_current_pane()
             
-            # If no key was pressed (timeout), continue to next iteration
-            if key == -1:
-                continue
+            # Handle key input first (including terminal resize events)
+            if key != -1:  # If a key was pressed
+                self.handle_key_input(key)
             
-            # Handle isearch mode input first
-            if self.isearch_mode:
-                if self.handle_isearch_input(key):
-                    continue  # Isearch mode handled the key
-            
-            # Handle general dialog input
-            if self.general_dialog.is_active:
-                if self.general_dialog.handle_key(key):
-                    continue  # General dialog handled the key
-            
-            # Handle quick choice mode input
-            if self.quick_choice_bar.mode:
-                if self.handle_quick_choice_input(key):
-                    continue  # Quick choice mode handled the key
-            
-            # Handle info dialog mode input
-            if self.info_dialog.mode:
-                if self.handle_info_dialog_input(key):
-                    continue  # Info dialog mode handled the key
-            
-            # Handle list dialog mode input
-            if self.list_dialog.mode:
-                if self.handle_list_dialog_input(key):
-                    continue  # List dialog mode handled the key
-            
-            # Handle search dialog mode input
-            if self.search_dialog.mode:
-                if self.handle_search_dialog_input(key):
-                    continue  # Search dialog mode handled the key
-            
-            # Handle jump dialog mode input
-            if self.jump_dialog.mode:
-                if self.handle_jump_dialog_input(key):
-                    continue  # Jump dialog mode handled the key
-            
-            # Handle batch rename dialog mode input
-            if self.batch_rename_dialog.mode:
-                if self.handle_batch_rename_input(key):
-                    continue  # Batch rename mode handled the key
-            
-            # Skip regular key processing if any dialog is open
-            # This prevents conflicts like starting isearch mode while help dialog is open
-            if self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or self.search_dialog.mode or self.jump_dialog.mode or self.batch_rename_dialog.mode or self.isearch_mode or self.general_dialog.is_active:
-                continue
-            
-            if self.is_key_for_action(key, 'quit'):
-                def quit_callback(confirmed):
-                    if confirmed:
-                        # Set a flag to exit the main loop
-                        self.should_quit = True
-                
-                # Check if quit confirmation is enabled
-                if getattr(self.config, 'CONFIRM_QUIT', True):
-                    self.show_confirmation("Are you sure you want to quit TFM?", quit_callback)
-                else:
-                    quit_callback(True)
-
-            elif key == curses.KEY_RESIZE:  # Terminal window resized
-                # Clear screen and trigger full redraw to handle new dimensions
-                self.clear_screen_with_background()
-                self.needs_full_redraw = True
-            elif key == KEY_TAB:  # Tab key - switch panes
-                self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
-                self.needs_full_redraw = True
-            elif key == curses.KEY_UP:
-                if current_pane['selected_index'] > 0:
-                    current_pane['selected_index'] -= 1
-                    self.needs_full_redraw = True
-            elif key == curses.KEY_DOWN:
-                if current_pane['selected_index'] < len(current_pane['files']) - 1:
-                    current_pane['selected_index'] += 1
-                    self.needs_full_redraw = True
-            elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-                self.handle_enter()
-                self.needs_full_redraw = True
-            elif self.is_key_for_action(key, 'toggle_hidden'):
-                self.file_operations.toggle_hidden_files()
-                # Reset both panes
-                self.pane_manager.left_pane['selected_index'] = 0
-                self.pane_manager.left_pane['scroll_offset'] = 0
-                self.pane_manager.right_pane['selected_index'] = 0
-                self.pane_manager.right_pane['scroll_offset'] = 0
-                self.needs_full_redraw = True
-            elif self.is_key_for_action(key, 'toggle_color_scheme'):
-                # Toggle between dark and light color schemes
-                new_scheme = toggle_color_scheme()
-                # Reinitialize colors with the new scheme
-                init_colors(new_scheme)
-                print(f"Switched to {new_scheme} color scheme")
-                # Print detailed color scheme info to log
-                self.print_color_scheme_info()
-                self.needs_full_redraw = True
-            elif key == curses.KEY_HOME:
-                current_pane['selected_index'] = 0
-                current_pane['scroll_offset'] = 0
-                self.needs_full_redraw = True
-            elif key == curses.KEY_END:
-                current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
-                self.needs_full_redraw = True
-            elif key == curses.KEY_PPAGE:  # Page Up - file navigation only
-                current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
-                self.needs_full_redraw = True
-            elif key == curses.KEY_NPAGE:  # Page Down - file navigation only
-                current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
-                self.needs_full_redraw = True
-            elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
-                if current_pane['path'] != current_pane['path'].parent:
-                    try:
-                        # Save current cursor position before changing directory
-                        self.save_cursor_position(current_pane)
-                        
-                        current_pane['path'] = current_pane['path'].parent
-                        current_pane['selected_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                        current_pane['selected_files'].clear()  # Clear selections when changing directory
-                        self.refresh_files(current_pane)
-                        
-                        # Try to restore cursor position for this directory
-                        if not self.restore_cursor_position(current_pane):
-                            # If no history found, default to first item
-                            current_pane['selected_index'] = 0
-                            current_pane['scroll_offset'] = 0
-                        
-                        self.needs_full_redraw = True
-                    except PermissionError:
-                        self.show_error("Permission denied")
-                        self.needs_full_redraw = True
-            elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
-                if current_pane['path'] != current_pane['path'].parent:
-                    try:
-                        # Save current cursor position before changing directory
-                        self.save_cursor_position(current_pane)
-                        
-                        current_pane['path'] = current_pane['path'].parent
-                        current_pane['selected_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                        current_pane['selected_files'].clear()  # Clear selections when changing directory
-                        self.refresh_files(current_pane)
-                        
-                        # Try to restore cursor position for this directory
-                        if not self.restore_cursor_position(current_pane):
-                            # If no history found, default to first item
-                            current_pane['selected_index'] = 0
-                            current_pane['scroll_offset'] = 0
-                        
-                        self.needs_full_redraw = True
-                    except PermissionError:
-                        self.show_error("Permission denied")
-            elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
-                if current_pane['path'] != current_pane['path'].parent:
-                    try:
-                        # Save current cursor position before changing directory
-                        self.save_cursor_position(current_pane)
-                        
-                        current_pane['path'] = current_pane['path'].parent
-                        current_pane['selected_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                        current_pane['selected_files'].clear()  # Clear selections when changing directory
-                        self.refresh_files(current_pane)
-                        
-                        # Try to restore cursor position for this directory
-                        if not self.restore_cursor_position(current_pane):
-                            # If no history found, default to first item
-                            current_pane['selected_index'] = 0
-                            current_pane['scroll_offset'] = 0
-                        
-                        self.needs_full_redraw = True
-                    except PermissionError:
-                        self.show_error("Permission denied")
-            elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'left':  # Right arrow in left pane - switch to right pane
-                self.pane_manager.active_pane = 'right'
-                self.needs_full_redraw = True
-            elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
-                self.pane_manager.active_pane = 'left'
-                self.needs_full_redraw = True
-            elif key in (KEY_SHIFT_UP_1,KEY_SHIFT_UP_2):  # Shift+Up
-                if self.log_manager.scroll_log_up(1):
-                    self.needs_full_redraw = True
-            elif key in (KEY_SHIFT_DOWN_1, KEY_SHIFT_DOWN_2):  # Shift+Down
-                if self.log_manager.scroll_log_down(1):
-                    self.needs_full_redraw = True
-            elif key in (KEY_SHIFT_LEFT_1, KEY_SHIFT_LEFT_2):  # Shift+Left - fast scroll to older messages
-                log_height = self._get_log_pane_height()
-                if self.log_manager.scroll_log_up(max(1, log_height)):
-                    self.needs_full_redraw = True
-            elif key in (KEY_SHIFT_RIGHT_1, KEY_SHIFT_RIGHT_2):  # Shift+Right - fast scroll to newer messages
-                log_height = self._get_log_pane_height()
-                if self.log_manager.scroll_log_down(max(1, log_height)):
-                    self.needs_full_redraw = True
-            elif self.is_key_for_action(key, 'select_file'):  # Toggle file selection
-                self.toggle_selection()
-                self.needs_full_redraw = True
-            elif key == 27:  # ESC key - check for Option key sequences
-                # Option+Space sends 194 followed by 160
-                next_key = self.stdscr.getch()
-                # Log unknown ESC sequence for debugging
-                print(f"Unknown ESC sequence: 27, {next_key}")
-            elif self.is_key_for_action(key, 'select_all_files'):  # Toggle all files selection
-                self.toggle_all_files_selection()
-            elif self.is_key_for_action(key, 'select_all_items'):  # Toggle all items selection
-                self.toggle_all_items_selection()
-            elif self.is_key_for_action(key, 'sync_current_to_other'):  # Sync current pane to other
-                self.sync_current_to_other()
-            elif self.is_key_for_action(key, 'sync_other_to_current'):  # Sync other pane to current
-                self.sync_other_to_current()
-            elif self.is_key_for_action(key, 'search_dialog'):  # Show search dialog (filename)
-                self.show_search_dialog('filename')
-            elif self.is_key_for_action(key, 'jump_dialog'):  # Show jump dialog (Shift+J)
-                self.show_jump_dialog()
-            elif self.is_key_for_action(key, 'search_content'):  # Show search dialog (content)
-                self.show_search_dialog('content')
-            elif self.is_key_for_action(key, 'edit_file'):  # Edit existing file
-                self.edit_selected_file()
-            elif self.is_key_for_action(key, 'create_file'):  # Create new file
-                self.enter_create_file_mode()
-            elif self.is_key_for_action(key, 'create_directory'):  # Create new directory
-                self.enter_create_directory_mode()
-            elif self.is_key_for_action(key, 'toggle_fallback_colors'):  # Toggle fallback color mode
-                self.toggle_fallback_color_mode()
-            elif self.is_key_for_action(key, 'view_options'):  # Show view options
-                self.show_view_options()
-            elif self.is_key_for_action(key, 'settings_menu'):  # Show settings menu
-                self.show_settings_menu()
-            elif self.is_key_for_action(key, 'search'):  # Search key - enter isearch mode
-                self.enter_isearch_mode()
-            elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
-                self.enter_filter_mode()
-            elif self.is_key_for_action(key, 'clear_filter'):  # Clear filter key
-                self.clear_filter()
-            elif self.is_key_for_action(key, 'sort_menu'):  # Sort menu
-                self.show_sort_menu()
-            elif self.is_key_for_action(key, 'quick_sort_name'):  # Quick sort by name
-                self.quick_sort('name')
-            elif self.is_key_for_action(key, 'quick_sort_size'):  # Quick sort by size
-                self.quick_sort('size')
-            elif self.is_key_for_action(key, 'quick_sort_date'):  # Quick sort by date
-                self.quick_sort('date')
-            elif self.is_key_for_action(key, 'quick_sort_ext'):  # Quick sort by extension
-                self.quick_sort('ext')
-            elif self.is_key_for_action(key, 'file_details'):  # Show file details
-                self.show_file_details()
-            elif self.is_key_for_action(key, 'view_text'):  # View text file
-                self.view_selected_text_file()
-            elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
-                self.copy_selected_files()
-            elif self.is_key_for_action(key, 'move_files'):  # Move selected files
-                self.move_selected_files()
-            elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
-                self.delete_selected_files()
-            elif self.is_key_for_action(key, 'create_archive'):  # Create archive
-                self.enter_create_archive_mode()
-            elif self.is_key_for_action(key, 'extract_archive'):  # Extract archive
-                self.extract_selected_archive()
-            elif self.is_key_for_action(key, 'rename_file'):  # Rename file
-                self.enter_rename_mode()
-            elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
-                self.show_favorite_directories()
-            elif self.is_key_for_action(key, 'history'):  # Show history
-                self.show_history()
-            elif self.is_key_for_action(key, 'programs'):  # Show external programs
-                self.show_programs_dialog()
-            elif self.is_key_for_action(key, 'compare_selection'):  # Show compare selection menu
-                self.show_compare_selection_dialog()
-            elif self.is_key_for_action(key, 'help'):  # Show help dialog
-                self.show_help_dialog()
-            elif self.is_key_for_action(key, 'adjust_pane_left'):  # Adjust pane boundary left
-                self.adjust_pane_boundary('left')
-            elif self.is_key_for_action(key, 'adjust_pane_right'):  # Adjust pane boundary right
-                self.adjust_pane_boundary('right')
-            elif self.is_key_for_action(key, 'adjust_log_up'):  # Adjust log boundary up
-                self.adjust_log_boundary('down')
-            elif self.is_key_for_action(key, 'adjust_log_down'):  # Adjust log boundary down
-                self.adjust_log_boundary('up')
-            elif self.is_key_for_action(key, 'reset_log_height'):  # Reset log pane height
-                self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
-                self.needs_full_redraw = True
-                print(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
-            elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
-                self.pane_manager.left_pane_ratio = 0.5
-                self.needs_full_redraw = True
-                print("Pane split reset to 50% | 50%")
-            elif self.is_key_for_action(key, 'subshell'):  # Sub-shell mode
-                self.stdscr = self.external_program_manager.enter_subshell_mode(
-                    self.stdscr, self.pane_manager
-                )
-                self.needs_full_redraw = True
+            # Draw interface after handling input
+            self.draw_interface()
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
