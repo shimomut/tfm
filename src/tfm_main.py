@@ -3557,10 +3557,13 @@ class FileManager:
                 
                 # Refresh screen
                 self.stdscr.refresh()
-                self.needs_full_redraw = False
             
             # Draw dialogs if needed
             self._draw_dialogs_if_needed()
+            
+            # Reset full redraw flag after both main screen and dialogs are rendered
+            if self.needs_full_redraw:
+                self.needs_full_redraw = False
             
             # Get user input with timeout to allow timer checks
             self.stdscr.timeout(16)  # 16ms timeout
