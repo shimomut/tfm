@@ -45,6 +45,9 @@ COLOR_SYNTAX_NAME = 21       # Variable/function names
 COLOR_SEARCH_MATCH = 22      # Search match highlighting
 COLOR_SEARCH_CURRENT = 23    # Current search match highlighting
 
+# Background color pair
+COLOR_BACKGROUND = 27        # Background color for filling areas
+
 # Current color scheme
 current_color_scheme = 'dark'
 
@@ -470,6 +473,9 @@ def init_colors(color_scheme=None):
     curses.init_pair(COLOR_SEARCH_MATCH, search_text_color, search_match_bg)
     curses.init_pair(COLOR_SEARCH_CURRENT, search_text_color, search_current_bg)
     
+    # Background color pair for filling areas
+    curses.init_pair(COLOR_BACKGROUND, default_fg, default_bg)
+    
     # Store the default colors globally for use by the application
     global default_background_color, default_foreground_color
     default_background_color = default_bg
@@ -708,25 +714,34 @@ def get_background_color_pair():
     """Get a color pair that can be used for background areas"""
     try:
         import curses
-        # Try to return a color pair with the scheme's background
-        if default_background_color is not None and default_foreground_color is not None:
-            # Use color pair 63 as background pair (created in init_colors if needed)
-            return curses.color_pair(63)
-        else:
-            # Fallback to normal colors
-            return curses.color_pair(0)
+        # Return the dedicated background color pair
+        return curses.color_pair(COLOR_BACKGROUND)
     except:
         return 0
 
 def apply_background_to_window(window):
-    """Apply the color scheme background to a curses window"""
+    """Apply the color scheme background to a curses window using addstr() method"""
     try:
         import curses
         if default_background_color is not None:
-            # Set the background character and color for the window
-            bg_char = ' '  # Space character
+            # Get window dimensions
+            height, width = window.getmaxyx()
             bg_attr = get_background_color_pair()
-            window.bkgd(bg_char, bg_attr)
+            
+            # Fill the window with spaces using the background color
+            for y in range(height):
+                try:
+                    # Fill each line with spaces, leaving room for cursor at end
+                    window.addstr(y, 0, ' ' * (width - 1), bg_attr)
+                except curses.error:
+                    pass  # Ignore errors at screen edges
+            
+            # Move cursor back to top-left
+            try:
+                window.move(0, 0)
+            except curses.error:
+                pass
+            
             return True
     except:
         pass
