@@ -347,7 +347,11 @@ class ListDialogHelpers:
                             try:
                                 current_size = file_path.stat().st_size if file_path.exists() else 0
                                 is_match = current_size == other_file['size']
-                            except:
+                            except (OSError, FileNotFoundError) as e:
+                                print(f"Warning: Could not get file size for {file_path}: {e}")
+                                is_match = False
+                            except Exception as e:
+                                print(f"Warning: Unexpected error checking file size: {e}")
                                 is_match = False
                                 
                         elif selected_option == "By filename, size, and timestamp":
@@ -357,7 +361,11 @@ class ListDialogHelpers:
                                 current_mtime = file_path.stat().st_mtime if file_path.exists() else 0
                                 is_match = (current_size == other_file['size'] and 
                                           abs(current_mtime - other_file['mtime']) < 1.0)  # Allow 1 second difference
-                            except:
+                            except (OSError, FileNotFoundError) as e:
+                                print(f"Warning: Could not get file stats for {file_path}: {e}")
+                                is_match = False
+                            except Exception as e:
+                                print(f"Warning: Unexpected error checking file stats: {e}")
                                 is_match = False
                         
                         if is_match:

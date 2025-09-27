@@ -382,7 +382,11 @@ class TextViewer:
                 size_str = f"{file_size / (1024 * 1024):.1f}M"
             else:
                 size_str = f"{file_size / (1024 * 1024 * 1024):.1f}G"
-        except:
+        except (OSError, AttributeError) as e:
+            print(f"Warning: Could not get file size for {self.file_path}: {e}")
+            size_str = "---"
+        except Exception as e:
+            print(f"Warning: Unexpected error getting file size: {e}")
             size_str = "---"
         
         # Build status components
@@ -674,7 +678,11 @@ def is_text_file(file_path: Path) -> bool:
                     continue
             return False
             
-    except Exception:
+    except (OSError, IOError) as e:
+        print(f"Warning: Could not read file for text detection {file_path}: {e}")
+        return False
+    except Exception as e:
+        print(f"Warning: Unexpected error in text file detection: {e}")
         return False
 
 
@@ -699,5 +707,12 @@ def view_text_file(stdscr, file_path: Path) -> bool:
         viewer = TextViewer(stdscr, file_path)
         viewer.run()
         return True
-    except Exception:
+    except (OSError, IOError) as e:
+        print(f"Error: Could not open text file {file_path}: {e}")
+        return False
+    except KeyboardInterrupt:
+        # User interrupted - this is normal
+        return True
+    except Exception as e:
+        print(f"Error: Unexpected error viewing text file {file_path}: {e}")
         return False

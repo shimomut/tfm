@@ -434,7 +434,11 @@ class BatchRenameDialogHelpers:
                 file_path = Path(file_path_str)
                 if file_path.exists():
                     selected_files.append(file_path)
-            except:
+            except (OSError, ValueError) as e:
+                print(f"Warning: Could not process selected file path '{file_path_str}': {e}")
+                continue
+            except Exception as e:
+                print(f"Warning: Unexpected error processing file path: {e}")
                 continue
                 
         return selected_files if selected_files else None

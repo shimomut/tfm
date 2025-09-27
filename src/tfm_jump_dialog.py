@@ -181,9 +181,10 @@ class JumpDialog(BaseListDialog):
             # Use iterative approach instead of rglob to have better control over traversal
             self._scan_directory_tree(root_directory, root_directory, temp_directories)
                             
+        except (OSError, PermissionError) as e:
+            print(f"Warning: Could not scan directory tree from {root_directory}: {e}")
         except Exception as e:
-            # Handle scan errors gracefully
-            pass
+            print(f"Warning: Unexpected error during directory scan: {e}")
         
         # Final update of results if not cancelled
         if not self.cancel_scan.is_set():

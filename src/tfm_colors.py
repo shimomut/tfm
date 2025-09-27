@@ -716,7 +716,11 @@ def get_background_color_pair():
         import curses
         # Return the dedicated background color pair
         return curses.color_pair(COLOR_BACKGROUND)
-    except:
+    except ImportError:
+        # Curses not available
+        return 0
+    except Exception as e:
+        print(f"Warning: Could not get background color pair: {e}")
         return 0
 
 def apply_background_to_window(window):
@@ -743,8 +747,11 @@ def apply_background_to_window(window):
                 pass
             
             return True
-    except:
+    except ImportError:
+        # Curses not available
         pass
+    except Exception as e:
+        print(f"Warning: Could not apply background to window: {e}")
     return False
 
 def define_rgb_color(color_num, red, green, blue):

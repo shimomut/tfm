@@ -307,11 +307,19 @@ class SearchDialog(BaseListDialog):
                         if sample:
                             text_chars = sum(1 for byte in sample if 32 <= byte <= 126 or byte in [9, 10, 13])
                             return text_chars / len(sample) > 0.7
-                except:
+                except (OSError, IOError) as e:
+                    print(f"Warning: Could not read file for text detection {file_path}: {e}")
+                    pass
+                except Exception as e:
+                    print(f"Warning: Unexpected error in file text detection: {e}")
                     pass
             
             return False
-        except:
+        except (OSError, PermissionError) as e:
+            print(f"Warning: Could not access file {file_path}: {e}")
+            return False
+        except Exception as e:
+            print(f"Warning: Unexpected error checking if file is text: {e}")
             return False
             
 

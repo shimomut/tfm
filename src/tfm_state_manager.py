@@ -645,7 +645,11 @@ class TFMStateManager(StateManager):
                     from tfm_config import get_config
                     config = get_config()
                     max_entries = getattr(config, 'MAX_HISTORY_ENTRIES', 100)
-                except:
+                except ImportError as e:
+                    print(f"Warning: Could not import config module: {e}")
+                    max_entries = 100
+                except Exception as e:
+                    print(f"Warning: Could not get config for history limit: {e}")
                     max_entries = 100
             
             # Limit the size of the history (keep most recent entries)

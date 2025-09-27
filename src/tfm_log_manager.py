@@ -110,15 +110,24 @@ class LogManager:
                 try:
                     self.original_stdout.write(f"Client connected from {address[0]}:{address[1]}\n")
                     self.original_stdout.flush()
-                except Exception:
+                except (OSError, IOError) as e:
+                    # Can't write to stdout, but continue serving the client
                     pass
                 
-            except Exception:
+            except (ConnectionError, OSError) as e:
                 if self.running:  # Only log if we're still supposed to be running
                     try:
-                        self.original_stdout.write("Error accepting client connection\n")
+                        self.original_stdout.write(f"Error accepting client connection: {e}\n")
                         self.original_stdout.flush()
-                    except Exception:
+                    except (OSError, IOError):
+                        pass  # Can't log the error, but continue
+                break
+            except Exception as e:
+                if self.running:
+                    try:
+                        self.original_stdout.write(f"Unexpected error in server loop: {e}\n")
+                        self.original_stdout.flush()
+                    except (OSError, IOError):
                         pass
                 break
     
@@ -132,8 +141,16 @@ class LogManager:
             for log_entry in self.log_messages:
                 try:
                     self._send_log_entry(client_socket, log_entry)
-                except Exception:
-                    # If we can't send initial messages, client is probably disconnected
+                except (ConnectionError, BrokenPipeError, OSError) as e:
+                    # Client disconnected during initial message send
+                    return
+                except Exception as e:
+                    # Unexpected error sending initial messages
+                    try:
+                        self.original_stdout.write(f"Warning: Could not send initial log to client: {e}\n")
+                        self.original_stdout.flush()
+                    except (OSError, IOError):
+                        pass
                     return
             
             # Keep the thread alive - disconnection will be detected in _broadcast_to_clients
@@ -142,23 +159,38 @@ class LogManager:
             while self.running and client_socket in self.remote_clients:
                 time.sleep(1.0)  # Just keep the thread alive
                     
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                self.original_stdout.write(f"Warning: Client handler error: {e}\n")
+                self.original_stdout.flush()
+            except (OSError, IOError):
+                pass
         finally:
             # Remove client and close socket
             if client_socket in self.remote_clients:
                 self.remote_clients.remove(client_socket)
             try:
                 client_socket.close()
-            except Exception:
+            except (OSError, ConnectionError) as e:
+                # Socket already closed or connection error
                 pass
+            except Exception as e:
+                try:
+                    self.original_stdout.write(f"Warning: Error closing client socket: {e}\n")
+                    self.original_stdout.flush()
+                except (OSError, IOError):
+                    pass
             
             # Don't add disconnection message to avoid potential recursion issues
             # Just use the original stdout to log
             try:
                 self.original_stdout.write(f"Client disconnected from {address[0]}:{address[1]}\n")
                 self.original_stdout.flush()
-            except Exception:
+            except (OSError, IOError) as e:
+                # Can't write to stdout, but that's not critical
+                pass
+            except Exception as e:
+                # Unexpected error, but don't let it crash the handler
                 pass
     
     def _broadcast_to_clients(self, log_entry):
@@ -172,8 +204,27 @@ class LogManager:
         for client_socket in clients_copy:
             try:
                 self._send_log_entry(client_socket, log_entry)
-            except Exception:
-                # Remove failed client
+            except (ConnectionError, BrokenPipeError, OSError):
+                # Remove failed client - connection lost
+                if client_socket in self.remote_clients:
+                    self.remote_clients.remove(client_socket)
+                try:
+                    client_socket.close()
+                except (OSError, ConnectionError):
+                    pass  # Socket already closed
+                except Exception as e:
+                    try:
+                        self.original_stdout.write(f"Warning: Error closing failed client socket: {e}\n")
+                        self.original_stdout.flush()
+                    except (OSError, IOError):
+                        pass
+            except Exception as e:
+                # Unexpected error - log it and remove client
+                try:
+                    self.original_stdout.write(f"Warning: Unexpected error broadcasting to client: {e}\n")
+                    self.original_stdout.flush()
+                except (OSError, IOError):
+                    pass
                 if client_socket in self.remote_clients:
                     self.remote_clients.remove(client_socket)
                 try:
@@ -192,8 +243,24 @@ class LogManager:
             }
             json_data = json.dumps(message) + '\n'
             client_socket.send(json_data.encode('utf-8'))
-        except Exception:
-            raise  # Re-raise to handle in calling method
+        except (ConnectionError, BrokenPipeError, OSError):
+            raise  # Re-raise connection errors to handle in calling method
+        except (UnicodeEncodeError, TypeError) as e:
+            # Data encoding error - log and re-raise
+            try:
+                self.original_stdout.write(f"Warning: Could not encode log message: {e}\n")
+                self.original_stdout.flush()
+            except (OSError, IOError):
+                pass
+            raise
+        except Exception as e:
+            # Unexpected error - log and re-raise
+            try:
+                self.original_stdout.write(f"Warning: Unexpected error sending log entry: {e}\n")
+                self.original_stdout.flush()
+            except (OSError, IOError):
+                pass
+            raise
 
     def _on_message_added(self):
         """Called when a new message is added to the log"""

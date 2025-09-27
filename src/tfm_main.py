@@ -171,14 +171,17 @@ class FileManager:
                     
                     # Move cursor back to top
                     self.stdscr.move(0, 0)
-                except:
-                    pass  # If all else fails, just use regular clear
+                except curses.error as e:
+                    print(f"Warning: Could not move cursor during background clear: {e}")
+                except Exception as e:
+                    print(f"Warning: Background clear operation failed: {e}")
             
         except ImportError:
             # Fallback to regular clear if color functions not available
             self.stdscr.clear()
-        except:
+        except Exception as e:
             # Any other error, use regular clear
+            print(f"Warning: Screen clear with background failed: {e}")
             self.stdscr.clear()
 
     def is_key_for_action(self, key, action):
@@ -1913,7 +1916,8 @@ class FileManager:
                     file_path = Path(file_path_str)
                     if file_path.exists():
                         files_to_show.append(file_path)
-                except:
+                except (OSError, ValueError) as e:
+                    print(f"Warning: Could not process selected file path '{file_path_str}': {e}")
                     continue
         else:
             # Show details for current cursor position
@@ -2994,8 +2998,10 @@ class FileManager:
         try:
             self.draw_status()
             self.stdscr.refresh()
-        except:
-            pass  # Ignore drawing errors during progress updates
+        except curses.error as e:
+            print(f"Warning: Could not refresh screen during progress update: {e}")
+        except Exception as e:
+            print(f"Warning: Progress display update failed: {e}")
     
     def _progress_callback(self, progress_data):
         """Callback for progress manager updates"""
@@ -3003,8 +3009,10 @@ class FileManager:
         try:
             self.draw_status()
             self.stdscr.refresh()
-        except:
-            pass  # Ignore drawing errors during progress updates
+        except curses.error as e:
+            print(f"Warning: Could not refresh screen during progress callback: {e}")
+        except Exception as e:
+            print(f"Warning: Progress callback display update failed: {e}")
     
     def _count_files_recursively(self, paths):
         """Count total number of individual files in the given paths (including files in directories)"""
@@ -3235,8 +3243,10 @@ class FileManager:
             try:
                 if extract_dir.exists():
                     shutil.rmtree(extract_dir)
-            except:
-                pass
+            except (OSError, PermissionError) as e:
+                print(f"Warning: Could not clean up extraction directory {extract_dir}: {e}")
+            except Exception as e:
+                print(f"Warning: Unexpected error during cleanup: {e}")
     
     def extract_zip_archive(self, archive_file, extract_dir):
         """Extract a ZIP archive with progress tracking"""

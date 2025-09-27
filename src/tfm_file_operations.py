@@ -53,10 +53,20 @@ class FileOperations:
             current_file_paths = {str(f) for f in pane_data['files']}
             pane_data['selected_files'] = pane_data['selected_files'] & current_file_paths
             
-        except PermissionError:
+        except PermissionError as e:
+            print(f"Permission denied accessing directory {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
-        except Exception:
+        except FileNotFoundError as e:
+            print(f"Directory not found: {pane_data['path']}: {e}")
+            pane_data['files'] = []
+            pane_data['selected_index'] = 0
+        except OSError as e:
+            print(f"System error reading directory {pane_data['path']}: {e}")
+            pane_data['files'] = []
+            pane_data['selected_index'] = 0
+        except Exception as e:
+            print(f"Unexpected error reading directory {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
     
