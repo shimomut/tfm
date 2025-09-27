@@ -37,11 +37,15 @@ class JumpDialog(BaseListDialog):
         # Get configurable directory scan limit
         self.max_directories = getattr(config, 'MAX_JUMP_DIRECTORIES', 5000)
         
-    def show(self, root_directory):
+        # Store reference to file_operations for show_hidden setting
+        self.file_operations = None
+        
+    def show(self, root_directory, file_operations=None):
         """Show the jump dialog and start scanning directories
         
         Args:
             root_directory: Path object representing the root directory to scan from
+            file_operations: FileOperations instance to get show_hidden setting from
         """
         # Cancel any existing scan first
         self._cancel_current_scan()
@@ -54,6 +58,12 @@ class JumpDialog(BaseListDialog):
         self.selected = 0
         self.scroll = 0
         self.searching = False
+        
+        # Store file_operations reference for show_hidden setting
+        self.file_operations = file_operations
+        
+        # Store root directory for context in filtering
+        self.root_directory = root_directory
         
         # Reset animation
         self.progress_animator.reset()
@@ -168,28 +178,8 @@ class JumpDialog(BaseListDialog):
             # Add the root directory itself first
             temp_directories.append(root_directory)
             
-            # Recursively scan for directories
-            for dir_path in root_directory.rglob('*'):
-                # Check for cancellation
-                if self.cancel_scan.is_set():
-                    with self.scan_lock:
-                        self.searching = False
-                        self.content_changed = True  # Mark content as changed when scan is canceled
-                    return
-                
-                # Check directory limit
-                if len(temp_directories) >= self.max_directories:
-                    break
-                
-                if dir_path.is_dir():
-                    temp_directories.append(dir_path)
-                    
-                    # Update results periodically for real-time display
-                    if len(temp_directories) % 50 == 0:
-                        with self.scan_lock:
-                            self.directories = temp_directories.copy()
-                            self._filter_directories_internal()
-                            self.content_changed = True  # Mark content as changed when directories update
+            # Use iterative approach instead of rglob to have better control over traversal
+            self._scan_directory_tree(root_directory, root_directory, temp_directories)
                             
         except Exception as e:
             # Handle scan errors gracefully
@@ -237,8 +227,107 @@ class JumpDialog(BaseListDialog):
         # Update selection and adjust scroll
         self.selected = new_selected
         self._adjust_scroll(len(self.filtered_directories))
+    
+    def _scan_directory_tree(self, current_dir, root_directory, temp_directories):
+        """Recursively scan directory tree with proper hidden file handling
         
-
+        Args:
+            current_dir: Current directory being scanned
+            root_directory: Root directory where scanning started
+            temp_directories: List to accumulate found directories
+        """
+        try:
+            # Get all entries in current directory
+            entries = list(current_dir.iterdir())
+            
+            for entry in entries:
+                # Check for cancellation
+                if self.cancel_scan.is_set():
+                    return
+                
+                # Check directory limit
+                if len(temp_directories) >= self.max_directories:
+                    return
+                
+                if entry.is_dir():
+                    # Check if this directory should be included
+                    if self._should_include_directory(entry, current_dir, root_directory):
+                        temp_directories.append(entry)
+                        
+                        # Update results periodically for real-time display
+                        if len(temp_directories) % 50 == 0:
+                            with self.scan_lock:
+                                self.directories = temp_directories.copy()
+                                self._filter_directories_internal()
+                                self.content_changed = True
+                        
+                        # Recursively scan this directory
+                        self._scan_directory_tree(entry, root_directory, temp_directories)
+                    # If directory is hidden and we're not showing hidden files,
+                    # don't recurse into it at all (skip its subdirectories)
+                        
+        except (PermissionError, OSError):
+            # Skip directories we can't access
+            pass
+    
+    def _should_include_directory(self, dir_path, parent_dir, root_directory):
+        """Check if a directory should be included based on show_hidden setting
+        
+        Args:
+            dir_path: Path object of the directory to check
+            parent_dir: Parent directory of dir_path
+            root_directory: Root directory where scanning started
+            
+        Returns:
+            bool: True if directory should be included, False otherwise
+        """
+        # If no file_operations reference, include all directories (fallback behavior)
+        if not self.file_operations:
+            return True
+        
+        # Check if we should show hidden files
+        show_hidden = getattr(self.file_operations, 'show_hidden', False)
+        
+        # If showing hidden files, include everything
+        if show_hidden:
+            return True
+        
+        # If not showing hidden files, check if this directory is hidden
+        dir_name = dir_path.name
+        if dir_name.startswith('.') and dir_name not in ['.', '..']:
+            # This is a hidden directory
+            # Only exclude it if we're not already inside a hidden directory context
+            
+            # Check if the root directory itself is hidden or contains hidden components
+            try:
+                # If root directory is already hidden, we're in a hidden context
+                root_relative_to_parent = root_directory
+                for part in root_directory.parts:
+                    if part.startswith('.') and part not in ['.', '..']:
+                        # Root is in hidden context, so allow hidden subdirectories
+                        return True
+                
+                # Check if parent directory is hidden relative to root
+                if parent_dir != root_directory:
+                    try:
+                        parent_relative = parent_dir.relative_to(root_directory)
+                        for part in parent_relative.parts:
+                            if part.startswith('.') and part not in ['.', '..']:
+                                # Parent is hidden, so allow hidden subdirectories
+                                return True
+                    except ValueError:
+                        # parent_dir is not relative to root_directory, allow it
+                        return True
+                
+                # We're not in a hidden context, so exclude this hidden directory
+                return False
+                
+            except (ValueError, AttributeError):
+                # If we can't determine the relationship, err on the side of inclusion
+                return True
+        
+        # Non-hidden directory, always include
+        return True
             
     def needs_redraw(self):
         """Check if this dialog needs to be redrawn"""

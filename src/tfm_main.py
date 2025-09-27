@@ -3497,7 +3497,7 @@ class FileManager:
         """Show the jump dialog - wrapper for jump dialog component"""
         current_pane = self.get_current_pane()
         root_directory = current_pane['path']
-        self.jump_dialog.show(root_directory)
+        self.jump_dialog.show(root_directory, self.file_operations)
         self.needs_full_redraw = True
         
         # Force immediate redraw to show dialog
