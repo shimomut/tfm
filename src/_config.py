@@ -73,6 +73,7 @@ class Config:
         'rename_file': ['r', 'R'],            # Rename selected file/directory
         'favorites': ['j'],                   # Show favorite directories dialog
         'jump_dialog': ['J'],                 # Show jump to directory dialog (Shift+J)
+        'drives_dialog': ['d', 'D'],          # Show drives/storage selection dialog
         'history': ['h', 'H'],                # Show history for current pane
         'subshell': ['X'],                     # Enter subshell (command line) mode
         'programs': ['x'],                     # Show external programs menu

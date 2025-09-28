@@ -37,6 +37,7 @@ from tfm_list_dialog import ListDialog, ListDialogHelpers
 from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_jump_dialog import JumpDialog, JumpDialogHelpers
+from tfm_drives_dialog import DrivesDialog, DrivesDialogHelpers
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
@@ -85,6 +86,7 @@ class FileManager:
         self.info_dialog = InfoDialog(self.config)
         self.search_dialog = SearchDialog(self.config)
         self.jump_dialog = JumpDialog(self.config)
+        self.drives_dialog = DrivesDialog(self.config)
         self.batch_rename_dialog = BatchRenameDialog(self.config)
         self.quick_choice_bar = QuickChoiceBar(self.config)
         self.general_dialog = GeneralPurposeDialog(self.config)
@@ -1446,6 +1448,8 @@ class FileManager:
             return self.search_dialog.needs_redraw()
         elif self.jump_dialog.mode:
             return self.jump_dialog.needs_redraw()
+        elif self.drives_dialog.mode:
+            return self.drives_dialog.needs_redraw()
         elif self.batch_rename_dialog.mode:
             return self.batch_rename_dialog.needs_redraw()
         return False
@@ -1471,6 +1475,9 @@ class FileManager:
                 dialog_drawn = True
             elif self.jump_dialog.mode:
                 self.jump_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.drives_dialog.mode:
+                self.drives_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
             elif self.batch_rename_dialog.mode:
                 self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
@@ -1502,6 +1509,8 @@ class FileManager:
             self.search_dialog.draw(self.stdscr, self.safe_addstr)
         elif self.jump_dialog.mode:
             self.jump_dialog.draw(self.stdscr, self.safe_addstr)
+        elif self.drives_dialog.mode:
+            self.drives_dialog.draw(self.stdscr, self.safe_addstr)
         elif self.batch_rename_dialog.mode:
             self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
         
@@ -3515,6 +3524,17 @@ class FileManager:
         self.jump_dialog.exit()
         self.needs_full_redraw = True
     
+    def show_drives_dialog(self):
+        """Show the drives dialog - wrapper for drives dialog component"""
+        self.drives_dialog.show()
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
+    
+    def exit_drives_dialog_mode(self):
+        """Exit drives dialog mode - wrapper for drives dialog component"""
+        self.drives_dialog.exit()
+        self.needs_full_redraw = True
+    
     def handle_jump_dialog_input(self, key):
         """Handle input while in jump dialog mode - wrapper for jump dialog component"""
         result = self.jump_dialog.handle_input(key)
@@ -3529,6 +3549,24 @@ class FileManager:
                     JumpDialogHelpers.navigate_to_directory(data, self.pane_manager, print)
                     
                 self.exit_jump_dialog_mode()
+                return True
+        
+        return False
+    
+    def handle_drives_dialog_input(self, key):
+        """Handle input while in drives dialog mode - wrapper for drives dialog component"""
+        result = self.drives_dialog.handle_input(key)
+        
+        if result == True:
+            self.needs_full_redraw = True
+            return True
+        elif isinstance(result, tuple):
+            action, data = result
+            if action == 'navigate':
+                if data:
+                    DrivesDialogHelpers.navigate_to_drive(data, self.pane_manager, print)
+                    
+                self.exit_drives_dialog_mode()
                 return True
         
         return False
@@ -3572,6 +3610,11 @@ class FileManager:
             if self.handle_jump_dialog_input(key):
                 return True  # Jump dialog mode handled the key
         
+        # Handle drives dialog mode input
+        if self.drives_dialog.mode:
+            if self.handle_drives_dialog_input(key):
+                return True  # Drives dialog mode handled the key
+        
         # Handle batch rename dialog mode input
         if self.batch_rename_dialog.mode:
             if self.handle_batch_rename_input(key):
@@ -3580,8 +3623,8 @@ class FileManager:
         # Skip regular key processing if any dialog is open
         # This prevents conflicts like starting isearch mode while help dialog is open
         if (self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or 
-            self.search_dialog.mode or self.jump_dialog.mode or self.batch_rename_dialog.mode or 
-            self.isearch_mode or self.general_dialog.is_active):
+            self.search_dialog.mode or self.jump_dialog.mode or self.drives_dialog.mode or 
+            self.batch_rename_dialog.mode or self.isearch_mode or self.general_dialog.is_active):
             return True
         
         # Handle main application keys
@@ -3746,6 +3789,8 @@ class FileManager:
             self.show_search_dialog('filename')
         elif self.is_key_for_action(key, 'jump_dialog'):  # Show jump dialog (Shift+J)
             self.show_jump_dialog()
+        elif self.is_key_for_action(key, 'drives_dialog'):  # Show drives dialog
+            self.show_drives_dialog()
         elif self.is_key_for_action(key, 'search_content'):  # Show search dialog (content)
             self.show_search_dialog('content')
         elif self.is_key_for_action(key, 'edit_file'):  # Edit existing file
