@@ -789,6 +789,8 @@ class TFMStateManager(StateManager):
         
         This method checks all saved cursor positions and removes entries
         for directories that no longer exist on the filesystem.
+        For performance reasons, remote storage paths (S3, etc.) are skipped
+        during existence checks to avoid slow network operations.
         
         Returns:
             bool: True if cleanup was successful
@@ -798,6 +800,7 @@ class TFMStateManager(StateManager):
             
             success = True
             cleaned_count = 0
+            skipped_remote_count = 0
             
             # Clean up both left and right pane histories
             for pane_name in ['left', 'right']:
@@ -814,7 +817,12 @@ class TFMStateManager(StateManager):
                         # Convert to list format and filter
                         filtered_entries = []
                         for path, filename in history.items():
-                            if Path(path).exists():
+                            path_obj = Path(path)
+                            # Skip existence check for remote paths to improve performance
+                            if path_obj.is_remote():
+                                filtered_entries.append([time.time(), path, filename])
+                                skipped_remote_count += 1
+                            elif path_obj.exists():
                                 filtered_entries.append([time.time(), path, filename])
                             else:
                                 cleaned_count += 1
@@ -822,11 +830,19 @@ class TFMStateManager(StateManager):
                     else:
                         # Filter list format
                         original_count = len(history)
-                        history = [
-                            entry for entry in history 
-                            if len(entry) >= 3 and Path(entry[1]).exists()
-                        ]
-                        cleaned_count += original_count - len(history)
+                        filtered_history = []
+                        for entry in history:
+                            if len(entry) >= 3:
+                                path_obj = Path(entry[1])
+                                # Skip existence check for remote paths to improve performance
+                                if path_obj.is_remote():
+                                    filtered_history.append(entry)
+                                    skipped_remote_count += 1
+                                elif path_obj.exists():
+                                    filtered_history.append(entry)
+                                else:
+                                    cleaned_count += 1
+                        history = filtered_history
                     
                     # Save the cleaned history back
                     if not self.set_state(state_key, history, self.instance_id):
@@ -838,6 +854,8 @@ class TFMStateManager(StateManager):
             
             if cleaned_count > 0:
                 print(f"Cleaned up {cleaned_count} non-existing directory entries from cursor history")
+            if skipped_remote_count > 0:
+                print(f"Skipped existence check for {skipped_remote_count} remote storage entries")
             
             return success
             
