@@ -11,6 +11,42 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
+from tfm_s3 import S3PathImpl
+
+def test_s3_name_property():
+    """Test S3 name property with various key formats"""
+    print("Testing S3 name property...")
+    
+    test_cases = [
+        ("s3://bucket/", "bucket"),           # Bucket root
+        ("s3://bucket/file.txt", "file.txt"), # File
+        ("s3://bucket/dir/", "dir"),          # Directory with slash
+        ("s3://bucket/dir", "dir"),           # Directory without slash
+        ("s3://bucket/path/to/file.txt", "file.txt"), # Nested file
+        ("s3://bucket/path/to/dir/", "dir"),  # Nested directory
+        ("s3://my-bucket/folder/subfolder/", "subfolder"), # Deep nested directory
+    ]
+    
+    all_passed = True
+    for uri, expected_name in test_cases:
+        try:
+            s3_impl = S3PathImpl(uri)
+            actual_name = s3_impl.name
+            if actual_name == expected_name:
+                print(f"✓ {uri} -> name='{actual_name}'")
+            else:
+                print(f"✗ {uri} -> name='{actual_name}' (expected: '{expected_name}')")
+                all_passed = False
+        except Exception as e:
+            print(f"✗ {uri} -> ERROR: {e}")
+            all_passed = False
+    
+    if all_passed:
+        print("✓ S3 name property test passed")
+    else:
+        print("⚠ S3 name property test had failures")
+    
+    return all_passed
 
 def test_s3_credentials():
     """Test if AWS credentials are available"""
@@ -117,6 +153,9 @@ def main():
         print("❌ boto3 is not installed. Run: pip install boto3")
         return False
     
+    # Test S3 name property (doesn't require AWS credentials)
+    name_test = test_s3_name_property()
+    
     # Test credentials
     has_credentials = test_s3_credentials()
     
@@ -132,7 +171,7 @@ def main():
     bucket_test = test_s3_bucket_operations()
     file_test = test_s3_file_operations()
     
-    if bucket_test and file_test:
+    if name_test and bucket_test and file_test:
         print("\n🎉 All integration tests passed!")
         return True
     else:

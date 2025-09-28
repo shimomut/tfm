@@ -10,8 +10,12 @@ import os
 import stat
 import fnmatch
 import io
+import time
+import threading
+import hashlib
+import json
 from datetime import datetime
-from typing import Iterator, List
+from typing import Iterator, List, Dict, Any, Optional, Tuple
 
 # Import the PathImpl base class
 try:
@@ -29,6 +33,159 @@ except ImportError:
     boto3 = None
     ClientError = Exception
     NoCredentialsError = Exception
+
+
+class S3Cache:
+    """
+    Caching system for S3 API calls to improve response times.
+    
+    Features:
+    - Configurable cache TTL (default 60 seconds)
+    - Thread-safe operations
+    - Partial cache invalidation
+    - LRU-style cache management
+    """
+    
+    def __init__(self, default_ttl: int = 60, max_entries: int = 1000):
+        self.default_ttl = default_ttl
+        self.max_entries = max_entries
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.RLock()
+    
+    def _generate_cache_key(self, operation: str, bucket: str, key: str = "", **kwargs) -> str:
+        """Generate a unique cache key for the operation and parameters"""
+        # Create a deterministic key from operation parameters
+        params = {
+            'operation': operation,
+            'bucket': bucket,
+            'key': key,
+            **kwargs
+        }
+        # Sort parameters for consistent key generation
+        param_str = json.dumps(params, sort_keys=True)
+        return hashlib.md5(param_str.encode()).hexdigest()
+    
+    def get(self, operation: str, bucket: str, key: str = "", **kwargs) -> Optional[Any]:
+        """Get cached result if available and not expired"""
+        cache_key = self._generate_cache_key(operation, bucket, key, **kwargs)
+        
+        with self._lock:
+            if cache_key not in self._cache:
+                return None
+            
+            entry = self._cache[cache_key]
+            current_time = time.time()
+            
+            # Check if entry has expired
+            if current_time - entry['timestamp'] > entry['ttl']:
+                del self._cache[cache_key]
+                return None
+            
+            # Update access time for LRU behavior
+            entry['last_access'] = current_time
+            return entry['data']
+    
+    def put(self, operation: str, bucket: str, key: str = "", data: Any = None, ttl: Optional[int] = None, **kwargs):
+        """Store result in cache with optional custom TTL"""
+        cache_key = self._generate_cache_key(operation, bucket, key, **kwargs)
+        current_time = time.time()
+        
+        with self._lock:
+            # Enforce max entries limit using LRU eviction
+            if len(self._cache) >= self.max_entries and cache_key not in self._cache:
+                self._evict_lru()
+            
+            self._cache[cache_key] = {
+                'data': data,
+                'timestamp': current_time,
+                'last_access': current_time,
+                'ttl': ttl or self.default_ttl,
+                'bucket': bucket,
+                'key': key,
+                'operation': operation
+            }
+    
+    def invalidate_bucket(self, bucket: str):
+        """Invalidate all cache entries for a specific bucket"""
+        with self._lock:
+            keys_to_remove = []
+            for cache_key, entry in self._cache.items():
+                if entry['bucket'] == bucket:
+                    keys_to_remove.append(cache_key)
+            
+            for key in keys_to_remove:
+                del self._cache[key]
+    
+    def invalidate_key(self, bucket: str, key: str):
+        """Invalidate cache entries for a specific S3 key and its parent directories"""
+        with self._lock:
+            keys_to_remove = []
+            for cache_key, entry in self._cache.items():
+                if entry['bucket'] == bucket:
+                    # Invalidate exact key matches
+                    if entry['key'] == key:
+                        keys_to_remove.append(cache_key)
+                    # Invalidate parent directory listings
+                    elif entry['operation'] in ['list_objects_v2', 'head_bucket'] and key.startswith(entry['key']):
+                        keys_to_remove.append(cache_key)
+                    # Invalidate child directory listings if we're modifying a parent
+                    elif entry['key'].startswith(key.rstrip('/') + '/'):
+                        keys_to_remove.append(cache_key)
+            
+            for key in keys_to_remove:
+                del self._cache[key]
+    
+    def invalidate_prefix(self, bucket: str, prefix: str):
+        """Invalidate all cache entries with keys starting with the given prefix"""
+        with self._lock:
+            keys_to_remove = []
+            for cache_key, entry in self._cache.items():
+                if entry['bucket'] == bucket and entry['key'].startswith(prefix):
+                    keys_to_remove.append(cache_key)
+            
+            for key in keys_to_remove:
+                del self._cache[key]
+    
+    def clear(self):
+        """Clear all cache entries"""
+        with self._lock:
+            self._cache.clear()
+    
+    def _evict_lru(self):
+        """Evict the least recently used cache entry"""
+        if not self._cache:
+            return
+        
+        # Find the entry with the oldest last_access time
+        oldest_key = min(self._cache.keys(), 
+                        key=lambda k: self._cache[k]['last_access'])
+        del self._cache[oldest_key]
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics for monitoring"""
+        with self._lock:
+            current_time = time.time()
+            expired_count = sum(1 for entry in self._cache.values() 
+                              if current_time - entry['timestamp'] > entry['ttl'])
+            
+            return {
+                'total_entries': len(self._cache),
+                'expired_entries': expired_count,
+                'max_entries': self.max_entries,
+                'default_ttl': self.default_ttl
+            }
+
+
+# Global S3 cache instance
+_s3_cache = None
+
+
+def get_s3_cache() -> S3Cache:
+    """Get or create the global S3 cache instance"""
+    global _s3_cache
+    if _s3_cache is None:
+        _s3_cache = S3Cache()
+    return _s3_cache
 
 
 class S3StatResult:
@@ -49,7 +206,7 @@ class S3StatResult:
 class S3WriteFile:
     """File-like object for writing to S3"""
     
-    def __init__(self, s3_client, bucket, key, mode, encoding=None):
+    def __init__(self, s3_client, bucket, key, mode, encoding=None, cache_invalidate_callback=None):
         self._s3_client = s3_client
         self._bucket = bucket
         self._key = key
@@ -57,6 +214,7 @@ class S3WriteFile:
         self._encoding = encoding or 'utf-8'
         self._buffer = io.BytesIO() if 'b' in mode else io.StringIO()
         self._closed = False
+        self._cache_invalidate_callback = cache_invalidate_callback
     
     def write(self, data):
         if self._closed:
@@ -83,6 +241,11 @@ class S3WriteFile:
                 Key=self._key,
                 Body=content
             )
+            
+            # Invalidate cache after successful write
+            if self._cache_invalidate_callback:
+                self._cache_invalidate_callback(self._key)
+            
             self._closed = True
     
     def __enter__(self):
@@ -133,6 +296,75 @@ class S3PathImpl(PathImpl):
                 raise RuntimeError("AWS credentials not found. Configure AWS credentials using AWS CLI, environment variables, or IAM roles.")
         return self._s3_client
     
+    @property
+    def _cache(self) -> S3Cache:
+        """Get the S3 cache instance"""
+        return get_s3_cache()
+    
+    def _cached_api_call(self, operation: str, cache_key_params: Dict[str, Any] = None, 
+                        ttl: Optional[int] = None, **api_params) -> Any:
+        """
+        Execute an S3 API call with caching support.
+        
+        Args:
+            operation: The boto3 client method name (e.g., 'head_object', 'list_objects_v2')
+            cache_key_params: Parameters to include in cache key generation
+            ttl: Custom TTL for this cache entry
+            **api_params: Parameters to pass to the boto3 API call
+        
+        Returns:
+            The API response, either from cache or fresh API call
+        """
+        if cache_key_params is None:
+            cache_key_params = {}
+        
+        # Try to get from cache first
+        cached_result = self._cache.get(
+            operation=operation,
+            bucket=self._bucket,
+            key=self._key,
+            **cache_key_params
+        )
+        
+        if cached_result is not None:
+            return cached_result
+        
+        # Cache miss - make the API call
+        try:
+            client_method = getattr(self._client, operation)
+            result = client_method(**api_params)
+            
+            # Store in cache
+            self._cache.put(
+                operation=operation,
+                bucket=self._bucket,
+                key=self._key,
+                data=result,
+                ttl=ttl,
+                **cache_key_params
+            )
+            
+            return result
+        except Exception as e:
+            # Don't cache errors, let them propagate
+            raise
+    
+    def _invalidate_cache_for_write(self, key: Optional[str] = None):
+        """Invalidate cache entries that might be affected by a write operation"""
+        target_key = key or self._key
+        
+        # Invalidate the specific key
+        self._cache.invalidate_key(self._bucket, target_key)
+        
+        # Also invalidate parent directory listings
+        if '/' in target_key:
+            parent_key = '/'.join(target_key.split('/')[:-1]) + '/'
+            self._cache.invalidate_key(self._bucket, parent_key)
+        
+        # Invalidate bucket root listing if this is a top-level key
+        if '/' not in target_key.strip('/'):
+            self._cache.invalidate_key(self._bucket, '')
+    
     def __str__(self) -> str:
         """String representation of the path"""
         return self._uri
@@ -161,7 +393,9 @@ class S3PathImpl(PathImpl):
         """The final component of the path"""
         if not self._key:
             return self._bucket
-        return self._key.split('/')[-1] if '/' in self._key else self._key
+        # Strip trailing slash before splitting to handle directory keys properly
+        key_without_slash = self._key.rstrip('/')
+        return key_without_slash.split('/')[-1] if '/' in key_without_slash else key_without_slash
     
     @property
     def stem(self) -> str:
@@ -330,11 +564,11 @@ class S3PathImpl(PathImpl):
         try:
             if not self._key:
                 # Check if bucket exists
-                self._client.head_bucket(Bucket=self._bucket)
+                self._cached_api_call('head_bucket', Bucket=self._bucket)
                 return True
             else:
                 # Check if object exists
-                self._client.head_object(Bucket=self._bucket, Key=self._key)
+                self._cached_api_call('head_object', Bucket=self._bucket, Key=self._key)
                 return True
         except ClientError as e:
             if e.response['Error']['Code'] in ['404', 'NoSuchBucket', 'NoSuchKey']:
@@ -354,7 +588,9 @@ class S3PathImpl(PathImpl):
         
         try:
             # Check if there are objects with this key as a prefix
-            response = self._client.list_objects_v2(
+            response = self._cached_api_call(
+                'list_objects_v2',
+                cache_key_params={'prefix_check': self._key + '/'},
                 Bucket=self._bucket,
                 Prefix=self._key + '/',
                 MaxKeys=1
@@ -372,7 +608,7 @@ class S3PathImpl(PathImpl):
             return False  # Directory marker
         
         try:
-            self._client.head_object(Bucket=self._bucket, Key=self._key)
+            self._cached_api_call('head_object', Bucket=self._bucket, Key=self._key)
             return True
         except ClientError:
             return False
@@ -392,7 +628,7 @@ class S3PathImpl(PathImpl):
                 # Bucket stat
                 return S3StatResult(size=0, mtime=0, is_dir=True)
             
-            response = self._client.head_object(Bucket=self._bucket, Key=self._key)
+            response = self._cached_api_call('head_object', Bucket=self._bucket, Key=self._key)
             size = response.get('ContentLength', 0)
             mtime = response.get('LastModified', datetime.now()).timestamp()
             return S3StatResult(size=size, mtime=mtime, is_dir=self.is_dir())
@@ -423,6 +659,8 @@ class S3PathImpl(PathImpl):
                 prefix = self._key.rstrip('/') + '/'
                 delimiter = '/'
             
+            # For directory listings, we'll cache each page separately
+            # This allows for better cache utilization with large directories
             paginator = self._client.get_paginator('list_objects_v2')
             page_iterator = paginator.paginate(
                 Bucket=self._bucket,
@@ -430,17 +668,45 @@ class S3PathImpl(PathImpl):
                 Delimiter=delimiter
             )
             
+            page_num = 0
             for page in page_iterator:
+                # Try to get this page from cache
+                cache_key_params = {
+                    'prefix': prefix,
+                    'delimiter': delimiter,
+                    'page': page_num
+                }
+                
+                cached_page = self._cache.get(
+                    operation='list_objects_v2_page',
+                    bucket=self._bucket,
+                    key=self._key,
+                    **cache_key_params
+                )
+                
+                if cached_page is None:
+                    # Cache this page
+                    self._cache.put(
+                        operation='list_objects_v2_page',
+                        bucket=self._bucket,
+                        key=self._key,
+                        data=page,
+                        **cache_key_params
+                    )
+                    cached_page = page
+                
                 # Yield directories (common prefixes)
-                for prefix_info in page.get('CommonPrefixes', []):
+                for prefix_info in cached_page.get('CommonPrefixes', []):
                     dir_key = prefix_info['Prefix'].rstrip('/')
                     yield Path(f's3://{self._bucket}/{dir_key}/')
                 
                 # Yield files (objects)
-                for obj in page.get('Contents', []):
+                for obj in cached_page.get('Contents', []):
                     key = obj['Key']
                     if key != prefix:  # Don't include the directory itself
                         yield Path(f's3://{self._bucket}/{key}')
+                
+                page_num += 1
         
         except ClientError as e:
             raise OSError(f"Failed to list S3 directory: {e}")
@@ -479,11 +745,13 @@ class S3PathImpl(PathImpl):
         """Open the file pointed to by this path"""
         if 'w' in mode or 'a' in mode:
             # Write mode - return a file-like object that uploads on close
-            return S3WriteFile(self._client, self._bucket, self._key, mode, encoding)
+            # Pass the cache invalidation callback to the write file
+            return S3WriteFile(self._client, self._bucket, self._key, mode, encoding, 
+                             cache_invalidate_callback=self._invalidate_cache_for_write)
         else:
-            # Read mode
+            # Read mode - use caching for get_object calls
             try:
-                response = self._client.get_object(Bucket=self._bucket, Key=self._key)
+                response = self._cached_api_call('get_object', Bucket=self._bucket, Key=self._key)
                 content = response['Body'].read()
                 
                 if 'b' in mode:
@@ -499,7 +767,7 @@ class S3PathImpl(PathImpl):
     def read_text(self, encoding=None, errors=None) -> str:
         """Open the file in text mode, read it, and close the file"""
         try:
-            response = self._client.get_object(Bucket=self._bucket, Key=self._key)
+            response = self._cached_api_call('get_object', Bucket=self._bucket, Key=self._key)
             content = response['Body'].read()
             return content.decode(encoding or 'utf-8', errors or 'strict')
         except ClientError as e:
@@ -510,7 +778,7 @@ class S3PathImpl(PathImpl):
     def read_bytes(self) -> bytes:
         """Open the file in bytes mode, read it, and close the file"""
         try:
-            response = self._client.get_object(Bucket=self._bucket, Key=self._key)
+            response = self._cached_api_call('get_object', Bucket=self._bucket, Key=self._key)
             return response['Body'].read()
         except ClientError as e:
             if e.response['Error']['Code'] == 'NoSuchKey':
@@ -522,6 +790,8 @@ class S3PathImpl(PathImpl):
         try:
             content = data.encode(encoding or 'utf-8', errors or 'strict')
             self._client.put_object(Bucket=self._bucket, Key=self._key, Body=content)
+            # Invalidate cache after write
+            self._invalidate_cache_for_write()
             return len(data)
         except ClientError as e:
             raise OSError(f"Failed to write S3 object: {e}")
@@ -530,6 +800,8 @@ class S3PathImpl(PathImpl):
         """Open the file in bytes mode, write to it, and close the file"""
         try:
             self._client.put_object(Bucket=self._bucket, Key=self._key, Body=data)
+            # Invalidate cache after write
+            self._invalidate_cache_for_write()
             return len(data)
         except ClientError as e:
             raise OSError(f"Failed to write S3 object: {e}")
@@ -551,6 +823,8 @@ class S3PathImpl(PathImpl):
             
             # Create directory marker
             self._client.put_object(Bucket=self._bucket, Key=directory_key, Body=b'')
+            # Invalidate cache after directory creation
+            self._invalidate_cache_for_write(directory_key)
         except ClientError as e:
             raise OSError(f"Failed to create S3 directory: {e}")
     
@@ -574,6 +848,8 @@ class S3PathImpl(PathImpl):
             directory_key = self._key.rstrip('/') + '/'
             try:
                 self._client.delete_object(Bucket=self._bucket, Key=directory_key)
+                # Invalidate cache after directory removal
+                self._invalidate_cache_for_write(directory_key)
             except ClientError:
                 pass  # Directory marker might not exist
         except ClientError as e:
@@ -583,6 +859,8 @@ class S3PathImpl(PathImpl):
         """Remove this file or symbolic link"""
         try:
             self._client.delete_object(Bucket=self._bucket, Key=self._key)
+            # Invalidate cache after deletion
+            self._invalidate_cache_for_write()
         except ClientError as e:
             if e.response['Error']['Code'] == 'NoSuchKey' and missing_ok:
                 return
@@ -607,10 +885,12 @@ class S3PathImpl(PathImpl):
                     Bucket=target_path._impl._bucket,
                     Key=target_path._impl._key
                 )
+                # Invalidate cache for target location
+                target_path._impl._invalidate_cache_for_write()
             else:
                 raise OSError("Cannot rename S3 object to non-S3 path")
             
-            # Delete original
+            # Delete original (this will invalidate cache for source)
             self.unlink()
             return target_path
         except ClientError as e:
@@ -635,6 +915,8 @@ class S3PathImpl(PathImpl):
         
         try:
             self._client.put_object(Bucket=self._bucket, Key=self._key, Body=b'')
+            # Invalidate cache after touch
+            self._invalidate_cache_for_write()
         except ClientError as e:
             raise OSError(f"Failed to touch S3 object: {e}")
     
@@ -672,3 +954,22 @@ class S3PathImpl(PathImpl):
     def as_posix(self) -> str:
         """Return the string representation with forward slashes"""
         return self._uri
+
+
+# Cache management functions
+def configure_s3_cache(ttl: int = 60, max_entries: int = 1000):
+    """Configure the global S3 cache settings"""
+    global _s3_cache
+    _s3_cache = S3Cache(default_ttl=ttl, max_entries=max_entries)
+
+
+def clear_s3_cache():
+    """Clear all entries from the S3 cache"""
+    cache = get_s3_cache()
+    cache.clear()
+
+
+def get_s3_cache_stats() -> Dict[str, Any]:
+    """Get S3 cache statistics"""
+    cache = get_s3_cache()
+    return cache.get_stats()
