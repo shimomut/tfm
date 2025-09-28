@@ -644,6 +644,11 @@ class S3PathImpl(PathImpl):
             return S3StatResult(size=size, mtime=mtime, is_dir=self.is_dir())
         except ClientError as e:
             if e.response['Error']['Code'] in ['404', 'NoSuchKey']:
+                # Check if this is a virtual directory (has objects with this prefix)
+                if self.is_dir():
+                    # This is a virtual directory - generate size and timestamp
+                    size, mtime = self._get_virtual_directory_stats()
+                    return S3StatResult(size=size, mtime=mtime, is_dir=True)
                 raise FileNotFoundError(f"S3 object not found: {self._uri}")
             raise OSError(f"Failed to stat S3 object: {e}")
     
@@ -932,6 +937,66 @@ class S3PathImpl(PathImpl):
                 
         except ClientError as e:
             raise OSError(f"Failed to delete objects batch: {e}")
+    
+    def _get_virtual_directory_stats(self) -> Tuple[int, float]:
+        """
+        Get generated stats for virtual directories (directories without actual S3 objects).
+        Returns (size, mtime) where size is 0 and mtime is the latest timestamp of children.
+        """
+        try:
+            # For virtual directories, size is always 0 (0B)
+            size = 0
+            
+            # Find the latest modification time among all children
+            latest_mtime = 0.0
+            
+            # List objects under this directory prefix
+            prefix = self._key.rstrip('/') + '/' if self._key else ''
+            
+            # Use cached API call to get objects under this prefix
+            response = self._cached_api_call(
+                'list_objects_v2',
+                cache_key_params={'virtual_dir_stats': True, 'prefix': prefix},
+                ttl=30,  # Cache for 30 seconds for directory stats
+                Bucket=self._bucket,
+                Prefix=prefix,
+                MaxKeys=1000  # Get up to 1000 objects to find latest timestamp
+            )
+            
+            # Find the latest LastModified timestamp among all objects
+            for obj in response.get('Contents', []):
+                obj_mtime = obj.get('LastModified')
+                if obj_mtime:
+                    obj_timestamp = obj_mtime.timestamp()
+                    if obj_timestamp > latest_mtime:
+                        latest_mtime = obj_timestamp
+            
+            # If we found objects but need to check more (there might be more than 1000)
+            if response.get('IsTruncated', False):
+                # Use paginator to check all objects for the latest timestamp
+                paginator = self._client.get_paginator('list_objects_v2')
+                page_iterator = paginator.paginate(
+                    Bucket=self._bucket,
+                    Prefix=prefix
+                )
+                
+                for page in page_iterator:
+                    for obj in page.get('Contents', []):
+                        obj_mtime = obj.get('LastModified')
+                        if obj_mtime:
+                            obj_timestamp = obj_mtime.timestamp()
+                            if obj_timestamp > latest_mtime:
+                                latest_mtime = obj_timestamp
+            
+            # If no objects found or no timestamps, use current time
+            if latest_mtime == 0.0:
+                latest_mtime = time.time()
+            
+            return size, latest_mtime
+            
+        except ClientError as e:
+            # If we can't get stats, return defaults
+            return 0, time.time()
     
     def unlink(self, missing_ok=False):
         """Remove this file or symbolic link"""
