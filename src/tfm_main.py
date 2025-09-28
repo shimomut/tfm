@@ -1188,8 +1188,8 @@ class FileManager:
         """Enter create directory mode"""
         current_pane = self.get_current_pane()
         
-        # Check if current directory is writable
-        if not os.access(current_pane['path'], os.W_OK):
+        # Check if current directory is writable (only for local paths)
+        if current_pane['path'].get_scheme() == 'file' and not os.access(current_pane['path'], os.W_OK):
             print(f"Permission denied: Cannot create directory in {current_pane['path']}")
             return
         
@@ -1252,8 +1252,8 @@ class FileManager:
         """Enter create file mode"""
         current_pane = self.get_current_pane()
         
-        # Check if current directory is writable
-        if not os.access(current_pane['path'], os.W_OK):
+        # Check if current directory is writable (only for local paths)
+        if current_pane['path'].get_scheme() == 'file' and not os.access(current_pane['path'], os.W_OK):
             print(f"Permission denied: Cannot create file in {current_pane['path']}")
             return
         
@@ -2097,8 +2097,8 @@ class FileManager:
         
         destination_dir = other_pane['path']
         
-        # Check if destination directory is writable
-        if not os.access(destination_dir, os.W_OK):
+        # Check if destination directory is writable (only for local paths)
+        if destination_dir.get_scheme() == 'file' and not os.access(destination_dir, os.W_OK):
             print(f"Permission denied: Cannot write to {destination_dir}")
             return
         
@@ -2210,12 +2210,27 @@ class FileManager:
                     
                     if source_file.is_dir():
                         # Copy directory recursively with progress tracking
-                        if dest_path.exists():
-                            shutil.rmtree(dest_path)
+                        if dest_path.exists() and overwrite:
+                            if dest_path.is_dir():
+                                # For S3, we can't use rmtree, so we'll let copy_to handle it
+                                pass
+                            else:
+                                dest_path.unlink()
                         
-                        processed_files = self._copy_directory_with_progress(
-                            source_file, dest_path, processed_files, total_individual_files
-                        )
+                        if source_file.get_scheme() == dest_path.get_scheme() == 'file':
+                            # Local to local - use the existing progress method
+                            processed_files = self._copy_directory_with_progress(
+                                source_file, dest_path, processed_files, total_individual_files
+                            )
+                        else:
+                            # Cross-storage copy - use the new method
+                            source_file.copy_to(dest_path, overwrite=overwrite)
+                            # Update progress for the entire directory
+                            dir_file_count = self._count_files_recursively([source_file])
+                            processed_files += dir_file_count
+                            if total_individual_files > 1:
+                                self.progress_manager.update_progress(source_file.name, processed_files)
+                        
                         print(f"Copied directory: {source_file.name}")
                     else:
                         # Copy single file
@@ -2223,7 +2238,7 @@ class FileManager:
                         if total_individual_files > 1:
                             self.progress_manager.update_progress(source_file.name, processed_files)
                         
-                        shutil.copy2(source_file, dest_path)
+                        source_file.copy_to(dest_path, overwrite=overwrite)
                         print(f"Copied file: {source_file.name}")
                     
                     copied_count += 1
@@ -2301,7 +2316,7 @@ class FileManager:
                             dest_file.symlink_to(link_target)
                         else:
                             # Copy regular file
-                            shutil.copy2(source_file, dest_file)
+                            source_file.copy_to(dest_file, overwrite=True)
                     except Exception as e:
                         print(f"Error copying {source_file}: {e}")
                         if total_files > 1:
@@ -2359,8 +2374,8 @@ class FileManager:
         
         destination_dir = other_pane['path']
         
-        # Check if destination directory is writable
-        if not os.access(destination_dir, os.W_OK):
+        # Check if destination directory is writable (only for local paths)
+        if destination_dir.get_scheme() == 'file' and not os.access(destination_dir, os.W_OK):
             print(f"Permission denied: Cannot write to {destination_dir}")
             return
         

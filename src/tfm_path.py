@@ -468,7 +468,7 @@ class LocalPathImpl(PathImpl):
     
     def write_text(self, data: str, encoding=None, errors=None, newline=None) -> int:
         """Open the file in text mode, write to it, and close the file"""
-        return self._path.write_text(data, encoding, errors, newline)
+        return self._path.write_text(data, encoding, errors)
     
     def write_bytes(self, data: bytes) -> int:
         """Open the file in bytes mode, write to it, and close the file"""
@@ -842,6 +842,103 @@ class Path:
     def as_posix(self) -> str:
         """Return the string representation with forward slashes"""
         return self._impl.as_posix()
+    
+    def copy_to(self, destination: 'Path', overwrite: bool = False) -> bool:
+        """
+        Copy this file or directory to the destination path.
+        
+        This method handles cross-storage copying (e.g., local to S3, S3 to local).
+        
+        Args:
+            destination: Target path where the file/directory should be copied
+            overwrite: Whether to overwrite existing files
+            
+        Returns:
+            True if copy was successful, False otherwise
+            
+        Raises:
+            FileNotFoundError: If source doesn't exist
+            FileExistsError: If destination exists and overwrite=False
+            PermissionError: If insufficient permissions
+            OSError: For other I/O errors
+        """
+        if not self.exists():
+            raise FileNotFoundError(f"Source path does not exist: {self}")
+        
+        if destination.exists() and not overwrite:
+            raise FileExistsError(f"Destination already exists: {destination}")
+        
+        # Handle same-storage copying first
+        source_scheme = self.get_scheme()
+        dest_scheme = destination.get_scheme()
+        
+        if source_scheme == dest_scheme:
+            # Same storage type - use native copy if available
+            if hasattr(self._impl, 'copy_to') and hasattr(destination._impl, 'copy_from'):
+                return self._impl.copy_to(destination._impl)
+            elif source_scheme == 'file':
+                # Local to local - use shutil
+                import shutil
+                if self.is_dir():
+                    shutil.copytree(str(self), str(destination), dirs_exist_ok=overwrite)
+                else:
+                    shutil.copy2(str(self), str(destination))
+                return True
+        
+        # Cross-storage copying
+        if self.is_dir():
+            return self._copy_directory_cross_storage(destination, overwrite)
+        else:
+            return self._copy_file_cross_storage(destination, overwrite)
+    
+    def _copy_file_cross_storage(self, destination: 'Path', overwrite: bool = False) -> bool:
+        """Copy a single file across different storage systems"""
+        try:
+            # Create destination directory if needed (only for local destinations)
+            if destination.get_scheme() == 'file':
+                destination.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Read from source and write to destination
+            if self.get_scheme() == 'file' and destination.get_scheme() == 's3':
+                # Local to S3
+                with self.open('rb') as src:
+                    data = src.read()
+                destination.write_bytes(data)
+            elif self.get_scheme() == 's3' and destination.get_scheme() == 'file':
+                # S3 to local
+                data = self.read_bytes()
+                destination.write_bytes(data)
+            elif self.get_scheme() == 's3' and destination.get_scheme() == 's3':
+                # S3 to S3
+                data = self.read_bytes()
+                destination.write_bytes(data)
+            else:
+                # Generic cross-storage copy
+                data = self.read_bytes()
+                destination.write_bytes(data)
+            
+            return True
+        except Exception as e:
+            raise OSError(f"Failed to copy file from {self} to {destination}: {e}")
+    
+    def _copy_directory_cross_storage(self, destination: 'Path', overwrite: bool = False) -> bool:
+        """Copy a directory recursively across different storage systems"""
+        try:
+            # Create destination directory (only for local destinations)
+            if destination.get_scheme() == 'file':
+                destination.mkdir(parents=True, exist_ok=overwrite)
+            
+            # Copy all contents recursively
+            for item in self.iterdir():
+                dest_item = destination / item.name
+                if item.is_dir():
+                    item._copy_directory_cross_storage(dest_item, overwrite)
+                else:
+                    item._copy_file_cross_storage(dest_item, overwrite)
+            
+            return True
+        except Exception as e:
+            raise OSError(f"Failed to copy directory from {self} to {destination}: {e}")
 
 
 # Convenience functions that mirror pathlib module-level functions
