@@ -122,6 +122,9 @@ class Config:
     # Text editor settings
     TEXT_EDITOR = 'vim'  # Text editor command (vim, nano, emacs, code, etc.)
     
+    # S3 settings
+    S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
+    
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
     # Relative paths in the first element are resolved relative to the TFM root directory (where tfm.py is located)

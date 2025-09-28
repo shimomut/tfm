@@ -184,7 +184,20 @@ def get_s3_cache() -> S3Cache:
     """Get or create the global S3 cache instance"""
     global _s3_cache
     if _s3_cache is None:
-        _s3_cache = S3Cache()
+        # Get TTL from configuration
+        try:
+            from .tfm_config import get_config
+            config = get_config()
+            ttl = getattr(config, 'S3_CACHE_TTL', 60)
+        except ImportError:
+            try:
+                from tfm_config import get_config
+                config = get_config()
+                ttl = getattr(config, 'S3_CACHE_TTL', 60)
+            except (ImportError, Exception):
+                ttl = 60  # Fallback to default
+        
+        _s3_cache = S3Cache(default_ttl=ttl)
     return _s3_cache
 
 
@@ -805,7 +818,6 @@ class S3PathImpl(PathImpl):
                 bucket=self._bucket,
                 key=self._key,
                 data=complete_listing,
-                ttl=300,  # Cache for 5 minutes
                 **cache_key_params
             )
             
@@ -872,8 +884,7 @@ class S3PathImpl(PathImpl):
                     operation='head_object',
                     bucket=self._bucket,
                     key=key,  # Use the file's actual key, not self._key
-                    data=head_response,
-                    ttl=300  # Cache for 5 minutes
+                    data=head_response
                 )
                 
                 # Create Path with metadata
