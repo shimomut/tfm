@@ -13,7 +13,8 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 📦 **Complete**: Built-in text viewer, archive operations, and external program integration  
 🔍 **Smart**: Incremental search, pattern filtering, threaded content search, and remote log monitoring  
 🔗 **Integrated**: VSCode integration, Beyond Compare support, and extensible external program system  
-🎛️ **Flexible**: Command line directory specification and workflow customization
+🎛️ **Flexible**: Command line directory specification and workflow customization  
+☁️ **Cloud Ready**: AWS S3 support for cloud storage operations with seamless local/remote integration
 
 ## Development with Kiro
 
@@ -79,6 +80,13 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 - **Configuration System**: Fully customizable key bindings and settings (Z key)
 - **Help System**: Comprehensive help dialog accessible with '?' key
 - **Cross-platform**: Works on macOS, Linux, and Windows with proper terminal support
+
+### Cloud Storage Support
+- **AWS S3 Integration**: Navigate and manage S3 buckets and objects using s3:// URIs
+- **Seamless Operations**: Copy, move, delete, and edit files between local and S3 storage
+- **Pathlib Compatibility**: S3 paths work with all standard file operations
+- **Intelligent Caching**: Optimized performance with configurable TTL caching system
+- **Virtual Directories**: Support for S3 prefix-based directory simulation
 
 
 
@@ -186,6 +194,13 @@ All key bindings are fully customizable through the configuration system. Below 
 | `T` | Toggle fallback color mode |
 | `z` | View options menu |
 | `Z` | Settings and configuration menu |
+
+### Cloud Storage Navigation
+| Key | Action |
+|-----|--------|
+| `s3://bucket/path` | Navigate to S3 bucket or object path |
+| All file operations | Work seamlessly with S3 objects (copy, move, delete, edit) |
+| Standard navigation | Use arrow keys, Enter, Backspace with S3 paths |
 
 ### General
 | Key | Action |
@@ -360,6 +375,8 @@ python3 tfm.py --version
    python3 tfm.py
    ```
 
+For detailed installation instructions, see `doc/INSTALLATION_GUIDE.md`.
+
 ### Advanced Usage
 ```bash
 # Enable remote log monitoring on port 8888
@@ -392,6 +409,10 @@ tfm --left ~/projects --right ~/documents --remote-log-port 8888
 - **Optional**: `pygments` for enhanced syntax highlighting
   ```bash
   pip install pygments
+  ```
+- **Optional**: `boto3` for AWS S3 support
+  ```bash
+  pip install boto3
   ```
 
 ### System Requirements
@@ -572,9 +593,13 @@ tfm/
 │   ├── tfm_const.py       # Constants and version information
 │   ├── tfm_colors.py      # Color management and terminal colors
 │   ├── tfm_text_viewer.py # Text file viewer with syntax highlighting
+│   ├── tfm_path.py        # Extended Path implementation with S3 support
+│   ├── tfm_s3.py          # AWS S3 integration and operations
+│   ├── tfm_cache_manager.py # Caching system for S3 and remote operations
 │   ├── tfm_*_dialog.py    # Modular dialog components (list, search, batch rename, etc.)
 │   ├── tfm_*_manager.py   # Core managers (log, pane, file operations, progress, state)
 │   ├── tfm_external_programs.py # External program integration
+│   ├── tfm_key_bindings.py # Key binding management system
 │   └── _config.py         # User configuration template
 ├── test/                   # Test files and demos
 │   ├── test_*.py          # Unit and integration tests
@@ -585,8 +610,9 @@ tfm/
 ├── doc/                    # Documentation
 │   ├── *_FEATURE.md       # Feature documentation and guides
 │   ├── *_SYSTEM.md        # System component documentation
-│   ├── COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md # Command line directory specification
-│   ├── LOG_REDRAW_TRIGGER_FEATURE.md # Log update system
+│   ├── S3_SUPPORT_FEATURE.md # AWS S3 integration documentation
+│   ├── REMOTE_LOG_MONITORING_FEATURE.md # Remote log monitoring
+│   ├── EXTERNAL_PROGRAMS_FEATURE.md # External program integration
 │   └── PROJECT_STRUCTURE.md # Detailed project organization
 ├── tools/                  # External integration tools
 │   ├── vscode_wrapper.sh  # VSCode integration script
@@ -595,16 +621,21 @@ tfm/
 │   └── preview_files.sh   # File preview script
 ├── demo/                   # Interactive demonstrations
 │   └── demo_*.py          # Feature demonstration scripts
+├── temp/                   # Temporary files and work-in-progress
+│   └── .keepme            # Directory placeholder
 ├── tfm.py                  # Main entry point with argument parsing
 ├── setup.py               # Package setup for pip installation
 ├── Makefile               # Build automation and common tasks
-├── requirements.txt       # Python dependencies (pygments)
+├── requirements.txt       # Python dependencies (pygments, boto3)
 └── README.md              # This file
 ```
 
 ### Getting Help
 - Press `?` in TFM for built-in help
 - Check documentation in the `doc/` directory
+- See `doc/USER_GUIDE.md` for comprehensive usage instructions
+- See `doc/FEATURE_SUMMARY.md` for complete feature list
+- See `doc/TFM_APPLICATION_OVERVIEW.md` for technical overview
 
 ## Remote Log Monitoring
 
@@ -684,6 +715,47 @@ Professional file and directory comparison with Beyond Compare:
 - **Directory comparison**: Compare entire directories
 - **Integration scripts**: Wrapper scripts handle TFM environment variables
 - **Automatic detection**: Uses TFM's current pane and selection state
+
+## AWS S3 Support
+
+TFM provides seamless integration with Amazon S3 cloud storage:
+
+### Features
+- **S3 URI Navigation**: Navigate to S3 buckets using `s3://bucket-name/path` format
+- **Unified Interface**: S3 objects appear and behave like local files
+- **Full File Operations**: Copy, move, delete, rename files between local and S3 storage
+- **Text Editing**: Edit S3 text files directly with built-in viewer and external editors
+- **Archive Operations**: Create and extract archives with S3 objects
+- **Intelligent Caching**: Configurable TTL-based caching for optimal performance
+- **Virtual Directories**: Support for S3 prefix-based directory simulation
+
+### Setup
+1. Install boto3: `pip install boto3`
+2. Configure AWS credentials via AWS CLI, environment variables, or IAM roles
+3. Navigate to S3 buckets: `s3://my-bucket/path/to/objects`
+
+### Usage Examples
+```bash
+# Navigate to S3 bucket
+s3://my-data-bucket/
+
+# Copy local files to S3
+# Select files in left pane (local), navigate right pane to s3://bucket/path, press 'c'
+
+# Edit S3 text files
+# Navigate to s3://bucket/file.txt, press Enter or 'v' to view, 'e' to edit
+
+# Mixed operations
+# Copy between s3://bucket1/path and s3://bucket2/path
+```
+
+### Supported Operations
+- **Navigation**: Browse buckets and objects like local directories
+- **File Operations**: All standard file operations (copy, move, delete, rename)
+- **Text Operations**: View and edit text files with syntax highlighting
+- **Archive Operations**: Create/extract archives with S3 objects
+- **Search**: Search within S3 objects and file names
+- **Batch Operations**: Multi-select and batch operations on S3 objects
 
 ## Contributing
 TFM welcomes contributions! The modular project structure makes it easy to add new features:

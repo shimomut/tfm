@@ -8,36 +8,58 @@ The TFM (Terminal File Manager) project is organized into a clean directory stru
 ```
 tfm/
 ├── src/                    # Source code
-│   ├── tfm_main.py        # Main application logic
-│   ├── tfm_config.py      # Configuration system
-│   ├── tfm_const.py       # Constants and definitions
-│   ├── tfm_colors.py      # Color management
-│   ├── tfm_text_viewer.py # Text file viewer
+│   ├── tfm_main.py        # Main application logic and FileManager class
+│   ├── tfm_config.py      # Configuration system and user settings
+│   ├── tfm_const.py       # Constants and key definitions
+│   ├── tfm_colors.py      # Color management and terminal colors
+│   ├── tfm_text_viewer.py # Text file viewer with syntax highlighting
+│   ├── tfm_path.py        # Extended Path implementation with S3 support
+│   ├── tfm_s3.py          # AWS S3 integration and operations
+│   ├── tfm_cache_manager.py # Caching system for S3 and remote operations
+│   ├── tfm_archive.py     # Archive creation and extraction
+│   ├── tfm_key_bindings.py # Key binding management system
 │   ├── tfm_single_line_text_edit.py # Single line text editor component
+│   ├── tfm_base_list_dialog.py      # Base class for searchable dialogs
 │   ├── tfm_batch_rename_dialog.py   # Batch rename dialog component
+│   ├── tfm_drives_dialog.py         # Drive selection dialog (Windows)
 │   ├── tfm_external_programs.py     # External programs and subshell functionality
 │   ├── tfm_file_operations.py       # File operations handler
 │   ├── tfm_general_purpose_dialog.py # General purpose dialog system
 │   ├── tfm_info_dialog.py           # Information dialog component
+│   ├── tfm_jump_dialog.py           # Jump to directory dialog
 │   ├── tfm_list_dialog.py           # Searchable list dialog component
-│   ├── tfm_log_manager.py           # Log management system
+│   ├── tfm_log_manager.py           # Log management system with remote monitoring
 │   ├── tfm_pane_manager.py          # Pane management functionality
+│   ├── tfm_progress_animator.py     # Progress animation system
 │   ├── tfm_progress_manager.py      # Progress tracking system
 │   ├── tfm_quick_choice_bar.py      # Quick choice bar component
 │   ├── tfm_search_dialog.py         # Search dialog component
+│   ├── tfm_state_manager.py         # Application state persistence
+│   ├── tfm_color_tester.py          # Color testing and debugging
 │   └── _config.py         # Default configuration template
 ├── test/                   # Test files and demos
 │   ├── test_*.py          # Unit and integration tests
 │   ├── demo_*.py          # Interactive demos
 │   └── verify_*.py        # Verification scripts
 ├── doc/                    # Documentation
-│   ├── *.md               # Feature documentation
+│   ├── *_FEATURE.md       # Feature documentation
+│   ├── *_SYSTEM.md        # System component documentation
+│   ├── TFM_APPLICATION_OVERVIEW.md # Comprehensive application overview
 │   └── PROJECT_STRUCTURE.md # This file
-├── tfm.py                  # Main entry point
-├── setup.py               # Package setup
-├── Makefile               # Build automation
-├── requirements.txt       # Python dependencies
-├── README.md              # Project overview
+├── tools/                  # External integration tools
+│   ├── tfm_log_client.py  # Remote log monitoring client
+│   ├── vscode_wrapper.sh  # VSCode integration script
+│   ├── bcompare_*.sh      # Beyond Compare integration scripts
+│   └── preview_files.sh   # File preview script
+├── demo/                   # Interactive demonstrations
+│   └── demo_*.py          # Feature demonstration scripts
+├── temp/                   # Temporary files and work-in-progress
+│   └── .keepme            # Directory placeholder
+├── tfm.py                  # Main entry point with argument parsing
+├── setup.py               # Package setup for pip installation
+├── Makefile               # Build automation and common tasks
+├── requirements.txt       # Python dependencies (pygments, boto3)
+├── README.md              # Project overview and user guide
 └── .gitignore             # Git ignore rules
 ```
 
@@ -48,22 +70,39 @@ tfm/
 - **`tfm_config.py`**: Configuration management and user settings
 - **`tfm_const.py`**: Application constants and key definitions
 - **`tfm_colors.py`**: Color scheme and terminal color management
-- **`tfm_text_viewer.py`**: Text file viewing functionality
+- **`tfm_text_viewer.py`**: Text file viewing functionality with syntax highlighting
 - **`_config.py`**: Template configuration file for users
 
-### Component Files
+### Path and Storage System
+- **`tfm_path.py`**: Extended Path implementation supporting local and S3 paths
+- **`tfm_s3.py`**: AWS S3 integration with full pathlib compatibility
+- **`tfm_cache_manager.py`**: Intelligent caching system for remote operations
+- **`tfm_archive.py`**: Archive creation and extraction (ZIP, TAR.GZ, TGZ)
+
+### Dialog Components
+- **`tfm_base_list_dialog.py`**: Base class for searchable list dialogs
 - **`tfm_single_line_text_edit.py`**: Reusable single-line text editor component
 - **`tfm_batch_rename_dialog.py`**: Batch file renaming dialog with regex support
-- **`tfm_external_programs.py`**: External program execution and subshell functionality
-- **`tfm_file_operations.py`**: File system operations and file management
+- **`tfm_drives_dialog.py`**: Drive selection dialog for Windows systems
 - **`tfm_general_purpose_dialog.py`**: Flexible dialog system for various inputs
 - **`tfm_info_dialog.py`**: Scrollable information display dialog
+- **`tfm_jump_dialog.py`**: Jump to directory dialog with intelligent scanning
 - **`tfm_list_dialog.py`**: Searchable list selection dialog
-- **`tfm_log_manager.py`**: Logging system and output capture
-- **`tfm_pane_manager.py`**: Dual pane management and navigation
-- **`tfm_progress_manager.py`**: Progress tracking for long operations
 - **`tfm_quick_choice_bar.py`**: Quick choice selection in status bar
 - **`tfm_search_dialog.py`**: File and content search functionality
+
+### Management Systems
+- **`tfm_external_programs.py`**: External program execution and subshell functionality
+- **`tfm_file_operations.py`**: File system operations and file management
+- **`tfm_key_bindings.py`**: Key binding management and configuration
+- **`tfm_log_manager.py`**: Logging system with remote monitoring support
+- **`tfm_pane_manager.py`**: Dual pane management and navigation
+- **`tfm_progress_animator.py`**: Configurable progress animation system
+- **`tfm_progress_manager.py`**: Progress tracking for long operations
+- **`tfm_state_manager.py`**: Application state persistence and restoration
+
+### Development and Testing
+- **`tfm_color_tester.py`**: Color testing and debugging utilities
 
 ### Key Components
 - **FileManager Class**: Main application controller
