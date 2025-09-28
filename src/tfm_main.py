@@ -2752,6 +2752,11 @@ class FileManager:
     def _delete_directory_with_progress(self, dir_path, processed_files, total_files):
         """Delete directory recursively with fine-grained progress updates"""
         try:
+            # Check if this is an S3 path
+            from tfm_s3 import S3PathImpl
+            if isinstance(dir_path._impl, S3PathImpl):
+                return self._delete_s3_directory_with_progress(dir_path, processed_files, total_files)
+            
             # Walk through directory and delete files one by one (bottom-up for safety)
             for root, dirs, files in os.walk(dir_path, topdown=False):
                 root_path = Path(root)
@@ -2818,6 +2823,77 @@ class FileManager:
             
         except Exception as e:
             print(f"Error deleting directory {dir_path}: {e}")
+    
+    def _delete_s3_directory_with_progress(self, dir_path, processed_files, total_files):
+        """Delete S3 directory recursively with fine-grained progress updates"""
+        try:
+            from tfm_s3 import S3PathImpl
+            s3_impl = dir_path._impl
+            
+            # List all objects in the directory
+            prefix = s3_impl._key.rstrip('/') + '/'
+            
+            # Use paginator to handle large directories
+            paginator = s3_impl._client.get_paginator('list_objects_v2')
+            page_iterator = paginator.paginate(
+                Bucket=s3_impl._bucket,
+                Prefix=prefix
+            )
+            
+            objects_to_delete = []
+            
+            for page in page_iterator:
+                for obj in page.get('Contents', []):
+                    processed_files += 1
+                    
+                    if total_files > 1:
+                        # Show relative path from the main directory being deleted
+                        try:
+                            rel_key = obj['Key'][len(prefix):]  # Remove the prefix
+                            display_name = rel_key if rel_key else obj['Key']
+                        except:
+                            display_name = obj['Key']
+                        
+                        self.progress_manager.update_progress(display_name, processed_files)
+                    
+                    objects_to_delete.append({'Key': obj['Key']})
+                    
+                    # Delete in batches of 1000 (S3 limit)
+                    if len(objects_to_delete) >= 1000:
+                        try:
+                            s3_impl._delete_objects_batch(objects_to_delete)
+                        except Exception as e:
+                            print(f"Error deleting S3 objects batch: {e}")
+                            if total_files > 1:
+                                self.progress_manager.increment_errors()
+                        objects_to_delete = []
+            
+            # Delete remaining objects
+            if objects_to_delete:
+                try:
+                    s3_impl._delete_objects_batch(objects_to_delete)
+                except Exception as e:
+                    print(f"Error deleting S3 objects batch: {e}")
+                    if total_files > 1:
+                        self.progress_manager.increment_errors()
+            
+            # Remove directory marker if it exists
+            directory_key = s3_impl._key.rstrip('/') + '/'
+            try:
+                s3_impl._client.delete_object(Bucket=s3_impl._bucket, Key=directory_key)
+            except:
+                pass  # Directory marker might not exist
+            
+            # Invalidate cache after directory removal
+            s3_impl._invalidate_cache_for_write()
+            
+            return processed_files
+            
+        except Exception as e:
+            print(f"Error deleting S3 directory {dir_path}: {e}")
+            if total_files > 1:
+                self.progress_manager.increment_errors()
+            return processed_files
             if total_files > 1:
                 self.progress_manager.increment_errors()
             return processed_files

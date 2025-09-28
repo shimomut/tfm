@@ -580,7 +580,9 @@ class S3PathImpl(PathImpl):
                 return True
         except ClientError as e:
             if e.response['Error']['Code'] in ['404', 'NoSuchBucket', 'NoSuchKey']:
-                return False
+                # If direct object doesn't exist, check if it's a directory
+                # (i.e., there are objects with this key as a prefix)
+                return self.is_dir()
             raise
     
     def is_dir(self) -> bool:
@@ -862,6 +864,74 @@ class S3PathImpl(PathImpl):
                 pass  # Directory marker might not exist
         except ClientError as e:
             raise OSError(f"Failed to remove S3 directory: {e}")
+    
+    def rmtree(self):
+        """Remove this directory and all its contents recursively"""
+        if not self._key:
+            raise OSError("Cannot remove S3 bucket using rmtree. Use AWS CLI or boto3 directly.")
+        
+        try:
+            # List all objects with this prefix
+            prefix = self._key.rstrip('/') + '/'
+            
+            # Use paginator to handle large directories
+            paginator = self._client.get_paginator('list_objects_v2')
+            page_iterator = paginator.paginate(
+                Bucket=self._bucket,
+                Prefix=prefix
+            )
+            
+            objects_to_delete = []
+            
+            for page in page_iterator:
+                for obj in page.get('Contents', []):
+                    objects_to_delete.append({'Key': obj['Key']})
+                    
+                    # Delete in batches of 1000 (S3 limit)
+                    if len(objects_to_delete) >= 1000:
+                        self._delete_objects_batch(objects_to_delete)
+                        objects_to_delete = []
+            
+            # Delete remaining objects
+            if objects_to_delete:
+                self._delete_objects_batch(objects_to_delete)
+            
+            # Remove directory marker if it exists
+            directory_key = self._key.rstrip('/') + '/'
+            try:
+                self._client.delete_object(Bucket=self._bucket, Key=directory_key)
+            except ClientError:
+                pass  # Directory marker might not exist
+            
+            # Invalidate cache after directory removal
+            self._invalidate_cache_for_write()
+            
+        except ClientError as e:
+            raise OSError(f"Failed to remove S3 directory tree: {e}")
+    
+    def _delete_objects_batch(self, objects_to_delete):
+        """Delete a batch of S3 objects"""
+        if not objects_to_delete:
+            return
+        
+        try:
+            response = self._client.delete_objects(
+                Bucket=self._bucket,
+                Delete={
+                    'Objects': objects_to_delete,
+                    'Quiet': True
+                }
+            )
+            
+            # Check for errors
+            if 'Errors' in response and response['Errors']:
+                error_messages = []
+                for error in response['Errors']:
+                    error_messages.append(f"Key: {error['Key']}, Error: {error['Message']}")
+                raise OSError(f"Failed to delete some objects: {'; '.join(error_messages)}")
+                
+        except ClientError as e:
+            raise OSError(f"Failed to delete objects batch: {e}")
     
     def unlink(self, missing_ok=False):
         """Remove this file or symbolic link"""
