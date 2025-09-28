@@ -9,7 +9,7 @@ import subprocess
 import sys
 import shlex
 import time
-from pathlib import Path
+from tfm_path import Path
 
 
 def quote_filenames_with_double_quotes(filenames):

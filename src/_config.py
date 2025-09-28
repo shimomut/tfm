@@ -73,6 +73,7 @@ class Config:
         'rename_file': ['r', 'R'],            # Rename selected file/directory
         'favorites': ['j'],                   # Show favorite directories dialog
         'jump_dialog': ['J'],                 # Show jump to directory dialog (Shift+J)
+        'drives_dialog': ['d', 'D'],          # Show drives/storage selection dialog
         'history': ['h', 'H'],                # Show history for current pane
         'subshell': ['X'],                     # Enter subshell (command line) mode
         'programs': ['x'],                     # Show external programs menu
@@ -121,6 +122,9 @@ class Config:
     # Text editor settings
     TEXT_EDITOR = 'vim'  # Text editor command (vim, nano, emacs, code, etc.)
     
+    # S3 settings
+    S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
+    
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
     # Relative paths in the first element are resolved relative to the TFM root directory (where tfm.py is located)
@@ -137,6 +141,8 @@ class Config:
         {'name': 'Compare Directories (BeyondCompare)', 'command': ['./tools/bcompare_dirs_wrapper.sh'], 'options': {'auto_return': True}},
         {'name': 'Open in VSCode', 'command': ['./tools/vscode_wrapper.sh'], 'options': {'auto_return': True}},
         {'name': 'Preview Files', 'command': ['./tools/preview_files.sh'], 'options': {'auto_return': True}},
+        {'name': 'S3 Information', 'command': ['./tools/s3_info.sh']},
+        {'name': 'S3 Browser', 'command': ['./tools/s3_browser.sh']},
         # Add your own programs here:
         # {'name': 'My Script', 'command': ['/path/to/script.sh']},
         # {'name': 'Python REPL', 'command': ['python3']},

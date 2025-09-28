@@ -10,7 +10,7 @@ import curses
 import sys
 import os
 import time
-from pathlib import Path
+from tfm_path import Path
 
 # Import TFM color modules
 from tfm_colors import (

@@ -8,7 +8,7 @@ for popular file formats using pygments (optional dependency).
 
 import curses
 import os
-from pathlib import Path
+from tfm_path import Path
 from typing import List, Tuple, Optional, Dict, Any
 import re
 
@@ -52,23 +52,38 @@ class TextViewer:
     def load_file(self):
         """Load and process the text file"""
         try:
-            # Try to read as text file with different encodings
+            # Try to read as text file with different encodings using tfm_path abstraction
             encodings = ['utf-8', 'latin-1', 'cp1252']
             content = None
             
             for encoding in encodings:
                 try:
-                    with open(self.file_path, 'r', encoding=encoding) as f:
-                        content = f.read()
+                    # Use tfm_path's read_text method which works for both local and remote files
+                    content = self.file_path.read_text(encoding=encoding)
                     break
                 except UnicodeDecodeError:
                     continue
+                except (FileNotFoundError, OSError):
+                    # Re-raise these as they indicate actual file access issues
+                    raise
             
             if content is None:
                 # If all encodings fail, try binary mode and show hex
-                self.lines = ["[Binary file - cannot display as text]"]
-                self.highlighted_lines = [[("[Binary file - cannot display as text]", curses.color_pair(COLOR_REGULAR_FILE))]]
-                return
+                try:
+                    # Try to read as bytes to detect if it's truly a binary file
+                    binary_content = self.file_path.read_bytes()
+                    # Check if it contains null bytes (common in binary files)
+                    if b'\x00' in binary_content[:1024]:
+                        self.lines = ["[Binary file - cannot display as text]"]
+                        self.highlighted_lines = [[("[Binary file - cannot display as text]", curses.color_pair(COLOR_REGULAR_FILE))]]
+                        return
+                    else:
+                        # Try to decode as latin-1 as a last resort (it can decode any byte sequence)
+                        content = binary_content.decode('latin-1', errors='replace')
+                except Exception:
+                    self.lines = ["[Binary file - cannot display as text]"]
+                    self.highlighted_lines = [[("[Binary file - cannot display as text]", curses.color_pair(COLOR_REGULAR_FILE))]]
+                    return
                 
             # Split into lines
             self.lines = content.splitlines()
@@ -80,8 +95,20 @@ class TextViewer:
                 # Create plain highlighted lines (no colors)
                 self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
                 
+        except FileNotFoundError:
+            error_msg = f"File not found: {self.file_path}"
+            self.lines = [error_msg]
+            self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
+        except PermissionError:
+            error_msg = f"Permission denied: {self.file_path}"
+            self.lines = [error_msg]
+            self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
+        except OSError as e:
+            error_msg = f"Error reading file: {e}"
+            self.lines = [error_msg]
+            self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
         except Exception as e:
-            error_msg = f"Error reading file: {str(e)}"
+            error_msg = f"Unexpected error reading file: {e}"
             self.lines = [error_msg]
             self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
     
@@ -313,8 +340,13 @@ class TextViewer:
         except curses.error:
             pass
         
-        # File path and info
-        file_info = f"File: {self.file_path.name}"
+        # File path and info - show scheme for remote files
+        if self.file_path.is_remote():
+            scheme = self.file_path.get_scheme().upper()
+            file_info = f"{scheme}: {self.file_path.name}"
+        else:
+            file_info = f"File: {self.file_path.name}"
+            
         if len(file_info) > width - 4:
             file_info = "..." + file_info[-(width-7):]
         
@@ -382,6 +414,12 @@ class TextViewer:
                 size_str = f"{file_size / (1024 * 1024):.1f}M"
             else:
                 size_str = f"{file_size / (1024 * 1024 * 1024):.1f}G"
+        except FileNotFoundError:
+            print(f"Warning: File not found for size calculation: {self.file_path}")
+            size_str = "---"
+        except PermissionError:
+            print(f"Warning: Permission denied for size calculation: {self.file_path}")
+            size_str = "---"
         except (OSError, AttributeError) as e:
             print(f"Warning: Could not get file size for {self.file_path}: {e}")
             size_str = "---"
@@ -655,10 +693,14 @@ def is_text_file(file_path: Path) -> bool:
     if file_path.name.lower() in text_names:
         return True
     
-    # Try to read first few bytes to detect binary files
+    # Try to read first few bytes to detect binary files using tfm_path abstraction
     try:
-        with open(file_path, 'rb') as f:
-            chunk = f.read(1024)
+        # Use tfm_path's read_bytes method which works for both local and remote files
+        chunk = file_path.read_bytes()
+        
+        # For large files, only read first 1024 bytes for detection
+        if len(chunk) > 1024:
+            chunk = chunk[:1024]
             
         # Check for null bytes (common in binary files)
         if b'\x00' in chunk:
@@ -678,7 +720,13 @@ def is_text_file(file_path: Path) -> bool:
                     continue
             return False
             
-    except (OSError, IOError) as e:
+    except FileNotFoundError:
+        print(f"Warning: File not found for text detection: {file_path}")
+        return False
+    except PermissionError:
+        print(f"Warning: Permission denied for text detection: {file_path}")
+        return False
+    except OSError as e:
         print(f"Warning: Could not read file for text detection {file_path}: {e}")
         return False
     except Exception as e:

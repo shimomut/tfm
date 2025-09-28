@@ -18,7 +18,7 @@ import time
 import webbrowser
 import importlib
 import traceback
-from pathlib import Path
+from tfm_path import Path
 from datetime import datetime
 from collections import deque
 from tfm_single_line_text_edit import SingleLineTextEdit
@@ -32,17 +32,20 @@ from tfm_text_viewer import view_text_file, is_text_file
 # Import new modular components
 from tfm_log_manager import LogManager
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileOperations
+from tfm_file_operations import FileOperations, FileOperationsUI
 from tfm_list_dialog import ListDialog, ListDialogHelpers
 from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_jump_dialog import JumpDialog, JumpDialogHelpers
+from tfm_drives_dialog import DrivesDialog, DrivesDialogHelpers
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
 from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
+from tfm_archive import ArchiveOperations, ArchiveUI
+from tfm_cache_manager import CacheManager
 
 class FileManager:
     def __init__(self, stdscr, remote_log_port=None, left_dir=None, right_dir=None):
@@ -85,11 +88,16 @@ class FileManager:
         self.info_dialog = InfoDialog(self.config)
         self.search_dialog = SearchDialog(self.config)
         self.jump_dialog = JumpDialog(self.config)
+        self.drives_dialog = DrivesDialog(self.config)
         self.batch_rename_dialog = BatchRenameDialog(self.config)
         self.quick_choice_bar = QuickChoiceBar(self.config)
         self.general_dialog = GeneralPurposeDialog(self.config)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
         self.progress_manager = ProgressManager()
+        self.cache_manager = CacheManager(self.log_manager)
+        self.archive_operations = ArchiveOperations(self.log_manager, self.cache_manager, self.progress_manager)
+        self.archive_ui = ArchiveUI(self, self.archive_operations)
+        self.file_operations_ui = FileOperationsUI(self, self.file_operations)
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -1186,8 +1194,8 @@ class FileManager:
         """Enter create directory mode"""
         current_pane = self.get_current_pane()
         
-        # Check if current directory is writable
-        if not os.access(current_pane['path'], os.W_OK):
+        # Check if current directory is writable (only for local paths)
+        if current_pane['path'].get_scheme() == 'file' and not os.access(current_pane['path'], os.W_OK):
             print(f"Permission denied: Cannot create directory in {current_pane['path']}")
             return
         
@@ -1222,6 +1230,9 @@ class FileManager:
             new_dir_path.mkdir(parents=True, exist_ok=False)
             print(f"Created directory: {new_dir_name}")
             
+            # Invalidate cache for the new directory
+            self.cache_manager.invalidate_cache_for_create_operation(new_dir_path)
+            
             # Refresh the current pane
             self.refresh_files(current_pane)
             
@@ -1250,8 +1261,8 @@ class FileManager:
         """Enter create file mode"""
         current_pane = self.get_current_pane()
         
-        # Check if current directory is writable
-        if not os.access(current_pane['path'], os.W_OK):
+        # Check if current directory is writable (only for local paths)
+        if current_pane['path'].get_scheme() == 'file' and not os.access(current_pane['path'], os.W_OK):
             print(f"Permission denied: Cannot create file in {current_pane['path']}")
             return
         
@@ -1285,6 +1296,9 @@ class FileManager:
             # Create the file
             new_file_path.touch()
             print(f"Created file: {new_file_name}")
+            
+            # Invalidate cache for the new file
+            self.cache_manager.invalidate_cache_for_create_operation(new_file_path)
             
             # Refresh the current pane
             self.refresh_files(current_pane)
@@ -1446,6 +1460,8 @@ class FileManager:
             return self.search_dialog.needs_redraw()
         elif self.jump_dialog.mode:
             return self.jump_dialog.needs_redraw()
+        elif self.drives_dialog.mode:
+            return self.drives_dialog.needs_redraw()
         elif self.batch_rename_dialog.mode:
             return self.batch_rename_dialog.needs_redraw()
         return False
@@ -1471,6 +1487,9 @@ class FileManager:
                 dialog_drawn = True
             elif self.jump_dialog.mode:
                 self.jump_dialog.draw(self.stdscr, self.safe_addstr)
+                dialog_drawn = True
+            elif self.drives_dialog.mode:
+                self.drives_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
             elif self.batch_rename_dialog.mode:
                 self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
@@ -1502,6 +1521,8 @@ class FileManager:
             self.search_dialog.draw(self.stdscr, self.safe_addstr)
         elif self.jump_dialog.mode:
             self.jump_dialog.draw(self.stdscr, self.safe_addstr)
+        elif self.drives_dialog.mode:
+            self.drives_dialog.draw(self.stdscr, self.safe_addstr)
         elif self.batch_rename_dialog.mode:
             self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
         
@@ -2061,944 +2082,63 @@ class FileManager:
             print(f"Error launching editor: {e}")
     
     def copy_selected_files(self):
-        """Copy selected files to the opposite pane's directory"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Get files to copy - either selected files or current file if none selected
-        files_to_copy = []
-        
-        if current_pane['selected_files']:
-            # Copy all selected files
-            for file_path_str in current_pane['selected_files']:
-                file_path = Path(file_path_str)
-                if file_path.exists():
-                    files_to_copy.append(file_path)
-        else:
-            # Copy current file if no files are selected
-            if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                
-                # Parent directory (..) is no longer shown
-                files_to_copy.append(selected_file)
-        
-        if not files_to_copy:
-            print("No files to copy")
-            return
-        
-        destination_dir = other_pane['path']
-        
-        # Check if destination directory is writable
-        if not os.access(destination_dir, os.W_OK):
-            print(f"Permission denied: Cannot write to {destination_dir}")
-            return
-        
-        # Check if copy confirmation is enabled
-        if getattr(self.config, 'CONFIRM_COPY', True):
-            # Show confirmation dialog
-            if len(files_to_copy) == 1:
-                message = f"Copy '{files_to_copy[0].name}' to {destination_dir}?"
-            else:
-                message = f"Copy {len(files_to_copy)} items to {destination_dir}?"
-            
-            def copy_callback(confirmed):
-                if confirmed:
-                    self.copy_files_to_directory(files_to_copy, destination_dir)
-                else:
-                    print("Copy operation cancelled")
-            
-            self.show_confirmation(message, copy_callback)
-        else:
-            # Start copying files without confirmation
-            self.copy_files_to_directory(files_to_copy, destination_dir)
+        """Copy selected files to the opposite pane's directory - delegated to FileOperationsUI"""
+        self.file_operations_ui.copy_selected_files()
     
     def copy_files_to_directory(self, files_to_copy, destination_dir):
-        """Copy a list of files to the destination directory with conflict resolution"""
-        conflicts = []
-        
-        # Check for conflicts first
-        for source_file in files_to_copy:
-            dest_path = destination_dir / source_file.name
-            if dest_path.exists():
-                conflicts.append((source_file, dest_path))
-        
-        if conflicts:
-            # Show conflict resolution dialog
-            conflict_names = [f.name for f, _ in conflicts]
-            if len(conflicts) == 1:
-                message = f"'{conflict_names[0]}' already exists in destination."
-            else:
-                message = f"{len(conflicts)} files already exist in destination."
-            
-            choices = [
-                {"text": "Overwrite", "key": "o", "value": "overwrite"},
-                {"text": "Skip", "key": "s", "value": "skip"},
-                {"text": "Cancel", "key": "c", "value": "cancel"}
-            ]
-            
-            def handle_conflict_choice(choice):
-                if choice == "cancel":
-                    print("Copy operation cancelled")
-                    return
-                elif choice == "skip":
-                    # Copy only non-conflicting files
-                    non_conflicting = [f for f in files_to_copy 
-                                     if not (destination_dir / f.name).exists()]
-                    if non_conflicting:
-                        self.perform_copy_operation(non_conflicting, destination_dir)
-                        print(f"Copied {len(non_conflicting)} files, skipped {len(conflicts)} conflicts")
-                    else:
-                        print("No files copied (all had conflicts)")
-                elif choice == "overwrite":
-                    # Copy all files, overwriting conflicts
-                    self.perform_copy_operation(files_to_copy, destination_dir, overwrite=True)
-                    print(f"Copied {len(files_to_copy)} files (overwrote {len(conflicts)} existing)")
-            
-            self.show_dialog(message, choices, handle_conflict_choice)
-        else:
-            # No conflicts, copy directly
-            self.perform_copy_operation(files_to_copy, destination_dir)
-            print(f"Copied {len(files_to_copy)} files")
+        """Copy files to directory - delegated to FileOperationsUI"""
+        self.file_operations_ui.copy_files_to_directory(files_to_copy, destination_dir)
     
     def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False):
-        """Perform the actual copy operation with fine-grained progress tracking"""
-        copied_count = 0
-        error_count = 0
-        
-        # Count total individual files for fine-grained progress
-        total_individual_files = self._count_files_recursively(files_to_copy)
-        
-        # Start progress tracking for copy operation
-        if total_individual_files > 1:  # Only show progress for multiple files
-            self.progress_manager.start_operation(
-                OperationType.COPY, 
-                total_individual_files, 
-                f"to {destination_dir.name}",
-                self._progress_callback
-            )
-        
-        processed_files = 0
-        
-        try:
-            for source_file in files_to_copy:
-                try:
-                    dest_path = destination_dir / source_file.name
-                    
-                    # Skip if file exists and we're not overwriting
-                    if dest_path.exists() and not overwrite:
-                        # Still need to count skipped files for progress
-                        if source_file.is_file() or source_file.is_symlink():
-                            processed_files += 1
-                            if total_individual_files > 1:
-                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
-                        elif source_file.is_dir():
-                            # Count files in skipped directory
-                            skipped_count = self._count_files_recursively([source_file])
-                            processed_files += skipped_count
-                            if total_individual_files > 1:
-                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
-                        continue
-                    
-                    if source_file.is_dir():
-                        # Copy directory recursively with progress tracking
-                        if dest_path.exists():
-                            shutil.rmtree(dest_path)
-                        
-                        processed_files = self._copy_directory_with_progress(
-                            source_file, dest_path, processed_files, total_individual_files
-                        )
-                        print(f"Copied directory: {source_file.name}")
-                    else:
-                        # Copy single file
-                        processed_files += 1
-                        if total_individual_files > 1:
-                            self.progress_manager.update_progress(source_file.name, processed_files)
-                        
-                        shutil.copy2(source_file, dest_path)
-                        print(f"Copied file: {source_file.name}")
-                    
-                    copied_count += 1
-                    
-                except PermissionError as e:
-                    print(f"Permission denied copying {source_file.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if source_file.is_file() or source_file.is_symlink():
-                            processed_files += 1
-                        elif source_file.is_dir():
-                            processed_files += self._count_files_recursively([source_file])
-                except Exception as e:
-                    print(f"Error copying {source_file.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if source_file.is_file() or source_file.is_symlink():
-                            processed_files += 1
-                        elif source_file.is_dir():
-                            processed_files += self._count_files_recursively([source_file])
-        
-        finally:
-            # Finish progress tracking
-            if total_individual_files > 1:
-                self.progress_manager.finish_operation()
-        
-        # Refresh both panes to show the copied files
-        self.refresh_files()
-        self.needs_full_redraw = True
-        
-        # Clear selections after successful copy
-        if copied_count > 0:
-            current_pane = self.get_current_pane()
-            current_pane['selected_files'].clear()
-        
-        if error_count > 0:
-            print(f"Copy completed with {error_count} errors")
+        """Perform copy operation - delegated to FileOperationsUI"""
+        self.file_operations_ui.perform_copy_operation(files_to_copy, destination_dir, overwrite)
     
+    # Legacy helper method - functionality moved to FileOperationsUI
     def _copy_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files):
-        """Copy directory recursively with fine-grained progress updates"""
-        try:
-            # Create destination directory
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Walk through source directory and copy files one by one
-            for root, dirs, files in os.walk(source_dir):
-                root_path = Path(root)
-                
-                # Calculate relative path from source directory
-                rel_path = root_path.relative_to(source_dir)
-                dest_root = dest_dir / rel_path
-                
-                # Create subdirectories
-                dest_root.mkdir(parents=True, exist_ok=True)
-                
-                # Copy files in current directory
-                for file_name in files:
-                    source_file = root_path / file_name
-                    dest_file = dest_root / file_name
-                    
-                    processed_files += 1
-                    if total_files > 1:
-                        # Show relative path for files in subdirectories
-                        display_name = str(rel_path / file_name) if rel_path != Path('.') else file_name
-                        self.progress_manager.update_progress(display_name, processed_files)
-                    
-                    try:
-                        if source_file.is_symlink():
-                            # Copy symbolic link
-                            link_target = os.readlink(str(source_file))
-                            dest_file.symlink_to(link_target)
-                        else:
-                            # Copy regular file
-                            shutil.copy2(source_file, dest_file)
-                    except Exception as e:
-                        print(f"Error copying {source_file}: {e}")
-                        if total_files > 1:
-                            self.progress_manager.increment_errors()
-                
-                # Handle symbolic links to directories
-                for dir_name in dirs:
-                    source_subdir = root_path / dir_name
-                    if source_subdir.is_symlink():
-                        processed_files += 1
-                        if total_files > 1:
-                            display_name = str(rel_path / dir_name) if rel_path != Path('.') else dir_name
-                            self.progress_manager.update_progress(f"Link: {display_name}", processed_files)
-                        
-                        dest_subdir = dest_root / dir_name
-                        try:
-                            link_target = os.readlink(str(source_subdir))
-                            dest_subdir.symlink_to(link_target)
-                        except Exception as e:
-                            print(f"Error copying symlink {source_subdir}: {e}")
-                            if total_files > 1:
-                                self.progress_manager.increment_errors()
-            
-            return processed_files
-            
-        except Exception as e:
-            print(f"Error copying directory {source_dir}: {e}")
-            if total_files > 1:
-                self.progress_manager.increment_errors()
-            return processed_files
+        """Copy directory with progress - delegated to FileOperationsUI"""
+        return self.file_operations_ui._copy_directory_with_progress(source_dir, dest_dir, processed_files, total_files)
     
     def move_selected_files(self):
-        """Move selected files to the opposite pane's directory"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Get files to move - either selected files or current file if none selected
-        files_to_move = []
-        
-        if current_pane['selected_files']:
-            # Move all selected files
-            for file_path_str in current_pane['selected_files']:
-                file_path = Path(file_path_str)
-                if file_path.exists():
-                    files_to_move.append(file_path)
-        else:
-            # Move current file if no files are selected
-            if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_move.append(selected_file)
-        
-        if not files_to_move:
-            print("No files to move")
-            return
-        
-        destination_dir = other_pane['path']
-        
-        # Check if destination directory is writable
-        if not os.access(destination_dir, os.W_OK):
-            print(f"Permission denied: Cannot write to {destination_dir}")
-            return
-        
-        # Check if any files are being moved to the same directory
-        same_dir_files = [f for f in files_to_move if f.parent == destination_dir]
-        if same_dir_files:
-            if len(same_dir_files) == len(files_to_move):
-                print("Cannot move files to the same directory")
-                return
-            else:
-                # Remove files that are already in the destination directory
-                files_to_move = [f for f in files_to_move if f.parent != destination_dir]
-                print(f"Skipping {len(same_dir_files)} files already in destination directory")
-        
-        # Check if move confirmation is enabled
-        if getattr(self.config, 'CONFIRM_MOVE', True):
-            # Show confirmation dialog
-            if len(files_to_move) == 1:
-                message = f"Move '{files_to_move[0].name}' to {destination_dir}?"
-            else:
-                message = f"Move {len(files_to_move)} items to {destination_dir}?"
-            
-            def move_callback(confirmed):
-                if confirmed:
-                    self.move_files_to_directory(files_to_move, destination_dir)
-                else:
-                    print("Move operation cancelled")
-            
-            self.show_confirmation(message, move_callback)
-        else:
-            # Start moving files without confirmation
-            self.move_files_to_directory(files_to_move, destination_dir)
+        """Move selected files to the opposite pane's directory - delegated to FileOperationsUI"""
+        self.file_operations_ui.move_selected_files()
     
     def move_files_to_directory(self, files_to_move, destination_dir):
-        """Move a list of files to the destination directory with conflict resolution"""
-        conflicts = []
-        
-        # Check for conflicts first
-        for source_file in files_to_move:
-            dest_path = destination_dir / source_file.name
-            if dest_path.exists():
-                conflicts.append((source_file, dest_path))
-        
-        if conflicts:
-            # Show conflict resolution dialog
-            conflict_names = [f.name for f, _ in conflicts]
-            if len(conflicts) == 1:
-                message = f"'{conflict_names[0]}' already exists in destination."
-            else:
-                message = f"{len(conflicts)} files already exist in destination."
-            
-            choices = [
-                {"text": "Overwrite", "key": "o", "value": "overwrite"},
-                {"text": "Skip", "key": "s", "value": "skip"},
-                {"text": "Cancel", "key": "c", "value": "cancel"}
-            ]
-            
-            def handle_conflict_choice(choice):
-                if choice == "cancel":
-                    print("Move operation cancelled")
-                    return
-                elif choice == "skip":
-                    # Move only non-conflicting files
-                    non_conflicting = [f for f in files_to_move 
-                                     if not (destination_dir / f.name).exists()]
-                    if non_conflicting:
-                        self.perform_move_operation(non_conflicting, destination_dir)
-                        print(f"Moved {len(non_conflicting)} files, skipped {len(conflicts)} conflicts")
-                    else:
-                        print("No files moved (all had conflicts)")
-                elif choice == "overwrite":
-                    # Move all files, overwriting conflicts
-                    self.perform_move_operation(files_to_move, destination_dir, overwrite=True)
-                    print(f"Moved {len(files_to_move)} files (overwrote {len(conflicts)} existing)")
-            
-            self.show_dialog(message, choices, handle_conflict_choice)
-        else:
-            # No conflicts, move directly
-            self.perform_move_operation(files_to_move, destination_dir)
-            print(f"Moved {len(files_to_move)} files")
+        """Move files to directory - delegated to FileOperationsUI"""
+        self.file_operations_ui.move_files_to_directory(files_to_move, destination_dir)
     
     def perform_move_operation(self, files_to_move, destination_dir, overwrite=False):
-        """Perform the actual move operation with fine-grained progress tracking"""
-        moved_count = 0
-        error_count = 0
-        
-        # Count total individual files for fine-grained progress
-        total_individual_files = self._count_files_recursively(files_to_move)
-        
-        # Start progress tracking for move operation
-        if total_individual_files > 1:  # Only show progress for multiple files
-            self.progress_manager.start_operation(
-                OperationType.MOVE, 
-                total_individual_files, 
-                f"to {destination_dir.name}",
-                self._progress_callback
-            )
-        
-        processed_files = 0
-        
-        try:
-            for source_file in files_to_move:
-                try:
-                    dest_path = destination_dir / source_file.name
-                    
-                    # Skip if file exists and we're not overwriting
-                    if dest_path.exists() and not overwrite:
-                        # Still need to count skipped files for progress
-                        if source_file.is_file() or source_file.is_symlink():
-                            processed_files += 1
-                            if total_individual_files > 1:
-                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
-                        elif source_file.is_dir():
-                            # Count files in skipped directory
-                            skipped_count = self._count_files_recursively([source_file])
-                            processed_files += skipped_count
-                            if total_individual_files > 1:
-                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
-                        continue
-                    
-                    # Remove destination if it exists and we're overwriting
-                    if dest_path.exists() and overwrite:
-                        if dest_path.is_dir():
-                            shutil.rmtree(dest_path)
-                        else:
-                            dest_path.unlink()
-                    
-                    # Move the file/directory
-                    if source_file.is_symlink():
-                        # For symbolic links, copy the link itself (not the target)
-                        processed_files += 1
-                        if total_individual_files > 1:
-                            self.progress_manager.update_progress(f"Link: {source_file.name}", processed_files)
-                        
-                        link_target = os.readlink(str(source_file))
-                        dest_path.symlink_to(link_target)
-                        source_file.unlink()
-                        print(f"Moved symbolic link: {source_file.name}")
-                    elif source_file.is_dir():
-                        # For directories, we need to track individual files being moved
-                        processed_files = self._move_directory_with_progress(
-                            source_file, dest_path, processed_files, total_individual_files
-                        )
-                        print(f"Moved directory: {source_file.name}")
-                    else:
-                        # Move single file
-                        processed_files += 1
-                        if total_individual_files > 1:
-                            self.progress_manager.update_progress(source_file.name, processed_files)
-                        
-                        shutil.move(str(source_file), str(dest_path))
-                        print(f"Moved file: {source_file.name}")
-                    
-                    moved_count += 1
-                    
-                except PermissionError as e:
-                    print(f"Permission denied moving {source_file.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if source_file.is_file() or source_file.is_symlink():
-                            processed_files += 1
-                        elif source_file.is_dir():
-                            processed_files += self._count_files_recursively([source_file])
-                except Exception as e:
-                    print(f"Error moving {source_file.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if source_file.is_file() or source_file.is_symlink():
-                            processed_files += 1
-                        elif source_file.is_dir():
-                            processed_files += self._count_files_recursively([source_file])
-        
-        finally:
-            # Finish progress tracking
-            if total_individual_files > 1:
-                self.progress_manager.finish_operation()
-        
-        # Refresh both panes to show the moved files
-        self.refresh_files()
-        self.needs_full_redraw = True
-        
-        # Clear selections after successful move
-        if moved_count > 0:
-            current_pane = self.get_current_pane()
-            current_pane['selected_files'].clear()
-        
-        if error_count > 0:
-            print(f"Move completed with {error_count} errors")
+        """Perform move operation - delegated to FileOperationsUI"""
+        self.file_operations_ui.perform_move_operation(files_to_move, destination_dir, overwrite)
     
-    def _move_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files):
-        """Move directory using copy + delete with fine-grained progress updates"""
-        try:
-            # First copy the directory with progress tracking
-            processed_files = self._copy_directory_with_progress(
-                source_dir, dest_dir, processed_files, total_files
-            )
-            
-            # Then remove the source directory
-            shutil.rmtree(source_dir)
-            
-            return processed_files
-            
-        except Exception as e:
-            print(f"Error moving directory {source_dir}: {e}")
-            if total_files > 1:
-                self.progress_manager.increment_errors()
-            return processed_files
+    # Legacy move operation methods - functionality moved to FileOperationsUI
     
     def delete_selected_files(self):
-        """Delete selected files or current file with confirmation"""
-        current_pane = self.get_current_pane()
-        
-        # Get files to delete - either selected files or current file if none selected
-        files_to_delete = []
-        
-        if current_pane['selected_files']:
-            # Delete all selected files
-            for file_path_str in current_pane['selected_files']:
-                file_path = Path(file_path_str)
-                if file_path.exists():
-                    files_to_delete.append(file_path)
-        else:
-            # Delete current file if no files are selected
-            if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                
-                # Parent directory (..) is no longer shown
-                files_to_delete.append(selected_file)
-        
-        if not files_to_delete:
-            print("No files to delete")
-            return
-        
-        def handle_delete_confirmation(confirmed):
-            if confirmed:
-                self.perform_delete_operation(files_to_delete)
-            else:
-                print("Delete operation cancelled")
-        
-        # Check if delete confirmation is enabled
-        if getattr(self.config, 'CONFIRM_DELETE', True):
-            # Show confirmation dialog
-            if len(files_to_delete) == 1:
-                file_name = files_to_delete[0].name
-                if files_to_delete[0].is_dir():
-                    message = f"Delete directory '{file_name}' and all its contents?"
-                elif files_to_delete[0].is_symlink():
-                    message = f"Delete symbolic link '{file_name}'?"
-                else:
-                    message = f"Delete file '{file_name}'?"
-            else:
-                dir_count = sum(1 for f in files_to_delete if f.is_dir())
-                file_count = len(files_to_delete) - dir_count
-                if dir_count > 0 and file_count > 0:
-                    message = f"Delete {len(files_to_delete)} items ({dir_count} directories, {file_count} files)?"
-                elif dir_count > 0:
-                    message = f"Delete {dir_count} directories and all their contents?"
-                else:
-                    message = f"Delete {file_count} files?"
-            
-            choices = [
-                {"text": "Yes", "key": "y", "value": True},
-                {"text": "No", "key": "n", "value": False}
-            ]
-            
-            self.show_dialog(message, choices, handle_delete_confirmation)
-        else:
-            # Delete without confirmation
-            handle_delete_confirmation(True)
+        """Delete selected files or current file with confirmation - delegated to FileOperationsUI"""
+        self.file_operations_ui.delete_selected_files()
     
     def perform_delete_operation(self, files_to_delete):
-        """Perform the actual delete operation with fine-grained progress tracking"""
-        deleted_count = 0
-        error_count = 0
-        
-        # Count total individual files for fine-grained progress
-        total_individual_files = self._count_files_recursively(files_to_delete)
-        
-        # Start progress tracking for delete operation
-        if total_individual_files > 1:  # Only show progress for multiple files
-            self.progress_manager.start_operation(
-                OperationType.DELETE, 
-                total_individual_files, 
-                "",
-                self._progress_callback
-            )
-        
-        processed_files = 0
-        
-        try:
-            for file_path in files_to_delete:
-                try:
-                    if file_path.is_symlink():
-                        # Delete symbolic link (not its target)
-                        processed_files += 1
-                        if total_individual_files > 1:
-                            self.progress_manager.update_progress(f"Link: {file_path.name}", processed_files)
-                        
-                        file_path.unlink()
-                        print(f"Deleted symbolic link: {file_path.name}")
-                    elif file_path.is_dir():
-                        # Delete directory recursively with progress tracking
-                        processed_files = self._delete_directory_with_progress(
-                            file_path, processed_files, total_individual_files
-                        )
-                        print(f"Deleted directory: {file_path.name}")
-                    else:
-                        # Delete single file
-                        processed_files += 1
-                        if total_individual_files > 1:
-                            self.progress_manager.update_progress(file_path.name, processed_files)
-                        
-                        file_path.unlink()
-                        print(f"Deleted file: {file_path.name}")
-                    
-                    deleted_count += 1
-                    
-                except PermissionError as e:
-                    print(f"Permission denied deleting {file_path.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if file_path.is_file() or file_path.is_symlink():
-                            processed_files += 1
-                        elif file_path.is_dir():
-                            processed_files += self._count_files_recursively([file_path])
-                except FileNotFoundError:
-                    print(f"File not found (already deleted?): {file_path.name}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if file_path.is_file() or file_path.is_symlink():
-                            processed_files += 1
-                        elif file_path.is_dir():
-                            processed_files += self._count_files_recursively([file_path])
-                except Exception as e:
-                    print(f"Error deleting {file_path.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if file_path.is_file() or file_path.is_symlink():
-                            processed_files += 1
-                        elif file_path.is_dir():
-                            processed_files += self._count_files_recursively([file_path])
-        
-        finally:
-            # Finish progress tracking
-            if total_individual_files > 1:
-                self.progress_manager.finish_operation()
-        
-        # Refresh current pane to show the changes
-        self.refresh_files(self.get_current_pane())
-        self.needs_full_redraw = True
-        
-        # Clear selections after delete operation
-        current_pane = self.get_current_pane()
-        current_pane['selected_files'].clear()
-        
-        # Adjust cursor position if it's now out of bounds
-        if current_pane['selected_index'] >= len(current_pane['files']):
-            current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
-        
-        # Report results
-        if deleted_count > 0:
-            print(f"Successfully deleted {deleted_count} items")
+        """Perform delete operation - delegated to FileOperationsUI"""
+        self.file_operations_ui.perform_delete_operation(files_to_delete)
     
-    def _delete_directory_with_progress(self, dir_path, processed_files, total_files):
-        """Delete directory recursively with fine-grained progress updates"""
-        try:
-            # Walk through directory and delete files one by one (bottom-up for safety)
-            for root, dirs, files in os.walk(dir_path, topdown=False):
-                root_path = Path(root)
-                
-                # Delete files in current directory
-                for file_name in files:
-                    file_path = root_path / file_name
-                    processed_files += 1
-                    
-                    if total_files > 1:
-                        # Show relative path from the main directory being deleted
-                        try:
-                            rel_path = file_path.relative_to(dir_path)
-                            display_name = str(rel_path)
-                        except ValueError:
-                            display_name = file_path.name
-                        
-                        self.progress_manager.update_progress(display_name, processed_files)
-                    
-                    try:
-                        file_path.unlink()  # Remove file or symlink
-                    except Exception as e:
-                        print(f"Error deleting {file_path}: {e}")
-                        if total_files > 1:
-                            self.progress_manager.increment_errors()
-                
-                # Delete empty subdirectories (they should be empty now since we're going bottom-up)
-                for dir_name in dirs:
-                    subdir_path = root_path / dir_name
-                    try:
-                        # Only try to remove if it's empty or a symlink
-                        if subdir_path.is_symlink():
-                            # Count symlinks to directories as files for progress
-                            processed_files += 1
-                            if total_files > 1:
-                                try:
-                                    rel_path = subdir_path.relative_to(dir_path)
-                                    display_name = f"Link: {rel_path}"
-                                except ValueError:
-                                    display_name = f"Link: {subdir_path.name}"
-                                self.progress_manager.update_progress(display_name, processed_files)
-                            subdir_path.unlink()
-                        else:
-                            # Try to remove empty directory (no progress update for empty dirs)
-                            subdir_path.rmdir()
-                    except OSError:
-                        # Directory not empty or permission error - skip it
-                        # The directory will be handled by shutil.rmtree fallback if needed
-                        pass
-                    except Exception as e:
-                        print(f"Error deleting directory {subdir_path}: {e}")
-                        if total_files > 1:
-                            self.progress_manager.increment_errors()
-            
-            # Finally remove the main directory
-            try:
-                dir_path.rmdir()
-            except OSError:
-                # If directory is not empty, use shutil.rmtree as fallback
-                # This shouldn't happen if our bottom-up deletion worked correctly
-                shutil.rmtree(dir_path)
-            
-            return processed_files
-            
-        except Exception as e:
-            print(f"Error deleting directory {dir_path}: {e}")
-            if total_files > 1:
-                self.progress_manager.increment_errors()
-            return processed_files
-        if error_count > 0:
-            print(f"Delete completed with {error_count} errors")
+    # Legacy file operation methods - functionality moved to FileOperationsUI
     
     def enter_create_archive_mode(self):
-        """Enter archive creation mode"""
-        current_pane = self.get_current_pane()
-        
-        # Check if there are files to archive
-        files_to_archive = []
-        
-        if current_pane['selected_files']:
-            # Archive selected files
-            for file_path_str in current_pane['selected_files']:
-                file_path = Path(file_path_str)
-                if file_path.exists():
-                    files_to_archive.append(file_path)
-        else:
-            # Archive current file if no files are selected
-            if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_archive.append(selected_file)
-        
-        if not files_to_archive:
-            print("No files to archive")
-            return
-        
-        # Determine default filename for single file/directory
-        default_filename = ""
-        if len(files_to_archive) == 1:
-            # Use basename of the single file/directory with a dot for extension
-            basename = files_to_archive[0].stem if files_to_archive[0].is_file() else files_to_archive[0].name
-            default_filename = f"{basename}."
-        
-        # Enter archive creation mode using general dialog with default filename
-        self.general_dialog.show_status_line_input(
-            prompt="Archive filename: ",
-            help_text="ESC:cancel Enter:create (.zip/.tar.gz/.tgz)",
-            initial_text=default_filename,
-            callback=self.on_create_archive_confirm,
-            cancel_callback=self.on_create_archive_cancel
-        )
-        self.needs_full_redraw = True
-        
-        # Log what we're about to archive
-        if len(files_to_archive) == 1:
-            print(f"Creating archive from: {files_to_archive[0].name}")
-        else:
-            print(f"Creating archive from {len(files_to_archive)} selected items")
-        print("Enter archive filename (with .zip, .tar.gz, or .tgz extension):")
+        """Enter archive creation mode - delegated to ArchiveUI"""
+        self.archive_ui.enter_create_archive_mode()
     
     def on_create_archive_confirm(self, archive_name):
-        """Handle create archive confirmation"""
-        if not archive_name.strip():
-            print("Invalid archive name")
-            self.general_dialog.hide()
-            self.needs_full_redraw = True
-            return
-        
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Get files to archive
-        files_to_archive = []
-        
-        if current_pane['selected_files']:
-            # Archive selected files
-            for file_path_str in current_pane['selected_files']:
-                file_path = Path(file_path_str)
-                if file_path.exists():
-                    files_to_archive.append(file_path)
-        else:
-            # Archive current file if no files are selected
-            if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_archive.append(selected_file)
-        
-        if not files_to_archive:
-            print("No files to archive")
-            self.general_dialog.hide()
-            self.needs_full_redraw = True
-            return
-        
-        archive_filename = archive_name.strip()
-        archive_path = other_pane['path'] / archive_filename
-        
-        # Check if archive already exists
-        if archive_path.exists():
-            print(f"Archive '{archive_filename}' already exists")
-            self.general_dialog.hide()
-            self.needs_full_redraw = True
-            return
-        
-        try:
-            # Detect archive format and create archive
-            archive_format = self.detect_archive_format(archive_filename)
-            
-            if archive_format == 'zip':
-                self.create_zip_archive(archive_path, files_to_archive)
-            elif archive_format in ['tar.gz', 'tgz']:
-                self.create_tar_archive(archive_path, files_to_archive)
-            else:
-                print(f"Unsupported archive format. Use .zip, .tar.gz, or .tgz")
-                self.general_dialog.hide()
-                self.needs_full_redraw = True
-                return
-            
-            print(f"Created archive: {archive_filename}")
-            
-            # Refresh the other pane to show the new archive
-            self.refresh_files(other_pane)
-            
-            # Try to select the new archive in the other pane
-            for i, file_path in enumerate(other_pane['files']):
-                if file_path.name == archive_filename:
-                    other_pane['selected_index'] = i
-                    self.adjust_scroll_for_selection(other_pane)
-                    break
-            
-            self.general_dialog.hide()
-            self.needs_full_redraw = True
-            
-        except Exception as e:
-            print(f"Error creating archive: {e}")
-            self.general_dialog.hide()
-            self.needs_full_redraw = True
+        """Handle create archive confirmation - delegated to ArchiveUI"""
+        self.archive_ui.on_create_archive_confirm(archive_name)
     
     def on_create_archive_cancel(self):
-        """Handle create archive cancellation"""
-        print("Archive creation cancelled")
-        self.general_dialog.hide()
-        self.needs_full_redraw = True
+        """Handle create archive cancellation - delegated to ArchiveUI"""
+        self.archive_ui.on_create_archive_cancel()
     
+    # Legacy method - no longer used with new UI approach
     def perform_create_archive(self):
-        """Create the archive file"""
-        if not self.create_archive_editor.text.strip():
-            print("Archive filename cannot be empty")
-            return
-        
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        # Get files to archive
-        files_to_archive = []
-        
-        if current_pane['selected_files']:
-            # Archive selected files
-            for file_path_str in current_pane['selected_files']:
-                file_path = Path(file_path_str)
-                if file_path.exists():
-                    files_to_archive.append(file_path)
-        else:
-            # Archive current file if no files are selected
-            if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_archive.append(selected_file)
-        
-        if not files_to_archive:
-            print("No files to archive")
-            self.exit_create_archive_mode()
-            return
-        
-        # Determine archive path (save to other pane's directory)
-        archive_filename = self.create_archive_editor.text.strip()
-        archive_path = other_pane['path'] / archive_filename
-        
-        # Detect archive format from extension
-        archive_format = self.detect_archive_format(archive_filename)
-        if not archive_format:
-            print("Unsupported archive format. Use .zip, .tar.gz, or .tgz extension")
-            return
-        
-        try:
-            if archive_format == 'zip':
-                self.create_zip_archive(archive_path, files_to_archive)
-            elif archive_format in ['tar.gz', 'tgz']:
-                self.create_tar_archive(archive_path, files_to_archive)
-            
-            print(f"Archive created successfully: {archive_path}")
-            
-            # Refresh the other pane to show the new archive
-            self.refresh_files(other_pane)
-            self.needs_full_redraw = True
-            
-        except Exception as e:
-            print(f"Error creating archive: {e}")
-        
-        self.exit_create_archive_mode()
-    
-    def update_archive_progress(self, current_file, processed, total):
-        """Update status bar with archive creation progress (legacy method - now uses ProgressManager)"""
-        # Update the progress manager if an operation is active
-        if self.progress_manager.is_operation_active():
-            self.progress_manager.update_progress(current_file, processed)
-        
-        # Force a screen refresh to show progress
-        try:
-            self.draw_status()
-            self.stdscr.refresh()
-        except curses.error as e:
-            print(f"Warning: Could not refresh screen during progress update: {e}")
-        except Exception as e:
-            print(f"Warning: Progress display update failed: {e}")
+        """Create the archive file - legacy method, functionality moved to ArchiveUI"""
+        print("Legacy archive creation method called - this should not happen")
+        pass
     
     def _progress_callback(self, progress_data):
         """Callback for progress manager updates"""
@@ -3006,8 +2146,6 @@ class FileManager:
         try:
             self.draw_status()
             self.stdscr.refresh()
-        except curses.error as e:
-            print(f"Warning: Could not refresh screen during progress callback: {e}")
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     
@@ -3031,298 +2169,46 @@ class FileManager:
                     total_files += 1
         return total_files
     
+    # Legacy methods - delegated to ArchiveUI for backward compatibility
     def detect_archive_format(self, filename):
-        """Detect archive format from filename extension"""
-        filename_lower = filename.lower()
-        
-        if filename_lower.endswith('.zip'):
-            return 'zip'
-        elif filename_lower.endswith('.tar.gz'):
-            return 'tar.gz'
-        elif filename_lower.endswith('.tgz'):
-            return 'tgz'
-        else:
-            return None
+        """Detect archive format from filename extension - delegated to ArchiveUI"""
+        return self.archive_ui.detect_archive_format(filename)
     
+    # Legacy methods - functionality moved to ArchiveOperations class
     def create_zip_archive(self, archive_path, files_to_archive):
-        """Create a ZIP archive with progress updates"""
-        # Count total files for progress tracking
-        total_files = 0
-        for file_path in files_to_archive:
-            if file_path.is_file():
-                total_files += 1
-            elif file_path.is_dir():
-                for root, dirs, files in os.walk(file_path):
-                    total_files += len(files)
-        
-        # Start progress tracking
-        self.progress_manager.start_operation(
-            OperationType.ARCHIVE_CREATE, 
-            total_files, 
-            f"ZIP: {archive_path.name}",
-            self._progress_callback
-        )
-        
-        processed_files = 0
-        
-        try:
-            with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for file_path in files_to_archive:
-                    if file_path.is_file():
-                        # Update progress
-                        processed_files += 1
-                        self.progress_manager.update_progress(file_path.name, processed_files)
-                        
-                        # Add file to archive
-                        zipf.write(file_path, file_path.name)
-                    elif file_path.is_dir():
-                        # Add directory recursively
-                        for root, dirs, files in os.walk(file_path):
-                            root_path = Path(root)
-                            # Calculate relative path from the base directory
-                            rel_path = root_path.relative_to(file_path.parent)
-                            
-                            # Add directory entry
-                            if rel_path != Path('.'):
-                                zipf.write(root_path, str(rel_path) + '/')
-                            
-                            # Add files in directory
-                            for file in files:
-                                processed_files += 1
-                                self.progress_manager.update_progress(file, processed_files)
-                                
-                                file_full_path = root_path / file
-                                file_rel_path = file_full_path.relative_to(file_path.parent)
-                                zipf.write(file_full_path, str(file_rel_path))
-        finally:
-            # Finish progress tracking
-            self.progress_manager.finish_operation()
+        """Create a ZIP archive - legacy method, functionality moved to ArchiveOperations"""
+        print("Legacy ZIP creation method called - this should not happen")
+        pass
     
     def create_tar_archive(self, archive_path, files_to_archive):
-        """Create a TAR.GZ archive with progress updates"""
-        # Count total files for progress tracking
-        total_files = 0
-        for file_path in files_to_archive:
-            if file_path.is_file():
-                total_files += 1
-            elif file_path.is_dir():
-                for root, dirs, files in os.walk(file_path):
-                    total_files += len(files)
-        
-        # Start progress tracking
-        self.progress_manager.start_operation(
-            OperationType.ARCHIVE_CREATE, 
-            total_files, 
-            f"TAR.GZ: {archive_path.name}",
-            self._progress_callback
-        )
-        
-        processed_files = 0
-        
-        try:
-            with tarfile.open(archive_path, 'w:gz') as tarf:
-                for file_path in files_to_archive:
-                    if file_path.is_file():
-                        processed_files += 1
-                        self.progress_manager.update_progress(file_path.name, processed_files)
-                        tarf.add(file_path, arcname=file_path.name)
-                    elif file_path.is_dir():
-                        # For directories, we need to track individual files being added
-                        def progress_filter(tarinfo):
-                            nonlocal processed_files
-                            if tarinfo.isfile():
-                                processed_files += 1
-                                self.progress_manager.update_progress(tarinfo.name, processed_files)
-                            return tarinfo
-                        
-                        tarf.add(file_path, arcname=file_path.name, filter=progress_filter)
-        finally:
-            # Finish progress tracking
-            self.progress_manager.finish_operation()
+        """Create a TAR.GZ archive - legacy method, functionality moved to ArchiveOperations"""
+        print("Legacy TAR creation method called - this should not happen")
+        pass
     
     def extract_selected_archive(self):
-        """Extract the selected archive file to the other pane"""
-        current_pane = self.get_current_pane()
-        other_pane = self.get_inactive_pane()
-        
-        if not current_pane['files']:
-            print("No files in current directory")
-            return
-        
-        # Get the selected file
-        selected_file = current_pane['files'][current_pane['selected_index']]
-        
-        if not selected_file.is_file():
-            print("Selected item is not a file")
-            return
-        
-        # Check if it's an archive file
-        archive_format = self.detect_archive_format(selected_file.name)
-        if not archive_format:
-            print(f"'{selected_file.name}' is not a supported archive format")
-            print("Supported formats: .zip, .tar.gz, .tgz")
-            return
-        
-        # Create extraction directory in the other pane
-        # Use the base name of the archive (without extension) as directory name
-        archive_basename = self.get_archive_basename(selected_file.name)
-        extract_dir = other_pane['path'] / archive_basename
-        
-        # Check if extract confirmation is enabled
-        if getattr(self.config, 'CONFIRM_EXTRACT_ARCHIVE', True):
-            # Show confirmation dialog
-            message = f"Extract '{selected_file.name}' to {other_pane['path']}?"
-            
-            def extract_callback(confirmed):
-                if confirmed:
-                    self._proceed_with_extraction(selected_file, extract_dir, archive_format, other_pane, archive_basename)
-                else:
-                    print("Extraction cancelled")
-            
-            self.show_confirmation(message, extract_callback)
-        else:
-            # Proceed with extraction without confirmation
-            self._proceed_with_extraction(selected_file, extract_dir, archive_format, other_pane, archive_basename)
+        """Extract the selected archive file to the other pane - delegated to ArchiveUI"""
+        self.archive_ui.extract_selected_archive()
     
-    def _proceed_with_extraction(self, selected_file, extract_dir, archive_format, other_pane, archive_basename):
-        """Proceed with extraction after confirmation (if enabled)"""
-        # Check if extraction directory already exists
-        if extract_dir.exists():
-            def overwrite_callback(confirmed):
-                if confirmed:
-                    try:
-                        # Remove existing directory
-                        shutil.rmtree(extract_dir)
-                        self.perform_extraction(selected_file, extract_dir, archive_format, other_pane)
-                    except Exception as e:
-                        print(f"Error removing existing directory: {e}")
-                else:
-                    print("Extraction cancelled")
-            
-            self.show_confirmation(f"Directory '{archive_basename}' already exists. Overwrite?", overwrite_callback)
-        else:
-            self.perform_extraction(selected_file, extract_dir, archive_format, other_pane)
-    
+    # Legacy methods - delegated to ArchiveUI for backward compatibility
     def get_archive_basename(self, filename):
-        """Get the base name of an archive file (without extension)"""
-        filename_lower = filename.lower()
-        
-        if filename_lower.endswith('.tar.gz'):
-            return filename[:-7]  # Remove .tar.gz
-        elif filename_lower.endswith('.tgz'):
-            return filename[:-4]  # Remove .tgz
-        elif filename_lower.endswith('.zip'):
-            return filename[:-4]  # Remove .zip
-        else:
-            # Fallback - remove last extension
-            return Path(filename).stem
+        """Get the base name of an archive file - delegated to ArchiveUI"""
+        return self.archive_ui.get_archive_basename(filename)
     
+    # Legacy extraction methods - functionality moved to ArchiveUI and ArchiveOperations
     def perform_extraction(self, archive_file, extract_dir, archive_format, other_pane):
-        """Perform the actual extraction"""
-        try:
-            # Create extraction directory
-            extract_dir.mkdir(parents=True, exist_ok=True)
-            
-            if archive_format == 'zip':
-                self.extract_zip_archive(archive_file, extract_dir)
-            elif archive_format in ['tar.gz', 'tgz']:
-                self.extract_tar_archive(archive_file, extract_dir)
-            
-            print(f"Archive extracted successfully to: {extract_dir}")
-            
-            # Refresh the other pane to show the extracted contents
-            self.refresh_files(other_pane)
-            self.needs_full_redraw = True
-            
-        except Exception as e:
-            print(f"Error extracting archive: {e}")
-            # Clean up partially created directory on error
-            try:
-                if extract_dir.exists():
-                    shutil.rmtree(extract_dir)
-            except (OSError, PermissionError) as e:
-                print(f"Warning: Could not clean up extraction directory {extract_dir}: {e}")
-            except Exception as e:
-                print(f"Warning: Unexpected error during cleanup: {e}")
+        """Perform extraction - legacy method, functionality moved to ArchiveUI"""
+        print("Legacy extraction method called - this should not happen")
+        pass
     
     def extract_zip_archive(self, archive_file, extract_dir):
-        """Extract a ZIP archive with progress tracking"""
-        with zipfile.ZipFile(archive_file, 'r') as zipf:
-            # Get list of files to extract
-            file_list = zipf.namelist()
-            total_files = len(file_list)
-            
-            # Start progress tracking if there are multiple files
-            if total_files > 1:
-                self.progress_manager.start_operation(
-                    OperationType.ARCHIVE_EXTRACT,
-                    total_files,
-                    f"ZIP: {archive_file.name}",
-                    self._progress_callback
-                )
-            
-            try:
-                # Extract files one by one to track progress
-                for i, file_info in enumerate(file_list):
-                    if total_files > 1:
-                        # Update progress with current file
-                        filename = Path(file_info).name if file_info else f"file_{i+1}"
-                        self.progress_manager.update_progress(filename, i)
-                    
-                    try:
-                        # Extract individual file
-                        zipf.extract(file_info, extract_dir)
-                    except Exception as e:
-                        print(f"Error extracting {file_info}: {e}")
-                        if total_files > 1:
-                            self.progress_manager.increment_errors()
-                    
-            finally:
-                # Finish progress tracking
-                if total_files > 1:
-                    self.progress_manager.finish_operation()
+        """Extract ZIP archive - legacy method, functionality moved to ArchiveOperations"""
+        print("Legacy ZIP extraction method called - this should not happen")
+        pass
     
     def extract_tar_archive(self, archive_file, extract_dir):
-        """Extract a TAR.GZ archive with progress tracking"""
-        with tarfile.open(archive_file, 'r:gz') as tarf:
-            # Get list of members to extract
-            members = tarf.getmembers()
-            # Count only files (not directories) for progress
-            file_members = [m for m in members if m.isfile()]
-            total_files = len(file_members)
-            
-            # Start progress tracking if there are multiple files
-            if total_files > 1:
-                self.progress_manager.start_operation(
-                    OperationType.ARCHIVE_EXTRACT,
-                    total_files,
-                    f"TAR.GZ: {archive_file.name}",
-                    self._progress_callback
-                )
-            
-            try:
-                # Extract members one by one to track progress
-                processed_files = 0
-                for member in members:
-                    if member.isfile():
-                        processed_files += 1
-                        if total_files > 1:
-                            # Update progress with current file
-                            filename = Path(member.name).name if member.name else f"file_{processed_files}"
-                            self.progress_manager.update_progress(filename, processed_files)
-                    
-                    try:
-                        # Extract individual member
-                        tarf.extract(member, extract_dir)
-                    except Exception as e:
-                        print(f"Error extracting {member.name}: {e}")
-                        if total_files > 1 and member.isfile():
-                            self.progress_manager.increment_errors()
-                    
-            finally:
-                # Finish progress tracking
-                if total_files > 1:
-                    self.progress_manager.finish_operation()
+        """Extract TAR archive - legacy method, functionality moved to ArchiveOperations"""
+        print("Legacy TAR extraction method called - this should not happen")
+        pass
         
     def handle_isearch_input(self, key):
         """Handle input while in isearch mode"""
@@ -3515,6 +2401,17 @@ class FileManager:
         self.jump_dialog.exit()
         self.needs_full_redraw = True
     
+    def show_drives_dialog(self):
+        """Show the drives dialog - wrapper for drives dialog component"""
+        self.drives_dialog.show()
+        self.needs_full_redraw = True
+        self._force_immediate_redraw()
+    
+    def exit_drives_dialog_mode(self):
+        """Exit drives dialog mode - wrapper for drives dialog component"""
+        self.drives_dialog.exit()
+        self.needs_full_redraw = True
+    
     def handle_jump_dialog_input(self, key):
         """Handle input while in jump dialog mode - wrapper for jump dialog component"""
         result = self.jump_dialog.handle_input(key)
@@ -3529,6 +2426,24 @@ class FileManager:
                     JumpDialogHelpers.navigate_to_directory(data, self.pane_manager, print)
                     
                 self.exit_jump_dialog_mode()
+                return True
+        
+        return False
+    
+    def handle_drives_dialog_input(self, key):
+        """Handle input while in drives dialog mode - wrapper for drives dialog component"""
+        result = self.drives_dialog.handle_input(key)
+        
+        if result == True:
+            self.needs_full_redraw = True
+            return True
+        elif isinstance(result, tuple):
+            action, data = result
+            if action == 'navigate':
+                if data:
+                    DrivesDialogHelpers.navigate_to_drive(data, self.pane_manager, print)
+                    
+                self.exit_drives_dialog_mode()
                 return True
         
         return False
@@ -3572,6 +2487,11 @@ class FileManager:
             if self.handle_jump_dialog_input(key):
                 return True  # Jump dialog mode handled the key
         
+        # Handle drives dialog mode input
+        if self.drives_dialog.mode:
+            if self.handle_drives_dialog_input(key):
+                return True  # Drives dialog mode handled the key
+        
         # Handle batch rename dialog mode input
         if self.batch_rename_dialog.mode:
             if self.handle_batch_rename_input(key):
@@ -3580,8 +2500,8 @@ class FileManager:
         # Skip regular key processing if any dialog is open
         # This prevents conflicts like starting isearch mode while help dialog is open
         if (self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or 
-            self.search_dialog.mode or self.jump_dialog.mode or self.batch_rename_dialog.mode or 
-            self.isearch_mode or self.general_dialog.is_active):
+            self.search_dialog.mode or self.jump_dialog.mode or self.drives_dialog.mode or 
+            self.batch_rename_dialog.mode or self.isearch_mode or self.general_dialog.is_active):
             return True
         
         # Handle main application keys
@@ -3746,6 +2666,8 @@ class FileManager:
             self.show_search_dialog('filename')
         elif self.is_key_for_action(key, 'jump_dialog'):  # Show jump dialog (Shift+J)
             self.show_jump_dialog()
+        elif self.is_key_for_action(key, 'drives_dialog'):  # Show drives dialog
+            self.show_drives_dialog()
         elif self.is_key_for_action(key, 'search_content'):  # Show search dialog (content)
             self.show_search_dialog('content')
         elif self.is_key_for_action(key, 'edit_file'):  # Edit existing file

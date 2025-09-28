@@ -1,5 +1,7 @@
 # No external dependencies required - uses built-in curses library
 # Python 3.6+ required for pathlib
 # Optional: pygments for syntax highlighting (will fallback gracefully if not available)
+# boto3 for AWS S3 support
 
 pygments
+boto3

@@ -8,7 +8,7 @@ Configuration is stored in ~/.tfm/config.py as a Python class.
 
 import os
 import sys
-from pathlib import Path
+from tfm_path import Path
 import importlib.util
 
 
@@ -126,6 +126,9 @@ class DefaultConfig:
     LIST_DIALOG_HEIGHT_RATIO = 0.7
     LIST_DIALOG_MIN_WIDTH = 40
     LIST_DIALOG_MIN_HEIGHT = 15
+    
+    # S3 settings
+    S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
 
 
 class ConfigManager:
