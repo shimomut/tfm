@@ -6,7 +6,7 @@ TFM File Operations - Handles file system operations and file management
 import os
 import stat
 import fnmatch
-from pathlib import Path
+from tfm_path import Path
 from datetime import datetime
 
 

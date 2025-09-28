@@ -6,7 +6,7 @@ Provides batch file renaming functionality with regex patterns
 
 import curses
 import re
-from pathlib import Path
+from tfm_path import Path
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2, KEY_TAB
 from tfm_colors import get_status_color, COLOR_ERROR

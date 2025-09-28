@@ -3,7 +3,7 @@
 TFM Pane Manager - Handles dual pane management and navigation
 """
 
-from pathlib import Path
+from tfm_path import Path
 from collections import deque
 
 

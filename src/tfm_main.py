@@ -18,7 +18,7 @@ import time
 import webbrowser
 import importlib
 import traceback
-from pathlib import Path
+from tfm_path import Path
 from datetime import datetime
 from collections import deque
 from tfm_single_line_text_edit import SingleLineTextEdit

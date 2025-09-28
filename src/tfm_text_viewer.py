@@ -8,7 +8,7 @@ for popular file formats using pygments (optional dependency).
 
 import curses
 import os
-from pathlib import Path
+from tfm_path import Path
 from typing import List, Tuple, Optional, Dict, Any
 import re
 

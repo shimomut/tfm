@@ -5,7 +5,7 @@ Provides searchable list dialog functionality
 """
 
 import curses
-from pathlib import Path
+from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color

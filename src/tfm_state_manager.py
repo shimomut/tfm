@@ -12,7 +12,7 @@ import time
 import threading
 import os
 import socket
-from pathlib import Path
+from tfm_path import Path
 from contextlib import contextmanager
 from typing import Any, Dict, Optional, List
 
@@ -794,7 +794,7 @@ class TFMStateManager(StateManager):
             bool: True if cleanup was successful
         """
         try:
-            from pathlib import Path
+            from tfm_path import Path
             
             success = True
             cleaned_count = 0
