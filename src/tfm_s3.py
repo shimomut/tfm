@@ -432,31 +432,39 @@ class S3PathImpl(PathImpl):
             from tfm_path import Path
         
         if not self._key:
-            # At bucket level, parent is the S3 root
-            return Path('s3://')
+            # At bucket level, bucket is its own parent (root level)
+            return Path(f's3://{self._bucket}/')
         
-        if '/' not in self._key:
+        # Strip trailing slash to handle directory keys properly
+        key_without_trailing_slash = self._key.rstrip('/')
+        
+        if '/' not in key_without_trailing_slash:
             # Key is at bucket root
             return Path(f's3://{self._bucket}/')
         
-        parent_key = '/'.join(self._key.split('/')[:-1])
-        return Path(f's3://{self._bucket}/{parent_key}/')
+        parent_key = '/'.join(key_without_trailing_slash.split('/')[:-1])
+        if parent_key:
+            return Path(f's3://{self._bucket}/{parent_key}/')
+        else:
+            # Parent is bucket root
+            return Path(f's3://{self._bucket}/')
     
     @property
     def parents(self):
         """A sequence providing access to the logical ancestors of the path"""
         parents = []
         current = self.parent
-        while str(current) != 's3://':
+        bucket_root = f's3://{self._bucket}/'
+        
+        # Add parents until we reach the bucket root
+        while str(current) != bucket_root:
             parents.append(current)
             current = current.parent
+            
+        # Add the bucket root as the final parent
+        if str(current) == bucket_root and str(self) != bucket_root:
+            parents.append(current)
         
-        # Import Path here to avoid circular imports
-        try:
-            from .tfm_path import Path
-        except ImportError:
-            from tfm_path import Path
-        parents.append(Path('s3://'))
         return parents
     
     @property
