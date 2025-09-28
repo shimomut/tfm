@@ -263,14 +263,58 @@ class S3PathImpl(PathImpl):
     S3 paths are expected in the format: s3://bucket-name/key/path
     """
     
-    def __init__(self, s3_uri: str):
-        """Initialize with an S3 URI (s3://bucket/key)"""
+    @classmethod
+    def create_path_with_metadata(cls, s3_uri: str, metadata: Dict[str, Any]) -> 'Path':
+        """Create a Path object with S3PathImpl that has metadata
+        
+        Args:
+            s3_uri: S3 URI in format s3://bucket/key
+            metadata: Metadata dict with file/directory information
+            
+        Returns:
+            Path object with S3PathImpl implementation containing metadata
+        """
+        try:
+            from .tfm_path import Path
+        except ImportError:
+            from tfm_path import Path
+        
+        # Create S3PathImpl with metadata
+        s3_impl = cls(s3_uri, metadata=metadata)
+        
+        # Create Path object and set implementation
+        path_obj = Path.__new__(Path)
+        path_obj._impl = s3_impl
+        return path_obj
+    
+    def __init__(self, s3_uri: str, metadata: Optional[Dict[str, Any]] = None):
+        """Initialize with an S3 URI (s3://bucket/key) and optional metadata
+        
+        Args:
+            s3_uri: S3 URI in format s3://bucket/key
+            metadata: Optional metadata dict with keys:
+                - is_dir: bool - whether this is a directory
+                - is_file: bool - whether this is a file  
+                - size: int - file size in bytes
+                - last_modified: datetime - last modification time
+                - etag: str - S3 ETag
+                - storage_class: str - S3 storage class
+        """
         if not HAS_BOTO3:
             raise ImportError("boto3 is required for S3 support. Install with: pip install boto3")
         
         self._uri = s3_uri
         self._parse_uri()
         self._s3_client = None
+        
+        # Store metadata to avoid API calls
+        self._metadata = metadata or {}
+        self._is_dir_cached = self._metadata.get('is_dir')
+        self._is_file_cached = self._metadata.get('is_file')
+        self._size_cached = self._metadata.get('size')
+        self._mtime_cached = self._metadata.get('last_modified')
+        self._etag_cached = self._metadata.get('etag')
+        self._storage_class_cached = self._metadata.get('storage_class')
     
     def _parse_uri(self):
         """Parse S3 URI into bucket and key components"""
@@ -302,7 +346,7 @@ class S3PathImpl(PathImpl):
         return get_s3_cache()
     
     def _cached_api_call(self, operation: str, cache_key_params: Dict[str, Any] = None, 
-                        ttl: Optional[int] = None, **api_params) -> Any:
+                        ttl: Optional[int] = None, cache_key_override: Optional[str] = None, **api_params) -> Any:
         """
         Execute an S3 API call with caching support.
         
@@ -310,6 +354,7 @@ class S3PathImpl(PathImpl):
             operation: The boto3 client method name (e.g., 'head_object', 'list_objects_v2')
             cache_key_params: Parameters to include in cache key generation
             ttl: Custom TTL for this cache entry
+            cache_key_override: Override the S3 key used for cache key generation
             **api_params: Parameters to pass to the boto3 API call
         
         Returns:
@@ -318,11 +363,14 @@ class S3PathImpl(PathImpl):
         if cache_key_params is None:
             cache_key_params = {}
         
+        # Use override key if provided, otherwise use instance key
+        cache_key = cache_key_override if cache_key_override is not None else self._key
+        
         # Try to get from cache first
         cached_result = self._cache.get(
             operation=operation,
             bucket=self._bucket,
-            key=self._key,
+            key=cache_key,
             **cache_key_params
         )
         
@@ -338,7 +386,7 @@ class S3PathImpl(PathImpl):
             self._cache.put(
                 operation=operation,
                 bucket=self._bucket,
-                key=self._key,
+                key=cache_key,
                 data=result,
                 ttl=ttl,
                 **cache_key_params
@@ -587,6 +635,10 @@ class S3PathImpl(PathImpl):
     
     def is_dir(self) -> bool:
         """Whether this path is a directory"""
+        # Use cached metadata if available
+        if self._is_dir_cached is not None:
+            return self._is_dir_cached
+        
         if not self._key:
             # Bucket is always a directory
             return True
@@ -594,6 +646,7 @@ class S3PathImpl(PathImpl):
         # In S3, directories are represented by keys ending with '/'
         # or by the presence of objects with this key as a prefix
         if self._key.endswith('/'):
+            self._is_dir_cached = True
             return True
         
         try:
@@ -605,22 +658,33 @@ class S3PathImpl(PathImpl):
                 Prefix=self._key + '/',
                 MaxKeys=1
             )
-            return response.get('KeyCount', 0) > 0
+            result = response.get('KeyCount', 0) > 0
+            self._is_dir_cached = result
+            return result
         except ClientError:
+            self._is_dir_cached = False
             return False
     
     def is_file(self) -> bool:
         """Whether this path is a regular file"""
+        # Use cached metadata if available
+        if self._is_file_cached is not None:
+            return self._is_file_cached
+        
         if not self._key:
+            self._is_file_cached = False
             return False  # Bucket is not a file
         
         if self._key.endswith('/'):
+            self._is_file_cached = False
             return False  # Directory marker
         
         try:
             self._cached_api_call('head_object', Bucket=self._bucket, Key=self._key)
+            self._is_file_cached = True
             return True
         except ClientError:
+            self._is_file_cached = False
             return False
     
     def is_symlink(self) -> bool:
@@ -633,22 +697,38 @@ class S3PathImpl(PathImpl):
     
     def stat(self):
         """Return the result of os.stat() on this path"""
+        if not self._key:
+            # Bucket stat
+            return S3StatResult(size=0, mtime=0, is_dir=True)
+        
+        # Use cached metadata if available
+        if self._size_cached is not None and self._mtime_cached is not None:
+            size = self._size_cached
+            mtime = self._mtime_cached.timestamp() if hasattr(self._mtime_cached, 'timestamp') else self._mtime_cached
+            is_dir = self.is_dir()  # This will use cached value if available
+            return S3StatResult(size=size, mtime=mtime, is_dir=is_dir)
+        
+        # Check if this is a directory first (avoids unnecessary head_object calls for virtual directories)
+        if self.is_dir():
+            # This is a directory - get virtual directory stats
+            size, mtime = self._get_virtual_directory_stats()
+            return S3StatResult(size=size, mtime=mtime, is_dir=True)
+        
+        # This should be a file - try head_object
         try:
-            if not self._key:
-                # Bucket stat
-                return S3StatResult(size=0, mtime=0, is_dir=True)
-            
-            response = self._cached_api_call('head_object', Bucket=self._bucket, Key=self._key)
+            response = self._cached_api_call('head_object', cache_key_override=self._key, Bucket=self._bucket, Key=self._key)
             size = response.get('ContentLength', 0)
             mtime = response.get('LastModified', datetime.now()).timestamp()
-            return S3StatResult(size=size, mtime=mtime, is_dir=self.is_dir())
+            
+            # Cache the results for future use
+            self._size_cached = size
+            self._mtime_cached = mtime
+            self._is_file_cached = True
+            self._is_dir_cached = False
+            
+            return S3StatResult(size=size, mtime=mtime, is_dir=False)
         except ClientError as e:
             if e.response['Error']['Code'] in ['404', 'NoSuchKey']:
-                # Check if this is a virtual directory (has objects with this prefix)
-                if self.is_dir():
-                    # This is a virtual directory - generate size and timestamp
-                    size, mtime = self._get_virtual_directory_stats()
-                    return S3StatResult(size=size, mtime=mtime, is_dir=True)
                 raise FileNotFoundError(f"S3 object not found: {self._uri}")
             raise OSError(f"Failed to stat S3 object: {e}")
     
@@ -713,13 +793,63 @@ class S3PathImpl(PathImpl):
                 # Yield directories (common prefixes)
                 for prefix_info in cached_page.get('CommonPrefixes', []):
                     dir_key = prefix_info['Prefix'].rstrip('/')
-                    yield Path(f's3://{self._bucket}/{dir_key}/')
+                    
+                    # Create directory with metadata
+                    dir_metadata = {
+                        'is_dir': True,
+                        'is_file': False,
+                        'size': 0,
+                        'last_modified': datetime.now(),  # Virtual directories use current time
+                        'etag': '',
+                        'storage_class': ''
+                    }
+                    
+                    # Create Path with metadata
+                    yield S3PathImpl.create_path_with_metadata(f's3://{self._bucket}/{dir_key}/', dir_metadata)
                 
-                # Yield files (objects)
+                # Yield files (objects) and cache their stat information
                 for obj in cached_page.get('Contents', []):
                     key = obj['Key']
                     if key != prefix:  # Don't include the directory itself
-                        yield Path(f's3://{self._bucket}/{key}')
+                        # Extract metadata from S3 object
+                        size = obj.get('Size', 0)
+                        last_modified = obj.get('LastModified')
+                        etag = obj.get('ETag', '')
+                        storage_class = obj.get('StorageClass', 'STANDARD')
+                        
+                        # Determine if this is a directory marker (key ends with '/')
+                        is_dir = key.endswith('/')
+                        is_file = not is_dir
+                        
+                        # Create file metadata
+                        file_metadata = {
+                            'is_dir': is_dir,
+                            'is_file': is_file,
+                            'size': size,
+                            'last_modified': last_modified or datetime.now(),
+                            'etag': etag,
+                            'storage_class': storage_class
+                        }
+                        
+                        # Create a mock head_object response for caching (for backward compatibility)
+                        head_response = {
+                            'ContentLength': size,
+                            'LastModified': last_modified or datetime.now(),
+                            'ETag': etag,
+                            'StorageClass': storage_class
+                        }
+                        
+                        # Cache this as a head_object response to avoid future API calls
+                        self._cache.put(
+                            operation='head_object',
+                            bucket=self._bucket,
+                            key=key,  # Use the file's actual key, not self._key
+                            data=head_response,
+                            ttl=300  # Cache for 5 minutes
+                        )
+                        
+                        # Create Path with metadata
+                        yield S3PathImpl.create_path_with_metadata(f's3://{self._bucket}/{key}', file_metadata)
                 
                 page_num += 1
         
@@ -941,62 +1071,28 @@ class S3PathImpl(PathImpl):
     def _get_virtual_directory_stats(self) -> Tuple[int, float]:
         """
         Get generated stats for virtual directories (directories without actual S3 objects).
-        Returns (size, mtime) where size is 0 and mtime is the latest timestamp of children.
+        Returns (size, mtime) where size is 0 and mtime is current time or cached value.
+        
+        Note: With the metadata caching optimization, this method is now mainly a fallback
+        for virtual directories that weren't created with cached metadata.
         """
-        try:
-            # For virtual directories, size is always 0 (0B)
-            size = 0
-            
-            # Find the latest modification time among all children
-            latest_mtime = 0.0
-            
-            # List objects under this directory prefix
-            prefix = self._key.rstrip('/') + '/' if self._key else ''
-            
-            # Use cached API call to get objects under this prefix
-            response = self._cached_api_call(
-                'list_objects_v2',
-                cache_key_params={'virtual_dir_stats': True, 'prefix': prefix},
-                ttl=30,  # Cache for 30 seconds for directory stats
-                Bucket=self._bucket,
-                Prefix=prefix,
-                MaxKeys=1000  # Get up to 1000 objects to find latest timestamp
-            )
-            
-            # Find the latest LastModified timestamp among all objects
-            for obj in response.get('Contents', []):
-                obj_mtime = obj.get('LastModified')
-                if obj_mtime:
-                    obj_timestamp = obj_mtime.timestamp()
-                    if obj_timestamp > latest_mtime:
-                        latest_mtime = obj_timestamp
-            
-            # If we found objects but need to check more (there might be more than 1000)
-            if response.get('IsTruncated', False):
-                # Use paginator to check all objects for the latest timestamp
-                paginator = self._client.get_paginator('list_objects_v2')
-                page_iterator = paginator.paginate(
-                    Bucket=self._bucket,
-                    Prefix=prefix
-                )
-                
-                for page in page_iterator:
-                    for obj in page.get('Contents', []):
-                        obj_mtime = obj.get('LastModified')
-                        if obj_mtime:
-                            obj_timestamp = obj_mtime.timestamp()
-                            if obj_timestamp > latest_mtime:
-                                latest_mtime = obj_timestamp
-            
-            # If no objects found or no timestamps, use current time
-            if latest_mtime == 0.0:
-                latest_mtime = time.time()
-            
-            return size, latest_mtime
-            
-        except ClientError as e:
-            # If we can't get stats, return defaults
-            return 0, time.time()
+        # For virtual directories, size is always 0
+        size = 0
+        
+        # Use cached modification time if available
+        if self._mtime_cached is not None:
+            mtime = self._mtime_cached.timestamp() if hasattr(self._mtime_cached, 'timestamp') else self._mtime_cached
+            return size, mtime
+        
+        # Fallback: use current time for virtual directories without cached metadata
+        # This is much simpler and faster than making API calls to find the latest child timestamp
+        mtime = time.time()
+        
+        # Cache the result for future use
+        self._size_cached = size
+        self._mtime_cached = mtime
+        
+        return size, mtime
     
     def unlink(self, missing_ok=False):
         """Remove this file or symbolic link"""
