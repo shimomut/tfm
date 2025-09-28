@@ -2499,7 +2499,8 @@ class FileManager:
                     # Remove destination if it exists and we're overwriting
                     if dest_path.exists() and overwrite:
                         if dest_path.is_dir():
-                            shutil.rmtree(dest_path)
+                            # Use the existing delete method for recursive directory removal
+                            self._delete_directory_with_progress(dest_path, 0, 1)
                         else:
                             dest_path.unlink()
                     
@@ -2526,7 +2527,7 @@ class FileManager:
                         if total_individual_files > 1:
                             self.progress_manager.update_progress(source_file.name, processed_files)
                         
-                        shutil.move(str(source_file), str(dest_path))
+                        source_file.rename(dest_path)
                         print(f"Moved file: {source_file.name}")
                     
                     moved_count += 1
@@ -2578,7 +2579,12 @@ class FileManager:
             )
             
             # Then remove the source directory
-            shutil.rmtree(source_dir)
+            if source_dir.is_dir():
+                # For directories, we need to delete recursively
+                # Use the existing delete method without progress tracking
+                self._delete_directory_with_progress(source_dir, 0, 1)
+            else:
+                source_dir.unlink()
             
             return processed_files
             
@@ -2815,9 +2821,13 @@ class FileManager:
             try:
                 dir_path.rmdir()
             except OSError:
-                # If directory is not empty, use shutil.rmtree as fallback
+                # If directory is not empty, try to remove it using Path method
                 # This shouldn't happen if our bottom-up deletion worked correctly
-                shutil.rmtree(dir_path)
+                try:
+                    # For S3 paths, this will handle directory deletion properly
+                    dir_path.rmdir()
+                except Exception as e:
+                    print(f"Warning: Could not remove directory {dir_path}: {e}")
             
             return processed_files
             
