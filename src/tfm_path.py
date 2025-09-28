@@ -843,6 +843,89 @@ class Path:
         """Return the string representation with forward slashes"""
         return self._impl.as_posix()
     
+    def move_to(self, destination: 'Path', overwrite: bool = False) -> bool:
+        """
+        Move this file or directory to the destination path.
+        
+        This method handles cross-storage moving (e.g., local to S3, S3 to local).
+        For same-storage moves, it uses the native rename operation.
+        For cross-storage moves, it copies then deletes the source.
+        
+        Args:
+            destination: Target path where the file/directory should be moved
+            overwrite: Whether to overwrite existing files
+            
+        Returns:
+            True if move was successful, False otherwise
+            
+        Raises:
+            FileNotFoundError: If source doesn't exist
+            FileExistsError: If destination exists and overwrite=False
+            PermissionError: If insufficient permissions
+            OSError: For other I/O errors
+        """
+        if not self.exists():
+            raise FileNotFoundError(f"Source path does not exist: {self}")
+        
+        if destination.exists() and not overwrite:
+            raise FileExistsError(f"Destination already exists: {destination}")
+        
+        # Handle same-storage moving first
+        source_scheme = self.get_scheme()
+        dest_scheme = destination.get_scheme()
+        
+        if source_scheme == dest_scheme:
+            # Same storage type - use native rename/move
+            try:
+                self.rename(destination)
+                return True
+            except Exception as e:
+                raise OSError(f"Failed to move {self} to {destination}: {e}")
+        
+        # Cross-storage moving: copy then delete
+        try:
+            # First copy to destination
+            success = self.copy_to(destination, overwrite=overwrite)
+            if not success:
+                return False
+            
+            # Then delete source
+            if self.is_dir():
+                # For directories, use recursive delete
+                if hasattr(self._impl, 'rmtree'):
+                    # S3 has optimized recursive delete
+                    self._impl.rmtree()
+                else:
+                    # Use standard recursive delete
+                    import shutil
+                    if source_scheme == 'file':
+                        shutil.rmtree(str(self))
+                    else:
+                        # For other remote schemes, delete recursively
+                        self._delete_recursive()
+            else:
+                # Single file
+                self.unlink()
+            
+            return True
+            
+        except Exception as e:
+            raise OSError(f"Failed to move {self} to {destination}: {e}")
+    
+    def _delete_recursive(self):
+        """Delete directory recursively for remote storage"""
+        if self.is_dir():
+            # Delete all contents first
+            for item in self.iterdir():
+                if item.is_dir():
+                    item._delete_recursive()
+                else:
+                    item.unlink()
+            # Then delete the directory itself
+            self.rmdir()
+        else:
+            self.unlink()
+    
     def copy_to(self, destination: 'Path', overwrite: bool = False) -> bool:
         """
         Copy this file or directory to the destination path.

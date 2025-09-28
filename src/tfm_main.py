@@ -2379,6 +2379,18 @@ class FileManager:
             print(f"Permission denied: Cannot write to {destination_dir}")
             return
         
+        # Check for cross-storage move and inform user
+        source_schemes = {f.get_scheme() for f in files_to_move}
+        dest_scheme = destination_dir.get_scheme()
+        is_cross_storage = any(scheme != dest_scheme for scheme in source_schemes)
+        
+        if is_cross_storage:
+            # Inform user about cross-storage move
+            scheme_names = {'file': 'Local', 's3': 'S3', 'scp': 'SCP', 'ftp': 'FTP'}
+            source_names = [scheme_names.get(scheme, scheme.upper()) for scheme in source_schemes]
+            dest_name = scheme_names.get(dest_scheme, dest_scheme.upper())
+            print(f"Cross-storage move: {'/'.join(set(source_names))} → {dest_name}")
+        
         # Check if any files are being moved to the same directory
         same_dir_files = [f for f in files_to_move if f.parent == destination_dir]
         if same_dir_files:
@@ -2504,9 +2516,14 @@ class FileManager:
                         else:
                             dest_path.unlink()
                     
+                    # Determine if this is a cross-storage move
+                    source_scheme = source_file.get_scheme()
+                    dest_scheme = destination_dir.get_scheme()
+                    is_cross_storage = source_scheme != dest_scheme
+                    
                     # Move the file/directory
-                    if source_file.is_symlink():
-                        # For symbolic links, copy the link itself (not the target)
+                    if source_file.is_symlink() and not is_cross_storage:
+                        # For symbolic links on same storage, copy the link itself (not the target)
                         processed_files += 1
                         if total_individual_files > 1:
                             self.progress_manager.update_progress(f"Link: {source_file.name}", processed_files)
@@ -2518,7 +2535,7 @@ class FileManager:
                     elif source_file.is_dir():
                         # For directories, we need to track individual files being moved
                         processed_files = self._move_directory_with_progress(
-                            source_file, dest_path, processed_files, total_individual_files
+                            source_file, dest_path, processed_files, total_individual_files, is_cross_storage
                         )
                         print(f"Moved directory: {source_file.name}")
                     else:
@@ -2527,8 +2544,15 @@ class FileManager:
                         if total_individual_files > 1:
                             self.progress_manager.update_progress(source_file.name, processed_files)
                         
-                        source_file.rename(dest_path)
-                        print(f"Moved file: {source_file.name}")
+                        if is_cross_storage:
+                            # Cross-storage move: copy then delete
+                            source_file.copy_to(dest_path, overwrite=overwrite)
+                            source_file.unlink()
+                            print(f"Moved file (cross-storage): {source_file.name}")
+                        else:
+                            # Same-storage move: use rename
+                            source_file.rename(dest_path)
+                            print(f"Moved file: {source_file.name}")
                     
                     moved_count += 1
                     
@@ -2570,21 +2594,40 @@ class FileManager:
         if error_count > 0:
             print(f"Move completed with {error_count} errors")
     
-    def _move_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files):
+    def _move_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files, is_cross_storage=False):
         """Move directory using copy + delete with fine-grained progress updates"""
         try:
-            # First copy the directory with progress tracking
-            processed_files = self._copy_directory_with_progress(
-                source_dir, dest_dir, processed_files, total_files
-            )
-            
-            # Then remove the source directory
-            if source_dir.is_dir():
-                # For directories, we need to delete recursively
-                # Use the existing delete method without progress tracking
-                self._delete_directory_with_progress(source_dir, 0, 1)
+            if is_cross_storage:
+                # Cross-storage move: use copy_to then delete
+                source_dir.copy_to(dest_dir, overwrite=True)
+                
+                # Count files for progress tracking
+                dir_file_count = self._count_files_recursively([source_dir])
+                processed_files += dir_file_count
+                
+                if total_files > 1:
+                    self.progress_manager.update_progress(f"Copied: {source_dir.name}", processed_files)
+                
+                # Delete source directory
+                if hasattr(source_dir._impl, 'rmtree'):
+                    # S3 has optimized recursive delete
+                    source_dir._impl.rmtree()
+                else:
+                    # Use standard recursive delete for local directories
+                    self._delete_directory_with_progress(source_dir, 0, 1)
             else:
-                source_dir.unlink()
+                # Same-storage move: first copy the directory with progress tracking
+                processed_files = self._copy_directory_with_progress(
+                    source_dir, dest_dir, processed_files, total_files
+                )
+                
+                # Then remove the source directory
+                if source_dir.is_dir():
+                    # For directories, we need to delete recursively
+                    # Use the existing delete method without progress tracking
+                    self._delete_directory_with_progress(source_dir, 0, 1)
+                else:
+                    source_dir.unlink()
             
             return processed_files
             
