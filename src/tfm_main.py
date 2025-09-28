@@ -44,6 +44,7 @@ from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
 from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
+from tfm_archive import ArchiveOperations
 
 class FileManager:
     def __init__(self, stdscr, remote_log_port=None, left_dir=None, right_dir=None):
@@ -92,6 +93,7 @@ class FileManager:
         self.general_dialog = GeneralPurposeDialog(self.config)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
         self.progress_manager = ProgressManager()
+        self.archive_operations = ArchiveOperations(self.log_manager)
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -3043,36 +3045,52 @@ class FileManager:
             return
         
         try:
-            # Detect archive format and create archive
-            archive_format = self.detect_archive_format(archive_filename)
+            # Determine archive format from filename
+            format_type = self._get_archive_format_from_filename(archive_filename)
             
-            if archive_format == 'zip':
-                self.create_zip_archive(archive_path, files_to_archive)
-            elif archive_format in ['tar.gz', 'tgz']:
-                self.create_tar_archive(archive_path, files_to_archive)
-            else:
-                print(f"Unsupported archive format. Use .zip, .tar.gz, or .tgz")
+            if not format_type:
+                print(f"Unsupported archive format. Supported: .zip, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .txz")
                 self.general_dialog.hide()
                 self.needs_full_redraw = True
                 return
             
-            print(f"Created archive: {archive_filename}")
+            # Start progress tracking
+            total_files = self._count_files_recursively(files_to_archive)
+            self.progress_manager.start_operation(
+                OperationType.ARCHIVE_CREATE, 
+                total_files, 
+                f"Creating {format_type}: {archive_filename}",
+                self._progress_callback
+            )
             
-            # Refresh the other pane to show the new archive
-            self.refresh_files(other_pane)
-            
-            # Try to select the new archive in the other pane
-            for i, file_path in enumerate(other_pane['files']):
-                if file_path.name == archive_filename:
-                    other_pane['selected_index'] = i
-                    self.adjust_scroll_for_selection(other_pane)
-                    break
+            try:
+                # Use the new cross-storage archive operations
+                success = self.archive_operations.create_archive(files_to_archive, archive_path, format_type)
+                
+                if success:
+                    print(f"Created archive: {archive_filename}")
+                    
+                    # Refresh the other pane to show the new archive
+                    self.refresh_files(other_pane)
+                    
+                    # Try to select the new archive in the other pane
+                    for i, file_path in enumerate(other_pane['files']):
+                        if file_path.name == archive_filename:
+                            other_pane['selected_index'] = i
+                            self.adjust_scroll_for_selection(other_pane)
+                            break
+                else:
+                    print(f"Failed to create archive: {archive_filename}")
+                    
+            finally:
+                self.progress_manager.finish_operation()
             
             self.general_dialog.hide()
             self.needs_full_redraw = True
             
         except Exception as e:
             print(f"Error creating archive: {e}")
+            self.progress_manager.finish_operation()
             self.general_dialog.hide()
             self.needs_full_redraw = True
     
@@ -3185,7 +3203,7 @@ class FileManager:
         return total_files
     
     def detect_archive_format(self, filename):
-        """Detect archive format from filename extension"""
+        """Detect archive format from filename extension (legacy method)"""
         filename_lower = filename.lower()
         
         if filename_lower.endswith('.zip'):
@@ -3194,6 +3212,23 @@ class FileManager:
             return 'tar.gz'
         elif filename_lower.endswith('.tgz'):
             return 'tgz'
+        else:
+            return None
+    
+    def _get_archive_format_from_filename(self, filename):
+        """Get archive format string for the new archive operations"""
+        filename_lower = filename.lower()
+        
+        if filename_lower.endswith('.tar.gz') or filename_lower.endswith('.tgz'):
+            return 'tar.gz'
+        elif filename_lower.endswith('.tar.bz2') or filename_lower.endswith('.tbz2'):
+            return 'tar.bz2'
+        elif filename_lower.endswith('.tar.xz') or filename_lower.endswith('.txz'):
+            return 'tar.xz'
+        elif filename_lower.endswith('.tar'):
+            return 'tar'
+        elif filename_lower.endswith('.zip'):
+            return 'zip'
         else:
             return None
     
@@ -3309,11 +3344,10 @@ class FileManager:
             print("Selected item is not a file")
             return
         
-        # Check if it's an archive file
-        archive_format = self.detect_archive_format(selected_file.name)
-        if not archive_format:
+        # Check if it's an archive file using the new archive operations
+        if not self.archive_operations.is_archive(selected_file):
             print(f"'{selected_file.name}' is not a supported archive format")
-            print("Supported formats: .zip, .tar.gz, .tgz")
+            print("Supported formats: .zip, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .txz, .gz, .bz2, .xz")
             return
         
         # Create extraction directory in the other pane
@@ -3328,17 +3362,17 @@ class FileManager:
             
             def extract_callback(confirmed):
                 if confirmed:
-                    self._proceed_with_extraction(selected_file, extract_dir, archive_format, other_pane, archive_basename)
+                    self._proceed_with_extraction_new(selected_file, extract_dir, other_pane, archive_basename)
                 else:
                     print("Extraction cancelled")
             
             self.show_confirmation(message, extract_callback)
         else:
             # Proceed with extraction without confirmation
-            self._proceed_with_extraction(selected_file, extract_dir, archive_format, other_pane, archive_basename)
+            self._proceed_with_extraction_new(selected_file, extract_dir, other_pane, archive_basename)
     
     def _proceed_with_extraction(self, selected_file, extract_dir, archive_format, other_pane, archive_basename):
-        """Proceed with extraction after confirmation (if enabled)"""
+        """Proceed with extraction after confirmation (if enabled) - legacy method"""
         # Check if extraction directory already exists
         if extract_dir.exists():
             def overwrite_callback(confirmed):
@@ -3356,16 +3390,46 @@ class FileManager:
         else:
             self.perform_extraction(selected_file, extract_dir, archive_format, other_pane)
     
+    def _proceed_with_extraction_new(self, selected_file, extract_dir, other_pane, archive_basename):
+        """Proceed with extraction using new archive operations"""
+        # Check if extraction directory already exists
+        if extract_dir.exists():
+            def overwrite_callback(confirmed):
+                if confirmed:
+                    self.perform_extraction_new(selected_file, extract_dir, other_pane, overwrite=True)
+                else:
+                    print("Extraction cancelled")
+            
+            self.show_confirmation(f"Directory '{archive_basename}' already exists. Overwrite?", overwrite_callback)
+        else:
+            self.perform_extraction_new(selected_file, extract_dir, other_pane, overwrite=False)
+    
     def get_archive_basename(self, filename):
         """Get the base name of an archive file (without extension)"""
         filename_lower = filename.lower()
         
         if filename_lower.endswith('.tar.gz'):
             return filename[:-7]  # Remove .tar.gz
+        elif filename_lower.endswith('.tar.bz2'):
+            return filename[:-8]  # Remove .tar.bz2
+        elif filename_lower.endswith('.tar.xz'):
+            return filename[:-7]  # Remove .tar.xz
         elif filename_lower.endswith('.tgz'):
             return filename[:-4]  # Remove .tgz
+        elif filename_lower.endswith('.tbz2'):
+            return filename[:-5]  # Remove .tbz2
+        elif filename_lower.endswith('.txz'):
+            return filename[:-4]  # Remove .txz
         elif filename_lower.endswith('.zip'):
             return filename[:-4]  # Remove .zip
+        elif filename_lower.endswith('.tar'):
+            return filename[:-4]  # Remove .tar
+        elif filename_lower.endswith('.gz'):
+            return filename[:-3]  # Remove .gz
+        elif filename_lower.endswith('.bz2'):
+            return filename[:-4]  # Remove .bz2
+        elif filename_lower.endswith('.xz'):
+            return filename[:-3]  # Remove .xz
         else:
             # Fallback - remove last extension
             return Path(filename).stem
@@ -3476,6 +3540,37 @@ class FileManager:
                 # Finish progress tracking
                 if total_files > 1:
                     self.progress_manager.finish_operation()
+    
+    def perform_extraction_new(self, archive_file, extract_dir, other_pane, overwrite=False):
+        """Perform extraction using new cross-storage archive operations"""
+        try:
+            # Start progress tracking
+            self.progress_manager.start_operation(
+                OperationType.ARCHIVE_EXTRACT,
+                1,  # We don't know the exact count beforehand
+                f"Extracting: {archive_file.name}",
+                self._progress_callback
+            )
+            
+            try:
+                # Use the new cross-storage archive operations
+                success = self.archive_operations.extract_archive(archive_file, extract_dir, overwrite)
+                
+                if success:
+                    print(f"Archive extracted successfully to: {extract_dir}")
+                    
+                    # Refresh the other pane to show the extracted contents
+                    self.refresh_files(other_pane)
+                    self.needs_full_redraw = True
+                else:
+                    print(f"Failed to extract archive: {archive_file.name}")
+                    
+            finally:
+                self.progress_manager.finish_operation()
+            
+        except Exception as e:
+            print(f"Error extracting archive: {e}")
+            self.progress_manager.finish_operation()
         
     def handle_isearch_input(self, key):
         """Handle input while in isearch mode"""
