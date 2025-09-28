@@ -143,9 +143,6 @@ class Config:
         {'name': 'Preview Files', 'command': ['./tools/preview_files.sh'], 'options': {'auto_return': True}},
         {'name': 'S3 Information', 'command': ['./tools/s3_info.sh']},
         {'name': 'S3 Browser', 'command': ['./tools/s3_browser.sh']},
-        {'name': 'Create Archive', 'command': ['./tools/create_archive.sh']},
-        {'name': 'Extract Archive', 'command': ['./tools/extract_archive.sh']},
-        {'name': 'Archive Information', 'command': ['./tools/archive_info.sh']},
         # Add your own programs here:
         # {'name': 'My Script', 'command': ['/path/to/script.sh']},
         # {'name': 'Python REPL', 'command': ['python3']},

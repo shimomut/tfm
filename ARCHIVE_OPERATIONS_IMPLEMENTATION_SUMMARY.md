@@ -26,24 +26,24 @@ Successfully implemented comprehensive archive operations for TFM with full cros
    - Automatic cleanup of temporary files
    - Support for all storage combinations (Local ↔ S3)
 
-### External Tools
+### Built-in Integration
 
-Created three shell scripts in `tools/` directory:
+Archive operations are fully integrated into TFM's existing interface:
 
-1. **create_archive.sh** - Interactive archive creation
-   - Format selection (tar.gz, tar.bz2, tar.xz, zip, tar)
-   - Uses TFM environment variables
-   - Progress feedback and error handling
+1. **Create Archive (P/p key)** - Enhanced existing functionality
+   - Support for multiple archive formats
+   - Cross-storage operations
+   - Progress tracking and error handling
 
-2. **extract_archive.sh** - Interactive archive extraction
+2. **Extract Archive (U/u key)** - Enhanced existing functionality
    - Auto-detection of archive formats
-   - Multiple extraction destination options
+   - Cross-storage extraction support
    - Overwrite protection and confirmation
 
-3. **archive_info.sh** - Archive information display
-   - Detailed archive metadata
-   - Content listing with file counts
-   - Size and compression information
+3. **Archive Information** - Available through file details
+   - Integrated with existing file information system
+   - Archive format detection
+   - Content preview capabilities
 
 ### TFM Integration
 
@@ -54,16 +54,16 @@ Created three shell scripts in `tools/` directory:
    - Progress tracking for large operations
 
 2. **Configuration Updates**
-   - Added archive tools to external programs menu
-   - Maintained existing key bindings (P/p for create, U/u for extract)
+   - Enhanced existing key bindings (P/p for create, U/u for extract)
    - Added confirmation settings for archive operations
+   - Maintained backward compatibility with existing interface
 
 3. **Key Features**
    - **P/p** - Create archive from selected files
    - **U/u** - Extract selected archive
-   - **x** menu - Access to archive tools
    - Progress tracking for large operations
    - Cross-storage operations (Local ↔ S3)
+   - Seamless integration with existing TFM interface
 
 ### Supported Operations
 
@@ -161,13 +161,13 @@ Created three shell scripts in `tools/` directory:
 # 4. Press P to create local archive from S3 files
 ```
 
-### External Tools
+### Built-in Operations
 
 ```bash
-# Access via 'x' menu:
-# - Create Archive (interactive format selection)
-# - Extract Archive (destination options)
-# - Archive Information (detailed metadata)
+# Direct key bindings:
+# - P/p: Create archive from selected files
+# - U/u: Extract selected archive
+# - Integrated with existing TFM interface
 ```
 
 ## Benefits Achieved
@@ -221,10 +221,10 @@ The archive operations implementation successfully provides comprehensive archiv
 Key achievements:
 - ✅ Cross-storage archive operations (Local ↔ S3)
 - ✅ Multiple archive format support
-- ✅ Interactive external tools
+- ✅ Built-in TFM integration
 - ✅ Comprehensive error handling
 - ✅ Full test coverage
 - ✅ Complete documentation
-- ✅ Seamless TFM integration
+- ✅ Seamless user experience
 
 The implementation follows TFM's design principles and provides a solid foundation for future archive-related enhancements.

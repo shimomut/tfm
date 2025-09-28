@@ -55,28 +55,20 @@ The archive operations support all combinations of source and destination storag
 - **P** or **p** - Create archive from selected files
 - **U** or **u** - Extract selected archive file
 
-### External Programs
-
-Three shell scripts are available through the external programs menu (press **x**):
-
-1. **Create Archive** - Interactive archive creation with format selection
-2. **Extract Archive** - Interactive archive extraction with destination options
-3. **Archive Information** - Display detailed archive information
-
 ### Workflow
 
 #### Creating Archives
 
 1. Select files/directories to archive using **Space**
-2. Press **P** to create archive, or use external program menu
+2. Press **P** to create archive
 3. Enter archive filename with appropriate extension
 4. Archive is created in the other pane's directory
 
 #### Extracting Archives
 
 1. Navigate to an archive file
-2. Press **U** to extract, or use external program menu
-3. Choose extraction destination
+2. Press **U** to extract
+3. Confirm extraction destination
 4. Archive is extracted with progress tracking
 
 ## Technical Implementation
@@ -114,18 +106,9 @@ Cross-storage operations use temporary files when necessary:
 CONFIRM_EXTRACT_ARCHIVE = True  # Show confirmation before extraction
 ```
 
-### External Programs
+### Built-in Integration
 
-The archive tools are automatically added to the external programs list:
-
-```python
-PROGRAMS = [
-    # ... other programs ...
-    {'name': 'Create Archive', 'command': ['./tools/create_archive.sh']},
-    {'name': 'Extract Archive', 'command': ['./tools/extract_archive.sh']},
-    {'name': 'Archive Information', 'command': ['./tools/archive_info.sh']},
-]
-```
+Archive operations are fully integrated into TFM's interface through the existing key bindings and menu system.
 
 ## Usage Examples
 
