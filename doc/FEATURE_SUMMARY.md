@@ -1,8 +1,8 @@
 # TFM Feature Summary
 
-## Version 0.96 - Complete Feature List
+## Version 0.97 - Complete Feature List
 
-This document provides a comprehensive overview of all features available in TFM (Terminal File Manager) version 0.96.
+This document provides a comprehensive overview of all features available in TFM (Terminal File Manager) version 0.97.
 
 ## Core Interface Features
 
@@ -263,4 +263,4 @@ tfm                               # If installed via pip
 --color-test interactive         # Interactive color tester
 ```
 
-This comprehensive feature list represents the current state of TFM version 0.96, showcasing its evolution from a simple file manager to a sophisticated terminal-based file management system with cloud integration and extensive customization capabilities.
+This comprehensive feature list represents the current state of TFM version 0.97, showcasing its evolution from a simple file manager to a sophisticated terminal-based file management system with cloud integration and extensive customization capabilities.

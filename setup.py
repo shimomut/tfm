@@ -22,7 +22,7 @@ requirements.append('windows-curses; sys_platform == "win32"')
 
 setup(
     name="tfm",
-    version="0.96",
+    version="0.97",
     description="Terminal File Manager - A dual-pane file manager for the terminal",
     long_description=long_description,
     long_description_content_type="text/markdown",

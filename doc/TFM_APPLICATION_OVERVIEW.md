@@ -1,6 +1,6 @@
 # TFM Application Overview
 
-## Current Version: 0.96
+## Current Version: 0.97
 
 TFM (Terminal File Manager) is a sophisticated terminal-based file manager built with Python's curses library. It provides a dual-pane interface with comprehensive file operations, cloud storage integration, and extensive customization capabilities.
 
@@ -203,4 +203,4 @@ python3 tfm.py --color-test diagnose     # Diagnose color issues
 - **Color Schemes**: Customizable appearance system
 - **Progress System**: Extensible progress tracking
 
-This overview provides a comprehensive understanding of TFM's current architecture, capabilities, and design principles as of version 0.96.
+This overview provides a comprehensive understanding of TFM's current architecture, capabilities, and design principles as of version 0.97.
