@@ -45,6 +45,7 @@ from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
 from tfm_archive import ArchiveOperations
+from tfm_cache_manager import CacheManager
 
 class FileManager:
     def __init__(self, stdscr, remote_log_port=None, left_dir=None, right_dir=None):
@@ -93,7 +94,8 @@ class FileManager:
         self.general_dialog = GeneralPurposeDialog(self.config)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
         self.progress_manager = ProgressManager()
-        self.archive_operations = ArchiveOperations(self.log_manager)
+        self.cache_manager = CacheManager(self.log_manager)
+        self.archive_operations = ArchiveOperations(self.log_manager, self.cache_manager)
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
@@ -1226,6 +1228,9 @@ class FileManager:
             new_dir_path.mkdir(parents=True, exist_ok=False)
             print(f"Created directory: {new_dir_name}")
             
+            # Invalidate cache for the new directory
+            self.cache_manager.invalidate_cache_for_create_operation(new_dir_path)
+            
             # Refresh the current pane
             self.refresh_files(current_pane)
             
@@ -1289,6 +1294,9 @@ class FileManager:
             # Create the file
             new_file_path.touch()
             print(f"Created file: {new_file_name}")
+            
+            # Invalidate cache for the new file
+            self.cache_manager.invalidate_cache_for_create_operation(new_file_path)
             
             # Refresh the current pane
             self.refresh_files(current_pane)
@@ -2271,6 +2279,10 @@ class FileManager:
             if total_individual_files > 1:
                 self.progress_manager.finish_operation()
         
+        # Invalidate cache for affected directories
+        if copied_count > 0:
+            self.cache_manager.invalidate_cache_for_copy_operation(files_to_copy, destination_dir)
+        
         # Refresh both panes to show the copied files
         self.refresh_files()
         self.needs_full_redraw = True
@@ -2584,6 +2596,10 @@ class FileManager:
             if total_individual_files > 1:
                 self.progress_manager.finish_operation()
         
+        # Invalidate cache for affected directories
+        if moved_count > 0:
+            self.cache_manager.invalidate_cache_for_move_operation(files_to_move, destination_dir)
+        
         # Refresh both panes to show the moved files
         self.refresh_files()
         self.needs_full_redraw = True
@@ -2783,6 +2799,10 @@ class FileManager:
             # Finish progress tracking
             if total_individual_files > 1:
                 self.progress_manager.finish_operation()
+        
+        # Invalidate cache for affected directories
+        if deleted_count > 0:
+            self.cache_manager.invalidate_cache_for_delete_operation(files_to_delete)
         
         # Refresh current pane to show the changes
         self.refresh_files(self.get_current_pane())
@@ -3146,6 +3166,9 @@ class FileManager:
                 self.create_tar_archive(archive_path, files_to_archive)
             
             print(f"Archive created successfully: {archive_path}")
+            
+            # Invalidate cache for the archive creation
+            self.cache_manager.invalidate_cache_for_archive_operation(archive_path, files_to_archive)
             
             # Refresh the other pane to show the new archive
             self.refresh_files(other_pane)

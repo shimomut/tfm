@@ -33,9 +33,10 @@ class ArchiveOperations:
         '.xz': {'type': 'xz', 'compression': None},
     }
     
-    def __init__(self, log_manager=None):
-        """Initialize archive operations with optional logging"""
+    def __init__(self, log_manager=None, cache_manager=None):
+        """Initialize archive operations with optional logging and cache management"""
         self.log_manager = log_manager
+        self.cache_manager = cache_manager
     
     def _log(self, message: str, level: str = "INFO"):
         """Log a message if log manager is available"""
@@ -109,10 +110,16 @@ class ArchiveOperations:
             
             # If all sources and destination are local, create directly
             if all(scheme == 'file' for scheme in source_schemes) and dest_scheme == 'file':
-                return self._create_archive_local(source_paths, archive_path, format_info)
+                success = self._create_archive_local(source_paths, archive_path, format_info)
+            else:
+                # For cross-storage, use temporary file approach
+                success = self._create_archive_cross_storage(source_paths, archive_path, format_info)
             
-            # For cross-storage, use temporary file approach
-            return self._create_archive_cross_storage(source_paths, archive_path, format_info)
+            # Invalidate cache for the archive creation if successful
+            if success and self.cache_manager:
+                self.cache_manager.invalidate_cache_for_archive_operation(archive_path, source_paths)
+            
+            return success
             
         except Exception as e:
             self._log(f"Error creating archive: {e}", "ERROR")
@@ -290,10 +297,16 @@ class ArchiveOperations:
             
             # If both are local, extract directly
             if archive_scheme == 'file' and dest_scheme == 'file':
-                return self._extract_archive_local(archive_path, destination_dir, format_info, overwrite)
+                success = self._extract_archive_local(archive_path, destination_dir, format_info, overwrite)
+            else:
+                # For cross-storage, use temporary file approach
+                success = self._extract_archive_cross_storage(archive_path, destination_dir, format_info, overwrite)
             
-            # For cross-storage, use temporary file approach
-            return self._extract_archive_cross_storage(archive_path, destination_dir, format_info, overwrite)
+            # Invalidate cache for the extraction if successful
+            if success and self.cache_manager:
+                self.cache_manager.invalidate_cache_for_directory(destination_dir, "archive extraction")
+            
+            return success
             
         except Exception as e:
             self._log(f"Error extracting archive: {e}", "ERROR")
