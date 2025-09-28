@@ -83,6 +83,10 @@ if [[ -n "$SELECTED_FILES" ]]; then
     done
 fi
 
+# Unset TFM environment variables before launching GUI app
+# These variables are not needed for VSCode and can sometimes cause issues
+unset TFM_THIS_DIR TFM_THIS_SELECTED TFM_OTHER_DIR TFM_OTHER_SELECTED TFM_LEFT_DIR TFM_LEFT_SELECTED TFM_RIGHT_DIR TFM_RIGHT_SELECTED TFM_ACTIVE
+
 # Execute VSCode
 echo "Executing: $VSCODE_CMD ${VSCODE_ARGS[*]}"
 exec "$VSCODE_CMD" ${VSCODE_ARGS[*]}

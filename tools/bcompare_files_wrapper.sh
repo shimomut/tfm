@@ -51,4 +51,12 @@ echo "Left file:  $LEFT_PATH"
 echo "Right file: $RIGHT_PATH"
 echo
 
-bcompare "$LEFT_PATH" "$RIGHT_PATH"
+# Store the file paths before unsetting environment variables
+LEFT_FILE_PATH="$LEFT_PATH"
+RIGHT_FILE_PATH="$RIGHT_PATH"
+
+# Unset TFM environment variables before launching GUI app
+# These variables are not needed for BeyondCompare and can sometimes cause issues
+unset TFM_THIS_DIR TFM_THIS_SELECTED TFM_OTHER_DIR TFM_OTHER_SELECTED TFM_LEFT_DIR TFM_LEFT_SELECTED TFM_RIGHT_DIR TFM_RIGHT_SELECTED TFM_ACTIVE
+
+bcompare "$LEFT_FILE_PATH" "$RIGHT_FILE_PATH"
