@@ -754,8 +754,30 @@ class S3PathImpl(PathImpl):
                 prefix = self._key.rstrip('/') + '/'
                 delimiter = '/'
             
-            # For directory listings, we'll cache each page separately
-            # This allows for better cache utilization with large directories
+            # Check if we have a cached complete directory listing first
+            cache_key_params = {
+                'prefix': prefix,
+                'delimiter': delimiter,
+                'complete_listing': True
+            }
+            
+            cached_listing = self._cache.get(
+                operation='list_objects_v2_complete',
+                bucket=self._bucket,
+                key=self._key,
+                **cache_key_params
+            )
+            
+            if cached_listing is not None:
+                # Use cached complete listing - no API calls needed
+                yield from self._yield_paths_from_cached_listing(cached_listing)
+                return
+            
+            # Cache miss - need to fetch from S3 and aggregate all pages
+            all_contents = []
+            all_common_prefixes = []
+            
+            # Use paginator to get all pages
             paginator = self._client.get_paginator('list_objects_v2')
             page_iterator = paginator.paginate(
                 Bucket=self._bucket,
@@ -763,98 +785,99 @@ class S3PathImpl(PathImpl):
                 Delimiter=delimiter
             )
             
-            page_num = 0
+            # Aggregate all pages into complete listing
             for page in page_iterator:
-                # Try to get this page from cache
-                cache_key_params = {
-                    'prefix': prefix,
-                    'delimiter': delimiter,
-                    'page': page_num
-                }
-                
-                cached_page = self._cache.get(
-                    operation='list_objects_v2_page',
-                    bucket=self._bucket,
-                    key=self._key,
-                    **cache_key_params
-                )
-                
-                if cached_page is None:
-                    # Cache this page
-                    self._cache.put(
-                        operation='list_objects_v2_page',
-                        bucket=self._bucket,
-                        key=self._key,
-                        data=page,
-                        **cache_key_params
-                    )
-                    cached_page = page
-                
-                # Yield directories (common prefixes)
-                for prefix_info in cached_page.get('CommonPrefixes', []):
-                    dir_key = prefix_info['Prefix'].rstrip('/')
-                    
-                    # Create directory with metadata
-                    dir_metadata = {
-                        'is_dir': True,
-                        'is_file': False,
-                        'size': 0,
-                        'last_modified': datetime.now(),  # Virtual directories use current time
-                        'etag': '',
-                        'storage_class': ''
-                    }
-                    
-                    # Create Path with metadata
-                    yield S3PathImpl.create_path_with_metadata(f's3://{self._bucket}/{dir_key}/', dir_metadata)
-                
-                # Yield files (objects) and cache their stat information
-                for obj in cached_page.get('Contents', []):
-                    key = obj['Key']
-                    if key != prefix:  # Don't include the directory itself
-                        # Extract metadata from S3 object
-                        size = obj.get('Size', 0)
-                        last_modified = obj.get('LastModified')
-                        etag = obj.get('ETag', '')
-                        storage_class = obj.get('StorageClass', 'STANDARD')
-                        
-                        # Determine if this is a directory marker (key ends with '/')
-                        is_dir = key.endswith('/')
-                        is_file = not is_dir
-                        
-                        # Create file metadata
-                        file_metadata = {
-                            'is_dir': is_dir,
-                            'is_file': is_file,
-                            'size': size,
-                            'last_modified': last_modified or datetime.now(),
-                            'etag': etag,
-                            'storage_class': storage_class
-                        }
-                        
-                        # Create a mock head_object response for caching (for backward compatibility)
-                        head_response = {
-                            'ContentLength': size,
-                            'LastModified': last_modified or datetime.now(),
-                            'ETag': etag,
-                            'StorageClass': storage_class
-                        }
-                        
-                        # Cache this as a head_object response to avoid future API calls
-                        self._cache.put(
-                            operation='head_object',
-                            bucket=self._bucket,
-                            key=key,  # Use the file's actual key, not self._key
-                            data=head_response,
-                            ttl=300  # Cache for 5 minutes
-                        )
-                        
-                        # Create Path with metadata
-                        yield S3PathImpl.create_path_with_metadata(f's3://{self._bucket}/{key}', file_metadata)
-                
-                page_num += 1
+                all_contents.extend(page.get('Contents', []))
+                all_common_prefixes.extend(page.get('CommonPrefixes', []))
+            
+            # Create complete listing structure
+            complete_listing = {
+                'Contents': all_contents,
+                'CommonPrefixes': all_common_prefixes,
+                'KeyCount': len(all_contents),
+                'Prefix': prefix,
+                'Delimiter': delimiter
+            }
+            
+            # Cache the complete aggregated listing
+            self._cache.put(
+                operation='list_objects_v2_complete',
+                bucket=self._bucket,
+                key=self._key,
+                data=complete_listing,
+                ttl=300,  # Cache for 5 minutes
+                **cache_key_params
+            )
+            
+            # Yield paths from the complete listing
+            yield from self._yield_paths_from_cached_listing(complete_listing)
         
         except ClientError as e:
             raise OSError(f"Failed to list S3 directory: {e}")
+    
+    def _yield_paths_from_cached_listing(self, cached_listing):
+        """Yield Path objects from a cached complete directory listing"""
+        # Yield directories (common prefixes)
+        for prefix_info in cached_listing.get('CommonPrefixes', []):
+            dir_key = prefix_info['Prefix'].rstrip('/')
+            
+            # Create directory with metadata
+            dir_metadata = {
+                'is_dir': True,
+                'is_file': False,
+                'size': 0,
+                'last_modified': datetime.now(),  # Virtual directories use current time
+                'etag': '',
+                'storage_class': ''
+            }
+            
+            # Create Path with metadata
+            yield S3PathImpl.create_path_with_metadata(f's3://{self._bucket}/{dir_key}/', dir_metadata)
+        
+        # Yield files (objects) and cache their stat information
+        prefix = cached_listing.get('Prefix', '')
+        for obj in cached_listing.get('Contents', []):
+            key = obj['Key']
+            if key != prefix:  # Don't include the directory itself
+                # Extract metadata from S3 object
+                size = obj.get('Size', 0)
+                last_modified = obj.get('LastModified')
+                etag = obj.get('ETag', '')
+                storage_class = obj.get('StorageClass', 'STANDARD')
+                
+                # Determine if this is a directory marker (key ends with '/')
+                is_dir = key.endswith('/')
+                is_file = not is_dir
+                
+                # Create file metadata
+                file_metadata = {
+                    'is_dir': is_dir,
+                    'is_file': is_file,
+                    'size': size,
+                    'last_modified': last_modified or datetime.now(),
+                    'etag': etag,
+                    'storage_class': storage_class
+                }
+                
+                # Create a mock head_object response for caching (for backward compatibility)
+                head_response = {
+                    'ContentLength': size,
+                    'LastModified': last_modified or datetime.now(),
+                    'ETag': etag,
+                    'StorageClass': storage_class
+                }
+                
+                # Cache this as a head_object response to avoid future API calls
+                self._cache.put(
+                    operation='head_object',
+                    bucket=self._bucket,
+                    key=key,  # Use the file's actual key, not self._key
+                    data=head_response,
+                    ttl=300  # Cache for 5 minutes
+                )
+                
+                # Create Path with metadata
+                yield S3PathImpl.create_path_with_metadata(f's3://{self._bucket}/{key}', file_metadata)
     
     def glob(self, pattern: str) -> Iterator['Path']:
         """Iterate over this subtree and yield all existing files matching pattern"""
