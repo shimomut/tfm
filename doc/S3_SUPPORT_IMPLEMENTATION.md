@@ -8,8 +8,8 @@ This document summarizes the implementation of AWS S3 support in TFM through the
 
 ### 1. Core Path Implementation
 
-#### S3PathImpl Class (`src/tfm_path.py`)
-- **Location**: Added to `src/tfm_path.py` after `LocalPathImpl`
+#### S3PathImpl Class (`src/tfm_s3.py`)
+- **Location**: Separated into dedicated `src/tfm_s3.py` module
 - **Purpose**: Implements all PathImpl abstract methods for S3 operations
 - **Key Features**:
   - Full pathlib-compatible interface
@@ -17,10 +17,11 @@ This document summarizes the implementation of AWS S3 support in TFM through the
   - Lazy S3 client initialization
   - Proper error handling for AWS-specific errors
 
-#### Path Class Updates
-- **URI Detection**: Modified `_create_implementation()` to detect S3 URIs
+#### Path Class Updates (`src/tfm_path.py`)
+- **URI Detection**: Modified `_create_implementation()` to detect S3 URIs and import S3PathImpl
 - **Constructor Fix**: Updated constructor to handle remote schemes before pathlib conversion
 - **Scheme Support**: Added detection for `s3://`, `scp://`, `ftp://` schemes
+- **Modular Import**: S3PathImpl imported dynamically to avoid circular dependencies
 
 ### 2. Dependencies
 
@@ -109,7 +110,7 @@ This document summarizes the implementation of AWS S3 support in TFM through the
 
 ### Architecture Integration
 
-#### PathImpl Extension
+#### PathImpl Extension (`src/tfm_s3.py`)
 ```python
 class S3PathImpl(PathImpl):
     """AWS S3 implementation of PathImpl interface"""
@@ -121,10 +122,14 @@ class S3PathImpl(PathImpl):
     # Implement all abstract methods from PathImpl
 ```
 
-#### Path Factory Pattern
+#### Path Factory Pattern (`src/tfm_path.py`)
 ```python
 def _create_implementation(self, path_str: str) -> PathImpl:
     if path_str.startswith('s3://'):
+        try:
+            from .tfm_s3 import S3PathImpl  # Dynamic import
+        except ImportError:
+            from tfm_s3 import S3PathImpl   # Fallback for direct execution
         return S3PathImpl(path_str)
     return LocalPathImpl(PathlibPath(path_str))
 ```
