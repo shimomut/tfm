@@ -3,6 +3,7 @@
 TFM Progress Manager - Handles progress tracking for file operations
 """
 
+import time
 from enum import Enum
 from typing import Optional, Callable, Dict, Any
 
@@ -68,7 +69,6 @@ class ProgressManager:
         
         # Call callback with updated state (with throttling)
         if self.progress_callback:
-            import time
             current_time = time.time() * 1000  # Convert to milliseconds
             
             # Always call callback for the first update or if enough time has passed

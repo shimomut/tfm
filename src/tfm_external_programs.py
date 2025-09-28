@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import shlex
+import time
 from pathlib import Path
 
 
@@ -172,7 +173,6 @@ class ExternalProgramManager:
             
             if auto_return:
                 print("Auto-returning to TFM...")
-                import time
                 time.sleep(1)  # Brief pause to show the message
             else:
                 print("Press Enter to return to TFM...")

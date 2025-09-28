@@ -157,6 +157,21 @@ Allow users to configure error handling behavior:
 - Error logging preferences
 - Recovery strategy preferences
 
+### 4. Module Import Optimization
+
+#### Import Consolidation
+- **Fixed**: Moved all function-level imports to module level
+- **Removed**: 15+ redundant import statements within functions
+- **Added**: Missing imports (`time`, `os`, `socket`, `importlib`, `traceback`) to module headers
+
+#### Files with Import Fixes
+- `src/tfm_colors.py`: Removed 4 redundant `import curses` statements
+- `src/tfm_log_manager.py`: Added `time` to module imports, removed function-level import
+- `src/tfm_progress_manager.py`: Added `time` to module imports, removed function-level import
+- `src/tfm_external_programs.py`: Added `time` to module imports, removed function-level import
+- `src/tfm_state_manager.py`: Added `os`, `socket` to module imports, removed function-level imports
+- `src/tfm_main.py`: Added `importlib`, `traceback` to module imports, removed function-level imports
+
 ## Compliance with Policy
 
 All changes comply with the established Exception Handling Policy:
@@ -165,10 +180,13 @@ All changes comply with the established Exception Handling Policy:
 - ✅ Error messages are informative and include context
 - ✅ Silent failures have been eliminated where possible
 - ✅ Critical operations (file, network) have comprehensive error handling
+- ✅ All module imports moved to module level for better performance
+- ✅ Redundant imports within functions eliminated
 
 ## Impact Assessment
 
 ### Performance
+- **Improved Performance**: Moving imports to module level eliminates repeated import overhead
 - **Minimal Impact**: Exception handling improvements have negligible performance impact
 - **Better Resource Management**: Proper cleanup in error conditions prevents resource leaks
 

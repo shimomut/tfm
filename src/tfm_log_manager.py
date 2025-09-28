@@ -7,6 +7,7 @@ import sys
 import socket
 import threading
 import json
+import time
 from datetime import datetime
 from collections import deque
 from tfm_const import LOG_TIME_FORMAT, MAX_LOG_MESSAGES
@@ -155,7 +156,6 @@ class LogManager:
             
             # Keep the thread alive - disconnection will be detected in _broadcast_to_clients
             # when we try to send data and it fails
-            import time
             while self.running and client_socket in self.remote_clients:
                 time.sleep(1.0)  # Just keep the thread alive
                     

@@ -668,7 +668,6 @@ def print_all_color_schemes():
 def print_color_support_info():
     """Print information about terminal color support"""
     try:
-        import curses
         # This will only work if curses has been initialized
         if hasattr(curses, 'COLORS'):
             colors = curses.COLORS
@@ -696,11 +695,7 @@ def print_color_support_info():
 
 def check_default_colors_support():
     """Check if terminal supports default color changes"""
-    try:
-        import curses
-        return hasattr(curses, 'assume_default_colors')
-    except ImportError:
-        return False
+    return hasattr(curses, 'assume_default_colors')
 
 def get_default_background_color():
     """Get the default background color for the current scheme"""
@@ -713,12 +708,8 @@ def get_default_foreground_color():
 def get_background_color_pair():
     """Get a color pair that can be used for background areas"""
     try:
-        import curses
         # Return the dedicated background color pair
         return curses.color_pair(COLOR_BACKGROUND)
-    except ImportError:
-        # Curses not available
-        return 0
     except Exception as e:
         print(f"Warning: Could not get background color pair: {e}")
         return 0
@@ -726,7 +717,6 @@ def get_background_color_pair():
 def apply_background_to_window(window):
     """Apply the color scheme background to a curses window using addstr() method"""
     try:
-        import curses
         if default_background_color is not None:
             # Get window dimensions
             height, width = window.getmaxyx()
@@ -747,9 +737,6 @@ def apply_background_to_window(window):
                 pass
             
             return True
-    except ImportError:
-        # Curses not available
-        pass
     except Exception as e:
         print(f"Warning: Could not apply background to window: {e}")
     return False

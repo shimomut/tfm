@@ -16,6 +16,8 @@ import zipfile
 import tarfile
 import time
 import webbrowser
+import importlib
+import traceback
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -176,9 +178,6 @@ class FileManager:
                 except Exception as e:
                     print(f"Warning: Background clear operation failed: {e}")
             
-        except ImportError:
-            # Fallback to regular clear if color functions not available
-            self.stdscr.clear()
         except Exception as e:
             # Any other error, use regular clear
             print(f"Warning: Screen clear with background failed: {e}")
@@ -1788,7 +1787,6 @@ class FileManager:
                     # Reload the configuration
                     from tfm_config import get_config
                     # Force reload by clearing any cached config
-                    import importlib
                     import tfm_config
                     importlib.reload(tfm_config)
                     
@@ -2042,7 +2040,6 @@ class FileManager:
             self.external_program_manager.suspend_curses(self.stdscr)
             
             # Launch the text editor as a subprocess
-            import subprocess
             result = subprocess.run([editor, str(selected_file)], 
                                   cwd=str(current_pane['path']))
             
@@ -4082,7 +4079,6 @@ def main(stdscr, remote_log_port=None, left_dir=None, right_dir=None):
             fm.restore_stdio()
         
         # Print error information to help with debugging
-        import traceback
         print(f"\nTFM encountered an unexpected error:", file=sys.stderr)
         print(f"Error: {type(e).__name__}: {e}", file=sys.stderr)
         print("\nFull traceback:", file=sys.stderr)

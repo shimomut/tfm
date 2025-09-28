@@ -10,6 +10,8 @@ import sqlite3
 import json
 import time
 import threading
+import os
+import socket
 from pathlib import Path
 from contextlib import contextmanager
 from typing import Any, Dict, Optional, List
@@ -329,8 +331,6 @@ class TFMStateManager(StateManager):
         
         # Generate instance ID if not provided
         if instance_id is None:
-            import os
-            import socket
             self.instance_id = f"tfm_{os.getpid()}_{socket.gethostname()}_{int(time.time())}"
         else:
             self.instance_id = instance_id
@@ -341,9 +341,6 @@ class TFMStateManager(StateManager):
     def _register_session(self):
         """Register this TFM session in the sessions table."""
         try:
-            import os
-            import socket
-            
             current_time = time.time()
             
             with self._get_connection() as conn:

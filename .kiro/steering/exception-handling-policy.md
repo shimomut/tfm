@@ -141,6 +141,51 @@ When updating existing code:
 - **Maintainability**: Clear error handling makes code easier to understand and modify
 - **Reliability**: Proper exception handling prevents unexpected crashes
 
+## Module Import Guidelines
+
+### 8. Import Modules at Module Level
+- **Always import modules at the top of the file** (module level), not within functions or methods
+- This improves performance by avoiding repeated imports during function calls
+- Makes dependencies clear and explicit
+
+#### ❌ Avoid - Imports Within Functions
+```python
+def some_function():
+    import time  # Bad - imports on every function call
+    import os
+    time.sleep(1)
+```
+
+#### ✅ Preferred - Module Level Imports
+```python
+import time
+import os
+
+def some_function():
+    time.sleep(1)  # Good - module already imported
+```
+
+#### Exception Handling Context
+When fixing exception handling, also check for and fix any imports within functions:
+```python
+# Before
+def handle_client(self):
+    try:
+        import time
+        time.sleep(1)
+    except Exception:
+        pass
+
+# After - move import to module level
+import time  # At top of file
+
+def handle_client(self):
+    try:
+        time.sleep(1)
+    except (OSError, ConnectionError) as e:
+        print(f"Client handling error: {e}")
+```
+
 ## Review Checklist
 
 When reviewing code changes:
@@ -149,3 +194,5 @@ When reviewing code changes:
 - [ ] Do broad exception handlers include error logging?
 - [ ] Are error messages informative and include context?
 - [ ] Is the error handling appropriate for the operation's criticality?
+- [ ] Are all module imports at the module level (not within functions)?
+- [ ] Are there any redundant imports that can be removed?
