@@ -6,6 +6,8 @@ This file contains your personal TFM configuration.
 You can modify any of these settings to customize TFM behavior.
 """
 
+import platform
+
 class Config:
     """User configuration for TFM"""
     
@@ -140,3 +142,7 @@ class Config:
         # {'name': 'Python REPL', 'command': ['python3']},
         # {'name': 'Quick Command', 'command': ['ls', '-la'], 'options': {'auto_return': True}},
     ]
+    
+    # Add macOS-specific programs
+    if platform.system() == 'Darwin':
+        PROGRAMS.append({'name': 'Reveal in Finder', 'command': ['./tools/reveal_in_finder.sh'], 'options': {'auto_return': True}})
