@@ -481,40 +481,13 @@ def init_colors(color_scheme=None):
     default_background_color = default_bg
     default_foreground_color = default_fg
     
-    # Try multiple methods to set default colors
-    default_colors_set = False
-    
-    # Method 1: assume_default_colors (best option)
+    # Set terminal default colors for better integration
     try:
         curses.assume_default_colors(default_fg, default_bg)
         print(f"Set terminal default colors: fg={default_fg}, bg={default_bg}")
-        default_colors_set = True
     except (curses.error, AttributeError):
-        pass
-    
-    # Method 2: Use color pair 0 (fallback)
-    if not default_colors_set:
-        try:
-            curses.init_pair(0, default_fg, default_bg)
-            print(f"Set default color pair 0: fg={default_fg}, bg={default_bg}")
-            default_colors_set = True
-        except curses.error:
-            pass
-    
-    # Method 3: Create a dedicated background color pair
-    if not default_colors_set:
-        try:
-            # Use a high color pair number for background
-            BACKGROUND_COLOR_PAIR = 63  # Usually safe, most terminals have 64+ pairs
-            curses.init_pair(BACKGROUND_COLOR_PAIR, default_fg, default_bg)
-            default_colors_set = True
-        except curses.error:
-            pass
-    
-    if not default_colors_set:
-        print("Warning: Could not set terminal default background color")
-        print("Blank spaces may not match the color scheme background")
-        print("Try using a different terminal emulator for better color support")
+        print("Warning: Could not set terminal default colors")
+        print("Terminal may not support assume_default_colors()")
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """Get the appropriate color for a file based on its properties"""
