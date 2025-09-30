@@ -76,7 +76,7 @@ class DefaultConfig:
         'programs': ['x'],                     # Show external programs menu
         'create_archive': {'keys': ['p', 'P'], 'selection': 'required'}, # Create archive from selected files
         'extract_archive': ['u', 'U'],        # Extract selected archive file
-        'compare_selection': {'keys': ['w', 'W'], 'selection': 'required'}, # Show file comparison options
+        'compare_selection': ['w', 'W'],      # Show file comparison options
         'adjust_pane_left': ['['],            # Make left pane smaller (move boundary left)
         'adjust_pane_right': [']'],           # Make left pane larger (move boundary right)
         'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
