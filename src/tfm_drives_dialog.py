@@ -54,9 +54,9 @@ class DriveEntry:
             display_name = self.name
         
         if self.description:
-            return f"{icon}{display_name} - {self.description}"
+            return f"{icon} {display_name} - {self.description}"
         else:
-            return f"{icon}{display_name}"
+            return f"{icon} {display_name}"
 
 
 class DrivesDialog(BaseListDialog):
@@ -178,25 +178,13 @@ class DrivesDialog(BaseListDialog):
             description="System root"
         ))
         
-        # Add current working directory if different from home
-        cwd_path = Path.cwd()
-        if cwd_path != home_path and cwd_path != root_path:
-            local_drives.append(DriveEntry(
-                name="Current Directory",
-                path=str(cwd_path),
-                drive_type="local",
-                description=str(cwd_path)
-            ))
+
         
         # Add common directories if they exist
         common_dirs = [
             ("Documents", "~/Documents"),
             ("Downloads", "~/Downloads"),
             ("Desktop", "~/Desktop"),
-            ("Applications", "/Applications"),  # macOS
-            ("usr/local", "/usr/local"),
-            ("opt", "/opt"),
-            ("tmp", "/tmp"),
         ]
         
         for name, path_str in common_dirs:
@@ -269,21 +257,12 @@ class DrivesDialog(BaseListDialog):
                     return
                 
                 bucket_name = bucket['Name']
-                creation_date = bucket.get('CreationDate', '')
-                
-                # Format creation date
-                date_str = ""
-                if creation_date:
-                    try:
-                        date_str = creation_date.strftime("%Y-%m-%d")
-                    except (AttributeError, ValueError):
-                        date_str = str(creation_date)
                 
                 s3_drives.append(DriveEntry(
                     name=bucket_name,
                     path=f"s3://{bucket_name}/",
                     drive_type="s3",
-                    description=f"S3 Bucket (created {date_str})" if date_str else "S3 Bucket"
+                    description=None
                 ))
                 
         except NoCredentialsError:
