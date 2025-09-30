@@ -1146,6 +1146,11 @@ class S3PathImpl(PathImpl):
         except ImportError:
             from tfm_path import Path
         
+        # Check if this is a directory - S3 directory renaming is not supported
+        # because it would require copying all objects and deleting originals
+        if self.is_dir():
+            raise OSError("Directory renaming is not supported on S3 due to performance and cost considerations")
+        
         # S3 doesn't have rename, so we copy and delete
         target_path = Path(target) if not isinstance(target, Path) else target
         
@@ -1227,6 +1232,10 @@ class S3PathImpl(PathImpl):
     def as_posix(self) -> str:
         """Return the string representation with forward slashes"""
         return self._uri
+    
+    def supports_directory_rename(self) -> bool:
+        """Return True if this storage implementation supports directory renaming"""
+        return False  # S3 does not support directory renaming due to performance and cost considerations
 
 
 # Cache management functions

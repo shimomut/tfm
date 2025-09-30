@@ -278,6 +278,11 @@ class PathImpl(ABC):
         """Return the path as a URI"""
         pass
     
+    @abstractmethod
+    def supports_directory_rename(self) -> bool:
+        """Return True if this storage implementation supports directory renaming"""
+        pass
+    
     # Compatibility methods
     @abstractmethod
     def samefile(self, other_path) -> bool:
@@ -552,6 +557,10 @@ class LocalPathImpl(PathImpl):
     def as_posix(self) -> str:
         """Return the string representation with forward slashes"""
         return self._path.as_posix()
+    
+    def supports_directory_rename(self) -> bool:
+        """Return True if this storage implementation supports directory renaming"""
+        return True  # Local file system supports directory renaming
 
 
 class Path:
@@ -842,6 +851,10 @@ class Path:
     def as_posix(self) -> str:
         """Return the string representation with forward slashes"""
         return self._impl.as_posix()
+    
+    def supports_directory_rename(self) -> bool:
+        """Return True if this storage implementation supports directory renaming"""
+        return self._impl.supports_directory_rename()
     
     def move_to(self, destination: 'Path', overwrite: bool = False) -> bool:
         """

@@ -1115,6 +1115,15 @@ class FileManager:
         
         # Parent directory (..) is no longer shown, so no need to check for it
         
+        # Check if this storage implementation supports directory renaming
+        try:
+            if selected_file.is_dir() and not selected_file.supports_directory_rename():
+                print("Directory renaming is not supported on this storage type due to performance and cost considerations")
+                return
+        except Exception as e:
+            # Handle any errors gracefully and continue
+            print(f"Warning: Could not check directory rename capability: {e}")
+        
         # Enter rename mode using general dialog
         self.rename_file_path = selected_file
         DialogHelpers.create_rename_dialog(self.general_dialog, selected_file.name, selected_file.name)
