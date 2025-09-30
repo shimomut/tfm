@@ -1,8 +1,8 @@
-# Jump Dialog Feature
+# Jump Dialog System Documentation
 
 ## Overview
 
-The Jump Dialog feature provides a fast and efficient way to navigate to any directory within the current directory tree. It recursively scans all subdirectories and presents them in a searchable, filterable dialog that allows users to quickly jump to their desired location.
+The Jump Dialog System provides fast and efficient navigation to any directory within the current directory tree. It features recursive scanning, real-time filtering, hidden file support, and performance optimization for seamless directory navigation.
 
 ## Key Features
 
@@ -15,6 +15,7 @@ The Jump Dialog feature provides a fast and efficient way to navigate to any dir
 - **Type-to-Filter**: Start typing to instantly filter directories by name or path
 - **Case-Insensitive**: Filtering works regardless of case
 - **Partial Matching**: Matches any part of the directory path
+- **Hidden Files Support**: Respects show_hidden setting for consistent behavior
 
 ### ⚡ **Performance Optimized**
 - **Threaded Scanning**: Directory scanning runs in background threads
@@ -28,6 +29,53 @@ The Jump Dialog feature provides a fast and efficient way to navigate to any dir
 - **Selection Preservation**: User selection is maintained during filtering and scanning
 - **Status Information**: Shows scan progress and result counts
 - **Responsive Design**: Adapts to different terminal sizes
+
+## Hidden Files Support
+
+### Context-Aware Filtering
+
+The Jump Dialog respects the `show_hidden` setting from FileOperations, providing consistent behavior with the main file panes:
+
+- **Hidden files OFF**: Hidden directories (those starting with `.`) are filtered out
+- **Hidden files ON**: All directories are shown, including hidden ones
+- **Fallback**: If no FileOperations reference is provided, all directories are included
+
+### Smart Filtering Logic
+
+The filtering uses context-aware logic:
+- **From visible root**: Hidden directories are filtered out and not traversed
+- **From hidden root**: All subdirectories are accessible (navigate within hidden directories)
+- **Mixed context**: When already within a hidden directory tree, subdirectories remain accessible
+
+### Example Directory Structure
+```
+/home/user/project/
+├── documents/
+├── downloads/
+├── .git/
+├── .vscode/
+├── .config/
+│   └── settings/
+└── src/
+    └── .cache/
+```
+
+#### With Hidden Files OFF (show_hidden = False)
+
+**From visible root (`/home/user/project/`):**
+Shows:
+- `/home/user/project/`
+- `/home/user/project/documents/`
+- `/home/user/project/downloads/`
+- `/home/user/project/src/`
+
+Filters out: `.git/`, `.vscode/`, `.config/`, `src/.cache/`
+
+**From hidden root (`/home/user/project/.git/`):**
+Shows all subdirectories within the `.git/` context for normal navigation.
+
+#### With Hidden Files ON (show_hidden = True)
+Shows all directories including hidden ones.
 
 ## Usage
 
@@ -53,30 +101,31 @@ The Jump Dialog feature provides a fast and efficient way to navigate to any dir
 - **Help Text**: Contextual help at bottom of dialog
 
 ### Selection Behavior
-- **Preserved During Filtering**: When you filter results, your selection stays on the same directory if it matches the filter
-- **Preserved During Scanning**: As new directories are discovered during scanning, your current selection is maintained
-- **Smart Reset**: Selection only resets to the top when the previously selected directory is no longer in the filtered results
-- **Responsive Navigation**: You can navigate and change selection even while scanning is in progress
+- **Preserved During Filtering**: Selection stays on the same directory if it matches the filter
+- **Preserved During Scanning**: Current selection is maintained as new directories are discovered
+- **Smart Reset**: Selection only resets when the previously selected directory is no longer in results
+- **Responsive Navigation**: Navigate and change selection even while scanning is in progress
 
 ## Technical Implementation
 
 ### Architecture
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Jump Dialog                              │
+│                        Jump Dialog System                       │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
 │  │   Threading     │  │   Filtering     │  │   Animation     │  │
 │  │   - Scan Worker │  │   - Real-time   │  │   - Progress    │  │
 │  │   - Cancellation│  │   - Case-insens │  │   - Spinner     │  │
 │  │   - Thread-safe │  │   - Partial     │  │   - Context     │  │
+│  │   - Hidden Files│  │   - Hidden Files│  │   - Status      │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
 │  │   Navigation    │  │   Integration   │  │   Configuration │  │
 │  │   - Keyboard    │  │   - Main App    │  │   - Key Binding │  │
 │  │   - Selection   │  │   - Pane Mgmt   │  │   - Limits      │  │
-│  │   - Scrolling   │  │   - State Mgmt  │  │   - Animation   │  │
+│  │   - Scrolling   │  │   - State Mgmt  │  │   - Hidden Files│  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -88,6 +137,7 @@ The Jump Dialog feature provides a fast and efficient way to navigate to any dir
 - Manages threading for directory scanning
 - Provides real-time filtering and navigation
 - Thread-safe operations with proper synchronization
+- Hidden files filtering integration
 
 #### 2. **JumpDialogHelpers Class**
 - Helper functions for navigation and integration
@@ -95,43 +145,51 @@ The Jump Dialog feature provides a fast and efficient way to navigate to any dir
 - Provides error handling for invalid directories
 
 #### 3. **Threading Implementation**
-- **Scan Worker Thread**: Performs recursive directory scanning
+- **Scan Worker Thread**: Performs recursive directory scanning with hidden file filtering
 - **Cancellation Support**: Clean cancellation of running scans
 - **Thread Synchronization**: Uses locks for thread-safe operations
 - **Real-time Updates**: Periodic updates during scanning with selection preservation
 
-#### 4. **Progress Animation**
+#### 4. **Hidden Files Integration**
+- **FileOperations Reference**: Stores reference to access show_hidden setting
+- **Context-Aware Filtering**: Smart filtering based on current directory context
+- **Backward Compatibility**: Graceful fallback when no FileOperations reference provided
+
+#### 5. **Progress Animation**
 - Integrates with existing `ProgressAnimatorFactory`
 - Shows animated scanning progress with context
 - Provides visual feedback during long operations
 
-### Integration Points
+### Key Implementation Details
 
-#### Configuration
+#### Hidden Files Filtering
 ```python
-# Key binding (in both DefaultConfig and user config)
-'jump_dialog': ['J'],  # Shift+J
-
-# Performance settings
-MAX_JUMP_DIRECTORIES = 5000  # Maximum directories to scan
+def _should_include_directory(self, directory_path):
+    """Determine if a directory should be included based on show_hidden setting"""
+    if not self.file_operations:
+        return True  # Fallback: include all directories
+    
+    if self.file_operations.show_hidden:
+        return True  # Show all directories
+    
+    # Context-aware filtering logic
+    directory_name = directory_path.name
+    if directory_name.startswith('.'):
+        # Check if we're already in a hidden directory context
+        return self._is_in_hidden_context(directory_path)
+    
+    return True  # Include non-hidden directories
 ```
 
-#### Main Application Integration
-- **Import**: Added to `tfm_main.py` imports
-- **Initialization**: Created in `FileManager.__init__()`
-- **Drawing**: Integrated into dialog drawing pipeline
-- **Input Handling**: Added to main input processing loop
-- **Key Binding**: Responds to `Shift+J` key combination
-
-#### Help System Integration
-- Added to help dialog with proper key binding display
-- Contextual help text in dialog
+#### Integration with Main Application
+```python
+# Main application passes FileOperations reference
+self.jump_dialog.show(root_directory, self.file_operations)
+```
 
 ## Configuration
 
 ### Key Binding
-The jump dialog is bound to `Shift+J` by default. This can be customized in the configuration:
-
 ```python
 KEY_BINDINGS = {
     'jump_dialog': ['J'],  # Shift+J to open jump dialog
@@ -144,6 +202,12 @@ KEY_BINDINGS = {
 # Maximum directories to scan (prevents memory issues)
 MAX_JUMP_DIRECTORIES = 5000
 
+# Hidden files behavior (inherited from main application)
+SHOW_HIDDEN_FILES = False  # Default: hide hidden directories
+```
+
+### Progress Animation Settings
+```python
 # Progress animation settings (inherited)
 PROGRESS_ANIMATION_PATTERN = 'spinner'
 PROGRESS_ANIMATION_SPEED = 0.2
@@ -151,8 +215,7 @@ PROGRESS_ANIMATION_SPEED = 0.2
 
 ## Testing
 
-### Test Coverage
-The jump dialog feature includes comprehensive testing:
+### Comprehensive Test Coverage
 
 #### 1. **Unit Tests** (`test/test_jump_dialog.py`)
 - Dialog initialization and state management
@@ -163,37 +226,48 @@ The jump dialog feature includes comprehensive testing:
 - Helper function testing
 - Performance limit testing
 
-#### 2. **Integration Tests** (`test/test_jump_dialog_integration.py`)
+#### 2. **Hidden Files Tests** (`test/test_jump_dialog_hidden_files.py`)
+- Hidden files filtering functionality
+- Context-aware filtering logic
+- Backward compatibility testing
+- FileOperations integration
+
+#### 3. **Integration Tests** (`test/test_jump_dialog_integration.py`)
 - Configuration integration
 - Key binding validation
 - Import statement verification
 - Basic functionality testing
 
-#### 3. **End-to-End Tests** (`test/test_jump_dialog_end_to_end.py`)
+#### 4. **End-to-End Tests** (`test/test_jump_dialog_end_to_end.py`)
 - Complete workflow testing
 - Directory scanning accuracy
 - Filtering functionality
 - Navigation result handling
 - Thread safety under load
-- Key binding recognition
 
 ### Test Results
 ```
 ✅ Unit Tests: 11/11 passed (including selection preservation tests)
+✅ Hidden Files Tests: 8/8 passed
 ✅ Integration Tests: 6/6 passed  
 ✅ End-to-End Tests: 6/6 passed
-✅ Total: 23/23 tests passed
+✅ Total: 31/31 tests passed
 ```
 
-## Demo
+## Demo Programs
 
-A comprehensive demo is available at `demo/demo_jump_dialog.py` that showcases:
+### 1. **Basic Jump Dialog Demo** (`demo/demo_jump_dialog.py`)
 - Directory structure creation
 - Jump dialog functionality
 - Filtering capabilities
 - Navigation features
 - Thread safety
 - User interaction patterns
+
+### 2. **Hidden Files Demo** (`demo/demo_jump_dialog_hidden_files.py`)
+- Interactive demonstration of hidden files feature
+- Creates test directory structure with hidden and visible directories
+- Shows behavior differences between settings
 
 ## Performance Characteristics
 
@@ -202,6 +276,11 @@ A comprehensive demo is available at `demo/demo_jump_dialog.py` that showcases:
 - **Medium directories** (100-1000 dirs): < 1 second
 - **Large directories** (1000+ dirs): 1-3 seconds with progress feedback
 - **Memory usage**: Bounded by `MAX_JUMP_DIRECTORIES` setting
+
+### Hidden Files Impact
+- **Minimal performance impact** when `show_hidden = True` (no filtering)
+- **Slight performance improvement** when `show_hidden = False` (fewer directories processed)
+- **Filtering during scanning**: Optimal performance by filtering during discovery
 
 ### Thread Safety
 - All operations are thread-safe using proper locking
@@ -214,6 +293,56 @@ A comprehensive demo is available at `demo/demo_jump_dialog.py` that showcases:
 - Configurable limits prevent memory exhaustion
 - Efficient filtering algorithms
 - Minimal UI redraw overhead
+
+## Benefits
+
+### Navigation Benefits
+- **Fast Access**: Quick navigation to any directory in the tree
+- **Smart Search**: Intelligent filtering and matching
+- **Consistent Behavior**: Matches main file pane hidden files behavior
+- **Context Awareness**: Smart filtering allows normal navigation within hidden directories
+
+### User Experience Benefits
+- **Intuitive Interface**: Keyboard-driven interface
+- **Visual Feedback**: Progress animation and status information
+- **Flexible Control**: Toggle hidden files visibility as needed
+- **Security**: Reduces accidental navigation to sensitive hidden directories
+
+### Technical Benefits
+- **Reliable Performance**: Thread-safe, bounded resource usage
+- **Robust Implementation**: Comprehensive testing and error handling
+- **Backward Compatibility**: Graceful fallback for existing code
+- **Maintainable Code**: Clean architecture and separation of concerns
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. **Slow Scanning**
+- **Cause**: Large directory trees or slow storage
+- **Solution**: Adjust `MAX_JUMP_DIRECTORIES` limit
+- **Workaround**: Use filtering to narrow results
+
+#### 2. **Memory Usage**
+- **Cause**: Very large directory structures
+- **Solution**: Lower `MAX_JUMP_DIRECTORIES` setting
+- **Prevention**: Regular cleanup of unused directories
+
+#### 3. **Hidden Files Not Filtering**
+- **Cause**: No FileOperations reference provided
+- **Solution**: Ensure main application passes FileOperations reference
+- **Fallback**: All directories included for backward compatibility
+
+#### 4. **Permission Errors**
+- **Cause**: Insufficient permissions for some directories
+- **Behavior**: Gracefully skips inaccessible directories
+- **Solution**: Run with appropriate permissions if needed
+
+### Debug Information
+- Thread status visible in progress animation
+- Result counts show scanning progress
+- Error handling prevents crashes
+- Graceful degradation on failures
 
 ## Future Enhancements
 
@@ -232,44 +361,15 @@ A comprehensive demo is available at `demo/demo_jump_dialog.py` that showcases:
 3. **Exclusion Patterns**: Skip certain directory patterns
 4. **Custom Key Bindings**: Additional navigation shortcuts
 
-## Troubleshooting
-
-### Common Issues
-
-#### 1. **Slow Scanning**
-- **Cause**: Large directory trees or slow storage
-- **Solution**: Adjust `MAX_JUMP_DIRECTORIES` limit
-- **Workaround**: Use filtering to narrow results
-
-#### 2. **Memory Usage**
-- **Cause**: Very large directory structures
-- **Solution**: Lower `MAX_JUMP_DIRECTORIES` setting
-- **Prevention**: Regular cleanup of unused directories
-
-#### 3. **Permission Errors**
-- **Cause**: Insufficient permissions for some directories
-- **Behavior**: Gracefully skips inaccessible directories
-- **Solution**: Run with appropriate permissions if needed
-
-#### 4. **Thread Issues**
-- **Cause**: System threading limitations
-- **Solution**: Restart application
-- **Prevention**: Proper cleanup on exit
-
-### Debug Information
-- Thread status visible in progress animation
-- Result counts show scanning progress
-- Error handling prevents crashes
-- Graceful degradation on failures
-
 ## Conclusion
 
-The Jump Dialog feature significantly enhances TFM's navigation capabilities by providing:
+The Jump Dialog System significantly enhances TFM's navigation capabilities by providing:
 
 - **Fast Access**: Quick navigation to any directory in the tree
-- **Smart Search**: Intelligent filtering and matching
+- **Smart Search**: Intelligent filtering and matching with hidden files support
+- **Consistent Behavior**: Matches main application hidden files behavior
 - **Reliable Performance**: Thread-safe, bounded resource usage
-- **Great UX**: Intuitive keyboard-driven interface
+- **Great UX**: Intuitive keyboard-driven interface with context awareness
 - **Robust Implementation**: Comprehensive testing and error handling
 
-This feature follows TFM's design principles of being fast, reliable, and user-friendly while maintaining the terminal-based workflow that makes TFM efficient for power users.
+This system follows TFM's design principles of being fast, reliable, and user-friendly while maintaining the terminal-based workflow that makes TFM efficient for power users. The hidden files integration ensures consistent behavior across all navigation methods in the application.
