@@ -155,16 +155,19 @@ class FileOperations:
         try:
             stat_info = path.stat()
             
-            # Format size
-            size = stat_info.st_size
-            if size < 1024:
-                size_str = f"{size}B"
-            elif size < 1024 * 1024:
-                size_str = f"{size/1024:.1f}K"
-            elif size < 1024 * 1024 * 1024:
-                size_str = f"{size/(1024*1024):.1f}M"
+            # Format size - display "<DIR>" for directories
+            if path.is_dir():
+                size_str = "<DIR>"
             else:
-                size_str = f"{size/(1024*1024*1024):.1f}G"
+                size = stat_info.st_size
+                if size < 1024:
+                    size_str = f"{size}B"
+                elif size < 1024 * 1024:
+                    size_str = f"{size/1024:.1f}K"
+                elif size < 1024 * 1024 * 1024:
+                    size_str = f"{size/(1024*1024):.1f}M"
+                else:
+                    size_str = f"{size/(1024*1024*1024):.1f}G"
             
             # Format date
             date_str = datetime.fromtimestamp(stat_info.st_mtime).strftime("%Y-%m-%d %H:%M")
