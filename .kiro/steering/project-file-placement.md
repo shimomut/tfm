@@ -50,6 +50,97 @@ This project follows a clean directory structure that separates different types 
 - Internal APIs and interfaces
 - Development processes and guidelines
 
+## Documentation Generation Policy
+
+### When to Create Documentation
+
+**ALWAYS generate separate documentation for end-users and developers** when creating or updating features that affect both audiences.
+
+#### Dual Documentation Required (Both `doc/` and `doc/dev/`)
+Create both end-user and developer documentation when:
+- **New user-facing features** - Features that users interact with directly
+- **Configuration changes** - Changes that affect user configuration files
+- **Behavior changes** - Changes that affect how users experience TFM
+- **Integration features** - Features that integrate with external tools users might use
+- **API changes** - Changes that affect both user experience and developer implementation
+
+#### Developer Documentation Only (`doc/dev/`)
+Create only developer documentation when changes are:
+- **Pure implementation details** - Internal code refactoring without user impact
+- **Architecture changes** - Internal system design changes
+- **Performance optimizations** - Internal improvements that don't change user experience
+- **Bug fixes** - Internal fixes that don't change user-facing behavior
+- **Code organization** - Moving or restructuring code without functional changes
+- **Testing infrastructure** - Changes to test systems and procedures
+- **Build system changes** - Changes to development and build processes
+
+#### End-User Documentation Only (`doc/`)
+Create only end-user documentation when:
+- **Usage guides** - How-to guides that don't require implementation knowledge
+- **Configuration examples** - User configuration examples and templates
+- **Troubleshooting guides** - User-level problem solving (rare, usually needs both)
+
+### Documentation Content Guidelines
+
+#### End-User Documentation Content
+- **What the feature does** - Clear description of functionality
+- **How to use it** - Step-by-step usage instructions
+- **Configuration** - How to configure and customize
+- **Key bindings** - What keys to press
+- **What users will see** - Expected behavior and visual feedback
+- **Troubleshooting** - Common user problems and solutions
+- **Examples** - Practical usage examples
+- **Benefits** - Why users would want to use this feature
+
+#### Developer Documentation Content
+- **Implementation details** - How the feature is implemented
+- **Architecture** - System design and component relationships
+- **Code examples** - API usage and integration examples
+- **Testing** - How to test the feature and run test suites
+- **Technical specifications** - Detailed technical requirements
+- **Integration points** - How it connects with other systems
+- **Performance considerations** - Memory, CPU, and scalability aspects
+- **Future enhancements** - Technical roadmap and planned improvements
+- **Troubleshooting** - Developer-level debugging and problem solving
+
+### Documentation Naming Conventions
+
+#### End-User Documents
+- Feature documentation: `doc/FEATURE_NAME_FEATURE.md`
+- User guides: `doc/USER_GUIDE.md`
+- Installation guides: `doc/INSTALLATION_GUIDE.md`
+- Integration guides: `doc/TOOL_NAME_INTEGRATION.md`
+
+#### Developer Documents
+- Implementation documentation: `doc/dev/FEATURE_NAME_IMPLEMENTATION.md`
+- System documentation: `doc/dev/SYSTEM_NAME_SYSTEM.md`
+- Architecture documentation: `doc/dev/COMPONENT_NAME_COMPONENT.md`
+- Technical specifications: `doc/dev/SPECIFICATION_NAME_SPEC.md`
+
+### Cross-References Between Documents
+
+When creating both end-user and developer documentation:
+- **End-user docs** may reference developer docs for advanced customization
+- **Developer docs** should reference end-user docs for context and user impact
+- Use relative links: `[Implementation Details](dev/FEATURE_NAME_IMPLEMENTATION.md)`
+
+### Examples
+
+#### Dual Documentation Example
+**New Search Feature**:
+- `doc/SEARCH_FEATURE.md` - How users search for files, key bindings, configuration
+- `doc/dev/SEARCH_IMPLEMENTATION.md` - Search algorithms, indexing, performance, API
+
+#### Developer-Only Documentation Example
+**Internal Cache Optimization**:
+- `doc/dev/CACHE_OPTIMIZATION_IMPLEMENTATION.md` - Technical details of cache improvements
+- No end-user doc needed - users don't interact with cache directly
+
+#### End-User-Only Documentation Example (Rare)
+**Configuration Template**:
+- `doc/CONFIGURATION_EXAMPLES.md` - Example configurations for common use cases
+- No developer doc needed - just examples, not implementation
+
 ### Demo Files (`demo/`)
 - **ALL demo and example files** should be placed in the `/demo` directory
 - Demo scripts: `demo/demo_*.py`
@@ -166,10 +257,42 @@ When working with existing files that are in the wrong location:
 4. **Test functionality** after file moves to ensure nothing breaks
 5. **Move temporary files** from root directory to `temp/` directory
 
+## Documentation Quality Standards
+
+### Content Separation Requirements
+
+#### End-User Documentation Must NOT Include:
+- Implementation details or code architecture
+- Technical API references or code examples
+- Internal system design explanations
+- Developer-specific troubleshooting
+- Performance implementation details
+- Testing procedures or technical specifications
+
+#### Developer Documentation Must NOT Include:
+- Basic usage instructions for end users
+- Simple configuration examples
+- User-level troubleshooting steps
+- Marketing-style feature benefits
+- Non-technical feature descriptions
+
+### Review Checklist
+
+When reviewing documentation changes:
+- [ ] Is the content appropriate for the target audience?
+- [ ] Are implementation details separated from user instructions?
+- [ ] Do both documents exist when user-facing changes are made?
+- [ ] Are cross-references between documents appropriate and helpful?
+- [ ] Is the naming convention followed correctly?
+- [ ] Does the content follow the established patterns?
+
 ## Benefits of This Structure
 
 - **Clear organization** - Easy to find files by purpose
+- **Audience-focused content** - Users and developers get exactly what they need
 - **Scalable** - Structure supports project growth
 - **Standard conventions** - Follows Python project best practices
 - **Tool-friendly** - IDEs and build tools work better with organized structure
 - **Maintainable** - Easier to maintain and navigate the codebase
+- **Reduced confusion** - No mixing of user and developer concerns
+- **Better onboarding** - New users and developers can find relevant information quickly
