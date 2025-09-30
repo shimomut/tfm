@@ -17,12 +17,38 @@ This project follows a clean directory structure that separates different types 
 - Verification scripts: `test/verify_*.py`
 
 ### Documentation (`doc/`)
-- **ALL documentation files** (*.md) should be placed in the `/doc` directory
+- **End-user documentation** should be placed in the `/doc` directory
+- **Developer documentation** should be placed in the `/doc/dev` directory
+
+#### End-User Documentation (`doc/`)
+- User guides: `doc/USER_GUIDE.md`, `doc/INSTALLATION_GUIDE.md`
 - Feature documentation: `doc/FEATURE_NAME_FEATURE.md`
-- Implementation summaries: `doc/FEATURE_NAME_IMPLEMENTATION.md`
-- System documentation: `doc/SYSTEM_NAME_SYSTEM.md`
-- Component documentation: `doc/COMPONENT_NAME_COMPONENT.md`
 - Integration guides: `doc/INTEGRATION_NAME_INTEGRATION.md`
+- Feature summaries: `doc/FEATURE_SUMMARY.md`
+
+#### Developer Documentation (`doc/dev/`)
+- System documentation: `doc/dev/SYSTEM_NAME_SYSTEM.md`
+- Component documentation: `doc/dev/COMPONENT_NAME_COMPONENT.md`
+- Implementation summaries: `doc/dev/FEATURE_NAME_IMPLEMENTATION.md`
+- Architecture documentation: `doc/dev/PROJECT_STRUCTURE.md`
+- Technical specifications: `doc/dev/CORE_COMPONENTS.md`
+
+#### Documentation Categorization Guidelines
+
+**End-User Documentation** (`doc/`) - Documents that help users understand and use TFM:
+- Installation and setup guides
+- User guides and tutorials
+- Feature descriptions from user perspective
+- Integration guides for external tools
+- Configuration examples and options
+
+**Developer Documentation** (`doc/dev/`) - Documents that help developers understand and modify TFM:
+- System architecture and design
+- Component implementation details
+- Code organization and structure
+- Technical specifications
+- Internal APIs and interfaces
+- Development processes and guidelines
 
 ### Demo Files (`demo/`)
 - **ALL demo and example files** should be placed in the `/demo` directory
@@ -65,11 +91,12 @@ This project follows a clean directory structure that separates different types 
 ### When Creating New Files
 
 1. **Test files** → Always use `test/test_<feature_name>.py`
-2. **Documentation** → Always use `doc/<FEATURE_NAME>_<TYPE>.md`
-3. **Demo scripts** → Always use `demo/demo_<feature_name>.py`
-4. **External tools** → Always use `tools/<tool_name>.<ext>`
-5. **Source code** → Always use `src/tfm_<module_name>.py`
-6. **Temporary files** → Always use `temp/<temp_file_name>.<ext>`
+2. **End-user documentation** → Always use `doc/<FEATURE_NAME>_<TYPE>.md`
+3. **Developer documentation** → Always use `doc/dev/<SYSTEM_NAME>_<TYPE>.md`
+4. **Demo scripts** → Always use `demo/demo_<feature_name>.py`
+5. **External tools** → Always use `tools/<tool_name>.<ext>`
+6. **Source code** → Always use `src/tfm_<module_name>.py`
+7. **Temporary files** → Always use `temp/<temp_file_name>.<ext>`
 
 ### When Moving Existing Files
 
@@ -82,7 +109,8 @@ This project follows a clean directory structure that separates different types 
 #### Correct Placement
 ```
 test/test_remote_log_monitoring.py          # Test file
-doc/REMOTE_LOG_MONITORING_FEATURE.md        # Documentation
+doc/REMOTE_LOG_MONITORING_FEATURE.md        # End-user feature documentation
+doc/dev/LOG_MANAGER_SYSTEM.md               # Developer system documentation
 demo/demo_remote_log.py                     # Demo script
 tools/log_analyzer.py                       # External tool
 src/tfm_log_manager.py                      # Source code
@@ -93,11 +121,12 @@ temp/TEMP_FEATURE_ANALYSIS.md               # Temporary documentation
 #### Incorrect Placement (to be avoided)
 ```
 remote_log_test.py                          # Should be in test/
-REMOTE_LOG_DOCS.md                          # Should be in doc/
+REMOTE_LOG_DOCS.md                          # Should be in doc/ (end-user) or doc/dev/ (developer)
 log_demo.py                                 # Should be in demo/
 analyze_logs.sh                             # Should be in tools/
 TEMP_REFACTORING_SUMMARY.md                 # Should be in temp/
 verify_bugfix.py                            # Should be in temp/
+SYSTEM_DOCS.md                              # Should be in doc/dev/ (not doc/)
 ```
 
 ## Temporary File Guidelines
