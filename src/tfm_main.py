@@ -2582,14 +2582,27 @@ class FileManager:
                     # Save current cursor position before changing directory
                     self.save_cursor_position(current_pane)
                     
+                    # Remember the child directory name we're leaving
+                    child_directory_name = current_pane['path'].name
+                    
                     current_pane['path'] = current_pane['path'].parent
                     current_pane['selected_index'] = 0
                     current_pane['scroll_offset'] = 0
                     current_pane['selected_files'].clear()  # Clear selections when changing directory
                     self.refresh_files(current_pane)
                     
-                    # Try to restore cursor position for this directory
-                    if not self.restore_cursor_position(current_pane):
+                    # Try to set cursor to the child directory we just came from
+                    cursor_set = False
+                    for i, file_path in enumerate(current_pane['files']):
+                        if file_path.name == child_directory_name and file_path.is_dir():
+                            current_pane['selected_index'] = i
+                            # Adjust scroll offset to keep selection visible
+                            self.adjust_scroll_for_selection(current_pane)
+                            cursor_set = True
+                            break
+                    
+                    # If we couldn't find the child directory, try to restore cursor position from history
+                    if not cursor_set and not self.restore_cursor_position(current_pane):
                         # If no history found, default to first item
                         current_pane['selected_index'] = 0
                         current_pane['scroll_offset'] = 0
