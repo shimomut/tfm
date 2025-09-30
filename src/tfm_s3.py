@@ -1236,6 +1236,10 @@ class S3PathImpl(PathImpl):
     def supports_directory_rename(self) -> bool:
         """Return True if this storage implementation supports directory renaming"""
         return False  # S3 does not support directory renaming due to performance and cost considerations
+    
+    def supports_file_editing(self) -> bool:
+        """Return True if this storage implementation supports file editing"""
+        return False  # S3 file editing is not supported for now
 
 
 # Cache management functions

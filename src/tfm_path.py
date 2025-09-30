@@ -283,6 +283,11 @@ class PathImpl(ABC):
         """Return True if this storage implementation supports directory renaming"""
         pass
     
+    @abstractmethod
+    def supports_file_editing(self) -> bool:
+        """Return True if this storage implementation supports file editing"""
+        pass
+    
     # Compatibility methods
     @abstractmethod
     def samefile(self, other_path) -> bool:
@@ -561,6 +566,10 @@ class LocalPathImpl(PathImpl):
     def supports_directory_rename(self) -> bool:
         """Return True if this storage implementation supports directory renaming"""
         return True  # Local file system supports directory renaming
+    
+    def supports_file_editing(self) -> bool:
+        """Return True if this storage implementation supports file editing"""
+        return True  # Local file system supports file editing
 
 
 class Path:
@@ -855,6 +864,10 @@ class Path:
     def supports_directory_rename(self) -> bool:
         """Return True if this storage implementation supports directory renaming"""
         return self._impl.supports_directory_rename()
+    
+    def supports_file_editing(self) -> bool:
+        """Return True if this storage implementation supports file editing"""
+        return self._impl.supports_file_editing()
     
     def move_to(self, destination: 'Path', overwrite: bool = False) -> bool:
         """

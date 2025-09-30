@@ -2057,6 +2057,11 @@ class FileManager:
         
         # Parent directory (..) is no longer shown
         
+        # Check if file editing is supported for this storage type
+        if not selected_file.supports_file_editing():
+            print("Editing S3 files is not supported for now")
+            return
+        
         # Allow editing directories (some editors can handle them)
         # but warn if it's a directory
         if selected_file.is_dir():
