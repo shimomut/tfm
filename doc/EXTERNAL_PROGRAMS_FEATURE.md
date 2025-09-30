@@ -12,151 +12,93 @@ Note: The sub-shell feature has been moved to **z / Z** keys to make room for th
 
 ## Configuration
 
-External programs are configured in the `PROGRAMS` list in your `config.py` file. Each program entry must have:
+External programs are configured in the `PROGRAMS` list in your `config.py` file. Each program entry needs:
 
 - `name`: Display name for the program
-- `command`: List of command arguments (for safe subprocess execution)
-- `options` (optional): Dictionary of program-specific options
+- `command`: List of command arguments
+- `options` (optional): Program-specific options like `auto_return`
 
-### Available Options
-
-- `auto_return`: Boolean (default: False) - If True, automatically returns to TFM after program execution without waiting for user input
-
-### Example Configuration
+### Basic Configuration Example
 
 ```python
 PROGRAMS = [
     {'name': 'Git Status', 'command': ['git', 'status']},
     {'name': 'Git Log', 'command': ['git', 'log', '--oneline', '-10']},
     {'name': 'Disk Usage', 'command': ['du', '-sh', '*']},
-    {'name': 'List Processes', 'command': ['ps', 'aux']},
-    {'name': 'System Info', 'command': ['uname', '-a']},
-    {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
     {'name': 'Python REPL', 'command': ['python3']},
-    {'name': 'My Script', 'command': ['/path/to/script.sh']},
-    # Examples with options:
     {'name': 'Quick Git Status', 'command': ['git', 'status', '--short'], 'options': {'auto_return': True}},
-    {'name': 'Compare Directories', 'command': ['./compare_script.sh'], 'options': {'auto_return': True}},
 ]
 ```
 
 ## Environment Variables
 
-When executing external programs, TFM sets the following environment variables:
+When you run external programs, TFM provides information about your current state through environment variables:
 
-- `TFM_ACTIVE`: Set to '1' to indicate TFM is active
-- `TFM_LEFT_DIR`: Path of the left pane directory
-- `TFM_RIGHT_DIR`: Path of the right pane directory  
-- `TFM_THIS_DIR`: Path of the current (active) pane directory
-- `TFM_OTHER_DIR`: Path of the inactive pane directory
-- `TFM_LEFT_SELECTED`: Space-separated list of selected files in left pane (quoted)
-- `TFM_RIGHT_SELECTED`: Space-separated list of selected files in right pane (quoted)
-- `TFM_THIS_SELECTED`: Space-separated list of selected files in current pane (quoted)
-- `TFM_OTHER_SELECTED`: Space-separated list of selected files in other pane (quoted)
+- `TFM_THIS_DIR`: Current pane directory
+- `TFM_OTHER_DIR`: Other pane directory
+- `TFM_THIS_SELECTED`: Selected files in current pane
+- `TFM_OTHER_SELECTED`: Selected files in other pane
 
-If no files are selected in a pane, the file under the cursor is used instead.
+Your scripts can use these variables to work with your current selection and location.
 
 ## Usage
 
 1. Press **x** or **X** to open the programs dialog
 2. Use the searchable list to find and select a program
 3. Press Enter to execute the selected program
-4. The program runs in the current pane's directory with TFM environment variables set
+4. The program runs in the current pane's directory
 5. Press Enter after the program completes to return to TFM
 
 ## Example Use Cases
 
 ### Git Operations
-```python
-{'name': 'Git Status', 'command': ['git', 'status']},
-{'name': 'Git Status (Quick)', 'command': ['git', 'status', '--short'], 'options': {'auto_return': True}},
-{'name': 'Git Add Selected', 'command': ['git', 'add'] + ['$TFM_THIS_SELECTED']},
-{'name': 'Git Commit', 'command': ['git', 'commit', '-m']},
-```
+- Check repository status
+- View recent commits
+- Add files to staging
 
 ### File Operations
-```python
-{'name': 'File Permissions', 'command': ['ls', '-la']},
-{'name': 'Disk Usage', 'command': ['du', '-sh', '*']},
-{'name': 'Disk Usage (Quick)', 'command': ['du', '-sh', '*'], 'options': {'auto_return': True}},
-{'name': 'Find Large Files', 'command': ['find', '.', '-size', '+100M']},
-```
+- View file permissions
+- Check disk usage
+- Find large files
 
 ### Development Tools
-```python
-{'name': 'Python REPL', 'command': ['python3']},
-{'name': 'Node.js REPL', 'command': ['node']},
-{'name': 'Run Tests', 'command': ['pytest']},
-```
+- Open Python or Node.js REPL
+- Run test suites
+- Execute build scripts
 
 ### System Information
-```python
-{'name': 'System Info', 'command': ['uname', '-a']},
-{'name': 'Memory Usage', 'command': ['free', '-h']},
-{'name': 'Process List', 'command': ['ps', 'aux']},
-```
+- View system information
+- Check memory usage
+- List running processes
 
-## Security Notes
+## Creating Custom Scripts
 
-- Commands are executed using `subprocess.run()` with the command as a list, preventing shell injection
-- Programs run with the same permissions as TFM
-- Be careful with programs that modify files or system state
-- Always use absolute paths for custom scripts to avoid PATH issues
-
-## Integration with Scripts
-
-Your custom scripts can access TFM state through environment variables:
+You can create custom scripts that work with TFM's environment variables. For example:
 
 ```bash
 #!/bin/bash
-# Example script that uses TFM environment variables
-
-echo "Current directory: $TFM_THIS_DIR"
+# Simple script that processes selected files
+echo "Working in: $TFM_THIS_DIR"
 echo "Selected files: $TFM_THIS_SELECTED"
-
-# Process selected files
-for file in $TFM_THIS_SELECTED; do
-    echo "Processing: $file"
-    # Your processing logic here
-done
-```
-
-```python
-#!/usr/bin/env python3
-# Example Python script
-
-import os
-
-current_dir = os.environ.get('TFM_THIS_DIR', '.')
-selected_files = os.environ.get('TFM_THIS_SELECTED', '').split()
-
-print(f"Working in: {current_dir}")
-for file in selected_files:
-    print(f"Selected: {file}")
 ```
 
 ## Troubleshooting
 
 ### Program Not Found
-- Ensure the command exists in your PATH or use absolute paths
-- Check that the command list is properly formatted
+- Make sure the command exists in your PATH
+- Use absolute paths for custom scripts
 
 ### Permission Denied
-- Verify the program has execute permissions
-- Check file/directory permissions for the operation
+- Check that scripts have execute permissions
+- Verify file/directory access rights
 
-### Environment Variables Not Set
-- Ensure you're running the program through TFM's external programs feature
-- Check that `TFM_ACTIVE` environment variable is set to '1'
+### No Output
+- Some programs may run silently
+- Check that the program completed successfully
 
-## Comparison with Sub-shell Mode
+## Quick Reference
 
-| Feature | External Programs (x) | Sub-shell Mode (z) |
-|---------|----------------------|-------------------|
-| Purpose | Execute specific programs | Interactive shell session |
-| Configuration | Pre-configured program list | Uses default shell |
-| Environment | TFM variables set | TFM variables + shell prompt |
-| Interaction | Program runs and exits | Full shell session |
-| Use Case | Quick operations, scripts | Extended command-line work |
-
-Both features complement each other - use external programs for quick, specific tasks and sub-shell mode for interactive command-line work.
+- **x/X**: Open external programs dialog
+- **z/Z**: Open sub-shell mode (different feature)
+- Use external programs for quick, specific tasks
+- Use sub-shell mode for interactive command-line work

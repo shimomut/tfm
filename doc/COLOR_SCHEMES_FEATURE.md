@@ -2,243 +2,101 @@
 
 ## Overview
 
-TFM now supports multiple color schemes to provide better visual experience in different environments. The system includes two built-in color schemes:
+TFM supports different color schemes to look good in different terminal environments. You can choose between:
 
-- **Dark** - Optimized for dark terminal backgrounds (default)
-- **Light** - Optimized for light terminal backgrounds
+- **Dark** - Designed for dark terminal backgrounds (default)
+- **Light** - Designed for light terminal backgrounds
 
-## Features
+## Available Color Schemes
 
-### Built-in Color Schemes
+### Dark Scheme (Default)
+- Dark backgrounds with bright colored text
+- Yellow directories, green executable files
+- Good for dark terminal backgrounds
+- Easy on the eyes in low-light environments
 
-#### Dark Scheme
-- Dark blue-gray backgrounds for headers, footers, and status bars
-- Bright colors for file types (yellow directories, green executables)
-- Light gray text for regular files
-- Optimized for dark terminal backgrounds
+### Light Scheme  
+- White backgrounds with black text
+- High contrast, clean appearance
+- Good for light terminal backgrounds
+- Professional, minimal look
 
-#### Light Scheme  
-- Pure white backgrounds for all UI elements
-- Pure black text for all foreground elements
-- High contrast monochrome design
-- Optimized for light terminal backgrounds
-- Simple and clean appearance
+## What Gets Colored
 
-### Color Elements
+Both color schemes change:
+- **File Types**: Different colors for directories, executables, and regular files
+- **Selected Items**: Highlighting for selected files
+- **Interface**: Headers, footers, status bar, and pane borders
+- **Log Messages**: Different colors for different types of messages
+- **Text Viewer**: Syntax highlighting when viewing code files
+- **Search Results**: Highlighting for search matches
 
-Both schemes define colors for:
-- **File Types**: Directories, executables, regular files
-- **Selection**: Selected items highlighting
-- **Interface**: Headers, footers, status bar, pane boundaries
-- **Logs**: System messages, stdout, stderr
-- **Syntax Highlighting**: Keywords, strings, comments, numbers, operators, built-ins
-- **Search**: Match highlighting, current match highlighting
+## How to Use
 
-### RGB and Fallback Support
+### Switch Color Schemes
 
-- **RGB Colors**: Full 24-bit color support for terminals that support it
-- **Fallback Colors**: Standard 8/16 color fallbacks for basic terminals
-- **Automatic Detection**: System automatically detects terminal capabilities
+Press `t` to toggle between Dark and Light color schemes while TFM is running. The change happens immediately.
 
-## Usage
+### Set Default Color Scheme
 
-### Runtime Color Scheme Toggle
-
-Press `t` to toggle between Dark and Light color schemes while TFM is running.
-
-### Configuration
-
-Set the default color scheme in your configuration file (`~/.tfm/config.py`):
+Set your preferred default in your configuration file (`~/.tfm/config.py`):
 
 ```python
 class Config:
-    # Color settings
-    COLOR_SCHEME = 'dark'  # 'dark' or 'light'
+    # Choose your default color scheme
+    COLOR_SCHEME = 'dark'  # Options: 'dark' or 'light'
 ```
 
-### Key Binding Customization
+### Change the Toggle Key
 
-Customize the color scheme toggle key in your configuration:
+If you want to use a different key to switch color schemes:
 
 ```python
 KEY_BINDINGS = {
-    'toggle_color_scheme': ['t'],  # Change to your preferred key
+    'toggle_color_scheme': ['t'],  # Change 't' to your preferred key
     # ... other bindings
 }
 ```
 
-## API Reference
+## Terminal Compatibility
 
-### Functions
+TFM automatically detects what your terminal supports:
 
-#### `get_available_color_schemes()`
-Returns a list of available color scheme names.
-
-#### `get_current_color_scheme()`
-Returns the name of the currently active color scheme.
-
-#### `set_color_scheme(scheme_name)`
-Sets the color scheme to the specified name. Does not reinitialize colors.
-
-#### `toggle_color_scheme()`
-Toggles between 'dark' and 'light' schemes. Returns the new scheme name.
-
-#### `init_colors(color_scheme=None)`
-Initializes curses colors with the specified or current color scheme.
-
-#### `print_current_color_scheme()`
-Prints information about the current color scheme to stdout.
-
-#### `print_all_color_schemes()`
-Prints information about all available color schemes to stdout.
-
-### Color Scheme Structure
-
-Each color scheme is defined as a dictionary with color definitions:
-
-```python
-COLOR_SCHEMES = {
-    'scheme_name': {
-        'COLOR_NAME': {
-            'color_num': 100,           # Curses color number
-            'rgb': (red, green, blue)   # RGB values 0-255
-        },
-        # ... more colors
-    }
-}
-```
-
-## Implementation Details
-
-### Color Initialization
-
-1. Color scheme is loaded from configuration on startup
-2. `init_colors()` is called with the configured scheme
-3. RGB colors are defined if terminal supports them
-4. Fallback colors are used for basic terminals
-5. Color pairs are initialized for all UI elements
-
-### Runtime Switching
-
-1. User presses toggle key (`t` by default)
-2. `toggle_color_scheme()` updates the global scheme variable
-3. `init_colors()` is called to reinitialize all color pairs
-4. Screen is marked for full redraw
-5. New colors take effect immediately
-
-### Terminal Compatibility
-
-- **RGB Terminals**: Use full 24-bit color definitions
-- **256-Color Terminals**: Use RGB colors mapped to available palette
-- **16-Color Terminals**: Use standard curses color constants
-- **8-Color Terminals**: Use basic color fallbacks
-
-## Customization
-
-### Adding New Color Schemes
-
-To add a new color scheme, extend the `COLOR_SCHEMES` dictionary in `tfm_colors.py`:
-
-```python
-COLOR_SCHEMES['my_scheme'] = {
-    'DIRECTORY_FG': {
-        'color_num': 101,
-        'rgb': (255, 128, 0)  # Orange directories
-    },
-    # ... define all required colors
-}
-```
-
-### Modifying Existing Schemes
-
-Edit the RGB values in the `COLOR_SCHEMES` dictionary to customize colors:
-
-```python
-COLOR_SCHEMES['dark']['DIRECTORY_FG']['rgb'] = (255, 255, 0)  # Yellow directories
-```
-
-### Custom Fallback Colors
-
-Modify `FALLBACK_COLOR_SCHEMES` for terminals without RGB support:
-
-```python
-FALLBACK_COLOR_SCHEMES['dark']['DIRECTORY_FG'] = curses.COLOR_YELLOW
-```
+- **Modern Terminals**: Get full 24-bit colors (millions of colors)
+- **Older Terminals**: Get basic 8 or 16 colors (still looks good)
+- **All Terminals**: Color schemes work everywhere
 
 ## Troubleshooting
 
-### Colors Not Changing
-- Ensure your terminal supports color changes
-- Check that `USE_COLORS = True` in configuration
-- Verify terminal has sufficient color support
+### Colors Don't Change When Pressing 't'
+- Make sure your terminal supports colors
+- Check that colors are enabled in your configuration
+- Try restarting TFM
 
-### Wrong Colors Displayed
-- Terminal may not support RGB colors (using fallbacks)
-- Check terminal color capabilities with `get_color_capabilities()`
-- Some terminals may require specific color settings
+### Colors Look Wrong
+- Your terminal might not support full RGB colors (this is normal)
+- TFM automatically uses simpler colors that work in your terminal
+- Try a different terminal if you want more colors
 
-### Performance Issues
-- Color initialization is fast but full screen redraws may be slower
-- Consider reducing toggle frequency in scripts
-- RGB color calculation is minimal overhead
+### Colors Are Too Bright/Dark
+- Switch between dark and light schemes with 't'
+- Dark scheme works better with dark terminal backgrounds
+- Light scheme works better with light terminal backgrounds
 
-## Utilities
+## Tips
 
-### Color Scheme Information Tool
+- **Dark terminals**: Use the dark color scheme (default)
+- **Light terminals**: Use the light color scheme (press 't' to switch)
+- **SSH connections**: Colors work over SSH too
+- **Screen/tmux**: Colors work in terminal multiplexers
+- **Different terminals**: Try both schemes to see which looks better
 
-Use the `show_color_schemes.py` script to view color scheme information without starting TFM:
+## Getting More Information
 
-```bash
-# Show all color schemes
-python3 show_color_schemes.py
+You can see detailed color information:
 
-# Show current scheme only
-python3 show_color_schemes.py current
+- **In TFM**: Press '?' for help, which mentions the 't' key
+- **Command line**: Run `python3 show_color_schemes.py` to see all available schemes
+- **Log messages**: TFM shows what type of colors your terminal supports
 
-# List available schemes
-python3 show_color_schemes.py list
-
-# Set specific scheme
-python3 show_color_schemes.py light
-```
-
-### In-Application Information
-
-- **Color Palette**: Press 'c' in debug mode to see the color palette with current scheme info
-- **Log Output**: When toggling color schemes with 't', detailed information is printed to the log
-- **Initialization Messages**: TFM displays whether RGB or fallback colors are being used
-- **Help System**: Color scheme toggle is documented in the help dialog ('?' key)
-
-### Color Initialization Messages
-
-TFM automatically detects your terminal's color capabilities and displays informative messages:
-
-- **RGB Support**: There is no message in this case.
-- **No RGB Support**: `"Terminal does not support RGB colors - using fallback colors for dark scheme"`
-- **RGB Failed**: `"RGB color initialization failed - using fallback colors for dark scheme"`
-- **Default Colors Set**: `"Set terminal default colors: fg=0, bg=7"`
-- **Default Colors Failed**: `"Warning: Could not set terminal default background color"`
-
-These messages help users understand:
-- Whether they're getting full 24-bit colors or basic 8/16 colors
-- If terminal default background is properly set for blank spaces
-- Why colors might look different on different terminals
-- When troubleshooting color-related issues
-
-### Background Color Handling
-
-TFM properly handles terminal background colors to ensure consistent appearance:
-
-- **Default Colors**: Uses `curses.assume_default_colors()` to set terminal defaults
-- **Blank Spaces**: Ensures blank areas match the color scheme background
-- **Light Scheme**: White background for all blank spaces and uncolored areas
-- **Dark Scheme**: Black background for all blank spaces and uncolored areas
-- **Fallback**: Uses color pair 0 if default color setting is not supported
-
-## Related Files
-
-- `src/tfm_colors.py` - Color scheme definitions and functions
-- `src/tfm_config.py` - Configuration system with color scheme support
-- `src/_config.py` - Default configuration template
-- `src/tfm_main.py` - Main application with color scheme integration
-- `show_color_schemes.py` - Standalone color scheme information tool
+The color scheme feature makes TFM look good in any terminal environment!
