@@ -28,8 +28,7 @@ setup(
     long_description_content_type="text/markdown",
     author="TFM Developer",
     url="https://github.com/shimomut/tfm",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
+    packages=["src"],
     py_modules=["tfm"],
     entry_points={
         "console_scripts": [
