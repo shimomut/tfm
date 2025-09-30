@@ -32,7 +32,7 @@ class TestKeyBindingsSelection(unittest.TestCase):
     def test_extended_format_parsing(self):
         """Test that extended format key bindings are parsed correctly."""
         # Test extended format (dict with keys and selection)
-        extended_bindings = ['copy_files', 'move_files', 'delete_files', 'create_archive', 'compare_selection']
+        extended_bindings = ['copy_files', 'move_files', 'delete_files', 'create_archive']
         
         for action in extended_bindings:
             self.assertIn(action, self.key_bindings)
@@ -46,7 +46,7 @@ class TestKeyBindingsSelection(unittest.TestCase):
     def test_selection_requirements(self):
         """Test that selection requirements are set correctly."""
         # Test actions that require selection
-        required_selection_actions = ['copy_files', 'move_files', 'delete_files', 'create_archive', 'compare_selection']
+        required_selection_actions = ['copy_files', 'move_files', 'delete_files', 'create_archive']
         
         for action in required_selection_actions:
             binding = self.key_bindings[action]

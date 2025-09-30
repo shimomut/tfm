@@ -143,7 +143,7 @@ All key bindings are fully customizable through the configuration system. Below 
 | `u/U` | Extract archive to other pane |
 | `v/V` | View text file in built-in viewer |
 | `i/I` | Show file details |
-| `w/W` | Compare selection (match files in other pane) |
+| `w/W` | Compare selection (match files/directories in other pane) |
 
 ### Search & Sorting
 | Key | Action |

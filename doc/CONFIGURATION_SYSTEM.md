@@ -149,7 +149,7 @@ KEY_BINDINGS = {
     'programs': ['x'],                     # Show external programs menu
     'create_archive': ['p', 'P'],         # Create archive from selected files
     'extract_archive': ['u', 'U'],        # Extract selected archive file
-    'compare_selection': ['w', 'W'],      # Show file comparison options
+    'compare_selection': ['w', 'W'],      # Show file and directory comparison options
     
     # Interface Options
     'toggle_fallback_colors': ['T'],       # Toggle fallback color mode for compatibility

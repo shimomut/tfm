@@ -253,7 +253,7 @@ class InfoDialogHelpers:
 
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all_files')} Toggle all files selection")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all_items')} Toggle all items selection")
-        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('compare_selection')} Compare selection (select files matching other pane)")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('compare_selection')} Compare selection (select files/directories matching other pane)")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('copy_files')} Copy selected files")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('move_files')} Move selected files")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('delete_files')} Delete selected files")

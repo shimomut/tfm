@@ -101,7 +101,7 @@ elif self.is_key_for_action(key, 'copy_files'):  # Automatically respects select
 - `move_files` - Move selected files to other pane  
 - `delete_files` - Delete selected files/directories
 - `create_archive` - Create archive from selected files
-- `compare_selection` - Show file comparison options
+- `compare_selection` - Show file and directory comparison options
 
 ### Actions Working Regardless (`'any'`)
 - All other actions (quit, help, navigation, etc.)
@@ -196,7 +196,7 @@ def handle_key(key, selected_files):
 - `move_files` - requires selection  
 - `delete_files` - requires selection
 - `create_archive` - requires selection
-- `compare_selection` - requires selection
+
 
 ## Future Enhancements
 

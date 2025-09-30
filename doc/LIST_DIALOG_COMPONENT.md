@@ -157,7 +157,7 @@ Shows configured external programs for execution.
 ```python
 ListDialogHelpers.show_compare_selection(list_dialog, current_pane, other_pane, print_func)
 ```
-Provides file comparison options based on pane contents.
+Provides file and directory comparison options based on pane contents.
 
 ## Visual Design
 

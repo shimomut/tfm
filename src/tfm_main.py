@@ -1704,7 +1704,7 @@ class FileManager:
         self._force_immediate_redraw()
     
     def show_compare_selection_dialog(self):
-        """Show compare selection dialog to select files based on comparison with other pane"""
+        """Show compare selection dialog to select files and directories based on comparison with other pane"""
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
         

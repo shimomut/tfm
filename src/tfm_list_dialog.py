@@ -298,7 +298,7 @@ class ListDialogHelpers:
     
     @staticmethod
     def show_compare_selection(list_dialog, current_pane, other_pane, print_func):
-        """Show compare selection menu to select files based on comparison with other pane"""
+        """Show compare selection menu to select files and directories based on comparison with other pane"""
         
         # Define comparison options
         compare_options = [
@@ -312,77 +312,119 @@ class ListDialogHelpers:
                 print_func("Compare selection cancelled")
                 return
             
-            # Get files from other pane for comparison
-            other_files = {}
-            for file_path in other_pane['files']:
-                if file_path.is_file():  # Only compare files, not directories
-                    name = file_path.name
-                    size = file_path.stat().st_size if file_path.exists() else 0
-                    mtime = file_path.stat().st_mtime if file_path.exists() else 0
-                    other_files[name] = {'size': size, 'mtime': mtime, 'path': file_path}
+            # Get files and directories from other pane for comparison
+            other_items = {}
+            for item_path in other_pane['files']:
+                name = item_path.name
+                try:
+                    if item_path.is_file():
+                        size = item_path.stat().st_size if item_path.exists() else 0
+                        mtime = item_path.stat().st_mtime if item_path.exists() else 0
+                        other_items[name] = {'size': size, 'mtime': mtime, 'path': item_path, 'is_dir': False}
+                    elif item_path.is_dir():
+                        # For directories, use 0 as size and get mtime
+                        mtime = item_path.stat().st_mtime if item_path.exists() else 0
+                        other_items[name] = {'size': 0, 'mtime': mtime, 'path': item_path, 'is_dir': True}
+                except (OSError, FileNotFoundError) as e:
+                    print(f"Warning: Could not get stats for {item_path}: {e}")
+                    continue
+                except Exception as e:
+                    print(f"Warning: Unexpected error checking {item_path}: {e}")
+                    continue
             
-            if not other_files:
-                print_func("No files in other pane to compare with")
+            if not other_items:
+                print_func("No items in other pane to compare with")
                 return
             
-            # Find matching files in current pane based on selected criteria
-            matching_files = []
-            total_files = 0
+            # Find matching items in current pane based on selected criteria
+            matching_items = []
+            total_items = 0
             
-            for file_path in current_pane['files']:
-                if file_path.is_file():  # Only compare files, not directories
-                    total_files += 1
-                    name = file_path.name
+            for item_path in current_pane['files']:
+                total_items += 1
+                name = item_path.name
+                
+                if name in other_items:
+                    other_item = other_items[name]
+                    is_match = False
                     
-                    if name in other_files:
-                        other_file = other_files[name]
-                        is_match = False
+                    try:
+                        # Check if both items are the same type (file vs directory)
+                        current_is_dir = item_path.is_dir()
+                        if current_is_dir != other_item['is_dir']:
+                            continue  # Skip if one is file and other is directory
                         
                         if selected_option == "By filename":
-                            # Just filename match
+                            # Just filename match (and same type)
                             is_match = True
                             
                         elif selected_option == "By filename and size":
                             # Filename and size match
-                            try:
-                                current_size = file_path.stat().st_size if file_path.exists() else 0
-                                is_match = current_size == other_file['size']
-                            except (OSError, FileNotFoundError) as e:
-                                print(f"Warning: Could not get file size for {file_path}: {e}")
-                                is_match = False
-                            except Exception as e:
-                                print(f"Warning: Unexpected error checking file size: {e}")
-                                is_match = False
+                            if current_is_dir:
+                                # For directories, only match by name (size is always 0)
+                                is_match = True
+                            else:
+                                # For files, match by size
+                                current_size = item_path.stat().st_size if item_path.exists() else 0
+                                is_match = current_size == other_item['size']
                                 
                         elif selected_option == "By filename, size, and timestamp":
                             # Filename, size, and timestamp match
-                            try:
-                                current_size = file_path.stat().st_size if file_path.exists() else 0
-                                current_mtime = file_path.stat().st_mtime if file_path.exists() else 0
-                                is_match = (current_size == other_file['size'] and 
-                                          abs(current_mtime - other_file['mtime']) < 1.0)  # Allow 1 second difference
-                            except (OSError, FileNotFoundError) as e:
-                                print(f"Warning: Could not get file stats for {file_path}: {e}")
-                                is_match = False
-                            except Exception as e:
-                                print(f"Warning: Unexpected error checking file stats: {e}")
-                                is_match = False
+                            current_mtime = item_path.stat().st_mtime if item_path.exists() else 0
+                            
+                            if current_is_dir:
+                                # For directories, match by name and timestamp
+                                is_match = abs(current_mtime - other_item['mtime']) < 1.0  # Allow 1 second difference
+                            else:
+                                # For files, match by size and timestamp
+                                current_size = item_path.stat().st_size if item_path.exists() else 0
+                                is_match = (current_size == other_item['size'] and 
+                                          abs(current_mtime - other_item['mtime']) < 1.0)  # Allow 1 second difference
                         
                         if is_match:
-                            matching_files.append(str(file_path))
+                            matching_items.append(str(item_path))
+                            
+                    except (OSError, FileNotFoundError) as e:
+                        print(f"Warning: Could not get stats for {item_path}: {e}")
+                        continue
+                    except Exception as e:
+                        print(f"Warning: Unexpected error checking {item_path}: {e}")
+                        continue
             
-            # Select the matching files
-            if matching_files:
+            # Select the matching items
+            if matching_items:
                 # Clear current selections
                 current_pane['selected_files'].clear()
                 
-                # Add matching files to selection
-                for file_path_str in matching_files:
-                    current_pane['selected_files'].add(file_path_str)
+                # Add matching items to selection
+                for item_path_str in matching_items:
+                    current_pane['selected_files'].add(item_path_str)
                 
-                print_func(f"Selected {len(matching_files)} files in current pane matching {selected_option.lower()}")
+                # Count files and directories for better user feedback
+                file_count = 0
+                dir_count = 0
+                for item_path_str in matching_items:
+                    try:
+                        from pathlib import Path
+                        item_path = Path(item_path_str)
+                        if item_path.is_dir():
+                            dir_count += 1
+                        else:
+                            file_count += 1
+                    except Exception:
+                        file_count += 1  # Default to file if we can't determine
+                
+                # Create descriptive message
+                if file_count > 0 and dir_count > 0:
+                    items_desc = f"{file_count} files and {dir_count} directories"
+                elif dir_count > 0:
+                    items_desc = f"{dir_count} directories"
+                else:
+                    items_desc = f"{file_count} files"
+                
+                print_func(f"Selected {len(matching_items)} items ({items_desc}) matching {selected_option.lower()}")
                 print_func(f"Criteria: {selected_option}")
             else:
-                print_func(f"No files found matching {selected_option.lower()}")
+                print_func(f"No items found matching {selected_option.lower()}")
         
         list_dialog.show("Compare Selection", compare_options, compare_callback)
