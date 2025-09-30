@@ -36,7 +36,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 ## Quick Start
 
 ### Installation
-1. Ensure you have Python 3.6+ installed
+1. Ensure you have Python 3.9+ installed
 2. Clone or download TFM
 3. Run the file manager:
    ```bash
@@ -142,7 +142,7 @@ python3 tfm.py --version
 ## Installation
 
 ### Requirements
-- Python 3.6+ with curses library (built-in on Unix systems)
+- Python 3.9+ with curses library (built-in on Unix systems)
 - Terminal with curses support
 
 ### Optional Dependencies
@@ -204,7 +204,7 @@ The log client provides color-coded output for different log sources and handles
 ## Troubleshooting
 
 **Installation Issues:**
-- Ensure Python 3.6+ is installed
+- Ensure Python 3.9+ is installed
 - Check terminal compatibility with curses library
 
 **Performance Issues:**

@@ -1,5 +1,5 @@
 # No external dependencies required - uses built-in curses library
-# Python 3.6+ required for pathlib
+# Python 3.9+ required for modern language features and security
 # Optional: pygments for syntax highlighting (will fallback gracefully if not available)
 # boto3 for AWS S3 support
 

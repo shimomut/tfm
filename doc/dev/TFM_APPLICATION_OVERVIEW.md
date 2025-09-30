@@ -151,7 +151,7 @@ python3 tfm.py --color-test diagnose     # Diagnose color issues
 ## Dependencies
 
 ### Required
-- **Python 3.6+**: Core language requirement
+- **Python 3.9+**: Core language requirement
 - **curses**: Terminal UI library (built-in on Unix systems)
 
 ### Optional

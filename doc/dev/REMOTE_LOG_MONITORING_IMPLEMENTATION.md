@@ -161,7 +161,7 @@ Potential improvements for future versions:
 
 ## Compatibility
 
-- **Python Version**: Requires Python 3.6+
+- **Python Version**: Requires Python 3.9+
 - **Operating System**: Works on Linux, macOS, and Windows
 - **Network**: Standard TCP sockets, no special requirements
 - **Dependencies**: Uses only Python standard library

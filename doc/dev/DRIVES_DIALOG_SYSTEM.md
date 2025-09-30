@@ -364,7 +364,7 @@ All tests pass successfully:
 ## Dependencies
 
 ### Required Dependencies
-- **Python 3.6+**: Core language support
+- **Python 3.9+**: Core language support
 - **curses**: Terminal UI library
 - **threading**: Background S3 scanning
 - **pathlib**: Path manipulation
