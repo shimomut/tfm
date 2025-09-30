@@ -41,15 +41,22 @@ class DriveEntry:
         """Get formatted display text for this drive entry"""
         if self.drive_type == 'local':
             icon = "🏠" if "Home" in self.name else "📁"
+            display_name = self.name
         elif self.drive_type == 's3':
-            icon = "☁️"
+            icon = "☁️ " # Add extra white space as this emoji is half-width on terminals.
+            # Add s3:// scheme prefix for S3 buckets (unless it's an error/status entry)
+            if self.path and not self.name.startswith("S3 ("):
+                display_name = f"s3://{self.name}"
+            else:
+                display_name = self.name
         else:
             icon = "💾"
+            display_name = self.name
         
         if self.description:
-            return f"{icon} {self.name} - {self.description}"
+            return f"{icon}{display_name} - {self.description}"
         else:
-            return f"{icon} {self.name}"
+            return f"{icon}{display_name}"
 
 
 class DrivesDialog(BaseListDialog):
