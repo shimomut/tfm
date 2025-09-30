@@ -142,20 +142,32 @@ class ExternalProgramManager:
             # Resolve relative paths in the command
             resolved_command = self.resolve_command_path(program['command'])
             
+            # Determine working directory for external program
+            # If current pane is browsing a remote directory (like S3), 
+            # fallback to TFM's working directory
+            working_dir = None
+            if current_pane['path'].is_remote():
+                working_dir = os.getcwd()
+            else:
+                working_dir = str(current_pane['path'])
+            
             # Print information about the program execution
             print(f"TFM External Program: {program['name']}")
             print("=" * 50)
             print(f"Original Command: {' '.join(program['command'])}")
             if resolved_command != program['command']:
                 print(f"Resolved Command: {' '.join(resolved_command)}")
-            print(f"Working Directory: {current_pane['path']}")
+            print(f"Working Directory: {working_dir}")
+            if current_pane['path'].is_remote():
+                print(f"Note: Current pane is browsing remote directory: {current_pane['path']}")
+                print(f"Working directory set to TFM's directory: {working_dir}")
             print(f"TFM_THIS_DIR: {env['TFM_THIS_DIR']}")
             print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
             print("=" * 50)
             print()
             
-            # Change to the current directory
-            os.chdir(current_pane['path'])
+            # Change to the working directory
+            os.chdir(working_dir)
             
             # Execute the program with the modified environment
             result = subprocess.run(resolved_command, env=env)
@@ -270,18 +282,39 @@ class ExternalProgramManager:
             else:
                 env['PROMPT'] = '[TFM] %n@%m:%~%# '
             
-            # Print information about the sub-shell environment
-            print("TFM Sub-shell Mode")
-            print("=" * 50)
-            print(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
-            print(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
-            print(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
-            print(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
-            print(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
-            print(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
-            print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
-            print(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
-            print("=" * 50)
+            # Determine working directory for subshell
+            # If current pane is browsing a remote directory (like S3), 
+            # fallback to TFM's working directory
+            working_dir = None
+            if current_pane['path'].is_remote():
+                working_dir = os.getcwd()
+                print("TFM Sub-shell Mode")
+                print("=" * 50)
+                print(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
+                print(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
+                print(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
+                print(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
+                print(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
+                print(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
+                print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
+                print(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
+                print("=" * 50)
+                print(f"Note: Current pane is browsing remote directory: {current_pane['path']}")
+                print(f"Subshell working directory set to TFM's directory: {working_dir}")
+            else:
+                working_dir = str(current_pane['path'])
+                print("TFM Sub-shell Mode")
+                print("=" * 50)
+                print(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
+                print(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
+                print(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
+                print(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
+                print(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
+                print(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
+                print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
+                print(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
+                print("=" * 50)
+            
             print("TFM_ACTIVE environment variable is set for shell customization")
             print("To show [TFM] in your prompt, add this to your shell config:")
             print("  Zsh (~/.zshrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PROMPT=\"[TFM] $PROMPT\"; fi")
@@ -289,8 +322,8 @@ class ExternalProgramManager:
             print("Type 'exit' to return to TFM")
             print()
             
-            # Change to the current directory
-            os.chdir(current_pane['path'])
+            # Change to the working directory
+            os.chdir(working_dir)
             
             # Start the shell with the modified environment
             shell = env.get('SHELL', '/bin/bash')
