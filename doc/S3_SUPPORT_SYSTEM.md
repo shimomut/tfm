@@ -448,9 +448,311 @@ The modular architecture enables easy addition of new storage backends:
 - **tfm_azure.py**: Azure Blob Storage
 - **tfm_gcs.py**: Google Cloud Storage
 
+## S3-Specific Features
+
+### Directory Rename Restriction
+
+TFM prevents users from renaming directories on S3 storage to avoid confusion and expensive operations. Unlike local file systems where directory renaming is a simple metadata operation, S3 directory renaming would require copying all objects within the directory and then deleting the originals, which can be:
+
+- **Expensive**: Each object copy and delete operation incurs S3 API costs
+- **Slow**: Large directories with many objects could take a very long time
+- **Risky**: Potential for partial failures leaving the directory in an inconsistent state
+
+#### Implementation
+The restriction is implemented at two levels:
+
+**Dialog Prevention (Primary UX)**:
+```python
+def enter_rename_mode(self):
+    # Check if this storage implementation supports directory renaming
+    try:
+        if selected_file.is_dir() and not selected_file.supports_directory_rename():
+            print("Directory renaming is not supported on this storage type due to performance and cost considerations")
+            return
+    except Exception as e:
+        print(f"Warning: Could not check directory rename capability: {e}")
+```
+
+**Backend Protection (Fallback)**:
+```python
+def rename(self, target) -> 'Path':
+    """Rename this file or directory to the given target"""
+    # Check if this is a directory - S3 directory renaming is not supported
+    if self.is_dir():
+        raise OSError("Directory renaming is not supported on S3 due to performance and cost considerations")
+```
+
+#### Behavior
+- **Files**: Renaming S3 files continues to work as before (copy + delete)
+- **Directories**: Attempting to rename any S3 directory shows immediate error message
+- **Virtual Directories**: Both explicit directories (ending with `/`) and virtual directories are blocked
+
+### File Editing Capability Indicator
+
+TFM provides a capability indicator for S3 file editing operations through the `supports_file_editing()` method. This allows applications to check whether a storage implementation supports file editing characteristics, without blocking the operations.
+
+#### Implementation
+```python
+# S3PathImpl returns False to indicate different editing characteristics
+def supports_file_editing(self) -> bool:
+    return False
+
+# LocalPathImpl returns True for full editing support
+def supports_file_editing(self) -> bool:
+    return True
+```
+
+#### Behavior
+- **All S3 file operations work normally**: `open()`, `write_text()`, `write_bytes()`, etc.
+- **Capability indicator**: Applications can check `path.supports_file_editing()` to understand storage characteristics
+- **FileManager integration**: TFM shows message "Editing S3 files is not supported for now" when launching external editors
+- **Non-blocking**: The capability is purely informational - operations work regardless
+
+#### Usage Example
+```python
+path = Path('s3://bucket/file.txt')
+if path.supports_file_editing():
+    # Local file system - full editing support expected
+    path.write_text("new content")
+else:
+    # S3 or other storage - editing works but may have different characteristics
+    print("Note: This storage type has different editing characteristics")
+    path.write_text("new content")  # Still works
+```
+
+### Virtual Directory Stats Enhancement
+
+TFM provides meaningful size and timestamp information for S3 virtual directories instead of showing "---" for both values.
+
+#### Problem Solved
+Virtual directories in S3 (directories that exist only because there are S3 objects with that prefix) previously showed:
+- Size: "---" 
+- Date: "---"
+
+#### Solution
+- **Size**: Always "0B" for virtual directories (logical since they don't consume storage)
+- **Timestamp**: Latest modification time among all child objects
+- **Fallback**: Current time if no children exist or timestamps unavailable
+
+#### Implementation
+```python
+def _get_virtual_directory_stats(self) -> Tuple[int, float]:
+    """Get generated stats for virtual directories."""
+    # Lists objects under the directory prefix
+    # Finds the latest LastModified timestamp among all children
+    # Handles pagination for large directories (>1000 objects)
+    # Uses caching to optimize performance
+    # Returns (size=0, latest_timestamp)
+```
+
+#### Performance Features
+- **Caching**: Directory stats cached for 30 seconds
+- **Efficient Pagination**: Uses S3 paginator for large directories
+- **Limited Scope**: Only processes objects needed for timestamp calculation
+- **Fallback Strategy**: Quick defaults if API calls fail
+
+#### User Experience Improvement
+**Before**:
+```
+s3://bucket/reports/2024/     ---      ---
+s3://bucket/data/processed/   ---      ---
+```
+
+**After**:
+```
+s3://bucket/reports/2024/     0B       2024-06-30 17:45:30
+s3://bucket/data/processed/   0B       2024-09-15 09:22:15
+```
+
+## S3 Fixes and Performance Optimizations
+
+### Cache System Fixes
+
+#### S3 Cache Key Consistency Fix
+**Problem**: `get_file_info()` calls were not hitting the cache and causing 404 errors from HeadObject API calls during directory rendering.
+
+**Root Cause**: Cache keys used during `iterdir()` didn't match the cache keys used during `stat()` calls.
+
+**Solution**: 
+- Added `cache_key_override` parameter to `_cached_api_call()` method
+- Ensured consistent cache key usage between directory listing and stat operations
+- Proactive caching of stat information during directory listing
+
+**Benefits**:
+- **API Call Reduction**: 100% for cached files
+- **Error Elimination**: 0 404 errors for valid files
+- **Performance**: Significantly faster directory operations
+
+#### S3 Caching Performance Optimization
+**Problem**: N+1 API call problem causing slow directory rendering (1 `list_objects_v2` call + N `head_object` calls for N files).
+
+**Solution**: 
+- Cache file stat information during directory listing
+- Use cached metadata from `list_objects_v2` response for subsequent `stat()` calls
+- Optimize virtual directory stats to use cached data
+
+**Performance Improvements**:
+
+| Scenario | Before | After | Improvement |
+|----------|--------|-------|-------------|
+| Directory with 20 files | 21 calls | 1 call | 95% reduction |
+| Directory with 100 files | 101 calls | 1 call | 99% reduction |
+| Repeated directory access | N+1 calls | 0 calls | 100% reduction |
+
+#### S3 Cache TTL Configuration
+**Enhancement**: Made S3 cache TTL configurable through TFM configuration system.
+
+**Configuration**:
+```python
+class Config:
+    S3_CACHE_TTL = 120  # Cache for 2 minutes (default: 60)
+```
+
+**Recommended TTL Values**:
+- **30 seconds**: Very fresh data, more API calls
+- **60 seconds**: Default, good balance
+- **120 seconds**: Less API calls, slightly stale data
+- **300 seconds**: Good for stable directories
+- **600 seconds**: Minimal API calls, longer staleness
+
+#### S3 Cache Invalidation Feature
+**Enhancement**: Automatic cache invalidation after file and archive operations.
+
+**Invalidation Strategies**:
+- **Copy Operations**: Invalidate destination directory cache
+- **Move Operations**: Invalidate both source and destination caches
+- **Delete Operations**: Invalidate parent directory cache
+- **Archive Operations**: Invalidate archive and source/destination paths
+- **Create Operations**: Invalidate created path and parent directory
+
+### Navigation and Path Fixes
+
+#### S3 Backspace Navigation Fix
+**Problem**: Backspace key would not work correctly when browsing S3 buckets, particularly for paths ending with trailing slashes.
+
+**Root Cause**: The `parent` property didn't properly handle S3 keys ending with trailing slashes.
+
+**Solution**:
+```python
+@property
+def parent(self) -> 'Path':
+    # Strip trailing slash to handle directory keys properly
+    key_without_trailing_slash = self._key.rstrip('/')
+    
+    if '/' not in key_without_trailing_slash:
+        return Path(f's3://{self._bucket}/')
+    
+    parent_key = '/'.join(key_without_trailing_slash.split('/')[:-1])
+    if parent_key:
+        return Path(f's3://{self._bucket}/{parent_key}/')
+    else:
+        return Path(f's3://{self._bucket}/')
+```
+
+#### S3 Empty Names Fix
+**Problem**: Directories were appearing with empty names and showing as "0B" in size.
+
+**Root Cause**: When S3 directory keys end with a forward slash (e.g., `test1/`), the `name` property would return an empty string.
+
+**Solution**:
+```python
+@property
+def name(self) -> str:
+    # Strip trailing slash before splitting to handle directory keys properly
+    key_without_slash = self._key.rstrip('/')
+    return key_without_slash.split('/')[-1] if '/' in key_without_slash else key_without_slash
+```
+
+### File Operation Fixes
+
+#### S3 Copy Fix
+**Problem**: Copying files from local filesystem to S3 resulted in "Permission denied" errors.
+
+**Root Cause**: TFM was using `shutil.copy2()` for all copy operations, which only works with local filesystem paths.
+
+**Solution**: 
+- Added new `copy_to()` method to Path class
+- Implemented cross-storage copy logic
+- Automatic storage type detection
+
+**Cross-Storage Copy Support**:
+- **Local to Local**: Uses `shutil.copy2()` for optimal performance
+- **Local to S3**: Reads file content and uploads using `write_bytes()`
+- **S3 to Local**: Downloads using `read_bytes()` and writes locally
+- **S3 to S3**: Downloads from source and uploads to destination
+
+#### S3 Move Fix
+**Problem**: Moving files between S3 directories resulted in "No such file or directory" errors.
+
+**Root Cause**: Move operations were using `shutil.move()` which doesn't understand S3 URIs.
+
+**Solution**: 
+- Replace `shutil.move()` calls with `Path.rename()` calls
+- Updated directory removal logic to use Path methods
+- Enhanced error handling for S3-specific issues
+
+#### S3 Directory Deletion Fix
+**Problem**: Attempting to delete S3 directories resulted in "No files to delete" error.
+
+**Root Cause**: 
+1. `exists()` method only checked for actual S3 objects, not virtual directories
+2. Lack of recursive deletion support for S3 paths
+
+**Solution**:
+- Enhanced `exists()` method to check for virtual directories
+- Added `rmtree()` method for recursive S3 directory deletion
+- Added `_delete_objects_batch()` for efficient batch deletion
+- Enhanced TFM directory deletion logic for S3 paths
+
+### Virtual Directory Optimizations
+
+#### S3 Virtual Directory Optimization
+**Problem**: Virtual directories (directories without actual S3 objects) caused HeadObject failures and unnecessary API calls.
+
+**Solution**: Store metadata as S3PathImpl instance properties to eliminate API calls.
+
+**Implementation**:
+```python
+def __init__(self, s3_uri: str, metadata: Optional[Dict[str, Any]] = None):
+    self._metadata = metadata or {}
+    self._is_dir_cached = self._metadata.get('is_dir')
+    self._is_file_cached = self._metadata.get('is_file')
+    self._size_cached = self._metadata.get('size')
+    self._mtime_cached = self._metadata.get('last_modified')
+```
+
+**Performance Improvements**:
+
+| Operation | Before | After | Improvement |
+|-----------|--------|-------|-------------|
+| `is_dir()` on virtual directory | 1 API call | 0 API calls | 100% reduction |
+| `is_file()` on cached file | 1 API call | 0 API calls | 100% reduction |
+| `stat()` on cached object | 1 API call | 0 API calls | 100% reduction |
+| Directory with 20 items | 20+ API calls | 0 API calls | 100% reduction |
+
+### Overall Performance Impact
+
+#### Performance Improvements Summary
+
+| Metric | Improvement | Impact |
+|--------|-------------|---------|
+| API Calls | 90-99% reduction | Faster operations, lower costs |
+| Directory Rendering | 50-90% faster | Better user experience |
+| Cache Hit Rate | 95%+ for repeated operations | Near-instant responses |
+| Error Rate | 100% reduction for virtual directories | More reliable operations |
+
+#### Memory Usage
+- **Cache Overhead**: 1-10MB for typical usage
+- **Metadata Storage**: Minimal overhead (few KB per object)
+- **LRU Eviction**: Prevents unbounded growth
+
+#### Cost Savings
+- **AWS API Costs**: Reduced by 90-99% for directory operations
+- **Request Charges**: Significant reduction in billable API requests
+- **Data Transfer**: Minimal impact (metadata is small)
+
 ## Related Documentation
 - [TFM Path Architecture](TFM_PATH_ARCHITECTURE.md)
 - [External Programs Policy](../external-programs-policy.md)
-- [S3 Fixes and Optimizations](S3_FIXES_AND_OPTIMIZATIONS.md)
 - [AWS S3 Documentation](https://docs.aws.amazon.com/s3/)
 - [boto3 Documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)
