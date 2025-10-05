@@ -54,6 +54,9 @@ class FileManager:
         # Load configuration
         self.config = get_config()
         
+        # Create TFM user directories if they don't exist
+        self._create_user_directories()
+        
         # Initialize colors BEFORE any stdout/stderr redirection
         # This prevents issues where LogManager's stdout redirection interferes with color detection
         color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
@@ -133,6 +136,26 @@ class FileManager:
         
         # Load saved state
         self.load_application_state()
+    
+    def _create_user_directories(self):
+        """Create TFM user directories if they don't exist."""
+        try:
+            # Create ~/.tfm directory
+            tfm_dir = Path.home() / '.tfm'
+            tfm_dir.mkdir(exist_ok=True)
+            
+            # Create ~/.tfm/tools directory
+            tools_dir = tfm_dir / 'tools'
+            tools_dir.mkdir(exist_ok=True)
+            
+            # Optionally create other user directories that might be useful in the future
+            # state_dir = tfm_dir / 'state'  # For future state persistence
+            # state_dir.mkdir(exist_ok=True)
+            
+        except OSError as e:
+            # If we can't create the directories, log a warning but don't fail
+            # TFM should still work without user directories
+            print(f"Warning: Could not create TFM user directories: {e}", file=sys.stderr)
         
     def safe_addstr(self, y, x, text, attr=curses.A_NORMAL):
         """Safely add string to screen, handling boundary conditions"""

@@ -7,6 +7,10 @@ You can modify any of these settings to customize TFM behavior.
 """
 
 import platform
+import sys
+
+# Import tfm_tool function for tool search functionality
+from tfm_external_programs import tfm_tool
 
 class Config:
     """User configuration for TFM"""
@@ -128,6 +132,9 @@ class Config:
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
     # Relative paths in the first element are resolved relative to the TFM root directory (where tfm.py is located)
+    # Use tfm_tool('tool_name') to search for tools in:
+    #   1. ~/.tfm/tools/ (user-specific tools, highest priority)
+    #   2. {tfm.py directory}/tools/ (system tools, fallback)
     # The "options" field is a dictionary with program-specific options:
     #   - auto_return: if True, automatically returns to TFM without waiting for user input
     PROGRAMS = [
@@ -137,18 +144,15 @@ class Config:
         {'name': 'List Processes', 'command': ['ps', 'aux']},
         {'name': 'System Info', 'command': ['uname', '-a']},
         {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
-        {'name': 'Compare Files (BeyondCompare)', 'command': ['./tools/bcompare_files_wrapper.sh'], 'options': {'auto_return': True}},
-        {'name': 'Compare Directories (BeyondCompare)', 'command': ['./tools/bcompare_dirs_wrapper.sh'], 'options': {'auto_return': True}},
-        {'name': 'Open in VSCode', 'command': ['./tools/vscode_wrapper.sh'], 'options': {'auto_return': True}},
-        {'name': 'Preview Files', 'command': ['./tools/preview_files.sh'], 'options': {'auto_return': True}},
-        {'name': 'S3 Information', 'command': ['./tools/s3_info.sh']},
-        {'name': 'S3 Browser', 'command': ['./tools/s3_browser.sh']},
+        {'name': 'Compare Files (BeyondCompare)', 'command': [sys.executable, tfm_tool('bcompare_files_wrapper.py')], 'options': {'auto_return': True}},
+        {'name': 'Compare Directories (BeyondCompare)', 'command': [sys.executable, tfm_tool('bcompare_dirs_wrapper.py')], 'options': {'auto_return': True}},
+        {'name': 'Open in VSCode', 'command': [sys.executable, tfm_tool('vscode_wrapper.py')], 'options': {'auto_return': True}},
+        {'name': 'Preview Files', 'command': [sys.executable, tfm_tool('preview_files.py')], 'options': {'auto_return': True}},
+        {'name': 'Reveal in File Manager', 'command': [sys.executable, tfm_tool('reveal_in_finder.py')], 'options': {'auto_return': True}},
+
         # Add your own programs here:
-        # {'name': 'My Script', 'command': ['/path/to/script.sh']},
+        # {'name': 'My Custom Tool', 'command': [sys.executable, tfm_tool('my_custom_tool.py')], 'options': {'auto_return': True}},
+        # {'name': 'My Script (direct path)', 'command': [sys.executable, '/path/to/script.py']},
         # {'name': 'Python REPL', 'command': ['python3']},
         # {'name': 'Quick Command', 'command': ['ls', '-la'], 'options': {'auto_return': True}},
     ]
-    
-    # Add macOS-specific programs
-    if platform.system() == 'Darwin':
-        PROGRAMS.append({'name': 'Reveal in Finder', 'command': ['./tools/reveal_in_finder.sh'], 'options': {'auto_return': True}})
