@@ -14,10 +14,9 @@ from tfm_path import Path
 
 def tfm_tool(tool_name):
     """
-    Marker function for TFM tool search.
+    Find and return the path to a TFM tool.
     
-    This function is used in PROGRAMS configuration to indicate that a tool
-    should be searched for in the TFM tool directories:
+    This function searches for tools in the TFM tool directories:
     1. ~/.tfm/tools/ (user-specific tools, highest priority)
     2. {tfm.py directory}/tools/ (system tools, fallback)
     
@@ -25,12 +24,33 @@ def tfm_tool(tool_name):
         tool_name: Name of the tool to search for
         
     Returns:
-        A special marker object that will be resolved by the external programs manager
+        Path to the tool if found, otherwise the original tool_name
         
     Example:
         {'name': 'My Tool', 'command': [sys.executable, tfm_tool('my_script.py')]}
     """
-    return f"__TFM_TOOL_SEARCH__{tool_name}"
+    
+    # Candidate directories in priority order
+    candidates = []
+    
+    # 1. User-specific tools directory: ~/.tfm/tools/
+    home_dir = Path.home()
+    user_tools_dir = home_dir / '.tfm' / 'tools'
+    candidates.append(user_tools_dir / tool_name)
+    
+    # 2. System tools directory: {tfm.py directory}/tools/
+    current_file = Path(__file__)  # This is tfm_external_programs.py in src/
+    tfm_root = current_file.parent.parent  # Go up from src/ to root
+    system_tools_dir = tfm_root / 'tools'
+    candidates.append(system_tools_dir / tool_name)
+    
+    # Check each candidate
+    for candidate_path in candidates:
+        if candidate_path.exists() and os.access(candidate_path, os.X_OK):
+            return str(candidate_path)
+    
+    # Tool not found, return original name (will likely fail later with clear error)
+    return tool_name
 
 
 def quote_filenames_with_double_quotes(filenames):
@@ -71,40 +91,7 @@ class ExternalProgramManager:
         self.config = config
         self.log_manager = log_manager
     
-    def find_tool_executable(self, tool_name):
-        """
-        Find the first executable file from the following candidates:
-        1. ~/.tfm/tools/{tool_name}
-        2. {same directory as tfm.py}/tools/{tool_name}
-        
-        Args:
-            tool_name: Name of the tool to find
-            
-        Returns:
-            Path to the executable if found, None otherwise
-        """
-        import os
-        
-        # Candidate directories in priority order
-        candidates = []
-        
-        # 1. User-specific tools directory: ~/.tfm/tools/
-        home_dir = Path.home()
-        user_tools_dir = home_dir / '.tfm' / 'tools'
-        candidates.append(user_tools_dir / tool_name)
-        
-        # 2. System tools directory: {tfm.py directory}/tools/
-        current_file = Path(__file__)  # This is tfm_external_programs.py in src/
-        tfm_root = current_file.parent.parent  # Go up from src/ to root
-        system_tools_dir = tfm_root / 'tools'
-        candidates.append(system_tools_dir / tool_name)
-        
-        # Check each candidate
-        for candidate_path in candidates:
-            if candidate_path.exists() and os.access(candidate_path, os.X_OK):
-                return candidate_path
-        
-        return None
+
 
     def resolve_command_path(self, command):
         """
@@ -115,66 +102,46 @@ class ExternalProgramManager:
         - Absolute paths: Returned unchanged (e.g., '/usr/bin/git')
         - Relative paths with separators: Resolved relative to tfm.py location (e.g., './tools/script.sh')
         - Command names only: Returned unchanged to be found in PATH (e.g., 'git')
-        - Tool search paths: If any command element contains tfm_tool() marker, searches in ~/.tfm/tools/ then {tfm.py}/tools/
+        
+        Note: tfm_tool() function calls are resolved at configuration time, not here.
         
         Args:
-            command: List where elements may contain paths or tfm_tool() markers
+            command: List where first element is the command/program path
             
         Returns:
-            List with resolved command paths
+            List with resolved command path (first element may be modified)
             
         Examples:
             ['./tools/script.sh'] -> ['/path/to/tfm/tools/script.sh']
             ['git', 'status'] -> ['git', 'status'] (unchanged)
             ['/usr/bin/python3'] -> ['/usr/bin/python3'] (unchanged)
-            [sys.executable, tfm_tool('my_script.py')] -> [sys.executable, '/home/user/.tfm/tools/my_script.py'] (if found)
         """
-        if not command:
+        if not command or not command[0]:
             return command
         
-        resolved_command = []
+        command_path = Path(command[0])
         
-        for i, element in enumerate(command):
-            if not element:
-                resolved_command.append(element)
-                continue
-                
-            # Handle special tfm_tool() marker for tool search
-            if isinstance(element, str) and element.startswith('__TFM_TOOL_SEARCH__'):
-                tool_name = element[19:]  # Remove '__TFM_TOOL_SEARCH__' prefix
-                found_tool = self.find_tool_executable(tool_name)
-                if found_tool:
-                    resolved_command.append(str(found_tool))
-                else:
-                    # Tool not found, return original element (will likely fail later)
-                    resolved_command.append(element)
-                continue
-            
-            # Only process path resolution for the first element (the main command)
-            if i == 0:
-                element_path = Path(element)
-                
-                # If it's already an absolute path, use as-is
-                if element_path.is_absolute():
-                    resolved_command.append(element)
-                    continue
-                
-                # If it's a relative path, resolve it relative to tfm.py location
-                if '/' in element or '\\' in element:  # Contains path separators
-                    # Find the TFM main script directory
-                    # We need to go up from src/ to the root where tfm.py is located
-                    current_file = Path(__file__)  # This is tfm_external_programs.py in src/
-                    tfm_root = current_file.parent.parent  # Go up from src/ to root
-                    
-                    # Resolve the relative path
-                    resolved_path = (tfm_root / element_path).resolve()
-                    resolved_command.append(str(resolved_path))
-                    continue
-            
-            # For all other cases, use the element as-is
-            resolved_command.append(element)
+        # If it's already an absolute path, return as-is
+        if command_path.is_absolute():
+            return command
         
-        return resolved_command
+        # If it's a relative path, resolve it relative to tfm.py location
+        if '/' in command[0] or '\\' in command[0]:  # Contains path separators
+            # Find the TFM main script directory
+            # We need to go up from src/ to the root where tfm.py is located
+            current_file = Path(__file__)  # This is tfm_external_programs.py in src/
+            tfm_root = current_file.parent.parent  # Go up from src/ to root
+            
+            # Resolve the relative path
+            resolved_path = (tfm_root / command_path).resolve()
+            
+            # Create new command list with resolved path
+            resolved_command = [str(resolved_path)] + command[1:]
+            return resolved_command
+        
+        # If it's just a command name without path separators, return as-is
+        # (let the system find it in PATH)
+        return command
     
     def execute_external_program(self, stdscr, pane_manager, program):
         """Execute an external program with environment variables set"""
