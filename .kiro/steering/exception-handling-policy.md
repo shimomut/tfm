@@ -147,6 +147,7 @@ When updating existing code:
 - **Always import modules at the top of the file** (module level), not within functions or methods
 - This improves performance by avoiding repeated imports during function calls
 - Makes dependencies clear and explicit
+- **Avoid redundant imports** - check if modules are already imported at module level before adding imports within functions
 
 #### ❌ Avoid - Imports Within Functions
 ```python
@@ -154,6 +155,17 @@ def some_function():
     import time  # Bad - imports on every function call
     import os
     time.sleep(1)
+```
+
+#### ❌ Avoid - Redundant Imports
+```python
+import os
+import sys
+
+def some_function():
+    import os  # Bad - os already imported at module level
+    import sys  # Bad - sys already imported at module level
+    return os.getcwd()
 ```
 
 #### ✅ Preferred - Module Level Imports
@@ -196,3 +208,4 @@ When reviewing code changes:
 - [ ] Is the error handling appropriate for the operation's criticality?
 - [ ] Are all module imports at the module level (not within functions)?
 - [ ] Are there any redundant imports that can be removed?
+- [ ] **Before adding imports within functions, check if the module is already imported at module level**
