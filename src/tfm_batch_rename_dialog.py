@@ -393,6 +393,7 @@ class BatchRenameDialog:
                     # Create preview line using wide character utilities
                     max_name_width = (content_width - 20) // 2
                     truncate_text = safe_funcs['truncate_to_width']
+                    pad_text = safe_funcs['pad_to_width']
                     
                     if get_width(original) > max_name_width:
                         original_display = truncate_text(original, max_name_width, "")
@@ -404,8 +405,15 @@ class BatchRenameDialog:
                     else:
                         new_display = new
                     
-                    preview_line = f"{original_display:<{max_name_width}} → {new_display:<{max_name_width}} [{status}]"
-                    preview_line = preview_line[:content_width]
+                    # Use wide character utilities for proper alignment
+                    original_padded = pad_text(original_display, max_name_width, 'left')
+                    new_padded = pad_text(new_display, max_name_width, 'left')
+                    
+                    preview_line = f"{original_padded} → {new_padded} [{status}]"
+                    
+                    # Truncate the entire line if it's too long
+                    if get_width(preview_line) > content_width:
+                        preview_line = truncate_text(preview_line, content_width, "")
                     
                     safe_addstr_func(y, content_start_x, preview_line, status_color)
         else:
