@@ -14,6 +14,7 @@ import os
 import sys
 import unicodedata
 import warnings
+from functools import lru_cache
 from typing import Tuple, Optional
 
 
@@ -55,6 +56,27 @@ def safe_is_wide_character(char: str, warn_on_error: bool = None) -> bool:
         return False
 
 
+@lru_cache(maxsize=1024)
+def _cached_is_wide_character(char: str) -> bool:
+    """
+    Cached version of wide character detection for performance.
+    
+    This function caches results to avoid repeated Unicode database lookups
+    for the same characters, which is common when processing file lists.
+    """
+    if len(char) != 1:
+        return False
+    
+    try:
+        # Use East Asian Width property from Unicode database
+        width = unicodedata.east_asian_width(char)
+        # 'F' = Fullwidth, 'W' = Wide
+        return width in ('F', 'W')
+    except (UnicodeError, ValueError):
+        # If we can't determine the width, assume it's not wide
+        return False
+
+
 def is_wide_character(char: str) -> bool:
     """
     Check if a character is a wide (double-width) character.
@@ -76,40 +98,20 @@ def is_wide_character(char: str) -> bool:
         >>> is_wide_character('中')
         True
     """
-    if len(char) != 1:
+    # Fast path for ASCII characters (most common case)
+    if len(char) == 1 and ord(char) < 128:
         return False
     
-    try:
-        # Use East Asian Width property from Unicode database
-        width = unicodedata.east_asian_width(char)
-        # 'F' = Fullwidth, 'W' = Wide
-        return width in ('F', 'W')
-    except (UnicodeError, ValueError):
-        # If we can't determine the width, assume it's not wide
-        return False
+    return _cached_is_wide_character(char)
 
 
-def get_display_width(text: str) -> int:
+@lru_cache(maxsize=2048)
+def _cached_get_display_width(text: str) -> int:
     """
-    Calculate the display width of a string, accounting for wide characters.
+    Cached version of display width calculation for performance.
     
-    This function properly measures the visual width that text will occupy
-    in a terminal, where wide characters take 2 columns and combining
-    characters take 0 columns.
-    
-    Args:
-        text: The text string to measure
-        
-    Returns:
-        The display width in terminal columns
-        
-    Examples:
-        >>> get_display_width("hello")
-        5
-        >>> get_display_width("こんにちは")
-        10
-        >>> get_display_width("hello世界")
-        9
+    This function caches results for frequently accessed strings like
+    filenames that appear repeatedly in directory listings.
     """
     if not text:
         return 0
@@ -143,6 +145,39 @@ def get_display_width(text: str) -> int:
     return width
 
 
+def get_display_width(text: str) -> int:
+    """
+    Calculate the display width of a string, accounting for wide characters.
+    
+    This function properly measures the visual width that text will occupy
+    in a terminal, where wide characters take 2 columns and combining
+    characters take 0 columns.
+    
+    Args:
+        text: The text string to measure
+        
+    Returns:
+        The display width in terminal columns
+        
+    Examples:
+        >>> get_display_width("hello")
+        5
+        >>> get_display_width("こんにちは")
+        10
+        >>> get_display_width("hello世界")
+        9
+    """
+    if not text:
+        return 0
+    
+    # Fast path for ASCII-only strings (most common case)
+    if all(ord(c) < 128 for c in text):
+        return len(text)
+    
+    # Use cached version for non-ASCII strings
+    return _cached_get_display_width(text)
+
+
 def safe_get_display_width(text: str, warn_on_error: bool = None) -> int:
     """
     Safely calculate display width with fallback to character count.
@@ -165,6 +200,17 @@ def safe_get_display_width(text: str, warn_on_error: bool = None) -> int:
         if warn_on_error:
             warnings.warn(f"safe_get_display_width: Expected string, got {type(text)}", UserWarning)
         return 0
+    
+    # Fast path for empty strings
+    if not text:
+        return 0
+    
+    # Fast path for ASCII-only strings (most common case)
+    try:
+        if all(ord(c) < 128 for c in text):
+            return len(text)
+    except (TypeError, ValueError):
+        pass  # Fall through to full Unicode processing
     
     try:
         return get_display_width(text)
@@ -268,6 +314,18 @@ def truncate_to_width(text: str, max_width: int, ellipsis: str = "...") -> str:
     if not text:
         return text
     
+    # Fast path for ASCII-only strings (most common case)
+    if all(ord(c) < 128 for c in text):
+        if len(text) <= max_width:
+            return text
+        if len(ellipsis) >= max_width:
+            return ellipsis[:max_width] if max_width > 0 else ""
+        target_len = max_width - len(ellipsis)
+        if target_len <= 0:
+            return ellipsis[:max_width]
+        return text[:target_len] + ellipsis
+    
+    # Full Unicode processing for non-ASCII strings
     current_width = get_display_width(text)
     if current_width <= max_width:
         return text
@@ -388,6 +446,27 @@ def pad_to_width(text: str, width: int, align: str = 'left', fill_char: str = ' 
     if not text:
         text = ""
     
+    # Fast path for ASCII-only strings with space padding (most common case)
+    if fill_char == ' ' and all(ord(c) < 128 for c in text):
+        current_len = len(text)
+        if current_len >= width:
+            return text
+        
+        padding_needed = width - current_len
+        padding = ' ' * padding_needed
+        
+        if align == 'left':
+            return text + padding
+        elif align == 'right':
+            return padding + text
+        elif align == 'center':
+            left_pad = padding_needed // 2
+            right_pad = padding_needed - left_pad
+            return (' ' * left_pad) + text + (' ' * right_pad)
+        else:
+            return text + padding
+    
+    # Full Unicode processing for non-ASCII strings or non-space padding
     current_width = get_display_width(text)
     
     if current_width >= width:
@@ -493,6 +572,13 @@ def split_at_width(text: str, width: int) -> Tuple[str, str]:
     if not text or width <= 0:
         return ("", text)
     
+    # Fast path for ASCII-only strings (most common case)
+    if all(ord(c) < 128 for c in text):
+        if width >= len(text):
+            return (text, "")
+        return (text[:width], text[width:])
+    
+    # Full Unicode processing for non-ASCII strings
     current_width = 0
     split_index = 0
     
@@ -905,6 +991,53 @@ _show_warnings = True
 def should_show_warnings():
     """Check if Unicode warnings should be shown based on configuration."""
     return _show_warnings
+
+
+# Cache management functions for performance optimization
+def clear_display_width_cache():
+    """
+    Clear the display width calculation cache.
+    
+    This can be useful to free memory or when Unicode handling mode changes.
+    """
+    try:
+        _cached_get_display_width.cache_clear()
+        _cached_is_wide_character.cache_clear()
+    except Exception as e:
+        warnings.warn(f"Error clearing display width cache: {e}", UserWarning)
+
+
+def get_cache_info():
+    """
+    Get cache statistics for performance monitoring.
+    
+    Returns:
+        Dictionary containing cache statistics for display width and character width functions
+    """
+    try:
+        return {
+            'display_width_cache': _cached_get_display_width.cache_info()._asdict(),
+            'is_wide_char_cache': _cached_is_wide_character.cache_info()._asdict()
+        }
+    except Exception as e:
+        warnings.warn(f"Error getting cache info: {e}", UserWarning)
+        return {}
+
+
+def optimize_for_ascii_only():
+    """
+    Optimize performance for ASCII-only environments.
+    
+    This function clears caches and sets up optimizations for environments
+    that primarily use ASCII filenames.
+    """
+    try:
+        clear_display_width_cache()
+        # The ASCII fast paths are already built into the functions
+        # This function mainly serves as a way to clear caches and
+        # potentially adjust cache sizes in the future
+    except Exception as e:
+        warnings.warn(f"Error optimizing for ASCII: {e}", UserWarning)
 
 
 # Initialize with auto-detection
