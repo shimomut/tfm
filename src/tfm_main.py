@@ -55,6 +55,10 @@ class FileManager:
         # Load configuration
         self.config = get_config()
         
+        # Initialize Unicode handling from configuration
+        from tfm_wide_char_utils import initialize_from_config
+        initialize_from_config()
+        
         # Create TFM user directories if they don't exist
         self._create_user_directories()
         

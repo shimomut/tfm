@@ -129,6 +129,11 @@ class DefaultConfig:
     
     # S3 settings
     S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
+    
+    # Unicode and wide character settings
+    UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
+    UNICODE_WARNINGS = True  # Show warnings for Unicode processing errors
+    UNICODE_FALLBACK_CHAR = '?'  # Character to use for unrepresentable characters in ASCII mode
 
 
 class ConfigManager:
@@ -247,6 +252,16 @@ class ConfigManager:
         if hasattr(config, 'COLOR_SCHEME'):
             if config.COLOR_SCHEME not in ['dark', 'light']:
                 errors.append("COLOR_SCHEME must be 'dark' or 'light'")
+        
+        # Validate Unicode mode
+        if hasattr(config, 'UNICODE_MODE'):
+            if config.UNICODE_MODE not in ['auto', 'full', 'basic', 'ascii']:
+                errors.append("UNICODE_MODE must be 'auto', 'full', 'basic', or 'ascii'")
+        
+        # Validate Unicode fallback character
+        if hasattr(config, 'UNICODE_FALLBACK_CHAR'):
+            if not isinstance(config.UNICODE_FALLBACK_CHAR, str) or len(config.UNICODE_FALLBACK_CHAR) != 1:
+                errors.append("UNICODE_FALLBACK_CHAR must be a single character string")
         
         return errors
     
