@@ -38,6 +38,7 @@ from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_jump_dialog import JumpDialog, JumpDialogHelpers
 from tfm_drives_dialog import DrivesDialog, DrivesDialogHelpers
+from tfm_wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
@@ -459,7 +460,7 @@ class FileManager:
     def calculate_max_extension_width(self, pane_data):
         """
         Calculate the maximum extension width for files in the current pane.
-        Returns the width needed for the extension column.
+        Returns the display width needed for the extension column.
         """
         max_width = 0
         max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
@@ -468,7 +469,9 @@ class FileManager:
             if file_path.is_file():
                 _, extension = self.separate_filename_extension(file_path.name, file_path.is_dir())
                 if extension and len(extension) <= max_ext_length:
-                    max_width = max(max_width, len(extension))
+                    # Use display width instead of character count
+                    ext_display_width = safe_get_display_width(extension)
+                    max_width = max(max_width, ext_display_width)
         
         return max_width
 
@@ -565,12 +568,13 @@ class FileManager:
         if left_pane_width > 6:  # Minimum space needed
             left_path = str(self.pane_manager.left_pane['path'])
             max_left_path_width = max(1, left_pane_width - 4)
-            if len(left_path) > max_left_path_width:
-                left_path = "..." + left_path[-(max(1, max_left_path_width-3)):]
+            # Use wide character aware truncation for path display
+            if safe_get_display_width(left_path) > max_left_path_width:
+                left_path = truncate_to_width(left_path, max_left_path_width, "...")
             
             left_color = get_header_color(self.pane_manager.active_pane == 'left')
             try:
-                self.stdscr.addstr(0, 2, left_path[:max_left_path_width], left_color)
+                self.stdscr.addstr(0, 2, left_path, left_color)
             except curses.error:
                 pass  # Ignore drawing errors for narrow panes
         
@@ -585,14 +589,15 @@ class FileManager:
         if right_pane_width > 6:  # Minimum space needed
             right_path = str(self.pane_manager.right_pane['path'])
             max_right_path_width = max(1, right_pane_width - 4)
-            if len(right_path) > max_right_path_width:
-                right_path = "..." + right_path[-(max(1, max_right_path_width-3)):]
+            # Use wide character aware truncation for path display
+            if safe_get_display_width(right_path) > max_right_path_width:
+                right_path = truncate_to_width(right_path, max_right_path_width, "...")
                 
             right_color = get_header_color(self.pane_manager.active_pane == 'right')
             try:
                 right_start_x = left_pane_width + 2
                 if right_start_x < width:
-                    self.stdscr.addstr(0, right_start_x, right_path[:max_right_path_width], right_color)
+                    self.stdscr.addstr(0, right_start_x, right_path, right_color)
             except curses.error:
                 pass  # Ignore drawing errors for narrow panes
         
@@ -617,7 +622,9 @@ class FileManager:
             # Show "no items to show" message in the center of the pane
             message = "No items to show"
             message_y = 1 + display_height // 2  # Center vertically in the pane
-            message_x = start_x + (pane_width - len(message)) // 2  # Center horizontally
+            # Use display width for proper centering with wide characters
+            message_display_width = safe_get_display_width(message)
+            message_x = start_x + (pane_width - message_display_width) // 2  # Center horizontally
             
             try:
                 from tfm_colors import get_error_color
@@ -691,7 +698,10 @@ class FileManager:
             
             # Safety check: ensure we have minimum space for formatting
             if pane_width < 20:  # Too narrow to display properly
-                line = f"{selection_marker} {display_name[:pane_width-5]}..."
+                # Use wide character aware truncation
+                max_name_width = max(1, pane_width - 5)
+                truncated_name = truncate_to_width(display_name, max_name_width, "...")
+                line = f"{selection_marker} {truncated_name}"
             else:
                 # Calculate precise filename width for column alignment
                 # Account for the fact that line will be truncated to pane_width-2
@@ -703,32 +713,30 @@ class FileManager:
                         # Calculate actual maximum extension width for this pane
                         ext_width = self.calculate_max_extension_width(pane_data)
                         if ext_width == 0:  # No extensions in this pane
-                            ext_width = len(extension)
+                            ext_width = safe_get_display_width(extension)
                         
                         # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) = 12 + ext_width
                         name_width = usable_width - (12 + ext_width)
                         
-                        # Truncate basename only if necessary
-                        if len(basename) > name_width:
-                            truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
-                            basename = basename[:truncate_at] + "..."
+                        # Truncate basename using wide character aware truncation
+                        if safe_get_display_width(basename) > name_width:
+                            basename = truncate_to_width(basename, name_width, "...")
                         
-                        # Pad basename to maintain column alignment
-                        padded_basename = basename.ljust(name_width)
-                        padded_extension = extension.ljust(ext_width)
+                        # Pad basename to maintain column alignment using display width
+                        padded_basename = pad_to_width(basename, name_width, align='left')
+                        padded_extension = pad_to_width(extension, ext_width, align='left')
                         line = f"{selection_marker} {padded_basename} {padded_extension}{size_str:>8}"
                     else:
                         # No extension separation - use full width for filename
                         # Reserve space for: marker(2) + space(1) + size(8) = 11
                         name_width = usable_width - 11
                         
-                        # Truncate filename only if necessary
-                        if len(display_name) > name_width:
-                            truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
-                            display_name = display_name[:truncate_at] + "..."
+                        # Truncate filename using wide character aware truncation
+                        if safe_get_display_width(display_name) > name_width:
+                            display_name = truncate_to_width(display_name, name_width, "...")
                         
-                        # Pad filename to maintain column alignment
-                        padded_name = display_name.ljust(name_width)
+                        # Pad filename to maintain column alignment using display width
+                        padded_name = pad_to_width(display_name, name_width, align='left')
                         line = f"{selection_marker} {padded_name}{size_str:>8}"
                 else:
                     # For wider panes: "● basename ext size datetime"
@@ -736,36 +744,38 @@ class FileManager:
                         # Calculate actual maximum extension width for this pane
                         ext_width = self.calculate_max_extension_width(pane_data)
                         if ext_width == 0:  # No extensions in this pane
-                            ext_width = len(extension)
+                            ext_width = safe_get_display_width(extension)
                         
                         # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) + space(1) + datetime(len) = 13 + ext_width + datetime_width
                         name_width = usable_width - (13 + ext_width + datetime_width)
                         
-                        # Truncate basename only if necessary
-                        if len(basename) > name_width:
-                            truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
-                            basename = basename[:truncate_at] + "..."
+                        # Truncate basename using wide character aware truncation
+                        if safe_get_display_width(basename) > name_width:
+                            basename = truncate_to_width(basename, name_width, "...")
                         
-                        # Pad basename to maintain column alignment
-                        padded_basename = basename.ljust(name_width)
-                        padded_extension = extension.ljust(ext_width)
+                        # Pad basename to maintain column alignment using display width
+                        padded_basename = pad_to_width(basename, name_width, align='left')
+                        padded_extension = pad_to_width(extension, ext_width, align='left')
                         line = f"{selection_marker} {padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
                     else:
                         # No extension separation - use full width for filename
                         # Reserve space for: marker(2) + space(1) + size(8) + space(1) + datetime(len) = 12 + datetime_width
                         name_width = usable_width - (12 + datetime_width)
                         
-                        # Truncate filename only if necessary
-                        if len(display_name) > name_width:
-                            truncate_at = max(1, name_width - 3)  # Reserve 3 for "..."
-                            display_name = display_name[:truncate_at] + "..."
+                        # Truncate filename using wide character aware truncation
+                        if safe_get_display_width(display_name) > name_width:
+                            display_name = truncate_to_width(display_name, name_width, "...")
                         
-                        # Pad filename to maintain column alignment
-                        padded_name = display_name.ljust(name_width)
+                        # Pad filename to maintain column alignment using display width
+                        padded_name = pad_to_width(display_name, name_width, align='left')
                         line = f"{selection_marker} {padded_name} {size_str:>8} {mtime_str}"
             
             try:
-                self.stdscr.addstr(y, start_x + 1, line[:pane_width-2], color)
+                # Use wide character aware truncation for final line display
+                max_line_width = pane_width - 2
+                if safe_get_display_width(line) > max_line_width:
+                    line = truncate_to_width(line, max_line_width, "")
+                self.stdscr.addstr(y, start_x + 1, line, color)
             except curses.error:
                 pass  # Ignore if we can't write to screen edge
                 

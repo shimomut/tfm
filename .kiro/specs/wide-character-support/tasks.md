@@ -30,19 +30,19 @@
   - Test edge cases including empty strings, only wide chars, and combining characters
   - _Requirements: 3.1, 3.2, 3.3, 4.1, 4.2, 4.3_
 
-- [ ] 2. Update file display system to use wide character utilities
+- [x] 2. Update file display system to use wide character utilities
   - Modify `draw_pane()` method in `tfm_main.py` to use wide character functions
   - Replace all `len()` calls with `get_display_width()` for filename width calculations
   - Update filename truncation logic to use `truncate_to_width()`
   - _Requirements: 1.1, 1.3, 2.1, 2.3_
 
-- [ ] 2.1 Fix column alignment in file list display
+- [x] 2.1 Fix column alignment in file list display
   - Update basename and extension column width calculations
   - Use `pad_to_width()` for proper column alignment with wide characters
   - Ensure consistent spacing regardless of character types in filenames
   - _Requirements: 1.3, 2.3_
 
-- [ ] 2.2 Update file selection and cursor positioning
+- [x] 2.2 Update file selection and cursor positioning
   - Ensure cursor positioning works correctly with wide character filenames
   - Fix selection highlighting to cover entire filename display width
   - Update scroll position calculations to account for display width
