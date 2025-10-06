@@ -54,19 +54,19 @@
   - Verify column alignment and cursor positioning accuracy
   - _Requirements: 1.1, 1.3, 2.1, 2.2, 2.3_
 
-- [ ] 3. Update TextViewer to handle wide characters in file content
+- [x] 3. Update TextViewer to handle wide characters in file content
   - Modify `tfm_text_viewer.py` to use wide character utilities for text display
   - Update line wrapping logic to use `get_display_width()` and `split_at_width()`
   - Fix text truncation in viewer to preserve character boundaries
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 3.1 Implement proper text wrapping for wide characters
+- [x] 3.1 Implement proper text wrapping for wide characters
   - Replace character-based wrapping with display-width-based wrapping
   - Handle mixed narrow and wide characters in text lines
   - Ensure wrapped lines maintain proper visual alignment
   - _Requirements: 4.1, 4.2_
 
-- [ ] 3.2 Fix cursor positioning and scrolling in text viewer
+- [x] 3.2 Fix cursor positioning and scrolling in text viewer
   - Update cursor position calculations to use display width
   - Ensure horizontal scrolling works correctly with wide characters
   - Fix line number display alignment with wide character content
