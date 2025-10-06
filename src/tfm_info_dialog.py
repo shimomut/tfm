@@ -7,6 +7,7 @@ Provides scrollable information dialog functionality
 import curses
 from tfm_colors import get_status_color
 from tfm_config import config_manager
+from tfm_wide_char_utils import get_display_width, get_safe_functions
 
 
 class InfoDialog:
@@ -142,11 +143,16 @@ class InfoDialog:
             bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
             safe_addstr_func(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
         
-        # Draw title
+        # Draw title using wide character utilities
         if self.title and start_y >= 0:
             title_text = f" {self.title} "
-            title_x = start_x + (dialog_width - len(title_text)) // 2
-            if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
+            # Get safe wide character functions
+            safe_funcs = get_safe_functions()
+            get_width = safe_funcs['get_display_width']
+            
+            title_width = get_width(title_text)
+            title_x = start_x + (dialog_width - title_width) // 2
+            if title_x >= start_x and title_x + title_width <= start_x + dialog_width:
                 safe_addstr_func(start_y, title_x, title_text, border_color)
         
         # Calculate content area
@@ -161,14 +167,22 @@ class InfoDialog:
         if self.scroll > max_scroll:
             self.scroll = max_scroll
         
-        # Draw content lines
+        # Draw content lines using wide character utilities
         visible_lines = self.lines[self.scroll:self.scroll + content_height]
+        
+        # Get safe wide character functions
+        safe_funcs = get_safe_functions()
+        get_width = safe_funcs['get_display_width']
+        truncate_text = safe_funcs['truncate_to_width']
         
         for i, line in enumerate(visible_lines):
             y = content_start_y + i
             if y <= content_end_y and y < height:
-                # Truncate line if too long
-                display_line = line[:content_width] if len(line) > content_width else line
+                # Truncate line if too wide using display width
+                if get_width(line) > content_width:
+                    display_line = truncate_text(line, content_width, "")
+                else:
+                    display_line = line
                 safe_addstr_func(y, content_start_x, display_line, get_status_color())
         
         # Draw scroll indicators
@@ -198,10 +212,19 @@ class InfoDialog:
         # Draw help text at bottom
         help_text = "↑↓:scroll  PgUp/PgDn:page  Home/End:top/bottom  Q/ESC:close"
         help_y = start_y + dialog_height - 2
-        if help_y < height and len(help_text) <= content_width:
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+        if help_y < height:
+            help_width = get_width(help_text)
+            if help_width <= content_width:
+                help_x = start_x + (dialog_width - help_width) // 2
+                if help_x >= start_x:
+                    safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            else:
+                # Truncate help text if too wide
+                truncated_help = truncate_text(help_text, content_width, "...")
+                help_width = get_width(truncated_help)
+                help_x = start_x + (dialog_width - help_width) // 2
+                if help_x >= start_x:
+                    safe_addstr_func(help_y, help_x, truncated_help, get_status_color() | curses.A_DIM)
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False

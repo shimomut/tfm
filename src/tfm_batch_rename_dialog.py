@@ -10,6 +10,7 @@ from tfm_path import Path
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2, KEY_TAB
 from tfm_colors import get_status_color, COLOR_ERROR
+from tfm_wide_char_utils import get_display_width, get_safe_functions
 
 
 class BatchRenameDialog:
@@ -295,10 +296,15 @@ class BatchRenameDialog:
             bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
             safe_addstr_func(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
         
-        # Draw title
+        # Draw title using wide character utilities
         title_text = f" Batch Rename ({len(self.files)} files) "
-        title_x = start_x + (dialog_width - len(title_text)) // 2
-        if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
+        # Get safe wide character functions
+        safe_funcs = get_safe_functions()
+        get_width = safe_funcs['get_display_width']
+        
+        title_width = get_width(title_text)
+        title_x = start_x + (dialog_width - title_width) // 2
+        if title_x >= start_x and title_x + title_width <= start_x + dialog_width:
             safe_addstr_func(start_y, title_x, title_text, border_color)
         
         # Content area
@@ -384,10 +390,19 @@ class BatchRenameDialog:
                         status = "OK"
                         status_color = get_status_color()
                     
-                    # Create preview line
+                    # Create preview line using wide character utilities
                     max_name_width = (content_width - 20) // 2
-                    original_display = original[:max_name_width] if len(original) > max_name_width else original
-                    new_display = new[:max_name_width] if len(new) > max_name_width else new
+                    truncate_text = safe_funcs['truncate_to_width']
+                    
+                    if get_width(original) > max_name_width:
+                        original_display = truncate_text(original, max_name_width, "")
+                    else:
+                        original_display = original
+                        
+                    if get_width(new) > max_name_width:
+                        new_display = truncate_text(new, max_name_width, "")
+                    else:
+                        new_display = new
                     
                     preview_line = f"{original_display:<{max_name_width}} → {new_display:<{max_name_width}} [{status}]"
                     preview_line = preview_line[:content_width]
@@ -404,9 +419,20 @@ class BatchRenameDialog:
         help_y = start_y + dialog_height - 2
         if help_y < height:
             help_text = "Tab: Switch input | ←→: Move cursor | Home/End: Start/End | Enter: Rename | ESC: Cancel"
-            help_x = start_x + (dialog_width - len(help_text)) // 2
-            if help_x >= start_x:
-                safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            help_width = get_width(help_text)
+            
+            if help_width <= dialog_width:
+                help_x = start_x + (dialog_width - help_width) // 2
+                if help_x >= start_x:
+                    safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+            else:
+                # Truncate help text if too wide
+                truncate_text = safe_funcs['truncate_to_width']
+                truncated_help = truncate_text(help_text, dialog_width - 4, "...")
+                help_width = get_width(truncated_help)
+                help_x = start_x + (dialog_width - help_width) // 2
+                if help_x >= start_x:
+                    safe_addstr_func(help_y, help_x, truncated_help, get_status_color() | curses.A_DIM)
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False

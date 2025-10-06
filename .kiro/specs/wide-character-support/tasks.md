@@ -78,25 +78,25 @@
   - Verify cursor positioning and scrolling functionality
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 4. Update dialog system components for wide character input
+- [x] 4. Update dialog system components for wide character input
   - Modify `SingleLineTextEdit` class to use wide character utilities
   - Update cursor positioning logic in text input fields
   - Fix text display and editing with wide characters
   - _Requirements: 2.2, 4.1, 4.2_
 
-- [ ] 4.1 Update text input field rendering
+- [x] 4.1 Update text input field rendering
   - Replace `len()` with `get_display_width()` in text field width calculations
   - Use `truncate_to_width()` for text field content display
   - Ensure proper cursor positioning with wide character input
   - _Requirements: 2.2, 4.1_
 
-- [ ] 4.2 Fix text editing operations with wide characters
+- [x] 4.2 Fix text editing operations with wide characters
   - Update character insertion and deletion to handle wide characters
   - Ensure backspace and delete operations work correctly
   - Fix cursor movement (left/right arrows) with wide characters
   - _Requirements: 2.2, 4.1, 4.2_
 
-- [ ] 4.3 Update all dialog components to use wide character utilities
+- [x] 4.3 Update all dialog components to use wide character utilities
   - Modify general purpose dialog, search dialog, and other dialog components
   - Ensure consistent wide character handling across all dialogs
   - Update dialog sizing and layout calculations
