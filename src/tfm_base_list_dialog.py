@@ -8,6 +8,7 @@ import curses
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
+from tfm_wide_char_utils import get_display_width, get_safe_functions
 
 
 class BaseListDialog:
@@ -180,11 +181,16 @@ class BaseListDialog:
             bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
             safe_addstr_func(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
         
-        # Draw title
+        # Draw title using wide character utilities
         if title and start_y >= 0:
             title_text = f" {title} "
-            title_x = start_x + (dialog_width - len(title_text)) // 2
-            if title_x >= start_x and title_x + len(title_text) <= start_x + dialog_width:
+            # Get safe wide character functions
+            safe_funcs = get_safe_functions()
+            get_width = safe_funcs['get_display_width']
+            
+            title_width = get_width(title_text)
+            title_x = start_x + (dialog_width - title_width) // 2
+            if title_x >= start_x and title_x + title_width <= start_x + dialog_width:
                 safe_addstr_func(start_y, title_x, title_text, border_color)
         
         return start_y, start_x, dialog_width, dialog_height
@@ -257,9 +263,16 @@ class BaseListDialog:
                     item_text = format_item_func(item)
                 else:
                     item_text = str(item)
-                    
-                if len(item_text) > content_width - 2:
-                    item_text = item_text[:content_width - 5] + "..."
+                
+                # Get safe wide character functions
+                safe_funcs = get_safe_functions()
+                get_width = safe_funcs['get_display_width']
+                truncate_text = safe_funcs['truncate_to_width']
+                
+                # Truncate item text if too wide, accounting for selection indicator
+                available_width = content_width - 2  # Account for selection indicator
+                if get_width(item_text) > available_width:
+                    item_text = truncate_text(item_text, available_width, "...")
                 
                 # Add selection indicator
                 if is_selected:
@@ -269,8 +282,9 @@ class BaseListDialog:
                     display_text = f"  {item_text}"
                     item_color = get_status_color()
                 
-                # Ensure text fits
-                display_text = display_text[:content_width]
+                # Ensure text fits using display width
+                if get_width(display_text) > content_width:
+                    display_text = truncate_text(display_text, content_width, "")
                 safe_addstr_func(y, start_x, display_text, item_color)
                 
     def draw_scrollbar(self, stdscr, safe_addstr_func, items_list, start_y, content_height, scrollbar_x):
@@ -316,8 +330,22 @@ class BaseListDialog:
         height = stdscr.getmaxyx()[0]
         
         if y < height:
+            # Get safe wide character functions
+            safe_funcs = get_safe_functions()
+            get_width = safe_funcs['get_display_width']
+            truncate_text = safe_funcs['truncate_to_width']
+            
             content_width = dialog_width - 4
-            if len(help_text) <= content_width:
-                help_x = start_x + (dialog_width - len(help_text)) // 2
+            help_width = get_width(help_text)
+            
+            if help_width <= content_width:
+                help_x = start_x + (dialog_width - help_width) // 2
                 if help_x >= start_x:
                     safe_addstr_func(y, help_x, help_text, get_status_color() | curses.A_DIM)
+            else:
+                # Truncate help text if too wide
+                truncated_help = truncate_text(help_text, content_width, "...")
+                help_width = get_width(truncated_help)
+                help_x = start_x + (dialog_width - help_width) // 2
+                if help_x >= start_x:
+                    safe_addstr_func(y, help_x, truncated_help, get_status_color() | curses.A_DIM)

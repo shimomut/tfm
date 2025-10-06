@@ -24,6 +24,7 @@ except ImportError:
 
 from tfm_colors import *
 from tfm_const import *
+from tfm_wide_char_utils import get_display_width, truncate_to_width, split_at_width, safe_get_display_width
 
 
 class TextViewer:
@@ -220,6 +221,105 @@ class TextViewer:
         
         return highlighted_lines
     
+    def wrap_highlighted_line(self, highlighted_line: List[Tuple[str, int]], max_width: int) -> List[List[Tuple[str, int]]]:
+        """
+        Wrap a highlighted line to fit within max_width display columns.
+        
+        Args:
+            highlighted_line: List of (text, color) tuples representing a line
+            max_width: Maximum display width for wrapped lines
+            
+        Returns:
+            List of wrapped lines, each being a list of (text, color) tuples
+        """
+        if not highlighted_line or max_width <= 0:
+            return [highlighted_line] if highlighted_line else [[]]
+        
+        wrapped_lines = []
+        current_line = []
+        current_width = 0
+        
+        for text, color in highlighted_line:
+            if not text:
+                continue
+                
+            # Process this text segment, potentially splitting it across lines
+            remaining_text = text
+            
+            while remaining_text:
+                # Calculate how much space is left on current line
+                space_left = max_width - current_width
+                
+                if space_left <= 0:
+                    # Current line is full, start a new line
+                    if current_line:
+                        wrapped_lines.append(current_line)
+                    current_line = []
+                    current_width = 0
+                    space_left = max_width
+                
+                # Split the remaining text to fit in available space
+                if get_display_width(remaining_text) <= space_left:
+                    # Entire remaining text fits
+                    current_line.append((remaining_text, color))
+                    current_width += get_display_width(remaining_text)
+                    remaining_text = ""
+                else:
+                    # Need to split the text
+                    fit_text, remaining_text = split_at_width(remaining_text, space_left)
+                    
+                    if fit_text:
+                        current_line.append((fit_text, color))
+                        current_width += get_display_width(fit_text)
+                    
+                    # If no text fit and we have space, there might be a wide character
+                    # that doesn't fit - in this case, start a new line
+                    if not fit_text and space_left > 0:
+                        if current_line:
+                            wrapped_lines.append(current_line)
+                        current_line = []
+                        current_width = 0
+        
+        # Add the final line if it has content
+        if current_line:
+            wrapped_lines.append(current_line)
+        
+        # Ensure we return at least one line (even if empty)
+        if not wrapped_lines:
+            wrapped_lines = [[]]
+        
+        return wrapped_lines
+    
+    def get_wrapped_lines(self) -> List[List[Tuple[str, int]]]:
+        """
+        Get all lines with wrapping applied if wrap_lines is enabled.
+        
+        Returns:
+            List of display lines, each being a list of (text, color) tuples
+        """
+        if not self.wrap_lines:
+            return self.highlighted_lines
+        
+        # Calculate available width for content
+        start_y, start_x, display_height, display_width = self.get_display_dimensions()
+        
+        # Account for line numbers if enabled
+        line_num_width = 0
+        if self.show_line_numbers and self.lines:
+            line_num_width = len(str(len(self.lines))) + 2
+        
+        content_width = display_width - line_num_width
+        
+        if content_width <= 0:
+            return self.highlighted_lines
+        
+        wrapped_lines = []
+        for highlighted_line in self.highlighted_lines:
+            wrapped_segments = self.wrap_highlighted_line(highlighted_line, content_width)
+            wrapped_lines.extend(wrapped_segments)
+        
+        return wrapped_lines
+    
     def find_matches(self, pattern: str) -> List[int]:
         """Find all lines that match the search pattern (case-insensitive)"""
         if not pattern:
@@ -394,8 +494,17 @@ class TextViewer:
             pass
         
         # Calculate current position info
-        current_line = self.scroll_offset + 1  # 1-based line number
-        total_lines = len(self.lines)
+        if self.wrap_lines:
+            # When wrapping is enabled, show display line position
+            display_lines = self.get_wrapped_lines()
+            current_line = self.scroll_offset + 1  # 1-based display line number
+            total_lines = len(display_lines)
+            original_line = self.get_original_line_number(self.scroll_offset)
+        else:
+            # Normal mode - show original line numbers
+            current_line = self.scroll_offset + 1  # 1-based line number
+            total_lines = len(self.lines)
+            original_line = current_line
         
         # Calculate scroll percentage
         if total_lines <= 1:
@@ -428,11 +537,16 @@ class TextViewer:
             size_str = "---"
         
         # Build status components
-        position_info = f"Line {current_line}/{total_lines} ({scroll_percent}%)"
+        if self.wrap_lines and total_lines != len(self.lines):
+            # Show both display line and original line when wrapping
+            position_info = f"Line {current_line}/{total_lines} (orig: {original_line}/{len(self.lines)}) ({scroll_percent}%)"
+        else:
+            position_info = f"Line {current_line}/{total_lines} ({scroll_percent}%)"
+        
         file_info = f"{size_str}"
         
-        # Add horizontal scroll info if applicable
-        if self.horizontal_offset > 0:
+        # Add horizontal scroll info if applicable (only when not wrapping)
+        if self.horizontal_offset > 0 and not self.wrap_lines:
             position_info += f" | Col {self.horizontal_offset + 1}"
         
         # Left side: position and file info
@@ -477,12 +591,16 @@ class TextViewer:
             pass
     
     def draw_content(self):
-        """Draw the file content with syntax highlighting"""
+        """Draw the file content with syntax highlighting and wide character support"""
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
+        
+        # Get the lines to display (wrapped or unwrapped)
+        display_lines = self.get_wrapped_lines()
         
         # Calculate line number width if showing line numbers
         line_num_width = 0
         if self.show_line_numbers and self.lines:
+            # Use original line count for line number width calculation
             line_num_width = len(str(len(self.lines))) + 2
         
         # Available width for content
@@ -503,13 +621,16 @@ class TextViewer:
             except curses.error:
                 pass
             
-            if line_index >= len(self.highlighted_lines):
+            if line_index >= len(display_lines):
                 continue
             
             # Draw line number if enabled
             x_pos = start_x
             if self.show_line_numbers:
-                line_num = f"{line_index + 1:>{line_num_width-1}} "
+                # For wrapped lines, we need to map back to original line numbers
+                # For now, show the display line index + 1 (this could be improved)
+                original_line_num = self.get_original_line_number(line_index) if self.wrap_lines else line_index + 1
+                line_num = f"{original_line_num:>{line_num_width-1}} "
                 try:
                     self.stdscr.addstr(y_pos, x_pos, line_num, get_line_number_color())
                 except curses.error:
@@ -517,41 +638,64 @@ class TextViewer:
                 x_pos += line_num_width
             
             # Get the highlighted line (list of (text, color) tuples)
-            highlighted_line = self.highlighted_lines[line_index]
+            highlighted_line = display_lines[line_index]
             
-            # Check if this line is an isearch match
+            # Check if this line is an isearch match (for unwrapped mode)
+            original_line_index = self.get_original_line_number(line_index) - 1 if self.wrap_lines else line_index
             is_search_match = (self.isearch_mode and 
                              self.isearch_matches and 
-                             line_index in self.isearch_matches)
+                             original_line_index in self.isearch_matches)
             
             # Check if this is the current search match
             is_current_match = (is_search_match and 
                               self.isearch_matches and
                               0 <= self.isearch_match_index < len(self.isearch_matches) and
-                              line_index == self.isearch_matches[self.isearch_match_index])
+                              original_line_index == self.isearch_matches[self.isearch_match_index])
             
-            # Apply horizontal scrolling
-            current_col = 0
+            # Apply horizontal scrolling using display width calculations
+            current_display_col = 0
             display_x = x_pos
             
             for text, color in highlighted_line:
+                if not text:
+                    continue
+                
+                text_display_width = get_display_width(text)
+                
                 # Skip text that's before the horizontal offset
-                if current_col + len(text) <= self.horizontal_offset:
-                    current_col += len(text)
+                if current_display_col + text_display_width <= self.horizontal_offset:
+                    current_display_col += text_display_width
                     continue
                 
                 # Calculate visible portion of this text segment
-                start_offset = max(0, self.horizontal_offset - current_col)
-                visible_text = text[start_offset:]
+                start_offset_cols = max(0, self.horizontal_offset - current_display_col)
+                
+                # Split text to handle horizontal scrolling with wide characters
+                if start_offset_cols > 0:
+                    # Need to skip some characters from the beginning
+                    visible_text = ""
+                    skip_width = 0
+                    for char in text:
+                        char_width = get_display_width(char)
+                        if skip_width + char_width > start_offset_cols:
+                            visible_text = text[text.index(char):]
+                            break
+                        skip_width += char_width
+                    if not visible_text:
+                        current_display_col += text_display_width
+                        continue
+                else:
+                    visible_text = text
                 
                 # Check if we have room to display this text
                 remaining_width = content_width - (display_x - x_pos)
                 if remaining_width <= 0:
                     break
                 
-                # Truncate if necessary
-                if len(visible_text) > remaining_width:
-                    visible_text = visible_text[:remaining_width]
+                # Truncate if necessary using wide character aware truncation
+                visible_text_width = get_display_width(visible_text)
+                if visible_text_width > remaining_width:
+                    visible_text = truncate_to_width(visible_text, remaining_width, "")
                 
                 # Draw the text with its color
                 if visible_text:
@@ -564,15 +708,44 @@ class TextViewer:
                             display_color = get_search_match_color()
                         
                         self.stdscr.addstr(y_pos, display_x, visible_text, display_color)
-                        display_x += len(visible_text)
+                        display_x += get_display_width(visible_text)
                     except curses.error:
                         pass
                 
-                current_col += len(text)
+                current_display_col += text_display_width
                 
                 # Stop if we've filled the line
                 if display_x - x_pos >= content_width:
                     break
+    
+    def get_original_line_number(self, display_line_index: int) -> int:
+        """
+        Get the original line number for a display line index when wrapping is enabled.
+        
+        Args:
+            display_line_index: Index in the wrapped display lines
+            
+        Returns:
+            Original line number (1-based)
+        """
+        if not self.wrap_lines:
+            return display_line_index + 1
+        
+        # This is a simplified implementation - for a more accurate mapping,
+        # we would need to track which original line each wrapped line came from
+        # For now, estimate based on average wrapping
+        if not self.lines:
+            return 1
+        
+        # Calculate approximate original line
+        total_display_lines = len(self.get_wrapped_lines())
+        if total_display_lines == 0:
+            return 1
+        
+        ratio = len(self.lines) / total_display_lines
+        estimated_line = int(display_line_index * ratio) + 1
+        
+        return min(estimated_line, len(self.lines))
     
     def handle_key(self, key) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
@@ -591,22 +764,28 @@ class TextViewer:
                 self.scroll_offset -= 1
                 
         elif key == curses.KEY_DOWN:
-            max_scroll = max(0, len(self.lines) - display_height)
+            # Use display lines for scrolling when wrapping is enabled
+            display_lines = self.get_wrapped_lines()
+            max_scroll = max(0, len(display_lines) - display_height)
             if self.scroll_offset < max_scroll:
                 self.scroll_offset += 1
                 
         elif key == curses.KEY_LEFT:
+            # Use display width units for horizontal scrolling
             if self.horizontal_offset > 0:
-                self.horizontal_offset -= 1
+                self.horizontal_offset = max(0, self.horizontal_offset - 1)
                 
         elif key == curses.KEY_RIGHT:
+            # Increment horizontal offset by display width units
             self.horizontal_offset += 1
             
         elif key == curses.KEY_PPAGE:  # Page Up
             self.scroll_offset = max(0, self.scroll_offset - display_height)
             
         elif key == curses.KEY_NPAGE:  # Page Down
-            max_scroll = max(0, len(self.lines) - display_height)
+            # Use display lines for page scrolling when wrapping is enabled
+            display_lines = self.get_wrapped_lines()
+            max_scroll = max(0, len(display_lines) - display_height)
             self.scroll_offset = min(max_scroll, self.scroll_offset + display_height)
             
         elif key == curses.KEY_HOME:
@@ -614,14 +793,30 @@ class TextViewer:
             self.horizontal_offset = 0
             
         elif key == curses.KEY_END:
-            max_scroll = max(0, len(self.lines) - display_height)
+            # Use display lines for end positioning when wrapping is enabled
+            display_lines = self.get_wrapped_lines()
+            max_scroll = max(0, len(display_lines) - display_height)
             self.scroll_offset = max_scroll
             
         elif key == ord('n') or key == ord('N'):
             self.show_line_numbers = not self.show_line_numbers
             
         elif key == ord('w') or key == ord('W'):
+            # When toggling wrap mode, adjust scroll position to maintain context
+            old_scroll = self.scroll_offset
             self.wrap_lines = not self.wrap_lines
+            
+            # Reset horizontal offset when enabling wrap mode
+            if self.wrap_lines:
+                self.horizontal_offset = 0
+            
+            # Try to maintain approximate scroll position
+            if self.wrap_lines:
+                # When enabling wrap, we might need to adjust scroll position
+                # since wrapped lines will be longer
+                display_lines = self.get_wrapped_lines()
+                max_scroll = max(0, len(display_lines) - display_height)
+                self.scroll_offset = min(old_scroll, max_scroll)
             
         elif key == ord('s') or key == ord('S'):
             if PYGMENTS_AVAILABLE:

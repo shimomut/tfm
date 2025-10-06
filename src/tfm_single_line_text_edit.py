@@ -8,10 +8,12 @@ This module provides a reusable SingleLineTextEdit class that handles:
 - Text rendering with cursor highlighting
 - Common editing operations (insert, delete, backspace)
 - Navigation (home, end, left, right)
+- Wide character support for proper display and editing
 """
 
 import curses
 from tfm_colors import get_status_color
+from tfm_wide_char_utils import get_display_width, truncate_to_width, get_safe_functions
 
 
 class SingleLineTextEdit:
@@ -52,14 +54,14 @@ class SingleLineTextEdit:
         self.cursor_pos = 0
         
     def move_cursor_left(self):
-        """Move cursor one position to the left"""
+        """Move cursor one character position to the left (handles wide characters properly)"""
         if self.cursor_pos > 0:
             self.cursor_pos -= 1
             return True
         return False
         
     def move_cursor_right(self):
-        """Move cursor one position to the right"""
+        """Move cursor one character position to the right (handles wide characters properly)"""
         if self.cursor_pos < len(self.text):
             self.cursor_pos += 1
             return True
@@ -81,7 +83,7 @@ class SingleLineTextEdit:
         
     def insert_char(self, char):
         """
-        Insert a character at the cursor position
+        Insert a character at the cursor position, handling wide characters
         
         Args:
             char (str): Character to insert
@@ -89,6 +91,7 @@ class SingleLineTextEdit:
         Returns:
             bool: True if character was inserted, False if max_length exceeded
         """
+        # Check max_length constraint (by character count, not display width)
         if self.max_length and len(self.text) >= self.max_length:
             return False
             
@@ -156,14 +159,22 @@ class SingleLineTextEdit:
             return self.backspace()
         elif key == 330 or (hasattr(curses, 'KEY_DC') and key == curses.KEY_DC):  # Delete key
             return self.delete_char_at_cursor()
-        elif 32 <= key <= 126:  # Printable characters
+        elif 32 <= key <= 126:  # ASCII printable characters
             return self.insert_char(chr(key))
+        elif key > 126:  # Extended characters (including wide characters)
+            try:
+                # Handle Unicode characters beyond ASCII range
+                char = chr(key)
+                return self.insert_char(char)
+            except (ValueError, OverflowError):
+                # Invalid character code
+                return False
         
         return False
         
     def draw(self, stdscr, y, x, max_width, label="", is_active=True):
         """
-        Draw the text field with cursor highlighting
+        Draw the text field with cursor highlighting, supporting wide characters
         
         Args:
             stdscr: The curses screen object
@@ -173,9 +184,15 @@ class SingleLineTextEdit:
             label (str): Optional label to display before the text
             is_active (bool): Whether to show the cursor
         """
-        # Calculate available space for text after label
-        text_start_x = x + len(label)
-        text_max_width = max_width - len(label)
+        # Get safe wide character functions for current terminal
+        safe_funcs = get_safe_functions()
+        get_width = safe_funcs['get_display_width']
+        truncate_text = safe_funcs['truncate_to_width']
+        
+        # Calculate available space for text after label using display width
+        label_width = get_width(label)
+        text_start_x = x + label_width
+        text_max_width = max_width - label_width
         
         if text_max_width <= 0:
             return
@@ -194,63 +211,110 @@ class SingleLineTextEdit:
         # Ensure cursor is within bounds
         cursor_pos = max(0, min(self.cursor_pos, len(self.text)))
         
-        # Calculate visible text window if text is too long
+        # Calculate display width of entire text
+        text_display_width = get_width(self.text)
+        
+        # Calculate visible text window if text is too wide
         visible_start = 0
         visible_end = len(self.text)
         
-        if len(self.text) > text_max_width:
-            # Adjust visible window to keep cursor in view
+        if text_display_width > text_max_width:
+            # Need to scroll text to keep cursor visible
+            # Calculate display position of cursor
+            cursor_display_pos = get_width(self.text[:cursor_pos])
+            
             # Reserve space for cursor if it's at the end of text
             effective_max_width = text_max_width
             if cursor_pos == len(self.text) and text_max_width > 1:
                 effective_max_width = text_max_width - 1  # Reserve space for end cursor
             
-            if cursor_pos < effective_max_width // 2:
+            if cursor_display_pos < effective_max_width // 2:
                 # Cursor near start, show from beginning
-                visible_end = effective_max_width
-            elif cursor_pos >= len(self.text) - effective_max_width // 2:
+                visible_text = truncate_text(self.text, effective_max_width, "")
+                visible_end = len(visible_text)
+            elif cursor_display_pos >= text_display_width - effective_max_width // 2:
                 # Cursor near end, show end portion
-                visible_start = max(0, len(self.text) - effective_max_width)
+                # Find starting position that gives us the right width
+                target_width = effective_max_width
+                temp_start = 0
+                for i in range(len(self.text)):
+                    remaining_text = self.text[i:]
+                    if get_width(remaining_text) <= target_width:
+                        temp_start = i
+                        break
+                visible_start = temp_start
             else:
-                # Cursor in middle, center the view
-                visible_start = cursor_pos - effective_max_width // 2
-                visible_end = visible_start + effective_max_width
+                # Cursor in middle, center the view around cursor
+                # Find a good starting position that centers the cursor
+                half_width = effective_max_width // 2
+                
+                # Start from cursor and work backwards to find start position
+                temp_start = cursor_pos
+                accumulated_width = 0
+                for i in range(cursor_pos - 1, -1, -1):
+                    char_width = get_width(self.text[i])
+                    if accumulated_width + char_width > half_width:
+                        break
+                    accumulated_width += char_width
+                    temp_start = i
+                
+                visible_start = temp_start
+                # Truncate from this position
+                remaining_text = self.text[visible_start:]
+                visible_text = truncate_text(remaining_text, effective_max_width, "")
+                visible_end = visible_start + len(visible_text)
         
         visible_text = self.text[visible_start:visible_end]
         cursor_in_visible = cursor_pos - visible_start
         
-        # Draw text with cursor highlighting
+        # Draw text with cursor highlighting, accounting for wide characters
         current_x = text_start_x
         
         for i, char in enumerate(visible_text):
+            char_width = get_width(char)
+            
             if i == cursor_in_visible and is_active:
                 # Draw cursor character with reversed colors
                 self._safe_addstr(stdscr, y, current_x, char, base_color | curses.A_REVERSE)
             else:
                 # Draw normal character
                 self._safe_addstr(stdscr, y, current_x, char, base_color)
-            current_x += 1
+            
+            # Advance cursor position by character's display width
+            current_x += char_width
         
         # If cursor is at the end of text and field is active, show cursor after last character
         if cursor_in_visible >= len(visible_text) and is_active:
             # Make sure we have space to draw the cursor
             if current_x < x + max_width:
                 self._safe_addstr(stdscr, y, current_x, " ", base_color | curses.A_REVERSE)
-            elif len(visible_text) > 0 and current_x == x + max_width:
-                # If we're at the edge, replace the last character with cursor
-                last_char_x = current_x - 1
-                last_char = visible_text[-1] if visible_text else " "
-                self._safe_addstr(stdscr, y, last_char_x, last_char, base_color | curses.A_REVERSE)
+            elif len(visible_text) > 0:
+                # If we're at the edge, we need to be more careful with wide characters
+                # Find the last character that we can highlight as cursor
+                last_char_pos = len(visible_text) - 1
+                if last_char_pos >= 0:
+                    last_char = visible_text[last_char_pos]
+                    last_char_width = get_width(last_char)
+                    last_char_x = current_x - last_char_width
+                    self._safe_addstr(stdscr, y, last_char_x, last_char, base_color | curses.A_REVERSE)
     
     def _safe_addstr(self, stdscr, y, x, text, attr=0):
-        """Safely add string to screen, handling boundary conditions"""
+        """Safely add string to screen, handling boundary conditions and wide characters"""
         try:
             height, width = stdscr.getmaxyx()
             if 0 <= y < height and 0 <= x < width:
-                # Truncate text if it would go beyond screen width
-                max_len = width - x
-                if len(text) > max_len:
-                    text = text[:max_len]
+                # Get safe wide character functions
+                safe_funcs = get_safe_functions()
+                get_width = safe_funcs['get_display_width']
+                truncate_text = safe_funcs['truncate_to_width']
+                
+                # Calculate available display width
+                max_display_width = width - x
+                
+                # Truncate text if it would go beyond screen width (by display width)
+                if get_width(text) > max_display_width:
+                    text = truncate_text(text, max_display_width, "")
+                
                 stdscr.addstr(y, x, text, attr)
         except curses.error:
             # Ignore curses errors (e.g., writing to bottom-right corner)

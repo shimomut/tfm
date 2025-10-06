@@ -210,8 +210,11 @@ When you first run TFM, you'll see:
 - **Color Schemes**: Dark and Light themes with runtime switching
 - **Status Bar**: Current path, file count, operation status
 - **Log Pane**: Bottom pane for system messages and output
+- **Wide Character Support**: Proper display of international filenames and Unicode characters
 
-**See detailed documentation**: [Color Schemes Feature](COLOR_SCHEMES_FEATURE.md)
+**See detailed documentation**: 
+- [Color Schemes Feature](COLOR_SCHEMES_FEATURE.md)
+- [Wide Character Support Feature](WIDE_CHARACTER_SUPPORT_FEATURE.md)
 
 ---
 
@@ -502,6 +505,11 @@ Try `--color-test diagnose` to check terminal support
 
 **See detailed documentation**: [Color Debugging Feature](COLOR_DEBUGGING_FEATURE.md)
 
+#### Wide characters display incorrectly
+Check terminal Unicode support and locale settings
+
+**See detailed documentation**: [Wide Character Support Feature](WIDE_CHARACTER_SUPPORT_FEATURE.md)
+
 #### Keys not responding
 Check terminal key mappings and ESCDELAY setting
 
@@ -544,6 +552,7 @@ For detailed information about specific features, see these dedicated guides:
 - [Key Bindings Selection Feature](KEY_BINDINGS_SELECTION_FEATURE.md) - Customizable keyboard shortcuts
 - [Log Redraw Trigger Feature](LOG_REDRAW_TRIGGER_FEATURE.md) - Real-time log updates
 - [Status Bar Feature](STATUS_BAR_FEATURE.md) - Status information display
+- [Wide Character Support Feature](WIDE_CHARACTER_SUPPORT_FEATURE.md) - International character display
 
 ### Integration and Extensions
 - [Beyond Compare Integration](BEYONDCOMPARE_INTEGRATION.md) - File comparison tool integration
