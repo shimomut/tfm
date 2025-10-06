@@ -262,49 +262,78 @@ class BatchRenameDialog:
         """Draw the batch rename dialog overlay"""
         height, width = stdscr.getmaxyx()
         
-        # Calculate dialog dimensions
-        dialog_width = max(80, int(width * 0.9))
-        dialog_height = max(25, int(height * 0.9))
+        # Calculate dialog dimensions safely for narrow terminals
+        desired_width = int(width * 0.9)
+        desired_height = int(height * 0.9)
         
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
+        # Apply minimum constraints, but never exceed terminal size
+        dialog_width = max(80, desired_width)
+        dialog_width = min(dialog_width, width)  # Never exceed terminal width
+        
+        dialog_height = max(25, desired_height)
+        dialog_height = min(dialog_height, height)  # Never exceed terminal height
+        
+        # Calculate safe centering
+        start_y = max(0, (height - dialog_height) // 2)
+        start_x = max(0, (width - dialog_width) // 2)
         
         # Draw dialog background
         for y in range(start_y, start_y + dialog_height):
-            if y < height:
+            if y < height and y >= 0:
                 bg_line = " " * min(dialog_width, width - start_x)
-                safe_addstr_func(y, start_x, bg_line, get_status_color())
+                if start_x >= 0 and start_x < width:
+                    safe_addstr_func(y, start_x, bg_line, get_status_color())
         
-        # Draw border
+        # Draw border with safe drawing
         border_color = get_status_color() | curses.A_BOLD
         
         # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            safe_addstr_func(start_y, start_x, top_line[:dialog_width], border_color)
+        if start_y >= 0 and start_y < height:
+            top_line = "┌" + "─" * max(0, dialog_width - 2) + "┐"
+            # Truncate if line would exceed terminal width
+            if start_x + len(top_line) > width:
+                top_line = top_line[:width - start_x]
+            if top_line:
+                safe_addstr_func(start_y, start_x, top_line, border_color)
         
         # Side borders
         for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                safe_addstr_func(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    safe_addstr_func(y, start_x + dialog_width - 1, "│", border_color)
+            if y < height and y >= 0:
+                # Left border
+                if start_x >= 0 and start_x < width:
+                    safe_addstr_func(y, start_x, "│", border_color)
+                # Right border
+                right_x = start_x + dialog_width - 1
+                if right_x >= 0 and right_x < width:
+                    safe_addstr_func(y, right_x, "│", border_color)
         
         # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            safe_addstr_func(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
+        bottom_y = start_y + dialog_height - 1
+        if bottom_y >= 0 and bottom_y < height:
+            bottom_line = "└" + "─" * max(0, dialog_width - 2) + "┘"
+            # Truncate if line would exceed terminal width
+            if start_x + len(bottom_line) > width:
+                bottom_line = bottom_line[:width - start_x]
+            if bottom_line:
+                safe_addstr_func(bottom_y, start_x, bottom_line, border_color)
         
-        # Draw title using wide character utilities
+        # Draw title using wide character utilities with safe positioning
         title_text = f" Batch Rename ({len(self.files)} files) "
         # Get safe wide character functions
         safe_funcs = get_safe_functions()
         get_width = safe_funcs['get_display_width']
+        truncate_text = safe_funcs['truncate_to_width']
         
         title_width = get_width(title_text)
+        
+        # Truncate title if it's too wide for the dialog
+        if title_width > dialog_width:
+            title_text = truncate_text(title_text, dialog_width - 2, "...")
+            title_width = get_width(title_text)
+        
         title_x = start_x + (dialog_width - title_width) // 2
-        if title_x >= start_x and title_x + title_width <= start_x + dialog_width:
+        # Ensure title fits within terminal bounds
+        if title_x >= 0 and title_x < width and title_x + title_width <= width:
             safe_addstr_func(start_y, title_x, title_text, border_color)
         
         # Content area
@@ -423,24 +452,28 @@ class BatchRenameDialog:
                 no_preview_text = "Enter regex pattern and destination to see preview"
                 safe_addstr_func(no_preview_y, content_start_x, no_preview_text, get_status_color() | curses.A_DIM)
         
-        # Draw help text
+        # Draw help text with safe positioning
         help_y = start_y + dialog_height - 2
-        if help_y < height:
+        if help_y < height and help_y >= 0:
             help_text = "Tab: Switch input | ←→: Move cursor | Home/End: Start/End | Enter: Rename | ESC: Cancel"
             help_width = get_width(help_text)
             
             if help_width <= dialog_width:
                 help_x = start_x + (dialog_width - help_width) // 2
-                if help_x >= start_x:
+                # Ensure help text fits within terminal bounds
+                if help_x >= 0 and help_x < width and help_x + help_width <= width:
                     safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
             else:
                 # Truncate help text if too wide
                 truncate_text = safe_funcs['truncate_to_width']
-                truncated_help = truncate_text(help_text, dialog_width - 4, "...")
-                help_width = get_width(truncated_help)
-                help_x = start_x + (dialog_width - help_width) // 2
-                if help_x >= start_x:
-                    safe_addstr_func(help_y, help_x, truncated_help, get_status_color() | curses.A_DIM)
+                available_width = min(dialog_width - 4, width - start_x - 2)
+                if available_width > 0:
+                    truncated_help = truncate_text(help_text, available_width, "...")
+                    help_width = get_width(truncated_help)
+                    help_x = start_x + (dialog_width - help_width) // 2
+                    # Ensure truncated help text fits within terminal bounds
+                    if help_x >= 0 and help_x < width and help_x + help_width <= width:
+                        safe_addstr_func(help_y, help_x, truncated_help, get_status_color() | curses.A_DIM)
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False

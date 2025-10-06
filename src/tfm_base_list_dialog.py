@@ -147,50 +147,79 @@ class BaseListDialog:
         """
         height, width = stdscr.getmaxyx()
         
-        # Calculate dialog dimensions
-        dialog_width = max(min_width, int(width * width_ratio))
-        dialog_height = max(min_height, int(height * height_ratio))
+        # Calculate dialog dimensions safely for narrow terminals
+        desired_width = int(width * width_ratio)
+        desired_height = int(height * height_ratio)
         
-        # Center the dialog
-        start_y = (height - dialog_height) // 2
-        start_x = (width - dialog_width) // 2
+        # Apply minimum constraints, but never exceed terminal size
+        dialog_width = max(min_width, desired_width)
+        dialog_width = min(dialog_width, width)  # Never exceed terminal width
+        
+        dialog_height = max(min_height, desired_height)
+        dialog_height = min(dialog_height, height)  # Never exceed terminal height
+        
+        # Calculate safe centering
+        start_y = max(0, (height - dialog_height) // 2)
+        start_x = max(0, (width - dialog_width) // 2)
         
         # Draw dialog background
         for y in range(start_y, start_y + dialog_height):
-            if y < height:
+            if y < height and y >= 0:
                 bg_line = " " * min(dialog_width, width - start_x)
-                safe_addstr_func(y, start_x, bg_line, get_status_color())
+                if start_x >= 0 and start_x < width:
+                    safe_addstr_func(y, start_x, bg_line, get_status_color())
         
-        # Draw border
+        # Draw border with safe drawing
         border_color = get_status_color() | curses.A_BOLD
         
         # Top border
-        if start_y >= 0:
-            top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            safe_addstr_func(start_y, start_x, top_line[:dialog_width], border_color)
+        if start_y >= 0 and start_y < height:
+            top_line = "┌" + "─" * max(0, dialog_width - 2) + "┐"
+            # Truncate if line would exceed terminal width
+            if start_x + len(top_line) > width:
+                top_line = top_line[:width - start_x]
+            if top_line:
+                safe_addstr_func(start_y, start_x, top_line, border_color)
         
         # Side borders
         for y in range(start_y + 1, start_y + dialog_height - 1):
-            if y < height:
-                safe_addstr_func(y, start_x, "│", border_color)
-                if start_x + dialog_width - 1 < width:
-                    safe_addstr_func(y, start_x + dialog_width - 1, "│", border_color)
+            if y < height and y >= 0:
+                # Left border
+                if start_x >= 0 and start_x < width:
+                    safe_addstr_func(y, start_x, "│", border_color)
+                # Right border
+                right_x = start_x + dialog_width - 1
+                if right_x >= 0 and right_x < width:
+                    safe_addstr_func(y, right_x, "│", border_color)
         
         # Bottom border
-        if start_y + dialog_height - 1 < height:
-            bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            safe_addstr_func(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
+        bottom_y = start_y + dialog_height - 1
+        if bottom_y >= 0 and bottom_y < height:
+            bottom_line = "└" + "─" * max(0, dialog_width - 2) + "┘"
+            # Truncate if line would exceed terminal width
+            if start_x + len(bottom_line) > width:
+                bottom_line = bottom_line[:width - start_x]
+            if bottom_line:
+                safe_addstr_func(bottom_y, start_x, bottom_line, border_color)
         
-        # Draw title using wide character utilities
-        if title and start_y >= 0:
+        # Draw title using wide character utilities with safe positioning
+        if title and start_y >= 0 and start_y < height:
             title_text = f" {title} "
             # Get safe wide character functions
             safe_funcs = get_safe_functions()
             get_width = safe_funcs['get_display_width']
+            truncate_text = safe_funcs['truncate_to_width']
             
             title_width = get_width(title_text)
+            
+            # Truncate title if it's too wide for the dialog
+            if title_width > dialog_width:
+                title_text = truncate_text(title_text, dialog_width - 2, "...")
+                title_width = get_width(title_text)
+            
             title_x = start_x + (dialog_width - title_width) // 2
-            if title_x >= start_x and title_x + title_width <= start_x + dialog_width:
+            # Ensure title fits within terminal bounds
+            if title_x >= 0 and title_x < width and title_x + title_width <= width:
                 safe_addstr_func(start_y, title_x, title_text, border_color)
         
         return start_y, start_x, dialog_width, dialog_height
