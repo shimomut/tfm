@@ -10,9 +10,25 @@ import os
 import argparse
 from pathlib import Path
 
-# Add src directory to Python path
-src_dir = Path(__file__).parent / 'src'
-sys.path.insert(0, str(src_dir))
+# Determine if we're running from source or installed package
+def setup_module_path():
+    """Setup module path for both development and installed environments"""
+    current_dir = Path(__file__).parent
+    
+    # Check if we're in development mode (src directory exists)
+    src_dir = current_dir / 'src'
+    if src_dir.exists() and src_dir.is_dir():
+        # Development mode - add src to path
+        sys.path.insert(0, str(src_dir))
+        return str(src_dir)
+    else:
+        # Installed package mode - src files are in the same directory as this file
+        # Add current directory to path
+        sys.path.insert(0, str(current_dir))
+        return str(current_dir)
+
+# Setup the module path
+module_path = setup_module_path()
 
 def create_parser():
     """Create and configure the argument parser"""

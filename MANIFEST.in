@@ -1,0 +1,13 @@
+include README.md
+include LICENSE
+include requirements.txt
+include tfm.py
+include __init__.py
+recursive-include src *.py
+recursive-include tools *
+exclude temp/*
+exclude test/*
+exclude demo/*
+exclude doc/*
+exclude build/*
+exclude *.egg-info/*

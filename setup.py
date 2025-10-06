@@ -3,7 +3,7 @@
 TFM Setup Script
 """
 
-from setuptools import setup, find_packages
+from setuptools import setup
 from pathlib import Path
 
 # Read README for long description
@@ -28,11 +28,20 @@ setup(
     long_description_content_type="text/markdown",
     author="TFM Developer",
     url="https://github.com/shimomut/tfm",
-    packages=["src"],
-    py_modules=["tfm"],
+    packages=["tfm"],
+    package_dir={
+        "tfm": ".",
+    },
+    package_data={
+        "tfm": [
+            "src/*.py",
+            "tools/*",
+        ],
+    },
+    include_package_data=True,
     entry_points={
         "console_scripts": [
-            "tfm=tfm:main",
+            "tfm=tfm.tfm:main",
         ],
     },
     install_requires=requirements,

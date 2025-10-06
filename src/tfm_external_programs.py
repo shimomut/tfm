@@ -18,7 +18,8 @@ def tfm_tool(tool_name):
     
     This function searches for tools in the TFM tool directories:
     1. ~/.tfm/tools/ (user-specific tools, highest priority)
-    2. {tfm.py directory}/tools/ (system tools, fallback)
+    2. {package}/tools/ (installed package tools)
+    3. {tfm.py directory}/tools/ (development tools, fallback)
     
     Args:
         tool_name: Name of the tool to search for
@@ -38,11 +39,26 @@ def tfm_tool(tool_name):
     user_tools_dir = home_dir / '.tfm' / 'tools'
     candidates.append(user_tools_dir / tool_name)
     
-    # 2. System tools directory: {tfm.py directory}/tools/
-    current_file = Path(__file__)  # This is tfm_external_programs.py in src/
-    tfm_root = current_file.parent.parent  # Go up from src/ to root
-    system_tools_dir = tfm_root / 'tools'
-    candidates.append(system_tools_dir / tool_name)
+    # 2. Installed package tools directory
+    current_file = Path(__file__)  # This is tfm_external_programs.py
+    
+    # Check if we're in an installed package structure
+    # In installed package: site-packages/tfm/src/tfm_external_programs.py
+    # In development: project_root/src/tfm_external_programs.py
+    
+    if current_file.parent.name == 'src':
+        # We're in src directory
+        package_root = current_file.parent.parent  # Go up from src/
+        
+        # Check if this looks like an installed package (has __init__.py in parent)
+        if (package_root / '__init__.py').exists():
+            # Installed package structure
+            installed_tools_dir = package_root / 'tools'
+            candidates.append(installed_tools_dir / tool_name)
+        
+        # Also check development structure (tools at same level as src)
+        dev_tools_dir = package_root / 'tools'
+        candidates.append(dev_tools_dir / tool_name)
     
     # Check each candidate
     for candidate_path in candidates:
@@ -96,11 +112,11 @@ class ExternalProgramManager:
     def resolve_command_path(self, command):
         """
         Resolve the command path, converting relative paths to absolute paths
-        based on the TFM main script location.
+        based on the TFM package location.
         
         This function handles the following cases:
         - Absolute paths: Returned unchanged (e.g., '/usr/bin/git')
-        - Relative paths with separators: Resolved relative to tfm.py location (e.g., './tools/script.sh')
+        - Relative paths with separators: Resolved relative to package root (e.g., './tools/script.sh')
         - Command names only: Returned unchanged to be found in PATH (e.g., 'git')
         
         Note: tfm_tool() function calls are resolved at configuration time, not here.
@@ -125,15 +141,20 @@ class ExternalProgramManager:
         if command_path.is_absolute():
             return command
         
-        # If it's a relative path, resolve it relative to tfm.py location
+        # If it's a relative path, resolve it relative to package root
         if '/' in command[0] or '\\' in command[0]:  # Contains path separators
-            # Find the TFM main script directory
-            # We need to go up from src/ to the root where tfm.py is located
-            current_file = Path(__file__)  # This is tfm_external_programs.py in src/
-            tfm_root = current_file.parent.parent  # Go up from src/ to root
+            # Find the TFM package root directory
+            current_file = Path(__file__)  # This is tfm_external_programs.py
+            
+            if current_file.parent.name == 'src':
+                # We're in src directory - go up to package root
+                package_root = current_file.parent.parent
+            else:
+                # Fallback - assume current directory is package root
+                package_root = current_file.parent
             
             # Resolve the relative path
-            resolved_path = (tfm_root / command_path).resolve()
+            resolved_path = (package_root / command_path).resolve()
             
             # Create new command list with resolved path
             resolved_command = [str(resolved_path)] + command[1:]
