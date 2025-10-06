@@ -955,11 +955,38 @@ def initialize_from_config():
         
         # Get Unicode mode from config
         unicode_mode = getattr(config, 'UNICODE_MODE', 'auto')
+        
+        # Check if fallback mode is forced
+        force_fallback = getattr(config, 'UNICODE_FORCE_FALLBACK', False)
+        if force_fallback:
+            unicode_mode = 'ascii'
+        
         set_unicode_mode(unicode_mode)
         
         # Configure warning behavior
         global _show_warnings
         _show_warnings = getattr(config, 'UNICODE_WARNINGS', True)
+        
+        # Configure caching behavior
+        enable_caching = getattr(config, 'UNICODE_ENABLE_CACHING', True)
+        cache_size = getattr(config, 'UNICODE_CACHE_SIZE', 1000)
+        
+        if enable_caching:
+            # Update cache sizes for the cached functions
+            _cached_is_wide_character.cache_clear()
+            _cached_get_display_width.cache_clear()
+            # Note: LRU cache size can't be changed after creation, but we clear it
+            # to ensure fresh start with current settings
+        else:
+            # Disable caching by clearing caches and not using cached versions
+            _cached_is_wide_character.cache_clear()
+            _cached_get_display_width.cache_clear()
+        
+        # Configure terminal detection
+        terminal_detection = getattr(config, 'UNICODE_TERMINAL_DETECTION', True)
+        if not terminal_detection and unicode_mode == 'auto':
+            # If terminal detection is disabled but mode is auto, default to basic
+            set_unicode_mode('basic')
         
     except ImportError:
         # Config system not available, use auto-detection

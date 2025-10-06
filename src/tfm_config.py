@@ -134,6 +134,10 @@ class DefaultConfig:
     UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
     UNICODE_WARNINGS = True  # Show warnings for Unicode processing errors
     UNICODE_FALLBACK_CHAR = '?'  # Character to use for unrepresentable characters in ASCII mode
+    UNICODE_ENABLE_CACHING = True  # Enable caching of display width calculations for performance
+    UNICODE_CACHE_SIZE = 1000  # Maximum number of cached width calculations
+    UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
+    UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
 
 
 class ConfigManager:
@@ -262,6 +266,11 @@ class ConfigManager:
         if hasattr(config, 'UNICODE_FALLBACK_CHAR'):
             if not isinstance(config.UNICODE_FALLBACK_CHAR, str) or len(config.UNICODE_FALLBACK_CHAR) != 1:
                 errors.append("UNICODE_FALLBACK_CHAR must be a single character string")
+        
+        # Validate Unicode cache size
+        if hasattr(config, 'UNICODE_CACHE_SIZE'):
+            if not isinstance(config.UNICODE_CACHE_SIZE, int) or config.UNICODE_CACHE_SIZE < 0:
+                errors.append("UNICODE_CACHE_SIZE must be a non-negative integer")
         
         return errors
     
