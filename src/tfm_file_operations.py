@@ -214,19 +214,22 @@ class FileOperations:
         if not files_only:
             return False, "No files to select in current directory"
         
-        # Check if all files are currently selected
+        # Inverse selection status for each file
         files_only_str = {str(f) for f in files_only}
-        currently_selected_files = pane_data['selected_files'] & files_only_str
+        selected_count = 0
+        deselected_count = 0
         
-        if len(currently_selected_files) == len(files_only):
-            # All files are selected, deselect them all
-            pane_data['selected_files'] -= files_only_str
-            message = f"Deselected all {len(files_only)} files"
-        else:
-            # Not all files are selected, select them all
-            pane_data['selected_files'].update(files_only_str)
-            message = f"Selected all {len(files_only)} files"
+        for file_str in files_only_str:
+            if file_str in pane_data['selected_files']:
+                # Currently selected, deselect it
+                pane_data['selected_files'].discard(file_str)
+                deselected_count += 1
+            else:
+                # Currently not selected, select it
+                pane_data['selected_files'].add(file_str)
+                selected_count += 1
         
+        message = f"Inversed selection: {selected_count} selected, {deselected_count} deselected"
         return True, message
     
     def toggle_all_items_selection(self, pane_data):
@@ -240,19 +243,22 @@ class FileOperations:
         if not all_items:
             return False, "No items to select in current directory"
         
-        # Check if all items are currently selected
+        # Inverse selection status for each item
         all_items_str = {str(f) for f in all_items}
-        currently_selected_items = pane_data['selected_files'] & all_items_str
+        selected_count = 0
+        deselected_count = 0
         
-        if len(currently_selected_items) == len(all_items):
-            # All items are selected, deselect them all
-            pane_data['selected_files'] -= all_items_str
-            message = f"Deselected all {len(all_items)} items"
-        else:
-            # Not all items are selected, select them all
-            pane_data['selected_files'].update(all_items_str)
-            message = f"Selected all {len(all_items)} items"
+        for item_str in all_items_str:
+            if item_str in pane_data['selected_files']:
+                # Currently selected, deselect it
+                pane_data['selected_files'].discard(item_str)
+                deselected_count += 1
+            else:
+                # Currently not selected, select it
+                pane_data['selected_files'].add(item_str)
+                selected_count += 1
         
+        message = f"Inversed selection: {selected_count} selected, {deselected_count} deselected"
         return True, message
     
     def find_matches(self, pane_data, pattern, match_all=False, return_indices_only=False):
