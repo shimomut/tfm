@@ -33,8 +33,9 @@ When you press V on a file, TFM uses the **view** action from file associations:
 **Behavior**:
 1. Checks file associations for 'view' action
 2. If found, launches the configured viewer
-3. If not found, falls back to built-in text viewer for text files
-4. Otherwise, shows "No viewer configured" message
+3. If not found, checks if file is a text file using `is_text_file()`
+4. If it's a text file, opens built-in text viewer
+5. Otherwise, shows "No viewer configured" message
 
 ### E Key - Edit File
 When you press E on a file, TFM uses the **edit** action from file associations:
@@ -106,22 +107,35 @@ When you press E on a file, TFM uses the **edit** action from file associations:
 If a file has no configured association:
 
 1. **Enter key**: Falls back to text viewer for text files, otherwise shows file info
-2. **V key**: Falls back to text viewer for text files, otherwise shows error
+2. **V key**: Checks if file is a text file first
+   - If text file: Opens in built-in text viewer
+   - If not text file: Shows "No viewer configured" error
 3. **E key**: Falls back to TEXT_EDITOR config setting
 
 ### Example
 
 ```python
 # No association for *.xyz files
-# Pressing Enter on 'data.xyz'
+
+# Pressing Enter on 'data.xyz' (binary file)
 # Result: Shows file info dialog (not a text file)
 
-# Pressing V on 'data.xyz'
-# Result: "No viewer configured for 'data.xyz'"
+# Pressing V on 'data.xyz' (binary file)
+# Result: "No viewer configured for 'data.xyz' (not a text file)"
+
+# Pressing V on 'notes.xyz' (text file)
+# Result: Opens in built-in text viewer (detected as text)
 
 # Pressing E on 'data.xyz'
 # Result: Opens in vim (TEXT_EDITOR fallback)
 ```
+
+### Text File Detection
+
+TFM uses the `is_text_file()` function to determine if a file is text:
+- Checks file extension against known text extensions
+- Reads file content to detect text encoding
+- Falls back to built-in viewer only for confirmed text files
 
 ## Platform-Specific Configuration
 

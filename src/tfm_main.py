@@ -2116,23 +2116,26 @@ class FileManager:
                 self.external_program_manager.resume_curses(self.stdscr)
                 print(f"Error viewing file: {e}")
                 self.needs_full_redraw = True
-        elif is_text_file(selected_file):
-            # Fallback to built-in text viewer for text files
-            try:
-                curses.curs_set(0)
-                
-                if view_text_file(self.stdscr, selected_file):
-                    print(f"Viewed text file: {selected_file.name}")
-                else:
-                    print(f"Failed to view file: {selected_file.name}")
-                
-                self.needs_full_redraw = True
-                
-            except Exception as e:
-                print(f"Error viewing file: {str(e)}")
-                self.needs_full_redraw = True
         else:
-            print(f"No viewer configured for '{selected_file.name}'")
+            # No file association found - check if it's a text file
+            if is_text_file(selected_file):
+                # Fallback to built-in text viewer for text files
+                try:
+                    curses.curs_set(0)
+                    
+                    if view_text_file(self.stdscr, selected_file):
+                        print(f"Viewed text file: {selected_file.name}")
+                    else:
+                        print(f"Failed to view file: {selected_file.name}")
+                    
+                    self.needs_full_redraw = True
+                    
+                except Exception as e:
+                    print(f"Error viewing file: {str(e)}")
+                    self.needs_full_redraw = True
+            else:
+                # Not a text file and no viewer configured
+                print(f"No viewer configured for '{selected_file.name}' (not a text file)")
     
     def edit_selected_file(self):
         """Edit the selected file using configured editor from file associations"""
