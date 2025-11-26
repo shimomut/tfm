@@ -1597,13 +1597,21 @@ class FileManager:
     
     def handle_info_dialog_input(self, key):
         """Handle input while in info dialog mode - wrapper for info dialog component"""
+        was_active = self.info_dialog.is_active
         if self.info_dialog.handle_input(key):
+            # If dialog was active but is no longer active, it exited - need full redraw
+            if was_active and not self.info_dialog.is_active:
+                self.needs_full_redraw = True
             return True
         return False
     
     def handle_list_dialog_input(self, key):
         """Handle input while in list dialog mode - wrapper for list dialog component"""
+        was_active = self.list_dialog.is_active
         if self.list_dialog.handle_input(key):
+            # If dialog was active but is no longer active, it exited - need full redraw
+            if was_active and not self.list_dialog.is_active:
+                self.needs_full_redraw = True
             return True
         return False
 
@@ -2313,9 +2321,13 @@ class FileManager:
     
     def handle_batch_rename_input(self, key):
         """Handle input while in batch rename mode - wrapper for batch rename dialog component"""
+        was_active = self.batch_rename_dialog.is_active
         result = self.batch_rename_dialog.handle_input(key)
         
         if result == True:
+            # If dialog was active but is no longer active, it exited - need full redraw
+            if was_active and not self.batch_rename_dialog.is_active:
+                self.needs_full_redraw = True
             return True
         elif isinstance(result, tuple):
             action, data = result
@@ -2393,9 +2405,13 @@ class FileManager:
     
     def handle_search_dialog_input(self, key):
         """Handle input while in search dialog mode - wrapper for search dialog component"""
+        was_active = self.search_dialog.is_active
         result = self.search_dialog.handle_input(key)
         
         if result == True:
+            # If dialog was active but is no longer active, it exited - need full redraw
+            if was_active and not self.search_dialog.is_active:
+                self.needs_full_redraw = True
             return True
         elif isinstance(result, tuple):
             action, data = result
@@ -2456,9 +2472,13 @@ class FileManager:
     
     def handle_jump_dialog_input(self, key):
         """Handle input while in jump dialog mode - wrapper for jump dialog component"""
+        was_active = self.jump_dialog.is_active
         result = self.jump_dialog.handle_input(key)
         
         if result == True:
+            # If dialog was active but is no longer active, it exited - need full redraw
+            if was_active and not self.jump_dialog.is_active:
+                self.needs_full_redraw = True
             return True
         elif isinstance(result, tuple):
             action, data = result
@@ -2473,9 +2493,13 @@ class FileManager:
     
     def handle_drives_dialog_input(self, key):
         """Handle input while in drives dialog mode - wrapper for drives dialog component"""
+        was_active = self.drives_dialog.is_active
         result = self.drives_dialog.handle_input(key)
         
         if result == True:
+            # If dialog was active but is no longer active, it exited - need full redraw
+            if was_active and not self.drives_dialog.is_active:
+                self.needs_full_redraw = True
             return True
         elif isinstance(result, tuple):
             action, data = result
