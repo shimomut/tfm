@@ -47,6 +47,8 @@ When extracting an archive to a directory where the extraction folder already ex
 5. Recursive conflict resolution if needed
 6. Archive extracted to the new directory name
 
+**Note**: Archive extraction only has a single conflict (the target directory name), unlike copy/move operations which may have multiple file conflicts. Therefore, batch processing is not applicable to archive extraction.
+
 ## Usage Examples
 
 ### Example 1: Copy with Rename
