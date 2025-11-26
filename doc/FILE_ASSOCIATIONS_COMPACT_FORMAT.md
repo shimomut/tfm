@@ -2,7 +2,7 @@
 
 ## Overview
 
-The compact format significantly reduces the verbosity of file association configuration by allowing multiple extensions and actions to be grouped together.
+The compact format significantly reduces the verbosity of file association configuration by allowing multiple patterns and actions to be grouped together.
 
 ## Format Comparison
 
@@ -40,7 +40,7 @@ FILE_ASSOCIATIONS = {
 ```python
 FILE_ASSOCIATIONS = [
     {
-        'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+        'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
         'open|view': ['open', '-a', 'Preview'],
         'edit': ['open', '-a', 'Photoshop']
     }
@@ -53,13 +53,13 @@ FILE_ASSOCIATIONS = [
 
 ## Key Features
 
-### 1. Multiple Extensions
+### 1. Multiple Patterns
 
-Group related file extensions together:
+Group related file patterns together:
 
 ```python
 {
-    'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif']
+    'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif']
 }
 ```
 
@@ -77,16 +77,16 @@ Use the pipe `|` operator to assign the same command to multiple actions:
 
 This clearly shows that open and view use the same program, making the intent explicit.
 
-### 3. Flexible Extension Format
+### 3. Flexible Pattern Format
 
-Single extension as string:
+Single pattern as string:
 ```python
-'extensions': '*.pdf'
+'pattern': '*.pdf'
 ```
 
-Multiple extensions as list:
+Multiple patterns as list:
 ```python
-'extensions': ['*.mp4', '*.mov', '*.avi']
+'pattern': ['*.mp4', '*.mov', '*.avi']
 ```
 
 ## Real-World Example
@@ -116,14 +116,14 @@ FILE_ASSOCIATIONS = {
 
 ```python
 FILE_ASSOCIATIONS = [
-    {'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif'], 'open|view': ['preview'], 'edit': ['photoshop']},
-    {'extensions': ['*.mp4', '*.mov'], 'open|view': ['quicktime'], 'edit': ['finalcut']},
-    {'extensions': '*.avi', 'open|view': ['vlc'], 'edit': None},
-    {'extensions': ['*.mp3', '*.wav'], 'open|view': ['music'], 'edit': ['audacity']},
-    {'extensions': '*.txt', 'open': ['textedit'], 'view': ['less'], 'edit': ['vim']},
-    {'extensions': '*.md', 'open': ['typora'], 'view': ['less'], 'edit': ['vim']},
-    {'extensions': ['*.py', '*.js'], 'open': ['vscode'], 'view': ['less'], 'edit': ['vim']},
-    {'extensions': '*.pdf', 'open|view': ['preview'], 'edit': ['acrobat']}
+    {'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'], 'open|view': ['preview'], 'edit': ['photoshop']},
+    {'pattern': ['*.mp4', '*.mov'], 'open|view': ['quicktime'], 'edit': ['finalcut']},
+    {'pattern': '*.avi', 'open|view': ['vlc'], 'edit': None},
+    {'pattern': ['*.mp3', '*.wav'], 'open|view': ['music'], 'edit': ['audacity']},
+    {'pattern': '*.txt', 'open': ['textedit'], 'view': ['less'], 'edit': ['vim']},
+    {'pattern': '*.md', 'open': ['typora'], 'view': ['less'], 'edit': ['vim']},
+    {'pattern': ['*.py', '*.js'], 'open': ['vscode'], 'view': ['less'], 'edit': ['vim']},
+    {'pattern': '*.pdf', 'open|view': ['preview'], 'edit': ['acrobat']}
 ]
 ```
 
@@ -141,9 +141,9 @@ FILE_ASSOCIATIONS = [
 
 If you have existing file associations in the old format, convert them to the compact format:
 
-### Step 1: Group Extensions
+### Step 1: Group Patterns
 
-Find extensions with identical configurations:
+Find patterns with identical configurations:
 ```python
 '*.jpg': {...}
 '*.jpeg': {...}  # Same as *.jpg
@@ -152,7 +152,7 @@ Find extensions with identical configurations:
 
 Combine into:
 ```python
-{'extensions': ['*.jpg', '*.jpeg', '*.png'], ...}
+{'pattern': ['*.jpg', '*.jpeg', '*.png'], ...}
 ```
 
 ### Step 2: Combine Actions
@@ -179,7 +179,7 @@ FILE_ASSOCIATIONS = {
 
 # New
 FILE_ASSOCIATIONS = [
-    {'extensions': '*.ext', ...}
+    {'pattern': '*.ext', ...}
 ]
 ```
 

@@ -13,7 +13,7 @@ File associations are configured in your `~/.tfm/config.py` file using the `FILE
 ```python
 FILE_ASSOCIATIONS = [
     {
-        'extensions': '*.ext' or ['*.ext1', '*.ext2'],  # Single or multiple
+        'pattern': '*.ext' or ['*.ext1', '*.ext2'],  # Single or multiple
         'open|view': ['command', 'args'],  # Combined actions
         'edit': ['command', 'args']        # Separate action
     }
@@ -22,9 +22,9 @@ FILE_ASSOCIATIONS = [
 
 ### Key Features
 
-1. **Multiple extensions**: Group related extensions in a list
+1. **Multiple patterns**: Group related patterns in a list
 2. **Combined actions**: Use `|` to assign same command to multiple actions
-3. **Flexible format**: Single extension as string, multiple as list
+3. **Flexible format**: Single pattern as string, multiple as list
 
 ### Actions
 
@@ -61,7 +61,7 @@ Group multiple image extensions and use the same program for opening and viewing
 
 ```python
 {
-    'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+    'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
     'open|view': ['open', '-a', 'Preview'],
     'edit': ['open', '-a', 'Photoshop']
 }
@@ -71,12 +71,12 @@ Group multiple image extensions and use the same program for opening and viewing
 
 ```python
 {
-    'extensions': ['*.mp4', '*.mov'],
+    'pattern': ['*.mp4', '*.mov'],
     'open|view': ['open', '-a', 'QuickTime Player'],
     'edit': ['open', '-a', 'Final Cut Pro']
 },
 {
-    'extensions': '*.avi',
+    'pattern': '*.avi',
     'open|view': ['open', '-a', 'VLC'],
     'edit': None  # No editor configured
 }
@@ -86,7 +86,7 @@ Group multiple image extensions and use the same program for opening and viewing
 
 ```python
 {
-    'extensions': '*.pdf',
+    'pattern': '*.pdf',
     'open|view': ['open', '-a', 'Preview'],
     'edit': ['open', '-a', 'Adobe Acrobat']
 }
@@ -96,13 +96,13 @@ Group multiple image extensions and use the same program for opening and viewing
 
 ```python
 {
-    'extensions': '*.txt',
+    'pattern': '*.txt',
     'open': ['open', '-e'],  # TextEdit on macOS
     'edit': ['vim']
     # 'view' omitted - uses built-in text viewer
 },
 {
-    'extensions': ['*.py', '*.js'],
+    'pattern': ['*.py', '*.js'],
     'open': ['open', '-a', 'Visual Studio Code'],
     'edit': ['vim']
     # 'view' omitted - uses built-in text viewer with syntax highlighting
@@ -130,13 +130,13 @@ FILE_ASSOCIATIONS = []
 
 if platform.system() == 'Darwin':  # macOS
     FILE_ASSOCIATIONS.append({
-        'extensions': ['*.jpg', '*.png'],
+        'pattern': ['*.jpg', '*.png'],
         'open|view': ['open', '-a', 'Preview'],
         'edit': ['open', '-a', 'Photoshop']
     })
 elif platform.system() == 'Linux':
     FILE_ASSOCIATIONS.append({
-        'extensions': ['*.jpg', '*.png'],
+        'pattern': ['*.jpg', '*.png'],
         'open': ['xdg-open'],
         'view': ['eog'],  # Eye of GNOME
         'edit': ['gimp']

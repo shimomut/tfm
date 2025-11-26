@@ -37,7 +37,7 @@ Check FILE_ASSOCIATIONS for 'view' action
 ```python
 # Configuration
 {
-    'extensions': '*.pdf',
+    'pattern': '*.pdf',
     'open|view': ['open', '-a', 'Preview'],
     'edit': ['open', '-a', 'Adobe Acrobat']
 }
@@ -51,7 +51,7 @@ Check FILE_ASSOCIATIONS for 'view' action
 ```python
 # Configuration
 {
-    'extensions': '*.txt',
+    'pattern': '*.txt',
     'open': ['open', '-e'],
     'view': ['less'],
     'edit': ['vim']
@@ -139,7 +139,7 @@ For better control, explicitly configure text file associations:
 
 ```python
 {
-    'extensions': ['*.txt', '*.log', '*.conf'],
+    'pattern': ['*.txt', '*.log', '*.conf'],
     'open': ['open', '-e'],
     'view': ['less'],
     'edit': ['vim']
@@ -162,7 +162,7 @@ To prevent viewing certain files, add explicit None:
 
 ```python
 {
-    'extensions': '*.dat',
+    'pattern': '*.dat',
     'open': None,
     'view': None,  # Prevents viewing even if text
     'edit': ['vim']
@@ -186,7 +186,7 @@ To prevent viewing certain files, add explicit None:
 ```python
 # Make sure you have:
 {
-    'extensions': '*.txt',
+    'pattern': '*.txt',
     'view': ['less']  # Not None or missing
 }
 ```
@@ -198,7 +198,7 @@ To prevent viewing certain files, add explicit None:
 **Solution**: The file is being detected as text. Add explicit association:
 ```python
 {
-    'extensions': '*.dat',
+    'pattern': '*.dat',
     'view': None  # Prevent viewing
 }
 ```

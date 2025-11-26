@@ -58,7 +58,7 @@ When you press E on a file, TFM uses the **edit** action from file associations:
 
 ```python
 {
-    'extensions': ['*.jpg', '*.png'],
+    'pattern': ['*.jpg', '*.png'],
     'open|view': ['open', '-a', 'Preview'],  # Same for both
     'edit': ['open', '-a', 'Photoshop']      # Different editor
 }
@@ -73,7 +73,7 @@ When you press E on a file, TFM uses the **edit** action from file associations:
 
 ```python
 {
-    'extensions': '*.avi',
+    'pattern': '*.avi',
     'open|view': ['open', '-a', 'VLC'],
     'edit': None  # No editor configured
 }
@@ -88,7 +88,7 @@ When you press E on a file, TFM uses the **edit** action from file associations:
 
 ```python
 {
-    'extensions': '*.txt',
+    'pattern': '*.txt',
     'open': ['open', '-e'],      # TextEdit
     'edit': ['vim']              # Terminal editor
     # 'view' omitted - will use built-in text viewer
@@ -150,13 +150,13 @@ FILE_ASSOCIATIONS = []
 
 if platform.system() == 'Darwin':  # macOS
     FILE_ASSOCIATIONS.append({
-        'extensions': ['*.jpg', '*.png'],
+        'pattern': ['*.jpg', '*.png'],
         'open|view': ['open', '-a', 'Preview'],
         'edit': ['open', '-a', 'Photoshop']
     })
 elif platform.system() == 'Linux':
     FILE_ASSOCIATIONS.append({
-        'extensions': ['*.jpg', '*.png'],
+        'pattern': ['*.jpg', '*.png'],
         'open': ['xdg-open'],
         'view': ['eog'],  # Eye of GNOME
         'edit': ['gimp']

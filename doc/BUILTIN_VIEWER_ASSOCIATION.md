@@ -17,7 +17,7 @@ When you set an action to `None` in FILE_ASSOCIATIONS:
 
 ```python
 {
-    'extensions': ['*.txt', '*.md', '*.py', '*.js'],
+    'pattern': ['*.txt', '*.md', '*.py', '*.js'],
     'open': ['open', '-a', 'Visual Studio Code'],
     'view': None,  # Use built-in text viewer
     'edit': ['vim']
@@ -55,7 +55,7 @@ Use explicit commands when:
 
 ```python
 {
-    'extensions': ['*.py', '*.js', '*.java', '*.cpp'],
+    'pattern': ['*.py', '*.js', '*.java', '*.cpp'],
     'open': ['open', '-a', 'Visual Studio Code'],
     'view': None,  # Built-in viewer with syntax highlighting
     'edit': ['vim']
@@ -68,7 +68,7 @@ Use explicit commands when:
 
 ```python
 {
-    'extensions': '*.md',
+    'pattern': '*.md',
     'open': ['open', '-a', 'Typora'],  # Rich markdown editor
     'view': None,  # Built-in viewer for quick viewing
     'edit': ['vim']
@@ -82,12 +82,12 @@ Use explicit commands when:
 ```python
 # Use built-in viewer for some text files
 {
-    'extensions': ['*.txt', '*.log'],
+    'pattern': ['*.txt', '*.log'],
     'view': None  # Built-in viewer
 },
 # Use external viewer for others
 {
-    'extensions': '*.json',
+    'pattern': '*.json',
     'view': ['jq', '.']  # External JSON formatter
 }
 ```
@@ -116,7 +116,7 @@ There are three different scenarios:
 # Configuration
 FILE_ASSOCIATIONS = [
     {
-        'extensions': '*.txt',
+        'pattern': '*.txt',
         'view': None  # Explicit None
     }
     # *.xyz has no association
@@ -172,21 +172,21 @@ TFM's default configuration uses `None` for common text and code files:
 FILE_ASSOCIATIONS = [
     # Text files
     {
-        'extensions': '*.txt',
+        'pattern': '*.txt',
         'open': ['open', '-e'],
         'view': None,  # Built-in viewer
         'edit': ['vim']
     },
     # Markdown
     {
-        'extensions': '*.md',
+        'pattern': '*.md',
         'open': ['open', '-a', 'Typora'],
         'view': None,  # Built-in viewer
         'edit': ['vim']
     },
     # Code files
     {
-        'extensions': ['*.py', '*.js'],
+        'pattern': ['*.py', '*.js'],
         'open': ['open', '-a', 'Visual Studio Code'],
         'view': None,  # Built-in viewer
         'edit': ['vim']
@@ -202,7 +202,7 @@ If you prefer external viewers, change `None` to a command:
 
 ```python
 {
-    'extensions': ['*.py', '*.js'],
+    'pattern': ['*.py', '*.js'],
     'view': ['less', '-R']  # Use less with color support
 }
 ```
@@ -213,7 +213,7 @@ Extend the configuration with more file types:
 
 ```python
 {
-    'extensions': ['*.c', '*.h', '*.cpp', '*.hpp'],
+    'pattern': ['*.c', '*.h', '*.cpp', '*.hpp'],
     'view': None  # Built-in viewer for C/C++ files
 }
 ```

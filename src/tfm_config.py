@@ -547,6 +547,13 @@ def get_program_for_file(filename, action='open'):
     """
     Get the program command for a specific file and action.
     
+    Checks FILE_ASSOCIATIONS entries in order from top to bottom.
+    For each entry:
+    1. Check if filename matches the pattern
+    2. If pattern matches, check if the action exists in that entry
+    3. If action exists, return the command (even if None)
+    4. If pattern doesn't match OR action doesn't exist, continue to next entry
+    
     Args:
         filename: The filename to check (e.g., 'document.pdf')
         action: The action to perform ('open', 'view', or 'edit')
@@ -561,19 +568,58 @@ def get_program_for_file(filename, action='open'):
     # Convert filename to lowercase for case-insensitive matching
     filename_lower = filename.lower()
     
-    # Try to find a matching pattern
+    # Check each entry in order from top to bottom
     for entry in associations:
-        # Expand the compact entry format
-        for pattern, entry_action, command in _expand_association_entry(entry):
-            if entry_action == action and fnmatch.fnmatch(filename_lower, pattern.lower()):
-                # Convert string commands to list format
-                if isinstance(command, str):
-                    return command.split()
-                elif isinstance(command, list):
-                    return command
-                elif command is None:
-                    return None
+        if not isinstance(entry, dict) or 'pattern' not in entry:
+            continue
+        
+        # Get patterns as a list
+        patterns = entry['pattern']
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        elif not isinstance(patterns, list):
+            continue
+        
+        # Check if filename matches any pattern in this entry
+        pattern_matches = False
+        for pattern in patterns:
+            if fnmatch.fnmatch(filename_lower, pattern.lower()):
+                pattern_matches = True
+                break
+        
+        # If pattern doesn't match, continue to next entry
+        if not pattern_matches:
+            continue
+        
+        # Pattern matches - now check if action exists in this entry
+        # Look for the action in both simple and combined formats
+        action_found = False
+        command = None
+        
+        for key, value in entry.items():
+            if key == 'pattern':
+                continue
+            
+            # Check if this key contains our action (handle 'open|view' format)
+            actions_in_key = [a.strip() for a in key.split('|')]
+            if action in actions_in_key:
+                action_found = True
+                command = value
+                break
+        
+        # If action is found in this entry, return the command
+        if action_found:
+            # Convert string commands to list format
+            if isinstance(command, str):
+                return command.split()
+            elif isinstance(command, list):
+                return command
+            elif command is None:
+                return None
+        
+        # Pattern matched but action not in this entry - continue to next entry
     
+    # No matching entry found
     return None
 
 
@@ -599,6 +645,8 @@ def has_explicit_association(filename, action='open'):
     This differs from has_action_for_file in that it returns True even when
     the association is explicitly set to None, which indicates "use built-in viewer".
     
+    Checks FILE_ASSOCIATIONS entries in order from top to bottom.
+    
     Args:
         filename: The filename to check
         action: The action to check ('open', 'view', or 'edit')
@@ -613,12 +661,40 @@ def has_explicit_association(filename, action='open'):
     # Convert filename to lowercase for case-insensitive matching
     filename_lower = filename.lower()
     
-    # Try to find a matching pattern
+    # Check each entry in order from top to bottom
     for entry in associations:
-        # Expand the compact entry format
-        for file_pattern, entry_action, command in _expand_association_entry(entry):
-            if entry_action == action and fnmatch.fnmatch(filename_lower, file_pattern.lower()):
-                # Found an explicit association (even if command is None)
+        if not isinstance(entry, dict) or 'pattern' not in entry:
+            continue
+        
+        # Get patterns as a list
+        patterns = entry['pattern']
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        elif not isinstance(patterns, list):
+            continue
+        
+        # Check if filename matches any pattern in this entry
+        pattern_matches = False
+        for pattern in patterns:
+            if fnmatch.fnmatch(filename_lower, pattern.lower()):
+                pattern_matches = True
+                break
+        
+        # If pattern doesn't match, continue to next entry
+        if not pattern_matches:
+            continue
+        
+        # Pattern matches - check if action exists in this entry
+        for key in entry.keys():
+            if key == 'pattern':
+                continue
+            
+            # Check if this key contains our action
+            actions_in_key = [a.strip() for a in key.split('|')]
+            if action in actions_in_key:
+                # Found an explicit association (even if value is None)
                 return True
+        
+        # Pattern matched but action not in this entry - continue to next entry
     
     return False

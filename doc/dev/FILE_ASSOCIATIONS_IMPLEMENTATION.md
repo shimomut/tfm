@@ -13,7 +13,7 @@ File associations are stored in the configuration system as a list of dictionari
 ```python
 FILE_ASSOCIATIONS = [
     {
-        'extensions': '*.pdf' or ['*.jpg', '*.png'],
+        'pattern': '*.pdf' or ['*.jpg', '*.png'],
         'open|view': ['command'],  # Combined actions
         'edit': ['command']
     }
@@ -219,12 +219,12 @@ if has_action_for_file('document.pdf', 'view'):
 ```python
 [
     {
-        'extensions': '*.pdf',
+        'pattern': '*.pdf',
         'open|view': ['open', '-a', 'Preview'],
         'edit': ['open', '-a', 'Adobe Acrobat']
     },
     {
-        'extensions': ['*.jpg', '*.jpeg', '*.png'],
+        'pattern': ['*.jpg', '*.jpeg', '*.png'],
         'open|view': ['open', '-a', 'Preview'],
         'edit': ['open', '-a', 'Photoshop']
     }
@@ -234,14 +234,14 @@ if has_action_for_file('document.pdf', 'view'):
 **Structure**:
 - Top-level: List of association entries
 - Each entry: Dictionary with 'extensions' key and action keys
-- 'extensions': String or list of extension patterns
+- 'pattern': String or list of extension patterns
 - Action keys: 'open', 'view', 'edit', or combined like 'open|view'
 - Values: Command lists, command strings, or None
 
 **Expansion Example**:
 ```python
 {
-    'extensions': ['*.jpg', '*.png'],
+    'pattern': ['*.jpg', '*.png'],
     'open|view': ['preview']
 }
 ```

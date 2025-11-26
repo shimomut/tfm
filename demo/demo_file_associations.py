@@ -101,19 +101,19 @@ def demo_all_associations():
     associations = get_file_associations()
     
     for i, entry in enumerate(associations, 1):
-        if not isinstance(entry, dict) or 'extensions' not in entry:
+        if not isinstance(entry, dict) or 'pattern' not in entry:
             continue
         
-        extensions = entry['extensions']
-        if isinstance(extensions, str):
-            ext_str = extensions
+        patterns = entry['pattern']
+        if isinstance(patterns, str):
+            pattern_str = patterns
         else:
-            ext_str = ', '.join(extensions)
+            pattern_str = ', '.join(patterns)
         
-        print(f"\n{i}. {ext_str}:")
+        print(f"\n{i}. {pattern_str}:")
         
         for key, command in entry.items():
-            if key == 'extensions':
+            if key == 'pattern':
                 continue
             
             if command:
