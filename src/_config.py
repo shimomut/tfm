@@ -178,6 +178,21 @@ class Config:
             'pattern': ['*.mp3', '*.wav'],
             'open': ['open', '-a', 'Music'],
         },
+        # Microsoft Word documents
+        {
+            'pattern': ['*.doc', '*.docx'],
+            'open|view|edit': ['open', '-a', 'Microsoft Word'],
+        },
+        # Microsoft Excel spreadsheets
+        {
+            'pattern': ['*.xls', '*.xlsx'],
+            'open|view|edit': ['open', '-a', 'Microsoft Excel'],
+        },
+        # Microsoft PowerPoint presentations
+        {
+            'pattern': ['*.ppt', '*.pptx'],
+            'open|view|edit': ['open', '-a', 'Microsoft PowerPoint'],
+        },
         # Add your own file associations here:
         # {
         #     'pattern': ['*.ext1', '*.ext2'],
