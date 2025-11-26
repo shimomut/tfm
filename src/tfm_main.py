@@ -26,7 +26,7 @@ from tfm_single_line_text_edit import SingleLineTextEdit
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file
+from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
 from tfm_text_viewer import view_text_file, is_text_file
 
 # Import new modular components
@@ -2116,6 +2116,25 @@ class FileManager:
                 self.external_program_manager.resume_curses(self.stdscr)
                 print(f"Error viewing file: {e}")
                 self.needs_full_redraw = True
+        elif has_explicit_association(filename, 'view'):
+            # Association exists but is None - use built-in text viewer
+            if is_text_file(selected_file):
+                try:
+                    curses.curs_set(0)
+                    
+                    if view_text_file(self.stdscr, selected_file):
+                        print(f"Viewed text file: {selected_file.name}")
+                    else:
+                        print(f"Failed to view file: {selected_file.name}")
+                    
+                    self.needs_full_redraw = True
+                    
+                except Exception as e:
+                    print(f"Error viewing file: {str(e)}")
+                    self.needs_full_redraw = True
+            else:
+                # Association is None but file is not text
+                print(f"Cannot view '{selected_file.name}' (not a text file)")
         else:
             # No file association found - check if it's a text file
             if is_text_file(selected_file):

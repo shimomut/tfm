@@ -182,24 +182,24 @@ class DefaultConfig:
             'open|view': ['open', '-a', 'Music'],
             'edit': ['open', '-a', 'Audacity']
         },
-        # Text files
+        # Text files - use built-in text viewer for 'view' action
         {
             'extensions': '*.txt',
             'open': ['open', '-e'],
-            'view': ['less'],
+            'view': None,  # Use built-in text viewer
             'edit': ['vim']
         },
         {
             'extensions': '*.md',
             'open': ['open', '-a', 'Typora'],
-            'view': ['less'],
+            'view': None,  # Use built-in text viewer
             'edit': ['vim']
         },
-        # Code files
+        # Code files - use built-in text viewer for 'view' action
         {
             'extensions': ['*.py', '*.js'],
             'open': ['open', '-a', 'Visual Studio Code'],
-            'view': ['less'],
+            'view': None,  # Use built-in text viewer
             'edit': ['vim']
         },
     ]
@@ -593,3 +593,35 @@ def has_action_for_file(filename, action='open'):
     """
     program = get_program_for_file(filename, action)
     return program is not None
+
+
+def has_explicit_association(filename, action='open'):
+    """
+    Check if a file has an explicit association (including None) for an action.
+    
+    This differs from has_action_for_file in that it returns True even when
+    the association is explicitly set to None, which indicates "use built-in viewer".
+    
+    Args:
+        filename: The filename to check
+        action: The action to check ('open', 'view', or 'edit')
+    
+    Returns:
+        True if an explicit association exists (even if None), False if no association
+    """
+    associations = get_file_associations()
+    if not associations:
+        return False
+    
+    # Convert filename to lowercase for case-insensitive matching
+    filename_lower = filename.lower()
+    
+    # Try to find a matching pattern
+    for entry in associations:
+        # Expand the compact entry format
+        for pattern, entry_action, command in _expand_association_entry(entry):
+            if entry_action == action and fnmatch.fnmatch(filename_lower, pattern.lower()):
+                # Found an explicit association (even if command is None)
+                return True
+    
+    return False

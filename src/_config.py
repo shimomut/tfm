@@ -187,24 +187,24 @@ class Config:
             'open|view': ['open', '-a', 'Music'],
             'edit': ['open', '-a', 'Audacity']
         },
-        # Text files
+        # Text files - use built-in text viewer for 'view' action
         {
             'extensions': '*.txt',
             'open': ['open', '-e'],  # TextEdit on macOS
-            'view': ['less'],
+            'view': None,  # Use built-in text viewer with syntax highlighting
             'edit': ['vim']
         },
         {
             'extensions': '*.md',
             'open': ['open', '-a', 'Typora'],
-            'view': ['less'],
+            'view': None,  # Use built-in text viewer with syntax highlighting
             'edit': ['vim']
         },
-        # Code files
+        # Code files - use built-in text viewer for 'view' action
         {
             'extensions': ['*.py', '*.js'],
             'open': ['open', '-a', 'Visual Studio Code'],
-            'view': ['less'],
+            'view': None,  # Use built-in text viewer with syntax highlighting
             'edit': ['vim']
         },
         # Add your own file associations here:
@@ -216,23 +216,6 @@ class Config:
             'view': ['less'],
             'edit': ['vim']
         },
-        # Code files
-        '*.py': {
-            'open': ['open', '-a', 'Visual Studio Code'],
-            'view': ['less'],
-            'edit': ['vim']
-        },
-        '*.js': {
-            'open': ['open', '-a', 'Visual Studio Code'],
-            'view': ['less'],
-            'edit': ['vim']
-        },
-        # Add your own file associations here:
-        # '*.ext': {
-        #     'open': ['command', 'args'],
-        #     'view': ['command', 'args'],
-        #     'edit': ['command', 'args']
-        # },
     }
     
     # External programs - each item has "name", "command", and optional "options" fields

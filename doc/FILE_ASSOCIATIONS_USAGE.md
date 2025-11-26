@@ -84,21 +84,23 @@ When you press E on a file, TFM uses the **edit** action from file associations:
 - Press V on `movie.avi` → Opens in VLC
 - Press E on `movie.avi` → Shows "No editor configured" message
 
-### Text Files - Different Programs for Each Action
+### Text Files - Built-in Viewer for View Action
 
 ```python
 {
     'extensions': '*.txt',
     'open': ['open', '-e'],      # TextEdit
-    'view': ['less'],            # Terminal pager
+    'view': None,                # Built-in text viewer
     'edit': ['vim']              # Terminal editor
 }
 ```
 
 **Usage**:
 - Press Enter on `readme.txt` → Opens in TextEdit
-- Press V on `readme.txt` → Opens in less (terminal pager)
+- Press V on `readme.txt` → Opens in built-in text viewer (with syntax highlighting)
 - Press E on `readme.txt` → Opens in vim
+
+**Note**: Setting `view: None` explicitly tells TFM to use the built-in text viewer, which provides syntax highlighting and is optimized for viewing code and text files.
 
 ## Fallback Behavior
 
