@@ -90,8 +90,8 @@ When you press E on a file, TFM uses the **edit** action from file associations:
 {
     'extensions': '*.txt',
     'open': ['open', '-e'],      # TextEdit
-    'view': None,                # Built-in text viewer
     'edit': ['vim']              # Terminal editor
+    # 'view' omitted - will use built-in text viewer
 }
 ```
 
@@ -100,7 +100,7 @@ When you press E on a file, TFM uses the **edit** action from file associations:
 - Press V on `readme.txt` → Opens in built-in text viewer (with syntax highlighting)
 - Press E on `readme.txt` → Opens in vim
 
-**Note**: Setting `view: None` explicitly tells TFM to use the built-in text viewer, which provides syntax highlighting and is optimized for viewing code and text files.
+**Note**: Omitting the `view` action allows TFM to use the built-in text viewer for text files, which provides syntax highlighting and is optimized for viewing code and text files.
 
 ## Fallback Behavior
 

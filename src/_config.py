@@ -187,36 +187,33 @@ class Config:
             'open|view': ['open', '-a', 'Music'],
             'edit': ['open', '-a', 'Audacity']
         },
-        # Text files - use built-in text viewer for 'view' action
+        # Text files - omit 'view' to use built-in text viewer
         {
             'extensions': '*.txt',
             'open': ['open', '-e'],  # TextEdit on macOS
-            'view': None,  # Use built-in text viewer with syntax highlighting
             'edit': ['vim']
+            # 'view' omitted - will use built-in text viewer with syntax highlighting
         },
         {
             'extensions': '*.md',
             'open': ['open', '-a', 'Typora'],
-            'view': None,  # Use built-in text viewer with syntax highlighting
             'edit': ['vim']
+            # 'view' omitted - will use built-in text viewer with syntax highlighting
         },
-        # Code files - use built-in text viewer for 'view' action
+        # Code files - omit 'view' to use built-in text viewer
         {
             'extensions': ['*.py', '*.js'],
             'open': ['open', '-a', 'Visual Studio Code'],
-            'view': None,  # Use built-in text viewer with syntax highlighting
             'edit': ['vim']
+            # 'view' omitted - will use built-in text viewer with syntax highlighting
         },
         # Add your own file associations here:
         # {
         #     'extensions': ['*.ext1', '*.ext2'],
         #     'open|view': ['command', 'args'],
         #     'edit': ['command', 'args']
-        #   'open': ['open', '-a', 'Typora'],
-            'view': ['less'],
-            'edit': ['vim']
-        },
-    }
+        # },
+    ]
     
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution

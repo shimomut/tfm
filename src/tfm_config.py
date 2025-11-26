@@ -182,24 +182,21 @@ class DefaultConfig:
             'open|view': ['open', '-a', 'Music'],
             'edit': ['open', '-a', 'Audacity']
         },
-        # Text files - use built-in text viewer for 'view' action
+        # Text files - omit 'view' to use built-in text viewer
         {
             'extensions': '*.txt',
             'open': ['open', '-e'],
-            'view': None,  # Use built-in text viewer
             'edit': ['vim']
         },
         {
             'extensions': '*.md',
             'open': ['open', '-a', 'Typora'],
-            'view': None,  # Use built-in text viewer
             'edit': ['vim']
         },
-        # Code files - use built-in text viewer for 'view' action
+        # Code files - omit 'view' to use built-in text viewer
         {
             'extensions': ['*.py', '*.js'],
             'open': ['open', '-a', 'Visual Studio Code'],
-            'view': None,  # Use built-in text viewer
             'edit': ['vim']
         },
     ]

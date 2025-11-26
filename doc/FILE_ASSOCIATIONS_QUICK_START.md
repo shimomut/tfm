@@ -62,9 +62,19 @@ Each file type can have three actions:
 - **view**: Quick preview (usually read-only)
 - **edit**: Full editing (specialized software)
 
-### 4. No Action Available
+### 4. Omit Actions
 
-Set an action to `None` if you don't want it available:
+Simply omit an action if you want default behavior:
+```python
+{
+    'extensions': '*.txt',
+    'open': ['open', '-e'],
+    'edit': ['vim']
+    # 'view' omitted - will use built-in text viewer for text files
+}
+```
+
+Or explicitly set to `None` to prevent the action:
 ```python
 {
     'extensions': '*.avi',

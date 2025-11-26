@@ -2116,25 +2116,6 @@ class FileManager:
                 self.external_program_manager.resume_curses(self.stdscr)
                 print(f"Error viewing file: {e}")
                 self.needs_full_redraw = True
-        elif has_explicit_association(filename, 'view'):
-            # Association exists but is None - use built-in text viewer
-            if is_text_file(selected_file):
-                try:
-                    curses.curs_set(0)
-                    
-                    if view_text_file(self.stdscr, selected_file):
-                        print(f"Viewed text file: {selected_file.name}")
-                    else:
-                        print(f"Failed to view file: {selected_file.name}")
-                    
-                    self.needs_full_redraw = True
-                    
-                except Exception as e:
-                    print(f"Error viewing file: {str(e)}")
-                    self.needs_full_redraw = True
-            else:
-                # Association is None but file is not text
-                print(f"Cannot view '{selected_file.name}' (not a text file)")
         else:
             # No file association found - check if it's a text file
             if is_text_file(selected_file):

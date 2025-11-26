@@ -98,14 +98,14 @@ Group multiple image extensions and use the same program for opening and viewing
 {
     'extensions': '*.txt',
     'open': ['open', '-e'],  # TextEdit on macOS
-    'view': ['less'],
     'edit': ['vim']
+    # 'view' omitted - uses built-in text viewer
 },
 {
     'extensions': ['*.py', '*.js'],
     'open': ['open', '-a', 'Visual Studio Code'],
-    'view': ['less'],
     'edit': ['vim']
+    # 'view' omitted - uses built-in text viewer with syntax highlighting
 }
 ```
 
