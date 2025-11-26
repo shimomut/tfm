@@ -171,7 +171,7 @@ class Config:
         # Video files
         {
             'pattern': ['*.mp4', '*.mov'],
-            'open|view': ['open', '-a', 'Preview'],
+            'open|view': ['open', '-a', 'QuickTime Player'],
         },
         # Audio files
         {
