@@ -157,47 +157,21 @@ class DefaultConfig:
         {
             'pattern': '*.pdf',
             'open|view': ['open', '-a', 'Preview'],
-            'edit': ['open', '-a', 'Adobe Acrobat']
         },
-        # Image files - multiple patterns, same program for open and view
+        # Image files
         {
             'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
             'open|view': ['open', '-a', 'Preview'],
-            'edit': ['open', '-a', 'Photoshop']
         },
         # Video files
         {
             'pattern': ['*.mp4', '*.mov'],
-            'open|view': ['open', '-a', 'QuickTime Player'],
-            'edit': ['open', '-a', 'Final Cut Pro']
-        },
-        {
-            'pattern': '*.avi',
-            'open|view': ['open', '-a', 'VLC'],
-            'edit': None  # No editor configured
+            'open|view': ['open', '-a', 'Preview'],
         },
         # Audio files
         {
             'pattern': ['*.mp3', '*.wav'],
             'open|view': ['open', '-a', 'Music'],
-            'edit': ['open', '-a', 'Audacity']
-        },
-        # Text files - omit 'view' to use built-in text viewer
-        {
-            'pattern': '*.txt',
-            'open': ['open', '-e'],
-            'edit': ['vim']
-        },
-        {
-            'pattern': '*.md',
-            'open': ['open', '-a', 'Typora'],
-            'edit': ['vim']
-        },
-        # Code files - omit 'view' to use built-in text viewer
-        {
-            'pattern': ['*.py', '*.js'],
-            'open': ['open', '-a', 'Visual Studio Code'],
-            'edit': ['vim']
         },
     ]
 
