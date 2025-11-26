@@ -143,73 +143,73 @@ class Config:
     UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
     
     # File extension associations
-    # Maps file extensions to programs for different actions (open, view, edit)
+    # Maps file patterns to programs for different actions (open, view, edit)
     # 
     # Compact Format Features:
-    # 1. Multiple extensions in one entry: ['*.jpg', '*.jpeg', '*.png']
+    # 1. Multiple patterns in one entry: ['*.jpg', '*.jpeg', '*.png']
     # 2. Combined actions: 'open|view' assigns same command to both actions
     # 3. Commands: List ['open', '-a', 'Preview'] or string 'open -a Preview'
     # 4. None: Action not available
     #
     # Format:
     # {
-    #     'extensions': '*.pdf' or ['*.jpg', '*.png'],  # Single or multiple extensions
+    #     'pattern': '*.pdf' or ['*.jpg', '*.png'],  # Single or multiple fnmatch patterns
     #     'open|view': ['command'],  # Same command for open and view
     #     'edit': ['command']        # Different command for edit
     # }
     FILE_ASSOCIATIONS = [
         # PDF files
         {
-            'extensions': '*.pdf',
+            'pattern': '*.pdf',
             'open|view': ['open', '-a', 'Preview'],
             'edit': ['open', '-a', 'Adobe Acrobat']
         },
-        # Image files - multiple extensions, same program for open and view
+        # Image files - multiple patterns, same program for open and view
         {
-            'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+            'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
             'open|view': ['open', '-a', 'Preview'],
             'edit': ['open', '-a', 'Photoshop']
         },
         # Video files
         {
-            'extensions': ['*.mp4', '*.mov'],
+            'pattern': ['*.mp4', '*.mov'],
             'open|view': ['open', '-a', 'QuickTime Player'],
             'edit': ['open', '-a', 'Final Cut Pro']
         },
         {
-            'extensions': '*.avi',
+            'pattern': '*.avi',
             'open|view': ['open', '-a', 'VLC'],
             'edit': None  # No editor configured
         },
         # Audio files
         {
-            'extensions': ['*.mp3', '*.wav'],
+            'pattern': ['*.mp3', '*.wav'],
             'open|view': ['open', '-a', 'Music'],
             'edit': ['open', '-a', 'Audacity']
         },
         # Text files - omit 'view' to use built-in text viewer
         {
-            'extensions': '*.txt',
+            'pattern': '*.txt',
             'open': ['open', '-e'],  # TextEdit on macOS
             'edit': ['vim']
             # 'view' omitted - will use built-in text viewer with syntax highlighting
         },
         {
-            'extensions': '*.md',
+            'pattern': '*.md',
             'open': ['open', '-a', 'Typora'],
             'edit': ['vim']
             # 'view' omitted - will use built-in text viewer with syntax highlighting
         },
         # Code files - omit 'view' to use built-in text viewer
         {
-            'extensions': ['*.py', '*.js'],
+            'pattern': ['*.py', '*.js'],
             'open': ['open', '-a', 'Visual Studio Code'],
             'edit': ['vim']
             # 'view' omitted - will use built-in text viewer with syntax highlighting
         },
         # Add your own file associations here:
         # {
-        #     'extensions': ['*.ext1', '*.ext2'],
+        #     'pattern': ['*.ext1', '*.ext2'],
         #     'open|view': ['command', 'args'],
         #     'edit': ['command', 'args']
         # },

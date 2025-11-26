@@ -141,61 +141,61 @@ class DefaultConfig:
     UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
     
     # File extension associations
-    # Maps file extensions to programs for different actions (open, view, edit)
+    # Maps file patterns to programs for different actions (open, view, edit)
     # 
     # Compact Format:
-    # - Extensions: Can be a string '*.pdf' or list ['*.jpg', '*.jpeg', '*.png']
+    # - Pattern: Can be a string '*.pdf' or list ['*.jpg', '*.jpeg', '*.png']
     # - Actions: Use 'open|view' to assign same command to multiple actions
     # - Commands: List ['open', '-a', 'Preview'] or string 'open -a Preview'
     # - None: Action not available
     #
     # Examples:
-    #   ['*.jpg', '*.png']: {'open|view': ['open', '-a', 'Preview'], 'edit': ['photoshop']}
-    #   '*.pdf': {'open|view': ['preview'], 'edit': ['acrobat']}
+    #   {'pattern': ['*.jpg', '*.png'], 'open|view': ['open', '-a', 'Preview'], 'edit': ['photoshop']}
+    #   {'pattern': '*.pdf', 'open|view': ['preview'], 'edit': ['acrobat']}
     FILE_ASSOCIATIONS = [
         # PDF files
         {
-            'extensions': '*.pdf',
+            'pattern': '*.pdf',
             'open|view': ['open', '-a', 'Preview'],
             'edit': ['open', '-a', 'Adobe Acrobat']
         },
-        # Image files - multiple extensions, same program for open and view
+        # Image files - multiple patterns, same program for open and view
         {
-            'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+            'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
             'open|view': ['open', '-a', 'Preview'],
             'edit': ['open', '-a', 'Photoshop']
         },
         # Video files
         {
-            'extensions': ['*.mp4', '*.mov'],
+            'pattern': ['*.mp4', '*.mov'],
             'open|view': ['open', '-a', 'QuickTime Player'],
             'edit': ['open', '-a', 'Final Cut Pro']
         },
         {
-            'extensions': '*.avi',
+            'pattern': '*.avi',
             'open|view': ['open', '-a', 'VLC'],
             'edit': None  # No editor configured
         },
         # Audio files
         {
-            'extensions': ['*.mp3', '*.wav'],
+            'pattern': ['*.mp3', '*.wav'],
             'open|view': ['open', '-a', 'Music'],
             'edit': ['open', '-a', 'Audacity']
         },
         # Text files - omit 'view' to use built-in text viewer
         {
-            'extensions': '*.txt',
+            'pattern': '*.txt',
             'open': ['open', '-e'],
             'edit': ['vim']
         },
         {
-            'extensions': '*.md',
+            'pattern': '*.md',
             'open': ['open', '-a', 'Typora'],
             'edit': ['vim']
         },
         # Code files - omit 'view' to use built-in text viewer
         {
-            'extensions': ['*.py', '*.js'],
+            'pattern': ['*.py', '*.js'],
             'open': ['open', '-a', 'Visual Studio Code'],
             'edit': ['vim']
         },
@@ -511,34 +511,34 @@ def _expand_association_entry(entry):
     Expand a compact association entry into individual pattern-action mappings.
     
     Args:
-        entry: Dictionary with 'extensions' key and action keys
+        entry: Dictionary with 'pattern' key and action keys
     
     Returns:
         List of (pattern, action, command) tuples
     """
-    if not isinstance(entry, dict) or 'extensions' not in entry:
+    if not isinstance(entry, dict) or 'pattern' not in entry:
         return []
     
-    # Get extensions as a list
-    extensions = entry['extensions']
-    if isinstance(extensions, str):
-        extensions = [extensions]
-    elif not isinstance(extensions, list):
+    # Get patterns as a list
+    patterns = entry['pattern']
+    if isinstance(patterns, str):
+        patterns = [patterns]
+    elif not isinstance(patterns, list):
         return []
     
     # Expand action keys (handle 'open|view' format)
     expanded = []
     for key, command in entry.items():
-        if key == 'extensions':
+        if key == 'pattern':
             continue
         
         # Split combined action keys like 'open|view'
         actions = key.split('|')
         
-        # Add mapping for each extension and action combination
-        for ext in extensions:
+        # Add mapping for each pattern and action combination
+        for pattern in patterns:
             for action in actions:
-                expanded.append((ext, action.strip(), command))
+                expanded.append((pattern, action.strip(), command))
     
     return expanded
 
@@ -616,8 +616,8 @@ def has_explicit_association(filename, action='open'):
     # Try to find a matching pattern
     for entry in associations:
         # Expand the compact entry format
-        for pattern, entry_action, command in _expand_association_entry(entry):
-            if entry_action == action and fnmatch.fnmatch(filename_lower, pattern.lower()):
+        for file_pattern, entry_action, command in _expand_association_entry(entry):
+            if entry_action == action and fnmatch.fnmatch(filename_lower, file_pattern.lower()):
                 # Found an explicit association (even if command is None)
                 return True
     

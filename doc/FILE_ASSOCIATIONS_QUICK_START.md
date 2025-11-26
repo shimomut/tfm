@@ -10,23 +10,23 @@ Add this to your `~/.tfm/config.py`:
 
 ```python
 FILE_ASSOCIATIONS = [
-    # Images: Multiple extensions, Preview for viewing, Photoshop for editing
+    # Images: Multiple patterns, Preview for viewing, Photoshop for editing
     {
-        'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+        'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
         'open|view': ['open', '-a', 'Preview'],  # Same for open and view
         'edit': ['open', '-a', 'Photoshop']
     },
     
     # Videos: QuickTime for viewing, Final Cut for editing
     {
-        'extensions': ['*.mp4', '*.mov'],
+        'pattern': ['*.mp4', '*.mov'],
         'open|view': ['open', '-a', 'QuickTime Player'],
         'edit': ['open', '-a', 'Final Cut Pro']
     },
     
     # PDFs: Preview for viewing, Acrobat for editing
     {
-        'extensions': '*.pdf',
+        'pattern': '*.pdf',
         'open|view': ['open', '-a', 'Preview'],
         'edit': ['open', '-a', 'Adobe Acrobat']
     }
@@ -35,11 +35,11 @@ FILE_ASSOCIATIONS = [
 
 ## Compact Format Features
 
-### 1. Multiple Extensions
-Group related extensions together:
+### 1. Multiple Patterns
+Group related patterns together:
 ```python
 {
-    'extensions': ['*.jpg', '*.jpeg', '*.png'],  # Multiple extensions
+    'pattern': ['*.jpg', '*.jpeg', '*.png'],  # Multiple fnmatch patterns
     'open|view': ['open', '-a', 'Preview'],
     'edit': ['open', '-a', 'Photoshop']
 }
@@ -49,7 +49,7 @@ Group related extensions together:
 Use `|` to assign the same command to multiple actions:
 ```python
 {
-    'extensions': '*.pdf',
+    'pattern': '*.pdf',
     'open|view': ['open', '-a', 'Preview'],  # Same for both
     'edit': ['open', '-a', 'Acrobat']
 }
@@ -67,7 +67,7 @@ Each file type can have three actions:
 Simply omit an action if you want default behavior:
 ```python
 {
-    'extensions': '*.txt',
+    'pattern': '*.txt',
     'open': ['open', '-e'],
     'edit': ['vim']
     # 'view' omitted - will use built-in text viewer for text files
@@ -77,7 +77,7 @@ Simply omit an action if you want default behavior:
 Or explicitly set to `None` to prevent the action:
 ```python
 {
-    'extensions': '*.avi',
+    'pattern': '*.avi',
     'open|view': ['open', '-a', 'VLC'],
     'edit': None  # No editor configured
 }
