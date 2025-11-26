@@ -5,22 +5,21 @@ Provides scrollable information dialog functionality
 """
 
 import curses
+from tfm_base_list_dialog import BaseListDialog
 from tfm_colors import get_status_color
 from tfm_config import config_manager
 from tfm_wide_char_utils import get_display_width, get_safe_functions
 
 
-class InfoDialog:
+class InfoDialog(BaseListDialog):
     """Scrollable information dialog component"""
     
     def __init__(self, config):
-        self.config = config
+        super().__init__(config)
         
-        # Info dialog state
-        self.mode = False
+        # Info dialog specific state
         self.title = ""
         self.lines = []
-        self.scroll = 0
         self.content_changed = True  # Track if content needs redraw
         
     def show(self, title, info_lines):
@@ -38,10 +37,9 @@ class InfoDialog:
         
     def exit(self):
         """Exit info dialog mode"""
-        self.mode = False
+        super().exit()
         self.title = ""
         self.lines = []
-        self.scroll = 0
         self.content_changed = True  # Mark content as changed when exiting
         
     def handle_input(self, key):

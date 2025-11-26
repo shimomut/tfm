@@ -7,26 +7,25 @@ Provides batch file renaming functionality with regex patterns
 import curses
 import re
 from tfm_path import Path
+from tfm_base_list_dialog import BaseListDialog
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_const import KEY_ENTER_1, KEY_ENTER_2, KEY_TAB
 from tfm_colors import get_status_color, COLOR_ERROR
 from tfm_wide_char_utils import get_display_width, get_safe_functions
 
 
-class BatchRenameDialog:
+class BatchRenameDialog(BaseListDialog):
     """Batch rename dialog component for renaming multiple files with regex patterns"""
     
     def __init__(self, config):
-        self.config = config
+        super().__init__(config)
         
-        # Batch rename dialog state
-        self.mode = False
+        # Batch rename dialog specific state
         self.regex_editor = SingleLineTextEdit()
         self.destination_editor = SingleLineTextEdit()
         self.active_field = 'regex'  # 'regex' or 'destination'
         self.files = []  # List of selected files to rename
         self.preview = []  # List of preview results
-        self.scroll = 0  # Scroll offset for preview list
         self.content_changed = True  # Track if content needs redraw
         
     def show(self, selected_files):
@@ -50,14 +49,13 @@ class BatchRenameDialog:
         
     def exit(self):
         """Exit batch rename mode"""
-        self.mode = False
+        super().exit()
         self.content_changed = True  # Mark content as changed when exiting
         self.files = []
         self.regex_editor.clear()
         self.destination_editor.clear()
         self.active_field = 'regex'
         self.preview = []
-        self.scroll = 0
         
     def get_active_editor(self):
         """Get the currently active text editor"""
