@@ -6,10 +6,11 @@ Manages user configuration for the Two-File Manager.
 Configuration is stored in ~/.tfm/config.py as a Python class.
 """
 
+import fnmatch
+import importlib.util
 import os
 import sys
 from tfm_path import Path
-import importlib.util
 
 
 class DefaultConfig:
@@ -138,6 +139,70 @@ class DefaultConfig:
     UNICODE_CACHE_SIZE = 1000  # Maximum number of cached width calculations
     UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
     UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
+    
+    # File extension associations
+    # Maps file extensions to programs for different actions (open, view, edit)
+    # 
+    # Compact Format:
+    # - Extensions: Can be a string '*.pdf' or list ['*.jpg', '*.jpeg', '*.png']
+    # - Actions: Use 'open|view' to assign same command to multiple actions
+    # - Commands: List ['open', '-a', 'Preview'] or string 'open -a Preview'
+    # - None: Action not available
+    #
+    # Examples:
+    #   ['*.jpg', '*.png']: {'open|view': ['open', '-a', 'Preview'], 'edit': ['photoshop']}
+    #   '*.pdf': {'open|view': ['preview'], 'edit': ['acrobat']}
+    FILE_ASSOCIATIONS = [
+        # PDF files
+        {
+            'extensions': '*.pdf',
+            'open|view': ['open', '-a', 'Preview'],
+            'edit': ['open', '-a', 'Adobe Acrobat']
+        },
+        # Image files - multiple extensions, same program for open and view
+        {
+            'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+            'open|view': ['open', '-a', 'Preview'],
+            'edit': ['open', '-a', 'Photoshop']
+        },
+        # Video files
+        {
+            'extensions': ['*.mp4', '*.mov'],
+            'open|view': ['open', '-a', 'QuickTime Player'],
+            'edit': ['open', '-a', 'Final Cut Pro']
+        },
+        {
+            'extensions': '*.avi',
+            'open|view': ['open', '-a', 'VLC'],
+            'edit': None  # No editor configured
+        },
+        # Audio files
+        {
+            'extensions': ['*.mp3', '*.wav'],
+            'open|view': ['open', '-a', 'Music'],
+            'edit': ['open', '-a', 'Audacity']
+        },
+        # Text files
+        {
+            'extensions': '*.txt',
+            'open': ['open', '-e'],
+            'view': ['less'],
+            'edit': ['vim']
+        },
+        {
+            'extensions': '*.md',
+            'open': ['open', '-a', 'Typora'],
+            'view': ['less'],
+            'edit': ['vim']
+        },
+        # Code files
+        {
+            'extensions': ['*.py', '*.js'],
+            'open': ['open', '-a', 'Visual Studio Code'],
+            'view': ['less'],
+            'edit': ['vim']
+        },
+    ]
 
 
 class ConfigManager:
@@ -429,3 +494,102 @@ def get_programs():
                 print(f"Warning: Invalid program configuration: {prog}")
     
     return programs
+
+
+def get_file_associations():
+    """Get the file extension associations from configuration"""
+    config = get_config()
+    
+    # Get associations from user config or fall back to defaults
+    if hasattr(config, 'FILE_ASSOCIATIONS') and config.FILE_ASSOCIATIONS:
+        return config.FILE_ASSOCIATIONS
+    elif hasattr(DefaultConfig, 'FILE_ASSOCIATIONS'):
+        return DefaultConfig.FILE_ASSOCIATIONS
+    
+    return []
+
+
+def _expand_association_entry(entry):
+    """
+    Expand a compact association entry into individual pattern-action mappings.
+    
+    Args:
+        entry: Dictionary with 'extensions' key and action keys
+    
+    Returns:
+        List of (pattern, action, command) tuples
+    """
+    if not isinstance(entry, dict) or 'extensions' not in entry:
+        return []
+    
+    # Get extensions as a list
+    extensions = entry['extensions']
+    if isinstance(extensions, str):
+        extensions = [extensions]
+    elif not isinstance(extensions, list):
+        return []
+    
+    # Expand action keys (handle 'open|view' format)
+    expanded = []
+    for key, command in entry.items():
+        if key == 'extensions':
+            continue
+        
+        # Split combined action keys like 'open|view'
+        actions = key.split('|')
+        
+        # Add mapping for each extension and action combination
+        for ext in extensions:
+            for action in actions:
+                expanded.append((ext, action.strip(), command))
+    
+    return expanded
+
+
+def get_program_for_file(filename, action='open'):
+    """
+    Get the program command for a specific file and action.
+    
+    Args:
+        filename: The filename to check (e.g., 'document.pdf')
+        action: The action to perform ('open', 'view', or 'edit')
+    
+    Returns:
+        Command list if found, None otherwise
+    """
+    associations = get_file_associations()
+    if not associations:
+        return None
+    
+    # Convert filename to lowercase for case-insensitive matching
+    filename_lower = filename.lower()
+    
+    # Try to find a matching pattern
+    for entry in associations:
+        # Expand the compact entry format
+        for pattern, entry_action, command in _expand_association_entry(entry):
+            if entry_action == action and fnmatch.fnmatch(filename_lower, pattern.lower()):
+                # Convert string commands to list format
+                if isinstance(command, str):
+                    return command.split()
+                elif isinstance(command, list):
+                    return command
+                elif command is None:
+                    return None
+    
+    return None
+
+
+def has_action_for_file(filename, action='open'):
+    """
+    Check if a specific action is available for a file.
+    
+    Args:
+        filename: The filename to check
+        action: The action to check ('open', 'view', or 'edit')
+    
+    Returns:
+        True if the action is available, False otherwise
+    """
+    program = get_program_for_file(filename, action)
+    return program is not None

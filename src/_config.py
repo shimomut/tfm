@@ -142,6 +142,79 @@ class Config:
     UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
     UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
     
+    # File extension associations
+    # Maps file extensions to programs for different actions (open, view, edit)
+    # 
+    # Compact Format Features:
+    # 1. Multiple extensions in one entry: ['*.jpg', '*.jpeg', '*.png']
+    # 2. Combined actions: 'open|view' assigns same command to both actions
+    # 3. Commands: List ['open', '-a', 'Preview'] or string 'open -a Preview'
+    # 4. None: Action not available
+    #
+    # Format:
+    # {
+    #     'extensions': '*.pdf' or ['*.jpg', '*.png'],  # Single or multiple extensions
+    #     'open|view': ['command'],  # Same command for open and view
+    #     'edit': ['command']        # Different command for edit
+    # }
+    FILE_ASSOCIATIONS = [
+        # PDF files
+        {
+            'extensions': '*.pdf',
+            'open|view': ['open', '-a', 'Preview'],
+            'edit': ['open', '-a', 'Adobe Acrobat']
+        },
+        # Image files - multiple extensions, same program for open and view
+        {
+            'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+            'open|view': ['open', '-a', 'Preview'],
+            'edit': ['open', '-a', 'Photoshop']
+        },
+        # Video files
+        {
+            'extensions': ['*.mp4', '*.mov'],
+            'open|view': ['open', '-a', 'QuickTime Player'],
+            'edit': ['open', '-a', 'Final Cut Pro']
+        },
+        {
+            'extensions': '*.avi',
+            'open|view': ['open', '-a', 'VLC'],
+            'edit': None  # No editor configured
+        },
+        # Audio files
+        {
+            'extensions': ['*.mp3', '*.wav'],
+            'open|view': ['open', '-a', 'Music'],
+            'edit': ['open', '-a', 'Audacity']
+        },
+        # Text files
+        {
+            'extensions': '*.txt',
+            'open': ['open', '-e'],  # TextEdit on macOS
+            'view': ['less'],
+            'edit': ['vim']
+        },
+        {
+            'extensions': '*.md',
+            'open': ['open', '-a', 'Typora'],
+            'view': ['less'],
+            'edit': ['vim']
+        },
+        # Code files
+        {
+            'extensions': ['*.py', '*.js'],
+            'open': ['open', '-a', 'Visual Studio Code'],
+            'view': ['less'],
+            'edit': ['vim']
+        },
+        # Add your own file associations here:
+        # {
+        #     'extensions': ['*.ext1', '*.ext2'],
+        #     'open|view': ['command', 'args'],
+        #     'edit': ['command', 'args']
+        # },
+    ]
+    
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
     # Relative paths in the first element are resolved relative to the TFM root directory (where tfm.py is located)
