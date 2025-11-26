@@ -1598,14 +1598,12 @@ class FileManager:
     def handle_info_dialog_input(self, key):
         """Handle input while in info dialog mode - wrapper for info dialog component"""
         if self.info_dialog.handle_input(key):
-            self.needs_full_redraw = True
             return True
         return False
     
     def handle_list_dialog_input(self, key):
         """Handle input while in list dialog mode - wrapper for list dialog component"""
         if self.list_dialog.handle_input(key):
-            self.needs_full_redraw = True
             return True
         return False
 
@@ -2318,7 +2316,6 @@ class FileManager:
         result = self.batch_rename_dialog.handle_input(key)
         
         if result == True:
-            self.needs_full_redraw = True
             return True
         elif isinstance(result, tuple):
             action, data = result
@@ -2327,10 +2324,8 @@ class FileManager:
                 self.exit_batch_rename_mode()
                 return True
             elif action == 'field_switch':
-                self.needs_full_redraw = True
                 return True
             elif action == 'scroll':
-                self.needs_full_redraw = True
                 return True
             elif action == 'execute':
                 self.perform_batch_rename()
@@ -2401,13 +2396,11 @@ class FileManager:
         result = self.search_dialog.handle_input(key)
         
         if result == True:
-            self.needs_full_redraw = True
             return True
         elif isinstance(result, tuple):
             action, data = result
             if action == 'search':
                 self.perform_search()
-                self.needs_full_redraw = True
                 return True
             elif action == 'navigate':
                 if data:
@@ -2435,14 +2428,13 @@ class FileManager:
         display_height = height - log_height - 3
         
         SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
-        self.needs_full_redraw = True
+        # needs_full_redraw will be set when dialog exits
 
     def show_jump_dialog(self):
         """Show the jump dialog - wrapper for jump dialog component"""
         current_pane = self.get_current_pane()
         root_directory = current_pane['path']
         self.jump_dialog.show(root_directory, self.file_operations)
-        self.needs_full_redraw = True
         
         # Force immediate redraw to show dialog
         self._force_immediate_redraw()
@@ -2455,7 +2447,6 @@ class FileManager:
     def show_drives_dialog(self):
         """Show the drives dialog - wrapper for drives dialog component"""
         self.drives_dialog.show()
-        self.needs_full_redraw = True
         self._force_immediate_redraw()
     
     def exit_drives_dialog_mode(self):
@@ -2468,7 +2459,6 @@ class FileManager:
         result = self.jump_dialog.handle_input(key)
         
         if result == True:
-            self.needs_full_redraw = True
             return True
         elif isinstance(result, tuple):
             action, data = result
@@ -2486,7 +2476,6 @@ class FileManager:
         result = self.drives_dialog.handle_input(key)
         
         if result == True:
-            self.needs_full_redraw = True
             return True
         elif isinstance(result, tuple):
             action, data = result
