@@ -783,13 +783,22 @@ class ArchiveUI:
         """Proceed with extraction using archive operations"""
         # Check if extraction directory already exists
         if extract_dir.exists():
-            def overwrite_callback(confirmed):
-                if confirmed:
+            message = f"Directory '{archive_basename}' already exists."
+            choices = [
+                {"text": "Overwrite", "key": "o", "value": "overwrite"},
+                {"text": "Rename", "key": "r", "value": "rename"},
+                {"text": "Cancel", "key": "c", "value": "cancel"}
+            ]
+            
+            def handle_conflict_choice(choice):
+                if choice == "overwrite":
                     self.perform_extraction(selected_file, extract_dir, other_pane, overwrite=True)
+                elif choice == "rename":
+                    self._handle_extraction_rename(selected_file, other_pane, archive_basename)
                 else:
                     print("Extraction cancelled")
             
-            self.file_manager.show_confirmation(f"Directory '{archive_basename}' already exists. Overwrite?", overwrite_callback)
+            self.file_manager.show_dialog(message, choices, handle_conflict_choice)
         else:
             self.perform_extraction(selected_file, extract_dir, other_pane, overwrite=False)
     
@@ -853,6 +862,78 @@ class ArchiveUI:
         else:
             # Fallback - remove last extension
             return Path(filename).stem
+    
+    def _handle_extraction_rename(self, archive_file, other_pane, original_basename):
+        """Handle rename operation for extraction conflict"""
+        # Store context for the rename callback
+        self.file_manager._extraction_rename_context = {
+            'archive_file': archive_file,
+            'other_pane': other_pane,
+            'original_basename': original_basename
+        }
+        
+        # Use the general dialog for input
+        from tfm_general_purpose_dialog import DialogHelpers
+        DialogHelpers.create_rename_dialog(
+            self.file_manager.general_dialog,
+            original_basename,
+            original_basename
+        )
+        self.file_manager.general_dialog.callback = self._on_extraction_rename_confirm
+        self.file_manager.general_dialog.cancel_callback = self._on_extraction_rename_cancel
+        self.file_manager.needs_full_redraw = True
+    
+    def _on_extraction_rename_confirm(self, new_name):
+        """Handle extraction rename confirmation"""
+        if not new_name or new_name.strip() == "":
+            print("Extraction cancelled: empty directory name")
+            self.file_manager.general_dialog.hide()
+            self.file_manager.needs_full_redraw = True
+            return
+        
+        context = self.file_manager._extraction_rename_context
+        archive_file = context['archive_file']
+        other_pane = context['other_pane']
+        original_basename = context['original_basename']
+        new_name = new_name.strip()
+        new_extract_dir = other_pane['path'] / new_name
+        
+        # Hide the dialog first
+        self.file_manager.general_dialog.hide()
+        self.file_manager.needs_full_redraw = True
+        
+        # Check if the new name also conflicts
+        if new_extract_dir.exists():
+            # Show conflict dialog again with the new name
+            message = f"Directory '{new_name}' already exists."
+            choices = [
+                {"text": "Overwrite", "key": "o", "value": "overwrite"},
+                {"text": "Rename", "key": "r", "value": "rename"},
+                {"text": "Cancel", "key": "c", "value": "cancel"}
+            ]
+            
+            def handle_rename_conflict(choice):
+                if choice == "overwrite":
+                    # Extract with the new name, overwriting
+                    self.perform_extraction(archive_file, new_extract_dir, other_pane, overwrite=True)
+                    print(f"Extracted to '{new_name}' (overwrote existing)")
+                elif choice == "rename":
+                    # Ask for another name
+                    self._handle_extraction_rename(archive_file, other_pane, original_basename)
+                else:
+                    print("Extraction cancelled")
+            
+            self.file_manager.show_dialog(message, choices, handle_rename_conflict)
+        else:
+            # No conflict, proceed with extraction
+            self.perform_extraction(archive_file, new_extract_dir, other_pane, overwrite=False)
+            print(f"Extracted to '{new_name}'")
+    
+    def _on_extraction_rename_cancel(self):
+        """Handle extraction rename cancellation"""
+        print("Extraction cancelled")
+        self.file_manager.general_dialog.hide()
+        self.file_manager.needs_full_redraw = True
     
     def _get_archive_format_from_filename(self, filename):
         """Get archive format string for the archive operations"""

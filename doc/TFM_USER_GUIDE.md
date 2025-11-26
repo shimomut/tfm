@@ -255,9 +255,12 @@ F7       - Create new directory
 
 ### Safety Features
 - **Confirmation Dialogs**: User confirmation for destructive operations
-- **Conflict Resolution**: Handle file name conflicts during operations
+- **Conflict Resolution**: Handle file name conflicts with Overwrite, Skip, Rename, or Cancel options
+- **Rename on Conflict**: Specify alternative filenames when conflicts occur during copy/move/extract
 - **Permission Checks**: Validate file system permissions
 - **Undo Prevention**: Clear warnings about irreversible operations
+
+**See detailed documentation**: [Rename Conflict Resolution Feature](RENAME_CONFLICT_RESOLUTION_FEATURE.md)
 
 ---
 
@@ -539,6 +542,7 @@ For detailed information about specific features, see these dedicated guides:
 - [Create File Feature](CREATE_FILE_FEATURE.md) - Creating and editing new files
 - [Cross-Storage Move Feature](CROSS_STORAGE_MOVE_FEATURE.md) - Moving files between storage types
 - [File Details Feature](FILE_DETAILS_FEATURE.md) - Viewing detailed file information
+- [Rename Conflict Resolution Feature](RENAME_CONFLICT_RESOLUTION_FEATURE.md) - Handling file name conflicts
 
 ### Navigation and Search
 - [Favorite Directories Feature](FAVORITE_DIRECTORIES_FEATURE.md) - Quick directory bookmarks

@@ -441,6 +441,7 @@ class FileOperationsUI:
             choices = [
                 {"text": "Overwrite", "key": "o", "value": "overwrite"},
                 {"text": "Skip", "key": "s", "value": "skip"},
+                {"text": "Rename", "key": "r", "value": "rename"},
                 {"text": "Cancel", "key": "c", "value": "cancel"}
             ]
             
@@ -461,6 +462,12 @@ class FileOperationsUI:
                     # Copy all files, overwriting conflicts
                     self.perform_copy_operation(files_to_copy, destination_dir, overwrite=True)
                     print(f"Copied {len(files_to_copy)} files (overwrote {len(conflicts)} existing)")
+                elif choice == "rename":
+                    # Handle rename for single file conflict
+                    if len(conflicts) == 1:
+                        self._handle_copy_rename(files_to_copy[0], destination_dir)
+                    else:
+                        print("Rename option only available for single file conflicts")
             
             self.file_manager.show_dialog(message, choices, handle_conflict_choice)
         else:
@@ -678,6 +685,7 @@ class FileOperationsUI:
             choices = [
                 {"text": "Overwrite", "key": "o", "value": "overwrite"},
                 {"text": "Skip", "key": "s", "value": "skip"},
+                {"text": "Rename", "key": "r", "value": "rename"},
                 {"text": "Cancel", "key": "c", "value": "cancel"}
             ]
             
@@ -698,6 +706,12 @@ class FileOperationsUI:
                     # Move all files, overwriting conflicts
                     self.perform_move_operation(files_to_move, destination_dir, overwrite=True)
                     print(f"Moved {len(files_to_move)} files (overwrote {len(conflicts)} existing)")
+                elif choice == "rename":
+                    # Handle rename for single file conflict
+                    if len(conflicts) == 1:
+                        self._handle_move_rename(files_to_move[0], destination_dir)
+                    else:
+                        print("Rename option only available for single file conflicts")
             
             self.file_manager.show_dialog(message, choices, handle_conflict_choice)
         else:
@@ -1274,3 +1288,220 @@ class FileOperationsUI:
             if total_files > 1:
                 self.progress_manager.increment_errors()
             return processed_files
+    
+    def _handle_copy_rename(self, source_file, destination_dir):
+        """Handle rename operation for copy conflict"""
+        # Store context for the rename callback
+        self.file_manager._copy_rename_context = {
+            'source_file': source_file,
+            'destination_dir': destination_dir
+        }
+        
+        # Use the general dialog for input
+        from tfm_general_purpose_dialog import DialogHelpers
+        DialogHelpers.create_rename_dialog(
+            self.file_manager.general_dialog,
+            source_file.name,
+            source_file.name
+        )
+        self.file_manager.general_dialog.callback = self._on_copy_rename_confirm
+        self.file_manager.general_dialog.cancel_callback = self._on_copy_rename_cancel
+        self.file_manager.needs_full_redraw = True
+    
+    def _on_copy_rename_confirm(self, new_name):
+        """Handle copy rename confirmation"""
+        if not new_name or new_name.strip() == "":
+            print("Copy cancelled: empty filename")
+            self.file_manager.general_dialog.hide()
+            self.file_manager.needs_full_redraw = True
+            return
+        
+        context = self.file_manager._copy_rename_context
+        source_file = context['source_file']
+        destination_dir = context['destination_dir']
+        new_name = new_name.strip()
+        new_dest_path = destination_dir / new_name
+        
+        # Hide the dialog first
+        self.file_manager.general_dialog.hide()
+        self.file_manager.needs_full_redraw = True
+        
+        # Check if the new name also conflicts
+        if new_dest_path.exists():
+            # Show conflict dialog again with the new name
+            message = f"'{new_name}' already exists in destination."
+            choices = [
+                {"text": "Overwrite", "key": "o", "value": "overwrite"},
+                {"text": "Rename", "key": "r", "value": "rename"},
+                {"text": "Cancel", "key": "c", "value": "cancel"}
+            ]
+            
+            def handle_rename_conflict(choice):
+                if choice == "overwrite":
+                    # Copy with the new name, overwriting
+                    self._perform_single_copy(source_file, new_dest_path, overwrite=True)
+                    print(f"Copied as '{new_name}' (overwrote existing)")
+                elif choice == "rename":
+                    # Ask for another name
+                    self._handle_copy_rename(source_file, destination_dir)
+                else:
+                    print("Copy operation cancelled")
+            
+            self.file_manager.show_dialog(message, choices, handle_rename_conflict)
+        else:
+            # No conflict, proceed with copy
+            self._perform_single_copy(source_file, new_dest_path, overwrite=False)
+            print(f"Copied as '{new_name}'")
+    
+    def _on_copy_rename_cancel(self):
+        """Handle copy rename cancellation"""
+        print("Copy operation cancelled")
+        self.file_manager.general_dialog.hide()
+        self.file_manager.needs_full_redraw = True
+    
+    def _handle_move_rename(self, source_file, destination_dir):
+        """Handle rename operation for move conflict"""
+        # Store context for the rename callback
+        self.file_manager._move_rename_context = {
+            'source_file': source_file,
+            'destination_dir': destination_dir
+        }
+        
+        # Use the general dialog for input
+        from tfm_general_purpose_dialog import DialogHelpers
+        DialogHelpers.create_rename_dialog(
+            self.file_manager.general_dialog,
+            source_file.name,
+            source_file.name
+        )
+        self.file_manager.general_dialog.callback = self._on_move_rename_confirm
+        self.file_manager.general_dialog.cancel_callback = self._on_move_rename_cancel
+        self.file_manager.needs_full_redraw = True
+    
+    def _on_move_rename_confirm(self, new_name):
+        """Handle move rename confirmation"""
+        if not new_name or new_name.strip() == "":
+            print("Move cancelled: empty filename")
+            self.file_manager.general_dialog.hide()
+            self.file_manager.needs_full_redraw = True
+            return
+        
+        context = self.file_manager._move_rename_context
+        source_file = context['source_file']
+        destination_dir = context['destination_dir']
+        new_name = new_name.strip()
+        new_dest_path = destination_dir / new_name
+        
+        # Hide the dialog first
+        self.file_manager.general_dialog.hide()
+        self.file_manager.needs_full_redraw = True
+        
+        # Check if the new name also conflicts
+        if new_dest_path.exists():
+            # Show conflict dialog again with the new name
+            message = f"'{new_name}' already exists in destination."
+            choices = [
+                {"text": "Overwrite", "key": "o", "value": "overwrite"},
+                {"text": "Rename", "key": "r", "value": "rename"},
+                {"text": "Cancel", "key": "c", "value": "cancel"}
+            ]
+            
+            def handle_rename_conflict(choice):
+                if choice == "overwrite":
+                    # Move with the new name, overwriting
+                    self._perform_single_move(source_file, new_dest_path, overwrite=True)
+                    print(f"Moved as '{new_name}' (overwrote existing)")
+                elif choice == "rename":
+                    # Ask for another name
+                    self._handle_move_rename(source_file, destination_dir)
+                else:
+                    print("Move operation cancelled")
+            
+            self.file_manager.show_dialog(message, choices, handle_rename_conflict)
+        else:
+            # No conflict, proceed with move
+            self._perform_single_move(source_file, new_dest_path, overwrite=False)
+            print(f"Moved as '{new_name}'")
+    
+    def _on_move_rename_cancel(self):
+        """Handle move rename cancellation"""
+        print("Move operation cancelled")
+        self.file_manager.general_dialog.hide()
+        self.file_manager.needs_full_redraw = True
+    
+    def _perform_single_copy(self, source_file, dest_path, overwrite=False):
+        """Perform copy operation for a single file"""
+        try:
+            if source_file.is_dir():
+                # Copy directory recursively
+                if dest_path.exists() and overwrite:
+                    if dest_path.is_dir():
+                        pass  # Let copy_to handle it
+                    else:
+                        dest_path.unlink()
+                
+                source_file.copy_to(dest_path, overwrite=overwrite)
+            else:
+                # Copy single file
+                source_file.copy_to(dest_path, overwrite=overwrite)
+            
+            # Invalidate cache
+            self.cache_manager.invalidate_cache_for_copy_operation([source_file], dest_path.parent)
+            
+            # Refresh both panes
+            self.file_manager.refresh_files()
+            self.file_manager.needs_full_redraw = True
+            
+            # Clear selections
+            current_pane = self.file_manager.get_current_pane()
+            current_pane['selected_files'].clear()
+            
+        except Exception as e:
+            print(f"Error copying {source_file.name}: {e}")
+    
+    def _perform_single_move(self, source_file, dest_path, overwrite=False):
+        """Perform move operation for a single file"""
+        try:
+            # Remove destination if it exists and we're overwriting
+            if dest_path.exists() and overwrite:
+                if dest_path.is_dir():
+                    self._delete_directory_with_progress(dest_path, 0, 1)
+                else:
+                    dest_path.unlink()
+            
+            # Determine if this is a cross-storage move
+            source_scheme = source_file.get_scheme()
+            dest_scheme = dest_path.parent.get_scheme()
+            is_cross_storage = source_scheme != dest_scheme
+            
+            # Move the file/directory
+            if source_file.is_dir():
+                if is_cross_storage:
+                    source_file.copy_to(dest_path, overwrite=overwrite)
+                    if hasattr(source_file._impl, 'rmtree'):
+                        source_file._impl.rmtree()
+                    else:
+                        self._delete_directory_with_progress(source_file, 0, 1)
+                else:
+                    source_file.copy_to(dest_path, overwrite=overwrite)
+                    self._delete_directory_with_progress(source_file, 0, 1)
+            else:
+                if is_cross_storage:
+                    source_file.copy_to(dest_path, overwrite=overwrite)
+                    source_file.unlink()
+                else:
+                    source_file.rename(dest_path)
+            
+            # Invalidate cache
+            self.cache_manager.invalidate_cache_for_move_operation([source_file], dest_path.parent)
+            
+            # Refresh both panes
+            self.file_manager.refresh_files()
+            self.file_manager.needs_full_redraw = True
+            
+            # Clear selections
+            current_pane = self.file_manager.get_current_pane()
+            current_pane['selected_files'].clear()
+            
+        except Exception as e:
+            print(f"Error moving {source_file.name}: {e}")
