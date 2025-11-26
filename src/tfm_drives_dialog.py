@@ -84,7 +84,7 @@ class DrivesDialog(BaseListDialog):
         # Cancel any existing S3 scan first
         self._cancel_current_s3_scan()
         
-        self.mode = True
+        self.is_active = True
         self.text_editor.clear()
         self.drives = []
         self.content_changed = True

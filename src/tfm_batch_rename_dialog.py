@@ -37,7 +37,7 @@ class BatchRenameDialog(BaseListDialog):
         if not selected_files:
             return False
             
-        self.mode = True
+        self.is_active = True
         self.files = selected_files
         self.regex_editor.clear()
         self.destination_editor.clear()

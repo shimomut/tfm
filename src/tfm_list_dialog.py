@@ -37,7 +37,7 @@ class ListDialog(BaseListDialog):
             custom_key_handler: Optional function to handle custom keys (key) -> bool
             custom_help_text: Optional custom help text to display at bottom
         """
-        self.mode = True
+        self.is_active = True
         self.title = title
         self.items = items
         self.filtered_items = items.copy()  # Initially show all items

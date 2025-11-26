@@ -31,21 +31,21 @@ class TestBaseListDialog(unittest.TestCase):
         
     def test_init(self):
         """Test BaseListDialog initialization"""
-        self.assertFalse(self.base_dialog.mode)
+        self.assertFalse(self.base_dialog.is_active)
         self.assertEqual(self.base_dialog.selected, 0)
         self.assertEqual(self.base_dialog.scroll, 0)
         self.assertIsNotNone(self.base_dialog.text_editor)
         
     def test_exit(self):
         """Test exit method"""
-        self.base_dialog.mode = True
+        self.base_dialog.is_active = True
         self.base_dialog.selected = 5
         self.base_dialog.scroll = 2
         self.base_dialog.text_editor.text = "test"
         
         self.base_dialog.exit()
         
-        self.assertFalse(self.base_dialog.mode)
+        self.assertFalse(self.base_dialog.is_active)
         self.assertEqual(self.base_dialog.selected, 0)
         self.assertEqual(self.base_dialog.scroll, 0)
         self.assertEqual(self.base_dialog.text_editor.text, "")
@@ -110,7 +110,7 @@ class TestListDialog(unittest.TestCase):
         
         self.list_dialog.show("Test Title", items, callback)
         
-        self.assertTrue(self.list_dialog.mode)
+        self.assertTrue(self.list_dialog.is_active)
         self.assertEqual(self.list_dialog.title, "Test Title")
         self.assertEqual(self.list_dialog.items, items)
         self.assertEqual(self.list_dialog.filtered_items, items)
@@ -138,7 +138,7 @@ class TestListDialog(unittest.TestCase):
         result = self.list_dialog.handle_input(curses.KEY_ENTER)
         
         self.assertTrue(result)
-        self.assertFalse(self.list_dialog.mode)  # Should exit
+        self.assertFalse(self.list_dialog.is_active)  # Should exit
         callback.assert_called_once_with("banana")
 
 
@@ -162,7 +162,7 @@ class TestSearchDialog(unittest.TestCase):
         """Test show method"""
         self.search_dialog.show('content')
         
-        self.assertTrue(self.search_dialog.mode)
+        self.assertTrue(self.search_dialog.is_active)
         self.assertEqual(self.search_dialog.search_type, 'content')
         self.assertEqual(self.search_dialog.results, [])
         

@@ -51,7 +51,7 @@ class SearchDialog(BaseListDialog):
         self._cancel_current_search()
         self.content_changed = True  # Mark content as changed when showing
         
-        self.mode = True
+        self.is_active = True
         self.search_type = search_type
         self.text_editor.clear()
         self.results = []

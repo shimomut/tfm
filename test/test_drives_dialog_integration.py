@@ -27,7 +27,7 @@ def test_drives_dialog_integration():
     dialog = DrivesDialog(config)
     
     # Test initialization
-    assert dialog.mode == False
+    assert dialog.is_active == False
     assert len(dialog.drives) == 0
     assert len(dialog.filtered_drives) == 0
     assert dialog.loading_s3 == False
@@ -35,7 +35,7 @@ def test_drives_dialog_integration():
     # Test show method (without actually running S3 scan)
     with patch.object(dialog, '_start_s3_bucket_scan'):
         dialog.show()
-        assert dialog.mode == True
+        assert dialog.is_active == True
         assert len(dialog.drives) >= 3  # Should have at least home, root, current
     
     # Test local drives loading

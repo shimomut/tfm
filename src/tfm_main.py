@@ -865,7 +865,7 @@ class FileManager:
             return
 
         # If in quick choice mode, show quick choice bar
-        if self.quick_choice_bar.mode:
+        if self.quick_choice_bar.is_active:
             self.quick_choice_bar.draw(self.stdscr, self.safe_addstr, status_y, width)
             return
         
@@ -1498,17 +1498,17 @@ class FileManager:
         """Check if any active dialog content has changed and needs redraw"""
         if self.general_dialog.is_active:
             return self.general_dialog.needs_redraw()
-        elif self.list_dialog.mode:
+        elif self.list_dialog.is_active:
             return self.list_dialog.needs_redraw()
-        elif self.info_dialog.mode:
+        elif self.info_dialog.is_active:
             return self.info_dialog.needs_redraw()
-        elif self.search_dialog.mode:
+        elif self.search_dialog.is_active:
             return self.search_dialog.needs_redraw()
-        elif self.jump_dialog.mode:
+        elif self.jump_dialog.is_active:
             return self.jump_dialog.needs_redraw()
-        elif self.drives_dialog.mode:
+        elif self.drives_dialog.is_active:
             return self.drives_dialog.needs_redraw()
-        elif self.batch_rename_dialog.mode:
+        elif self.batch_rename_dialog.is_active:
             return self.batch_rename_dialog.needs_redraw()
         return False
     
@@ -1522,22 +1522,22 @@ class FileManager:
             if self.general_dialog.is_active:
                 self.general_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
-            elif self.list_dialog.mode:
+            elif self.list_dialog.is_active:
                 self.list_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
-            elif self.info_dialog.mode:
+            elif self.info_dialog.is_active:
                 self.info_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
-            elif self.search_dialog.mode:
+            elif self.search_dialog.is_active:
                 self.search_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
-            elif self.jump_dialog.mode:
+            elif self.jump_dialog.is_active:
                 self.jump_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
-            elif self.drives_dialog.mode:
+            elif self.drives_dialog.is_active:
                 self.drives_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
-            elif self.batch_rename_dialog.mode:
+            elif self.batch_rename_dialog.is_active:
                 self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
                 dialog_drawn = True
             
@@ -1559,17 +1559,17 @@ class FileManager:
         self.draw_status()
         
         # Draw dialog overlays
-        if self.list_dialog.mode:
+        if self.list_dialog.is_active:
             self.list_dialog.draw(self.stdscr, self.safe_addstr)
-        elif self.info_dialog.mode:
+        elif self.info_dialog.is_active:
             self.info_dialog.draw(self.stdscr, self.safe_addstr)
-        elif self.search_dialog.mode:
+        elif self.search_dialog.is_active:
             self.search_dialog.draw(self.stdscr, self.safe_addstr)
-        elif self.jump_dialog.mode:
+        elif self.jump_dialog.is_active:
             self.jump_dialog.draw(self.stdscr, self.safe_addstr)
-        elif self.drives_dialog.mode:
+        elif self.drives_dialog.is_active:
             self.drives_dialog.draw(self.stdscr, self.safe_addstr)
-        elif self.batch_rename_dialog.mode:
+        elif self.batch_rename_dialog.is_active:
             self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
         
         # Refresh screen immediately
@@ -2514,45 +2514,45 @@ class FileManager:
                 return True  # General dialog handled the key
         
         # Handle quick choice mode input
-        if self.quick_choice_bar.mode:
+        if self.quick_choice_bar.is_active:
             if self.handle_quick_choice_input(key):
                 return True  # Quick choice mode handled the key
         
         # Handle info dialog mode input
-        if self.info_dialog.mode:
+        if self.info_dialog.is_active:
             if self.handle_info_dialog_input(key):
                 return True  # Info dialog mode handled the key
         
         # Handle list dialog mode input
-        if self.list_dialog.mode:
+        if self.list_dialog.is_active:
             if self.handle_list_dialog_input(key):
                 return True  # List dialog mode handled the key
         
         # Handle search dialog mode input
-        if self.search_dialog.mode:
+        if self.search_dialog.is_active:
             if self.handle_search_dialog_input(key):
                 return True  # Search dialog mode handled the key
         
         # Handle jump dialog mode input
-        if self.jump_dialog.mode:
+        if self.jump_dialog.is_active:
             if self.handle_jump_dialog_input(key):
                 return True  # Jump dialog mode handled the key
         
         # Handle drives dialog mode input
-        if self.drives_dialog.mode:
+        if self.drives_dialog.is_active:
             if self.handle_drives_dialog_input(key):
                 return True  # Drives dialog mode handled the key
         
         # Handle batch rename dialog mode input
-        if self.batch_rename_dialog.mode:
+        if self.batch_rename_dialog.is_active:
             if self.handle_batch_rename_input(key):
                 return True  # Batch rename mode handled the key
         
         # Skip regular key processing if any dialog is open
         # This prevents conflicts like starting isearch mode while help dialog is open
-        if (self.quick_choice_bar.mode or self.info_dialog.mode or self.list_dialog.mode or 
-            self.search_dialog.mode or self.jump_dialog.mode or self.drives_dialog.mode or 
-            self.batch_rename_dialog.mode or self.isearch_mode or self.general_dialog.is_active):
+        if (self.quick_choice_bar.is_active or self.info_dialog.is_active or self.list_dialog.is_active or 
+            self.search_dialog.is_active or self.jump_dialog.is_active or self.drives_dialog.is_active or 
+            self.batch_rename_dialog.is_active or self.isearch_mode or self.general_dialog.is_active):
             return True
         
         # Handle main application keys

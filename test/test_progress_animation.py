@@ -139,13 +139,13 @@ def test_main_loop_animation_logic():
             self.general_dialog = Mock()
             self.general_dialog.is_active = False
             self.list_dialog = Mock()
-            self.list_dialog.mode = False
+            self.list_dialog.is_active = False
             self.info_dialog = Mock()
-            self.info_dialog.mode = False
+            self.info_dialog.is_active = False
             self.jump_dialog = Mock()
-            self.jump_dialog.mode = False
+            self.jump_dialog.is_active = False
             self.batch_rename_dialog = Mock()
-            self.batch_rename_dialog.mode = False
+            self.batch_rename_dialog.is_active = False
         
         def _check_dialog_content_changed(self):
             """Simulate the updated method"""

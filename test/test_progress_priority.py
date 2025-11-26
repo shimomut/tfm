@@ -16,7 +16,7 @@ from tfm_progress_manager import ProgressManager, OperationType
 class MockQuickChoiceBar:
     """Mock quick choice bar"""
     def __init__(self):
-        self.mode = False
+        self.is_active = False
         self.draw_called = False
     
     def draw(self, stdscr, safe_addstr, status_y, width):
@@ -63,7 +63,7 @@ class MockTFM:
             return
 
         # If in quick choice mode, show quick choice bar
-        if self.quick_choice_bar.mode:
+        if self.quick_choice_bar.is_active:
             self.quick_choice_bar.draw(self.stdscr, self.safe_addstr, status_y, width)
             return
 
@@ -75,7 +75,7 @@ def test_progress_takes_priority():
     tfm = MockTFM()
     
     # Test 1: Quick choice bar active, no progress
-    tfm.quick_choice_bar.mode = True
+    tfm.quick_choice_bar.is_active = True
     tfm.draw_status()
     
     assert tfm.quick_choice_bar.draw_called, "Quick choice bar should be drawn when no progress active"
@@ -85,7 +85,7 @@ def test_progress_takes_priority():
     tfm.progress_manager.start_operation(OperationType.DELETE, 10, "", None)
     tfm.progress_manager.update_progress("test_file.txt", 5)
     
-    tfm.quick_choice_bar.mode = True  # Still active
+    tfm.quick_choice_bar.is_active = True  # Still active
     tfm.draw_status()
     
     assert not tfm.quick_choice_bar.draw_called, "Quick choice bar should NOT be drawn when progress is active"
@@ -99,7 +99,7 @@ def test_progress_takes_priority():
     
     # Test 3: Progress finished, quick choice bar should work again
     tfm.progress_manager.finish_operation()
-    tfm.quick_choice_bar.mode = True
+    tfm.quick_choice_bar.is_active = True
     tfm.draw_status()
     
     assert tfm.quick_choice_bar.draw_called, "Quick choice bar should be drawn again after progress finishes"
@@ -118,7 +118,7 @@ def test_progress_without_quick_choice():
     tfm.progress_manager.update_progress("document.pdf", 3)
     
     # Quick choice bar not active
-    tfm.quick_choice_bar.mode = False
+    tfm.quick_choice_bar.is_active = False
     tfm.draw_status()
     
     assert not tfm.quick_choice_bar.draw_called, "Quick choice bar should not be drawn"

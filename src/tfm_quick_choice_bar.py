@@ -16,7 +16,7 @@ class QuickChoiceBar:
         self.config = config
         
         # Quick choice bar state
-        self.mode = False
+        self.is_active = False
         self.message = ""
         self.choices = []  # List of choice dictionaries: [{"text": "Yes", "key": "y", "value": True}, ...]
         self.callback = None
@@ -33,7 +33,7 @@ class QuickChoiceBar:
                       {"text": "Cancel", "key": "c", "value": None}]
             callback: Function to call with the selected choice's value
         """
-        self.mode = True
+        self.is_active = True
         self.message = message
         self.choices = choices
         self.callback = callback
@@ -41,7 +41,7 @@ class QuickChoiceBar:
         
     def exit(self):
         """Exit quick choice mode"""
-        self.mode = False
+        self.is_active = False
         self.message = ""
         self.choices = []
         self.callback = None

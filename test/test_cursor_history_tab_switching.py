@@ -91,7 +91,7 @@ def test_cursor_history_tab_switching():
                 # Mock list dialog
                 class MockListDialog:
                     def __init__(self):
-                        self.mode = False
+                        self.is_active = False
                         self.title = ""
                         self.items = []
                         self.callback = None
@@ -100,7 +100,7 @@ def test_cursor_history_tab_switching():
                         self.last_shown_data = None
                     
                     def show(self, title, items, callback, custom_key_handler=None, custom_help_text=None):
-                        self.mode = True
+                        self.is_active = True
                         self.title = title
                         self.items = items
                         self.callback = callback
@@ -114,7 +114,7 @@ def test_cursor_history_tab_switching():
                         }
                     
                     def exit(self):
-                        self.mode = False
+                        self.is_active = False
                         self.title = ""
                         self.items = []
                         self.callback = None
@@ -174,7 +174,7 @@ def test_cursor_history_tab_switching():
         print("\nTesting left pane history dialog:")
         mock_tfm._show_cursor_history_for_pane('left')
         
-        assert mock_tfm.list_dialog.mode == True
+        assert mock_tfm.list_dialog.is_active == True
         assert mock_tfm.list_dialog.title == "History - Left"
         assert "TAB:switch to Right" in mock_tfm.list_dialog.custom_help_text
         assert mock_tfm.list_dialog.custom_key_handler is not None

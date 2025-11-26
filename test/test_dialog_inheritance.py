@@ -98,25 +98,25 @@ def test_exit_method():
     
     # Test BatchRenameDialog exit
     batch_dialog = BatchRenameDialog(config)
-    batch_dialog.mode = True
+    batch_dialog.is_active = True
     batch_dialog.scroll = 5
     batch_dialog.selected = 3
     batch_dialog.exit()
     
     print("BatchRenameDialog after exit:")
-    print(f"  ✓ mode reset: {batch_dialog.mode == False}")
+    print(f"  ✓ is_active reset: {batch_dialog.is_active == False}")
     print(f"  ✓ scroll reset: {batch_dialog.scroll == 0}")
     print(f"  ✓ selected reset: {batch_dialog.selected == 0}")
     
     # Test InfoDialog exit
     info_dialog = InfoDialog(config)
-    info_dialog.mode = True
+    info_dialog.is_active = True
     info_dialog.scroll = 5
     info_dialog.selected = 3
     info_dialog.exit()
     
     print("\nInfoDialog after exit:")
-    print(f"  ✓ mode reset: {info_dialog.mode == False}")
+    print(f"  ✓ is_active reset: {info_dialog.is_active == False}")
     print(f"  ✓ scroll reset: {info_dialog.scroll == 0}")
     print(f"  ✓ selected reset: {info_dialog.selected == 0}")
     

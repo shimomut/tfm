@@ -57,7 +57,7 @@ def test_drives_dialog_basic():
     dialog = DrivesDialog(config)
     
     # Test initial state
-    assert dialog.mode == False
+    assert dialog.is_active == False
     assert len(dialog.drives) == 0
     assert len(dialog.filtered_drives) == 0
     assert dialog.loading_s3 == False

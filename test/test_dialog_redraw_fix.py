@@ -53,11 +53,11 @@ class TestDialogRedrawFix(unittest.TestCase):
             
             # Set up default states
             self.file_manager.general_dialog.is_active = False
-            self.file_manager.list_dialog.mode = False
-            self.file_manager.info_dialog.mode = False
-            self.file_manager.search_dialog.mode = False
-            self.file_manager.jump_dialog.mode = False
-            self.file_manager.batch_rename_dialog.mode = False
+            self.file_manager.list_dialog.is_active = False
+            self.file_manager.info_dialog.is_active = False
+            self.file_manager.search_dialog.is_active = False
+            self.file_manager.jump_dialog.is_active = False
+            self.file_manager.batch_rename_dialog.is_active = False
             
             # Mock other required methods
             self.file_manager.refresh_files = Mock()
@@ -73,7 +73,7 @@ class TestDialogRedrawFix(unittest.TestCase):
     def test_dialog_redrawn_when_full_redraw_needed(self):
         """Test that active dialogs are redrawn when full redraw is needed"""
         # Set up a list dialog as active
-        self.file_manager.list_dialog.mode = True
+        self.file_manager.list_dialog.is_active = True
         self.file_manager.list_dialog.needs_redraw.return_value = False  # Content hasn't changed
         
         # Trigger a main screen redraw
@@ -90,11 +90,11 @@ class TestDialogRedrawFix(unittest.TestCase):
         """Test that inactive dialogs are not drawn when no full redraw is needed"""
         # All dialogs inactive
         self.file_manager.general_dialog.is_active = False
-        self.file_manager.list_dialog.mode = False
-        self.file_manager.info_dialog.mode = False
-        self.file_manager.search_dialog.mode = False
-        self.file_manager.jump_dialog.mode = False
-        self.file_manager.batch_rename_dialog.mode = False
+        self.file_manager.list_dialog.is_active = False
+        self.file_manager.info_dialog.is_active = False
+        self.file_manager.search_dialog.is_active = False
+        self.file_manager.jump_dialog.is_active = False
+        self.file_manager.batch_rename_dialog.is_active = False
         
         # No full redraw needed
         self.file_manager.needs_full_redraw = False
@@ -126,7 +126,7 @@ class TestDialogRedrawFix(unittest.TestCase):
     def test_info_dialog_redrawn_when_full_redraw(self):
         """Test that info dialog is redrawn when full redraw is needed"""
         # Set up info dialog as active
-        self.file_manager.info_dialog.mode = True
+        self.file_manager.info_dialog.is_active = True
         self.file_manager.info_dialog.needs_redraw.return_value = False  # Content hasn't changed
         self.file_manager.needs_full_redraw = True  # But full redraw is needed
         
@@ -140,7 +140,7 @@ class TestDialogRedrawFix(unittest.TestCase):
     def test_search_dialog_redrawn_when_content_changed(self):
         """Test that search dialog is redrawn when content changes"""
         # Set up search dialog as active
-        self.file_manager.search_dialog.mode = True
+        self.file_manager.search_dialog.is_active = True
         self.file_manager.search_dialog.needs_redraw.return_value = True  # Content has changed
         
         # Call _draw_dialogs_if_needed
@@ -153,7 +153,7 @@ class TestDialogRedrawFix(unittest.TestCase):
     def test_jump_dialog_redrawn_when_full_redraw(self):
         """Test that jump dialog is redrawn when full redraw is needed"""
         # Set up jump dialog as active
-        self.file_manager.jump_dialog.mode = True
+        self.file_manager.jump_dialog.is_active = True
         self.file_manager.jump_dialog.needs_redraw.return_value = False  # Content hasn't changed
         self.file_manager.needs_full_redraw = True  # But full redraw is needed
         
@@ -167,7 +167,7 @@ class TestDialogRedrawFix(unittest.TestCase):
     def test_batch_rename_dialog_redrawn_when_content_changed(self):
         """Test that batch rename dialog is redrawn when content changes"""
         # Set up batch rename dialog as active
-        self.file_manager.batch_rename_dialog.mode = True
+        self.file_manager.batch_rename_dialog.is_active = True
         self.file_manager.batch_rename_dialog.needs_redraw.return_value = True  # Content has changed
         
         # Call _draw_dialogs_if_needed
@@ -180,7 +180,7 @@ class TestDialogRedrawFix(unittest.TestCase):
     def test_screen_refreshed_when_dialog_drawn(self):
         """Test that screen is refreshed when a dialog is drawn"""
         # Set up a dialog as active
-        self.file_manager.list_dialog.mode = True
+        self.file_manager.list_dialog.is_active = True
         self.file_manager.list_dialog.needs_redraw.return_value = False
         
         # Call _draw_dialogs_if_needed
@@ -193,7 +193,7 @@ class TestDialogRedrawFix(unittest.TestCase):
         """Test that only the active dialog is drawn when multiple could be active"""
         # Set up multiple dialogs, but only one should be drawn (general dialog has priority)
         self.file_manager.general_dialog.is_active = True
-        self.file_manager.list_dialog.mode = True  # This should be ignored
+        self.file_manager.list_dialog.is_active = True  # This should be ignored
         
         # Trigger full redraw
         self.file_manager.needs_full_redraw = True
@@ -209,7 +209,7 @@ class TestDialogRedrawFix(unittest.TestCase):
     def test_dialog_not_constantly_redrawn(self):
         """Test that dialogs are not constantly redrawn when active but content unchanged and no full redraw"""
         # Set up a dialog as active
-        self.file_manager.list_dialog.mode = True
+        self.file_manager.list_dialog.is_active = True
         self.file_manager.list_dialog.needs_redraw.return_value = False  # Content hasn't changed
         self.file_manager.needs_full_redraw = False  # No full redraw needed
         

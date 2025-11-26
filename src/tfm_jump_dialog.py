@@ -50,7 +50,7 @@ class JumpDialog(BaseListDialog):
         # Cancel any existing scan first
         self._cancel_current_scan()
         
-        self.mode = True
+        self.is_active = True
         self.text_editor.clear()
         self.directories = []
         self.content_changed = True  # Mark content as changed when showing

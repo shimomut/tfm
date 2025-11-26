@@ -18,14 +18,14 @@ class BaseListDialog:
         self.config = config
         
         # Common dialog state
-        self.mode = False
+        self.is_active = False
         self.selected = 0  # Index of currently selected item
         self.scroll = 0  # Scroll offset for the list
         self.text_editor = SingleLineTextEdit()  # Text editor for input
         
     def exit(self):
         """Exit dialog mode - to be overridden by subclasses"""
-        self.mode = False
+        self.is_active = False
         self.selected = 0
         self.scroll = 0
         self.text_editor.clear()

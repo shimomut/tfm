@@ -29,7 +29,7 @@ class InfoDialog(BaseListDialog):
             title: The title to display at the top of the dialog
             info_lines: List of strings to display in the dialog
         """
-        self.mode = True
+        self.is_active = True
         self.title = title
         self.lines = info_lines
         self.scroll = 0
