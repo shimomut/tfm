@@ -104,11 +104,44 @@ When the conflict resolution dialog appears:
 - **r** - Rename to a different name
 - **c** - Cancel the operation
 
+## Batch Conflict Resolution
+
+When multiple files have conflicts, selecting "Rename" will process each conflict one by one:
+
+1. **First Conflict**: Dialog appears for the first conflicting file
+   - Options: Overwrite, Rename, Skip, Skip All, Cancel
+2. **Individual Decisions**: For each file, you can:
+   - **Overwrite**: Replace this file and continue to next
+   - **Rename**: Enter a new name for this file
+   - **Skip**: Skip this file and continue to next
+   - **Skip All**: Skip all remaining conflicts
+   - **Cancel**: Abort the entire operation
+3. **Automatic Processing**: Non-conflicting files are copied/moved automatically after all conflicts are resolved
+
+### Example: Batch Rename Workflow
+
+```
+Files to copy: file1.txt, file2.txt, file3.txt, file4.txt
+Conflicts: file1.txt, file2.txt, file3.txt
+No conflict: file4.txt
+
+1. Dialog for file1.txt → User selects "Rename" → Enters "file1_backup.txt"
+2. Dialog for file2.txt → User selects "Overwrite"
+3. Dialog for file3.txt → User selects "Skip"
+4. file4.txt is copied automatically
+
+Result:
+- file1_backup.txt created (renamed)
+- file2.txt overwritten
+- file3.txt skipped (original preserved)
+- file4.txt copied
+```
+
 ## Limitations
 
-- The "Rename" option is only available for single file conflicts
-- When multiple files conflict, you must choose "Overwrite", "Skip", or "Cancel"
-- For batch operations with multiple conflicts, consider using "Skip" to handle non-conflicting files
+- No automatic numbering (file_1.txt, file_2.txt)
+- No pattern-based batch renaming
+- Each conflict requires individual attention (but Skip All is available)
 
 ## Benefits
 

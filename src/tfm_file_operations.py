@@ -463,11 +463,8 @@ class FileOperationsUI:
                     self.perform_copy_operation(files_to_copy, destination_dir, overwrite=True)
                     print(f"Copied {len(files_to_copy)} files (overwrote {len(conflicts)} existing)")
                 elif choice == "rename":
-                    # Handle rename for single file conflict
-                    if len(conflicts) == 1:
-                        self._handle_copy_rename(files_to_copy[0], destination_dir)
-                    else:
-                        print("Rename option only available for single file conflicts")
+                    # Handle rename - process conflicts one by one
+                    self._handle_copy_rename_batch(files_to_copy, destination_dir, conflicts)
             
             self.file_manager.show_dialog(message, choices, handle_conflict_choice)
         else:
@@ -707,11 +704,8 @@ class FileOperationsUI:
                     self.perform_move_operation(files_to_move, destination_dir, overwrite=True)
                     print(f"Moved {len(files_to_move)} files (overwrote {len(conflicts)} existing)")
                 elif choice == "rename":
-                    # Handle rename for single file conflict
-                    if len(conflicts) == 1:
-                        self._handle_move_rename(files_to_move[0], destination_dir)
-                    else:
-                        print("Rename option only available for single file conflicts")
+                    # Handle rename - process conflicts one by one
+                    self._handle_move_rename_batch(files_to_move, destination_dir, conflicts)
             
             self.file_manager.show_dialog(message, choices, handle_conflict_choice)
         else:
@@ -1289,6 +1283,84 @@ class FileOperationsUI:
                 self.progress_manager.increment_errors()
             return processed_files
     
+    def _handle_copy_rename_batch(self, files_to_copy, destination_dir, conflicts):
+        """Handle rename operation for multiple file conflicts - process one by one"""
+        # Store the batch context
+        self.file_manager._copy_rename_batch_context = {
+            'files_to_copy': files_to_copy,
+            'destination_dir': destination_dir,
+            'conflicts': conflicts,
+            'conflict_index': 0,
+            'copied_files': [],
+            'skipped_files': []
+        }
+        
+        # Start processing the first conflict
+        self._process_next_copy_conflict()
+    
+    def _process_next_copy_conflict(self):
+        """Process the next file in the copy conflict batch"""
+        context = self.file_manager._copy_rename_batch_context
+        
+        # Check if we've processed all conflicts
+        if context['conflict_index'] >= len(context['conflicts']):
+            # All conflicts processed, copy remaining non-conflicting files
+            non_conflicting = [f for f in context['files_to_copy'] 
+                             if f not in [c[0] for c in context['conflicts']]]
+            
+            if non_conflicting:
+                self.perform_copy_operation(non_conflicting, context['destination_dir'])
+            
+            # Report results
+            total_copied = len(context['copied_files']) + len(non_conflicting)
+            total_skipped = len(context['skipped_files'])
+            
+            if total_copied > 0:
+                print(f"Copied {total_copied} files, skipped {total_skipped} conflicts")
+            else:
+                print(f"No files copied, skipped {total_skipped} conflicts")
+            
+            return
+        
+        # Get the current conflict
+        source_file, dest_path = context['conflicts'][context['conflict_index']]
+        
+        # Show dialog for this specific file
+        message = f"'{source_file.name}' already exists in destination."
+        choices = [
+            {"text": "Overwrite", "key": "o", "value": "overwrite"},
+            {"text": "Rename", "key": "r", "value": "rename"},
+            {"text": "Skip", "key": "s", "value": "skip"},
+            {"text": "Skip All", "key": "a", "value": "skip_all"},
+            {"text": "Cancel", "key": "c", "value": "cancel"}
+        ]
+        
+        def handle_single_conflict(choice):
+            if choice == "overwrite":
+                # Copy this file with overwrite
+                self._perform_single_copy(source_file, dest_path, overwrite=True)
+                context['copied_files'].append(source_file)
+                context['conflict_index'] += 1
+                self._process_next_copy_conflict()
+            elif choice == "rename":
+                # Ask for new name for this file
+                self._handle_copy_rename(source_file, context['destination_dir'])
+            elif choice == "skip":
+                # Skip this file and continue
+                context['skipped_files'].append(source_file)
+                context['conflict_index'] += 1
+                self._process_next_copy_conflict()
+            elif choice == "skip_all":
+                # Skip all remaining conflicts
+                for i in range(context['conflict_index'], len(context['conflicts'])):
+                    context['skipped_files'].append(context['conflicts'][i][0])
+                context['conflict_index'] = len(context['conflicts'])
+                self._process_next_copy_conflict()
+            else:  # cancel
+                print("Copy operation cancelled")
+        
+        self.file_manager.show_dialog(message, choices, handle_single_conflict)
+    
     def _handle_copy_rename(self, source_file, destination_dir):
         """Handle rename operation for copy conflict"""
         # Store context for the rename callback
@@ -1341,23 +1413,117 @@ class FileOperationsUI:
                     # Copy with the new name, overwriting
                     self._perform_single_copy(source_file, new_dest_path, overwrite=True)
                     print(f"Copied as '{new_name}' (overwrote existing)")
+                    # Continue with batch if in batch mode
+                    if hasattr(self.file_manager, '_copy_rename_batch_context'):
+                        batch_context = self.file_manager._copy_rename_batch_context
+                        batch_context['copied_files'].append(source_file)
+                        batch_context['conflict_index'] += 1
+                        self._process_next_copy_conflict()
                 elif choice == "rename":
                     # Ask for another name
                     self._handle_copy_rename(source_file, destination_dir)
                 else:
                     print("Copy operation cancelled")
+                    # Cancel batch if in batch mode
+                    if hasattr(self.file_manager, '_copy_rename_batch_context'):
+                        delattr(self.file_manager, '_copy_rename_batch_context')
             
             self.file_manager.show_dialog(message, choices, handle_rename_conflict)
         else:
             # No conflict, proceed with copy
             self._perform_single_copy(source_file, new_dest_path, overwrite=False)
             print(f"Copied as '{new_name}'")
+            
+            # Continue with batch if in batch mode
+            if hasattr(self.file_manager, '_copy_rename_batch_context'):
+                batch_context = self.file_manager._copy_rename_batch_context
+                batch_context['copied_files'].append(source_file)
+                batch_context['conflict_index'] += 1
+                self._process_next_copy_conflict()
     
     def _on_copy_rename_cancel(self):
         """Handle copy rename cancellation"""
         print("Copy operation cancelled")
         self.file_manager.general_dialog.hide()
         self.file_manager.needs_full_redraw = True
+    
+    def _handle_move_rename_batch(self, files_to_move, destination_dir, conflicts):
+        """Handle rename operation for multiple file conflicts - process one by one"""
+        # Store the batch context
+        self.file_manager._move_rename_batch_context = {
+            'files_to_move': files_to_move,
+            'destination_dir': destination_dir,
+            'conflicts': conflicts,
+            'conflict_index': 0,
+            'moved_files': [],
+            'skipped_files': []
+        }
+        
+        # Start processing the first conflict
+        self._process_next_move_conflict()
+    
+    def _process_next_move_conflict(self):
+        """Process the next file in the move conflict batch"""
+        context = self.file_manager._move_rename_batch_context
+        
+        # Check if we've processed all conflicts
+        if context['conflict_index'] >= len(context['conflicts']):
+            # All conflicts processed, move remaining non-conflicting files
+            non_conflicting = [f for f in context['files_to_move'] 
+                             if f not in [c[0] for c in context['conflicts']]]
+            
+            if non_conflicting:
+                self.perform_move_operation(non_conflicting, context['destination_dir'])
+            
+            # Report results
+            total_moved = len(context['moved_files']) + len(non_conflicting)
+            total_skipped = len(context['skipped_files'])
+            
+            if total_moved > 0:
+                print(f"Moved {total_moved} files, skipped {total_skipped} conflicts")
+            else:
+                print(f"No files moved, skipped {total_skipped} conflicts")
+            
+            return
+        
+        # Get the current conflict
+        source_file, dest_path = context['conflicts'][context['conflict_index']]
+        
+        # Show dialog for this specific file
+        message = f"'{source_file.name}' already exists in destination."
+        choices = [
+            {"text": "Overwrite", "key": "o", "value": "overwrite"},
+            {"text": "Rename", "key": "r", "value": "rename"},
+            {"text": "Skip", "key": "s", "value": "skip"},
+            {"text": "Skip All", "key": "a", "value": "skip_all"},
+            {"text": "Cancel", "key": "c", "value": "cancel"}
+        ]
+        
+        def handle_single_conflict(choice):
+            if choice == "overwrite":
+                # Move this file with overwrite
+                self._perform_single_move(source_file, dest_path, overwrite=True)
+                context['moved_files'].append(source_file)
+                context['conflict_index'] += 1
+                self._process_next_move_conflict()
+            elif choice == "rename":
+                # Ask for new name for this file
+                self._handle_move_rename(source_file, context['destination_dir'])
+            elif choice == "skip":
+                # Skip this file and continue
+                context['skipped_files'].append(source_file)
+                context['conflict_index'] += 1
+                self._process_next_move_conflict()
+            elif choice == "skip_all":
+                # Skip all remaining conflicts
+                for i in range(context['conflict_index'], len(context['conflicts'])):
+                    context['skipped_files'].append(context['conflicts'][i][0])
+                context['conflict_index'] = len(context['conflicts'])
+                self._process_next_move_conflict()
+            else:  # cancel
+                print("Move operation cancelled")
+        
+        self.file_manager.show_dialog(message, choices, handle_single_conflict)
     
     def _handle_move_rename(self, source_file, destination_dir):
         """Handle rename operation for move conflict"""
@@ -1411,17 +1577,33 @@ class FileOperationsUI:
                     # Move with the new name, overwriting
                     self._perform_single_move(source_file, new_dest_path, overwrite=True)
                     print(f"Moved as '{new_name}' (overwrote existing)")
+                    # Continue with batch if in batch mode
+                    if hasattr(self.file_manager, '_move_rename_batch_context'):
+                        batch_context = self.file_manager._move_rename_batch_context
+                        batch_context['moved_files'].append(source_file)
+                        batch_context['conflict_index'] += 1
+                        self._process_next_move_conflict()
                 elif choice == "rename":
                     # Ask for another name
                     self._handle_move_rename(source_file, destination_dir)
                 else:
                     print("Move operation cancelled")
+                    # Cancel batch if in batch mode
+                    if hasattr(self.file_manager, '_move_rename_batch_context'):
+                        delattr(self.file_manager, '_move_rename_batch_context')
             
             self.file_manager.show_dialog(message, choices, handle_rename_conflict)
         else:
             # No conflict, proceed with move
             self._perform_single_move(source_file, new_dest_path, overwrite=False)
             print(f"Moved as '{new_name}'")
+            
+            # Continue with batch if in batch mode
+            if hasattr(self.file_manager, '_move_rename_batch_context'):
+                batch_context = self.file_manager._move_rename_batch_context
+                batch_context['moved_files'].append(source_file)
+                batch_context['conflict_index'] += 1
+                self._process_next_move_conflict()
     
     def _on_move_rename_cancel(self):
         """Handle move rename cancellation"""
