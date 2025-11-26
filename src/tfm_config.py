@@ -6,10 +6,11 @@ Manages user configuration for the Two-File Manager.
 Configuration is stored in ~/.tfm/config.py as a Python class.
 """
 
+import fnmatch
+import importlib.util
 import os
 import sys
 from tfm_path import Path
-import importlib.util
 
 
 class DefaultConfig:
@@ -58,7 +59,7 @@ class DefaultConfig:
         'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
         'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
         'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
-        'view_text': ['v', 'V'],              # View text file in built-in viewer
+        'view_file': ['v', 'V'],              # View file using configured viewer
         'edit_file': ['e'],                    # Edit selected file with configured text editor
         'create_file': ['E'],                  # Create new file (prompts for filename)
         'create_directory': {'keys': ['m', 'M'], 'selection': 'none'},  # Create new directory (only when no files selected)
@@ -138,6 +139,41 @@ class DefaultConfig:
     UNICODE_CACHE_SIZE = 1000  # Maximum number of cached width calculations
     UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
     UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
+    
+    # File extension associations
+    # Maps file patterns to programs for different actions (open, view, edit)
+    # 
+    # Compact Format:
+    # - Pattern: Can be a string '*.pdf' or list ['*.jpg', '*.jpeg', '*.png']
+    # - Actions: Use 'open|view' to assign same command to multiple actions
+    # - Commands: List ['open', '-a', 'Preview'] or string 'open -a Preview'
+    # - None: Action not available
+    #
+    # Examples:
+    #   {'pattern': ['*.jpg', '*.png'], 'open|view': ['open', '-a', 'Preview'], 'edit': ['photoshop']}
+    #   {'pattern': '*.pdf', 'open|view': ['preview'], 'edit': ['acrobat']}
+    FILE_ASSOCIATIONS = [
+        # PDF files
+        {
+            'pattern': '*.pdf',
+            'open|view': ['open', '-a', 'Preview'],
+        },
+        # Image files
+        {
+            'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+            'open|view': ['open', '-a', 'Preview'],
+        },
+        # Video files
+        {
+            'pattern': ['*.mp4', '*.mov'],
+            'open|view': ['open', '-a', 'Preview'],
+        },
+        # Audio files
+        {
+            'pattern': ['*.mp3', '*.wav'],
+            'open|view': ['open', '-a', 'Music'],
+        },
+    ]
 
 
 class ConfigManager:
@@ -429,3 +465,210 @@ def get_programs():
                 print(f"Warning: Invalid program configuration: {prog}")
     
     return programs
+
+
+def get_file_associations():
+    """Get the file extension associations from configuration"""
+    config = get_config()
+    
+    # Get associations from user config or fall back to defaults
+    if hasattr(config, 'FILE_ASSOCIATIONS') and config.FILE_ASSOCIATIONS:
+        return config.FILE_ASSOCIATIONS
+    elif hasattr(DefaultConfig, 'FILE_ASSOCIATIONS'):
+        return DefaultConfig.FILE_ASSOCIATIONS
+    
+    return []
+
+
+def _expand_association_entry(entry):
+    """
+    Expand a compact association entry into individual pattern-action mappings.
+    
+    Args:
+        entry: Dictionary with 'pattern' key and action keys
+    
+    Returns:
+        List of (pattern, action, command) tuples
+    """
+    if not isinstance(entry, dict) or 'pattern' not in entry:
+        return []
+    
+    # Get patterns as a list
+    patterns = entry['pattern']
+    if isinstance(patterns, str):
+        patterns = [patterns]
+    elif not isinstance(patterns, list):
+        return []
+    
+    # Expand action keys (handle 'open|view' format)
+    expanded = []
+    for key, command in entry.items():
+        if key == 'pattern':
+            continue
+        
+        # Split combined action keys like 'open|view'
+        actions = key.split('|')
+        
+        # Add mapping for each pattern and action combination
+        for pattern in patterns:
+            for action in actions:
+                expanded.append((pattern, action.strip(), command))
+    
+    return expanded
+
+
+def get_program_for_file(filename, action='open'):
+    """
+    Get the program command for a specific file and action.
+    
+    Checks FILE_ASSOCIATIONS entries in order from top to bottom.
+    For each entry:
+    1. Check if filename matches the pattern
+    2. If pattern matches, check if the action exists in that entry
+    3. If action exists, return the command (even if None)
+    4. If pattern doesn't match OR action doesn't exist, continue to next entry
+    
+    Args:
+        filename: The filename to check (e.g., 'document.pdf')
+        action: The action to perform ('open', 'view', or 'edit')
+    
+    Returns:
+        Command list if found, None otherwise
+    """
+    associations = get_file_associations()
+    if not associations:
+        return None
+    
+    # Convert filename to lowercase for case-insensitive matching
+    filename_lower = filename.lower()
+    
+    # Check each entry in order from top to bottom
+    for entry in associations:
+        if not isinstance(entry, dict) or 'pattern' not in entry:
+            continue
+        
+        # Get patterns as a list
+        patterns = entry['pattern']
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        elif not isinstance(patterns, list):
+            continue
+        
+        # Check if filename matches any pattern in this entry
+        pattern_matches = False
+        for pattern in patterns:
+            if fnmatch.fnmatch(filename_lower, pattern.lower()):
+                pattern_matches = True
+                break
+        
+        # If pattern doesn't match, continue to next entry
+        if not pattern_matches:
+            continue
+        
+        # Pattern matches - now check if action exists in this entry
+        # Look for the action in both simple and combined formats
+        action_found = False
+        command = None
+        
+        for key, value in entry.items():
+            if key == 'pattern':
+                continue
+            
+            # Check if this key contains our action (handle 'open|view' format)
+            actions_in_key = [a.strip() for a in key.split('|')]
+            if action in actions_in_key:
+                action_found = True
+                command = value
+                break
+        
+        # If action is found in this entry, return the command
+        if action_found:
+            # Convert string commands to list format
+            if isinstance(command, str):
+                return command.split()
+            elif isinstance(command, list):
+                return command
+            elif command is None:
+                return None
+        
+        # Pattern matched but action not in this entry - continue to next entry
+    
+    # No matching entry found
+    return None
+
+
+def has_action_for_file(filename, action='open'):
+    """
+    Check if a specific action is available for a file.
+    
+    Args:
+        filename: The filename to check
+        action: The action to check ('open', 'view', or 'edit')
+    
+    Returns:
+        True if the action is available, False otherwise
+    """
+    program = get_program_for_file(filename, action)
+    return program is not None
+
+
+def has_explicit_association(filename, action='open'):
+    """
+    Check if a file has an explicit association (including None) for an action.
+    
+    This differs from has_action_for_file in that it returns True even when
+    the association is explicitly set to None, which indicates "use built-in viewer".
+    
+    Checks FILE_ASSOCIATIONS entries in order from top to bottom.
+    
+    Args:
+        filename: The filename to check
+        action: The action to check ('open', 'view', or 'edit')
+    
+    Returns:
+        True if an explicit association exists (even if None), False if no association
+    """
+    associations = get_file_associations()
+    if not associations:
+        return False
+    
+    # Convert filename to lowercase for case-insensitive matching
+    filename_lower = filename.lower()
+    
+    # Check each entry in order from top to bottom
+    for entry in associations:
+        if not isinstance(entry, dict) or 'pattern' not in entry:
+            continue
+        
+        # Get patterns as a list
+        patterns = entry['pattern']
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        elif not isinstance(patterns, list):
+            continue
+        
+        # Check if filename matches any pattern in this entry
+        pattern_matches = False
+        for pattern in patterns:
+            if fnmatch.fnmatch(filename_lower, pattern.lower()):
+                pattern_matches = True
+                break
+        
+        # If pattern doesn't match, continue to next entry
+        if not pattern_matches:
+            continue
+        
+        # Pattern matches - check if action exists in this entry
+        for key in entry.keys():
+            if key == 'pattern':
+                continue
+            
+            # Check if this key contains our action
+            actions_in_key = [a.strip() for a in key.split('|')]
+            if action in actions_in_key:
+                # Found an explicit association (even if value is None)
+                return True
+        
+        # Pattern matched but action not in this entry - continue to next entry
+    
+    return False

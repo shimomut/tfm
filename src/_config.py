@@ -64,7 +64,7 @@ class Config:
         'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
         'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
         'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
-        'view_text': ['v', 'V'],              # View text file in built-in viewer
+        'view_file': ['v', 'V'],              # View file using configured viewer
         'edit_file': ['e'],                    # Edit selected file with configured text editor
         'create_file': ['E'],                  # Create new file (prompts for filename)
         'create_directory': {'keys': ['m', 'M'], 'selection': 'none'},  # Create new directory (only when no files selected)
@@ -141,6 +141,65 @@ class Config:
     UNICODE_CACHE_SIZE = 1000  # Maximum number of cached width calculations
     UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
     UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
+    
+    # File extension associations
+    # Maps file patterns to programs for different actions (open, view, edit)
+    # 
+    # Compact Format Features:
+    # 1. Multiple patterns in one entry: ['*.jpg', '*.jpeg', '*.png']
+    # 2. Combined actions: 'open|view' assigns same command to both actions
+    # 3. Commands: List ['open', '-a', 'Preview'] or string 'open -a Preview'
+    # 4. None: Action not available
+    #
+    # Format:
+    # {
+    #     'pattern': '*.pdf' or ['*.jpg', '*.png'],  # Single or multiple fnmatch patterns
+    #     'open|view': ['command'],  # Same command for open and view
+    #     'edit': ['command']        # Different command for edit
+    # }
+    FILE_ASSOCIATIONS = [
+        # PDF files
+        {
+            'pattern': '*.pdf',
+            'open|view': ['open', '-a', 'Preview'],
+        },
+        # Image files
+        {
+            'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
+            'open|view': ['open', '-a', 'Preview'],
+        },
+        # Video files
+        {
+            'pattern': ['*.mp4', '*.mov'],
+            'open|view': ['open', '-a', 'QuickTime Player'],
+        },
+        # Audio files
+        {
+            'pattern': ['*.mp3', '*.wav'],
+            'open': ['open', '-a', 'Music'],
+        },
+        # Microsoft Word documents
+        {
+            'pattern': ['*.doc', '*.docx'],
+            'open|view|edit': ['open', '-a', 'Microsoft Word'],
+        },
+        # Microsoft Excel spreadsheets
+        {
+            'pattern': ['*.xls', '*.xlsx'],
+            'open|view|edit': ['open', '-a', 'Microsoft Excel'],
+        },
+        # Microsoft PowerPoint presentations
+        {
+            'pattern': ['*.ppt', '*.pptx'],
+            'open|view|edit': ['open', '-a', 'Microsoft PowerPoint'],
+        },
+        # Add your own file associations here:
+        # {
+        #     'pattern': ['*.ext1', '*.ext2'],
+        #     'open|view': ['command', 'args'],
+        #     'edit': ['command', 'args']
+        # },
+    ]
     
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
