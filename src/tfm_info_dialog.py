@@ -285,7 +285,7 @@ class InfoDialogHelpers:
         
         # View & Search (configurable)
         help_lines.append("View & Search:")
-        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('view_text')} View file content")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('view_file')} View file content")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('edit_file')} Edit file")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('search')} Search files (isearch)")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('filter')} Filter files by pattern")

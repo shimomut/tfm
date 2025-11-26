@@ -26,7 +26,7 @@ from tfm_single_line_text_edit import SingleLineTextEdit
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, get_favorite_directories, get_programs
+from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file
 from tfm_text_viewer import view_text_file, is_text_file
 
 # Import new modular components
@@ -974,23 +974,47 @@ class FileManager:
             except PermissionError:
                 self.show_error("Permission denied")
         else:
-            # For files, try to open in text viewer if it's a text file
-            if is_text_file(selected_file):
-                # Save current screen state
+            # For files, try to use file association for 'open' action
+            filename = selected_file.name
+            command = get_program_for_file(filename, 'open')
+            
+            if command:
+                # Use configured program from file associations
+                try:
+                    # Suspend curses
+                    self.external_program_manager.suspend_curses(self.stdscr)
+                    
+                    # Launch the program
+                    result = subprocess.run(command + [str(selected_file)], 
+                                          cwd=str(current_pane['path']))
+                    
+                    # Resume curses
+                    self.external_program_manager.resume_curses(self.stdscr)
+                    
+                    if result.returncode == 0:
+                        print(f"Opened file: {selected_file.name}")
+                    else:
+                        print(f"Program exited with code {result.returncode}")
+                    
+                    self.needs_full_redraw = True
+                    
+                except Exception as e:
+                    # Resume curses even if there's an error
+                    self.external_program_manager.resume_curses(self.stdscr)
+                    print(f"Error opening file: {e}")
+                    self.needs_full_redraw = True
+            elif is_text_file(selected_file):
+                # Fallback to text viewer for text files without association
                 curses.curs_set(0)
                 
-                # Open text viewer
                 if view_text_file(self.stdscr, selected_file):
-                    # Text viewer completed successfully
                     print(f"Viewed file: {selected_file.name}")
                 else:
-                    # Fallback to file info if viewer failed
                     self.show_info(f"File: {selected_file.name}")
                 
-                # Restore TFM display
                 self.needs_full_redraw = True
             else:
-                # For non-text files, show file info
+                # For files without association, show file info
                 self.show_info(f"File: {selected_file.name}")
             
     def show_error(self, message):
@@ -2049,8 +2073,8 @@ class FileManager:
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
-    def view_selected_text_file(self):
-        """View the selected file in text viewer if it's a text file"""
+    def view_selected_file(self):
+        """View the selected file using configured viewer from file associations"""
         current_pane = self.get_current_pane()
         
         if not current_pane['files']:
@@ -2059,37 +2083,59 @@ class FileManager:
         
         selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Parent directory (..) is no longer shown
         if selected_file.is_dir():
-            print("Cannot view directory as text file")
+            print("Cannot view directory")
             return
         
-        if not is_text_file(selected_file):
-            print(f"File '{selected_file.name}' is not recognized as a text file")
-            return
+        # Try to use file association for 'view' action
+        filename = selected_file.name
+        command = get_program_for_file(filename, 'view')
         
-        try:
-            # Save current screen state
-            curses.curs_set(0)
-            
-            # Open text viewer
-            if view_text_file(self.stdscr, selected_file):
-                print(f"Viewed text file: {selected_file.name}")
-            else:
-                print(f"Failed to view file: {selected_file.name}")
-            
-            # Restore TFM display
-            self.needs_full_redraw = True
-            
-        except Exception as e:
-            print(f"Error viewing file: {str(e)}")
-            self.needs_full_redraw = True
-    
-
-        self.needs_full_redraw = True
+        if command:
+            # Use configured program from file associations
+            try:
+                # Suspend curses
+                self.external_program_manager.suspend_curses(self.stdscr)
+                
+                # Launch the viewer
+                result = subprocess.run(command + [str(selected_file)], 
+                                      cwd=str(current_pane['path']))
+                
+                # Resume curses
+                self.external_program_manager.resume_curses(self.stdscr)
+                
+                if result.returncode == 0:
+                    print(f"Viewed file: {selected_file.name}")
+                else:
+                    print(f"Viewer exited with code {result.returncode}")
+                
+                self.needs_full_redraw = True
+                
+            except Exception as e:
+                # Resume curses even if there's an error
+                self.external_program_manager.resume_curses(self.stdscr)
+                print(f"Error viewing file: {e}")
+                self.needs_full_redraw = True
+        elif is_text_file(selected_file):
+            # Fallback to built-in text viewer for text files
+            try:
+                curses.curs_set(0)
+                
+                if view_text_file(self.stdscr, selected_file):
+                    print(f"Viewed text file: {selected_file.name}")
+                else:
+                    print(f"Failed to view file: {selected_file.name}")
+                
+                self.needs_full_redraw = True
+                
+            except Exception as e:
+                print(f"Error viewing file: {str(e)}")
+                self.needs_full_redraw = True
+        else:
+            print(f"No viewer configured for '{selected_file.name}'")
     
     def edit_selected_file(self):
-        """Edit the selected file using the configured text editor"""
+        """Edit the selected file using configured editor from file associations"""
         current_pane = self.get_current_pane()
         
         if not current_pane['files']:
@@ -2098,45 +2144,73 @@ class FileManager:
             
         selected_file = current_pane['files'][current_pane['selected_index']]
         
-        # Parent directory (..) is no longer shown
-        
         # Check if file editing is supported for this storage type
         if not selected_file.supports_file_editing():
             print("Editing S3 files is not supported for now")
             return
         
         # Allow editing directories (some editors can handle them)
-        # but warn if it's a directory
         if selected_file.is_dir():
             print(f"Warning: '{selected_file.name}' is a directory")
         
-        # Get the configured text editor
-        editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
+        # Try to use file association for 'edit' action
+        filename = selected_file.name
+        command = get_program_for_file(filename, 'edit')
         
-        try:
-            # Suspend curses
-            self.external_program_manager.suspend_curses(self.stdscr)
-            
-            # Launch the text editor as a subprocess
-            result = subprocess.run([editor, str(selected_file)], 
-                                  cwd=str(current_pane['path']))
-            
-            # Resume curses
-            self.external_program_manager.resume_curses(self.stdscr)
-            
-            if result.returncode == 0:
-                print(f"Edited file: {selected_file.name}")
-            else:
-                print(f"Editor exited with code {result.returncode}")
+        if command:
+            # Use configured program from file associations
+            try:
+                # Suspend curses
+                self.external_program_manager.suspend_curses(self.stdscr)
                 
-        except FileNotFoundError:
-            # Resume curses even if editor not found
-            self.external_program_manager.resume_curses(self.stdscr)
-            print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
-        except Exception as e:
-            # Resume curses even if there's an error
-            self.external_program_manager.resume_curses(self.stdscr)
-            print(f"Error launching editor: {e}")
+                # Launch the editor
+                result = subprocess.run(command + [str(selected_file)], 
+                                      cwd=str(current_pane['path']))
+                
+                # Resume curses
+                self.external_program_manager.resume_curses(self.stdscr)
+                
+                if result.returncode == 0:
+                    print(f"Edited file: {selected_file.name}")
+                else:
+                    print(f"Editor exited with code {result.returncode}")
+                    
+            except FileNotFoundError:
+                # Resume curses even if editor not found
+                self.external_program_manager.resume_curses(self.stdscr)
+                print(f"Editor not found. Please check your file associations configuration.")
+            except Exception as e:
+                # Resume curses even if there's an error
+                self.external_program_manager.resume_curses(self.stdscr)
+                print(f"Error launching editor: {e}")
+        else:
+            # Fallback to TEXT_EDITOR config for files without association
+            editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
+            
+            try:
+                # Suspend curses
+                self.external_program_manager.suspend_curses(self.stdscr)
+                
+                # Launch the text editor
+                result = subprocess.run([editor, str(selected_file)], 
+                                      cwd=str(current_pane['path']))
+                
+                # Resume curses
+                self.external_program_manager.resume_curses(self.stdscr)
+                
+                if result.returncode == 0:
+                    print(f"Edited file: {selected_file.name}")
+                else:
+                    print(f"Editor exited with code {result.returncode}")
+                    
+            except FileNotFoundError:
+                # Resume curses even if editor not found
+                self.external_program_manager.resume_curses(self.stdscr)
+                print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
+            except Exception as e:
+                # Resume curses even if there's an error
+                self.external_program_manager.resume_curses(self.stdscr)
+                print(f"Error launching editor: {e}")
     
     def copy_selected_files(self):
         """Copy selected files to the opposite pane's directory - delegated to FileOperationsUI"""
@@ -2777,8 +2851,8 @@ class FileManager:
             self.quick_sort('ext')
         elif self.is_key_for_action(key, 'file_details'):  # Show file details
             self.show_file_details()
-        elif self.is_key_for_action(key, 'view_text'):  # View text file
-            self.view_selected_text_file()
+        elif self.is_key_for_action(key, 'view_file'):  # View file
+            self.view_selected_file()
         elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
             self.copy_selected_files()
         elif self.is_key_for_action(key, 'move_files'):  # Move selected files

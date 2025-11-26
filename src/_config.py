@@ -64,7 +64,7 @@ class Config:
         'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
         'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
         'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
-        'view_text': ['v', 'V'],              # View text file in built-in viewer
+        'view_file': ['v', 'V'],              # View file using configured viewer
         'edit_file': ['e'],                    # Edit selected file with configured text editor
         'create_file': ['E'],                  # Create new file (prompts for filename)
         'create_directory': {'keys': ['m', 'M'], 'selection': 'none'},  # Create new directory (only when no files selected)
@@ -212,8 +212,28 @@ class Config:
         #     'extensions': ['*.ext1', '*.ext2'],
         #     'open|view': ['command', 'args'],
         #     'edit': ['command', 'args']
+        #   'open': ['open', '-a', 'Typora'],
+            'view': ['less'],
+            'edit': ['vim']
+        },
+        # Code files
+        '*.py': {
+            'open': ['open', '-a', 'Visual Studio Code'],
+            'view': ['less'],
+            'edit': ['vim']
+        },
+        '*.js': {
+            'open': ['open', '-a', 'Visual Studio Code'],
+            'view': ['less'],
+            'edit': ['vim']
+        },
+        # Add your own file associations here:
+        # '*.ext': {
+        #     'open': ['command', 'args'],
+        #     'view': ['command', 'args'],
+        #     'edit': ['command', 'args']
         # },
-    ]
+    }
     
     # External programs - each item has "name", "command", and optional "options" fields
     # The "command" field is a list for safe subprocess execution
