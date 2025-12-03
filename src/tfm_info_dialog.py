@@ -116,10 +116,18 @@ class InfoDialog(BaseListDialog):
         start_x = (width - dialog_width) // 2
         
         # Draw dialog background
+        # Use hline() to properly clear wide characters underneath
         for y in range(start_y, start_y + dialog_height):
-            if y < height:
-                bg_line = " " * min(dialog_width, width - start_x)
-                safe_addstr_func(y, start_x, bg_line, get_status_color())
+            if y < height and start_x >= 0 and start_x < width:
+                columns_to_fill = min(dialog_width, width - start_x)
+                try:
+                    stdscr.hline(y, start_x, ' ', columns_to_fill, get_status_color())
+                except curses.error:
+                    try:
+                        bg_line = " " * columns_to_fill
+                        safe_addstr_func(y, start_x, bg_line, get_status_color())
+                    except curses.error:
+                        pass
         
         # Draw border
         border_color = get_status_color() | curses.A_BOLD

@@ -163,11 +163,25 @@ class BaseListDialog:
         start_x = max(0, (width - dialog_width) // 2)
         
         # Draw dialog background
+        # When there are wide characters in the underlying content, we need to
+        # ensure the background properly clears them. Use hline() which is more
+        # reliable for clearing areas than addstr() with spaces.
         for y in range(start_y, start_y + dialog_height):
-            if y < height and y >= 0:
-                bg_line = " " * min(dialog_width, width - start_x)
-                if start_x >= 0 and start_x < width:
-                    safe_addstr_func(y, start_x, bg_line, get_status_color())
+            if y < height and y >= 0 and start_x >= 0 and start_x < width:
+                # Calculate the number of columns to fill
+                columns_to_fill = min(dialog_width, width - start_x)
+                
+                try:
+                    # Use hline() to draw a horizontal line of spaces
+                    # This is more reliable than addstr() for clearing wide characters
+                    stdscr.hline(y, start_x, ' ', columns_to_fill, get_status_color())
+                except curses.error:
+                    # Fallback to addstr if hline fails
+                    try:
+                        bg_line = " " * columns_to_fill
+                        safe_addstr_func(y, start_x, bg_line, get_status_color())
+                    except curses.error:
+                        pass
         
         # Draw border with safe drawing
         border_color = get_status_color() | curses.A_BOLD
