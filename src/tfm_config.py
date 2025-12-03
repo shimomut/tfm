@@ -6,11 +6,43 @@ Manages user configuration for the Two-File Manager.
 Configuration is stored in ~/.tfm/config.py as a Python class.
 """
 
+import curses
 import fnmatch
 import importlib.util
 import os
 import sys
 from tfm_path import Path
+
+
+# Special key name to curses key code mapping
+SPECIAL_KEY_MAP = {
+    'HOME': curses.KEY_HOME,
+    'END': curses.KEY_END,
+    'PPAGE': curses.KEY_PPAGE,
+    'NPAGE': curses.KEY_NPAGE,
+    'UP': curses.KEY_UP,
+    'DOWN': curses.KEY_DOWN,
+    'LEFT': curses.KEY_LEFT,
+    'RIGHT': curses.KEY_RIGHT,
+    'BACKSPACE': curses.KEY_BACKSPACE,
+    'DELETE': curses.KEY_DC,
+    'INSERT': curses.KEY_IC,
+    'F1': curses.KEY_F1,
+    'F2': curses.KEY_F2,
+    'F3': curses.KEY_F3,
+    'F4': curses.KEY_F4,
+    'F5': curses.KEY_F5,
+    'F6': curses.KEY_F6,
+    'F7': curses.KEY_F7,
+    'F8': curses.KEY_F8,
+    'F9': curses.KEY_F9,
+    'F10': curses.KEY_F10,
+    'F11': curses.KEY_F11,
+    'F12': curses.KEY_F12,
+}
+
+# Reverse mapping for display purposes
+SPECIAL_KEY_NAMES = {v: k for k, v in SPECIAL_KEY_MAP.items()}
 
 
 class DefaultConfig:
@@ -57,6 +89,8 @@ class DefaultConfig:
         'select_file': [' '],                  # Toggle selection of current file (Space)
         'select_all_files': ['a'],             # Toggle selection of all files in current pane
         'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
+        'select_all': ['HOME'],                # Select all items (Home key)
+        'unselect_all': ['END'],               # Unselect all items (End key)
         'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
         'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
         'view_file': ['v', 'V'],              # View file using configured viewer
@@ -371,6 +405,62 @@ class ConfigManager:
         if not self.is_key_bound_to_action(key_char, action):
             return False
         return self.is_action_available(action, has_selection)
+    
+    def is_special_key_bound_to_action(self, key_code, action):
+        """Check if a special key code is bound to a specific action"""
+        keys = self.get_key_for_action(action)
+        
+        # Check if any of the keys match the special key code
+        for key in keys:
+            if isinstance(key, str) and key in SPECIAL_KEY_MAP:
+                if SPECIAL_KEY_MAP[key] == key_code:
+                    return True
+        
+        return False
+    
+    def is_special_key_bound_to_action_with_selection(self, key_code, action, has_selection):
+        """Check if a special key is bound to a specific action and available for current selection status"""
+        if not self.is_special_key_bound_to_action(key_code, action):
+            return False
+        return self.is_action_available(action, has_selection)
+    
+    def get_action_for_key(self, key):
+        """
+        Get the action bound to a key (character or special key code).
+        
+        Args:
+            key: Either a character string or a curses key code (int)
+        
+        Returns:
+            Action name if found, None otherwise
+        """
+        config = self.get_config()
+        
+        # Check both user config and default config (user config takes precedence)
+        configs_to_check = []
+        if hasattr(config, 'KEY_BINDINGS') and config.KEY_BINDINGS:
+            configs_to_check.append(config.KEY_BINDINGS)
+        if hasattr(DefaultConfig, 'KEY_BINDINGS'):
+            configs_to_check.append(DefaultConfig.KEY_BINDINGS)
+        
+        for key_bindings in configs_to_check:
+            for action, binding in key_bindings.items():
+                # Get keys list
+                keys = binding if isinstance(binding, list) else binding.get('keys', []) if isinstance(binding, dict) else []
+                
+                # Check if key matches
+                for bound_key in keys:
+                    if isinstance(key, str):
+                        # Character key
+                        if bound_key == key:
+                            return action
+                    elif isinstance(key, int):
+                        # Special key code
+                        if isinstance(bound_key, str) and bound_key in SPECIAL_KEY_MAP:
+                            if SPECIAL_KEY_MAP[bound_key] == key:
+                                return action
+        
+        return None
 
 
 # Global configuration manager instance
@@ -400,6 +490,21 @@ def is_key_bound_to_with_selection(key_char, action, has_selection):
 def is_action_available(action, has_selection):
     """Check if action is available based on current selection status"""
     return config_manager.is_action_available(action, has_selection)
+
+
+def is_special_key_bound_to(key_code, action):
+    """Check if a special key code is bound to a specific action"""
+    return config_manager.is_special_key_bound_to_action(key_code, action)
+
+
+def is_special_key_bound_to_with_selection(key_code, action, has_selection):
+    """Check if a special key is bound to a specific action and available for current selection status"""
+    return config_manager.is_special_key_bound_to_action_with_selection(key_code, action, has_selection)
+
+
+def get_action_for_key(key):
+    """Get the action bound to a key (character or special key code)"""
+    return config_manager.get_action_for_key(key)
 
 
 

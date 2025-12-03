@@ -37,12 +37,22 @@ class Config:
     
     # Key bindings - customize your shortcuts
     # Each action can have multiple keys assigned to it
-    # Extended format supports selection requirements:
-    # - Simple format: 'action': ['key1', 'key2'] (works regardless of selection status)
-    # - Extended format: 'action': {'keys': ['key1', 'key2'], 'selection': 'any|required|none'}
-    #   - 'any': works regardless of selection status (default)
-    #   - 'required': only works when at least one item is explicitly selected
-    #   - 'none': only works when no items are explicitly selected
+    # 
+    # Supported formats:
+    # 1. Simple format: 'action': ['key1', 'key2']
+    #    - Works regardless of selection status
+    #    - Keys can be characters ('a', 'Q') or special key names ('HOME', 'END')
+    # 
+    # 2. Extended format: 'action': {'keys': ['key1', 'key2'], 'selection': 'any|required|none'}
+    #    - 'any': works regardless of selection status (default)
+    #    - 'required': only works when at least one item is explicitly selected
+    #    - 'none': only works when no items are explicitly selected
+    #
+    # Special key names (use these strings in the keys list):
+    #   'HOME', 'END', 'PPAGE', 'NPAGE', 'UP', 'DOWN',
+    #   'LEFT', 'RIGHT', 'BACKSPACE', 'DELETE', 'INSERT',
+    #   'F1' through 'F12'
+    #
     KEY_BINDINGS = {
         'quit': ['q', 'Q'],                    # Exit TFM application
         'help': ['?'],                         # Show help dialog with all key bindings
@@ -62,6 +72,8 @@ class Config:
         'select_file': [' '],                  # Toggle selection of current file (Space)
         'select_all_files': ['a'],             # Toggle selection of all files in current pane
         'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
+        'select_all': ['HOME'],                # Select all items (Home key)
+        'unselect_all': ['END'],               # Unselect all items (End key)
         'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
         'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
         'view_file': ['v', 'V'],              # View file using configured viewer

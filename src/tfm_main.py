@@ -26,7 +26,7 @@ from tfm_single_line_text_edit import SingleLineTextEdit
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
+from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, is_special_key_bound_to_with_selection, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
 from tfm_text_viewer import view_text_file, is_text_file
 
 # Import new modular components
@@ -221,12 +221,15 @@ class FileManager:
 
     def is_key_for_action(self, key, action):
         """Check if a key matches a configured action and respects selection requirements"""
+        current_pane = self.get_current_pane()
+        has_selection = len(current_pane['selected_files']) > 0
+        
         if 32 <= key <= 126:  # Printable ASCII
             key_char = chr(key)
-            current_pane = self.get_current_pane()
-            has_selection = len(current_pane['selected_files']) > 0
             return is_key_bound_to_with_selection(key_char, action, has_selection)
-        return False
+        else:
+            # Special key (non-printable)
+            return is_special_key_bound_to_with_selection(key, action, has_selection)
         
     def count_files_and_dirs(self, pane_data):
         """Count directories and files in a pane"""
@@ -307,6 +310,29 @@ class FileManager:
         if success:
             print(message)
             self.needs_full_redraw = True
+    
+    def unselect_all(self):
+        """Unselect all items in current pane"""
+        current_pane = self.get_current_pane()
+        if current_pane['selected_files']:
+            current_pane['selected_files'].clear()
+            print("Unselected all items")
+            self.needs_full_redraw = True
+    
+    def select_all(self):
+        """Select all items (files and directories) in current pane"""
+        current_pane = self.get_current_pane()
+        selected_count = 0
+        for file_path in current_pane['files']:
+            if file_path not in current_pane['selected_files']:
+                current_pane['selected_files'].add(file_path)
+                selected_count += 1
+        
+        if selected_count > 0:
+            print(f"Selected all {len(current_pane['selected_files'])} items")
+            self.needs_full_redraw = True
+        elif current_pane['selected_files']:
+            print(f"All {len(current_pane['selected_files'])} items already selected")
     
     def sync_current_to_other(self):
         """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
@@ -2690,13 +2716,10 @@ class FileManager:
             # Print detailed color scheme info to log
             self.print_color_scheme_info()
             self.needs_full_redraw = True
-        elif key == curses.KEY_HOME:
-            current_pane['selected_index'] = 0
-            current_pane['scroll_offset'] = 0
-            self.needs_full_redraw = True
-        elif key == curses.KEY_END:
-            current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
-            self.needs_full_redraw = True
+        elif self.is_key_for_action(key, 'select_all'):
+            self.select_all()
+        elif self.is_key_for_action(key, 'unselect_all'):
+            self.unselect_all()
         elif key == curses.KEY_PPAGE:  # Page Up - file navigation only
             current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
             self.needs_full_redraw = True
