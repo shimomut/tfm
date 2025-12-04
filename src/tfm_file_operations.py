@@ -479,15 +479,19 @@ class FileOperationsUI:
         self.file_manager.operation_in_progress = True
         self.file_manager.operation_cancelled = False
         
-        # Show "Preparing..." message immediately
+        # Count total individual files BEFORE starting progress
+        # This prevents showing confusing "6/1" progress
+        total_individual_files = self._count_files_recursively(files_to_copy)
+        
+        # Start progress with correct total from the beginning
         self.progress_manager.start_operation(
             OperationType.COPY,
-            1,  # Temporary count, will be updated after counting
-            f"Preparing to copy to {destination_dir.name}",
+            total_individual_files if total_individual_files > 0 else 1,
+            f"to {destination_dir.name}",
             self._progress_callback
         )
         
-        # Start animation refresh thread immediately so "Preparing..." animates
+        # Start animation refresh thread immediately
         animation_stop_event = threading.Event()
         animation_thread = threading.Thread(
             target=self._animation_refresh_loop,
@@ -500,20 +504,6 @@ class FileOperationsUI:
         def copy_thread():
             copied_count = 0
             error_count = 0
-            
-            # Count total individual files for fine-grained progress
-            total_individual_files = self._count_files_recursively(files_to_copy)
-            
-            # If no files to process, finish early
-            if total_individual_files == 0:
-                # Still need to handle empty directory copy
-                pass
-            else:
-                # Update progress tracking with actual file count
-                self.progress_manager.update_operation_total(
-                    total_individual_files,
-                    f"to {destination_dir.name}"
-                )
             
             processed_files = 0
             
@@ -1116,12 +1106,7 @@ class FileOperationsUI:
     def _copy_file_with_progress(self, source_file, dest_file, overwrite=False):
         """Copy a single file with byte-level progress tracking"""
         try:
-            # For small files or non-local files, use simple copy
-            if source_file.get_scheme() != 'file' or dest_file.get_scheme() != 'file':
-                source_file.copy_to(dest_file, overwrite=overwrite)
-                return
-            
-            # For local files, check size
+            # Get file size
             file_size = source_file.stat().st_size
             
             # For files smaller than 10MB, use simple copy
@@ -1129,36 +1114,86 @@ class FileOperationsUI:
                 source_file.copy_to(dest_file, overwrite=overwrite)
                 return
             
-            # For large files, copy with byte-level progress
+            # For large files, copy with byte-level progress and cancellation support
             chunk_size = 1024 * 1024  # 1MB chunks
             bytes_copied = 0
             
-            with open(str(source_file), 'rb') as src:
-                with open(str(dest_file), 'wb') as dst:
-                    while True:
-                        # Check for cancellation
-                        if self.file_manager.operation_cancelled:
-                            # Close files and remove partial copy
-                            dst.close()
-                            src.close()
-                            try:
-                                dest_file.unlink()
-                            except Exception:
-                                pass
-                            return
-                        
-                        chunk = src.read(chunk_size)
-                        if not chunk:
-                            break
-                        dst.write(chunk)
-                        bytes_copied += len(chunk)
-                        
-                        # Update progress with byte percentage
-                        byte_percentage = int((bytes_copied / file_size) * 100)
-                        self.progress_manager.update_file_byte_progress(byte_percentage)
+            # Handle different storage combinations
+            source_scheme = source_file.get_scheme()
+            dest_scheme = dest_file.get_scheme()
             
-            # Copy file metadata
-            shutil.copystat(str(source_file), str(dest_file))
+            # Create destination directory if needed (for local destinations)
+            if dest_scheme == 'file':
+                dest_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Open source for reading
+            if source_scheme == 'file':
+                src = open(str(source_file), 'rb')
+            elif source_scheme == 's3':
+                # For S3, get the streaming body
+                import boto3
+                from botocore.exceptions import ClientError
+                s3_client = boto3.client('s3')
+                # Parse S3 URI
+                s3_uri = str(source_file)
+                if s3_uri.startswith('s3://'):
+                    path_part = s3_uri[5:]
+                    if '/' in path_part:
+                        bucket, key = path_part.split('/', 1)
+                    else:
+                        raise ValueError(f"Invalid S3 URI: {s3_uri}")
+                    response = s3_client.get_object(Bucket=bucket, Key=key)
+                    src = response['Body']
+                else:
+                    raise ValueError(f"Invalid S3 URI: {s3_uri}")
+            else:
+                # Fallback to simple copy for other schemes
+                source_file.copy_to(dest_file, overwrite=overwrite)
+                return
+            
+            # Open destination for writing
+            if dest_scheme == 'file':
+                dst = open(str(dest_file), 'wb')
+            elif dest_scheme == 's3':
+                # For S3 destination, we need to buffer in memory or use multipart upload
+                # For now, fall back to simple copy
+                src.close()
+                source_file.copy_to(dest_file, overwrite=overwrite)
+                return
+            else:
+                src.close()
+                source_file.copy_to(dest_file, overwrite=overwrite)
+                return
+            
+            # Copy with progress tracking and cancellation support
+            try:
+                while True:
+                    # Check for cancellation
+                    if self.file_manager.operation_cancelled:
+                        # Close files and remove partial copy
+                        dst.close()
+                        src.close()
+                        try:
+                            dest_file.unlink()
+                        except Exception:
+                            pass
+                        return
+                    
+                    chunk = src.read(chunk_size)
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+                    bytes_copied += len(chunk)
+                    
+                    # Update progress with bytes copied and total
+                    self.progress_manager.update_file_byte_progress(bytes_copied, file_size)
+            finally:
+                dst.close()
+                src.close()
+            
+            # Copy file metadata (only for local to local)
+            if source_scheme == 'file' and dest_scheme == 'file':
+                shutil.copystat(str(source_file), str(dest_file))
             
         except Exception as e:
             raise e
@@ -1241,6 +1276,10 @@ class FileOperationsUI:
             
             # Get all files in the source directory recursively
             for item in source_dir.rglob('*'):
+                # Check for cancellation
+                if self.file_manager.operation_cancelled:
+                    return processed_files
+                
                 if item.is_file():
                     # Calculate relative path
                     rel_path = item.relative_to(source_dir)
@@ -1253,7 +1292,8 @@ class FileOperationsUI:
                     self.progress_manager.update_progress(str(rel_path), processed_files)
                     
                     try:
-                        item.copy_to(dest_item, overwrite=overwrite)
+                        # Use _copy_file_with_progress for byte-level progress and cancellation support
+                        self._copy_file_with_progress(item, dest_item, overwrite=overwrite)
                     except Exception as e:
                         print(f"Error copying {item}: {e}")
                         self.progress_manager.increment_errors()

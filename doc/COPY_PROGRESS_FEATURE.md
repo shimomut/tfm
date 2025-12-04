@@ -5,10 +5,9 @@
 TFM now provides detailed, real-time progress tracking for copy operations, especially when copying directories with many files or large files. The progress system runs operations in a background thread and provides frequent updates showing:
 
 1. **Current filename** being copied
-2. **File count progress** (e.g., "5/100 files")
-3. **Percentage progress** for overall operation
-4. **Byte-level progress** for large files (>10MB)
-5. **Animated progress indicator** showing the operation is active
+2. **File count progress** (e.g., "5/100")
+3. **Byte-level progress** for large files (>1MB) in human-readable format (e.g., "15M/32.0G")
+4. **Animated progress indicator** showing the operation is active
 
 ## Features
 
@@ -25,10 +24,12 @@ Instead of showing only top-level directory names, TFM now shows:
 
 ### Byte-Level Progress for Large Files
 
-When copying large files (>10MB), TFM shows byte-level progress:
+When copying large files (>1MB), TFM shows byte-level progress in human-readable format:
 - Files are copied in 1MB chunks
-- Progress percentage is updated for each chunk
-- Example: `large_file.dat [45%]` shows the file is 45% copied
+- Progress is shown as bytes copied vs total size
+- Example: `large_file.iso [15M/32.0G]` shows 15 megabytes copied of 32 gigabytes total
+- Only displayed for files that require multiple read/write operations
+- Formats: B (bytes), K (kilobytes), M (megabytes), G (gigabytes), T (terabytes)
 
 ### Progress Animation
 

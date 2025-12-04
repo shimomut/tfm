@@ -111,7 +111,8 @@ class TestProgressManager(unittest.TestCase):
         
         self.assertEqual(self.last_progress_data['processed_items'], 1)
         self.assertEqual(self.last_progress_data['current_item'], "file1.txt")
-        self.assertEqual(self.last_progress_data['file_byte_progress'], 0)
+        self.assertEqual(self.last_progress_data['file_bytes_copied'], 0)
+        self.assertEqual(self.last_progress_data['file_bytes_total'], 0)
     
     def test_update_file_byte_progress(self):
         """Test updating byte-level progress"""
@@ -123,9 +124,11 @@ class TestProgressManager(unittest.TestCase):
         )
         
         self.progress_manager.update_progress("large_file.dat", 1)
-        self.progress_manager.update_file_byte_progress(50)
+        # Simulate copying 50MB of a 100MB file
+        self.progress_manager.update_file_byte_progress(50 * 1024 * 1024, 100 * 1024 * 1024)
         
-        self.assertEqual(self.last_progress_data['file_byte_progress'], 50)
+        self.assertEqual(self.last_progress_data['file_bytes_copied'], 50 * 1024 * 1024)
+        self.assertEqual(self.last_progress_data['file_bytes_total'], 100 * 1024 * 1024)
     
     def test_increment_errors(self):
         """Test error counting"""
@@ -189,8 +192,9 @@ class TestProgressManager(unittest.TestCase):
         # Check that text contains expected components
         self.assertIn("Copying", progress_text)
         self.assertIn("25/100", progress_text)
-        self.assertIn("25%", progress_text)
         self.assertIn("file1.txt", progress_text)
+        # Should NOT contain percentage anymore
+        self.assertNotIn("%", progress_text)
     
     def test_get_progress_text_with_byte_progress(self):
         """Test progress text with byte-level progress"""
@@ -201,12 +205,14 @@ class TestProgressManager(unittest.TestCase):
         )
         
         self.progress_manager.update_progress("large_file.dat", 1)
-        self.progress_manager.update_file_byte_progress(67)
+        # Simulate copying 15MB of a 32GB file
+        self.progress_manager.update_file_byte_progress(15 * 1024 * 1024, 32 * 1024 * 1024 * 1024)
         
         progress_text = self.progress_manager.get_progress_text(max_width=80)
         
-        # Check that text contains byte progress
-        self.assertIn("[67%]", progress_text)
+        # Check that text contains byte progress in human-readable format
+        self.assertIn("[15M/32", progress_text)  # Should show "15M/32.0G" or similar
+        self.assertIn("G]", progress_text)
     
     def test_progress_throttling(self):
         """Test that progress updates are throttled"""

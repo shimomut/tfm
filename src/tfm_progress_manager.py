@@ -37,6 +37,27 @@ class ProgressManager:
                 PROGRESS_ANIMATION_SPEED = 0.08
             self.animator = ProgressAnimator(MinimalConfig())
     
+    @staticmethod
+    def _format_bytes(bytes_value: int) -> str:
+        """Format bytes into human-readable format (B, K, M, G, T)
+        
+        Args:
+            bytes_value: Number of bytes
+            
+        Returns:
+            Formatted string like "15M", "2.3G", etc.
+        """
+        if bytes_value < 1024:
+            return f"{bytes_value}B"
+        elif bytes_value < 1024 * 1024:
+            return f"{bytes_value / 1024:.0f}K"
+        elif bytes_value < 1024 * 1024 * 1024:
+            return f"{bytes_value / (1024 * 1024):.0f}M"
+        elif bytes_value < 1024 * 1024 * 1024 * 1024:
+            return f"{bytes_value / (1024 * 1024 * 1024):.1f}G"
+        else:
+            return f"{bytes_value / (1024 * 1024 * 1024 * 1024):.1f}T"
+    
     def start_operation(self, operation_type: OperationType, total_items: int, 
                        description: str = "", progress_callback: Optional[Callable] = None):
         """Start tracking progress for an operation
@@ -54,7 +75,8 @@ class ProgressManager:
             'current_item': '',
             'description': description,
             'errors': 0,
-            'file_byte_progress': 0  # Percentage of current file copied (0-100)
+            'file_bytes_copied': 0,  # Bytes copied for current file
+            'file_bytes_total': 0    # Total bytes for current file
         }
         self.progress_callback = progress_callback
         self.animator.reset()
@@ -94,7 +116,8 @@ class ProgressManager:
             return
         
         self.current_operation['current_item'] = current_item
-        self.current_operation['file_byte_progress'] = 0  # Reset byte progress for new file
+        self.current_operation['file_bytes_copied'] = 0  # Reset byte progress for new file
+        self.current_operation['file_bytes_total'] = 0
         
         if processed_items is not None:
             self.current_operation['processed_items'] = processed_items
@@ -104,16 +127,18 @@ class ProgressManager:
         # Call callback with updated state (with throttling)
         self._trigger_callback_if_needed()
     
-    def update_file_byte_progress(self, percentage: int):
+    def update_file_byte_progress(self, bytes_copied: int, bytes_total: int):
         """Update the byte-level progress for the current file being copied
         
         Args:
-            percentage: Percentage of current file copied (0-100)
+            bytes_copied: Number of bytes copied so far
+            bytes_total: Total number of bytes in the file
         """
         if not self.current_operation:
             return
         
-        self.current_operation['file_byte_progress'] = percentage
+        self.current_operation['file_bytes_copied'] = bytes_copied
+        self.current_operation['file_bytes_total'] = bytes_total
         
         # Call callback with updated state (with throttling)
         self._trigger_callback_if_needed()
@@ -197,8 +222,8 @@ class ProgressManager:
         processed = op['processed_items']
         total = op['total_items']
         current_item = op['current_item']
-        percentage = self.get_progress_percentage()
-        file_byte_progress = op.get('file_byte_progress', 0)
+        file_bytes_copied = op.get('file_bytes_copied', 0)
+        file_bytes_total = op.get('file_bytes_total', 0)
         
         # Get operation verb
         operation_verbs = {
@@ -214,11 +239,11 @@ class ProgressManager:
         # Get animation frame using the existing animator
         animation_frame = self.animator.get_current_frame()
         
-        # Build base progress text with animator
+        # Build base progress text with animator (no percentage)
         if op['description']:
-            progress_text = f"{animation_frame} {verb} ({op['description']})... {processed}/{total} ({percentage}%)"
+            progress_text = f"{animation_frame} {verb} ({op['description']})... {processed}/{total}"
         else:
-            progress_text = f"{animation_frame} {verb}... {processed}/{total} ({percentage}%)"
+            progress_text = f"{animation_frame} {verb}... {processed}/{total}"
         
         # Add current item if there's space
         if current_item:
@@ -228,9 +253,12 @@ class ProgressManager:
             available_space = max_width - base_len - len(separator)
             
             # Reserve space for byte progress if applicable
+            # Only show byte progress for large files (>1MB) that require multiple read/write operations
             byte_progress_text = ""
-            if file_byte_progress > 0:
-                byte_progress_text = f" [{file_byte_progress}%]"
+            if file_bytes_total > 1024 * 1024 and file_bytes_copied > 0:
+                bytes_copied_str = self._format_bytes(file_bytes_copied)
+                bytes_total_str = self._format_bytes(file_bytes_total)
+                byte_progress_text = f" [{bytes_copied_str}/{bytes_total_str}]"
                 available_space -= len(byte_progress_text)
             
             if available_space > 10:  # Only show filename if we have reasonable space

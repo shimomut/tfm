@@ -201,7 +201,7 @@ self.progress_manager.update_progress(display_name, processed_files)
 
 ### 2. Byte-Level Progress
 
-Tracks bytes copied for large files (≥10MB):
+Tracks bytes copied for large files (>1MB) and displays in human-readable format:
 
 ```python
 chunk_size = 1024 * 1024  # 1MB chunks
@@ -216,13 +216,19 @@ with open(str(source_file), 'rb') as src:
             dst.write(chunk)
             bytes_copied += len(chunk)
             
-            byte_percentage = int((bytes_copied / file_size) * 100)
-            self.progress_manager.update_file_byte_progress(byte_percentage)
+            # Update with actual bytes, not percentage
+            self.progress_manager.update_file_byte_progress(bytes_copied, file_size)
 ```
 
+**Display Format:**
+- Converts bytes to human-readable format: B, K, M, G, T
+- Example: `15M/32.0G` shows 15 megabytes of 32 gigabytes copied
+- Only shown for files >1MB that require multiple read/write operations
+- Format function rounds appropriately for each unit
+
 **Thresholds:**
-- Small files (<10MB): Simple copy, no byte progress
-- Large files (≥10MB): Chunked copy with byte progress
+- Small files (≤1MB): Simple copy, no byte progress displayed
+- Large files (>1MB): Chunked copy with byte progress in format like "15M/32.0G"
 - Chunk size: 1MB for optimal I/O performance
 
 ### 3. Directory-Level Progress

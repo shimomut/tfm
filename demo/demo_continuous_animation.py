@@ -136,8 +136,11 @@ def test_animation_with_byte_progress():
     animation_thread.start()
     
     # Simulate byte progress updates (slower than animation)
-    for byte_percent in range(0, 101, 10):
-        progress_manager.update_file_byte_progress(byte_percent)
+    # Simulate copying a 100MB file
+    file_size = 100 * 1024 * 1024
+    for i in range(0, 11):
+        bytes_copied = int(file_size * i / 10)
+        progress_manager.update_file_byte_progress(bytes_copied, file_size)
         time.sleep(0.5)  # Slow updates, but animation should continue
     
     # Stop animation thread

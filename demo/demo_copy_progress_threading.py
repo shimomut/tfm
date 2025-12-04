@@ -149,9 +149,8 @@ def simulate_copy_with_progress(source_dir, dest_dir):
                             dst.write(chunk)
                             bytes_copied += len(chunk)
                             
-                            # Update byte progress
-                            byte_percentage = int((bytes_copied / file_size) * 100)
-                            progress_manager.update_file_byte_progress(byte_percentage)
+                            # Update byte progress with actual bytes
+                            progress_manager.update_file_byte_progress(bytes_copied, file_size)
                             
                             # Small delay to make progress visible
                             time.sleep(0.05)
