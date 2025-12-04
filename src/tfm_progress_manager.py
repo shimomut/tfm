@@ -76,7 +76,8 @@ class ProgressManager:
             'description': description,
             'errors': 0,
             'file_bytes_copied': 0,  # Bytes copied for current file
-            'file_bytes_total': 0    # Total bytes for current file
+            'file_bytes_total': 0,   # Total bytes for current file
+            'counting': True         # Flag to indicate we're still counting files
         }
         self.progress_callback = progress_callback
         self.animator.reset()
@@ -101,6 +102,9 @@ class ProgressManager:
         self.current_operation['total_items'] = total_items
         if description:
             self.current_operation['description'] = description
+        
+        # Mark counting as complete
+        self.current_operation['counting'] = False
         
         # Trigger callback to update display
         self._trigger_callback_if_needed(force=True)
@@ -240,10 +244,21 @@ class ProgressManager:
         animation_frame = self.animator.get_current_frame()
         
         # Build base progress text with animator (no percentage)
-        if op['description']:
-            progress_text = f"{animation_frame} {verb} ({op['description']})... {processed}/{total}"
+        # Hide count during counting phase
+        is_counting = op.get('counting', False)
+        
+        if is_counting:
+            # During counting, show "Preparing..." without count
+            if op['description']:
+                progress_text = f"{animation_frame} {verb} ({op['description']})... Preparing"
+            else:
+                progress_text = f"{animation_frame} {verb}... Preparing"
         else:
-            progress_text = f"{animation_frame} {verb}... {processed}/{total}"
+            # After counting, show actual progress count
+            if op['description']:
+                progress_text = f"{animation_frame} {verb} ({op['description']})... {processed}/{total}"
+            else:
+                progress_text = f"{animation_frame} {verb}... {processed}/{total}"
         
         # Add current item if there's space
         if current_item:
