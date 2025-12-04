@@ -479,19 +479,15 @@ class FileOperationsUI:
         self.file_manager.operation_in_progress = True
         self.file_manager.operation_cancelled = False
         
-        # Count total individual files BEFORE starting progress
-        # This prevents showing confusing "6/1" progress
-        total_individual_files = self._count_files_recursively(files_to_copy)
-        
-        # Start progress with correct total from the beginning
+        # Show "Preparing..." message immediately
         self.progress_manager.start_operation(
             OperationType.COPY,
-            total_individual_files if total_individual_files > 0 else 1,
-            f"to {destination_dir.name}",
+            1,
+            f"Preparing to copy to {destination_dir.name}",
             self._progress_callback
         )
         
-        # Start animation refresh thread immediately
+        # Start animation refresh thread so "Preparing" animates
         animation_stop_event = threading.Event()
         animation_thread = threading.Thread(
             target=self._animation_refresh_loop,
@@ -502,9 +498,17 @@ class FileOperationsUI:
         
         # Run the copy operation in a background thread
         def copy_thread():
+            # Count files in background thread so "Preparing" message displays
+            total_individual_files = self._count_files_recursively(files_to_copy)
+            
+            # Update progress with correct total
+            self.progress_manager.update_operation_total(
+                total_individual_files if total_individual_files > 0 else 1,
+                f"to {destination_dir.name}"
+            )
+            
             copied_count = 0
             error_count = 0
-            
             processed_files = 0
             
             try:
@@ -743,146 +747,173 @@ class FileOperationsUI:
             # Success message will be printed by the operation thread
     
     def perform_move_operation(self, files_to_move, destination_dir, overwrite=False):
-        """Perform the actual move operation with fine-grained progress tracking"""
-        moved_count = 0
-        error_count = 0
+        """Perform the actual move operation with fine-grained progress tracking in a background thread"""
+        # Set operation in progress flag to block user input
+        self.file_manager.operation_in_progress = True
+        self.file_manager.operation_cancelled = False
         
         # Show "Preparing..." message immediately
         self.progress_manager.start_operation(
             OperationType.MOVE,
-            1,  # Temporary count
+            1,
             f"Preparing to move to {destination_dir.name}",
             self._progress_callback
         )
         
-        # Count total individual files for fine-grained progress
-        total_individual_files = self._count_files_recursively(files_to_move)
+        # Start animation refresh thread
+        animation_stop_event = threading.Event()
+        animation_thread = threading.Thread(
+            target=self._animation_refresh_loop,
+            args=(animation_stop_event,),
+            daemon=True
+        )
+        animation_thread.start()
         
-        # If no files to process, finish progress immediately and continue
-        if total_individual_files == 0:
-            self.progress_manager.finish_operation()
-        else:
-            # Update progress tracking with actual file count
+        # Run the move operation in a background thread
+        def move_thread():
+            # Count files in background thread
+            total_individual_files = self._count_files_recursively(files_to_move)
+            
+            # Update progress with correct total
             self.progress_manager.update_operation_total(
-                total_individual_files,
+                total_individual_files if total_individual_files > 0 else 1,
                 f"to {destination_dir.name}"
             )
-        
-        processed_files = 0
-        
-        try:
-            for source_file in files_to_move:
-                try:
-                    dest_path = destination_dir / source_file.name
+            
+            moved_count = 0
+            error_count = 0
+            processed_files = 0
+            
+            try:
+                for source_file in files_to_move:
+                    # Check for cancellation
+                    if self.file_manager.operation_cancelled:
+                        print("Move operation cancelled by user")
+                        break
                     
-                    # Skip if file exists and we're not overwriting
-                    if dest_path.exists() and not overwrite:
-                        # Still need to count skipped files for progress
-                        if source_file.is_file() or source_file.is_symlink():
+                    try:
+                        dest_path = destination_dir / source_file.name
+                        
+                        # Skip if file exists and we're not overwriting
+                        if dest_path.exists() and not overwrite:
+                            # Still need to count skipped files for progress
+                            if source_file.is_file() or source_file.is_symlink():
+                                processed_files += 1
+                                if total_individual_files > 1:
+                                    self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
+                            elif source_file.is_dir():
+                                # Count files in skipped directory
+                                skipped_count = self._count_files_recursively([source_file])
+                                processed_files += skipped_count
+                                if total_individual_files > 1:
+                                    self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
+                            continue
+                        
+                        # Remove destination if it exists and we're overwriting
+                        if dest_path.exists() and overwrite:
+                            if dest_path.is_dir():
+                                # Use the existing delete method for recursive directory removal
+                                self._delete_directory_with_progress(dest_path, 0, 1)
+                            else:
+                                dest_path.unlink()
+                        
+                        # Determine if this is a cross-storage move
+                        source_scheme = source_file.get_scheme()
+                        dest_scheme = destination_dir.get_scheme()
+                        is_cross_storage = source_scheme != dest_scheme
+                        
+                        # Move the file/directory
+                        if source_file.is_symlink() and not is_cross_storage:
+                            # For symbolic links on same storage, copy the link itself (not the target)
                             processed_files += 1
                             if total_individual_files > 1:
-                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
-                        elif source_file.is_dir():
-                            # Count files in skipped directory
-                            skipped_count = self._count_files_recursively([source_file])
-                            processed_files += skipped_count
-                            if total_individual_files > 1:
-                                self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
-                        continue
-                    
-                    # Remove destination if it exists and we're overwriting
-                    if dest_path.exists() and overwrite:
-                        if dest_path.is_dir():
-                            # Use the existing delete method for recursive directory removal
-                            self._delete_directory_with_progress(dest_path, 0, 1)
-                        else:
-                            dest_path.unlink()
-                    
-                    # Determine if this is a cross-storage move
-                    source_scheme = source_file.get_scheme()
-                    dest_scheme = destination_dir.get_scheme()
-                    is_cross_storage = source_scheme != dest_scheme
-                    
-                    # Move the file/directory
-                    if source_file.is_symlink() and not is_cross_storage:
-                        # For symbolic links on same storage, copy the link itself (not the target)
-                        processed_files += 1
-                        if total_individual_files > 1:
-                            self.progress_manager.update_progress(f"Link: {source_file.name}", processed_files)
-                        
-                        link_target = os.readlink(str(source_file))
-                        dest_path.symlink_to(link_target)
-                        source_file.unlink()
-                        print(f"Moved symbolic link: {source_file.name}")
-                    elif source_file.is_dir():
-                        # For directories, we need to track individual files being moved
-                        processed_files = self._move_directory_with_progress(
-                            source_file, dest_path, processed_files, total_individual_files, is_cross_storage
-                        )
-                        print(f"Moved directory: {source_file.name}")
-                    else:
-                        # Move single file
-                        processed_files += 1
-                        if total_individual_files > 1:
-                            self.progress_manager.update_progress(source_file.name, processed_files)
-                        
-                        if is_cross_storage:
-                            # Cross-storage move: copy then delete
-                            source_file.copy_to(dest_path, overwrite=overwrite)
+                                self.progress_manager.update_progress(f"Link: {source_file.name}", processed_files)
+                            
+                            link_target = os.readlink(str(source_file))
+                            dest_path.symlink_to(link_target)
                             source_file.unlink()
-                            print(f"Moved file (cross-storage): {source_file.name}")
+                            print(f"Moved symbolic link: {source_file.name}")
+                        elif source_file.is_dir():
+                            # For directories, we need to track individual files being moved
+                            processed_files = self._move_directory_with_progress(
+                                source_file, dest_path, processed_files, total_individual_files, is_cross_storage
+                            )
+                            print(f"Moved directory: {source_file.name}")
                         else:
-                            # Same-storage move: use rename
-                            source_file.rename(dest_path)
-                            print(f"Moved file: {source_file.name}")
-                    
-                    moved_count += 1
-                    
-                except PermissionError as e:
-                    print(f"Permission denied moving {source_file.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if source_file.is_file() or source_file.is_symlink():
+                            # Move single file
                             processed_files += 1
-                        elif source_file.is_dir():
-                            processed_files += self._count_files_recursively([source_file])
-                except Exception as e:
-                    print(f"Error moving {source_file.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
-                        self.progress_manager.increment_errors()
-                        # Still count the file for progress tracking
-                        if source_file.is_file() or source_file.is_symlink():
-                            processed_files += 1
-                        elif source_file.is_dir():
-                            processed_files += self._count_files_recursively([source_file])
+                            if total_individual_files > 1:
+                                self.progress_manager.update_progress(source_file.name, processed_files)
+                            
+                            if is_cross_storage:
+                                # Cross-storage move: copy then delete
+                                source_file.copy_to(dest_path, overwrite=overwrite)
+                                source_file.unlink()
+                                print(f"Moved file (cross-storage): {source_file.name}")
+                            else:
+                                # Same-storage move: use rename
+                                source_file.rename(dest_path)
+                                print(f"Moved file: {source_file.name}")
+                        
+                        moved_count += 1
+                        
+                    except PermissionError as e:
+                        print(f"Permission denied moving {source_file.name}: {e}")
+                        error_count += 1
+                        if total_individual_files > 1:
+                            self.progress_manager.increment_errors()
+                            # Still count the file for progress tracking
+                            if source_file.is_file() or source_file.is_symlink():
+                                processed_files += 1
+                            elif source_file.is_dir():
+                                processed_files += self._count_files_recursively([source_file])
+                    except Exception as e:
+                        print(f"Error moving {source_file.name}: {e}")
+                        error_count += 1
+                        if total_individual_files > 1:
+                            self.progress_manager.increment_errors()
+                            # Still count the file for progress tracking
+                            if source_file.is_file() or source_file.is_symlink():
+                                processed_files += 1
+                            elif source_file.is_dir():
+                                processed_files += self._count_files_recursively([source_file])
+            
+            finally:
+                # Stop animation refresh thread
+                animation_stop_event.set()
+                
+                # Always finish progress tracking
+                self.progress_manager.finish_operation()
+                
+                # Clear operation in progress flag
+                self.file_manager.operation_in_progress = False
+                
+                # Invalidate cache for affected directories
+                if moved_count > 0:
+                    self.cache_manager.invalidate_cache_for_move_operation(files_to_move, destination_dir)
+                
+                # Refresh both panes to show the moved files
+                self.file_manager.refresh_files()
+                self.file_manager.needs_full_redraw = True
+                
+                # Clear selections after successful move
+                if moved_count > 0:
+                    current_pane = self.file_manager.get_current_pane()
+                    current_pane['selected_files'].clear()
+                
+                # Print completion message
+                if self.file_manager.operation_cancelled:
+                    print(f"Move cancelled: {moved_count} files moved before cancellation")
+                elif error_count > 0:
+                    print(f"Move completed: {moved_count} files moved, {error_count} errors")
+                elif moved_count > 0:
+                    print(f"Successfully moved {moved_count} files")
+                else:
+                    print("No files moved")
         
-        finally:
-            # Always finish progress tracking (it was started, so must be finished)
-            self.progress_manager.finish_operation()
-        
-        # Invalidate cache for affected directories
-        if moved_count > 0:
-            self.cache_manager.invalidate_cache_for_move_operation(files_to_move, destination_dir)
-        
-        # Refresh both panes to show the moved files
-        self.file_manager.refresh_files()
-        self.file_manager.needs_full_redraw = True
-        
-        # Clear selections after successful move
-        if moved_count > 0:
-            current_pane = self.file_manager.get_current_pane()
-            current_pane['selected_files'].clear()
-        
-        # Print completion message
-        if error_count > 0:
-            print(f"Move completed: {moved_count} files moved, {error_count} errors")
-        elif moved_count > 0:
-            print(f"Successfully moved {moved_count} files")
-        else:
-            print("No files moved")
+        # Start the thread
+        thread = threading.Thread(target=move_thread, daemon=True)
+        thread.start()
     
     def delete_selected_files(self):
         """Delete selected files or current file with confirmation"""
@@ -943,119 +974,139 @@ class FileOperationsUI:
             handle_delete_confirmation(True)
     
     def perform_delete_operation(self, files_to_delete):
-        """Perform the actual delete operation with fine-grained progress tracking"""
-        deleted_count = 0
-        error_count = 0
+        """Perform the actual delete operation with fine-grained progress tracking in a background thread"""
+        # Set operation in progress flag to block user input
+        self.file_manager.operation_in_progress = True
+        self.file_manager.operation_cancelled = False
         
         # Show "Preparing..." message immediately
         self.progress_manager.start_operation(
             OperationType.DELETE,
-            1,  # Temporary count
+            1,
             "Preparing to delete",
             self._progress_callback
         )
         
-        # Count total individual files for fine-grained progress
-        total_individual_files = self._count_files_recursively(files_to_delete)
+        # Start animation refresh thread
+        animation_stop_event = threading.Event()
+        animation_thread = threading.Thread(
+            target=self._animation_refresh_loop,
+            args=(animation_stop_event,),
+            daemon=True
+        )
+        animation_thread.start()
         
-        # If no files to process, finish progress immediately and continue
-        if total_individual_files == 0:
-            self.progress_manager.finish_operation()
-        else:
-            # Update progress tracking with actual file count
+        # Run the delete operation in a background thread
+        def delete_thread():
+            # Count files in background thread
+            total_individual_files = self._count_files_recursively(files_to_delete)
+            
+            # Update progress with correct total
             self.progress_manager.update_operation_total(
-                total_individual_files,
+                total_individual_files if total_individual_files > 0 else 1,
                 ""
             )
-        
-        processed_files = 0
-        
-        try:
-            for file_path in files_to_delete:
-                try:
-                    if file_path.is_symlink():
-                        # Delete symbolic link (not its target)
-                        processed_files += 1
-                        if total_individual_files > 1:
+            
+            deleted_count = 0
+            error_count = 0
+            processed_files = 0
+            
+            try:
+                for file_path in files_to_delete:
+                    # Check for cancellation
+                    if self.file_manager.operation_cancelled:
+                        print("Delete operation cancelled by user")
+                        break
+                    
+                    try:
+                        if file_path.is_symlink():
+                            # Delete symbolic link (not its target)
+                            processed_files += 1
                             self.progress_manager.update_progress(f"Link: {file_path.name}", processed_files)
-                        
-                        file_path.unlink()
-                        print(f"Deleted symbolic link: {file_path.name}")
-                    elif file_path.is_dir():
-                        # Delete directory recursively with progress tracking
-                        processed_files = self._delete_directory_with_progress(
-                            file_path, processed_files, total_individual_files
-                        )
-                        print(f"Deleted directory: {file_path.name}")
-                    else:
-                        # Delete single file
-                        processed_files += 1
-                        if total_individual_files > 1:
+                            
+                            file_path.unlink()
+                            print(f"Deleted symbolic link: {file_path.name}")
+                        elif file_path.is_dir():
+                            # Delete directory recursively with progress tracking
+                            processed_files = self._delete_directory_with_progress(
+                                file_path, processed_files, total_individual_files
+                            )
+                            print(f"Deleted directory: {file_path.name}")
+                        else:
+                            # Delete single file
+                            processed_files += 1
                             self.progress_manager.update_progress(file_path.name, processed_files)
+                            
+                            file_path.unlink()
+                            print(f"Deleted file: {file_path.name}")
                         
-                        file_path.unlink()
-                        print(f"Deleted file: {file_path.name}")
-                    
-                    deleted_count += 1
-                    
-                except PermissionError as e:
-                    print(f"Permission denied deleting {file_path.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
+                        deleted_count += 1
+                        
+                    except PermissionError as e:
+                        print(f"Permission denied deleting {file_path.name}: {e}")
+                        error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
                         if file_path.is_file() or file_path.is_symlink():
                             processed_files += 1
                         elif file_path.is_dir():
                             processed_files += self._count_files_recursively([file_path])
-                except FileNotFoundError:
-                    print(f"File not found (already deleted?): {file_path.name}")
-                    error_count += 1
-                    if total_individual_files > 1:
+                    except FileNotFoundError:
+                        print(f"File not found (already deleted?): {file_path.name}")
+                        error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
                         if file_path.is_file() or file_path.is_symlink():
                             processed_files += 1
                         elif file_path.is_dir():
                             processed_files += self._count_files_recursively([file_path])
-                except Exception as e:
-                    print(f"Error deleting {file_path.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
+                    except Exception as e:
+                        print(f"Error deleting {file_path.name}: {e}")
+                        error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
                         if file_path.is_file() or file_path.is_symlink():
                             processed_files += 1
                         elif file_path.is_dir():
                             processed_files += self._count_files_recursively([file_path])
+            
+            finally:
+                # Stop animation refresh thread
+                animation_stop_event.set()
+                
+                # Always finish progress tracking
+                self.progress_manager.finish_operation()
+                
+                # Clear operation in progress flag
+                self.file_manager.operation_in_progress = False
+                
+                # Invalidate cache for affected directories
+                if deleted_count > 0:
+                    self.cache_manager.invalidate_cache_for_delete_operation(files_to_delete)
+                
+                # Refresh current pane to show the changes
+                self.file_manager.refresh_files(self.file_manager.get_current_pane())
+                self.file_manager.needs_full_redraw = True
+                
+                # Clear selections after delete operation
+                current_pane = self.file_manager.get_current_pane()
+                current_pane['selected_files'].clear()
+                
+                # Adjust cursor position if it's now out of bounds
+                if current_pane['selected_index'] >= len(current_pane['files']):
+                    current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
+                
+                # Print completion message
+                if self.file_manager.operation_cancelled:
+                    print(f"Delete cancelled: {deleted_count} files deleted before cancellation")
+                elif error_count > 0:
+                    print(f"Delete completed: {deleted_count} files deleted, {error_count} errors")
+                elif deleted_count > 0:
+                    print(f"Successfully deleted {deleted_count} files")
         
-        finally:
-            # Always finish progress tracking (it was started, so must be finished)
-            self.progress_manager.finish_operation()
-        
-        # Invalidate cache for affected directories
-        if deleted_count > 0:
-            self.cache_manager.invalidate_cache_for_delete_operation(files_to_delete)
-        
-        # Refresh current pane to show the changes
-        self.file_manager.refresh_files(self.file_manager.get_current_pane())
-        self.file_manager.needs_full_redraw = True
-        
-        # Clear selections after delete operation
-        current_pane = self.file_manager.get_current_pane()
-        current_pane['selected_files'].clear()
-        
-        # Adjust cursor position if it's now out of bounds
-        if current_pane['selected_index'] >= len(current_pane['files']):
-            current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
-        
-        # Print completion message
-        if error_count > 0:
-            print(f"Delete completed: {deleted_count} items deleted, {error_count} errors")
-        elif deleted_count > 0:
-            print(f"Successfully deleted {deleted_count} items")
-        else:
-            print("No items deleted")
+        # Start the thread
+        thread = threading.Thread(target=delete_thread, daemon=True)
+        thread.start()
     
     # Helper methods
     def _count_files_recursively(self, paths):
@@ -1310,6 +1361,10 @@ class FileOperationsUI:
     def _move_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files, is_cross_storage=False):
         """Move directory using copy + delete with fine-grained progress updates"""
         try:
+            # Check for cancellation
+            if self.file_manager.operation_cancelled:
+                return processed_files
+            
             if is_cross_storage:
                 # Cross-storage move: use copy_to then delete
                 source_dir.copy_to(dest_dir, overwrite=True)
@@ -1360,29 +1415,34 @@ class FileOperationsUI:
             
             # Walk through directory and delete files one by one (bottom-up for safety)
             for root, dirs, files in os.walk(dir_path, topdown=False):
+                # Check for cancellation
+                if self.file_manager.operation_cancelled:
+                    return processed_files
+                
                 root_path = Path(root)
                 
                 # Delete files in current directory
                 for file_name in files:
+                    # Check for cancellation
+                    if self.file_manager.operation_cancelled:
+                        return processed_files
                     file_path = root_path / file_name
                     processed_files += 1
                     
-                    if total_files > 1:
-                        # Show relative path from the main directory being deleted
-                        try:
-                            rel_path = file_path.relative_to(dir_path)
-                            display_name = str(rel_path)
-                        except ValueError:
-                            display_name = file_path.name
-                        
-                        self.progress_manager.update_progress(display_name, processed_files)
+                    # Show relative path from the main directory being deleted
+                    try:
+                        rel_path = file_path.relative_to(dir_path)
+                        display_name = str(rel_path)
+                    except ValueError:
+                        display_name = file_path.name
+                    
+                    self.progress_manager.update_progress(display_name, processed_files)
                     
                     try:
                         file_path.unlink()  # Remove file or symlink
                     except Exception as e:
                         print(f"Error deleting {file_path}: {e}")
-                        if total_files > 1:
-                            self.progress_manager.increment_errors()
+                        self.progress_manager.increment_errors()
                 
                 # Delete empty subdirectories (they should be empty now since we're going bottom-up)
                 for dir_name in dirs:
@@ -1392,13 +1452,12 @@ class FileOperationsUI:
                         if subdir_path.is_symlink():
                             # Count symlinks to directories as files for progress
                             processed_files += 1
-                            if total_files > 1:
-                                try:
-                                    rel_path = subdir_path.relative_to(dir_path)
-                                    display_name = f"Link: {rel_path}"
-                                except ValueError:
-                                    display_name = f"Link: {subdir_path.name}"
-                                self.progress_manager.update_progress(display_name, processed_files)
+                            try:
+                                rel_path = subdir_path.relative_to(dir_path)
+                                display_name = f"Link: {rel_path}"
+                            except ValueError:
+                                display_name = f"Link: {subdir_path.name}"
+                            self.progress_manager.update_progress(display_name, processed_files)
                             subdir_path.unlink()
                         else:
                             # Try to remove empty directory (no progress update for empty dirs)
@@ -1409,8 +1468,7 @@ class FileOperationsUI:
                         pass
                     except Exception as e:
                         print(f"Error deleting directory {subdir_path}: {e}")
-                        if total_files > 1:
-                            self.progress_manager.increment_errors()
+                        self.progress_manager.increment_errors()
             
             # Finally remove the main directory
             try:
@@ -1448,7 +1506,15 @@ class FileOperationsUI:
             objects_to_delete = []
             
             for page in page_iterator:
+                # Check for cancellation
+                if self.file_manager.operation_cancelled:
+                    return processed_files
+                
                 for obj in page.get('Contents', []):
+                    # Check for cancellation
+                    if self.file_manager.operation_cancelled:
+                        return processed_files
+                    
                     processed_files += 1
                     
                     if total_files > 1:
