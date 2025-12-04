@@ -7,6 +7,7 @@ import os
 import stat
 import fnmatch
 import shutil
+import threading
 from tfm_path import Path
 from tfm_progress_manager import ProgressManager, OperationType
 from datetime import datetime
@@ -455,13 +456,13 @@ class FileOperationsUI:
                                      if not (destination_dir / f.name).exists()]
                     if non_conflicting:
                         self.perform_copy_operation(non_conflicting, destination_dir)
-                        print(f"Copied {len(non_conflicting)} files, skipped {len(conflicts)} conflicts")
+                        # Success message will be printed by the operation thread
                     else:
                         print("No files copied (all had conflicts)")
                 elif choice == "overwrite":
                     # Copy all files, overwriting conflicts
                     self.perform_copy_operation(files_to_copy, destination_dir, overwrite=True)
-                    print(f"Copied {len(files_to_copy)} files (overwrote {len(conflicts)} existing)")
+                    # Success message will be printed by the operation thread
                 elif choice == "rename":
                     # Handle rename - process conflicts one by one
                     self._handle_copy_rename_batch(files_to_copy, destination_dir, conflicts)
@@ -470,123 +471,161 @@ class FileOperationsUI:
         else:
             # No conflicts, copy directly
             self.perform_copy_operation(files_to_copy, destination_dir)
-            print(f"Copied {len(files_to_copy)} files")
+            # Success message will be printed by the operation thread
     
     def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False):
-        """Perform the actual copy operation with fine-grained progress tracking"""
-        copied_count = 0
-        error_count = 0
+        """Perform the actual copy operation with fine-grained progress tracking in a background thread"""
+        # Set operation in progress flag to block user input
+        self.file_manager.operation_in_progress = True
+        self.file_manager.operation_cancelled = False
         
-        # Count total individual files for fine-grained progress
-        total_individual_files = self._count_files_recursively(files_to_copy)
+        # Show "Preparing..." message immediately
+        self.progress_manager.start_operation(
+            OperationType.COPY,
+            1,  # Temporary count, will be updated after counting
+            f"Preparing to copy to {destination_dir.name}",
+            self._progress_callback
+        )
         
-        # Start progress tracking for copy operation
-        if total_individual_files > 1:  # Only show progress for multiple files
-            self.progress_manager.start_operation(
-                OperationType.COPY, 
-                total_individual_files, 
-                f"to {destination_dir.name}",
-                self._progress_callback
-            )
+        # Start animation refresh thread immediately so "Preparing..." animates
+        animation_stop_event = threading.Event()
+        animation_thread = threading.Thread(
+            target=self._animation_refresh_loop,
+            args=(animation_stop_event,),
+            daemon=True
+        )
+        animation_thread.start()
         
-        processed_files = 0
-        
-        try:
-            for source_file in files_to_copy:
-                try:
-                    dest_path = destination_dir / source_file.name
+        # Run the copy operation in a background thread
+        def copy_thread():
+            copied_count = 0
+            error_count = 0
+            
+            # Count total individual files for fine-grained progress
+            total_individual_files = self._count_files_recursively(files_to_copy)
+            
+            # If no files to process, finish early
+            if total_individual_files == 0:
+                # Still need to handle empty directory copy
+                pass
+            else:
+                # Update progress tracking with actual file count
+                self.progress_manager.update_operation_total(
+                    total_individual_files,
+                    f"to {destination_dir.name}"
+                )
+            
+            processed_files = 0
+            
+            try:
+                for source_file in files_to_copy:
+                    # Check for cancellation
+                    if self.file_manager.operation_cancelled:
+                        print("Copy operation cancelled by user")
+                        break
                     
-                    # Skip if file exists and we're not overwriting
-                    if dest_path.exists() and not overwrite:
-                        # Still need to count skipped files for progress
-                        if source_file.is_file() or source_file.is_symlink():
-                            processed_files += 1
-                            if total_individual_files > 1:
+                    try:
+                        dest_path = destination_dir / source_file.name
+                        
+                        # Skip if file exists and we're not overwriting
+                        if dest_path.exists() and not overwrite:
+                            # Still need to count skipped files for progress
+                            if source_file.is_file() or source_file.is_symlink():
+                                processed_files += 1
                                 self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
-                        elif source_file.is_dir():
-                            # Count files in skipped directory
-                            skipped_count = self._count_files_recursively([source_file])
-                            processed_files += skipped_count
-                            if total_individual_files > 1:
+                            elif source_file.is_dir():
+                                # Count files in skipped directory
+                                skipped_count = self._count_files_recursively([source_file])
+                                processed_files += skipped_count
                                 self.progress_manager.update_progress(f"Skipped: {source_file.name}", processed_files)
-                        continue
-                    
-                    if source_file.is_dir():
-                        # Copy directory recursively with progress tracking
-                        if dest_path.exists() and overwrite:
-                            if dest_path.is_dir():
-                                # For S3, we can't use rmtree, so we'll let copy_to handle it
-                                pass
+                            continue
+                        
+                        if source_file.is_dir():
+                            # Copy directory recursively with progress tracking
+                            if dest_path.exists() and overwrite:
+                                if dest_path.is_dir():
+                                    # For S3, we can't use rmtree, so we'll let copy_to handle it
+                                    pass
+                                else:
+                                    dest_path.unlink()
+                            
+                            if source_file.get_scheme() == dest_path.get_scheme() == 'file':
+                                # Local to local - use the existing progress method
+                                processed_files = self._copy_directory_with_progress(
+                                    source_file, dest_path, processed_files, total_individual_files
+                                )
                             else:
-                                dest_path.unlink()
-                        
-                        if source_file.get_scheme() == dest_path.get_scheme() == 'file':
-                            # Local to local - use the existing progress method
-                            processed_files = self._copy_directory_with_progress(
-                                source_file, dest_path, processed_files, total_individual_files
-                            )
+                                # Cross-storage copy - use the new method
+                                processed_files = self._copy_directory_cross_storage_with_progress(
+                                    source_file, dest_path, processed_files, total_individual_files, overwrite
+                                )
+                            
+                            print(f"Copied directory: {source_file.name}")
                         else:
-                            # Cross-storage copy - use the new method
-                            source_file.copy_to(dest_path, overwrite=overwrite)
-                            # Update progress for the entire directory
-                            dir_file_count = self._count_files_recursively([source_file])
-                            processed_files += dir_file_count
-                            if total_individual_files > 1:
-                                self.progress_manager.update_progress(source_file.name, processed_files)
-                        
-                        print(f"Copied directory: {source_file.name}")
-                    else:
-                        # Copy single file
-                        processed_files += 1
-                        if total_individual_files > 1:
+                            # Copy single file with progress tracking
+                            processed_files += 1
                             self.progress_manager.update_progress(source_file.name, processed_files)
+                            
+                            self._copy_file_with_progress(source_file, dest_path, overwrite)
+                            print(f"Copied file: {source_file.name}")
                         
-                        source_file.copy_to(dest_path, overwrite=overwrite)
-                        print(f"Copied file: {source_file.name}")
-                    
-                    copied_count += 1
-                    
-                except PermissionError as e:
-                    print(f"Permission denied copying {source_file.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
+                        copied_count += 1
+                        
+                    except PermissionError as e:
+                        print(f"Permission denied copying {source_file.name}: {e}")
+                        error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
                         if source_file.is_file() or source_file.is_symlink():
                             processed_files += 1
                         elif source_file.is_dir():
                             processed_files += self._count_files_recursively([source_file])
-                except Exception as e:
-                    print(f"Error copying {source_file.name}: {e}")
-                    error_count += 1
-                    if total_individual_files > 1:
+                    except Exception as e:
+                        print(f"Error copying {source_file.name}: {e}")
+                        error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
                         if source_file.is_file() or source_file.is_symlink():
                             processed_files += 1
                         elif source_file.is_dir():
                             processed_files += self._count_files_recursively([source_file])
-        
-        finally:
-            # Finish progress tracking
-            if total_individual_files > 1:
+            
+            finally:
+                # Stop animation refresh thread
+                animation_stop_event.set()
+                
+                # Finish progress tracking
                 self.progress_manager.finish_operation()
+                
+                # Clear operation in progress flag
+                self.file_manager.operation_in_progress = False
+            
+            # Invalidate cache for affected directories
+            if copied_count > 0:
+                self.cache_manager.invalidate_cache_for_copy_operation(files_to_copy, destination_dir)
+            
+            # Refresh both panes to show the copied files
+            self.file_manager.refresh_files()
+            self.file_manager.needs_full_redraw = True
+            
+            # Clear selections after successful copy
+            if copied_count > 0:
+                current_pane = self.file_manager.get_current_pane()
+                current_pane['selected_files'].clear()
+            
+            # Print completion message
+            if self.file_manager.operation_cancelled:
+                print(f"Copy cancelled: {copied_count} files copied before cancellation")
+            elif error_count > 0:
+                print(f"Copy completed: {copied_count} files copied, {error_count} errors")
+            elif copied_count > 0:
+                print(f"Successfully copied {copied_count} files")
+            else:
+                print("No files copied")
         
-        # Invalidate cache for affected directories
-        if copied_count > 0:
-            self.cache_manager.invalidate_cache_for_copy_operation(files_to_copy, destination_dir)
-        
-        # Refresh both panes to show the copied files
-        self.file_manager.refresh_files()
-        self.file_manager.needs_full_redraw = True
-        
-        # Clear selections after successful copy
-        if copied_count > 0:
-            current_pane = self.file_manager.get_current_pane()
-            current_pane['selected_files'].clear()
-        
-        if error_count > 0:
-            print(f"Copy completed with {error_count} errors")
+        # Start the copy thread
+        thread = threading.Thread(target=copy_thread, daemon=True)
+        thread.start()
     
     def move_selected_files(self):
         """Move selected files to the opposite pane's directory"""
@@ -696,13 +735,13 @@ class FileOperationsUI:
                                      if not (destination_dir / f.name).exists()]
                     if non_conflicting:
                         self.perform_move_operation(non_conflicting, destination_dir)
-                        print(f"Moved {len(non_conflicting)} files, skipped {len(conflicts)} conflicts")
+                        # Success message will be printed by the operation thread
                     else:
                         print("No files moved (all had conflicts)")
                 elif choice == "overwrite":
                     # Move all files, overwriting conflicts
                     self.perform_move_operation(files_to_move, destination_dir, overwrite=True)
-                    print(f"Moved {len(files_to_move)} files (overwrote {len(conflicts)} existing)")
+                    # Success message will be printed by the operation thread
                 elif choice == "rename":
                     # Handle rename - process conflicts one by one
                     self._handle_move_rename_batch(files_to_move, destination_dir, conflicts)
@@ -711,23 +750,32 @@ class FileOperationsUI:
         else:
             # No conflicts, move directly
             self.perform_move_operation(files_to_move, destination_dir)
-            print(f"Moved {len(files_to_move)} files")
+            # Success message will be printed by the operation thread
     
     def perform_move_operation(self, files_to_move, destination_dir, overwrite=False):
         """Perform the actual move operation with fine-grained progress tracking"""
         moved_count = 0
         error_count = 0
         
+        # Show "Preparing..." message immediately
+        self.progress_manager.start_operation(
+            OperationType.MOVE,
+            1,  # Temporary count
+            f"Preparing to move to {destination_dir.name}",
+            self._progress_callback
+        )
+        
         # Count total individual files for fine-grained progress
         total_individual_files = self._count_files_recursively(files_to_move)
         
-        # Start progress tracking for move operation
-        if total_individual_files > 1:  # Only show progress for multiple files
-            self.progress_manager.start_operation(
-                OperationType.MOVE, 
-                total_individual_files, 
-                f"to {destination_dir.name}",
-                self._progress_callback
+        # If no files to process, finish progress immediately and continue
+        if total_individual_files == 0:
+            self.progress_manager.finish_operation()
+        else:
+            # Update progress tracking with actual file count
+            self.progress_manager.update_operation_total(
+                total_individual_files,
+                f"to {destination_dir.name}"
             )
         
         processed_files = 0
@@ -822,9 +870,8 @@ class FileOperationsUI:
                             processed_files += self._count_files_recursively([source_file])
         
         finally:
-            # Finish progress tracking
-            if total_individual_files > 1:
-                self.progress_manager.finish_operation()
+            # Always finish progress tracking (it was started, so must be finished)
+            self.progress_manager.finish_operation()
         
         # Invalidate cache for affected directories
         if moved_count > 0:
@@ -839,8 +886,13 @@ class FileOperationsUI:
             current_pane = self.file_manager.get_current_pane()
             current_pane['selected_files'].clear()
         
+        # Print completion message
         if error_count > 0:
-            print(f"Move completed with {error_count} errors")
+            print(f"Move completed: {moved_count} files moved, {error_count} errors")
+        elif moved_count > 0:
+            print(f"Successfully moved {moved_count} files")
+        else:
+            print("No files moved")
     
     def delete_selected_files(self):
         """Delete selected files or current file with confirmation"""
@@ -905,16 +957,25 @@ class FileOperationsUI:
         deleted_count = 0
         error_count = 0
         
+        # Show "Preparing..." message immediately
+        self.progress_manager.start_operation(
+            OperationType.DELETE,
+            1,  # Temporary count
+            "Preparing to delete",
+            self._progress_callback
+        )
+        
         # Count total individual files for fine-grained progress
         total_individual_files = self._count_files_recursively(files_to_delete)
         
-        # Start progress tracking for delete operation
-        if total_individual_files > 1:  # Only show progress for multiple files
-            self.progress_manager.start_operation(
-                OperationType.DELETE, 
-                total_individual_files, 
-                "",
-                self._progress_callback
+        # If no files to process, finish progress immediately and continue
+        if total_individual_files == 0:
+            self.progress_manager.finish_operation()
+        else:
+            # Update progress tracking with actual file count
+            self.progress_manager.update_operation_total(
+                total_individual_files,
+                ""
             )
         
         processed_files = 0
@@ -979,9 +1040,8 @@ class FileOperationsUI:
                             processed_files += self._count_files_recursively([file_path])
         
         finally:
-            # Finish progress tracking
-            if total_individual_files > 1:
-                self.progress_manager.finish_operation()
+            # Always finish progress tracking (it was started, so must be finished)
+            self.progress_manager.finish_operation()
         
         # Invalidate cache for affected directories
         if deleted_count > 0:
@@ -999,9 +1059,13 @@ class FileOperationsUI:
         if current_pane['selected_index'] >= len(current_pane['files']):
             current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
         
-        # Report results
-        if deleted_count > 0:
+        # Print completion message
+        if error_count > 0:
+            print(f"Delete completed: {deleted_count} items deleted, {error_count} errors")
+        elif deleted_count > 0:
             print(f"Successfully deleted {deleted_count} items")
+        else:
+            print("No items deleted")
     
     # Helper methods
     def _count_files_recursively(self, paths):
@@ -1033,6 +1097,72 @@ class FileOperationsUI:
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     
+    def _animation_refresh_loop(self, stop_event):
+        """Background loop to refresh animation periodically
+        
+        Args:
+            stop_event: Threading event to signal when to stop
+        """
+        import time
+        
+        while not stop_event.is_set():
+            # Refresh animation to keep spinner moving
+            self.progress_manager.refresh_animation()
+            
+            # Sleep for a short time (100ms) to keep animation smooth
+            # This is independent of progress updates
+            time.sleep(0.1)
+    
+    def _copy_file_with_progress(self, source_file, dest_file, overwrite=False):
+        """Copy a single file with byte-level progress tracking"""
+        try:
+            # For small files or non-local files, use simple copy
+            if source_file.get_scheme() != 'file' or dest_file.get_scheme() != 'file':
+                source_file.copy_to(dest_file, overwrite=overwrite)
+                return
+            
+            # For local files, check size
+            file_size = source_file.stat().st_size
+            
+            # For files smaller than 10MB, use simple copy
+            if file_size < 10 * 1024 * 1024:
+                source_file.copy_to(dest_file, overwrite=overwrite)
+                return
+            
+            # For large files, copy with byte-level progress
+            chunk_size = 1024 * 1024  # 1MB chunks
+            bytes_copied = 0
+            
+            with open(str(source_file), 'rb') as src:
+                with open(str(dest_file), 'wb') as dst:
+                    while True:
+                        # Check for cancellation
+                        if self.file_manager.operation_cancelled:
+                            # Close files and remove partial copy
+                            dst.close()
+                            src.close()
+                            try:
+                                dest_file.unlink()
+                            except Exception:
+                                pass
+                            return
+                        
+                        chunk = src.read(chunk_size)
+                        if not chunk:
+                            break
+                        dst.write(chunk)
+                        bytes_copied += len(chunk)
+                        
+                        # Update progress with byte percentage
+                        byte_percentage = int((bytes_copied / file_size) * 100)
+                        self.progress_manager.update_file_byte_progress(byte_percentage)
+            
+            # Copy file metadata
+            shutil.copystat(str(source_file), str(dest_file))
+            
+        except Exception as e:
+            raise e
+    
     def _copy_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files):
         """Copy directory recursively with fine-grained progress updates"""
         try:
@@ -1041,6 +1171,10 @@ class FileOperationsUI:
             
             # Walk through source directory and copy files one by one
             for root, dirs, files in os.walk(source_dir):
+                # Check for cancellation
+                if self.file_manager.operation_cancelled:
+                    return processed_files
+                
                 root_path = Path(root)
                 
                 # Calculate relative path from source directory
@@ -1052,14 +1186,17 @@ class FileOperationsUI:
                 
                 # Copy files in current directory
                 for file_name in files:
+                    # Check for cancellation
+                    if self.file_manager.operation_cancelled:
+                        return processed_files
+                    
                     source_file = root_path / file_name
                     dest_file = dest_root / file_name
                     
                     processed_files += 1
-                    if total_files > 1:
-                        # Show relative path for files in subdirectories
-                        display_name = str(rel_path / file_name) if rel_path != Path('.') else file_name
-                        self.progress_manager.update_progress(display_name, processed_files)
+                    # Show relative path for files in subdirectories
+                    display_name = str(rel_path / file_name) if rel_path != Path('.') else file_name
+                    self.progress_manager.update_progress(display_name, processed_files)
                     
                     try:
                         if source_file.is_symlink():
@@ -1067,21 +1204,19 @@ class FileOperationsUI:
                             link_target = os.readlink(str(source_file))
                             dest_file.symlink_to(link_target)
                         else:
-                            # Copy regular file
-                            source_file.copy_to(dest_file, overwrite=True)
+                            # Copy regular file with byte-level progress for large files
+                            self._copy_file_with_progress(source_file, dest_file, overwrite=True)
                     except Exception as e:
                         print(f"Error copying {source_file}: {e}")
-                        if total_files > 1:
-                            self.progress_manager.increment_errors()
+                        self.progress_manager.increment_errors()
                 
                 # Handle symbolic links to directories
                 for dir_name in dirs:
                     source_subdir = root_path / dir_name
                     if source_subdir.is_symlink():
                         processed_files += 1
-                        if total_files > 1:
-                            display_name = str(rel_path / dir_name) if rel_path != Path('.') else dir_name
-                            self.progress_manager.update_progress(f"Link: {display_name}", processed_files)
+                        display_name = str(rel_path / dir_name) if rel_path != Path('.') else dir_name
+                        self.progress_manager.update_progress(f"Link: {display_name}", processed_files)
                         
                         dest_subdir = dest_root / dir_name
                         try:
@@ -1089,15 +1224,45 @@ class FileOperationsUI:
                             dest_subdir.symlink_to(link_target)
                         except Exception as e:
                             print(f"Error copying symlink {source_subdir}: {e}")
-                            if total_files > 1:
-                                self.progress_manager.increment_errors()
+                            self.progress_manager.increment_errors()
             
             return processed_files
             
         except Exception as e:
             print(f"Error copying directory {source_dir}: {e}")
-            if total_files > 1:
-                self.progress_manager.increment_errors()
+            self.progress_manager.increment_errors()
+            return processed_files
+    
+    def _copy_directory_cross_storage_with_progress(self, source_dir, dest_dir, processed_files, total_files, overwrite=False):
+        """Copy directory across storage systems with fine-grained progress updates"""
+        try:
+            # For cross-storage, we need to recursively copy files
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Get all files in the source directory recursively
+            for item in source_dir.rglob('*'):
+                if item.is_file():
+                    # Calculate relative path
+                    rel_path = item.relative_to(source_dir)
+                    dest_item = dest_dir / rel_path
+                    
+                    # Create parent directory if needed
+                    dest_item.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    processed_files += 1
+                    self.progress_manager.update_progress(str(rel_path), processed_files)
+                    
+                    try:
+                        item.copy_to(dest_item, overwrite=overwrite)
+                    except Exception as e:
+                        print(f"Error copying {item}: {e}")
+                        self.progress_manager.increment_errors()
+            
+            return processed_files
+            
+        except Exception as e:
+            print(f"Error copying directory {source_dir}: {e}")
+            self.progress_manager.increment_errors()
             return processed_files
     
     def _move_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files, is_cross_storage=False):

@@ -6,6 +6,7 @@ TFM Progress Manager - Handles progress tracking for file operations
 import time
 from enum import Enum
 from typing import Optional, Callable, Dict, Any
+from tfm_progress_animator import ProgressAnimator
 
 
 class OperationType(Enum):
@@ -20,11 +21,21 @@ class OperationType(Enum):
 class ProgressManager:
     """Manages progress tracking for long-running file operations"""
     
-    def __init__(self):
+    def __init__(self, config=None):
         self.current_operation: Optional[Dict[str, Any]] = None
         self.progress_callback: Optional[Callable] = None
         self.last_callback_time: float = 0
         self.callback_throttle_ms: float = 50  # Minimum 50ms between callbacks
+        
+        # Create animator with config or use minimal config
+        if config:
+            self.animator = ProgressAnimator(config, pattern_override='spinner', speed_override=0.08)
+        else:
+            # Create a minimal config object for standalone use
+            class MinimalConfig:
+                PROGRESS_ANIMATION_PATTERN = 'spinner'
+                PROGRESS_ANIMATION_SPEED = 0.08
+            self.animator = ProgressAnimator(MinimalConfig())
     
     def start_operation(self, operation_type: OperationType, total_items: int, 
                        description: str = "", progress_callback: Optional[Callable] = None):
@@ -42,13 +53,35 @@ class ProgressManager:
             'processed_items': 0,
             'current_item': '',
             'description': description,
-            'errors': 0
+            'errors': 0,
+            'file_byte_progress': 0  # Percentage of current file copied (0-100)
         }
         self.progress_callback = progress_callback
+        self.animator.reset()
         
         # Call callback with initial state
         if self.progress_callback:
             self.progress_callback(self.current_operation)
+    
+    def update_operation_total(self, total_items: int, description: str = ""):
+        """Update the total item count for current operation
+        
+        This is useful when the total count isn't known at operation start
+        (e.g., during file counting phase).
+        
+        Args:
+            total_items: New total number of items
+            description: Optional updated description
+        """
+        if not self.current_operation:
+            return
+        
+        self.current_operation['total_items'] = total_items
+        if description:
+            self.current_operation['description'] = description
+        
+        # Trigger callback to update display
+        self._trigger_callback_if_needed(force=True)
     
     def update_progress(self, current_item: str, processed_items: Optional[int] = None):
         """Update progress with current item being processed
@@ -61,6 +94,7 @@ class ProgressManager:
             return
         
         self.current_operation['current_item'] = current_item
+        self.current_operation['file_byte_progress'] = 0  # Reset byte progress for new file
         
         if processed_items is not None:
             self.current_operation['processed_items'] = processed_items
@@ -68,16 +102,52 @@ class ProgressManager:
             self.current_operation['processed_items'] += 1
         
         # Call callback with updated state (with throttling)
-        if self.progress_callback:
-            current_time = time.time() * 1000  # Convert to milliseconds
+        self._trigger_callback_if_needed()
+    
+    def update_file_byte_progress(self, percentage: int):
+        """Update the byte-level progress for the current file being copied
+        
+        Args:
+            percentage: Percentage of current file copied (0-100)
+        """
+        if not self.current_operation:
+            return
+        
+        self.current_operation['file_byte_progress'] = percentage
+        
+        # Call callback with updated state (with throttling)
+        self._trigger_callback_if_needed()
+    
+    def _trigger_callback_if_needed(self, force: bool = False):
+        """Trigger progress callback if enough time has passed or forced
+        
+        Args:
+            force: If True, bypass throttling and always trigger callback
+        """
+        if not self.progress_callback:
+            return
+        
+        current_time = time.time() * 1000  # Convert to milliseconds
+        
+        # Always call callback for the first update, if forced, or if enough time has passed
+        if (force or 
+            self.last_callback_time == 0 or 
+            current_time - self.last_callback_time >= self.callback_throttle_ms or
+            (self.current_operation and 
+             self.current_operation['processed_items'] >= self.current_operation['total_items'])):
             
-            # Always call callback for the first update or if enough time has passed
-            if (self.last_callback_time == 0 or 
-                current_time - self.last_callback_time >= self.callback_throttle_ms or
-                self.current_operation['processed_items'] >= self.current_operation['total_items']):
-                
-                self.progress_callback(self.current_operation)
-                self.last_callback_time = current_time
+            self.progress_callback(self.current_operation)
+            self.last_callback_time = current_time
+    
+    def refresh_animation(self):
+        """Force a callback to refresh animation without changing progress data
+        
+        This should be called periodically to keep the animation smooth even when
+        there are no progress updates (e.g., during large file copies).
+        """
+        if self.current_operation and self.progress_callback:
+            # Force callback to update animation
+            self._trigger_callback_if_needed(force=True)
     
     def increment_errors(self):
         """Increment the error count for the current operation"""
@@ -93,6 +163,7 @@ class ProgressManager:
         self.current_operation = None
         self.progress_callback = None
         self.last_callback_time = 0  # Reset throttling
+        self.animator.reset()
     
     def is_operation_active(self) -> bool:
         """Check if an operation is currently being tracked"""
@@ -127,6 +198,7 @@ class ProgressManager:
         total = op['total_items']
         current_item = op['current_item']
         percentage = self.get_progress_percentage()
+        file_byte_progress = op.get('file_byte_progress', 0)
         
         # Get operation verb
         operation_verbs = {
@@ -139,11 +211,14 @@ class ProgressManager:
         
         verb = operation_verbs.get(op_type, "Processing")
         
-        # Build base progress text
+        # Get animation frame using the existing animator
+        animation_frame = self.animator.get_current_frame()
+        
+        # Build base progress text with animator
         if op['description']:
-            progress_text = f"{verb} ({op['description']})... {processed}/{total} ({percentage}%)"
+            progress_text = f"{animation_frame} {verb} ({op['description']})... {processed}/{total} ({percentage}%)"
         else:
-            progress_text = f"{verb}... {processed}/{total} ({percentage}%)"
+            progress_text = f"{animation_frame} {verb}... {processed}/{total} ({percentage}%)"
         
         # Add current item if there's space
         if current_item:
@@ -152,12 +227,18 @@ class ProgressManager:
             separator = " - "
             available_space = max_width - base_len - len(separator)
             
+            # Reserve space for byte progress if applicable
+            byte_progress_text = ""
+            if file_byte_progress > 0:
+                byte_progress_text = f" [{file_byte_progress}%]"
+                available_space -= len(byte_progress_text)
+            
             if available_space > 10:  # Only show filename if we have reasonable space
                 # Truncate filename if too long
                 if len(current_item) > available_space:
                     truncate_at = max(1, available_space - 3)
                     current_item = "..." + current_item[-truncate_at:]
                 
-                progress_text += separator + current_item
+                progress_text += separator + current_item + byte_progress_text
         
         return progress_text

@@ -123,6 +123,9 @@ class FileManager:
         # Dialog state (now handled by general_dialog)
         self.rename_file_path = None  # Still needed for rename operations
         
+        # Operation state flags
+        self.operation_in_progress = False  # Flag to block input during operations
+        self.operation_cancelled = False  # Flag to signal operation cancellation
 
         self.should_quit = False  # Flag to control main loop exit
 
@@ -2980,8 +2983,16 @@ class FileManager:
                 self.clear_screen_with_background()
                 self.needs_full_redraw = True
             else:
-                # Handle other key input
-                self.handle_key_input(key)
+                # Check if operation is in progress
+                if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
+                    # Only allow ESC key to cancel operation
+                    if key == 27:  # ESC key
+                        self.operation_cancelled = True
+                        print("Cancelling operation...")
+                    # Ignore all other keys during operation
+                else:
+                    # Handle normal key input
+                    self.handle_key_input(key)
             
             # Draw interface after handling input
             self.draw_interface()
