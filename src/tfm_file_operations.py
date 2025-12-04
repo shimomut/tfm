@@ -979,11 +979,11 @@ class FileOperationsUI:
         self.file_manager.operation_in_progress = True
         self.file_manager.operation_cancelled = False
         
-        # Show "Preparing..." message immediately
+        # Start operation without description
         self.progress_manager.start_operation(
             OperationType.DELETE,
             1,
-            "Preparing to delete",
+            "",
             self._progress_callback
         )
         
@@ -1012,6 +1012,7 @@ class FileOperationsUI:
             processed_files = 0
             
             try:
+                
                 for file_path in files_to_delete:
                     # Check for cancellation
                     if self.file_manager.operation_cancelled:
