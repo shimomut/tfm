@@ -1079,13 +1079,15 @@ class FileOperationsUI:
         return total_files
     
     def _progress_callback(self, progress_data):
-        """Callback for progress manager updates"""
-        # Force a screen refresh to show progress
-        try:
-            self.file_manager.draw_status()
-            self.file_manager.stdscr.refresh()
-        except Exception as e:
-            print(f"Warning: Progress callback display update failed: {e}")
+        """Callback for progress manager updates
+        
+        Note: This is called from background threads. We do NOT call curses functions
+        here because curses is not thread-safe. Instead, we set a flag that tells the
+        main loop to redraw on its next iteration.
+        """
+        # Set flag to trigger redraw in main loop (thread-safe)
+        # This is safe because it's just setting a boolean flag
+        self.file_manager.needs_full_redraw = True
     
     def _animation_refresh_loop(self, stop_event):
         """Background loop to refresh animation periodically
