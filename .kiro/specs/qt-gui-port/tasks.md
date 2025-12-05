@@ -32,35 +32,35 @@
 
 ## Phase 2: Extract Business Logic
 
-- [ ] 2. Refactor FileManager into TFMApplication controller
-- [ ] 2.1 Create TFMApplication class that accepts IUIBackend
+- [-] 2. Refactor FileManager into TFMApplication controller
+- [x] 2.1 Create TFMApplication class that accepts IUIBackend
   - Move all business logic from FileManager to TFMApplication
   - Remove all direct curses calls from business logic
   - Accept ui_backend parameter in constructor
   - _Requirements: 2.1, 2.2, 2.5_
 
-- [ ] 2.2 Implement main application loop in TFMApplication
+- [x] 2.2 Implement main application loop in TFMApplication
   - Create run() method with initialize, event loop, and cleanup
   - Implement render() method that calls UI backend methods
   - Implement handle_input() method for event processing
   - _Requirements: 2.1, 2.2_
 
-- [ ] 2.3 Refactor PaneManager to remove UI dependencies
+- [x] 2.3 Refactor PaneManager to remove UI dependencies
   - Ensure PaneManager only manages pane state, not rendering
   - Remove any curses-specific code
   - _Requirements: 2.1, 2.5_
 
-- [ ] 2.4 Refactor FileOperations to remove UI dependencies
+- [x] 2.4 Refactor FileOperations to remove UI dependencies
   - Ensure FileOperations only performs file operations, not UI updates
   - Remove any curses-specific code
   - _Requirements: 2.1, 2.5_
 
-- [ ] 2.5 Refactor all dialog classes to work with abstraction layer
+- [-] 2.5 Refactor all dialog classes to work with abstraction layer
   - Update ListDialog, InfoDialog, SearchDialog, etc. to use IUIBackend
   - Remove direct curses calls from dialog classes
   - _Requirements: 2.1, 2.3, 2.5_
 
-- [ ] 2.6 Write property test for business logic isolation
+- [x] 2.6 Write property test for business logic isolation
   - **Property 4: Business logic isolation**
   - **Validates: Requirements 2.1, 2.5**
 
