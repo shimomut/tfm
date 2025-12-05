@@ -120,49 +120,49 @@
 
 ## Phase 4: Implement Qt Backend Foundation
 
-- [ ] 7. Create Qt main window and pane widgets
-- [ ] 7.1 Create TFMMainWindow class (QMainWindow)
+- [x] 7. Create Qt main window and pane widgets
+- [x] 7.1 Create TFMMainWindow class (QMainWindow)
   - Set up main window with menu bar, toolbar, status bar
   - Create central widget with splitter for dual panes
   - Implement window geometry save/restore
   - _Requirements: 1.2, 1.3, 10.1, 10.2, 10.3_
 
-- [ ] 7.2 Create FilePaneWidget class (QWidget)
+- [x] 7.2 Create FilePaneWidget class (QWidget)
   - Create QTableWidget or QListWidget for file listing
   - Implement columns for filename, size, date, permissions
   - Implement selection handling (single, multi, range)
   - Implement keyboard navigation
   - _Requirements: 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 7.3 Create HeaderWidget for directory paths
+- [x] 7.3 Create HeaderWidget for directory paths
   - Display current directory path for each pane
   - Highlight active pane
   - _Requirements: 3.2_
 
-- [ ] 7.4 Create FooterWidget for file counts and sort info
+- [x] 7.4 Create FooterWidget for file counts and sort info
   - Display directory/file counts
   - Display sort mode and filter info
   - Highlight active pane
   - _Requirements: 3.2_
 
-- [ ] 7.5 Create LogPaneWidget for log messages
+- [x] 7.5 Create LogPaneWidget for log messages
   - Create QTextEdit or QListWidget for log display
   - Implement scrolling and message formatting
   - _Requirements: 1.3_
 
-- [ ] 7.6 Write integration test for Qt window creation
+- [x] 7.6 Write integration test for Qt window creation
   - Verify TFMMainWindow creates all required widgets
   - Verify dual-pane layout is established
   - _Requirements: 1.3, 3.1_
 
-- [ ] 8. Create QtBackend implementation
-- [ ] 8.1 Implement QtBackend class inheriting from IUIBackend
+- [x] 8. Create QtBackend implementation
+- [x] 8.1 Implement QtBackend class inheriting from IUIBackend
   - Implement initialize() and cleanup() methods
   - Store reference to TFMMainWindow
   - Set up event queue for input events
   - _Requirements: 1.2, 2.3_
 
-- [ ] 8.2 Implement Qt rendering methods
+- [x] 8.2 Implement Qt rendering methods
   - Implement render_panes() updating FilePaneWidget contents
   - Implement render_header() updating HeaderWidget
   - Implement render_footer() updating FooterWidget
@@ -170,68 +170,68 @@
   - Implement render_log_pane() updating LogPaneWidget
   - _Requirements: 1.2, 2.1, 3.1, 3.2, 3.3_
 
-- [ ] 8.3 Implement Qt input handling
+- [x] 8.3 Implement Qt input handling
   - Implement get_input_event() reading from event queue
   - Connect Qt signals to event queue (key press, mouse click, resize)
   - Convert Qt events to InputEvent objects
   - _Requirements: 1.2, 2.3, 4.1, 4.2, 4.3, 5.1_
 
-- [ ] 8.4 Implement get_screen_size() for Qt
+- [x] 8.4 Implement get_screen_size() for Qt
   - Return main window dimensions
   - _Requirements: 1.2_
 
-- [ ] 8.5 Write property test for Qt backend
+- [x] 8.5 Write property test for Qt backend
   - **Property 30: Backend interface compliance**
   - **Validates: Requirements 11.3**
 
-- [ ] 9. Checkpoint - Ensure all tests pass
+- [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 5: Implement Qt Dialogs
 
-- [ ] 10. Create Qt dialog implementations
-- [ ] 10.1 Implement confirmation dialog
+- [-] 10. Create Qt dialog implementations
+- [x] 10.1 Implement confirmation dialog
   - Create QMessageBox-based confirmation dialog
   - Support Yes/No/Cancel options
   - Return user choice
   - _Requirements: 6.1, 6.5_
 
-- [ ] 10.2 Implement input dialog
+- [x] 10.2 Implement input dialog
   - Create QInputDialog-based text input dialog
   - Support default values and validation
   - Return user input or None if cancelled
   - _Requirements: 6.2, 6.5_
 
-- [ ] 10.3 Implement list selection dialog
+- [x] 10.3 Implement list selection dialog
   - Create custom QDialog with QListWidget
   - Support single and multi-selection
   - Support search/filter
   - Return selected items
   - _Requirements: 6.5_
 
-- [ ] 10.4 Implement info dialog
+- [x] 10.4 Implement info dialog
   - Create custom QDialog with QTextEdit
   - Display formatted information
   - Support scrolling for long content
   - _Requirements: 6.5_
 
-- [ ] 10.5 Implement progress dialog
+- [x] 10.5 Implement progress dialog
   - Create QProgressDialog for long operations
   - Support progress bar updates
   - Support current file name display
   - Support cancellation
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 10.6 Implement show_dialog() in QtBackend
+- [x] 10.6 Implement show_dialog() in QtBackend
   - Route dialog requests to appropriate Qt dialog implementation
   - Ensure dialogs are modal (block main window)
   - _Requirements: 6.5_
 
-- [ ] 10.7 Write property test for dialog modality
+- [x] 10.7 Write property test for dialog modality
   - **Property 16: Dialog modality**
   - **Validates: Requirements 6.5**
 
-- [ ] 10.8 Write property test for progress dialog behavior
+- [x] 10.8 Write property test for progress dialog behavior
   - **Property 17: Progress bar updates**
   - **Property 18: Current file display in progress**
   - **Property 19: Progress dialog auto-close**

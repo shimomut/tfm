@@ -224,7 +224,8 @@ class TestCursesBackendCompliance:
                 backend.render_panes(left_pane, right_pane, 'left', layout)
                 backend.render_footer('left info', 'right info', 'left')
                 backend.render_status_bar('message', [{'key': 'F1', 'label': 'Help'}])
-                backend.render_log_pane(['message1', 'message2'], 0, 0.2)
+                # Log messages are tuples of (timestamp, source, message)
+                backend.render_log_pane([('12:00:00', 'TEST', 'message1'), ('12:00:01', 'TEST', 'message2')], 0, 0.2)
             except Exception as e:
                 assert False, f"Render methods should not crash: {e}"
 
