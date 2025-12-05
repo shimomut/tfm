@@ -64,16 +64,17 @@ class CursesBackend(IUIBackend):
         Clean up curses resources.
         
         Restores the terminal to its original state.
+        
+        Note: When using curses.wrapper(), endwin() is automatically called.
+        We only need to restore cursor visibility here.
         """
         try:
             # Restore cursor visibility
             curses.curs_set(1)
             
-            # End curses mode
-            curses.endwin()
-            
         except curses.error:
-            pass  # Ignore errors during cleanup
+            # Ignore errors during cleanup - terminal may already be cleaned up
+            pass
     
     def get_screen_size(self) -> Tuple[int, int]:
         """
@@ -308,9 +309,11 @@ class CursesBackend(IUIBackend):
         start_idx = max(0, total_messages - display_height - scroll_offset)
         end_idx = min(total_messages, start_idx + display_height)
         
-        messages_to_show = messages[start_idx:end_idx]
+        # Convert deque to list for slicing support
+        messages_list = list(messages)
+        messages_to_show = messages_list[start_idx:end_idx]
         
-        for i, message in enumerate(messages_to_show):
+        for i, log_entry in enumerate(messages_to_show):
             if i >= display_height:
                 break
             
@@ -318,14 +321,20 @@ class CursesBackend(IUIBackend):
             if y >= log_start_y + log_height:
                 break
             
+            # Unpack log entry tuple (timestamp, source, message)
+            timestamp, source, message = log_entry
+            
+            # Format log line
+            log_line = f"{timestamp} [{source:>6}] {message}"
+            
             # Truncate if too long
-            if len(message) > width - 1:
-                message = message[:width - 4] + "..."
+            if len(log_line) > width - 1:
+                log_line = log_line[:width - 4] + "..."
             
             try:
-                # Use default log color (stdout)
-                color = get_log_color("STDOUT")
-                self.stdscr.addstr(y, 0, message.ljust(width - 1)[:width - 1], color)
+                # Get color based on source
+                color = get_log_color(source)
+                self.stdscr.addstr(y, 0, log_line.ljust(width - 1)[:width - 1], color)
             except curses.error:
                 pass
     
@@ -675,7 +684,7 @@ class CursesBackend(IUIBackend):
             
             # Get file info
             from tfm_file_operations import FileOperations
-            size_str, mtime_str = FileOperations.get_file_info_static(file_path)
+            size_str, mtime_str = FileOperations.get_file_info(file_path)
             
             # Check selection states
             is_multi_selected = str(file_path) in pane_data['selected_files']

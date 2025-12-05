@@ -224,12 +224,130 @@ class TFMApplication:
             # Only allow ESC key to cancel operation
             if event.key == 27:  # ESC key
                 self.operation_cancelled = True
-                print("Cancelling operation...")
+                self.log_manager.add_message("Cancelling operation...")
             return
         
-        # TODO: Implement key handling logic
-        # This will be moved from FileManager.handle_key_input()
-        pass
+        # Get current pane
+        current_pane = self.pane_manager.get_current_pane()
+        
+        # Handle basic navigation keys
+        key = event.key
+        
+        # Tab key - switch panes
+        if key == 9:  # Tab
+            self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
+            self.needs_full_redraw = True
+        
+        # Arrow keys - navigation
+        elif event.key_name == 'KEY_UP':
+            if current_pane['selected_index'] > 0:
+                current_pane['selected_index'] -= 1
+                self.needs_full_redraw = True
+        
+        elif event.key_name == 'KEY_DOWN':
+            if current_pane['selected_index'] < len(current_pane['files']) - 1:
+                current_pane['selected_index'] += 1
+                self.needs_full_redraw = True
+        
+        # Enter key - open directory or file
+        elif event.key_name in ('KEY_ENTER', '\n', '\r') or key in (10, 13):
+            self._handle_enter()
+            self.needs_full_redraw = True
+        
+        # Backspace - go to parent directory
+        elif event.key_name in ('KEY_BACKSPACE', '\x7f') or key in (127, 263, 8):
+            if current_pane['path'] != current_pane['path'].parent:
+                try:
+                    current_pane['path'] = current_pane['path'].parent
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                    current_pane['selected_files'].clear()
+                    self.file_operations.refresh_files(current_pane)
+                    self.needs_full_redraw = True
+                except PermissionError:
+                    self.log_manager.add_message("Permission denied", "ERROR")
+        
+        # Page Up/Down
+        elif event.key_name == 'KEY_PPAGE':
+            current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
+            self.needs_full_redraw = True
+        
+        elif event.key_name == 'KEY_NPAGE':
+            current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
+            self.needs_full_redraw = True
+        
+        # Left/Right arrows - pane switching or parent navigation
+        elif event.key_name == 'KEY_LEFT':
+            if self.pane_manager.active_pane == 'right':
+                # Switch to left pane
+                self.pane_manager.active_pane = 'left'
+                self.needs_full_redraw = True
+            elif current_pane['path'] != current_pane['path'].parent:
+                # Go to parent directory
+                try:
+                    current_pane['path'] = current_pane['path'].parent
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                    current_pane['selected_files'].clear()
+                    self.file_operations.refresh_files(current_pane)
+                    self.needs_full_redraw = True
+                except PermissionError:
+                    self.log_manager.add_message("Permission denied", "ERROR")
+        
+        elif event.key_name == 'KEY_RIGHT':
+            if self.pane_manager.active_pane == 'left':
+                # Switch to right pane
+                self.pane_manager.active_pane = 'right'
+                self.needs_full_redraw = True
+            elif current_pane['path'] != current_pane['path'].parent:
+                # Go to parent directory
+                try:
+                    current_pane['path'] = current_pane['path'].parent
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                    current_pane['selected_files'].clear()
+                    self.file_operations.refresh_files(current_pane)
+                    self.needs_full_redraw = True
+                except PermissionError:
+                    self.log_manager.add_message("Permission denied", "ERROR")
+        
+        # 'q' key - quit
+        elif key == ord('q') or key == ord('Q'):
+            self.should_quit = True
+        
+        # '.' key - toggle hidden files
+        elif key == ord('.'):
+            self.file_operations.toggle_hidden_files()
+            self.pane_manager.left_pane['selected_index'] = 0
+            self.pane_manager.left_pane['scroll_offset'] = 0
+            self.pane_manager.right_pane['selected_index'] = 0
+            self.pane_manager.right_pane['scroll_offset'] = 0
+            self.file_operations.refresh_files(self.pane_manager.left_pane)
+            self.file_operations.refresh_files(self.pane_manager.right_pane)
+            self.needs_full_redraw = True
+    
+    def _handle_enter(self):
+        """Handle Enter key - open directory or file."""
+        current_pane = self.pane_manager.get_current_pane()
+        
+        if not current_pane['files']:
+            return
+        
+        selected_file = current_pane['files'][current_pane['selected_index']]
+        
+        if selected_file.is_dir():
+            # Navigate into directory
+            try:
+                current_pane['path'] = selected_file
+                current_pane['selected_index'] = 0
+                current_pane['scroll_offset'] = 0
+                current_pane['selected_files'].clear()
+                self.file_operations.refresh_files(current_pane)
+            except PermissionError:
+                self.log_manager.add_message(f"Permission denied: {selected_file}", "ERROR")
+        else:
+            # For files, just log for now (file viewing will be implemented later)
+            self.log_manager.add_message(f"File: {selected_file.name}")
     
     def _handle_mouse_event(self, event: InputEvent):
         """Handle mouse events."""
@@ -278,8 +396,8 @@ class TFMApplication:
         self.ui.render_status_bar(status_message, controls)
         
         # Render log pane
-        messages = self.log_manager.get_messages()
-        scroll_offset = self.log_manager.get_scroll_offset()
+        messages = self.log_manager.log_messages
+        scroll_offset = self.log_manager.log_scroll_offset
         self.ui.render_log_pane(messages, scroll_offset, self.log_height_ratio)
         
         # Refresh display

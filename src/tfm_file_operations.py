@@ -151,7 +151,8 @@ class FileOperations:
         
         return description
     
-    def get_file_info(self, path):
+    @staticmethod
+    def get_file_info(path):
         """Get file information for display"""
         try:
             stat_info = path.stat()
