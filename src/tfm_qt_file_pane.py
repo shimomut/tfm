@@ -5,6 +5,7 @@ This module implements the file pane widget for displaying file listings
 in TFM's Qt GUI mode.
 """
 
+import os
 from PySide6.QtWidgets import (
     QWidget, QTableWidget, QTableWidgetItem, QVBoxLayout,
     QHeaderView, QAbstractItemView
@@ -13,6 +14,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor
 from typing import List, Dict, Any
 from pathlib import Path
+
+from tfm_qt_colors import get_file_color, get_qt_colors
 
 
 class FilePaneWidget(QWidget):
@@ -46,6 +49,7 @@ class FilePaneWidget(QWidget):
         self.selected_files = set()  # Set of selected file paths (strings)
         self.current_index = 0  # Current cursor position
         self.is_active = False  # Whether this pane is active
+        self.color_scheme = 'dark'  # Default color scheme
         
         # Setup UI
         self._setup_ui()
@@ -145,6 +149,8 @@ class FilePaneWidget(QWidget):
         """
         Format file size for display.
         
+        Handles both local and S3 paths.
+        
         Args:
             file_path: Path to the file
         
@@ -166,12 +172,15 @@ class FilePaneWidget(QWidget):
                 return f"{size / (1024 * 1024):.1f} MB"
             else:
                 return f"{size / (1024 * 1024 * 1024):.1f} GB"
-        except (OSError, PermissionError):
+        except (OSError, PermissionError, Exception):
+            # Catch all exceptions including S3-specific errors
             return "???"
     
     def _format_date(self, file_path: Path) -> str:
         """
         Format modification date for display.
+        
+        Handles both local and S3 paths.
         
         Args:
             file_path: Path to the file
@@ -184,21 +193,36 @@ class FilePaneWidget(QWidget):
             mtime = file_path.stat().st_mtime
             dt = datetime.datetime.fromtimestamp(mtime)
             return dt.strftime("%Y-%m-%d %H:%M")
-        except (OSError, PermissionError):
+        except (OSError, PermissionError, Exception):
+            # Catch all exceptions including S3-specific errors
             return "???"
     
     def _format_permissions(self, file_path: Path) -> str:
         """
         Format file permissions for display.
         
+        For S3 paths, returns a simplified representation since S3 doesn't
+        have traditional Unix permissions.
+        
         Args:
             file_path: Path to the file
         
         Returns:
-            Formatted permissions string (e.g., "rwxr-xr-x")
+            Formatted permissions string (e.g., "rwxr-xr-x" for local, "rw-rw-rw-" for S3)
         """
         try:
             import stat
+            
+            # Check if this is an S3 path
+            if hasattr(file_path, '_impl') and hasattr(file_path._impl, 'get_scheme'):
+                if file_path._impl.get_scheme() == 's3':
+                    # S3 objects don't have traditional permissions
+                    # Show simplified representation
+                    if file_path.is_dir():
+                        return "rwxrwxrwx"  # Directories are accessible
+                    else:
+                        return "rw-rw-rw-"  # Files are readable/writable
+            
             st = file_path.stat()
             mode = st.st_mode
             
@@ -221,38 +245,47 @@ class FilePaneWidget(QWidget):
             perms.append('x' if mode & stat.S_IXOTH else '-')
             
             return ''.join(perms)
-        except (OSError, PermissionError):
+        except (OSError, PermissionError, Exception):
+            # Catch all exceptions including S3-specific errors
             return "?????????"
     
     def _apply_file_coloring(self, row: int, file_path: Path):
         """
         Apply coloring to a file row based on file type.
         
+        Handles both local and S3 paths.
+        
         Args:
             row: Row index in the table
             file_path: Path to the file
         """
-        import os
-        
-        # Determine color based on file type
-        color = None
+        # Determine file type
+        file_type = 'regular'
         
         if file_path.is_dir():
-            # Directories - blue
-            color = QColor(100, 149, 237)  # Cornflower blue
+            file_type = 'directory'
         elif file_path.is_symlink():
-            # Symlinks - cyan
-            color = QColor(0, 255, 255)
-        elif file_path.is_file() and os.access(file_path, os.X_OK):
-            # Executable files - green
-            color = QColor(50, 205, 50)  # Lime green
+            file_type = 'symlink'
+        else:
+            # Check if executable (only for local files)
+            try:
+                # S3 paths don't support os.access, so check if it's a local path
+                is_s3 = hasattr(file_path, '_impl') and hasattr(file_path._impl, 'get_scheme') and file_path._impl.get_scheme() == 's3'
+                
+                if not is_s3 and file_path.is_file() and os.access(file_path, os.X_OK):
+                    file_type = 'executable'
+            except (OSError, Exception):
+                # Ignore errors when checking executability
+                pass
+        
+        # Get color for file type using current color scheme
+        color = get_file_color(file_type, self.color_scheme)
         
         # Apply color to all cells in the row
-        if color:
-            for col in range(self.table.columnCount()):
-                item = self.table.item(row, col)
-                if item:
-                    item.setForeground(color)
+        for col in range(self.table.columnCount()):
+            item = self.table.item(row, col)
+            if item:
+                item.setForeground(color)
     
     def _restore_selection(self):
         """Restore multi-selection state after updating files."""
@@ -300,6 +333,19 @@ class FilePaneWidget(QWidget):
         else:
             # Remove border for inactive pane
             self.setStyleSheet("FilePaneWidget { border: 1px solid #CCCCCC; }")
+    
+    def set_color_scheme(self, scheme: str):
+        """
+        Set the color scheme for this pane.
+        
+        Args:
+            scheme: Color scheme name ('dark' or 'light')
+        """
+        self.color_scheme = scheme
+        
+        # Reapply colors to all files
+        for row, file_path in enumerate(self.files):
+            self._apply_file_coloring(row, file_path)
     
     def get_selected_files(self) -> List[Path]:
         """

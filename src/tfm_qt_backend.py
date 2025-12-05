@@ -5,11 +5,13 @@ This module implements the IUIBackend interface using Qt for Python (PySide6),
 providing a graphical user interface for TFM.
 """
 
+import os
 import queue
-from typing import Tuple, Dict, List, Any, Optional
+import subprocess
+from typing import Tuple, Dict, List, Any, Optional, Callable
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt, QTimer, Signal, QObject, QEvent
+from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtCore import Qt, QTimer, Signal, QObject, QEvent, QProcess
 from PySide6.QtGui import QKeyEvent, QMouseEvent, QResizeEvent
 
 from tfm_ui_backend import IUIBackend, InputEvent, LayoutInfo, DialogConfig
@@ -18,6 +20,8 @@ from tfm_qt_file_pane import FilePaneWidget
 from tfm_qt_header import HeaderWidget
 from tfm_qt_footer import FooterWidget
 from tfm_qt_log_pane import LogPaneWidget
+from tfm_qt_colors import apply_color_scheme, get_qt_colors
+from tfm_external_programs import quote_filenames_with_double_quotes, get_selected_or_cursor_files
 
 
 class QtBackend(IUIBackend):
@@ -83,6 +87,11 @@ class QtBackend(IUIBackend):
             # Connect signals for input events
             self._connect_signals()
             
+            # Apply initial color scheme
+            apply_color_scheme(self.app, self.color_scheme)
+            self.left_pane_widget.set_color_scheme(self.color_scheme)
+            self.right_pane_widget.set_color_scheme(self.color_scheme)
+            
             # Show the main window
             self.main_window.show()
             
@@ -107,6 +116,12 @@ class QtBackend(IUIBackend):
         # Install event filter on main window to capture all events
         if self.main_window:
             self.main_window.installEventFilter(self)
+            
+            # Connect keyboard shortcut action signals
+            self.main_window.action_triggered.connect(self._on_action_triggered)
+            
+            # Connect Tab key pane switching signal
+            self.main_window.switch_pane_requested.connect(self._on_switch_pane_requested)
         
         # Connect file pane signals
         if self.left_pane_widget:
@@ -124,6 +139,28 @@ class QtBackend(IUIBackend):
             self.right_pane_widget.file_activated.connect(
                 lambda idx: self._queue_event(InputEvent(type='key', key_name='Enter'))
             )
+    
+    def _on_action_triggered(self, action_name: str):
+        """
+        Handle action triggered by keyboard shortcut.
+        
+        Args:
+            action_name: Name of the action that was triggered
+        """
+        # Queue an input event with the action name
+        self._queue_event(InputEvent(
+            type='action',
+            key_name=action_name
+        ))
+    
+    def _on_switch_pane_requested(self):
+        """Handle Tab key press for pane switching."""
+        # Queue a Tab key event with key code 9 (Tab)
+        self._queue_event(InputEvent(
+            type='key',
+            key=9,  # Tab key code
+            key_name='Tab'
+        ))
     
     def eventFilter(self, obj, event):
         """
@@ -193,8 +230,19 @@ class QtBackend(IUIBackend):
             scheme: Color scheme name (e.g., 'dark', 'light', 'custom')
         """
         self.color_scheme = scheme
-        # TODO: Apply color scheme to Qt widgets
-        # This will be implemented when theme support is added
+        
+        # Apply color scheme to the application
+        try:
+            apply_color_scheme(self.app, scheme)
+            
+            # Update file pane colors
+            if self.left_pane_widget:
+                self.left_pane_widget.set_color_scheme(scheme)
+            if self.right_pane_widget:
+                self.right_pane_widget.set_color_scheme(scheme)
+                
+        except Exception as e:
+            print(f"Warning: Could not set color scheme '{scheme}': {e}")
     
     def render_panes(self, left_pane: Dict, right_pane: Dict, 
                     active_pane: str, layout: LayoutInfo):
@@ -222,6 +270,14 @@ class QtBackend(IUIBackend):
             self.right_pane_widget.current_index = right_pane.get('selected_index', 0)
             self.right_pane_widget.selected_files = right_pane.get('selected_files', set())
             self.right_pane_widget.set_active(active_pane == 'right')
+        
+        # Update keyboard shortcuts based on selection status
+        # Check if any files are selected in the active pane
+        active_pane_data = left_pane if active_pane == 'left' else right_pane
+        has_selection = len(active_pane_data.get('selected_files', set())) > 0
+        
+        if self.main_window:
+            self.main_window.update_shortcuts_for_selection(has_selection)
     
     def render_header(self, left_path: str, right_path: str, active_pane: str):
         """
@@ -525,7 +581,7 @@ class QtBackend(IUIBackend):
             raise ValueError(f"Unknown dialog type: {dialog_config.type}")
     
     def show_progress(self, operation: str, current: int, total: int, 
-                     message: str):
+                     message: str, cancel_callback: Optional[Callable] = None):
         """
         Show or update progress indicator for long operations.
         
@@ -534,6 +590,7 @@ class QtBackend(IUIBackend):
             current: Current progress value
             total: Total progress value
             message: Current status message (e.g., current file name)
+            cancel_callback: Optional callback to call when user cancels
         """
         from tfm_qt_progress_dialog import ProgressDialog
         
@@ -545,6 +602,10 @@ class QtBackend(IUIBackend):
                 operation=operation,
                 cancelable=True
             )
+            
+            # Connect cancel signal if callback provided
+            if cancel_callback:
+                self._progress_dialog.cancelled.connect(cancel_callback)
         
         # Update progress
         self._progress_dialog.update_progress(current, total, message)
@@ -553,4 +614,189 @@ class QtBackend(IUIBackend):
         if current >= total and total > 0:
             self._progress_dialog.auto_close()
             self._progress_dialog = None
+    
+    def get_selected_files(self, pane: str) -> list:
+        """
+        Get selected files from a pane.
+        
+        Args:
+            pane: Which pane ('left' or 'right')
+        
+        Returns:
+            List of selected file paths
+        """
+        if pane == 'left' and self.left_pane_widget:
+            return self.left_pane_widget.get_selected_files()
+        elif pane == 'right' and self.right_pane_widget:
+            return self.right_pane_widget.get_selected_files()
+        return []
+    
+    def get_current_file(self, pane: str):
+        """
+        Get the current file (at cursor position) from a pane.
+        
+        Args:
+            pane: Which pane ('left' or 'right')
+        
+        Returns:
+            Path object for current file, or None
+        """
+        if pane == 'left' and self.left_pane_widget:
+            return self.left_pane_widget.get_current_file()
+        elif pane == 'right' and self.right_pane_widget:
+            return self.right_pane_widget.get_current_file()
+        return None
+    
+    def clear_selection(self, pane: str):
+        """
+        Clear file selection in a pane.
+        
+        Args:
+            pane: Which pane ('left' or 'right')
+        """
+        if pane == 'left' and self.left_pane_widget:
+            self.left_pane_widget.clear_selection()
+        elif pane == 'right' and self.right_pane_widget:
+            self.right_pane_widget.clear_selection()
 
+
+    def execute_external_program(self, program: Dict, pane_manager) -> bool:
+        """
+        Execute an external program with TFM environment variables.
+        
+        This method launches external programs in Qt mode using the same
+        environment variable approach as TUI mode, ensuring consistent
+        integration across both interfaces.
+        
+        Args:
+            program: Program configuration dict with 'name', 'command', and optional 'options'
+            pane_manager: PaneManager instance for accessing pane data
+        
+        Returns:
+            True if program executed successfully, False otherwise
+        """
+        try:
+            # Get current pane information
+            left_pane = pane_manager.left_pane
+            right_pane = pane_manager.right_pane
+            current_pane = pane_manager.get_current_pane()
+            other_pane = pane_manager.get_inactive_pane()
+            
+            # Set environment variables with TFM_ prefix (same as TUI mode)
+            env = os.environ.copy()
+            env['TFM_LEFT_DIR'] = str(left_pane['path'])
+            env['TFM_RIGHT_DIR'] = str(right_pane['path'])
+            env['TFM_THIS_DIR'] = str(current_pane['path'])
+            env['TFM_OTHER_DIR'] = str(other_pane['path'])
+            
+            # Get selected files for each pane, or cursor position if no selection
+            left_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(left_pane))
+            right_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(right_pane))
+            current_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(current_pane))
+            other_selected = quote_filenames_with_double_quotes(get_selected_or_cursor_files(other_pane))
+            
+            # Set selected files environment variables (space-separated) with TFM_ prefix
+            env['TFM_LEFT_SELECTED'] = ' '.join(left_selected)
+            env['TFM_RIGHT_SELECTED'] = ' '.join(right_selected)
+            env['TFM_THIS_SELECTED'] = ' '.join(current_selected)
+            env['TFM_OTHER_SELECTED'] = ' '.join(other_selected)
+            
+            # Set TFM indicator environment variable
+            env['TFM_ACTIVE'] = '1'
+            
+            # Use the command as-is (users should use tfm_tool() for TFM tools)
+            command = program['command']
+            
+            # Determine working directory for external program
+            # If current pane is browsing a remote directory (like S3), 
+            # fallback to TFM's working directory
+            working_dir = None
+            if current_pane['path'].is_remote():
+                working_dir = os.getcwd()
+            else:
+                working_dir = str(current_pane['path'])
+            
+            # Check if auto_return option is enabled
+            auto_return = program.get('options', {}).get('auto_return', False)
+            
+            # Execute the program with the modified environment
+            # Use QProcess for better Qt integration
+            process = QProcess()
+            process.setWorkingDirectory(working_dir)
+            
+            # Set environment variables
+            process_env = QProcess.systemEnvironment()
+            for key, value in env.items():
+                process_env.append(f"{key}={value}")
+            process.setEnvironment(process_env)
+            
+            # Start the process
+            program_name = command[0]
+            program_args = command[1:] if len(command) > 1 else []
+            
+            # For GUI programs with auto_return, start detached
+            if auto_return:
+                success = process.startDetached(program_name, program_args, working_dir)
+                if not success:
+                    raise OSError(f"Failed to start program: {program_name}")
+                return True
+            else:
+                # For CLI programs, start and wait
+                process.start(program_name, program_args)
+                
+                if not process.waitForStarted(5000):  # 5 second timeout
+                    raise OSError(f"Failed to start program: {program_name}")
+                
+                # Wait for process to finish
+                if not process.waitForFinished(-1):  # Wait indefinitely
+                    raise OSError(f"Program did not finish properly: {program_name}")
+                
+                # Check exit code
+                exit_code = process.exitCode()
+                if exit_code != 0:
+                    error_output = process.readAllStandardError().data().decode('utf-8', errors='replace')
+                    raise subprocess.CalledProcessError(exit_code, command, stderr=error_output)
+                
+                return True
+        
+        except FileNotFoundError as e:
+            # Program not found
+            QMessageBox.critical(
+                self.main_window,
+                "Program Not Found",
+                f"Error: Command not found: {program['command'][0]}\n\n"
+                f"Tip: Use tfm_tool() function for TFM tools in your configuration\n\n"
+                f"Details: {e}"
+            )
+            return False
+        
+        except subprocess.CalledProcessError as e:
+            # Program exited with error
+            error_msg = f"Program '{program['name']}' exited with code {e.returncode}"
+            if e.stderr:
+                error_msg += f"\n\nError output:\n{e.stderr}"
+            
+            QMessageBox.warning(
+                self.main_window,
+                "Program Error",
+                error_msg
+            )
+            return False
+        
+        except OSError as e:
+            # System error (permissions, etc.)
+            QMessageBox.critical(
+                self.main_window,
+                "System Error",
+                f"Error executing program '{program['name']}':\n\n{e}"
+            )
+            return False
+        
+        except Exception as e:
+            # Unexpected error
+            QMessageBox.critical(
+                self.main_window,
+                "Unexpected Error",
+                f"Unexpected error executing program '{program['name']}':\n\n{e}"
+            )
+            return False

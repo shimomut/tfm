@@ -141,6 +141,17 @@ class Config:
     # S3 settings
     S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
     
+    # GUI-specific settings (Qt mode)
+    GUI_WINDOW_WIDTH = 1200  # Default window width in pixels
+    GUI_WINDOW_HEIGHT = 800  # Default window height in pixels
+    GUI_WINDOW_X = None  # Saved window X position (None = center on screen)
+    GUI_WINDOW_Y = None  # Saved window Y position (None = center on screen)
+    GUI_FONT_FAMILY = 'Monospace'  # Font family for file listings
+    GUI_FONT_SIZE = 10  # Font size in points
+    GUI_ENABLE_DRAG_DROP = True  # Enable drag-and-drop file operations
+    GUI_SHOW_TOOLBAR = True  # Show toolbar with common actions
+    GUI_SHOW_MENUBAR = True  # Show menu bar
+    
     # Unicode and wide character settings
     UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
     # - 'auto': Automatically detect terminal capabilities (recommended)

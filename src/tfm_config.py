@@ -165,6 +165,17 @@ class DefaultConfig:
     # S3 settings
     S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
     
+    # GUI-specific settings (Qt mode)
+    GUI_WINDOW_WIDTH = 1200  # Default window width in pixels
+    GUI_WINDOW_HEIGHT = 800  # Default window height in pixels
+    GUI_WINDOW_X = None  # Saved window X position (None = center on screen)
+    GUI_WINDOW_Y = None  # Saved window Y position (None = center on screen)
+    GUI_FONT_FAMILY = 'Monospace'  # Font family for file listings
+    GUI_FONT_SIZE = 10  # Font size in points
+    GUI_ENABLE_DRAG_DROP = True  # Enable drag-and-drop file operations
+    GUI_SHOW_TOOLBAR = True  # Show toolbar with common actions
+    GUI_SHOW_MENUBAR = True  # Show menu bar
+    
     # Unicode and wide character settings
     UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
     UNICODE_WARNINGS = True  # Show warnings for Unicode processing errors
@@ -342,7 +353,76 @@ class ConfigManager:
             if not isinstance(config.UNICODE_CACHE_SIZE, int) or config.UNICODE_CACHE_SIZE < 0:
                 errors.append("UNICODE_CACHE_SIZE must be a non-negative integer")
         
+        # Validate GUI settings
+        if hasattr(config, 'GUI_WINDOW_WIDTH'):
+            if not isinstance(config.GUI_WINDOW_WIDTH, int) or config.GUI_WINDOW_WIDTH < 400:
+                errors.append("GUI_WINDOW_WIDTH must be an integer >= 400")
+        
+        if hasattr(config, 'GUI_WINDOW_HEIGHT'):
+            if not isinstance(config.GUI_WINDOW_HEIGHT, int) or config.GUI_WINDOW_HEIGHT < 300:
+                errors.append("GUI_WINDOW_HEIGHT must be an integer >= 300")
+        
+        if hasattr(config, 'GUI_WINDOW_X'):
+            if config.GUI_WINDOW_X is not None and not isinstance(config.GUI_WINDOW_X, int):
+                errors.append("GUI_WINDOW_X must be an integer or None")
+        
+        if hasattr(config, 'GUI_WINDOW_Y'):
+            if config.GUI_WINDOW_Y is not None and not isinstance(config.GUI_WINDOW_Y, int):
+                errors.append("GUI_WINDOW_Y must be an integer or None")
+        
+        if hasattr(config, 'GUI_FONT_SIZE'):
+            if not isinstance(config.GUI_FONT_SIZE, int) or config.GUI_FONT_SIZE < 6 or config.GUI_FONT_SIZE > 72:
+                errors.append("GUI_FONT_SIZE must be an integer between 6 and 72")
+        
         return errors
+    
+    def save_gui_geometry(self, width, height, x, y):
+        """
+        Save GUI window geometry to configuration file.
+        
+        Args:
+            width: Window width in pixels
+            height: Window height in pixels
+            x: Window X position
+            y: Window Y position
+        
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        if not self.config_file.exists():
+            return False
+        
+        try:
+            # Read current config file
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # Update geometry values
+            updated_lines = []
+            for line in lines:
+                if line.strip().startswith('GUI_WINDOW_WIDTH'):
+                    updated_lines.append(f"    GUI_WINDOW_WIDTH = {width}  # Default window width in pixels\n")
+                elif line.strip().startswith('GUI_WINDOW_HEIGHT'):
+                    updated_lines.append(f"    GUI_WINDOW_HEIGHT = {height}  # Default window height in pixels\n")
+                elif line.strip().startswith('GUI_WINDOW_X'):
+                    updated_lines.append(f"    GUI_WINDOW_X = {x}  # Saved window X position (None = center on screen)\n")
+                elif line.strip().startswith('GUI_WINDOW_Y'):
+                    updated_lines.append(f"    GUI_WINDOW_Y = {y}  # Saved window Y position (None = center on screen)\n")
+                else:
+                    updated_lines.append(line)
+            
+            # Write updated config
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                f.writelines(updated_lines)
+            
+            # Reload config to pick up changes
+            self.reload_config()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error saving GUI geometry: {e}")
+            return False
     
     def get_key_for_action(self, action):
         """Get the key binding for a specific action"""
