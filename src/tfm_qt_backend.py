@@ -24,6 +24,18 @@ from tfm_qt_colors import apply_color_scheme, get_qt_colors
 from tfm_external_programs import quote_filenames_with_double_quotes, get_selected_or_cursor_files
 
 
+class _EventFilter(QObject):
+    """Internal event filter for QtBackend."""
+    
+    def __init__(self, backend):
+        super().__init__()
+        self.backend = backend
+    
+    def eventFilter(self, obj, event):
+        """Forward events to backend."""
+        return self.backend._handle_event(obj, event)
+
+
 class QtBackend(IUIBackend):
     """
     Qt-based GUI backend implementation.
@@ -44,6 +56,9 @@ class QtBackend(IUIBackend):
         self.main_window = None
         self.event_queue = queue.Queue()
         self.color_scheme = 'dark'  # Default color scheme
+        
+        # Create internal event filter
+        self._event_filter = _EventFilter(self)
         
         # Widget references (will be set during initialization)
         self.left_pane_widget = None
@@ -115,7 +130,7 @@ class QtBackend(IUIBackend):
         """Connect Qt signals to event queue."""
         # Install event filter on main window to capture all events
         if self.main_window:
-            self.main_window.installEventFilter(self)
+            self.main_window.installEventFilter(self._event_filter)
             
             # Connect keyboard shortcut action signals
             self.main_window.action_triggered.connect(self._on_action_triggered)
@@ -205,9 +220,11 @@ class QtBackend(IUIBackend):
             key_name=action
         ))
     
-    def eventFilter(self, obj, event):
+    def _handle_event(self, obj, event):
         """
-        Event filter to capture Qt events and convert to InputEvents.
+        Handle Qt events and convert to InputEvents.
+        
+        Called by the internal event filter.
         
         Args:
             obj: Object that received the event
