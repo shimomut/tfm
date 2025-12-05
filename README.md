@@ -1,10 +1,16 @@
-# TFM - TUI File Manager
+# TFM - Dual-Mode File Manager
 
-A powerful terminal-based file manager built with Python's curses library. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, advanced text editing, and professional-grade features.
+A powerful file manager that runs in both Terminal (TUI) and Graphical (GUI) modes. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, advanced text editing, and professional-grade features.
+
+**Choose your interface:**
+- **TUI Mode**: Terminal-based interface using curses (traditional)
+- **GUI Mode**: Modern Qt-based graphical interface (new!)
 
 ## Key Features
 
+- **Dual-mode support** - Run in terminal (TUI) or graphical (GUI) mode
 - **Dual-pane interface** with independent navigation and cross-pane operations
+- **Mouse support** in GUI mode with drag-and-drop, context menus, and toolbar
 - **Advanced search** with real-time filtering and background processing  
 - **Multi-selection** with bulk operations and progress tracking
 - **Built-in text viewer** with syntax highlighting for 20+ file formats
@@ -19,6 +25,8 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 
 ## Screenshots
 
+### Terminal Mode (TUI)
+
 ![main screen](doc/images/main-screen.png)
 
 <div align="center">
@@ -32,15 +40,27 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 <img src="doc/images/color-schemes.png" alt="color schemes" width="250">
 </div>
 
+### Graphical Mode (GUI)
+
+GUI mode provides the same powerful features with a modern graphical interface, mouse support, drag-and-drop, toolbar, and menu bar. See [Qt GUI Mode documentation](doc/QT_GUI_MODE_FEATURE.md) for details and screenshots.
+
 
 ## Quick Start
 
 ### Installation
 1. Ensure you have Python 3.9+ installed
 2. Clone or download TFM
-3. Run the file manager:
+3. Install Qt dependencies for GUI mode (optional):
    ```bash
+   pip install PySide6
+   ```
+4. Run the file manager:
+   ```bash
+   # Terminal mode (TUI)
    python3 tfm.py
+   
+   # Graphical mode (GUI)
+   python3 tfm_qt.py
    ```
 
 ### Essential Controls
@@ -59,10 +79,12 @@ For comprehensive information about TFM's features and usage:
 
 ### User Documentation
 - **[Complete User Guide](doc/TFM_USER_GUIDE.md)** - Comprehensive guide covering all features, configuration, and usage
+- **[Qt GUI Mode](doc/QT_GUI_MODE_FEATURE.md)** - GUI mode features, mouse support, and configuration
 - **[Remote Log Monitoring](doc/REMOTE_LOG_MONITORING_FEATURE.md)** - Real-time log monitoring setup and usage
 - **[Search Animation](doc/SEARCH_ANIMATION_FEATURE.md)** - Advanced search features and visual feedback
 
 ### Developer Documentation
+- **[UI Abstraction Layer](doc/dev/UI_ABSTRACTION_LAYER_SYSTEM.md)** - Architecture for dual-mode support
 - **[Navigation System](doc/dev/NAVIGATION_SYSTEM.md)** - Core navigation implementation
 - **[Remote Log Implementation](doc/dev/REMOTE_LOG_MONITORING_IMPLEMENTATION.md)** - Technical details of log monitoring
 - **[External Programs](doc/dev/EXTERNAL_PROGRAMS_IMPLEMENTATION.md)** - Program integration system
@@ -122,11 +144,40 @@ Type `exit` to return to TFM.
 
 For detailed information on all features, see the [User Guide](doc/TFM_USER_GUIDE.md).
 
+## Dual-Mode Support
+
+TFM supports both Terminal (TUI) and Graphical (GUI) modes, sharing the same configuration and features:
+
+### Terminal Mode (TUI)
+Traditional curses-based interface for terminal environments:
+```bash
+python3 tfm.py [options]
+```
+
+### Graphical Mode (GUI)
+Modern Qt-based interface with mouse support:
+```bash
+python3 tfm_qt.py [options]
+```
+
+**GUI Mode Features:**
+- Full mouse support (click, drag-and-drop, context menus)
+- Toolbar with common operations
+- Menu bar for all features
+- Native dialogs and progress indicators
+- Window geometry persistence
+- All keyboard shortcuts from TUI mode
+
+See [Qt GUI Mode documentation](doc/QT_GUI_MODE_FEATURE.md) for details.
+
 ## Command Line Options
+
+Both modes support the same command-line options:
 
 ```bash
 # Specify startup directories
 python3 tfm.py --left /path/to/projects --right /path/to/documents
+python3 tfm_qt.py --left /path/to/projects --right /path/to/documents
 
 # Enable remote log monitoring
 python3 tfm.py --remote-log-port 8888
@@ -142,10 +193,23 @@ python3 tfm.py --version
 ## Installation
 
 ### Requirements
+
+**For TUI Mode:**
 - Python 3.9+ with curses library (built-in on Unix systems)
 - Terminal with curses support
 
-### Optional Dependencies
+**For GUI Mode:**
+- Python 3.9+
+- PySide6 or PyQt6
+
+### Dependencies
+
+**Required for GUI Mode:**
+```bash
+pip install PySide6
+```
+
+**Optional for Both Modes:**
 ```bash
 pip install pygments  # Enhanced syntax highlighting
 pip install boto3     # AWS S3 support
@@ -153,12 +217,16 @@ pip install boto3     # AWS S3 support
 
 ### Installation Options
 ```bash
-# Run directly
+# Run directly (TUI mode)
 python3 tfm.py
+
+# Run directly (GUI mode)
+python3 tfm_qt.py
 
 # Install from source
 python3 setup.py install
-tfm
+tfm        # TUI mode
+tfm-qt     # GUI mode
 ```
 
 ## Configuration
@@ -179,12 +247,18 @@ For detailed configuration options, see the [User Guide](doc/TFM_USER_GUIDE.md#c
 ```
 tfm/
 ├── src/           # Core application code
+│   ├── tfm_application.py      # UI-agnostic controller
+│   ├── tfm_ui_backend.py       # Backend interface
+│   ├── tfm_curses_backend.py   # TUI implementation
+│   ├── tfm_qt_backend.py       # GUI implementation
+│   └── tfm_qt_*.py             # Qt widgets
 ├── test/          # Test files and demos
 ├── doc/           # User documentation
 ├── doc/dev/       # Developer documentation
 ├── tools/         # External integration scripts
 ├── demo/          # Interactive demonstrations
-└── tfm.py         # Main entry point
+├── tfm.py         # TUI mode entry point
+└── tfm_qt.py      # GUI mode entry point
 ```
 
 ## Remote Log Monitoring

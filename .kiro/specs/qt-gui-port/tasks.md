@@ -407,61 +407,63 @@
 
 ## Phase 9: Polish and Enhancements
 
-- [ ] 22. Add GUI-specific enhancements
-- [ ] 22.1 Implement drag-and-drop support
+- [x] 22. Add GUI-specific enhancements
+- [x] 22.1 Implement drag-and-drop support
   - Allow dragging files between panes
   - Allow dragging files to/from external applications
   - _Requirements: 1.5_
 
-- [ ] 22.2 Implement context menus
+- [x] 22.2 Implement context menus
   - Right-click context menu for files
   - Context menu for panes
   - _Requirements: 1.5_
 
-- [ ] 22.3 Implement toolbar with common actions
+- [x] 22.3 Implement toolbar with common actions
   - Add toolbar buttons for common operations
   - Make toolbar configurable
   - _Requirements: 1.5_
 
-- [ ] 22.4 Implement menu bar
+- [x] 22.4 Implement menu bar
   - Add File, Edit, View, Tools, Help menus
   - Populate with all available actions
   - _Requirements: 1.5_
 
-- [ ] 23. Performance optimization
-- [ ] 23.1 Optimize file list rendering
+- [x] 23. Performance optimization
+- [x] 23.1 Optimize file list rendering
   - Use incremental updates when possible
   - Implement virtual scrolling for large directories
   - _Requirements: 1.5_
 
-- [ ] 23.2 Optimize progress updates
+- [x] 23.2 Optimize progress updates
   - Throttle progress bar updates to avoid UI lag
   - Use background threads for file operations
   - _Requirements: 7.2_
 
-- [ ] 24. Final integration testing
-- [ ] 24.1 Write comprehensive integration tests
+- [x] 24. Final integration testing
+- [x] 24.1 Write comprehensive integration tests
   - Test all file operations in both modes
   - Test all dialogs in both modes
   - Test external programs in both modes
   - Test S3 operations in both modes
   - _Requirements: 11.4_
 
-- [ ] 24.2 Write property test for configuration consistency
+- [x] 24.2 Write property test for configuration consistency
   - **Property 2: Configuration consistency across modes**
   - **Validates: Requirements 1.4**
 
-- [ ] 24.3 Write property test for feature parity
+- [x] 24.3 Write property test for feature parity
   - **Property 3: Feature parity between backends**
   - **Validates: Requirements 1.5**
 
-- [ ] 25. Final Checkpoint - Ensure all tests pass
+- [x] 25. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+  - **Status**: COMPLETE - All Qt GUI Port tests passing (36/37, 1 expected skip)
+  - **See**: temp/TASK_25_CHECKPOINT_STATUS.md for detailed analysis
 
 ## Phase 10: Documentation and Deployment
 
-- [ ] 26. Create documentation
-- [ ] 26.1 Create end-user documentation for GUI mode
+- [x] 26. Create documentation
+- [x] 26.1 Create end-user documentation for GUI mode
   - Document how to launch GUI mode
   - Document GUI-specific features (mouse, drag-drop, menus)
   - Document keyboard shortcuts in GUI mode
@@ -469,7 +471,7 @@
   - Place in doc/QT_GUI_MODE_FEATURE.md
   - _Requirements: 1.2, 1.5_
 
-- [ ] 26.2 Create developer documentation for abstraction layer
+- [x] 26.2 Create developer documentation for abstraction layer
   - Document IUIBackend interface
   - Document how to implement new backends
   - Document InputEvent system
@@ -477,20 +479,20 @@
   - Place in doc/dev/UI_ABSTRACTION_LAYER_SYSTEM.md
   - _Requirements: 2.1, 2.3_
 
-- [ ] 26.3 Update README with Qt GUI information
+- [x] 26.3 Update README with Qt GUI information
   - Add section about dual-mode support
   - Add installation instructions for Qt dependencies
   - Add screenshots of GUI mode
   - _Requirements: 1.2_
 
-- [ ] 27. Update build and installation
-- [ ] 27.1 Update setup.py with Qt dependencies
+- [x] 27. Update build and installation
+- [x] 27.1 Update setup.py with Qt dependencies
   - Add PySide6 or PyQt6 to requirements
   - Add optional dependencies for Qt themes
   - Create separate entry point for tfm_qt.py
   - _Requirements: 1.2_
 
-- [ ] 27.2 Update requirements.txt
+- [x] 27.2 Update requirements.txt
   - Add Qt dependencies
   - Document optional dependencies
   - _Requirements: 1.2_

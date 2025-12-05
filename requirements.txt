@@ -1,8 +1,16 @@
-# No external dependencies required - uses built-in curses library
+# Core Dependencies
 # Python 3.9+ required for modern language features and security
-# Optional: pygments for syntax highlighting (will fallback gracefully if not available)
-# boto3 for AWS S3 support
 
+# Optional: pygments for syntax highlighting (will fallback gracefully if not available)
 pygments
+
+# Optional: boto3 for AWS S3 support
 boto3
+
+# Testing Dependencies
 hypothesis  # For property-based testing
+
+# GUI Dependencies (Optional)
+# Install with: pip install -e ".[gui]" or pip install -e ".[gui-themes]"
+# PySide6>=6.0.0  # Qt for Python - GUI mode support
+# qdarkstyle>=3.0.0  # Optional: Dark theme support for Qt GUI

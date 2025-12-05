@@ -100,7 +100,19 @@ class TFMMainWindow(QMainWindow):
     
     def _setup_menu_bar(self):
         """Set up the menu bar with File, Edit, View, Tools, Help menus."""
+        # Check if menu bar should be shown (from config)
+        from tfm_config import get_config
+        config = get_config()
+        show_menubar = getattr(config, 'GUI_SHOW_MENUBAR', True)
+        
+        if not show_menubar:
+            self.menuBar().setVisible(False)
+            return
+        
         menubar = self.menuBar()
+        
+        # Store menu actions for later reference
+        self.menu_actions = {}
         
         # File menu
         file_menu = menubar.addMenu("&File")
@@ -109,13 +121,17 @@ class TFMMainWindow(QMainWindow):
         new_file_action = QAction("&New File", self)
         new_file_action.setShortcut(QKeySequence.New)
         new_file_action.setStatusTip("Create a new file")
+        new_file_action.triggered.connect(lambda: self.action_triggered.emit('new_file'))
         file_menu.addAction(new_file_action)
+        self.menu_actions['new_file'] = new_file_action
         
         # New directory action
         new_dir_action = QAction("New &Directory", self)
         new_dir_action.setShortcut(QKeySequence("F7"))
         new_dir_action.setStatusTip("Create a new directory")
+        new_dir_action.triggered.connect(lambda: self.action_triggered.emit('new_directory'))
         file_menu.addAction(new_dir_action)
+        self.menu_actions['new_directory'] = new_dir_action
         
         file_menu.addSeparator()
         
@@ -133,19 +149,25 @@ class TFMMainWindow(QMainWindow):
         copy_action = QAction("&Copy", self)
         copy_action.setShortcut(QKeySequence("F5"))
         copy_action.setStatusTip("Copy selected files")
+        copy_action.triggered.connect(lambda: self.action_triggered.emit('copy'))
         edit_menu.addAction(copy_action)
+        self.menu_actions['copy'] = copy_action
         
         # Move action
         move_action = QAction("&Move", self)
         move_action.setShortcut(QKeySequence("F6"))
         move_action.setStatusTip("Move selected files")
+        move_action.triggered.connect(lambda: self.action_triggered.emit('move'))
         edit_menu.addAction(move_action)
+        self.menu_actions['move'] = move_action
         
         # Delete action
         delete_action = QAction("&Delete", self)
         delete_action.setShortcut(QKeySequence("F8"))
         delete_action.setStatusTip("Delete selected files")
+        delete_action.triggered.connect(lambda: self.action_triggered.emit('delete'))
         edit_menu.addAction(delete_action)
+        self.menu_actions['delete'] = delete_action
         
         edit_menu.addSeparator()
         
@@ -153,7 +175,26 @@ class TFMMainWindow(QMainWindow):
         rename_action = QAction("&Rename", self)
         rename_action.setShortcut(QKeySequence("F2"))
         rename_action.setStatusTip("Rename selected file")
+        rename_action.triggered.connect(lambda: self.action_triggered.emit('rename'))
         edit_menu.addAction(rename_action)
+        self.menu_actions['rename'] = rename_action
+        
+        edit_menu.addSeparator()
+        
+        # Select All action
+        select_all_action = QAction("Select &All", self)
+        select_all_action.setShortcut(QKeySequence.SelectAll)
+        select_all_action.setStatusTip("Select all files")
+        select_all_action.triggered.connect(lambda: self.action_triggered.emit('select_all'))
+        edit_menu.addAction(select_all_action)
+        self.menu_actions['select_all'] = select_all_action
+        
+        # Clear Selection action
+        clear_selection_action = QAction("Clear Selection", self)
+        clear_selection_action.setStatusTip("Clear file selection")
+        clear_selection_action.triggered.connect(lambda: self.action_triggered.emit('clear_selection'))
+        edit_menu.addAction(clear_selection_action)
+        self.menu_actions['clear_selection'] = clear_selection_action
         
         # View menu
         view_menu = menubar.addMenu("&View")
@@ -162,7 +203,9 @@ class TFMMainWindow(QMainWindow):
         refresh_action = QAction("&Refresh", self)
         refresh_action.setShortcut(QKeySequence.Refresh)
         refresh_action.setStatusTip("Refresh file listings")
+        refresh_action.triggered.connect(lambda: self.action_triggered.emit('refresh'))
         view_menu.addAction(refresh_action)
+        self.menu_actions['refresh'] = refresh_action
         
         view_menu.addSeparator()
         
@@ -170,7 +213,49 @@ class TFMMainWindow(QMainWindow):
         show_hidden_action = QAction("Show &Hidden Files", self)
         show_hidden_action.setCheckable(True)
         show_hidden_action.setStatusTip("Toggle display of hidden files")
+        show_hidden_action.triggered.connect(lambda checked: self.action_triggered.emit('toggle_hidden'))
         view_menu.addAction(show_hidden_action)
+        self.menu_actions['toggle_hidden'] = show_hidden_action
+        
+        view_menu.addSeparator()
+        
+        # Sort menu
+        sort_menu = view_menu.addMenu("&Sort By")
+        
+        # Sort by name
+        sort_name_action = QAction("&Name", self)
+        sort_name_action.setStatusTip("Sort files by name")
+        sort_name_action.triggered.connect(lambda: self.action_triggered.emit('sort_name'))
+        sort_menu.addAction(sort_name_action)
+        
+        # Sort by size
+        sort_size_action = QAction("&Size", self)
+        sort_size_action.setStatusTip("Sort files by size")
+        sort_size_action.triggered.connect(lambda: self.action_triggered.emit('sort_size'))
+        sort_menu.addAction(sort_size_action)
+        
+        # Sort by date
+        sort_date_action = QAction("&Date", self)
+        sort_date_action.setStatusTip("Sort files by date")
+        sort_date_action.triggered.connect(lambda: self.action_triggered.emit('sort_date'))
+        sort_menu.addAction(sort_date_action)
+        
+        # Sort by extension
+        sort_ext_action = QAction("&Extension", self)
+        sort_ext_action.setStatusTip("Sort files by extension")
+        sort_ext_action.triggered.connect(lambda: self.action_triggered.emit('sort_ext'))
+        sort_menu.addAction(sort_ext_action)
+        
+        view_menu.addSeparator()
+        
+        # Toggle toolbar
+        toggle_toolbar_action = QAction("Show &Toolbar", self)
+        toggle_toolbar_action.setCheckable(True)
+        toggle_toolbar_action.setChecked(True)
+        toggle_toolbar_action.setStatusTip("Toggle toolbar visibility")
+        toggle_toolbar_action.triggered.connect(self._toggle_toolbar)
+        view_menu.addAction(toggle_toolbar_action)
+        self.menu_actions['toggle_toolbar'] = toggle_toolbar_action
         
         # Tools menu
         tools_menu = menubar.addMenu("&Tools")
@@ -179,16 +264,36 @@ class TFMMainWindow(QMainWindow):
         search_action = QAction("&Search", self)
         search_action.setShortcut(QKeySequence.Find)
         search_action.setStatusTip("Search for files")
+        search_action.triggered.connect(lambda: self.action_triggered.emit('search'))
         tools_menu.addAction(search_action)
+        self.menu_actions['search'] = search_action
+        
+        tools_menu.addSeparator()
+        
+        # External programs submenu (will be populated dynamically)
+        self.external_programs_menu = tools_menu.addMenu("&External Programs")
+        
+        tools_menu.addSeparator()
         
         # Preferences action
         prefs_action = QAction("&Preferences", self)
         prefs_action.setShortcut(QKeySequence.Preferences)
         prefs_action.setStatusTip("Configure application settings")
+        prefs_action.triggered.connect(lambda: self.action_triggered.emit('preferences'))
         tools_menu.addAction(prefs_action)
+        self.menu_actions['preferences'] = prefs_action
         
         # Help menu
         help_menu = menubar.addMenu("&Help")
+        
+        # Help action
+        help_action = QAction("&Help", self)
+        help_action.setShortcut(QKeySequence.HelpContents)
+        help_action.setStatusTip("Show help")
+        help_action.triggered.connect(lambda: self.action_triggered.emit('help'))
+        help_menu.addAction(help_action)
+        
+        help_menu.addSeparator()
         
         # About action
         about_action = QAction("&About", self)
@@ -196,39 +301,144 @@ class TFMMainWindow(QMainWindow):
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
     
+    def _toggle_toolbar(self, checked: bool):
+        """Toggle toolbar visibility."""
+        if hasattr(self, 'toolbar'):
+            self.toolbar.setVisible(checked)
+    
+    def set_menu_bar_visible(self, visible: bool):
+        """
+        Set menu bar visibility.
+        
+        Args:
+            visible: Whether to show the menu bar
+        """
+        self.menuBar().setVisible(visible)
+    
+    def enable_menu_action(self, action: str, enabled: bool = True):
+        """
+        Enable or disable a menu action.
+        
+        Args:
+            action: Action name
+            enabled: Whether to enable the action
+        """
+        if hasattr(self, 'menu_actions') and action in self.menu_actions:
+            self.menu_actions[action].setEnabled(enabled)
+    
+    def populate_external_programs_menu(self, programs: list):
+        """
+        Populate the external programs submenu.
+        
+        Args:
+            programs: List of program configurations
+        """
+        if not hasattr(self, 'external_programs_menu'):
+            return
+        
+        # Clear existing actions
+        self.external_programs_menu.clear()
+        
+        # Add program actions
+        for program in programs:
+            program_action = QAction(program.get('name', 'Unknown'), self)
+            program_action.setStatusTip(f"Launch {program.get('name', 'Unknown')}")
+            program_action.triggered.connect(
+                lambda checked, p=program: self.action_triggered.emit(f"external_program:{p.get('name')}")
+            )
+            self.external_programs_menu.addAction(program_action)
+    
     def _setup_toolbar(self):
         """Set up the toolbar with common actions."""
-        toolbar = QToolBar("Main Toolbar")
-        toolbar.setMovable(False)
-        self.addToolBar(toolbar)
+        # Check if toolbar should be shown (from config)
+        from tfm_config import get_config
+        config = get_config()
+        show_toolbar = getattr(config, 'GUI_SHOW_TOOLBAR', True)
+        
+        if not show_toolbar:
+            return
+        
+        self.toolbar = QToolBar("Main Toolbar")
+        self.toolbar.setMovable(False)
+        self.addToolBar(self.toolbar)
+        
+        # Store toolbar actions for later reference
+        self.toolbar_actions = {}
         
         # Add common actions to toolbar
         # Copy
         copy_action = QAction("Copy", self)
         copy_action.setStatusTip("Copy selected files (F5)")
-        toolbar.addAction(copy_action)
+        copy_action.triggered.connect(lambda: self.action_triggered.emit('copy'))
+        self.toolbar.addAction(copy_action)
+        self.toolbar_actions['copy'] = copy_action
         
         # Move
         move_action = QAction("Move", self)
         move_action.setStatusTip("Move selected files (F6)")
-        toolbar.addAction(move_action)
+        move_action.triggered.connect(lambda: self.action_triggered.emit('move'))
+        self.toolbar.addAction(move_action)
+        self.toolbar_actions['move'] = move_action
         
         # Delete
         delete_action = QAction("Delete", self)
         delete_action.setStatusTip("Delete selected files (F8)")
-        toolbar.addAction(delete_action)
+        delete_action.triggered.connect(lambda: self.action_triggered.emit('delete'))
+        self.toolbar.addAction(delete_action)
+        self.toolbar_actions['delete'] = delete_action
         
-        toolbar.addSeparator()
+        self.toolbar.addSeparator()
         
         # Refresh
         refresh_action = QAction("Refresh", self)
         refresh_action.setStatusTip("Refresh file listings")
-        toolbar.addAction(refresh_action)
+        refresh_action.triggered.connect(lambda: self.action_triggered.emit('refresh'))
+        self.toolbar.addAction(refresh_action)
+        self.toolbar_actions['refresh'] = refresh_action
         
         # Search
         search_action = QAction("Search", self)
         search_action.setStatusTip("Search for files")
-        toolbar.addAction(search_action)
+        search_action.triggered.connect(lambda: self.action_triggered.emit('search'))
+        self.toolbar.addAction(search_action)
+        self.toolbar_actions['search'] = search_action
+        
+        self.toolbar.addSeparator()
+        
+        # New File
+        new_file_action = QAction("New File", self)
+        new_file_action.setStatusTip("Create a new file")
+        new_file_action.triggered.connect(lambda: self.action_triggered.emit('new_file'))
+        self.toolbar.addAction(new_file_action)
+        self.toolbar_actions['new_file'] = new_file_action
+        
+        # New Directory
+        new_dir_action = QAction("New Dir", self)
+        new_dir_action.setStatusTip("Create a new directory (F7)")
+        new_dir_action.triggered.connect(lambda: self.action_triggered.emit('new_directory'))
+        self.toolbar.addAction(new_dir_action)
+        self.toolbar_actions['new_directory'] = new_dir_action
+    
+    def set_toolbar_visible(self, visible: bool):
+        """
+        Set toolbar visibility.
+        
+        Args:
+            visible: Whether to show the toolbar
+        """
+        if hasattr(self, 'toolbar'):
+            self.toolbar.setVisible(visible)
+    
+    def enable_toolbar_action(self, action: str, enabled: bool = True):
+        """
+        Enable or disable a toolbar action.
+        
+        Args:
+            action: Action name
+            enabled: Whether to enable the action
+        """
+        if hasattr(self, 'toolbar_actions') and action in self.toolbar_actions:
+            self.toolbar_actions[action].setEnabled(enabled)
     
     def _setup_status_bar(self):
         """Set up the status bar."""

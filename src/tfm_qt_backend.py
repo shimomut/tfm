@@ -131,6 +131,12 @@ class QtBackend(IUIBackend):
             self.left_pane_widget.file_activated.connect(
                 lambda idx: self._queue_event(InputEvent(type='key', key_name='Enter'))
             )
+            self.left_pane_widget.files_dropped.connect(
+                lambda files, target: self._on_files_dropped(files, target, 'left')
+            )
+            self.left_pane_widget.context_action_triggered.connect(
+                lambda action: self._on_context_action(action, 'left')
+            )
         
         if self.right_pane_widget:
             self.right_pane_widget.file_selected.connect(
@@ -138,6 +144,12 @@ class QtBackend(IUIBackend):
             )
             self.right_pane_widget.file_activated.connect(
                 lambda idx: self._queue_event(InputEvent(type='key', key_name='Enter'))
+            )
+            self.right_pane_widget.files_dropped.connect(
+                lambda files, target: self._on_files_dropped(files, target, 'right')
+            )
+            self.right_pane_widget.context_action_triggered.connect(
+                lambda action: self._on_context_action(action, 'right')
             )
     
     def _on_action_triggered(self, action_name: str):
@@ -160,6 +172,37 @@ class QtBackend(IUIBackend):
             type='key',
             key=9,  # Tab key code
             key_name='Tab'
+        ))
+    
+    def _on_files_dropped(self, file_paths: List[str], target_dir: str, pane: str):
+        """
+        Handle files dropped onto a pane.
+        
+        Args:
+            file_paths: List of file paths that were dropped
+            target_dir: Target directory where files were dropped
+            pane: Which pane received the drop ('left' or 'right')
+        """
+        # Queue a custom event with drop information
+        # The application controller can handle this event to perform copy/move
+        self._queue_event(InputEvent(
+            type='drop',
+            key_name=f'files_dropped_{pane}',
+            modifiers={'files': file_paths, 'target': target_dir}
+        ))
+    
+    def _on_context_action(self, action: str, pane: str):
+        """
+        Handle context menu action triggered.
+        
+        Args:
+            action: Action name (e.g., 'copy', 'move', 'delete')
+            pane: Which pane triggered the action ('left' or 'right')
+        """
+        # Queue an action event
+        self._queue_event(InputEvent(
+            type='action',
+            key_name=action
         ))
     
     def eventFilter(self, obj, event):

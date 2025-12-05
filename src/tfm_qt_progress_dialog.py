@@ -5,6 +5,7 @@ This module provides a custom progress dialog for long-running operations
 with support for progress updates, current file display, and cancellation.
 """
 
+import time
 from typing import Optional, Callable
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QProgressBar, QLabel, QPushButton
@@ -23,7 +24,8 @@ class ProgressDialog(QDialog):
     cancelled = Signal()
     
     def __init__(self, parent=None, title: str = "Progress",
-                 operation: str = "Processing", cancelable: bool = True):
+                 operation: str = "Processing", cancelable: bool = True,
+                 throttle_ms: int = 100):
         """
         Initialize the progress dialog.
         
@@ -32,6 +34,7 @@ class ProgressDialog(QDialog):
             title: Dialog title
             operation: Operation name (e.g., "Copying files")
             cancelable: Whether the operation can be cancelled
+            throttle_ms: Minimum milliseconds between UI updates (default: 100ms)
         """
         super().__init__(parent)
         
@@ -46,6 +49,11 @@ class ProgressDialog(QDialog):
         self.operation = operation
         self.cancelable = cancelable
         self.is_cancelled = False
+        
+        # Throttling state
+        self.throttle_ms = throttle_ms
+        self._last_update_time = 0
+        self._pending_update = None
         
         self._setup_ui()
     
@@ -84,14 +92,45 @@ class ProgressDialog(QDialog):
         
         self.setLayout(layout)
     
-    def update_progress(self, current: int, total: int, message: str = ""):
+    def update_progress(self, current: int, total: int, message: str = "", force: bool = False):
         """
-        Update the progress dialog.
+        Update the progress dialog with throttling.
+        
+        Updates are throttled to avoid excessive UI updates that can cause lag.
+        The last update is always applied to ensure the final state is shown.
         
         Args:
             current: Current progress value
             total: Total progress value
             message: Current status message (e.g., current file name)
+            force: If True, bypass throttling and update immediately
+        """
+        current_time = time.time() * 1000  # Convert to milliseconds
+        time_since_last = current_time - self._last_update_time
+        
+        # Check if we should throttle this update
+        should_update = (
+            force or
+            time_since_last >= self.throttle_ms or
+            current == total  # Always update on completion
+        )
+        
+        if should_update:
+            self._apply_update(current, total, message)
+            self._last_update_time = current_time
+            self._pending_update = None
+        else:
+            # Store pending update to apply later
+            self._pending_update = (current, total, message)
+    
+    def _apply_update(self, current: int, total: int, message: str):
+        """
+        Apply a progress update to the UI.
+        
+        Args:
+            current: Current progress value
+            total: Total progress value
+            message: Current status message
         """
         if total > 0:
             percentage = int((current / total) * 100)
@@ -111,6 +150,18 @@ class ProgressDialog(QDialog):
         # Process events to keep UI responsive
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
+    
+    def flush_pending_update(self):
+        """
+        Flush any pending throttled update.
+        
+        Call this when an operation completes to ensure the final
+        progress state is displayed.
+        """
+        if self._pending_update:
+            current, total, message = self._pending_update
+            self._apply_update(current, total, message)
+            self._pending_update = None
     
     def set_operation(self, operation: str):
         """
@@ -143,6 +194,8 @@ class ProgressDialog(QDialog):
     
     def auto_close(self):
         """Automatically close the dialog when operation completes."""
+        # Flush any pending updates before closing
+        self.flush_pending_update()
         self.accept()
     
     @staticmethod

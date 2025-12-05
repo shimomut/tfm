@@ -23,7 +23,7 @@ requirements.append('windows-curses; sys_platform == "win32"')
 setup(
     name="tfm",
     version="0.98",
-    description="Terminal File Manager - A dual-pane file manager for the terminal",
+    description="Terminal File Manager - A dual-pane file manager for the terminal and GUI",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="TFM Developer",
@@ -42,16 +42,29 @@ setup(
     entry_points={
         "console_scripts": [
             "tfm=tfm.tfm:main",
+            "tfm-qt=tfm.tfm_qt:main",
         ],
     },
     install_requires=requirements,
+    extras_require={
+        "gui": [
+            "PySide6>=6.0.0",
+        ],
+        "gui-themes": [
+            "PySide6>=6.0.0",
+            "qdarkstyle>=3.0.0",
+        ],
+    },
     python_requires=">=3.9",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Console :: Curses",
+        "Environment :: X11 Applications :: Qt",
         "Intended Audience :: End Users/Desktop",
         "License :: OSI Approved :: MIT License",
         "Operating System :: POSIX",
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
@@ -60,5 +73,5 @@ setup(
         "Topic :: System :: Filesystems",
         "Topic :: Utilities",
     ],
-    keywords="file manager terminal curses dual-pane",
+    keywords="file manager terminal curses dual-pane gui qt",
 )
