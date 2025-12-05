@@ -238,8 +238,8 @@
   - **Property 20: Operation cancellation**
   - **Validates: Requirements 7.2, 7.3, 7.4, 7.5**
 
-- [ ] 11. Create tfm_qt.py entry point
-- [ ] 11.1 Create tfm_qt.py entry point script
+- [x] 11. Create tfm_qt.py entry point
+- [x] 11.1 Create tfm_qt.py entry point script
   - Initialize Qt application (QApplication)
   - Create QtBackend instance
   - Create TFMApplication with QtBackend
@@ -247,13 +247,13 @@
   - Start Qt event loop
   - _Requirements: 1.2_
 
-- [ ] 11.2 Write integration test for GUI mode launch
+- [x] 11.2 Write integration test for GUI mode launch
   - Verify tfm_qt.py launches in GUI mode
   - Verify Qt window is displayed
   - Verify dual-pane layout is visible
   - _Requirements: 1.2, 1.3_
 
-- [ ] 12. Checkpoint - Ensure all tests pass
+- [x] 12. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 6: Implement File Operations in GUI
