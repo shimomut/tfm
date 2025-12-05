@@ -100,15 +100,61 @@ def main():
         # Set ESC delay to 100ms BEFORE any curses-related imports for responsive ESC key
         os.environ.setdefault('ESCDELAY', '100')
         
-        # Import and run the main application
-        from tfm_main import main as tfm_main
+        # Import required modules
         import curses
+        from tfm_curses_backend import CursesBackend
+        from tfm_application import TFMApplication
+        from tfm_state_manager import cleanup_state_manager
         
-        # Pass arguments to main function
-        curses.wrapper(tfm_main, 
-                      remote_log_port=args.remote_log_port,
-                      left_dir=args.left,
-                      right_dir=args.right)
+        # Run TFM with curses backend
+        def run_with_curses(stdscr):
+            """Initialize and run TFM with curses backend"""
+            app = None
+            try:
+                # Create curses backend
+                backend = CursesBackend(stdscr)
+                
+                # Initialize backend
+                backend.initialize()
+                
+                # Create application with backend
+                app = TFMApplication(
+                    ui_backend=backend,
+                    remote_log_port=args.remote_log_port,
+                    left_dir=args.left,
+                    right_dir=args.right
+                )
+                
+                # Run application
+                app.run()
+                
+            except KeyboardInterrupt:
+                # Clean exit on Ctrl+C
+                pass
+            except Exception as e:
+                # Restore stdout/stderr before handling exception
+                if app is not None and hasattr(app, 'log_manager'):
+                    app.log_manager.restore_stdio()
+                
+                # Print error information
+                print(f"\nTFM encountered an unexpected error:", file=sys.stderr)
+                print(f"Error: {type(e).__name__}: {e}", file=sys.stderr)
+                print("\nFull traceback:", file=sys.stderr)
+                import traceback
+                traceback.print_exc()
+                
+                # Re-raise the exception
+                raise
+            finally:
+                # Always restore stdout/stderr
+                if app is not None and hasattr(app, 'log_manager'):
+                    app.log_manager.restore_stdio()
+                
+                # Clean up state manager
+                cleanup_state_manager()
+        
+        # Launch with curses wrapper
+        curses.wrapper(run_with_curses)
         
     except ImportError as e:
         print(f"Error importing TFM modules: {e}", file=sys.stderr)

@@ -44,7 +44,7 @@ class TestRefactoringIntegration(unittest.TestCase):
         
         # Test that it can be shown
         search_dialog.show('filename')
-        self.assertTrue(search_dialog.mode)
+        self.assertTrue(search_dialog.is_active)
         self.assertEqual(search_dialog.search_type, 'filename')
         
         # Test that text_editor works
@@ -62,7 +62,7 @@ class TestRefactoringIntegration(unittest.TestCase):
         self.assertTrue(search_dialog.searching or len(search_dialog.results) > 0)
         
         search_dialog.exit()
-        self.assertFalse(search_dialog.mode)
+        self.assertFalse(search_dialog.is_active)
         
     def test_list_dialog_integration(self):
         """Test ListDialog integration after refactoring"""
@@ -77,7 +77,7 @@ class TestRefactoringIntegration(unittest.TestCase):
             
         # Test show functionality
         list_dialog.show("Test Items", items, test_callback)
-        self.assertTrue(list_dialog.mode)
+        self.assertTrue(list_dialog.is_active)
         self.assertEqual(list_dialog.items, items)
         self.assertEqual(list_dialog.filtered_items, items)
         
@@ -90,7 +90,7 @@ class TestRefactoringIntegration(unittest.TestCase):
         list_dialog.selected = 0
         result = list_dialog.handle_input(10)  # ENTER key
         self.assertTrue(result)
-        self.assertFalse(list_dialog.mode)  # Should exit
+        self.assertFalse(list_dialog.is_active)  # Should exit
         self.assertEqual(callback_result, "apple")
         
     def test_jump_dialog_integration(self):
@@ -99,7 +99,7 @@ class TestRefactoringIntegration(unittest.TestCase):
         
         # Test show functionality
         jump_dialog.show(self.temp_dir)
-        self.assertTrue(jump_dialog.mode)
+        self.assertTrue(jump_dialog.is_active)
         
         # Wait for scanning to complete
         import time
@@ -123,7 +123,7 @@ class TestRefactoringIntegration(unittest.TestCase):
             self.assertIn("subdir", filtered_names)
             
         jump_dialog.exit()
-        self.assertFalse(jump_dialog.mode)
+        self.assertFalse(jump_dialog.is_active)
         
     def test_common_navigation_works(self):
         """Test that common navigation works across all dialogs"""

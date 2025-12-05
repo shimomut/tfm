@@ -64,18 +64,18 @@
   - **Property 4: Business logic isolation**
   - **Validates: Requirements 2.1, 2.5**
 
-- [ ] 3. Checkpoint - Ensure all tests pass
+- [x] 3. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 3: Implement Curses Backend
 
-- [ ] 4. Create CursesBackend implementation
-- [ ] 4.1 Implement CursesBackend class inheriting from IUIBackend
+- [x] 4. Create CursesBackend implementation
+- [x] 4.1 Implement CursesBackend class inheriting from IUIBackend
   - Implement initialize() and cleanup() methods
   - Implement get_screen_size() method
   - _Requirements: 1.1, 2.3_
 
-- [ ] 4.2 Implement curses rendering methods
+- [x] 4.2 Implement curses rendering methods
   - Implement render_panes() wrapping existing draw_pane logic
   - Implement render_header() wrapping existing draw_header logic
   - Implement render_footer() wrapping existing draw_file_footers logic
@@ -83,39 +83,39 @@
   - Implement render_log_pane() wrapping existing log rendering
   - _Requirements: 1.1, 2.1_
 
-- [ ] 4.3 Implement curses dialog methods
+- [x] 4.3 Implement curses dialog methods
   - Implement show_dialog() delegating to existing dialog classes
   - Support all dialog types: confirmation, input, list, info, progress
   - _Requirements: 1.1, 2.3_
 
-- [ ] 4.4 Implement curses input handling
+- [x] 4.4 Implement curses input handling
   - Implement get_input_event() converting curses keys to InputEvent
   - Handle keyboard events, special keys, and resize events
   - _Requirements: 1.1, 2.3_
 
-- [ ] 4.5 Implement curses color scheme support
+- [x] 4.5 Implement curses color scheme support
   - Implement set_color_scheme() using existing color system
   - _Requirements: 1.1, 12.1_
 
-- [ ] 4.6 Write property test for curses backend
+- [x] 4.6 Write property test for curses backend
   - **Property 30: Backend interface compliance**
   - **Validates: Requirements 11.3**
 
-- [ ] 5. Update tfm.py entry point
-- [ ] 5.1 Refactor tfm.py to use TFMApplication with CursesBackend
+- [x] 5. Update tfm.py entry point
+- [x] 5.1 Refactor tfm.py to use TFMApplication with CursesBackend
   - Initialize curses environment
   - Create CursesBackend instance
   - Create TFMApplication with CursesBackend
   - Call TFMApplication.run()
   - _Requirements: 1.1, 1.2_
 
-- [ ] 5.2 Write integration test for TUI mode launch
+- [x] 5.2 Write integration test for TUI mode launch
   - Verify tfm.py launches in TUI mode
   - Verify curses is initialized
   - Verify dual-pane layout is displayed
   - _Requirements: 1.1, 1.3_
 
-- [ ] 6. Checkpoint - Ensure all tests pass
+- [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 4: Implement Qt Backend Foundation
