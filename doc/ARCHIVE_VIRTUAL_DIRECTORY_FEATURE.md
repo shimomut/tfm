@@ -311,9 +311,30 @@ To view detailed information about an archive entry:
 ## Limitations
 
 ### Read-Only Access
-- Archives are read-only in TFM
-- You cannot create, modify, or delete files within archives
-- To modify archive contents, extract files, modify them, and create a new archive
+
+Archives are read-only in TFM. The following operations are **NOT supported** and will show an error message:
+
+#### Unsupported Operations
+- **Delete files within archives**: You cannot delete files or directories inside archives
+  - Error: "Cannot delete files within archives. Archives are read-only."
+- **Move files from archives**: You cannot move (only copy) files out of archives
+  - Error: "Cannot move files from archives. Use copy instead. Archives are read-only."
+- **Move files into archives**: You cannot move files into archives
+  - Error: "Cannot move files into archives. Archives are read-only."
+- **Copy files into archives**: You cannot add files to existing archives
+  - Error: "Cannot copy files into archives. Archives are read-only."
+
+#### Supported Operations
+- **Copy files FROM archives**: You can extract files by copying them to other locations ✅
+- **View files**: You can view text and binary files within archives ✅
+- **Browse contents**: You can navigate and explore archive contents ✅
+- **Search**: You can search for files within archives ✅
+
+#### Modifying Archive Contents
+To modify archive contents:
+1. Copy (extract) files from the archive to a regular directory
+2. Modify the extracted files as needed
+3. Use external archive tools to create a new archive with the modified files
 
 ### Archive Creation
 - TFM supports browsing archives but not creating them

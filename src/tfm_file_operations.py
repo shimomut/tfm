@@ -418,6 +418,49 @@ class FileOperationsUI:
         self.cache_manager = file_manager.cache_manager
         self.config = file_manager.config
     
+    def _is_archive_path(self, path):
+        """Check if a path is an archive path (read-only)"""
+        return str(path).startswith('archive://')
+    
+    def _validate_operation_on_archives(self, operation, source_paths, dest_path=None):
+        """
+        Validate if an operation is allowed on archive paths.
+        
+        Args:
+            operation: 'delete', 'move', or 'copy'
+            source_paths: List of source Path objects
+            dest_path: Optional destination Path object
+            
+        Returns:
+            (is_valid, error_message) tuple
+        """
+        if operation == 'delete':
+            # Cannot delete from archives
+            if any(self._is_archive_path(p) for p in source_paths):
+                return False, "Cannot delete files within archives. Archives are read-only."
+        
+        elif operation == 'move':
+            # Cannot move from or to archives
+            if any(self._is_archive_path(p) for p in source_paths):
+                return False, "Cannot move files from archives. Use copy instead. Archives are read-only."
+            if dest_path and self._is_archive_path(dest_path):
+                return False, "Cannot move files into archives. Archives are read-only."
+        
+        elif operation == 'copy':
+            # Can copy FROM archives, but not TO archives
+            if dest_path and self._is_archive_path(dest_path):
+                return False, "Cannot copy files into archives. Archives are read-only."
+            # Copying FROM archives is OK (extraction)
+        
+        return True, None
+    
+    def _show_unsupported_operation_error(self, message):
+        """Show error dialog for unsupported archive operations"""
+        choices = [
+            {"text": "OK", "key": "enter", "value": True}
+        ]
+        self.file_manager.show_dialog(message, choices, lambda _: None)
+    
     def copy_selected_files(self):
         """Copy selected files to the opposite pane's directory"""
         current_pane = self.file_manager.get_current_pane()
@@ -443,6 +486,12 @@ class FileOperationsUI:
             return
         
         destination_dir = other_pane['path']
+        
+        # Validate operation on archives - check BEFORE any other checks
+        is_valid, error_msg = self._validate_operation_on_archives('copy', files_to_copy, destination_dir)
+        if not is_valid:
+            self._show_unsupported_operation_error(error_msg)
+            return
         
         # Check if destination directory is writable (only for local paths)
         if destination_dir.get_scheme() == 'file' and not os.access(destination_dir, os.W_OK):
@@ -693,6 +742,12 @@ class FileOperationsUI:
             return
         
         destination_dir = other_pane['path']
+        
+        # Validate operation on archives - check BEFORE any other checks
+        is_valid, error_msg = self._validate_operation_on_archives('move', files_to_move, destination_dir)
+        if not is_valid:
+            self._show_unsupported_operation_error(error_msg)
+            return
         
         # Check if destination directory is writable (only for local paths)
         if destination_dir.get_scheme() == 'file' and not os.access(destination_dir, os.W_OK):
@@ -983,6 +1038,12 @@ class FileOperationsUI:
         
         if not files_to_delete:
             print("No files to delete")
+            return
+        
+        # Validate operation on archives - check BEFORE confirmation dialog
+        is_valid, error_msg = self._validate_operation_on_archives('delete', files_to_delete)
+        if not is_valid:
+            self._show_unsupported_operation_error(error_msg)
             return
         
         def handle_delete_confirmation(confirmed):
