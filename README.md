@@ -5,6 +5,7 @@ A powerful terminal-based file manager built with Python's curses library. Navig
 ## Key Features
 
 - **Dual-pane interface** with independent navigation and cross-pane operations
+- **Archive browsing** - Navigate ZIP, TAR, and compressed archives as virtual directories
 - **Advanced search** with real-time filtering and background processing  
 - **Multi-selection** with bulk operations and progress tracking
 - **Built-in text viewer** with syntax highlighting for 20+ file formats
@@ -45,6 +46,7 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 
 ### Essential Controls
 - **Navigate:** `↑↓` to move up/down, `←→` to switch panes/navigate directories
+- **Enter archives:** Press `Enter` on `.zip`, `.tar`, `.tar.gz` files to browse contents
 - **Select:** `Space` to select/deselect files, `a` for all files, `A` for all items
 - **File operations:** `c/C` (copy), `m/M` (move), `k/K` (delete), `r/R` (rename)
 - **Help:** `?` for comprehensive help dialog
@@ -59,10 +61,12 @@ For comprehensive information about TFM's features and usage:
 
 ### User Documentation
 - **[Complete User Guide](doc/TFM_USER_GUIDE.md)** - Comprehensive guide covering all features, configuration, and usage
+- **[Archive Virtual Directory Browsing](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md)** - Browse archives as directories
 - **[Remote Log Monitoring](doc/REMOTE_LOG_MONITORING_FEATURE.md)** - Real-time log monitoring setup and usage
 - **[Search Animation](doc/SEARCH_ANIMATION_FEATURE.md)** - Advanced search features and visual feedback
 
 ### Developer Documentation
+- **[Path Polymorphism System](doc/dev/PATH_POLYMORPHISM_SYSTEM.md)** - Storage-agnostic architecture and extensibility
 - **[Navigation System](doc/dev/NAVIGATION_SYSTEM.md)** - Core navigation implementation
 - **[Remote Log Implementation](doc/dev/REMOTE_LOG_MONITORING_IMPLEMENTATION.md)** - Technical details of log monitoring
 - **[External Programs](doc/dev/EXTERNAL_PROGRAMS_IMPLEMENTATION.md)** - Program integration system
@@ -72,12 +76,13 @@ For comprehensive information about TFM's features and usage:
 All key bindings are fully customizable through the configuration system. For complete key binding reference, press `?` in TFM or see the [User Guide](doc/TFM_USER_GUIDE.md).
 
 ### Core Operations
-- **Navigation:** Arrow keys, Tab to switch panes, Enter to open directories/files
+- **Navigation:** Arrow keys, Tab to switch panes, Enter to open directories/files/archives
+- **Archive Browsing:** Press Enter on `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz` files to browse as virtual directories
 - **File Operations:** Copy (`c/C`), Move (`m/M`), Delete (`k/K`), Rename (`r/R`)
 - **Selection:** Space to select files, `a` for all files, `A` for all items
 - **Search:** `f` for incremental search, `F` for filename search, `G` for content search
-- **Archives:** `p/P` to create archives, `u/U` to extract
-- **Text Viewer:** `v/V` to view files with syntax highlighting
+- **Archives:** `p/P` to create archives, `u/U` to extract, Enter to browse contents
+- **Text Viewer:** `v/V` to view files with syntax highlighting (works inside archives)
 
 ### Advanced Features
 - **Favorite Directories:** `j` for quick access to bookmarked locations
@@ -86,14 +91,40 @@ All key bindings are fully customizable through the configuration system. For co
 - **Configuration:** `Z` for settings menu
 - **AWS S3 Support:** Navigate S3 buckets using `s3://bucket/path` syntax
 
+## Archive Virtual Directory Browsing
+
+TFM lets you browse archive files as if they were regular directories - no extraction needed!
+
+**Supported formats:** `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`
+
+**How to use:**
+1. Navigate to any archive file
+2. Press `Enter` to browse its contents
+3. Navigate directories inside the archive with arrow keys
+4. Press `Enter` on files to view them
+5. Copy files out with `F5` (or your copy key)
+6. Search within archives with `Alt+F7`
+7. Press `Backspace` to exit the archive
+
+**What you can do:**
+- Browse nested directories within archives
+- View text files with syntax highlighting
+- Copy files and directories from archives to local/S3
+- Search for files by name or content
+- Select multiple files for batch operations
+- Sort by name, size, date, or extension
+
+See [Archive Virtual Directory Feature](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md) for complete documentation.
+
 ## Built-in Text Viewer
 
-TFM includes a powerful text viewer with syntax highlighting for 20+ file formats. Press `Enter` on text files or use `v` to open the viewer.
+TFM includes a powerful text viewer with syntax highlighting for 20+ file formats. Press `Enter` on text files or use `v` to open the viewer. Works seamlessly with files inside archives!
 
 **Features:**
 - Syntax highlighting for Python, JavaScript, JSON, Markdown, YAML, and more
 - Line numbers, horizontal scrolling, search functionality
 - Multiple encoding support (UTF-8, Latin-1, CP1252)
+- View files directly from archives without extraction
 
 **Enhanced highlighting:** Install `pygments` for full syntax support:
 ```bash
@@ -113,8 +144,9 @@ Type `exit` to return to TFM.
 
 ## Advanced Features
 
+- **Archive Virtual Directories:** Browse ZIP, TAR, and compressed archives as if they were directories - navigate, search, view files, and copy contents without extraction
 - **Batch Rename:** Regex-based renaming with capture groups and macros
-- **Threaded Search:** Non-blocking filename and content search with progress tracking
+- **Threaded Search:** Non-blocking filename and content search with progress tracking (works inside archives)
 - **Pane Management:** Resizable layout, directory sync, state persistence
 - **External Integration:** VSCode, Beyond Compare, and custom program support
 - **Remote Log Monitoring:** Stream logs to remote terminals for debugging
@@ -179,7 +211,7 @@ For detailed configuration options, see the [User Guide](doc/TFM_USER_GUIDE.md#c
 ```
 tfm/
 ├── src/           # Core application code
-├── test/          # Test files and demos
+├── test/          # Test files (720+ passing tests)
 ├── doc/           # User documentation
 ├── doc/dev/       # Developer documentation
 ├── tools/         # External integration scripts
@@ -210,6 +242,13 @@ The log client provides color-coded output for different log sources and handles
 **Performance Issues:**
 - Install `pygments` for better text viewer performance
 - Check available memory for large directory operations
+- First access to large archives may be slow while structure is cached
+
+**Archive Issues:**
+- Verify archive file is not corrupted
+- Ensure you have read permissions for the archive
+- Check supported formats: `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`
+- Archives are read-only - use copy operations to extract files
 
 For detailed troubleshooting, see the [User Guide](doc/TFM_USER_GUIDE.md#troubleshooting).
 
