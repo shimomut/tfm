@@ -157,12 +157,31 @@ class SearchDialog(BaseListDialog):
         # Reset animation for new search
         self.progress_animator.reset()
         
+        # Detect if we're searching within an archive
+        is_archive_search = self._is_archive_path(search_root)
+        
         self.search_thread = threading.Thread(
             target=self._search_worker,
-            args=(search_root, pattern_text, self.search_type),
+            args=(search_root, pattern_text, self.search_type, is_archive_search),
             daemon=True
         )
         self.search_thread.start()
+    
+    def _is_archive_path(self, path):
+        """Check if a path is an archive path
+        
+        Args:
+            path: Path object to check
+            
+        Returns:
+            bool: True if path is an archive path, False otherwise
+        """
+        try:
+            # Import here to avoid circular dependency
+            from tfm_archive import ArchivePathImpl
+            return isinstance(path._impl, ArchivePathImpl)
+        except (ImportError, AttributeError):
+            return False
     
     def _cancel_current_search(self):
         """Cancel the current search operation"""
@@ -175,13 +194,14 @@ class SearchDialog(BaseListDialog):
         self.search_thread = None
         self.content_changed = True  # Mark content as changed when search is canceled
     
-    def _search_worker(self, search_root, pattern_text, search_type):
+    def _search_worker(self, search_root, pattern_text, search_type, is_archive_search=False):
         """Worker thread for performing the actual search
         
         Args:
             search_root: Path object representing the root directory to search from
             pattern_text: The search pattern text
             search_type: 'filename' or 'content'
+            is_archive_search: Whether we're searching within an archive
         """
         temp_results = []
         
@@ -201,12 +221,20 @@ class SearchDialog(BaseListDialog):
                         break
                     
                     if fnmatch.fnmatch(file_path.name.lower(), pattern_text.lower()):
-                        relative_path = file_path.relative_to(search_root)
+                        # For archive paths, show the full archive path
+                        if is_archive_search:
+                            relative_path = file_path.relative_to(search_root)
+                            display_path = str(relative_path)
+                        else:
+                            relative_path = file_path.relative_to(search_root)
+                            display_path = str(relative_path)
+                        
                         result = {
                             'type': 'dir' if file_path.is_dir() else 'file',
                             'path': file_path,
-                            'relative_path': str(relative_path),
-                            'match_info': file_path.name
+                            'relative_path': display_path,
+                            'match_info': file_path.name,
+                            'is_archive': is_archive_search
                         }
                         temp_results.append(result)
                         
@@ -237,13 +265,16 @@ class SearchDialog(BaseListDialog):
                     
                     if file_path.is_file() and self._is_text_file(file_path):
                         try:
-                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                for line_num, line in enumerate(f, 1):
+                            # For archive paths, use read_text() which handles extraction
+                            if is_archive_search:
+                                content = file_path.read_text(encoding='utf-8', errors='ignore')
+                                lines = content.splitlines()
+                                for line_num, line in enumerate(lines, 1):
                                     # Check for cancellation periodically
                                     if line_num % 100 == 0 and self.cancel_search.is_set():
                                         with self.search_lock:
                                             self.searching = False
-                                            self.content_changed = True  # Mark content as changed when search is canceled
+                                            self.content_changed = True
                                         return
                                     
                                     if pattern.search(line):
@@ -253,7 +284,8 @@ class SearchDialog(BaseListDialog):
                                             'path': file_path,
                                             'relative_path': str(relative_path),
                                             'line_num': line_num,
-                                            'match_info': f"Line {line_num}: {line.strip()[:50]}"
+                                            'match_info': f"Line {line_num}: {line.strip()[:50]}",
+                                            'is_archive': True
                                         }
                                         temp_results.append(result)
                                         
@@ -264,10 +296,54 @@ class SearchDialog(BaseListDialog):
                                                 if self.selected >= len(self.results):
                                                     self.selected = max(0, len(self.results) - 1)
                                                     self._adjust_scroll(len(self.results))
-                                                self.content_changed = True  # Mark content as changed when results update
+                                                self.content_changed = True
                                         
                                         break  # Only show first match per file
-                        except (IOError, UnicodeDecodeError):
+                            else:
+                                # Regular filesystem search
+                                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                    for line_num, line in enumerate(f, 1):
+                                        # Check for cancellation periodically
+                                        if line_num % 100 == 0 and self.cancel_search.is_set():
+                                            with self.search_lock:
+                                                self.searching = False
+                                                self.content_changed = True  # Mark content as changed when search is canceled
+                                            return
+                                        
+                                        if pattern.search(line):
+                                            relative_path = file_path.relative_to(search_root)
+                                            result = {
+                                                'type': 'content',
+                                                'path': file_path,
+                                                'relative_path': str(relative_path),
+                                                'line_num': line_num,
+                                                'match_info': f"Line {line_num}: {line.strip()[:50]}",
+                                                'is_archive': False
+                                            }
+                                            temp_results.append(result)
+                                            
+                                            # Update results periodically for real-time display
+                                            if len(temp_results) % 10 == 0:
+                                                with self.search_lock:
+                                                    self.results = temp_results.copy()
+                                                    if self.selected >= len(self.results):
+                                                        self.selected = max(0, len(self.results) - 1)
+                                                        self._adjust_scroll(len(self.results))
+                                                    self.content_changed = True  # Mark content as changed when results update
+                                            
+                                            break  # Only show first match per file
+                        except FileNotFoundError:
+                            # File was deleted during search
+                            continue
+                        except PermissionError:
+                            # No permission to read file
+                            continue
+                        except (IOError, UnicodeDecodeError, OSError) as e:
+                            # Handle I/O errors, encoding issues, and archive extraction errors
+                            continue
+                        except Exception as e:
+                            # Catch any unexpected errors with logging
+                            print(f"Warning: Unexpected error searching file {file_path}: {e}")
                             continue
                             
         except Exception as e:
@@ -332,9 +408,18 @@ class SearchDialog(BaseListDialog):
     
     def draw(self, stdscr, safe_addstr_func):
         """Draw the search dialog overlay"""
+        
+        # Check if we're searching in an archive
+        is_archive_search = False
+        with self.search_lock:
+            if self.results:
+                is_archive_search = self.results[0].get('is_archive', False)
 
-        # Draw dialog frame
-        title_text = f"Search ({self.search_type.title()})"
+        # Draw dialog frame with archive indicator if applicable
+        if is_archive_search:
+            title_text = f"Search in Archive ({self.search_type.title()})"
+        else:
+            title_text = f"Search ({self.search_type.title()})"
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
             stdscr, safe_addstr_func, title_text, 0.8, 0.8, 60, 20
         )

@@ -18,12 +18,12 @@
 
 ## Remaining Work - Virtual Directory Browsing
 
-- [ ] 3. Implement ArchiveEntry data class
+- [x] 3. Implement ArchiveEntry data class
   - Create ArchiveEntry dataclass with all required fields (name, internal_path, is_dir, size, compressed_size, mtime, mode, archive_type)
   - Implement helper methods for ArchiveEntry (to_stat_result, from_zip_info, from_tar_info)
   - _Requirements: 1.2, 6.5_
 
-- [ ] 4. Implement ArchiveHandler class
+- [x] 4. Implement ArchiveHandler class
   - Create ArchiveHandler class with initialization and archive opening logic
   - Implement archive format-specific handlers (ZipHandler, TarHandler)
   - Implement list_entries method for listing directory contents within archives
@@ -41,7 +41,7 @@
   - **Property 7: Metadata preservation during extraction**
   - **Validates: Requirements 3.2**
 
-- [ ] 5. Implement ArchiveCache class
+- [x] 5. Implement ArchiveCache class
   - Create ArchiveCache class with LRU eviction policy
   - Implement get_handler method with lazy initialization
   - Implement cache invalidation methods
@@ -49,7 +49,7 @@
   - Implement cache statistics and monitoring
   - _Requirements: Performance optimization_
 
-- [ ] 6. Implement ArchivePathImpl class
+- [x] 6. Implement ArchivePathImpl class
   - Create ArchivePathImpl class inheriting from PathImpl
   - Implement URI parsing (_parse_uri, _normalize_internal_path)
   - Implement all PathImpl abstract methods for archive paths
@@ -78,7 +78,7 @@
   - **Property 14: Uncompressed size display**
   - **Validates: Requirements 6.5**
 
-- [ ] 7. Integrate ArchivePathImpl with Path factory
+- [x] 7. Integrate ArchivePathImpl with Path factory
   - Modify Path._create_implementation in tfm_path.py to detect archive:// URIs
   - Add import for ArchivePathImpl
   - Test Path creation with archive URIs (archive:///path/to/file.zip#internal/path)
@@ -96,10 +96,10 @@
   - **Property 1: Archive entry round trip**
   - **Validates: Requirements 1.1, 1.2, 1.3**
 
-- [ ] 8. Checkpoint - Ensure all tests pass
+- [x] 8. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Integrate archive virtual directory browsing with FileManager
+- [x] 9. Integrate archive virtual directory browsing with FileManager
   - Modify FileManager.handle_enter_key to detect archive files and create archive:// URIs
   - Add logic to navigate into archives as virtual directories
   - Update path display to show archive name and internal path clearly
@@ -107,7 +107,7 @@
   - Support backspace navigation within archives and exiting archives
   - _Requirements: 1.1, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5, 6.1, 6.2_
 
-- [ ] 10. Implement archive file viewing support
+- [x] 10. Implement archive file viewing support
   - Modify text viewer integration to handle archive:// paths
   - Implement temporary file extraction for viewing files within archives
   - Add cleanup logic for temporary files after viewer closes
@@ -122,7 +122,7 @@
   - **Property 11: Temporary file cleanup**
   - **Validates: Requirements 4.3**
 
-- [ ] 11. Implement archive copy operations from virtual directories
+- [x] 11. Implement archive copy operations from virtual directories
   - Extend file operations to handle archive:// source paths
   - Implement single file extraction during copy from archive
   - Implement recursive directory extraction during copy from archive
@@ -142,7 +142,7 @@
   - **Property 15: Batch operation completeness**
   - **Validates: Requirements 8.2**
 
-- [ ] 12. Implement archive search support
+- [x] 12. Implement archive search support
   - Extend search dialog to work with archive:// paths
   - Implement archive-scoped search (only search within current archive)
   - Update search results to show full archive paths
@@ -153,7 +153,7 @@
   - **Property 12: Archive search scope correctness**
   - **Validates: Requirements 5.1, 5.2, 5.3, 5.4**
 
-- [ ] 13. Implement archive metadata display
+- [x] 13. Implement archive metadata display
   - Extend file details dialog to show archive entry metadata
   - Display uncompressed size, compressed size, compression ratio
   - Show archive type and internal path
@@ -163,7 +163,7 @@
   - **Property 16: Metadata display completeness**
   - **Validates: Requirements 8.3**
 
-- [ ] 14. Implement archive sorting support
+- [x] 14. Implement archive sorting support
   - Ensure sort operations work correctly with archive entries
   - Test all sort modes (name, size, date, type, ext) with archives
   - Verify directories-first sorting works in archives
@@ -173,31 +173,31 @@
   - **Property 17: Sort order consistency**
   - **Validates: Requirements 8.4**
 
-- [ ] 15. Add archive support to dual-pane operations
+- [x] 15. Add archive support to dual-pane operations
   - Test archive browsing in left and right panes
   - Test copy operations between archive and filesystem panes
   - Test copy operations between two archive panes
   - Verify pane synchronization works with archives
   - _Requirements: 8.5_
 
-- [ ] 16. Implement comprehensive error handling
+- [x] 16. Implement comprehensive error handling
   - Add error handling for all archive virtual directory operations
   - Implement user-friendly error messages for navigation failures
   - Add logging for all archive browsing operations
   - Test error recovery scenarios (corrupt archives, missing entries)
   - _Requirements: 1.5, 3.5, 4.5, 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 17. Checkpoint - Ensure all tests pass
+- [x] 17. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 18. Performance optimization
+- [x] 18. Performance optimization
   - Verify archive caching with LRU eviction is working efficiently
   - Add lazy loading for archive directory structures
   - Optimize memory usage for large archives
   - Profile and optimize hot paths in ArchivePathImpl
   - _Requirements: Performance_
 
-- [ ] 19. Create end-user documentation
+- [x] 19. Create end-user documentation
   - Create `doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md` with user guide
   - Document how to browse archives as virtual directories
   - Document navigation within archives (ENTER, backspace)
@@ -205,7 +205,7 @@
   - Add troubleshooting section for archive browsing
   - _Requirements: All user-facing requirements_
 
-- [ ] 20. Create developer documentation
+- [x] 20. Create developer documentation
   - Create `doc/dev/ARCHIVE_VIRTUAL_DIRECTORY_IMPLEMENTATION.md` with technical details
   - Document ArchivePathImpl architecture and design
   - Document ArchiveHandler and ArchiveCache implementation
@@ -214,7 +214,7 @@
   - Add API reference for archive classes
   - _Requirements: All requirements_
 
-- [ ] 21. Final integration testing
+- [x] 21. Final integration testing
   - Test virtual directory browsing for all archive formats (.zip, .tar, .tar.gz, .tgz, .tar.bz2, .tar.xz)
   - Test navigation within large archives (>1GB)
   - Test with deeply nested directory structures within archives
@@ -223,5 +223,5 @@
   - Test on all supported platforms (Linux, macOS, Windows)
   - _Requirements: All requirements_
 
-- [ ] 22. Final checkpoint - Ensure all tests pass
+- [x] 22. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

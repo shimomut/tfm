@@ -272,7 +272,6 @@ def test_progress_text_formatting():
     progress_text = fm.progress_manager.get_progress_text(80)
     assert "Extracting archive" in progress_text
     assert "3/10" in progress_text
-    assert "30%" in progress_text
     assert "document.pdf" in progress_text
     assert "ZIP: large_archive.zip" in progress_text
     

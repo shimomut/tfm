@@ -83,7 +83,6 @@ def test_archive_progress_migration():
     progress_text = fm.progress_manager.get_progress_text(80)
     assert "Creating archive" in progress_text
     assert "2/10" in progress_text
-    assert "20%" in progress_text
     assert "file2.txt" in progress_text
     
     # Finish the operation

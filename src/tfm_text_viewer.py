@@ -440,10 +440,28 @@ class TextViewer:
         except curses.error:
             pass
         
-        # File path and info - show scheme for remote files
-        if self.file_path.is_remote():
-            scheme = self.file_path.get_scheme().upper()
-            file_info = f"{scheme}: {self.file_path.name}"
+        # File path and info - show scheme for remote files and archives
+        scheme = self.file_path.get_scheme()
+        
+        if scheme == 'archive':
+            # For archive files, show the full archive path
+            # Format: ARCHIVE: archive.zip#internal/path/file.txt
+            try:
+                # Get the archive path and internal path from the implementation
+                archive_impl = self.file_path._impl
+                archive_name = archive_impl._archive_path.name
+                internal_path = archive_impl._internal_path
+                
+                if internal_path:
+                    file_info = f"ARCHIVE: {archive_name}#{internal_path}"
+                else:
+                    file_info = f"ARCHIVE: {archive_name}"
+            except (AttributeError, Exception):
+                # Fallback if we can't access the implementation details
+                file_info = f"ARCHIVE: {self.file_path.name}"
+        elif self.file_path.is_remote():
+            scheme_upper = scheme.upper()
+            file_info = f"{scheme_upper}: {self.file_path.name}"
         else:
             file_info = f"File: {self.file_path.name}"
             
