@@ -69,15 +69,14 @@ def test_archive_filename_search(test_archive_with_files, search_dialog):
     search_dialog.show('filename')
     search_dialog.text_editor.text = "*.txt"
     
-    # Run search synchronously for testing (pass is_archive_search=True)
-    search_dialog._search_worker(archive_path, "*.txt", 'filename', is_archive_search=True)
+    # Run search synchronously for testing
+    search_dialog._search_worker(archive_path, "*.txt", 'filename')
     
     # Verify results
     assert len(search_dialog.results) == 2  # readme.txt and notes.txt
     
-    # Check that results are marked as archive results
+    # Check that results have correct type
     for result in search_dialog.results:
-        assert result['is_archive'] is True
         assert result['type'] in ['file', 'dir']
     
     # Verify specific files found
@@ -95,8 +94,8 @@ def test_archive_content_search(test_archive_with_files, search_dialog):
     search_dialog.show('content')
     search_dialog.text_editor.text = "guide"
     
-    # Run search synchronously for testing (pass is_archive_search=True)
-    search_dialog._search_worker(archive_path, "guide", 'content', is_archive_search=True)
+    # Run search synchronously for testing
+    search_dialog._search_worker(archive_path, "guide", 'content')
     
     # Verify results
     assert len(search_dialog.results) >= 1
@@ -104,7 +103,6 @@ def test_archive_content_search(test_archive_with_files, search_dialog):
     # Check that results contain the expected file
     found_guide = False
     for result in search_dialog.results:
-        assert result['is_archive'] is True
         assert result['type'] == 'content'
         if 'guide.md' in result['relative_path']:
             found_guide = True
@@ -123,8 +121,8 @@ def test_archive_search_nested_directories(test_archive_with_files, search_dialo
     search_dialog.show('filename')
     search_dialog.text_editor.text = "*.md"
     
-    # Run search synchronously for testing (pass is_archive_search=True)
-    search_dialog._search_worker(archive_path, "*.md", 'filename', is_archive_search=True)
+    # Run search synchronously for testing
+    search_dialog._search_worker(archive_path, "*.md", 'filename')
     
     # Verify results
     assert len(search_dialog.results) == 1
@@ -133,7 +131,6 @@ def test_archive_search_nested_directories(test_archive_with_files, search_dialo
     # Check that nested path is shown correctly
     assert 'docs' in result['relative_path']
     assert 'guide.md' in result['relative_path']
-    assert result['is_archive'] is True
 
 
 def test_archive_search_from_subdirectory(test_archive_with_files, search_dialog):
@@ -145,8 +142,8 @@ def test_archive_search_from_subdirectory(test_archive_with_files, search_dialog
     search_dialog.show('filename')
     search_dialog.text_editor.text = "*.txt"
     
-    # Run search synchronously for testing (pass is_archive_search=True)
-    search_dialog._search_worker(archive_path, "*.txt", 'filename', is_archive_search=True)
+    # Run search synchronously for testing
+    search_dialog._search_worker(archive_path, "*.txt", 'filename')
     
     # Verify results - should only find files in docs subdirectory
     assert len(search_dialog.results) == 1
@@ -154,7 +151,6 @@ def test_archive_search_from_subdirectory(test_archive_with_files, search_dialog
     
     # Should find notes.txt but not readme.txt (which is in parent)
     assert 'notes.txt' in result['match_info']
-    assert result['is_archive'] is True
 
 
 def test_archive_search_case_insensitive(test_archive_with_files, search_dialog):
@@ -231,8 +227,8 @@ def test_archive_content_search_multiple_matches(test_archive_with_files, search
     search_dialog.show('content')
     search_dialog.text_editor.text = "is"
     
-    # Run search synchronously for testing (pass is_archive_search=True)
-    search_dialog._search_worker(archive_path, "is", 'content', is_archive_search=True)
+    # Run search synchronously for testing
+    search_dialog._search_worker(archive_path, "is", 'content')
     
     # Should find multiple files containing "is"
     assert len(search_dialog.results) >= 2
@@ -240,7 +236,6 @@ def test_archive_content_search_multiple_matches(test_archive_with_files, search
     # All results should be content type
     for result in search_dialog.results:
         assert result['type'] == 'content'
-        assert result['is_archive'] is True
         assert 'line_num' in result
 
 
@@ -267,10 +262,9 @@ def test_archive_search_tar_format(tmp_path, search_dialog):
     search_dialog.show('filename')
     search_dialog.text_editor.text = "*.txt"
     
-    # Run search synchronously for testing (pass is_archive_search=True)
-    search_dialog._search_worker(archive_path, "*.txt", 'filename', is_archive_search=True)
+    # Run search synchronously for testing
+    search_dialog._search_worker(archive_path, "*.txt", 'filename')
     
     # Should find the txt file
     assert len(search_dialog.results) == 1
     assert 'file1.txt' in search_dialog.results[0]['match_info']
-    assert search_dialog.results[0]['is_archive'] is True

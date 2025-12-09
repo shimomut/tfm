@@ -418,13 +418,9 @@ class FileOperationsUI:
         self.cache_manager = file_manager.cache_manager
         self.config = file_manager.config
     
-    def _is_archive_path(self, path):
-        """Check if a path is an archive path (read-only)"""
-        return str(path).startswith('archive://')
-    
-    def _validate_operation_on_archives(self, operation, source_paths, dest_path=None):
+    def _validate_operation_capabilities(self, operation, source_paths, dest_path=None):
         """
-        Validate if an operation is allowed on archive paths.
+        Validate if an operation is allowed based on storage capabilities.
         
         Args:
             operation: 'delete', 'move', or 'copy'
@@ -435,27 +431,31 @@ class FileOperationsUI:
             (is_valid, error_message) tuple
         """
         if operation == 'delete':
-            # Cannot delete from archives
-            if any(self._is_archive_path(p) for p in source_paths):
-                return False, "Cannot delete files within archives. Archives are read-only."
+            # Check if all source paths support file editing (required for deletion)
+            for path in source_paths:
+                if not path.supports_file_editing():
+                    return False, "Cannot delete files from read-only storage."
         
         elif operation == 'move':
-            # Cannot move from or to archives
-            if any(self._is_archive_path(p) for p in source_paths):
-                return False, "Cannot move files from archives. Use copy instead. Archives are read-only."
-            if dest_path and self._is_archive_path(dest_path):
-                return False, "Cannot move files into archives. Archives are read-only."
+            # Check if all source paths support file editing (required for deletion after move)
+            for path in source_paths:
+                if not path.supports_file_editing():
+                    return False, "Cannot move files from read-only storage. Use copy instead."
+            
+            # Check if destination supports file editing (required for writing)
+            if dest_path and not dest_path.supports_file_editing():
+                return False, "Cannot move files to read-only storage."
         
         elif operation == 'copy':
-            # Can copy FROM archives, but not TO archives
-            if dest_path and self._is_archive_path(dest_path):
-                return False, "Cannot copy files into archives. Archives are read-only."
-            # Copying FROM archives is OK (extraction)
+            # Can copy FROM any storage, but destination must support file editing
+            if dest_path and not dest_path.supports_file_editing():
+                return False, "Cannot copy files to read-only storage."
+            # Copying FROM read-only storage is OK (extraction)
         
         return True, None
     
     def _show_unsupported_operation_error(self, message):
-        """Show error dialog for unsupported archive operations"""
+        """Show error dialog for unsupported operations"""
         choices = [
             {"text": "OK", "key": "enter", "value": True}
         ]
@@ -487,8 +487,8 @@ class FileOperationsUI:
         
         destination_dir = other_pane['path']
         
-        # Validate operation on archives - check BEFORE any other checks
-        is_valid, error_msg = self._validate_operation_on_archives('copy', files_to_copy, destination_dir)
+        # Validate operation capabilities - check BEFORE any other checks
+        is_valid, error_msg = self._validate_operation_capabilities('copy', files_to_copy, destination_dir)
         if not is_valid:
             self._show_unsupported_operation_error(error_msg)
             return
@@ -743,8 +743,8 @@ class FileOperationsUI:
         
         destination_dir = other_pane['path']
         
-        # Validate operation on archives - check BEFORE any other checks
-        is_valid, error_msg = self._validate_operation_on_archives('move', files_to_move, destination_dir)
+        # Validate operation capabilities - check BEFORE any other checks
+        is_valid, error_msg = self._validate_operation_capabilities('move', files_to_move, destination_dir)
         if not is_valid:
             self._show_unsupported_operation_error(error_msg)
             return
@@ -1040,8 +1040,8 @@ class FileOperationsUI:
             print("No files to delete")
             return
         
-        # Validate operation on archives - check BEFORE confirmation dialog
-        is_valid, error_msg = self._validate_operation_on_archives('delete', files_to_delete)
+        # Validate operation capabilities - check BEFORE confirmation dialog
+        is_valid, error_msg = self._validate_operation_capabilities('delete', files_to_delete)
         if not is_valid:
             self._show_unsupported_operation_error(error_msg)
             return

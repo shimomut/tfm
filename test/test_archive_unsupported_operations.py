@@ -36,117 +36,116 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
         # Create FileOperationsUI instance
         self.file_ops_ui = FileOperationsUI(self.mock_file_manager, self.mock_file_operations)
     
-    def test_is_archive_path_detection(self):
-        """Test that archive paths are correctly detected"""
-        # Archive paths should be detected
-        self.assertTrue(self.file_ops_ui._is_archive_path(Path('archive:///path/to/file.zip#')))
-        self.assertTrue(self.file_ops_ui._is_archive_path(Path('archive:///path/to/file.tar.gz#internal/path')))
+    def test_capability_detection(self):
+        """Test that storage capabilities are correctly detected"""
+        # Archive paths should not support file editing
+        archive_path = Path('archive:///path/to/file.zip#')
+        self.assertFalse(archive_path.supports_file_editing())
         
-        # Non-archive paths should not be detected
-        self.assertFalse(self.file_ops_ui._is_archive_path(Path('/path/to/file.txt')))
-        self.assertFalse(self.file_ops_ui._is_archive_path(Path('s3://bucket/key')))
+        archive_path2 = Path('archive:///path/to/file.tar.gz#internal/path')
+        self.assertFalse(archive_path2.supports_file_editing())
+        
+        # Local paths should support file editing
+        local_path = Path('/path/to/file.txt')
+        self.assertTrue(local_path.supports_file_editing())
     
-    def test_validate_delete_from_archive(self):
-        """Test that deleting from archive is rejected"""
+    def test_validate_delete_from_read_only_storage(self):
+        """Test that deleting from read-only storage is rejected"""
         archive_path = Path('archive:///path/to/file.zip#internal/file.txt')
         
-        is_valid, error_msg = self.file_ops_ui._validate_operation_on_archives(
+        is_valid, error_msg = self.file_ops_ui._validate_operation_capabilities(
             'delete', [archive_path]
         )
         
         self.assertFalse(is_valid)
-        self.assertIn("Cannot delete files within archives", error_msg)
-        self.assertIn("read-only", error_msg)
+        self.assertIn("Cannot delete files from read-only storage", error_msg)
     
-    def test_validate_delete_from_filesystem(self):
-        """Test that deleting from filesystem is allowed"""
+    def test_validate_delete_from_writable_storage(self):
+        """Test that deleting from writable storage is allowed"""
         local_path = Path('/path/to/file.txt')
         
-        is_valid, error_msg = self.file_ops_ui._validate_operation_on_archives(
+        is_valid, error_msg = self.file_ops_ui._validate_operation_capabilities(
             'delete', [local_path]
         )
         
         self.assertTrue(is_valid)
         self.assertIsNone(error_msg)
     
-    def test_validate_move_from_archive(self):
-        """Test that moving from archive is rejected"""
+    def test_validate_move_from_read_only_storage(self):
+        """Test that moving from read-only storage is rejected"""
         archive_path = Path('archive:///path/to/file.zip#internal/file.txt')
         dest_path = Path('/destination/dir')
         
-        is_valid, error_msg = self.file_ops_ui._validate_operation_on_archives(
+        is_valid, error_msg = self.file_ops_ui._validate_operation_capabilities(
             'move', [archive_path], dest_path
         )
         
         self.assertFalse(is_valid)
-        self.assertIn("Cannot move files from archives", error_msg)
+        self.assertIn("Cannot move files from read-only storage", error_msg)
         self.assertIn("Use copy instead", error_msg)
-        self.assertIn("read-only", error_msg)
     
-    def test_validate_move_to_archive(self):
-        """Test that moving to archive is rejected"""
+    def test_validate_move_to_read_only_storage(self):
+        """Test that moving to read-only storage is rejected"""
         local_path = Path('/path/to/file.txt')
         archive_dest = Path('archive:///path/to/file.zip#')
         
-        is_valid, error_msg = self.file_ops_ui._validate_operation_on_archives(
+        is_valid, error_msg = self.file_ops_ui._validate_operation_capabilities(
             'move', [local_path], archive_dest
         )
         
         self.assertFalse(is_valid)
-        self.assertIn("Cannot move files into archives", error_msg)
-        self.assertIn("read-only", error_msg)
+        self.assertIn("Cannot move files to read-only storage", error_msg)
     
-    def test_validate_move_filesystem_to_filesystem(self):
-        """Test that moving between filesystem locations is allowed"""
+    def test_validate_move_between_writable_storage(self):
+        """Test that moving between writable storage locations is allowed"""
         source_path = Path('/path/to/file.txt')
         dest_path = Path('/destination/dir')
         
-        is_valid, error_msg = self.file_ops_ui._validate_operation_on_archives(
+        is_valid, error_msg = self.file_ops_ui._validate_operation_capabilities(
             'move', [source_path], dest_path
         )
         
         self.assertTrue(is_valid)
         self.assertIsNone(error_msg)
     
-    def test_validate_copy_to_archive(self):
-        """Test that copying to archive is rejected"""
+    def test_validate_copy_to_read_only_storage(self):
+        """Test that copying to read-only storage is rejected"""
         local_path = Path('/path/to/file.txt')
         archive_dest = Path('archive:///path/to/file.zip#')
         
-        is_valid, error_msg = self.file_ops_ui._validate_operation_on_archives(
+        is_valid, error_msg = self.file_ops_ui._validate_operation_capabilities(
             'copy', [local_path], archive_dest
         )
         
         self.assertFalse(is_valid)
-        self.assertIn("Cannot copy files into archives", error_msg)
-        self.assertIn("read-only", error_msg)
+        self.assertIn("Cannot copy files to read-only storage", error_msg)
     
-    def test_validate_copy_from_archive(self):
-        """Test that copying from archive is allowed (extraction)"""
+    def test_validate_copy_from_read_only_storage(self):
+        """Test that copying from read-only storage is allowed (extraction)"""
         archive_path = Path('archive:///path/to/file.zip#internal/file.txt')
         dest_path = Path('/destination/dir')
         
-        is_valid, error_msg = self.file_ops_ui._validate_operation_on_archives(
+        is_valid, error_msg = self.file_ops_ui._validate_operation_capabilities(
             'copy', [archive_path], dest_path
         )
         
         self.assertTrue(is_valid)
         self.assertIsNone(error_msg)
     
-    def test_validate_copy_filesystem_to_filesystem(self):
-        """Test that copying between filesystem locations is allowed"""
+    def test_validate_copy_between_writable_storage(self):
+        """Test that copying between writable storage locations is allowed"""
         source_path = Path('/path/to/file.txt')
         dest_path = Path('/destination/dir')
         
-        is_valid, error_msg = self.file_ops_ui._validate_operation_on_archives(
+        is_valid, error_msg = self.file_ops_ui._validate_operation_capabilities(
             'copy', [source_path], dest_path
         )
         
         self.assertTrue(is_valid)
         self.assertIsNone(error_msg)
     
-    def test_delete_shows_error_for_archive_path(self):
-        """Test that delete operation shows error for archive paths"""
+    def test_delete_shows_error_for_read_only_storage(self):
+        """Test that delete operation shows error for read-only storage"""
         # Set up mock pane with archive file
         archive_path = Path('archive:///path/to/file.zip#internal/file.txt')
         
@@ -169,15 +168,14 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
         # Verify error dialog was shown
         self.assertEqual(len(dialog_calls), 1)
         message, choices = dialog_calls[0]
-        self.assertIn("Cannot delete files within archives", message)
-        self.assertIn("read-only", message)
+        self.assertIn("Cannot delete files from read-only storage", message)
         
         # Verify only OK choice is available
         self.assertEqual(len(choices), 1)
         self.assertEqual(choices[0]['text'], 'OK')
     
-    def test_move_shows_error_for_archive_source(self):
-        """Test that move operation shows error for archive source paths"""
+    def test_move_shows_error_for_read_only_source(self):
+        """Test that move operation shows error for read-only source storage"""
         # Set up mock panes
         archive_path = Path('archive:///path/to/file.zip#internal/file.txt')
         dest_path = Path('/destination/dir')
@@ -205,12 +203,11 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
         # Verify error dialog was shown
         self.assertEqual(len(dialog_calls), 1)
         message, choices = dialog_calls[0]
-        self.assertIn("Cannot move files from archives", message)
+        self.assertIn("Cannot move files from read-only storage", message)
         self.assertIn("Use copy instead", message)
-        self.assertIn("read-only", message)
     
-    def test_move_shows_error_for_archive_destination(self):
-        """Test that move operation shows error for archive destination paths"""
+    def test_move_shows_error_for_read_only_destination(self):
+        """Test that move operation shows error for read-only destination storage"""
         # Set up mock panes
         local_path = Path('/path/to/file.txt')
         archive_dest = Path('archive:///path/to/file.zip#')
@@ -240,11 +237,10 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
             # Verify error dialog was shown
             self.assertEqual(len(dialog_calls), 1)
             message, choices = dialog_calls[0]
-            self.assertIn("Cannot move files into archives", message)
-            self.assertIn("read-only", message)
+            self.assertIn("Cannot move files to read-only storage", message)
     
-    def test_copy_shows_error_for_archive_destination(self):
-        """Test that copy operation shows error for archive destination paths"""
+    def test_copy_shows_error_for_read_only_destination(self):
+        """Test that copy operation shows error for read-only destination storage"""
         # Set up mock panes
         local_path = Path('/path/to/file.txt')
         archive_dest = Path('archive:///path/to/file.zip#')
@@ -274,8 +270,7 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
             # Verify error dialog was shown
             self.assertEqual(len(dialog_calls), 1)
             message, choices = dialog_calls[0]
-            self.assertIn("Cannot copy files into archives", message)
-            self.assertIn("read-only", message)
+            self.assertIn("Cannot copy files to read-only storage", message)
 
 
 if __name__ == '__main__':

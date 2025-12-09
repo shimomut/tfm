@@ -1240,6 +1240,154 @@ class S3PathImpl(PathImpl):
     def supports_file_editing(self) -> bool:
         """Return True if this storage implementation supports file editing"""
         return False  # S3 file editing is not supported for now
+    
+    # Display methods
+    def get_display_prefix(self) -> str:
+        """Return a prefix for display purposes.
+        
+        Returns:
+            str: Display prefix 'S3: ' (with trailing space)
+        """
+        return 'S3: '
+    
+    def get_display_title(self) -> str:
+        """Return a formatted title for display in viewers/dialogs.
+        
+        Returns:
+            str: S3 URI (e.g., 's3://bucket/key')
+        """
+        return self._uri
+    
+    # Content reading strategy methods
+    def requires_extraction_for_reading(self) -> bool:
+        """Return True if content must be extracted before reading.
+        
+        This affects how content is accessed - whether it can be read
+        directly or must be extracted to memory/disk first.
+        
+        Returns:
+            bool: True - S3 objects must be downloaded before reading
+        """
+        return True
+    
+    def supports_streaming_read(self) -> bool:
+        """Return True if file can be read line-by-line without full extraction.
+        
+        This affects memory usage during operations like search.
+        
+        Returns:
+            bool: False - S3 objects must be fully downloaded, cannot stream line-by-line
+        """
+        return False
+    
+    def get_search_strategy(self) -> str:
+        """Return recommended search strategy.
+        
+        Returns:
+            str: 'buffered' - Download to buffer for S3 objects
+        """
+        return 'buffered'
+    
+    def should_cache_for_search(self) -> bool:
+        """Return True if content should be cached during search operations.
+        
+        Returns:
+            bool: True - Caching is recommended for S3 to avoid repeated downloads
+        """
+        return True
+    
+    # Metadata method
+    def get_extended_metadata(self) -> Dict[str, Any]:
+        """Return storage-specific metadata for display in info dialogs.
+        
+        Returns:
+            dict: Metadata dictionary with keys:
+                - 'type': str - Storage type ('s3')
+                - 'details': List[Tuple[str, str]] - List of (label, value) pairs
+                - 'format_hint': str - Display format hint ('remote')
+        
+        Example:
+            {
+                'type': 's3',
+                'details': [
+                    ('Bucket', 'my-bucket'),
+                    ('Key', 'path/to/file.txt'),
+                    ('Type', 'Object'),
+                    ('Size', '1.2 MB'),
+                    ('Storage Class', 'STANDARD'),
+                    ('Last Modified', '2024-01-15 10:30:00')
+                ],
+                'format_hint': 'remote'
+            }
+        """
+        details = []
+        
+        # Add bucket and key information
+        details.append(('Bucket', self._bucket))
+        details.append(('Key', self._key if self._key else '/'))
+        
+        # Determine type
+        if self.is_dir():
+            details.append(('Type', 'Directory'))
+        else:
+            details.append(('Type', 'Object'))
+        
+        # Get object metadata if this is a file
+        if not self.is_dir() and self._key:
+            try:
+                # Try to use cached metadata first
+                if self._size_cached is not None:
+                    size = self._size_cached
+                    last_modified = self._mtime_cached
+                    storage_class = self._storage_class_cached or 'STANDARD'
+                else:
+                    # Fetch metadata from S3
+                    response = self._cached_api_call('head_object', Bucket=self._bucket, Key=self._key)
+                    size = response.get('ContentLength', 0)
+                    last_modified = response.get('LastModified')
+                    storage_class = response.get('StorageClass', 'STANDARD')
+                
+                # Format size
+                details.append(('Size', self._format_size(size)))
+                
+                # Add storage class
+                details.append(('Storage Class', storage_class))
+                
+                # Format last modified time
+                if last_modified:
+                    if hasattr(last_modified, 'strftime'):
+                        formatted_time = last_modified.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        # If it's a timestamp
+                        formatted_time = datetime.fromtimestamp(last_modified).strftime('%Y-%m-%d %H:%M:%S')
+                    details.append(('Last Modified', formatted_time))
+                else:
+                    details.append(('Last Modified', 'Unknown'))
+                    
+            except (ClientError, OSError) as e:
+                # If we can't get metadata, add what we know
+                details.append(('Size', 'Unknown'))
+                details.append(('Storage Class', 'Unknown'))
+                details.append(('Last Modified', 'Unknown'))
+        else:
+            # For directories, add basic info
+            details.append(('Size', '0 B'))
+            details.append(('Storage Class', 'N/A'))
+            details.append(('Last Modified', 'N/A'))
+        
+        return {
+            'type': 's3',
+            'details': details,
+            'format_hint': 'remote'
+        }
+    
+    def _format_size(self, size: int) -> str:
+        """Format size in human-readable format"""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} PB"
 
 
 # Cache management functions

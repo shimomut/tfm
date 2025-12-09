@@ -1750,6 +1750,174 @@ class ArchivePathImpl(PathImpl):
         """Return True if this storage implementation supports file editing."""
         return False  # Archives are read-only
     
+    # Display methods for UI presentation
+    def get_display_prefix(self) -> str:
+        """Return a prefix for display purposes.
+        
+        For archive entries, returns 'ARCHIVE: ' to indicate the storage type
+        in UI components like text viewers and info dialogs.
+        
+        Returns:
+            str: 'ARCHIVE: ' (with trailing space)
+        """
+        return 'ARCHIVE: '
+    
+    def get_display_title(self) -> str:
+        """Return a formatted title for display in viewers and dialogs.
+        
+        For archive entries, returns the full archive URI which includes both
+        the archive file path and the internal path within the archive.
+        
+        Returns:
+            str: Full archive URI in format 'archive://path/to/file.zip#internal/path'
+        """
+        return self._uri
+    
+    # Content reading strategy methods
+    def requires_extraction_for_reading(self) -> bool:
+        """Return True if content must be extracted before reading.
+        
+        Archive files must be extracted from the archive container before their
+        content can be read. This affects how content is accessed - it cannot be
+        read directly and must be extracted to memory or disk first.
+        
+        Returns:
+            bool: True - archive content always requires extraction
+        """
+        return True
+    
+    def supports_streaming_read(self) -> bool:
+        """Return True if file can be read line-by-line without full extraction.
+        
+        Archive files do not support streaming reads. The entire file must be
+        extracted from the archive before it can be accessed. This affects memory
+        usage during operations like search, as the full content must be loaded.
+        
+        Returns:
+            bool: False - archive content cannot be streamed
+        """
+        return False
+    
+    def get_search_strategy(self) -> str:
+        """Return recommended search strategy for this storage type.
+        
+        Archive files require the 'extracted' strategy, meaning the entire file
+        content must be extracted from the archive before searching can begin.
+        This is necessary because archive formats don't support random access
+        or streaming reads of individual files.
+        
+        Returns:
+            str: 'extracted' - must extract entire content before searching
+        """
+        return 'extracted'
+    
+    def should_cache_for_search(self) -> bool:
+        """Return True if content should be cached during search operations.
+        
+        Archive content should be cached during search operations because
+        extraction is expensive. Caching the extracted content allows multiple
+        search operations or result viewing without repeated extraction overhead.
+        
+        Returns:
+            bool: True - caching is recommended for archive content
+        """
+        return True
+    
+    # Metadata method for info dialogs
+    def get_extended_metadata(self) -> dict:
+        """Return storage-specific metadata for display in info dialogs.
+        
+        For archive entries, provides detailed information including the archive
+        file name, internal path within the archive, compressed and uncompressed
+        sizes, compression type, and modification time.
+        
+        Returns:
+            dict: Metadata dictionary with keys:
+                - 'type': 'archive'
+                - 'details': List of (label, value) tuples with archive-specific fields
+                - 'format_hint': 'archive'
+        """
+        entry = self._get_entry()
+        if not entry:
+            # If entry doesn't exist, return minimal metadata
+            details = [
+                ('Archive', self._archive_path.name),
+                ('Internal Path', self._internal_path or '/'),
+                ('Type', 'Unknown'),
+            ]
+        else:
+            details = [
+                ('Archive', self._archive_path.name),
+                ('Internal Path', self._internal_path or '/'),
+                ('Type', 'Directory' if entry.is_dir else 'File'),
+                ('Compressed Size', self._format_size(entry.compressed_size)),
+                ('Uncompressed Size', self._format_size(entry.size)),
+                ('Compression', self._get_compression_name(entry.archive_type)),
+                ('Modified', self._format_archive_time(entry.mtime))
+            ]
+        
+        return {
+            'type': 'archive',
+            'details': details,
+            'format_hint': 'archive'
+        }
+    
+    def _format_size(self, size: int) -> str:
+        """Format size in human-readable format.
+        
+        Args:
+            size: Size in bytes
+            
+        Returns:
+            str: Formatted size string (e.g., '1.2 MB', '345 KB')
+        """
+        if size < 0:
+            return '0 B'
+        
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024.0:
+                if unit == 'B':
+                    return f"{int(size)} {unit}"
+                else:
+                    return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} PB"
+    
+    def _get_compression_name(self, archive_type: str) -> str:
+        """Convert archive type to compression name.
+        
+        Args:
+            archive_type: Archive format string (e.g., 'zip', 'tar.gz', 'tar')
+            
+        Returns:
+            str: Human-readable compression name
+        """
+        compression_map = {
+            'zip': 'ZIP (Deflated)',
+            'tar': 'None (Uncompressed)',
+            'tar.gz': 'GZIP',
+            'tar.bz2': 'BZIP2',
+            'tar.xz': 'LZMA/XZ',
+        }
+        return compression_map.get(archive_type, archive_type.upper())
+    
+    def _format_archive_time(self, timestamp: float) -> str:
+        """Format archive entry modification time.
+        
+        Args:
+            timestamp: Unix timestamp (seconds since epoch)
+            
+        Returns:
+            str: Formatted date/time string (e.g., '2024-01-15 10:30:00')
+        """
+        import datetime
+        try:
+            dt = datetime.datetime.fromtimestamp(timestamp)
+            return dt.strftime('%Y-%m-%d %H:%M:%S')
+        except (ValueError, OSError):
+            # Handle invalid timestamps
+            return 'Unknown'
+    
     # Compatibility methods
     def samefile(self, other_path) -> bool:
         """Return whether other_path is the same or not as this file."""

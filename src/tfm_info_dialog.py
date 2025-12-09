@@ -368,15 +368,8 @@ class InfoDialogHelpers:
         
         for file_path in files_to_show:
             try:
-                # Check if this is an archive path
-                is_archive_path = str(file_path).startswith('archive://')
-                
-                if is_archive_path:
-                    # Handle archive entry metadata
-                    InfoDialogHelpers._add_archive_entry_details(details_lines, file_path)
-                else:
-                    # Handle regular file metadata
-                    InfoDialogHelpers._add_regular_file_details(details_lines, file_path)
+                # Use polymorphic metadata method - works for all storage types
+                InfoDialogHelpers._add_file_details(details_lines, file_path)
                 
                 if len(files_to_show) > 1:
                     details_lines.append("")  # Separator between files
@@ -395,149 +388,24 @@ class InfoDialogHelpers:
         info_dialog.show(title, details_lines)
     
     @staticmethod
-    def _add_regular_file_details(details_lines, file_path):
-        """Add details for regular (non-archive) files"""
-        from datetime import datetime
-        
-        stat_info = file_path.stat()
-        
-        # Basic info
+    def _add_file_details(details_lines, file_path):
+        """Add file details using polymorphic metadata method - works for all storage types"""
+        # Common fields first
         details_lines.append(f"Name: {file_path.name}")
         details_lines.append(f"Path: {file_path}")
         
-        # Type
-        if file_path.is_dir():
-            details_lines.append("Type: Directory")
-        elif file_path.is_file():
-            details_lines.append("Type: File")
-        elif file_path.is_symlink():
-            details_lines.append("Type: Symbolic Link")
-        else:
-            details_lines.append("Type: Other")
-        
-        # Size
-        if file_path.is_file():
-            size = stat_info.st_size
-            size_str = InfoDialogHelpers._format_size(size)
-            details_lines.append(f"Size: {size_str}")
-        
-        # Permissions
-        mode = stat_info.st_mode
-        perms = []
-        perms.append('r' if mode & 0o400 else '-')
-        perms.append('w' if mode & 0o200 else '-')
-        perms.append('x' if mode & 0o100 else '-')
-        perms.append('r' if mode & 0o040 else '-')
-        perms.append('w' if mode & 0o020 else '-')
-        perms.append('x' if mode & 0o010 else '-')
-        perms.append('r' if mode & 0o004 else '-')
-        perms.append('w' if mode & 0o002 else '-')
-        perms.append('x' if mode & 0o001 else '-')
-        details_lines.append(f"Permissions: {''.join(perms)} ({oct(mode)[-3:]})")
-        
-        # Timestamps
-        mtime = datetime.fromtimestamp(stat_info.st_mtime)
-        details_lines.append(f"Modified: {mtime.strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    @staticmethod
-    def _add_archive_entry_details(details_lines, file_path):
-        """Add details for archive entries"""
-        from datetime import datetime
-        
-        # Parse archive URI to get components
-        uri = str(file_path)
-        if '#' in uri:
-            archive_part, internal_part = uri.split('#', 1)
-            archive_file = archive_part.replace('archive://', '')
-            internal_path = internal_part
-        else:
-            archive_file = uri.replace('archive://', '')
-            internal_path = ''
-        
-        # Basic info
-        details_lines.append(f"Name: {file_path.name}")
-        details_lines.append(f"Archive: {archive_file}")
-        if internal_path:
-            details_lines.append(f"Internal Path: {internal_path}")
-        else:
-            details_lines.append(f"Internal Path: (root)")
-        
-        # Get archive entry metadata
+        # Get storage-specific metadata using polymorphic method
         try:
-            # Access the implementation to get the entry
-            impl = file_path._impl
-            if hasattr(impl, '_get_entry'):
-                entry = impl._get_entry()
-                
-                if entry:
-                    # Archive type
-                    details_lines.append(f"Archive Type: {entry.archive_type}")
-                    
-                    # Type
-                    if entry.is_dir:
-                        details_lines.append("Type: Directory")
-                    else:
-                        details_lines.append("Type: File")
-                    
-                    # Size information (only for files)
-                    if not entry.is_dir:
-                        # Uncompressed size
-                        uncompressed_str = InfoDialogHelpers._format_size(entry.size)
-                        details_lines.append(f"Uncompressed Size: {uncompressed_str}")
-                        
-                        # Compressed size
-                        compressed_str = InfoDialogHelpers._format_size(entry.compressed_size)
-                        details_lines.append(f"Compressed Size: {compressed_str}")
-                        
-                        # Compression ratio
-                        if entry.size > 0:
-                            ratio = (1 - entry.compressed_size / entry.size) * 100
-                            details_lines.append(f"Compression Ratio: {ratio:.1f}%")
-                        else:
-                            details_lines.append(f"Compression Ratio: N/A")
-                    
-                    # Permissions
-                    mode = entry.mode
-                    perms = []
-                    perms.append('r' if mode & 0o400 else '-')
-                    perms.append('w' if mode & 0o200 else '-')
-                    perms.append('x' if mode & 0o100 else '-')
-                    perms.append('r' if mode & 0o040 else '-')
-                    perms.append('w' if mode & 0o020 else '-')
-                    perms.append('x' if mode & 0o010 else '-')
-                    perms.append('r' if mode & 0o004 else '-')
-                    perms.append('w' if mode & 0o002 else '-')
-                    perms.append('x' if mode & 0o001 else '-')
-                    details_lines.append(f"Permissions: {''.join(perms)} ({oct(mode)[-3:]})")
-                    
-                    # Timestamps
-                    if entry.mtime > 0:
-                        mtime = datetime.fromtimestamp(entry.mtime)
-                        details_lines.append(f"Modified: {mtime.strftime('%Y-%m-%d %H:%M:%S')}")
-                else:
-                    details_lines.append("(Unable to retrieve archive entry metadata)")
-            else:
-                # Fallback to stat() if _get_entry not available
-                stat_info = file_path.stat()
-                details_lines.append("Type: " + ("Directory" if file_path.is_dir() else "File"))
-                if file_path.is_file():
-                    size_str = InfoDialogHelpers._format_size(stat_info.st_size)
-                    details_lines.append(f"Size: {size_str}")
+            metadata = file_path.get_extended_metadata()
+            
+            # Display storage-specific details
+            if 'details' in metadata:
+                for label, value in metadata['details']:
+                    details_lines.append(f"{label}: {value}")
         except Exception as e:
             details_lines.append(f"(Error retrieving metadata: {e})")
     
-    @staticmethod
-    def _format_size(size):
-        """Format size in bytes to human-readable string"""
-        if size < 1024:
-            return f"{size} B"
-        elif size < 1024 * 1024:
-            return f"{size / 1024:.1f} KB"
-        elif size < 1024 * 1024 * 1024:
-            return f"{size / (1024 * 1024):.1f} MB"
-        else:
-            return f"{size / (1024 * 1024 * 1024):.1f} GB"
-    
+
     @staticmethod
     def show_color_scheme_info(info_dialog):
         """Show information about the current color scheme"""

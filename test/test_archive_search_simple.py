@@ -27,15 +27,12 @@ def create_test_zip(temp_dir, filename, files):
     return zip_path
 
 
-def test_is_archive_path_detection():
-    """Test detection of archive paths"""
-    print("Testing archive path detection...")
+def test_archive_path_search_strategy():
+    """Test that archive paths use correct search strategy"""
+    print("Testing archive path search strategy...")
     
     temp_dir = tempfile.mkdtemp()
     try:
-        config = DefaultConfig()
-        search_dialog = SearchDialog(config)
-        
         # Create a test archive
         zip_path = create_test_zip(temp_dir, 'test.zip', {
             'file1.txt': 'content1',
@@ -46,14 +43,14 @@ def test_is_archive_path_detection():
         archive_uri = f"archive://{zip_path}#"
         archive_path = Path(archive_uri)
         
-        # Test detection
-        assert search_dialog._is_archive_path(archive_path) == True, "Should detect archive path"
+        # Test that archive path returns correct search strategy
+        assert archive_path.get_search_strategy() == 'extracted', "Archive should use extracted strategy"
         
         # Test regular path
         regular_path = Path(temp_dir)
-        assert search_dialog._is_archive_path(regular_path) == False, "Should not detect regular path as archive"
+        assert regular_path.get_search_strategy() == 'streaming', "Local path should use streaming strategy"
         
-        print("✓ Archive path detection works")
+        print("✓ Archive path search strategy works")
         return True
     finally:
         import shutil
@@ -99,10 +96,6 @@ def test_filename_search_in_archive():
         
         # Check results
         assert len(search_dialog.results) == 3, f"Expected 3 results, got {len(search_dialog.results)}"
-        
-        # Verify all results are marked as archive
-        for result in search_dialog.results:
-            assert result.get('is_archive') == True, "Result should be marked as archive"
         
         # Verify result paths
         result_names = [r['match_info'] for r in search_dialog.results]
@@ -156,9 +149,8 @@ def test_content_search_in_archive():
         # Check results - should find file1.txt and file3.txt
         assert len(search_dialog.results) == 2, f"Expected 2 results, got {len(search_dialog.results)}"
         
-        # Verify all results are marked as archive
+        # Verify result type
         for result in search_dialog.results:
-            assert result.get('is_archive') == True, "Result should be marked as archive"
             assert result['type'] == 'content', "Result type should be content"
         
         # Verify result paths contain the matching files
@@ -176,7 +168,7 @@ def test_content_search_in_archive():
 def run_all_tests():
     """Run all tests"""
     tests = [
-        test_is_archive_path_detection,
+        test_archive_path_search_strategy,
         test_filename_search_in_archive,
         test_content_search_in_archive,
     ]

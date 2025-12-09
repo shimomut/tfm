@@ -97,14 +97,13 @@ def test_search_in_archive_root(test_archive_structure):
     # Perform search for Python files
     search_dialog.show('filename')
     search_dialog.text_editor.text = "*.py"
-    search_dialog._search_worker(archive_path, "*.py", 'filename', is_archive_search=True)
+    search_dialog._search_worker(archive_path, "*.py", 'filename')
     
     # Should find all Python files
     assert len(search_dialog.results) == 3
     
     # Verify all results are from archive
     for result in search_dialog.results:
-        assert result['is_archive'] is True
         assert result['path'].get_scheme() == 'archive'
 
 
@@ -119,14 +118,13 @@ def test_search_in_archive_subdirectory(test_archive_structure):
     # Perform search for Python files
     search_dialog.show('filename')
     search_dialog.text_editor.text = "*.py"
-    search_dialog._search_worker(archive_path, "*.py", 'filename', is_archive_search=True)
+    search_dialog._search_worker(archive_path, "*.py", 'filename')
     
     # Should only find Python files in src directory
     assert len(search_dialog.results) == 2
     
     # Verify results are from src directory
     for result in search_dialog.results:
-        assert result['is_archive'] is True
         # Results should be relative to src directory
         assert 'tests' not in result['relative_path']
 
@@ -142,7 +140,7 @@ def test_navigate_to_search_result_in_archive(test_archive_structure):
     # Perform search
     search_dialog.show('filename')
     search_dialog.text_editor.text = "README.md"
-    search_dialog._search_worker(archive_path, "README.md", 'filename', is_archive_search=True)
+    search_dialog._search_worker(archive_path, "README.md", 'filename')
     
     # Should find README.md
     assert len(search_dialog.results) == 1
@@ -183,7 +181,7 @@ def test_content_search_in_archive(test_archive_structure):
     # Perform content search
     search_dialog.show('content')
     search_dialog.text_editor.text = "def main"
-    search_dialog._search_worker(archive_path, "def main", 'content', is_archive_search=True)
+    search_dialog._search_worker(archive_path, "def main", 'content')
     
     # Should find files containing "def main"
     assert len(search_dialog.results) >= 1
@@ -192,7 +190,6 @@ def test_content_search_in_archive(test_archive_structure):
     found_main = False
     for result in search_dialog.results:
         assert result['type'] == 'content'
-        assert result['is_archive'] is True
         if 'main.py' in result['relative_path']:
             found_main = True
             assert result['line_num'] == 1
@@ -212,7 +209,7 @@ def test_search_shows_full_archive_path(test_archive_structure):
     # Search for files in nested directory
     search_dialog.show('filename')
     search_dialog.text_editor.text = "test_*.py"
-    search_dialog._search_worker(archive_path, "test_*.py", 'filename', is_archive_search=True)
+    search_dialog._search_worker(archive_path, "test_*.py", 'filename')
     
     # Should find test file
     assert len(search_dialog.results) == 1
@@ -251,11 +248,10 @@ def test_search_multiple_archive_formats(tmp_path):
     archive_path = Path(f"archive://{tar_path}")
     search_dialog.show('filename')
     search_dialog.text_editor.text = "*.txt"
-    search_dialog._search_worker(archive_path, "*.txt", 'filename', is_archive_search=True)
+    search_dialog._search_worker(archive_path, "*.txt", 'filename')
     
     # Should find the file
     assert len(search_dialog.results) == 1
-    assert search_dialog.results[0]['is_archive'] is True
 
 
 def test_search_cancellation_in_archive(test_archive_structure):

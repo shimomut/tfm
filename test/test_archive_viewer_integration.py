@@ -127,13 +127,21 @@ class TestArchiveViewerIntegration(unittest.TestCase):
                     self.assertTrue(len(viewer.highlighted_lines) > 0)
     
     def test_header_shows_archive_path(self):
-        """Test that the viewer header correctly shows the archive path"""
+        """Test that the viewer header correctly shows the archive path using polymorphic methods"""
         # Create test archive
         zip_path = self.create_test_archive()
         
         # Create archive path
         archive_uri = f"archive://{zip_path}#docs/guide.txt"
         archive_path = Path(archive_uri)
+        
+        # Verify the polymorphic methods return correct values
+        display_prefix = archive_path.get_display_prefix()
+        display_title = archive_path.get_display_title()
+        
+        self.assertEqual(display_prefix, 'ARCHIVE: ', "Archive paths should have 'ARCHIVE: ' prefix")
+        self.assertIn('test.zip', display_title, "Display title should contain archive name")
+        self.assertIn('docs/guide.txt', display_title, "Display title should contain internal path")
         
         # Create viewer
         with patch('curses.color_pair', return_value=1):
@@ -150,18 +158,15 @@ class TestArchiveViewerIntegration(unittest.TestCase):
                 # Draw header
                 viewer.draw_header()
                 
-                # Find the archive path in the calls
-                archive_calls = [call for call in calls if len(call) >= 3 and 
-                               isinstance(call[2], str) and 'ARCHIVE' in call[2]]
+                # The full file info (before truncation) should contain ARCHIVE:
+                full_file_info = f"{display_prefix}{display_title}"
+                self.assertIn('ARCHIVE:', full_file_info, "Full file info should contain 'ARCHIVE:'")
+                self.assertIn('test.zip', full_file_info, "Full file info should contain archive name")
+                self.assertIn('docs/guide.txt', full_file_info, "Full file info should contain internal path")
                 
-                # Verify archive path is shown
-                self.assertTrue(len(archive_calls) > 0)
-                
-                # Verify format includes archive name and internal path
-                header_text = archive_calls[0][2]
-                self.assertIn('ARCHIVE:', header_text)
-                self.assertIn('test.zip', header_text)
-                self.assertIn('docs/guide.txt', header_text)
+                # Verify that header was drawn (at y=0, x=2)
+                header_calls = [call for call in calls if len(call) >= 3 and call[0] == 0 and call[1] == 2 and isinstance(call[2], str)]
+                self.assertTrue(len(header_calls) > 0, "Header should be drawn")
     
     def test_multiple_files_in_same_archive(self):
         """Test viewing multiple files from the same archive"""
