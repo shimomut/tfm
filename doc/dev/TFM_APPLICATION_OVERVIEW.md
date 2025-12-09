@@ -6,6 +6,8 @@ TFM (Terminal File Manager) is a sophisticated terminal-based file manager built
 
 ## Core Architecture
 
+![TFM Architecture Diagram](images/TFM_ARCHITECTURE.svg)
+
 ### Main Components
 
 #### Application Core
