@@ -12,18 +12,69 @@
       .ui-box { fill: #2ecc71; stroke: #27ae60; stroke-width: 2; }
       .manager-box { fill: #f39c12; stroke: #d68910; stroke-width: 2; }
       .util-box { fill: #9b59b6; stroke: #8e44ad; stroke-width: 2; }
-      .arrow { stroke: #34495e; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
-      .data-arrow { stroke: #e74c3c; stroke-width: 2; fill: none; marker-end: url(#arrowhead-red); stroke-dasharray: 5,5; }
+      .arrow { stroke: #7fb3d5; stroke-width: 2; fill: none; marker-end: url(#arrowhead); opacity: 0.7; }
+      .data-arrow { stroke: #e74c3c; stroke-width: 2; fill: none; marker-end: url(#arrowhead-red); stroke-dasharray: 5,5; opacity: 0.7; }
       .white-text { fill: white; }
     </style>
     <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#34495e" />
+      <polygon points="0 0, 10 3, 0 6" fill="#7fb3d5" opacity="0.7" />
     </marker>
     <marker id="arrowhead-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
       <polygon points="0 0, 10 3, 0 6" fill="#e74c3c" />
     </marker>
   </defs>
 
+  <!-- ========== ARROWS LAYER (BACKGROUND) ========== -->
+  <!-- Arrows showing relationships -->
+  
+  <!-- FileManager (550,120 + 300x80) center bottom: (700, 200) to Managers top centers -->
+  <!-- PaneManager (100,250 + 200x100) top center: (200, 250) -->
+  <path d="M 700 200 L 200 250" class="arrow"/>
+  <!-- FileOperations (350,250 + 200x100) top center: (450, 250) -->
+  <path d="M 700 200 L 450 250" class="arrow"/>
+  <!-- LogManager (600,250 + 200x100) top center: (700, 250) -->
+  <path d="M 700 200 L 700 250" class="arrow"/>
+  <!-- StateManager (850,250 + 200x100) top center: (950, 250) -->
+  <path d="M 700 200 L 950 250" class="arrow"/>
+  <!-- ProgressManager (1100,250 + 200x100) top center: (1200, 250) -->
+  <path d="M 700 200 L 1200 250" class="arrow"/>
+
+  <!-- FileOperations (450, 350) bottom center to Path (700, 400) top center -->
+  <path d="M 450 350 L 700 400" class="arrow"/>
+  <!-- LogManager (700, 350) bottom center to Path (700, 400) top center -->
+  <path d="M 700 350 L 700 400" class="arrow"/>
+
+  <!-- Path (400,400 + 600x120) bottom center: (700, 520) to Storage Implementations top centers -->
+  <!-- LocalPathImpl (100,570 + 250x120) top center: (225, 570) -->
+  <path d="M 700 520 L 225 570" class="arrow"/>
+  <!-- S3PathImpl (400,570 + 250x120) top center: (525, 570) -->
+  <path d="M 700 520 L 525 570" class="arrow"/>
+  <!-- ArchivePathImpl (700,570 + 250x120) top center: (825, 570) -->
+  <path d="M 700 520 L 825 570" class="arrow"/>
+
+  <!-- S3PathImpl (525, 690) bottom center to S3Cache (350,740 + 200x80) top center: (450, 740) -->
+  <path d="M 525 690 L 450 740" class="data-arrow"/>
+
+  <!-- ArchivePathImpl (825, 690) bottom center to ArchiveOperations (600,740 + 250x80) top center: (725, 740) -->
+  <path d="M 825 690 L 725 740" class="arrow"/>
+
+  <!-- Storage Implementations bottom centers to External Systems top centers -->
+  <!-- LocalPathImpl (225, 690) to Local FS (300,1150 + 180x60) top center: (390, 1150) -->
+  <path d="M 225 690 L 390 1150" class="data-arrow"/>
+  <!-- S3PathImpl (525, 690) to AWS S3 (100,1150 + 180x60) top center: (190, 1150) -->
+  <path d="M 525 690 L 190 1150" class="data-arrow"/>
+  <!-- ArchivePathImpl (825, 690) to Archives (500,1150 + 180x60) top center: (590, 1150) -->
+  <path d="M 825 690 L 590 1150" class="data-arrow"/>
+
+  <!-- FileManager (550, 160) left edge center to SearchDialog (300,890 + 180x80) top center: (390, 890) -->
+  <path d="M 550 160 L 390 890" class="arrow"/>
+  <!-- FileManager (700, 200) bottom center to TextViewer (700,890 + 180x80) top center: (790, 890) -->
+  <path d="M 700 200 L 790 890" class="arrow"/>
+
+  <!-- FileManager (850, 160) right edge center to Curses (700,1150 + 180x60) top center: (790, 1150) -->
+  <path d="M 850 160 L 790 1150" class="arrow"/>
+
+  <!-- ========== CONTENT LAYER (FOREGROUND) ========== -->
   <!-- Title -->
   <text x="700" y="40" text-anchor="middle" class="title">TFM (TUI File Manager) Architecture</text>
   
@@ -287,39 +338,4 @@
     <text x="0" y="70" class="small-label">User Input → FileManager → Managers → Path → Storage Implementations → External Systems</text>
     <text x="0" y="95" class="small-label">Storage Data → Path → Managers → UI Components → Display</text>
   </g>
-
-  <!-- Arrows showing relationships -->
-  <!-- FileManager to Managers -->
-  <path d="M 700 200 L 200 250" class="arrow"/>
-  <path d="M 700 200 L 350 250" class="arrow"/>
-  <path d="M 700 200 L 600 250" class="arrow"/>
-  <path d="M 700 200 L 850 250" class="arrow"/>
-  <path d="M 700 200 L 1100 250" class="arrow"/>
-
-  <!-- Managers to Path -->
-  <path d="M 350 350 L 600 400" class="arrow"/>
-  <path d="M 600 350 L 650 400" class="arrow"/>
-
-  <!-- Path to Implementations -->
-  <path d="M 550 520 L 225 570" class="arrow"/>
-  <path d="M 700 520 L 425 570" class="arrow"/>
-  <path d="M 800 520 L 725 570" class="arrow"/>
-
-  <!-- S3PathImpl to S3Cache -->
-  <path d="M 425 690 L 350 740" class="data-arrow"/>
-
-  <!-- ArchivePathImpl to ArchiveOperations -->
-  <path d="M 725 690 L 725 740" class="arrow"/>
-
-  <!-- Storage to External Systems -->
-  <path d="M 225 690 L 290 1130" class="data-arrow"/>
-  <path d="M 425 690 L 90 1130" class="data-arrow"/>
-  <path d="M 725 690 L 490 1130" class="data-arrow"/>
-
-  <!-- FileManager to UI Components -->
-  <path d="M 600 200 L 290 870" class="arrow"/>
-  <path d="M 700 200 L 690 870" class="arrow"/>
-
-  <!-- FileManager to Curses -->
-  <path d="M 800 200 L 690 1130" class="arrow"/>
 </svg>
