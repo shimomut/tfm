@@ -440,12 +440,15 @@ class TextViewer:
         except curses.error:
             pass
         
-        # File path and info - show scheme for remote files
-        if self.file_path.is_remote():
-            scheme = self.file_path.get_scheme().upper()
-            file_info = f"{scheme}: {self.file_path.name}"
+        # File path and info - use polymorphic display methods
+        display_prefix = self.file_path.get_display_prefix()
+        display_title = self.file_path.get_display_title()
+        
+        # Combine prefix and title for display
+        if display_prefix:
+            file_info = f"{display_prefix}{display_title}"
         else:
-            file_info = f"File: {self.file_path.name}"
+            file_info = f"File: {display_title}"
             
         if len(file_info) > width - 4:
             file_info = "..." + file_info[-(width-7):]

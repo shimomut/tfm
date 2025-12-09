@@ -82,16 +82,17 @@ class FileManager:
         
         # Validate directories exist, fall back to defaults if not
         if not initial_left_dir.exists() or not initial_left_dir.is_dir():
-            self.log_manager.add_message(f"Warning: Left directory '{initial_left_dir}' does not exist, using current directory")
+            self.log_manager.add_message("WARNING", f"Left directory '{initial_left_dir}' does not exist, using current directory")
             initial_left_dir = Path.cwd()
             
         if not initial_right_dir.exists() or not initial_right_dir.is_dir():
-            self.log_manager.add_message(f"Warning: Right directory '{initial_right_dir}' does not exist, using home directory")
+            self.log_manager.add_message("WARNING", f"Right directory '{initial_right_dir}' does not exist, using home directory")
             initial_right_dir = Path.home()
         
         # Use simple defaults since TFM loads previous state anyway
         self.pane_manager = PaneManager(self.config, initial_left_dir, initial_right_dir, self.state_manager)
         self.file_operations = FileOperations(self.config)
+        self.file_operations.log_manager = self.log_manager  # Set log_manager for error reporting
         self.list_dialog = ListDialog(self.config)
         self.info_dialog = InfoDialog(self.config)
         self.search_dialog = SearchDialog(self.config)
@@ -585,6 +586,43 @@ class FileManager:
         """Get file information for display"""
         return self.file_operations.get_file_info(path)
             
+    def format_path_display(self, path_obj):
+        """
+        Format a path for display, with special handling for archive paths.
+        
+        Args:
+            path_obj: Path object to format
+            
+        Returns:
+            Formatted string for display
+        """
+        path_str = str(path_obj)
+        
+        # Check if this is an archive path
+        if path_str.startswith('archive://'):
+            # Format: archive:///path/to/archive.zip#internal/path
+            # Extract archive file path and internal path
+            path_part = path_str[10:]  # Remove 'archive://'
+            
+            if '#' in path_part:
+                archive_path, internal_path = path_part.split('#', 1)
+                
+                # Get just the archive filename
+                archive_name = Path(archive_path).name
+                
+                if internal_path:
+                    # Show: [archive.zip]/internal/path
+                    return f"[{archive_name}]/{internal_path}"
+                else:
+                    # Show: [archive.zip]
+                    return f"[{archive_name}]"
+            else:
+                # Shouldn't happen, but handle gracefully
+                return path_str
+        else:
+            # Regular path
+            return path_str
+    
     def draw_header(self):
         """Draw the header with pane paths and controls"""
         height, width = self.stdscr.getmaxyx()
@@ -599,7 +637,7 @@ class FileManager:
         
         # Left pane path with safety checks
         if left_pane_width > 6:  # Minimum space needed
-            left_path = str(self.pane_manager.left_pane['path'])
+            left_path = self.format_path_display(self.pane_manager.left_pane['path'])
             max_left_path_width = max(1, left_pane_width - 4)
             # Use wide character aware truncation for path display
             if safe_get_display_width(left_path) > max_left_path_width:
@@ -620,7 +658,7 @@ class FileManager:
         
         # Right pane path with safety checks
         if right_pane_width > 6:  # Minimum space needed
-            right_path = str(self.pane_manager.right_pane['path'])
+            right_path = self.format_path_display(self.pane_manager.right_pane['path'])
             max_right_path_width = max(1, right_pane_width - 4)
             # Use wide character aware truncation for path display
             if safe_get_display_width(right_path) > max_right_path_width:
@@ -941,6 +979,12 @@ class FileManager:
         # Normal status display
         # Left side: status info
         status_parts = []
+        
+        # Check if browsing an archive
+        current_path_str = str(current_pane['path'])
+        if current_path_str.startswith('archive://'):
+            status_parts.append("📦 archive")
+        
         if self.file_operations.show_hidden:
             status_parts.append("showing hidden")
 
@@ -1002,6 +1046,69 @@ class FileManager:
                 self.needs_full_redraw = True
             except PermissionError:
                 self.show_error("Permission denied")
+        elif self.archive_operations.is_archive(selected_file):
+            # Navigate into archive as virtual directory
+            try:
+                # Import archive exceptions for specific error handling
+                from tfm_archive import (
+                    ArchiveError, ArchiveFormatError, ArchiveCorruptedError,
+                    ArchivePermissionError, ArchiveDiskSpaceError
+                )
+                
+                # Save current cursor position before entering archive
+                self.save_cursor_position(current_pane)
+                
+                # Create archive URI for the root of the archive
+                archive_uri = f"archive://{selected_file.absolute()}#"
+                archive_path = Path(archive_uri)
+                
+                # Navigate into the archive
+                current_pane['path'] = archive_path
+                current_pane['selected_index'] = 0
+                current_pane['scroll_offset'] = 0
+                current_pane['selected_files'].clear()  # Clear selections when entering archive
+                self.refresh_files(current_pane)
+                
+                # Default to first item
+                current_pane['selected_index'] = 0
+                current_pane['scroll_offset'] = 0
+                
+                self.needs_full_redraw = True
+                self.log_manager.add_message("INFO", f"Entered archive: {selected_file.name}")
+            except FileNotFoundError as e:
+                # Archive file doesn't exist
+                user_msg = getattr(e, 'args', ['Archive file not found'])[1] if len(getattr(e, 'args', [])) > 1 else "Archive file not found"
+                self.show_error(user_msg)
+                self.log_manager.add_message("ERROR", f"Archive not found: {selected_file}: {e}")
+            except ArchiveCorruptedError as e:
+                # Archive is corrupted
+                user_msg = getattr(e, 'user_message', str(e))
+                self.show_error(user_msg)
+                self.log_manager.add_message("ERROR", f"Corrupted archive: {selected_file}: {e}")
+            except ArchiveFormatError as e:
+                # Unsupported or invalid format
+                user_msg = getattr(e, 'user_message', str(e))
+                self.show_error(user_msg)
+                self.log_manager.add_message("ERROR", f"Invalid archive format: {selected_file}: {e}")
+            except ArchivePermissionError as e:
+                # Permission denied
+                user_msg = getattr(e, 'user_message', str(e))
+                self.show_error(user_msg)
+                self.log_manager.add_message("ERROR", f"Permission denied: {selected_file}: {e}")
+            except ArchiveDiskSpaceError as e:
+                # Insufficient disk space
+                user_msg = getattr(e, 'user_message', str(e))
+                self.show_error(user_msg)
+                self.log_manager.add_message("ERROR", f"Insufficient disk space: {e}")
+            except ArchiveError as e:
+                # Generic archive error
+                user_msg = getattr(e, 'user_message', str(e))
+                self.show_error(user_msg)
+                self.log_manager.add_message("ERROR", f"Archive error: {selected_file}: {e}")
+            except Exception as e:
+                # Unexpected error
+                self.show_error(f"Cannot open archive: {e}")
+                self.log_manager.add_message("ERROR", f"Unexpected error opening archive: {selected_file}: {e}")
         else:
             # For files, try to use file association for 'open' action
             filename = selected_file.name
@@ -2730,7 +2837,50 @@ class FileManager:
             current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
             self.needs_full_redraw = True
         elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
-            if current_pane['path'] != current_pane['path'].parent:
+            # Check if we're at the root of an archive
+            current_path_str = str(current_pane['path'])
+            if current_path_str.startswith('archive://') and current_path_str.endswith('#'):
+                # We're at the root of an archive, exit to the filesystem directory containing the archive
+                try:
+                    # Save current cursor position before exiting archive
+                    self.save_cursor_position(current_pane)
+                    
+                    # Extract the archive file path from the URI
+                    # Format: archive:///path/to/archive.zip#
+                    archive_path_part = current_path_str[10:-1]  # Remove 'archive://' and trailing '#'
+                    archive_file_path = Path(archive_path_part)
+                    
+                    # Get the directory containing the archive
+                    parent_dir = archive_file_path.parent
+                    archive_filename = archive_file_path.name
+                    
+                    # Navigate to the parent directory
+                    current_pane['path'] = parent_dir
+                    current_pane['selected_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                    current_pane['selected_files'].clear()
+                    self.refresh_files(current_pane)
+                    
+                    # Try to set cursor to the archive file we just exited
+                    cursor_set = False
+                    for i, file_path in enumerate(current_pane['files']):
+                        if file_path.name == archive_filename:
+                            current_pane['selected_index'] = i
+                            self.adjust_scroll_for_selection(current_pane)
+                            cursor_set = True
+                            break
+                    
+                    if not cursor_set:
+                        current_pane['selected_index'] = 0
+                        current_pane['scroll_offset'] = 0
+                    
+                    self.needs_full_redraw = True
+                    self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
+                except Exception as e:
+                    self.show_error(f"Error exiting archive: {e}")
+                    self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
+                    self.needs_full_redraw = True
+            elif current_pane['path'] != current_pane['path'].parent:
                 try:
                     # Save current cursor position before changing directory
                     self.save_cursor_position(current_pane)

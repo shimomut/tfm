@@ -123,6 +123,9 @@ class ProgressManager:
         self.current_operation['file_bytes_copied'] = 0  # Reset byte progress for new file
         self.current_operation['file_bytes_total'] = 0
         
+        # Mark counting as complete when we start processing items
+        self.current_operation['counting'] = False
+        
         if processed_items is not None:
             self.current_operation['processed_items'] = processed_items
         else:

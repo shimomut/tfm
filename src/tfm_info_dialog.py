@@ -368,53 +368,8 @@ class InfoDialogHelpers:
         
         for file_path in files_to_show:
             try:
-                stat_info = file_path.stat()
-                
-                # Basic info
-                details_lines.append(f"Name: {file_path.name}")
-                details_lines.append(f"Path: {file_path}")
-                
-                # Type
-                if file_path.is_dir():
-                    details_lines.append("Type: Directory")
-                elif file_path.is_file():
-                    details_lines.append("Type: File")
-                elif file_path.is_symlink():
-                    details_lines.append("Type: Symbolic Link")
-                else:
-                    details_lines.append("Type: Other")
-                
-                # Size
-                if file_path.is_file():
-                    size = stat_info.st_size
-                    if size < 1024:
-                        size_str = f"{size} B"
-                    elif size < 1024 * 1024:
-                        size_str = f"{size / 1024:.1f} KB"
-                    elif size < 1024 * 1024 * 1024:
-                        size_str = f"{size / (1024 * 1024):.1f} MB"
-                    else:
-                        size_str = f"{size / (1024 * 1024 * 1024):.1f} GB"
-                    details_lines.append(f"Size: {size_str}")
-                
-                # Permissions
-                mode = stat_info.st_mode
-                perms = []
-                perms.append('r' if mode & 0o400 else '-')
-                perms.append('w' if mode & 0o200 else '-')
-                perms.append('x' if mode & 0o100 else '-')
-                perms.append('r' if mode & 0o040 else '-')
-                perms.append('w' if mode & 0o020 else '-')
-                perms.append('x' if mode & 0o010 else '-')
-                perms.append('r' if mode & 0o004 else '-')
-                perms.append('w' if mode & 0o002 else '-')
-                perms.append('x' if mode & 0o001 else '-')
-                details_lines.append(f"Permissions: {''.join(perms)} ({oct(mode)[-3:]})")
-                
-                # Timestamps
-                from datetime import datetime
-                mtime = datetime.fromtimestamp(stat_info.st_mtime)
-                details_lines.append(f"Modified: {mtime.strftime('%Y-%m-%d %H:%M:%S')}")
+                # Use polymorphic metadata method - works for all storage types
+                InfoDialogHelpers._add_file_details(details_lines, file_path)
                 
                 if len(files_to_show) > 1:
                     details_lines.append("")  # Separator between files
@@ -432,6 +387,25 @@ class InfoDialogHelpers:
         
         info_dialog.show(title, details_lines)
     
+    @staticmethod
+    def _add_file_details(details_lines, file_path):
+        """Add file details using polymorphic metadata method - works for all storage types"""
+        # Common fields first
+        details_lines.append(f"Name: {file_path.name}")
+        details_lines.append(f"Path: {file_path}")
+        
+        # Get storage-specific metadata using polymorphic method
+        try:
+            metadata = file_path.get_extended_metadata()
+            
+            # Display storage-specific details
+            if 'details' in metadata:
+                for label, value in metadata['details']:
+                    details_lines.append(f"{label}: {value}")
+        except Exception as e:
+            details_lines.append(f"(Error retrieving metadata: {e})")
+    
+
     @staticmethod
     def show_color_scheme_info(info_dialog):
         """Show information about the current color scheme"""

@@ -15,6 +15,7 @@ from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_config import DefaultConfig
 from tfm_pane_manager import PaneManager
 from tfm_file_operations import FileOperations
+from tfm_path import Path as TFMPath
 
 
 class TestConfig(DefaultConfig):
@@ -54,7 +55,7 @@ def test_search_integration():
         # Test filename search
         search_dialog.show('filename')
         search_dialog.text_editor.text = "*.txt"
-        search_dialog.perform_search(test_dir)
+        search_dialog.perform_search(TFMPath(test_dir))
         
         # Wait for search to complete
         import time
@@ -89,7 +90,7 @@ def test_search_integration():
         # Test content search
         search_dialog.show('content')
         search_dialog.text_editor.text = "test"
-        search_dialog.perform_search(test_dir)
+        search_dialog.perform_search(TFMPath(test_dir))
         
         # Wait for search to complete
         start_time = time.time()

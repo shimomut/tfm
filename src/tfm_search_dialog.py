@@ -202,10 +202,12 @@ class SearchDialog(BaseListDialog):
                     
                     if fnmatch.fnmatch(file_path.name.lower(), pattern_text.lower()):
                         relative_path = file_path.relative_to(search_root)
+                        display_path = str(relative_path)
+                        
                         result = {
                             'type': 'dir' if file_path.is_dir() else 'file',
                             'path': file_path,
-                            'relative_path': str(relative_path),
+                            'relative_path': display_path,
                             'match_info': file_path.name
                         }
                         temp_results.append(result)
@@ -237,13 +239,51 @@ class SearchDialog(BaseListDialog):
                     
                     if file_path.is_file() and self._is_text_file(file_path):
                         try:
-                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                for line_num, line in enumerate(f, 1):
+                            # Use search strategy from path to determine how to read content
+                            search_strategy = file_path.get_search_strategy()
+                            
+                            if search_strategy == 'streaming':
+                                # Stream line by line for local files
+                                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                    for line_num, line in enumerate(f, 1):
+                                        # Check for cancellation periodically
+                                        if line_num % 100 == 0 and self.cancel_search.is_set():
+                                            with self.search_lock:
+                                                self.searching = False
+                                                self.content_changed = True
+                                            return
+                                        
+                                        if pattern.search(line):
+                                            relative_path = file_path.relative_to(search_root)
+                                            result = {
+                                                'type': 'content',
+                                                'path': file_path,
+                                                'relative_path': str(relative_path),
+                                                'line_num': line_num,
+                                                'match_info': f"Line {line_num}: {line.strip()[:50]}"
+                                            }
+                                            temp_results.append(result)
+                                            
+                                            # Update results periodically for real-time display
+                                            if len(temp_results) % 10 == 0:
+                                                with self.search_lock:
+                                                    self.results = temp_results.copy()
+                                                    if self.selected >= len(self.results):
+                                                        self.selected = max(0, len(self.results) - 1)
+                                                        self._adjust_scroll(len(self.results))
+                                                    self.content_changed = True
+                                            
+                                            break  # Only show first match per file
+                            else:
+                                # For 'extracted' or 'buffered' strategies, read entire content
+                                content = file_path.read_text(encoding='utf-8', errors='ignore')
+                                lines = content.splitlines()
+                                for line_num, line in enumerate(lines, 1):
                                     # Check for cancellation periodically
                                     if line_num % 100 == 0 and self.cancel_search.is_set():
                                         with self.search_lock:
                                             self.searching = False
-                                            self.content_changed = True  # Mark content as changed when search is canceled
+                                            self.content_changed = True
                                         return
                                     
                                     if pattern.search(line):
@@ -264,10 +304,21 @@ class SearchDialog(BaseListDialog):
                                                 if self.selected >= len(self.results):
                                                     self.selected = max(0, len(self.results) - 1)
                                                     self._adjust_scroll(len(self.results))
-                                                self.content_changed = True  # Mark content as changed when results update
+                                                self.content_changed = True
                                         
                                         break  # Only show first match per file
-                        except (IOError, UnicodeDecodeError):
+                        except FileNotFoundError:
+                            # File was deleted during search
+                            continue
+                        except PermissionError:
+                            # No permission to read file
+                            continue
+                        except (IOError, UnicodeDecodeError, OSError) as e:
+                            # Handle I/O errors, encoding issues, and archive extraction errors
+                            continue
+                        except Exception as e:
+                            # Catch any unexpected errors with logging
+                            print(f"Warning: Unexpected error searching file {file_path}: {e}")
                             continue
                             
         except Exception as e:
@@ -332,9 +383,19 @@ class SearchDialog(BaseListDialog):
     
     def draw(self, stdscr, safe_addstr_func):
         """Draw the search dialog overlay"""
+        
+        # Get display prefix from the search root path if available
+        display_prefix = ""
+        with self.search_lock:
+            if self.results and hasattr(self.results[0]['path'], 'get_display_prefix'):
+                # Get the prefix from any result path (they all share the same root)
+                display_prefix = self.results[0]['path'].get_display_prefix()
 
-        # Draw dialog frame
-        title_text = f"Search ({self.search_type.title()})"
+        # Draw dialog frame with storage-specific prefix if applicable
+        if display_prefix:
+            title_text = f"{display_prefix}Search ({self.search_type.title()})"
+        else:
+            title_text = f"Search ({self.search_type.title()})"
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
             stdscr, safe_addstr_func, title_text, 0.8, 0.8, 60, 20
         )

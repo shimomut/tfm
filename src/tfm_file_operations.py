@@ -19,10 +19,17 @@ class FileOperations:
     def __init__(self, config):
         self.config = config
         self.show_hidden = getattr(config, 'SHOW_HIDDEN_FILES', False)
+        self.log_manager = None  # Will be set by FileManager if available
     
     def refresh_files(self, pane_data):
         """Refresh the file list for specified pane"""
         try:
+            # Import archive exceptions for specific error handling
+            from tfm_archive import (
+                ArchiveError, ArchiveNavigationError, ArchiveCorruptedError,
+                ArchivePermissionError
+            )
+            
             # Get all entries in the directory
             all_entries = list(pane_data['path'].iterdir())
             
@@ -56,20 +63,60 @@ class FileOperations:
             current_file_paths = {str(f) for f in pane_data['files']}
             pane_data['selected_files'] = pane_data['selected_files'] & current_file_paths
             
+        except ArchiveNavigationError as e:
+            # Archive navigation error - path doesn't exist in archive
+            user_msg = getattr(e, 'user_message', str(e))
+            print(f"Archive navigation error: {user_msg}")
+            if self.log_manager:
+                self.log_manager.add_message("ERROR", f"Archive navigation error: {pane_data['path']}: {e}")
+            pane_data['files'] = []
+            pane_data['selected_index'] = 0
+        except ArchiveCorruptedError as e:
+            # Archive is corrupted
+            user_msg = getattr(e, 'user_message', str(e))
+            print(f"Corrupted archive: {user_msg}")
+            if self.log_manager:
+                self.log_manager.add_message("ERROR", f"Corrupted archive: {pane_data['path']}: {e}")
+            pane_data['files'] = []
+            pane_data['selected_index'] = 0
+        except ArchivePermissionError as e:
+            # Permission denied for archive
+            user_msg = getattr(e, 'user_message', str(e))
+            print(f"Permission denied: {user_msg}")
+            if self.log_manager:
+                self.log_manager.add_message("ERROR", f"Archive permission denied: {pane_data['path']}: {e}")
+            pane_data['files'] = []
+            pane_data['selected_index'] = 0
+        except ArchiveError as e:
+            # Generic archive error
+            user_msg = getattr(e, 'user_message', str(e))
+            print(f"Archive error: {user_msg}")
+            if self.log_manager:
+                self.log_manager.add_message("ERROR", f"Archive error: {pane_data['path']}: {e}")
+            pane_data['files'] = []
+            pane_data['selected_index'] = 0
         except PermissionError as e:
             print(f"Permission denied accessing directory {pane_data['path']}: {e}")
+            if self.log_manager:
+                self.log_manager.add_message("ERROR", f"Permission denied: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except FileNotFoundError as e:
             print(f"Directory not found: {pane_data['path']}: {e}")
+            if self.log_manager:
+                self.log_manager.add_message("ERROR", f"Directory not found: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except OSError as e:
             print(f"System error reading directory {pane_data['path']}: {e}")
+            if self.log_manager:
+                self.log_manager.add_message("ERROR", f"System error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except Exception as e:
             print(f"Unexpected error reading directory {pane_data['path']}: {e}")
+            if self.log_manager:
+                self.log_manager.add_message("ERROR", f"Unexpected error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
     
@@ -371,6 +418,49 @@ class FileOperationsUI:
         self.cache_manager = file_manager.cache_manager
         self.config = file_manager.config
     
+    def _validate_operation_capabilities(self, operation, source_paths, dest_path=None):
+        """
+        Validate if an operation is allowed based on storage capabilities.
+        
+        Args:
+            operation: 'delete', 'move', or 'copy'
+            source_paths: List of source Path objects
+            dest_path: Optional destination Path object
+            
+        Returns:
+            (is_valid, error_message) tuple
+        """
+        if operation == 'delete':
+            # Check if all source paths support file editing (required for deletion)
+            for path in source_paths:
+                if not path.supports_file_editing():
+                    return False, "Cannot delete files from read-only storage."
+        
+        elif operation == 'move':
+            # Check if all source paths support file editing (required for deletion after move)
+            for path in source_paths:
+                if not path.supports_file_editing():
+                    return False, "Cannot move files from read-only storage. Use copy instead."
+            
+            # Check if destination supports file editing (required for writing)
+            if dest_path and not dest_path.supports_file_editing():
+                return False, "Cannot move files to read-only storage."
+        
+        elif operation == 'copy':
+            # Can copy FROM any storage, but destination must support file editing
+            if dest_path and not dest_path.supports_file_editing():
+                return False, "Cannot copy files to read-only storage."
+            # Copying FROM read-only storage is OK (extraction)
+        
+        return True, None
+    
+    def _show_unsupported_operation_error(self, message):
+        """Show error dialog for unsupported operations"""
+        choices = [
+            {"text": "OK", "key": "enter", "value": True}
+        ]
+        self.file_manager.show_dialog(message, choices, lambda _: None)
+    
     def copy_selected_files(self):
         """Copy selected files to the opposite pane's directory"""
         current_pane = self.file_manager.get_current_pane()
@@ -396,6 +486,12 @@ class FileOperationsUI:
             return
         
         destination_dir = other_pane['path']
+        
+        # Validate operation capabilities - check BEFORE any other checks
+        is_valid, error_msg = self._validate_operation_capabilities('copy', files_to_copy, destination_dir)
+        if not is_valid:
+            self._show_unsupported_operation_error(error_msg)
+            return
         
         # Check if destination directory is writable (only for local paths)
         if destination_dir.get_scheme() == 'file' and not os.access(destination_dir, os.W_OK):
@@ -646,6 +742,12 @@ class FileOperationsUI:
             return
         
         destination_dir = other_pane['path']
+        
+        # Validate operation capabilities - check BEFORE any other checks
+        is_valid, error_msg = self._validate_operation_capabilities('move', files_to_move, destination_dir)
+        if not is_valid:
+            self._show_unsupported_operation_error(error_msg)
+            return
         
         # Check if destination directory is writable (only for local paths)
         if destination_dir.get_scheme() == 'file' and not os.access(destination_dir, os.W_OK):
@@ -938,6 +1040,12 @@ class FileOperationsUI:
             print("No files to delete")
             return
         
+        # Validate operation capabilities - check BEFORE confirmation dialog
+        is_valid, error_msg = self._validate_operation_capabilities('delete', files_to_delete)
+        if not is_valid:
+            self._show_unsupported_operation_error(error_msg)
+            return
+        
         def handle_delete_confirmation(confirmed):
             if confirmed:
                 self.perform_delete_operation(files_to_delete)
@@ -1118,13 +1226,21 @@ class FileOperationsUI:
                 total_files += 1
             elif path.is_dir():
                 try:
-                    for root, dirs, files in os.walk(path):
-                        total_files += len(files)
-                        # Count symlinks to directories as files
-                        for d in dirs:
-                            dir_path = Path(root) / d
-                            if dir_path.is_symlink():
+                    # Check if this is an archive path
+                    if path.get_scheme() == 'archive':
+                        # For archive paths, use iterdir recursively
+                        for item in path.rglob('*'):
+                            if item.is_file():
                                 total_files += 1
+                    else:
+                        # For local/S3 paths, use os.walk
+                        for root, dirs, files in os.walk(path):
+                            total_files += len(files)
+                            # Count symlinks to directories as files
+                            for d in dirs:
+                                dir_path = Path(root) / d
+                                if dir_path.is_symlink():
+                                    total_files += 1
                 except (PermissionError, OSError):
                     # If we can't walk the directory, count it as 1 item
                     total_files += 1
@@ -1200,6 +1316,9 @@ class FileOperationsUI:
                     src = response['Body']
                 else:
                     raise ValueError(f"Invalid S3 URI: {s3_uri}")
+            elif source_scheme == 'archive':
+                # For archive files, use the open method which returns a file-like object
+                src = source_file.open('rb')
             else:
                 # Fallback to simple copy for other schemes
                 source_file.copy_to(dest_file, overwrite=overwrite)
@@ -1258,7 +1377,35 @@ class FileOperationsUI:
             # Create destination directory
             dest_dir.mkdir(parents=True, exist_ok=True)
             
-            # Walk through source directory and copy files one by one
+            # Check if source is an archive path
+            if source_dir.get_scheme() == 'archive':
+                # For archive paths, use rglob to iterate through all files
+                for item in source_dir.rglob('*'):
+                    # Check for cancellation
+                    if self.file_manager.operation_cancelled:
+                        return processed_files
+                    
+                    if item.is_file():
+                        # Calculate relative path
+                        rel_path = item.relative_to(source_dir)
+                        dest_file = dest_dir / rel_path
+                        
+                        # Create parent directory if needed
+                        dest_file.parent.mkdir(parents=True, exist_ok=True)
+                        
+                        processed_files += 1
+                        self.progress_manager.update_progress(str(rel_path), processed_files)
+                        
+                        try:
+                            # Copy file with byte-level progress for large files
+                            self._copy_file_with_progress(item, dest_file, overwrite=True)
+                        except Exception as e:
+                            print(f"Error copying {item}: {e}")
+                            self.progress_manager.increment_errors()
+                
+                return processed_files
+            
+            # For non-archive paths, use os.walk
             for root, dirs, files in os.walk(source_dir):
                 # Check for cancellation
                 if self.file_manager.operation_cancelled:
