@@ -82,11 +82,11 @@ class FileManager:
         
         # Validate directories exist, fall back to defaults if not
         if not initial_left_dir.exists() or not initial_left_dir.is_dir():
-            self.log_manager.add_message(f"Warning: Left directory '{initial_left_dir}' does not exist, using current directory")
+            self.log_manager.add_message("WARNING", f"Left directory '{initial_left_dir}' does not exist, using current directory")
             initial_left_dir = Path.cwd()
             
         if not initial_right_dir.exists() or not initial_right_dir.is_dir():
-            self.log_manager.add_message(f"Warning: Right directory '{initial_right_dir}' does not exist, using home directory")
+            self.log_manager.add_message("WARNING", f"Right directory '{initial_right_dir}' does not exist, using home directory")
             initial_right_dir = Path.home()
         
         # Use simple defaults since TFM loads previous state anyway
@@ -1074,41 +1074,41 @@ class FileManager:
                 current_pane['scroll_offset'] = 0
                 
                 self.needs_full_redraw = True
-                self.log_manager.add_message(f"Entered archive: {selected_file.name}")
+                self.log_manager.add_message("INFO", f"Entered archive: {selected_file.name}")
             except FileNotFoundError as e:
                 # Archive file doesn't exist
                 user_msg = getattr(e, 'args', ['Archive file not found'])[1] if len(getattr(e, 'args', [])) > 1 else "Archive file not found"
                 self.show_error(user_msg)
-                self.log_manager.add_message(f"Archive not found: {selected_file}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Archive not found: {selected_file}: {e}")
             except ArchiveCorruptedError as e:
                 # Archive is corrupted
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message(f"Corrupted archive: {selected_file}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Corrupted archive: {selected_file}: {e}")
             except ArchiveFormatError as e:
                 # Unsupported or invalid format
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message(f"Invalid archive format: {selected_file}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Invalid archive format: {selected_file}: {e}")
             except ArchivePermissionError as e:
                 # Permission denied
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message(f"Permission denied: {selected_file}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Permission denied: {selected_file}: {e}")
             except ArchiveDiskSpaceError as e:
                 # Insufficient disk space
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message(f"Insufficient disk space: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Insufficient disk space: {e}")
             except ArchiveError as e:
                 # Generic archive error
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message(f"Archive error: {selected_file}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Archive error: {selected_file}: {e}")
             except Exception as e:
                 # Unexpected error
                 self.show_error(f"Cannot open archive: {e}")
-                self.log_manager.add_message(f"Unexpected error opening archive: {selected_file}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Unexpected error opening archive: {selected_file}: {e}")
         else:
             # For files, try to use file association for 'open' action
             filename = selected_file.name
@@ -2875,10 +2875,10 @@ class FileManager:
                         current_pane['scroll_offset'] = 0
                     
                     self.needs_full_redraw = True
-                    self.log_manager.add_message(f"Exited archive: {archive_filename}")
+                    self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
                 except Exception as e:
                     self.show_error(f"Error exiting archive: {e}")
-                    self.log_manager.add_message(f"Error exiting archive: {e}", "ERROR")
+                    self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
                     self.needs_full_redraw = True
             elif current_pane['path'] != current_pane['path'].parent:
                 try:

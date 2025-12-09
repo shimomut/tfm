@@ -20,7 +20,7 @@ class CacheManager:
     def _log(self, message: str, level: str = "INFO"):
         """Log a message if log manager is available"""
         if self.log_manager:
-            self.log_manager.add_message(message, level)
+            self.log_manager.add_message(level, message)
     
     def invalidate_cache_for_paths(self, paths: List[Path], operation: str = "operation"):
         """

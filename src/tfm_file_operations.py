@@ -68,7 +68,7 @@ class FileOperations:
             user_msg = getattr(e, 'user_message', str(e))
             print(f"Archive navigation error: {user_msg}")
             if self.log_manager:
-                self.log_manager.add_message(f"Archive navigation error: {pane_data['path']}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Archive navigation error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except ArchiveCorruptedError as e:
@@ -76,7 +76,7 @@ class FileOperations:
             user_msg = getattr(e, 'user_message', str(e))
             print(f"Corrupted archive: {user_msg}")
             if self.log_manager:
-                self.log_manager.add_message(f"Corrupted archive: {pane_data['path']}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Corrupted archive: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except ArchivePermissionError as e:
@@ -84,7 +84,7 @@ class FileOperations:
             user_msg = getattr(e, 'user_message', str(e))
             print(f"Permission denied: {user_msg}")
             if self.log_manager:
-                self.log_manager.add_message(f"Archive permission denied: {pane_data['path']}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Archive permission denied: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except ArchiveError as e:
@@ -92,31 +92,31 @@ class FileOperations:
             user_msg = getattr(e, 'user_message', str(e))
             print(f"Archive error: {user_msg}")
             if self.log_manager:
-                self.log_manager.add_message(f"Archive error: {pane_data['path']}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Archive error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except PermissionError as e:
             print(f"Permission denied accessing directory {pane_data['path']}: {e}")
             if self.log_manager:
-                self.log_manager.add_message(f"Permission denied: {pane_data['path']}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Permission denied: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except FileNotFoundError as e:
             print(f"Directory not found: {pane_data['path']}: {e}")
             if self.log_manager:
-                self.log_manager.add_message(f"Directory not found: {pane_data['path']}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Directory not found: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except OSError as e:
             print(f"System error reading directory {pane_data['path']}: {e}")
             if self.log_manager:
-                self.log_manager.add_message(f"System error: {pane_data['path']}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"System error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
         except Exception as e:
             print(f"Unexpected error reading directory {pane_data['path']}: {e}")
             if self.log_manager:
-                self.log_manager.add_message(f"Unexpected error: {pane_data['path']}: {e}", "ERROR")
+                self.log_manager.add_message("ERROR", f"Unexpected error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['selected_index'] = 0
     
