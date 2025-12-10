@@ -24,20 +24,20 @@
   - Implement helper methods (is_printable, is_special_key, has_modifier)
   - _Requirements: 1.2, 5.1, 5.2, 5.3, 5.4, 10.1_
 
-- [ ] 4. Implement TextAttribute enum
+- [x] 4. Implement TextAttribute enum
   - Define TextAttribute IntEnum in renderer.py
   - Include NORMAL, BOLD, UNDERLINE, REVERSE attributes
   - Document that attributes can be combined with bitwise OR
   - _Requirements: 1.1, 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 5. Implement CursesBackend class
+- [x] 5. Implement CursesBackend class
   - Create backends/curses_backend.py
   - Implement CursesBackend class inheriting from Renderer
   - Implement initialize() method to set up curses
   - Implement shutdown() method to clean up curses
   - _Requirements: 2.1, 2.5_
 
-- [ ] 6. Implement curses drawing operations
+- [x] 6. Implement curses drawing operations
   - Implement draw_text() with color and attribute support
   - Implement draw_hline() and draw_vline()
   - Implement draw_rect() for both filled and outlined rectangles
@@ -46,26 +46,26 @@
   - Handle curses.error exceptions gracefully
   - _Requirements: 2.1, 2.2, 4.1, 4.2, 4.3, 4.5, 4.6_
 
-- [ ] 7. Implement curses color management
+- [x] 7. Implement curses color management
   - Implement init_color_pair() with RGB to curses color conversion
   - Implement _rgb_to_curses_color() helper method
   - Track initialized color pairs to avoid re-initialization
   - _Requirements: 2.2, 4.4, 7.1, 7.2_
 
-- [ ] 8. Implement curses input handling
+- [x] 8. Implement curses input handling
   - Implement get_input() with timeout support
   - Implement _translate_curses_key() to convert curses keys to InputEvent
   - Map all special keys (arrows, function keys, etc.)
   - Handle printable characters and special characters
   - _Requirements: 2.3, 5.1, 5.2, 5.5_
 
-- [ ] 9. Implement curses window management
+- [x] 9. Implement curses window management
   - Implement get_dimensions() to return terminal size
   - Implement set_cursor_visibility() and move_cursor()
   - Handle terminal resize events (KEY_RESIZE)
   - _Requirements: 2.4, 8.3, 8.4_
 
-- [ ] 10. Checkpoint - Verify curses backend functionality
+- [x] 10. Checkpoint - Verify curses backend functionality
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 11. Implement MetalBackend class structure
