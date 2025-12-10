@@ -1238,8 +1238,12 @@ class S3PathImpl(PathImpl):
         return False  # S3 does not support directory renaming due to performance and cost considerations
     
     def supports_file_editing(self) -> bool:
-        """Return True if this storage implementation supports file editing"""
+        """Return True if this storage implementation supports external editor editing (vim, nano, etc.)"""
         return False  # S3 file editing is not supported for now
+    
+    def supports_write_operations(self) -> bool:
+        """Return True if this storage implementation supports write operations (copy, move, create, delete)"""
+        return True  # S3 supports write operations (copy, move, create, delete)
     
     # Display methods
     def get_display_prefix(self) -> str:

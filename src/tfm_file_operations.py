@@ -431,24 +431,24 @@ class FileOperationsUI:
             (is_valid, error_message) tuple
         """
         if operation == 'delete':
-            # Check if all source paths support file editing (required for deletion)
+            # Check if all source paths support write operations (required for deletion)
             for path in source_paths:
-                if not path.supports_file_editing():
+                if not path.supports_write_operations():
                     return False, "Cannot delete files from read-only storage."
         
         elif operation == 'move':
-            # Check if all source paths support file editing (required for deletion after move)
+            # Check if all source paths support write operations (required for deletion after move)
             for path in source_paths:
-                if not path.supports_file_editing():
+                if not path.supports_write_operations():
                     return False, "Cannot move files from read-only storage. Use copy instead."
             
-            # Check if destination supports file editing (required for writing)
-            if dest_path and not dest_path.supports_file_editing():
+            # Check if destination supports write operations (required for writing)
+            if dest_path and not dest_path.supports_write_operations():
                 return False, "Cannot move files to read-only storage."
         
         elif operation == 'copy':
-            # Can copy FROM any storage, but destination must support file editing
-            if dest_path and not dest_path.supports_file_editing():
+            # Can copy FROM any storage, but destination must support write operations
+            if dest_path and not dest_path.supports_write_operations():
                 return False, "Cannot copy files to read-only storage."
             # Copying FROM read-only storage is OK (extraction)
         

@@ -285,7 +285,12 @@ class PathImpl(ABC):
     
     @abstractmethod
     def supports_file_editing(self) -> bool:
-        """Return True if this storage implementation supports file editing"""
+        """Return True if this storage implementation supports external editor editing (vim, nano, etc.)"""
+        pass
+    
+    @abstractmethod
+    def supports_write_operations(self) -> bool:
+        """Return True if this storage implementation supports write operations (copy, move, create, delete)"""
         pass
     
     # Display methods for UI presentation
@@ -788,8 +793,12 @@ class LocalPathImpl(PathImpl):
         return True  # Local file system supports directory renaming
     
     def supports_file_editing(self) -> bool:
-        """Return True if this storage implementation supports file editing"""
+        """Return True if this storage implementation supports external editor editing (vim, nano, etc.)"""
         return True  # Local file system supports file editing
+    
+    def supports_write_operations(self) -> bool:
+        """Return True if this storage implementation supports write operations (copy, move, create, delete)"""
+        return True  # Local file system supports all write operations
     
     # Display methods for UI presentation
     def get_display_prefix(self) -> str:
@@ -1263,8 +1272,12 @@ class Path:
         return self._impl.supports_directory_rename()
     
     def supports_file_editing(self) -> bool:
-        """Return True if this storage implementation supports file editing"""
+        """Return True if this storage implementation supports external editor editing (vim, nano, etc.)"""
         return self._impl.supports_file_editing()
+    
+    def supports_write_operations(self) -> bool:
+        """Return True if this storage implementation supports write operations (copy, move, create, delete)"""
+        return self._impl.supports_write_operations()
     
     # Display methods delegation
     def get_display_prefix(self) -> str:

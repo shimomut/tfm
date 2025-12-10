@@ -1747,7 +1747,11 @@ class ArchivePathImpl(PathImpl):
         return False  # Archives are read-only
     
     def supports_file_editing(self) -> bool:
-        """Return True if this storage implementation supports file editing."""
+        """Return True if this storage implementation supports external editor editing (vim, nano, etc.)"""
+        return False  # Archives are read-only
+    
+    def supports_write_operations(self) -> bool:
+        """Return True if this storage implementation supports write operations (copy, move, create, delete)"""
         return False  # Archives are read-only
     
     # Display methods for UI presentation
