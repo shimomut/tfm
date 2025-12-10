@@ -68,14 +68,14 @@
 - [x] 10. Checkpoint - Verify curses backend functionality
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Implement MetalBackend class structure
+- [x] 11. Implement MetalBackend class structure
   - Create backends/metal_backend.py
   - Implement MetalBackend class inheriting from Renderer
   - Define __init__() with window_title, font_name, font_size parameters
   - Initialize instance variables for Metal resources
   - _Requirements: 3.1_
 
-- [ ] 12. Implement Metal initialization
+- [x] 12. Implement Metal initialization
   - Implement initialize() method
   - Create Metal device using PyObjC
   - Create command queue
@@ -84,19 +84,19 @@
   - Initialize character grid buffer
   - _Requirements: 3.1, 3.2, 17.1, 17.3_
 
-- [ ] 13. Implement Metal font validation
+- [x] 13. Implement Metal font validation
   - Implement _validate_font() method
   - Check that font is monospace using Core Text
   - Raise ValueError for proportional fonts with clear error message
   - _Requirements: 17.2, 17.5_
 
-- [ ] 14. Implement Metal character grid
+- [x] 14. Implement Metal character grid
   - Implement _initialize_grid() to create character buffer
   - Calculate rows and columns based on window size and character dimensions
   - Create 2D grid structure storing (char, color_pair, attributes) tuples
   - _Requirements: 3.1, 8.1, 8.2_
 
-- [ ] 15. Implement Metal drawing operations
+- [x] 15. Implement Metal drawing operations
   - Implement draw_text() to update grid buffer
   - Implement draw_hline() and draw_vline()
   - Implement draw_rect() for both filled and outlined rectangles

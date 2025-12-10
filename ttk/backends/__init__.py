@@ -8,8 +8,7 @@ Available backends:
 - MetalBackend: Native macOS desktop applications with GPU-accelerated rendering
 """
 
-# Backend imports will be added as they are implemented
-# from ttk.backends.curses_backend import CursesBackend
-# from ttk.backends.metal_backend import MetalBackend
+from ttk.backends.curses_backend import CursesBackend
+from ttk.backends.metal_backend import MetalBackend
 
-__all__ = []
+__all__ = ['CursesBackend', 'MetalBackend']

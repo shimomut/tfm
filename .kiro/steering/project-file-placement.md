@@ -23,9 +23,29 @@ This project follows a clean directory structure that separates different types 
 - TTK tests should import from the ttk package: `from ttk.module import Class`
 - Example: `ttk/test/test_input_event.py`, `ttk/test/test_renderer_abc.py`
 
-### Documentation (`doc/`)
-- **End-user documentation** should be placed in the `/doc` directory
-- **Developer documentation** should be placed in the `/doc/dev` directory
+### TTK Library Documentation (`ttk/doc/`)
+- **TTK end-user documentation** should be placed in the `/ttk/doc` directory
+- **TTK developer documentation** should be placed in the `/ttk/doc/dev` directory
+- This keeps TTK library documentation separate from TFM application documentation
+- TTK is a standalone library, so its documentation should be self-contained
+
+#### TTK End-User Documentation (`ttk/doc/`)
+- Library overview: `ttk/doc/README.md`
+- User guides: `ttk/doc/USER_GUIDE.md`
+- API reference: `ttk/doc/API_REFERENCE.md`
+- Backend implementation guides: `ttk/doc/BACKEND_IMPLEMENTATION_GUIDE.md`
+- Usage examples: `ttk/doc/EXAMPLES.md`
+
+#### TTK Developer Documentation (`ttk/doc/dev/`)
+- Implementation details: `ttk/doc/dev/COMPONENT_NAME_IMPLEMENTATION.md`
+- Architecture documentation: `ttk/doc/dev/ARCHITECTURE.md`
+- Technical specifications: `ttk/doc/dev/SPECIFICATION_NAME_SPEC.md`
+- Example: `ttk/doc/dev/METAL_INITIALIZATION_IMPLEMENTATION.md`
+
+### TFM Documentation (`doc/`)
+- **TFM end-user documentation** should be placed in the `/doc` directory
+- **TFM developer documentation** should be placed in the `/doc/dev` directory
+- This is for TFM application-specific documentation only
 
 #### End-User Documentation (`doc/`)
 - User guides: `doc/USER_GUIDE.md`, `doc/INSTALLATION_GUIDE.md`
@@ -190,12 +210,14 @@ When creating both end-user and developer documentation:
 
 1. **TFM test files** → Always use `test/test_<feature_name>.py`
 2. **TTK test files** → Always use `ttk/test/test_<feature_name>.py`
-3. **End-user documentation** → Always use `doc/<FEATURE_NAME>_<TYPE>.md`
-4. **Developer documentation** → Always use `doc/dev/<SYSTEM_NAME>_<TYPE>.md`
-5. **Demo scripts** → Always use `demo/demo_<feature_name>.py`
-6. **External tools** → Always use `tools/<tool_name>.<ext>`
-7. **Source code** → Always use `src/tfm_<module_name>.py`
-8. **Temporary files** → Always use `temp/<temp_file_name>.<ext>`
+3. **TTK end-user documentation** → Always use `ttk/doc/<FEATURE_NAME>_<TYPE>.md`
+4. **TTK developer documentation** → Always use `ttk/doc/dev/<COMPONENT_NAME>_<TYPE>.md`
+5. **TFM end-user documentation** → Always use `doc/<FEATURE_NAME>_<TYPE>.md`
+6. **TFM developer documentation** → Always use `doc/dev/<SYSTEM_NAME>_<TYPE>.md`
+7. **Demo scripts** → Always use `demo/demo_<feature_name>.py`
+8. **External tools** → Always use `tools/<tool_name>.<ext>`
+9. **Source code** → Always use `src/tfm_<module_name>.py`
+10. **Temporary files** → Always use `temp/<temp_file_name>.<ext>`
 
 ### When Moving Existing Files
 
@@ -209,8 +231,10 @@ When creating both end-user and developer documentation:
 ```
 test/test_remote_log_monitoring.py          # TFM test file
 ttk/test/test_input_event.py                # TTK test file
-doc/REMOTE_LOG_MONITORING_FEATURE.md        # End-user feature documentation
-doc/dev/LOG_MANAGER_SYSTEM.md               # Developer system documentation
+ttk/doc/API_REFERENCE.md                    # TTK end-user documentation
+ttk/doc/dev/METAL_INITIALIZATION_IMPLEMENTATION.md  # TTK developer documentation
+doc/REMOTE_LOG_MONITORING_FEATURE.md        # TFM end-user feature documentation
+doc/dev/LOG_MANAGER_SYSTEM.md               # TFM developer system documentation
 demo/demo_remote_log.py                     # Demo script
 tools/log_analyzer.py                       # External tool
 src/tfm_log_manager.py                      # Source code
@@ -221,6 +245,7 @@ temp/TEMP_FEATURE_ANALYSIS.md               # Temporary documentation
 #### Incorrect Placement (to be avoided)
 ```
 remote_log_test.py                          # Should be in test/
+doc/dev/METAL_BACKEND_IMPLEMENTATION.md     # TTK doc, should be in ttk/doc/dev/
 REMOTE_LOG_DOCS.md                          # Should be in doc/ (end-user) or doc/dev/ (developer)
 log_demo.py                                 # Should be in demo/
 analyze_logs.sh                             # Should be in tools/
