@@ -9,12 +9,19 @@ inclusion: always
 This project follows a clean directory structure that separates different types of files. Always place files in the appropriate directory based on their purpose.
 
 ### Test Files (`test/`)
-- **ALL test files** must be placed in the `/test` directory
+- **TFM test files** must be placed in the `/test` directory
 - Test files should follow the naming convention `test_*.py`
 - Integration tests: `test/test_integration_*.py`
 - Unit tests: `test/test_unit_*.py`
 - Demo test files: `test/demo_*.py`
 - Verification scripts: `test/verify_*.py`
+
+### TTK Library Test Files (`ttk/test/`)
+- **TTK-specific test files** must be placed in the `/ttk/test` directory
+- This keeps TTK library tests separate from TFM application tests
+- Test files should follow the naming convention `test_*.py`
+- TTK tests should import from the ttk package: `from ttk.module import Class`
+- Example: `ttk/test/test_input_event.py`, `ttk/test/test_renderer_abc.py`
 
 ### Documentation (`doc/`)
 - **End-user documentation** should be placed in the `/doc` directory
@@ -181,13 +188,14 @@ When creating both end-user and developer documentation:
 
 ### When Creating New Files
 
-1. **Test files** → Always use `test/test_<feature_name>.py`
-2. **End-user documentation** → Always use `doc/<FEATURE_NAME>_<TYPE>.md`
-3. **Developer documentation** → Always use `doc/dev/<SYSTEM_NAME>_<TYPE>.md`
-4. **Demo scripts** → Always use `demo/demo_<feature_name>.py`
-5. **External tools** → Always use `tools/<tool_name>.<ext>`
-6. **Source code** → Always use `src/tfm_<module_name>.py`
-7. **Temporary files** → Always use `temp/<temp_file_name>.<ext>`
+1. **TFM test files** → Always use `test/test_<feature_name>.py`
+2. **TTK test files** → Always use `ttk/test/test_<feature_name>.py`
+3. **End-user documentation** → Always use `doc/<FEATURE_NAME>_<TYPE>.md`
+4. **Developer documentation** → Always use `doc/dev/<SYSTEM_NAME>_<TYPE>.md`
+5. **Demo scripts** → Always use `demo/demo_<feature_name>.py`
+6. **External tools** → Always use `tools/<tool_name>.<ext>`
+7. **Source code** → Always use `src/tfm_<module_name>.py`
+8. **Temporary files** → Always use `temp/<temp_file_name>.<ext>`
 
 ### When Moving Existing Files
 
@@ -199,7 +207,8 @@ When creating both end-user and developer documentation:
 
 #### Correct Placement
 ```
-test/test_remote_log_monitoring.py          # Test file
+test/test_remote_log_monitoring.py          # TFM test file
+ttk/test/test_input_event.py                # TTK test file
 doc/REMOTE_LOG_MONITORING_FEATURE.md        # End-user feature documentation
 doc/dev/LOG_MANAGER_SYSTEM.md               # Developer system documentation
 demo/demo_remote_log.py                     # Demo script
