@@ -3,10 +3,11 @@
 
 .PHONY: help demo-ttk demo-performance demo-standalone demo-test-interface demo-all test clean
 
-# Backend selection (default: auto)
+# Backend selection (default: curses)
 # Usage: make demo-ttk BACKEND=metal
 # Valid options: auto, curses, metal
-BACKEND ?= auto
+# Note: Metal backend is under development, use curses for now
+BACKEND ?= curses
 
 # Default target - show help
 help:
@@ -21,9 +22,9 @@ help:
 	@echo "  make demo-all              - Run all demos sequentially"
 	@echo ""
 	@echo "Backend Selection:"
-	@echo "  BACKEND=auto               - Auto-detect best backend (default)"
-	@echo "  BACKEND=curses             - Use curses (terminal) backend"
-	@echo "  BACKEND=metal              - Use Metal (macOS desktop) backend"
+	@echo "  BACKEND=curses             - Use curses (terminal) backend (default)"
+	@echo "  BACKEND=auto               - Auto-detect best backend"
+	@echo "  BACKEND=metal              - Use Metal (macOS desktop) backend (NOT YET FUNCTIONAL)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make demo-ttk                    # Auto-detect backend"
