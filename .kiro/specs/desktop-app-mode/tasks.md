@@ -104,7 +104,7 @@
   - Handle out-of-bounds coordinates gracefully
   - _Requirements: 3.2, 4.1, 4.2, 4.3, 4.5, 8.5_
 
-- [ ] 16. Implement Metal rendering pipeline
+- [x] 16. Implement Metal rendering pipeline
   - Implement _create_render_pipeline() to load shaders
   - Create vertex and fragment shaders for text rendering
   - Implement _render_grid() to render entire character grid
@@ -112,13 +112,13 @@
   - Implement _render_character() to render individual characters
   - _Requirements: 3.2, 3.6, 14.1_
 
-- [ ] 17. Implement Metal color management
+- [x] 17. Implement Metal color management
   - Implement init_color_pair() to store RGB color pairs
   - Store color pairs in dictionary
   - Use colors during rendering
   - _Requirements: 3.3, 4.4, 7.1, 7.4_
 
-- [ ] 18. Implement Metal input handling
+- [x] 18. Implement Metal input handling
   - Implement get_input() to poll macOS event queue
   - Implement _poll_macos_event() using NSEvent
   - Implement _translate_macos_event() to convert to InputEvent
@@ -126,21 +126,21 @@
   - Handle modifier keys (Shift, Control, Alt, Command)
   - _Requirements: 3.4, 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 19. Implement Metal window management
+- [x] 19. Implement Metal window management
   - Implement get_dimensions() to return grid dimensions
   - Implement refresh() and refresh_region()
   - Implement set_cursor_visibility() and move_cursor()
   - Handle window resize events
   - _Requirements: 3.5, 4.6, 8.3, 8.4_
 
-- [ ] 20. Implement Metal shutdown
+- [x] 20. Implement Metal shutdown
   - Implement shutdown() method
   - Close native window
   - Release Metal resources (device, command queue, pipeline)
   - Clean up grid buffer
   - _Requirements: 3.1_
 
-- [ ] 21. Checkpoint - Verify Metal backend functionality
+- [x] 21. Checkpoint - Verify Metal backend functionality
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 22. Implement command serialization

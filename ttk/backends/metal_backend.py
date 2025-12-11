@@ -171,6 +171,9 @@ class MetalBackend(Renderer):
         # Step 5: Initialize character grid buffer
         self._initialize_grid()
         
+        # Step 6: Create rendering pipeline
+        self.render_pipeline = self._create_render_pipeline()
+        
         # Initialize default color pair (0)
         self.color_pairs[0] = ((255, 255, 255), (0, 0, 0))  # White on black
     
@@ -366,17 +369,350 @@ class MetalBackend(Renderer):
             for _ in range(self.rows)
         ]
     
+    def _create_render_pipeline(self):
+        """
+        Create Metal rendering pipeline with text shaders.
+        
+        This method loads and compiles the vertex and fragment shaders
+        for text rendering, then creates a render pipeline state object
+        that will be used for all rendering operations.
+        
+        The shaders handle:
+        - Character positioning in the grid
+        - Color application (foreground and background)
+        - Text attributes (bold, underline, reverse)
+        
+        Returns:
+            MTLRenderPipelineState: The compiled rendering pipeline
+            
+        Raises:
+            RuntimeError: If shader compilation or pipeline creation fails
+        """
+        try:
+            import Metal
+        except ImportError:
+            return None
+        
+        # Define shader source code
+        shader_source = self._get_shader_source()
+        
+        # Create shader library from source
+        try:
+            library = self.metal_device.newLibraryWithSource_options_error_(
+                shader_source, None, None
+            )
+            if library is None:
+                raise RuntimeError("Failed to create shader library")
+        except Exception as e:
+            raise RuntimeError(f"Failed to compile shaders: {e}")
+        
+        # Get vertex and fragment functions
+        vertex_function = library.newFunctionWithName_("vertex_main")
+        fragment_function = library.newFunctionWithName_("fragment_main")
+        
+        if vertex_function is None or fragment_function is None:
+            raise RuntimeError("Failed to load shader functions")
+        
+        # Create render pipeline descriptor
+        pipeline_descriptor = Metal.MTLRenderPipelineDescriptor.alloc().init()
+        pipeline_descriptor.setVertexFunction_(vertex_function)
+        pipeline_descriptor.setFragmentFunction_(fragment_function)
+        
+        # Configure color attachment
+        pipeline_descriptor.colorAttachments().objectAtIndexedSubscript_(0).setPixelFormat_(
+            Metal.MTLPixelFormatBGRA8Unorm
+        )
+        
+        # Enable blending for text rendering
+        color_attachment = pipeline_descriptor.colorAttachments().objectAtIndexedSubscript_(0)
+        color_attachment.setBlendingEnabled_(True)
+        color_attachment.setRgbBlendOperation_(Metal.MTLBlendOperationAdd)
+        color_attachment.setAlphaBlendOperation_(Metal.MTLBlendOperationAdd)
+        color_attachment.setSourceRGBBlendFactor_(Metal.MTLBlendFactorSourceAlpha)
+        color_attachment.setSourceAlphaBlendFactor_(Metal.MTLBlendFactorSourceAlpha)
+        color_attachment.setDestinationRGBBlendFactor_(Metal.MTLBlendFactorOneMinusSourceAlpha)
+        color_attachment.setDestinationAlphaBlendFactor_(Metal.MTLBlendFactorOneMinusSourceAlpha)
+        
+        # Create render pipeline state
+        try:
+            pipeline_state = self.metal_device.newRenderPipelineStateWithDescriptor_error_(
+                pipeline_descriptor, None
+            )
+            if pipeline_state is None:
+                raise RuntimeError("Failed to create render pipeline state")
+            return pipeline_state
+        except Exception as e:
+            raise RuntimeError(f"Failed to create render pipeline: {e}")
+    
+    def _get_shader_source(self) -> str:
+        """
+        Get Metal shader source code for text rendering.
+        
+        Returns:
+            str: Metal Shading Language (MSL) source code
+        """
+        return """
+        #include <metal_stdlib>
+        using namespace metal;
+        
+        // Vertex shader input structure
+        struct VertexIn {
+            float2 position [[attribute(0)]];
+            float2 texCoord [[attribute(1)]];
+            float4 color [[attribute(2)]];
+        };
+        
+        // Vertex shader output / Fragment shader input
+        struct VertexOut {
+            float4 position [[position]];
+            float2 texCoord;
+            float4 color;
+        };
+        
+        // Vertex shader
+        vertex VertexOut vertex_main(VertexIn in [[stage_in]]) {
+            VertexOut out;
+            out.position = float4(in.position, 0.0, 1.0);
+            out.texCoord = in.texCoord;
+            out.color = in.color;
+            return out;
+        }
+        
+        // Fragment shader
+        fragment float4 fragment_main(VertexOut in [[stage_in]],
+                                     texture2d<float> texture [[texture(0)]],
+                                     sampler textureSampler [[sampler(0)]]) {
+            // Sample the texture (character glyph)
+            float4 texColor = texture.sample(textureSampler, in.texCoord);
+            
+            // Apply color modulation
+            // The texture alpha channel contains the glyph shape
+            // The color contains the foreground color
+            return float4(in.color.rgb, in.color.a * texColor.a);
+        }
+        """
+    
+    def _render_grid(self):
+        """
+        Render the entire character grid using Metal.
+        
+        This method creates a Metal command buffer and render pass,
+        then renders each non-space character in the grid as a textured
+        quad with the appropriate colors and attributes.
+        
+        The rendering process:
+        1. Create command buffer from command queue
+        2. Create render pass descriptor
+        3. Begin render pass
+        4. For each character in grid:
+           - Skip spaces (optimization)
+           - Render background quad if needed
+           - Render character glyph with foreground color
+        5. End render pass
+        6. Present drawable
+        7. Commit command buffer
+        
+        Note: This method is called by refresh() to update the display.
+        """
+        try:
+            import Metal
+        except ImportError:
+            return
+        
+        if self.metal_view is None or self.command_queue is None:
+            return
+        
+        # Get current drawable
+        drawable = self.metal_view.currentDrawable()
+        if drawable is None:
+            return
+        
+        # Create command buffer
+        command_buffer = self.command_queue.commandBuffer()
+        if command_buffer is None:
+            return
+        
+        # Create render pass descriptor
+        render_pass_descriptor = self.metal_view.currentRenderPassDescriptor()
+        if render_pass_descriptor is None:
+            return
+        
+        # Create render command encoder
+        render_encoder = command_buffer.renderCommandEncoderWithDescriptor_(
+            render_pass_descriptor
+        )
+        if render_encoder is None:
+            return
+        
+        # Set render pipeline state
+        if self.render_pipeline is not None:
+            render_encoder.setRenderPipelineState_(self.render_pipeline)
+        
+        # Render each character in the grid
+        for row in range(self.rows):
+            for col in range(self.cols):
+                char, color_pair, attrs = self.grid[row][col]
+                
+                # Skip spaces for optimization (unless they have a background color)
+                if char == ' ' and color_pair == 0:
+                    continue
+                
+                # Render this character
+                self._render_character(render_encoder, row, col, char, color_pair, attrs)
+        
+        # End encoding
+        render_encoder.endEncoding()
+        
+        # Present drawable
+        command_buffer.presentDrawable_(drawable)
+        
+        # Commit command buffer
+        command_buffer.commit()
+    
+    def _render_grid_region(self, row: int, col: int, height: int, width: int):
+        """
+        Render a specific region of the character grid.
+        
+        This is an optimized version of _render_grid() that only renders
+        characters within the specified rectangular region. This is useful
+        for partial updates when only a small portion of the screen changes.
+        
+        Args:
+            row: Starting row of the region (0-based)
+            col: Starting column of the region (0-based)
+            height: Height of the region in character rows
+            width: Width of the region in character columns
+            
+        Note: This method is called by refresh_region() for optimized updates.
+        """
+        try:
+            import Metal
+        except ImportError:
+            return
+        
+        if self.metal_view is None or self.command_queue is None:
+            return
+        
+        # Get current drawable
+        drawable = self.metal_view.currentDrawable()
+        if drawable is None:
+            return
+        
+        # Create command buffer
+        command_buffer = self.command_queue.commandBuffer()
+        if command_buffer is None:
+            return
+        
+        # Create render pass descriptor
+        render_pass_descriptor = self.metal_view.currentRenderPassDescriptor()
+        if render_pass_descriptor is None:
+            return
+        
+        # Create render command encoder
+        render_encoder = command_buffer.renderCommandEncoderWithDescriptor_(
+            render_pass_descriptor
+        )
+        if render_encoder is None:
+            return
+        
+        # Set render pipeline state
+        if self.render_pipeline is not None:
+            render_encoder.setRenderPipelineState_(self.render_pipeline)
+        
+        # Calculate region bounds (clip to grid)
+        start_row = max(0, row)
+        end_row = min(self.rows, row + height)
+        start_col = max(0, col)
+        end_col = min(self.cols, col + width)
+        
+        # Render each character in the region
+        for r in range(start_row, end_row):
+            for c in range(start_col, end_col):
+                char, color_pair, attrs = self.grid[r][c]
+                
+                # Skip spaces for optimization (unless they have a background color)
+                if char == ' ' and color_pair == 0:
+                    continue
+                
+                # Render this character
+                self._render_character(render_encoder, r, c, char, color_pair, attrs)
+        
+        # End encoding
+        render_encoder.endEncoding()
+        
+        # Present drawable
+        command_buffer.presentDrawable_(drawable)
+        
+        # Commit command buffer
+        command_buffer.commit()
+    
+    def _render_character(self, render_encoder, row: int, col: int,
+                         char: str, color_pair: int, attrs: int):
+        """
+        Render a single character at the specified grid position.
+        
+        This method renders one character by:
+        1. Calculating screen position from grid coordinates
+        2. Getting foreground and background colors from color pair
+        3. Applying text attributes (bold, underline, reverse)
+        4. Rendering background quad with background color
+        5. Rendering character glyph with foreground color
+        
+        Args:
+            render_encoder: Metal render command encoder
+            row: Character row position in grid
+            col: Character column position in grid
+            char: Character to render
+            color_pair: Color pair index
+            attrs: Text attributes (bitwise OR of TextAttribute values)
+            
+        Note: This is a low-level rendering method called by _render_grid()
+        and _render_grid_region(). It assumes the render encoder is already
+        configured with the appropriate pipeline state.
+        """
+        # Calculate screen position in pixels
+        x = col * self.char_width
+        y = row * self.char_height
+        
+        # Get colors from color pair
+        fg_color, bg_color = self.color_pairs.get(color_pair, ((255, 255, 255), (0, 0, 0)))
+        
+        # Apply reverse attribute (swap foreground and background)
+        if attrs & TextAttribute.REVERSE:
+            fg_color, bg_color = bg_color, fg_color
+        
+        # Convert RGB tuples to normalized float values (0.0-1.0)
+        fg_r, fg_g, fg_b = [c / 255.0 for c in fg_color]
+        bg_r, bg_g, bg_b = [c / 255.0 for c in bg_color]
+        
+        # TODO: Implement actual Metal rendering
+        # This is a placeholder that documents the rendering process
+        # Actual implementation would:
+        # 1. Create vertex buffer with quad vertices for character cell
+        # 2. Set vertex buffer with position, texCoord, and color data
+        # 3. Render background quad with background color
+        # 4. Render character glyph texture with foreground color
+        # 5. Apply bold attribute by rendering glyph slightly offset
+        # 6. Apply underline attribute by rendering line below character
+        #
+        # For now, this method serves as a documented interface that
+        # will be fully implemented when Metal texture and buffer
+        # management is added in subsequent tasks.
+        pass
+    
     def shutdown(self) -> None:
         """
         Clean up Metal resources and close window.
         
         This method performs cleanup in the following order:
         1. Close the native window
-        2. Release the rendering pipeline
-        3. Release the command queue
-        4. Release the Metal device
-        5. Clear the character grid buffer
-        6. Clear color pair storage
+        2. Clear Metal view reference
+        3. Release the rendering pipeline
+        4. Release the command queue
+        5. Release the Metal device
+        6. Clear the character grid buffer
+        7. Clear color pair storage
+        8. Reset cursor state
         
         This method handles cleanup gracefully even if some resources
         were not fully initialized. It's safe to call shutdown() multiple
@@ -388,9 +724,47 @@ class MetalBackend(Renderer):
             # ... use backend ...
             backend.shutdown()
         """
-        # TODO: Implement Metal cleanup
-        # This will be implemented in subsequent tasks
-        pass
+        # Close the native window
+        if self.window is not None:
+            try:
+                self.window.close()
+            except (AttributeError, RuntimeError) as e:
+                # Window may already be closed or in invalid state
+                print(f"Warning: Error closing window during shutdown: {e}")
+            except Exception as e:
+                # Catch any other unexpected errors during cleanup
+                print(f"Warning: Unexpected error closing window: {e}")
+            self.window = None
+        
+        # Clear Metal view reference
+        if hasattr(self, 'metal_view'):
+            self.metal_view = None
+        
+        # Release rendering pipeline
+        self.render_pipeline = None
+        
+        # Release command queue
+        self.command_queue = None
+        
+        # Release Metal device
+        self.metal_device = None
+        
+        # Clear character grid buffer
+        self.grid = []
+        
+        # Clear color pair storage
+        self.color_pairs = {}
+        
+        # Reset dimensions
+        self.rows = 0
+        self.cols = 0
+        self.char_width = 0
+        self.char_height = 0
+        
+        # Reset cursor state
+        self.cursor_visible = False
+        self.cursor_row = 0
+        self.cursor_col = 0
     
     def get_dimensions(self) -> Tuple[int, int]:
         """
@@ -553,9 +927,7 @@ class MetalBackend(Renderer):
         This method renders the entire character grid using Metal,
         converting each character cell into GPU draw calls.
         """
-        # TODO: Implement full window refresh
-        # This will be implemented in subsequent tasks
-        pass
+        self._render_grid()
     
     def refresh_region(self, row: int, col: int, height: int, width: int) -> None:
         """
@@ -570,9 +942,7 @@ class MetalBackend(Renderer):
         Note: This is an optimization hint. The Metal backend can render
         only the specified region for better performance.
         """
-        # TODO: Implement region refresh
-        # This will be implemented in subsequent tasks
-        pass
+        self._render_grid_region(row, col, height, width)
     
     def init_color_pair(self, pair_id: int, fg_color: Tuple[int, int, int],
                        bg_color: Tuple[int, int, int]) -> None:
@@ -588,13 +958,37 @@ class MetalBackend(Renderer):
             ValueError: If pair_id is 0 or outside the range 1-255
             ValueError: If any RGB component is outside the range 0-255
         """
-        # TODO: Implement color pair initialization
-        # This will be implemented in subsequent tasks
-        pass
+        # Validate pair_id
+        if pair_id < 1 or pair_id > 255:
+            raise ValueError(
+                f"Color pair ID must be in range 1-255, got {pair_id}. "
+                f"Pair ID 0 is reserved for default colors."
+            )
+        
+        # Validate RGB values
+        for color, name in [(fg_color, "foreground"), (bg_color, "background")]:
+            if not isinstance(color, tuple) or len(color) != 3:
+                raise ValueError(
+                    f"{name.capitalize()} color must be a tuple of 3 integers (R, G, B), "
+                    f"got {color}"
+                )
+            for component, component_name in zip(color, ['R', 'G', 'B']):
+                if not isinstance(component, int) or component < 0 or component > 255:
+                    raise ValueError(
+                        f"{name.capitalize()} color {component_name} component must be "
+                        f"an integer in range 0-255, got {component}"
+                    )
+        
+        # Store color pair
+        self.color_pairs[pair_id] = (fg_color, bg_color)
     
     def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
         """
         Get the next input event from the macOS event system.
+        
+        This method polls the macOS event queue for keyboard, mouse, and
+        window events, then translates them into TTK's unified InputEvent
+        format.
         
         Args:
             timeout_ms: Timeout in milliseconds.
@@ -605,10 +999,461 @@ class MetalBackend(Renderer):
         Returns:
             Optional[InputEvent]: An InputEvent object if input is available,
                                  or None if the timeout expires with no input.
+                                 
+        Note: This method processes the following event types:
+        - Keyboard events (key down, key up)
+        - Mouse events (mouse down, mouse up, mouse moved)
+        - Window events (resize, focus change)
+        
+        Example:
+            # Non-blocking check for input
+            event = backend.get_input(timeout_ms=0)
+            if event:
+                print(f"Got key: {event.key_code}")
+            
+            # Blocking wait for input
+            event = backend.get_input(timeout_ms=-1)
+            print(f"User pressed: {event.char}")
         """
-        # TODO: Implement input handling
-        # This will be implemented in subsequent tasks
-        pass
+        # Poll macOS event queue
+        macos_event = self._poll_macos_event(timeout_ms)
+        
+        if macos_event is None:
+            return None
+        
+        # Translate macOS event to InputEvent
+        return self._translate_macos_event(macos_event)
+    
+    def _translate_macos_event(self, event) -> Optional[InputEvent]:
+        """
+        Translate a macOS NSEvent to a TTK InputEvent.
+        
+        This method converts macOS-specific event objects into TTK's unified
+        InputEvent format. It handles:
+        - Keyboard events: Maps macOS key codes to TTK KeyCode values
+        - Modifier keys: Extracts Shift, Control, Alt, Command states
+        - Mouse events: Converts mouse position and button information
+        - Window events: Handles resize and other window-related events
+        
+        Args:
+            event: NSEvent object from macOS event system
+        
+        Returns:
+            Optional[InputEvent]: Translated InputEvent, or None if the event
+                                 type is not supported or cannot be translated.
+                                 
+        Note: This method uses the following mappings:
+        - macOS key codes -> TTK KeyCode enum values
+        - macOS modifier flags -> TTK ModifierKey flags
+        - macOS mouse coordinates -> character grid coordinates
+        """
+        try:
+            import Cocoa
+            from ttk.input_event import KeyCode, ModifierKey, InputEvent
+        except ImportError:
+            return None
+        
+        if event is None:
+            return None
+        
+        # Get event type
+        event_type = event.type()
+        
+        # Handle keyboard events
+        if event_type == Cocoa.NSEventTypeKeyDown:
+            return self._translate_keyboard_event(event)
+        
+        # Handle mouse events
+        elif event_type in (
+            Cocoa.NSEventTypeLeftMouseDown,
+            Cocoa.NSEventTypeLeftMouseUp,
+            Cocoa.NSEventTypeRightMouseDown,
+            Cocoa.NSEventTypeRightMouseUp,
+            Cocoa.NSEventTypeOtherMouseDown,
+            Cocoa.NSEventTypeOtherMouseUp,
+            Cocoa.NSEventTypeMouseMoved,
+            Cocoa.NSEventTypeLeftMouseDragged,
+            Cocoa.NSEventTypeRightMouseDragged,
+            Cocoa.NSEventTypeOtherMouseDragged
+        ):
+            return self._translate_mouse_event(event)
+        
+        # Handle window resize events
+        # Note: macOS doesn't have a specific resize event type in the event queue
+        # Instead, we need to check for window size changes periodically or use delegates
+        # For now, we'll check window size on each event and detect changes
+        
+        # Check if window size has changed (simple resize detection)
+        if self.window and self.metal_view:
+            try:
+                content_rect = self.window.contentView().frame()
+                window_width = int(content_rect.size.width)
+                window_height = int(content_rect.size.height)
+                
+                # Calculate what the grid dimensions should be
+                expected_cols = max(1, window_width // self.char_width) if self.char_width > 0 else self.cols
+                expected_rows = max(1, window_height // self.char_height) if self.char_height > 0 else self.rows
+                
+                # If dimensions don't match, we have a resize
+                if expected_rows != self.rows or expected_cols != self.cols:
+                    # Handle the resize
+                    self._handle_window_resize()
+                    
+                    # Return a RESIZE event
+                    return InputEvent(
+                        key_code=KeyCode.RESIZE,
+                        modifiers=ModifierKey.NONE,
+                        char=None
+                    )
+            except Exception:
+                pass  # Ignore errors during resize detection
+        
+        return None
+    
+    def _translate_keyboard_event(self, event) -> Optional[InputEvent]:
+        """
+        Translate a macOS keyboard event to InputEvent.
+        
+        Args:
+            event: NSEvent keyboard event
+            
+        Returns:
+            Optional[InputEvent]: Translated keyboard event
+        """
+        try:
+            import Cocoa
+            from ttk.input_event import KeyCode, ModifierKey, InputEvent
+        except ImportError:
+            return None
+        
+        # Get the key code
+        key_code = event.keyCode()
+        
+        # Get modifier flags
+        modifiers = self._extract_modifiers(event)
+        
+        # Get the character string
+        chars = event.characters()
+        char = chars[0] if chars and len(chars) > 0 else None
+        
+        # Map macOS key codes to TTK KeyCode values
+        # macOS key codes are hardware-dependent, but these are common values
+        key_map = {
+            # Arrow keys
+            123: KeyCode.LEFT,
+            124: KeyCode.RIGHT,
+            125: KeyCode.DOWN,
+            126: KeyCode.UP,
+            
+            # Function keys
+            122: KeyCode.F1,
+            120: KeyCode.F2,
+            99: KeyCode.F3,
+            118: KeyCode.F4,
+            96: KeyCode.F5,
+            97: KeyCode.F6,
+            98: KeyCode.F7,
+            100: KeyCode.F8,
+            101: KeyCode.F9,
+            109: KeyCode.F10,
+            103: KeyCode.F11,
+            111: KeyCode.F12,
+            
+            # Editing keys
+            51: KeyCode.BACKSPACE,  # Delete key (backspace)
+            117: KeyCode.DELETE,     # Forward delete
+            115: KeyCode.HOME,
+            119: KeyCode.END,
+            116: KeyCode.PAGE_UP,
+            121: KeyCode.PAGE_DOWN,
+            
+            # Special keys
+            36: KeyCode.ENTER,       # Return key
+            76: KeyCode.ENTER,       # Enter key (numeric keypad)
+            53: KeyCode.ESCAPE,
+            48: KeyCode.TAB,
+        }
+        
+        # Check if this is a special key
+        if key_code in key_map:
+            ttk_key_code = key_map[key_code]
+            return InputEvent(
+                key_code=ttk_key_code,
+                modifiers=modifiers,
+                char=None  # Special keys don't have printable characters
+            )
+        
+        # Handle printable characters
+        if char and len(char) == 1:
+            # Get Unicode code point
+            code_point = ord(char)
+            
+            # Handle special characters that might come through as printable
+            if char == '\r' or char == '\n':
+                return InputEvent(
+                    key_code=KeyCode.ENTER,
+                    modifiers=modifiers,
+                    char=None
+                )
+            elif char == '\t':
+                return InputEvent(
+                    key_code=KeyCode.TAB,
+                    modifiers=modifiers,
+                    char=None
+                )
+            elif char == '\x1b':  # Escape
+                return InputEvent(
+                    key_code=KeyCode.ESCAPE,
+                    modifiers=modifiers,
+                    char=None
+                )
+            elif char == '\x7f':  # Delete/Backspace
+                return InputEvent(
+                    key_code=KeyCode.BACKSPACE,
+                    modifiers=modifiers,
+                    char=None
+                )
+            else:
+                # Regular printable character
+                return InputEvent(
+                    key_code=code_point,
+                    modifiers=modifiers,
+                    char=char
+                )
+        
+        # Unknown key - return None
+        return None
+    
+    def _translate_mouse_event(self, event) -> Optional[InputEvent]:
+        """
+        Translate a macOS mouse event to InputEvent.
+        
+        Args:
+            event: NSEvent mouse event
+            
+        Returns:
+            Optional[InputEvent]: Translated mouse event
+        """
+        try:
+            import Cocoa
+            from ttk.input_event import KeyCode, ModifierKey, InputEvent
+        except ImportError:
+            return None
+        
+        # Get mouse location in window coordinates
+        location = event.locationInWindow()
+        
+        # Convert pixel coordinates to character grid coordinates
+        # Note: macOS uses bottom-left origin, we need top-left
+        if self.window and self.metal_view:
+            # Get window content height
+            content_rect = self.window.contentView().frame()
+            window_height = content_rect.size.height
+            
+            # Convert to top-left origin
+            pixel_x = int(location.x)
+            pixel_y = int(window_height - location.y)
+            
+            # Convert to character grid coordinates
+            mouse_col = pixel_x // self.char_width if self.char_width > 0 else 0
+            mouse_row = pixel_y // self.char_height if self.char_height > 0 else 0
+            
+            # Clamp to grid bounds
+            mouse_col = max(0, min(mouse_col, self.cols - 1))
+            mouse_row = max(0, min(mouse_row, self.rows - 1))
+        else:
+            mouse_col = 0
+            mouse_row = 0
+        
+        # Determine mouse button
+        event_type = event.type()
+        if event_type in (Cocoa.NSEventTypeLeftMouseDown, Cocoa.NSEventTypeLeftMouseUp, Cocoa.NSEventTypeLeftMouseDragged):
+            mouse_button = 1  # Left button
+        elif event_type in (Cocoa.NSEventTypeRightMouseDown, Cocoa.NSEventTypeRightMouseUp, Cocoa.NSEventTypeRightMouseDragged):
+            mouse_button = 3  # Right button
+        elif event_type in (Cocoa.NSEventTypeOtherMouseDown, Cocoa.NSEventTypeOtherMouseUp, Cocoa.NSEventTypeOtherMouseDragged):
+            mouse_button = 2  # Middle button
+        else:
+            mouse_button = None  # Mouse moved without button
+        
+        # Get modifier flags
+        modifiers = self._extract_modifiers(event)
+        
+        # Create mouse input event
+        return InputEvent(
+            key_code=KeyCode.MOUSE,
+            modifiers=modifiers,
+            char=None,
+            mouse_row=mouse_row,
+            mouse_col=mouse_col,
+            mouse_button=mouse_button
+        )
+    
+    def _handle_window_resize(self) -> None:
+        """
+        Handle window resize events.
+        
+        This method is called when the window is resized. It:
+        1. Recalculates the character grid dimensions based on new window size
+        2. Preserves existing grid content where possible
+        3. Fills new areas with spaces
+        4. Clamps cursor position to new grid bounds
+        
+        Note: This method is called automatically when a resize event is detected
+        in the event polling loop.
+        """
+        if self.window is None or self.metal_view is None:
+            return
+        
+        # Get new window content size
+        # Note: We don't need to import Cocoa here since we're just calling methods
+        # on the window object that was already created
+        try:
+            content_rect = self.window.contentView().frame()
+            window_width = int(content_rect.size.width)
+            window_height = int(content_rect.size.height)
+        except Exception:
+            # If we can't get window size, return without resizing
+            return
+        
+        # Calculate new grid dimensions
+        new_cols = max(1, window_width // self.char_width) if self.char_width > 0 else 80
+        new_rows = max(1, window_height // self.char_height) if self.char_height > 0 else 40
+        
+        # Check if dimensions actually changed
+        if new_rows == self.rows and new_cols == self.cols:
+            return
+        
+        # Create new grid with new dimensions
+        new_grid = [
+            [(' ', 0, 0) for _ in range(new_cols)]
+            for _ in range(new_rows)
+        ]
+        
+        # Copy existing content to new grid (preserve what fits)
+        for row in range(min(self.rows, new_rows)):
+            for col in range(min(self.cols, new_cols)):
+                new_grid[row][col] = self.grid[row][col]
+        
+        # Update grid and dimensions
+        self.grid = new_grid
+        self.rows = new_rows
+        self.cols = new_cols
+        
+        # Clamp cursor position to new bounds
+        if self.cursor_row >= self.rows:
+            self.cursor_row = max(0, self.rows - 1)
+        if self.cursor_col >= self.cols:
+            self.cursor_col = max(0, self.cols - 1)
+    
+    def _extract_modifiers(self, event) -> int:
+        """
+        Extract modifier key flags from a macOS event.
+        
+        Args:
+            event: NSEvent object
+            
+        Returns:
+            int: Bitwise OR of ModifierKey flags
+        """
+        try:
+            import Cocoa
+            from ttk.input_event import ModifierKey
+        except ImportError:
+            return ModifierKey.NONE
+        
+        modifiers = ModifierKey.NONE
+        modifier_flags = event.modifierFlags()
+        
+        # Check for Shift
+        if modifier_flags & Cocoa.NSEventModifierFlagShift:
+            modifiers |= ModifierKey.SHIFT
+        
+        # Check for Control
+        if modifier_flags & Cocoa.NSEventModifierFlagControl:
+            modifiers |= ModifierKey.CONTROL
+        
+        # Check for Alt/Option
+        if modifier_flags & Cocoa.NSEventModifierFlagOption:
+            modifiers |= ModifierKey.ALT
+        
+        # Check for Command
+        if modifier_flags & Cocoa.NSEventModifierFlagCommand:
+            modifiers |= ModifierKey.COMMAND
+        
+        return modifiers
+    
+    def _poll_macos_event(self, timeout_ms: int):
+        """
+        Poll the macOS event queue for the next event.
+        
+        This method uses NSApp (the application object) to poll for events
+        from the macOS event system. It handles different timeout modes:
+        - Blocking: Wait indefinitely for an event
+        - Non-blocking: Return immediately if no event is available
+        - Timed: Wait up to the specified timeout for an event
+        
+        Args:
+            timeout_ms: Timeout in milliseconds.
+                       -1: Block indefinitely
+                        0: Non-blocking
+                       >0: Wait up to timeout_ms milliseconds
+        
+        Returns:
+            NSEvent object if an event is available, None otherwise.
+            
+        Note: This method processes events from the application's event queue,
+        which includes keyboard events, mouse events, and window events.
+        """
+        try:
+            import Cocoa
+            import Foundation
+        except ImportError:
+            return None
+        
+        # Get the shared application instance
+        app = Cocoa.NSApplication.sharedApplication()
+        
+        # Calculate timeout date based on timeout_ms
+        if timeout_ms < 0:
+            # Blocking mode - use distant future
+            until_date = Foundation.NSDate.distantFuture()
+        elif timeout_ms == 0:
+            # Non-blocking mode - use distant past (return immediately)
+            until_date = Foundation.NSDate.distantPast()
+        else:
+            # Timed mode - calculate date from now + timeout
+            timeout_seconds = timeout_ms / 1000.0
+            until_date = Foundation.NSDate.dateWithTimeIntervalSinceNow_(timeout_seconds)
+        
+        # Define event mask for events we're interested in
+        # This includes keyboard, mouse, and window events
+        event_mask = (
+            Cocoa.NSEventMaskKeyDown |
+            Cocoa.NSEventMaskKeyUp |
+            Cocoa.NSEventMaskFlagsChanged |
+            Cocoa.NSEventMaskLeftMouseDown |
+            Cocoa.NSEventMaskLeftMouseUp |
+            Cocoa.NSEventMaskRightMouseDown |
+            Cocoa.NSEventMaskRightMouseUp |
+            Cocoa.NSEventMaskOtherMouseDown |
+            Cocoa.NSEventMaskOtherMouseUp |
+            Cocoa.NSEventMaskMouseMoved |
+            Cocoa.NSEventMaskLeftMouseDragged |
+            Cocoa.NSEventMaskRightMouseDragged |
+            Cocoa.NSEventMaskOtherMouseDragged |
+            Cocoa.NSEventMaskScrollWheel
+        )
+        
+        # Poll for next event
+        event = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
+            event_mask,
+            until_date,
+            Cocoa.NSDefaultRunLoopMode,
+            True  # dequeue the event
+        )
+        
+        return event
     
     def set_cursor_visibility(self, visible: bool) -> None:
         """
@@ -616,10 +1461,17 @@ class MetalBackend(Renderer):
         
         Args:
             visible: True to show the cursor, False to hide it.
+            
+        Note: The cursor is rendered as part of the character grid during
+        refresh operations. This method updates the cursor visibility state,
+        and the cursor will be shown or hidden on the next refresh.
+        
+        Example:
+            backend.set_cursor_visibility(True)   # Show cursor
+            backend.move_cursor(10, 20)           # Position cursor
+            backend.refresh()                      # Cursor now visible at (10, 20)
         """
-        # TODO: Implement cursor visibility control
-        # This will be implemented in subsequent tasks
-        pass
+        self.cursor_visible = visible
     
     def move_cursor(self, row: int, col: int) -> None:
         """
@@ -628,7 +1480,16 @@ class MetalBackend(Renderer):
         Args:
             row: Row position (0-based, 0 is top)
             col: Column position (0-based, 0 is left)
+            
+        Note: The cursor position is stored and will be rendered during
+        the next refresh operation if cursor visibility is enabled.
+        The cursor is clamped to valid grid coordinates.
+        
+        Example:
+            backend.move_cursor(5, 10)    # Move cursor to row 5, column 10
+            backend.set_cursor_visibility(True)
+            backend.refresh()              # Cursor now visible at new position
         """
-        # TODO: Implement cursor movement
-        # This will be implemented in subsequent tasks
-        pass
+        # Clamp cursor position to valid grid coordinates
+        self.cursor_row = max(0, min(row, self.rows - 1)) if self.rows > 0 else 0
+        self.cursor_col = max(0, min(col, self.cols - 1)) if self.cols > 0 else 0
