@@ -45,7 +45,7 @@ class CursesBackend(Renderer):
         - Sets up color support
         - Configures terminal modes (no echo, cbreak, keypad)
         - Hides the cursor by default
-        - Initializes the default color pair (0)
+        - Sets black background for the terminal
         
         Raises:
             RuntimeError: If curses initialization fails
@@ -53,15 +53,18 @@ class CursesBackend(Renderer):
         try:
             self.stdscr = curses.initscr()
             curses.start_color()
-            curses.use_default_colors()
             curses.noecho()
             curses.cbreak()
             self.stdscr.keypad(True)
             curses.curs_set(0)  # Hide cursor by default
             
-            # Initialize default color pair (0)
-            curses.init_pair(0, -1, -1)
-            self.color_pairs_initialized.add(0)
+            # Initialize color pair 1 with white on black for default background
+            curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
+            self.color_pairs_initialized.add(1)
+            
+            # Set black background for the entire terminal window
+            # This ensures all areas have black background, not terminal default
+            self.stdscr.bkgd(' ', curses.color_pair(1))
         except Exception as e:
             raise RuntimeError(f"Failed to initialize curses: {e}")
     
@@ -102,7 +105,7 @@ class CursesBackend(Renderer):
         """
         Clear the terminal.
         
-        This fills the entire terminal with spaces using the default color pair.
+        This fills the entire terminal with spaces using black background.
         Changes are not visible until refresh() is called.
         """
         self.stdscr.clear()
