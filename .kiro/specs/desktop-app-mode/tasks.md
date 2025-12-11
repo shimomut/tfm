@@ -184,7 +184,7 @@
   - Set up main application loop
   - _Requirements: 6.1_
 
-- [ ] 27. Implement demo test interface
+- [x] 27. Implement demo test interface
   - Create demo/test_interface.py
   - Implement test UI showing text in various colors and attributes
   - Implement rectangle and line drawing demonstrations
@@ -192,27 +192,27 @@
   - Display window dimensions and coordinate system
   - _Requirements: 6.2, 6.3, 6.4_
 
-- [ ] 28. Implement demo performance monitoring
+- [x] 28. Implement demo performance monitoring
   - Create demo/performance.py
   - Track frame rate (FPS)
   - Track rendering time per frame
   - Display performance metrics in demo UI
   - _Requirements: 6.6_
 
-- [ ] 29. Implement demo keyboard handling
+- [x] 29. Implement demo keyboard handling
   - Handle keyboard input in demo application
   - Display pressed keys with key codes and modifiers
   - Demonstrate special key handling
   - Allow quitting with 'q' or ESC
   - _Requirements: 6.3_
 
-- [ ] 30. Implement demo window resize handling
+- [x] 30. Implement demo window resize handling
   - Handle resize events in demo application
   - Update UI layout on resize
   - Display updated dimensions
   - _Requirements: 6.4_
 
-- [ ] 31. Checkpoint - Verify demo application works with both backends
+- [x] 31. Checkpoint - Verify demo application works with both backends
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ]* 32. Write unit tests for Renderer ABC

@@ -31,6 +31,7 @@ from ttk.backends.curses_backend import CursesBackend
 from ttk.backends.metal_backend import MetalBackend
 from ttk.utils.utils import get_recommended_backend
 from ttk.renderer import Renderer
+from ttk.demo.test_interface import create_test_interface
 
 
 class DemoApplication:
@@ -112,42 +113,21 @@ class DemoApplication:
     
     def run(self):
         """
-        Run the main application loop.
+        Run the main application loop with the test interface.
         
-        This is a placeholder that will be expanded in subsequent tasks
-        to include the actual demo interface.
+        This creates and runs the comprehensive test interface that demonstrates
+        all TTK rendering capabilities including colors, attributes, shapes,
+        input handling, and coordinate system information.
         """
         if not self.running:
             raise RuntimeError("Application not initialized. Call initialize() first.")
         
         try:
-            # Get window dimensions
-            rows, cols = self.renderer.get_dimensions()
-            print(f"Window dimensions: {rows} rows x {cols} columns")
+            # Create the test interface
+            test_interface = create_test_interface(self.renderer)
             
-            # Clear the screen
-            self.renderer.clear()
-            
-            # Draw a simple test message
-            self.renderer.draw_text(0, 0, "TTK Demo Application", 1)
-            self.renderer.draw_text(1, 0, f"Backend: {self.backend_name}", 1)
-            self.renderer.draw_text(2, 0, f"Dimensions: {rows}x{cols}", 1)
-            self.renderer.draw_text(4, 0, "Press 'q' to quit", 1)
-            
-            # Refresh to show changes
-            self.renderer.refresh()
-            
-            # Main event loop
-            while self.running:
-                # Get input with timeout
-                event = self.renderer.get_input(timeout=100)
-                
-                if event is None:
-                    continue
-                
-                # Check for quit command
-                if event.char and event.char.lower() == 'q':
-                    break
+            # Run the test interface
+            test_interface.run()
                 
         except KeyboardInterrupt:
             print("\nInterrupted by user")
