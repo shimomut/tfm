@@ -12,7 +12,68 @@ Features:
 - Command recording and replay
 """
 
-# Serialization functions will be added as they are implemented
-# from ttk.serialization.command_serializer import serialize_command, parse_command, pretty_print_command
+from ttk.serialization.command_serializer import (
+    # Command dataclasses
+    DrawTextCommand,
+    DrawHLineCommand,
+    DrawVLineCommand,
+    DrawRectCommand,
+    ClearCommand,
+    ClearRegionCommand,
+    RefreshCommand,
+    RefreshRegionCommand,
+    InitColorPairCommand,
+    SetCursorVisibilityCommand,
+    MoveCursorCommand,
+    Command,
+    # Serialization functions
+    serialize_command,
+    serialize_draw_text,
+    serialize_draw_hline,
+    serialize_draw_vline,
+    serialize_draw_rect,
+    serialize_clear,
+    serialize_clear_region,
+    serialize_refresh,
+    serialize_refresh_region,
+    serialize_init_color_pair,
+    serialize_set_cursor_visibility,
+    serialize_move_cursor,
+    # Parsing functions
+    parse_command,
+    # Pretty-printing functions
+    pretty_print_command,
+)
 
-__all__ = []
+__all__ = [
+    # Command dataclasses
+    'DrawTextCommand',
+    'DrawHLineCommand',
+    'DrawVLineCommand',
+    'DrawRectCommand',
+    'ClearCommand',
+    'ClearRegionCommand',
+    'RefreshCommand',
+    'RefreshRegionCommand',
+    'InitColorPairCommand',
+    'SetCursorVisibilityCommand',
+    'MoveCursorCommand',
+    'Command',
+    # Serialization functions
+    'serialize_command',
+    'serialize_draw_text',
+    'serialize_draw_hline',
+    'serialize_draw_vline',
+    'serialize_draw_rect',
+    'serialize_clear',
+    'serialize_clear_region',
+    'serialize_refresh',
+    'serialize_refresh_region',
+    'serialize_init_color_pair',
+    'serialize_set_cursor_visibility',
+    'serialize_move_cursor',
+    # Parsing functions
+    'parse_command',
+    # Pretty-printing functions
+    'pretty_print_command',
+]

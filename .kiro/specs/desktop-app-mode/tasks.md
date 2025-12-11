@@ -143,14 +143,14 @@
 - [x] 21. Checkpoint - Verify Metal backend functionality
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 22. Implement command serialization
+- [x] 22. Implement command serialization
   - Create serialization.py module
   - Define command representation format (dict or dataclass)
   - Implement serialize_command() for all drawing operations
   - Include all parameters needed to reproduce commands
   - _Requirements: 13.1, 13.2_
 
-- [ ] 23. Implement command parsing
+- [x] 23. Implement command parsing
   - Implement parse_command() to reconstruct commands from serialized format
   - Validate command structure and parameters
   - Handle all command types (draw_text, draw_rect, etc.)
@@ -160,24 +160,24 @@
   - **Property 10: Command serialization round-trip**
   - **Validates: Requirements 13.1, 13.2, 13.3**
 
-- [ ] 24. Implement command pretty-printing
+- [x] 24. Implement command pretty-printing
   - Implement pretty_print_command() for human-readable output
   - Format commands with indentation and parameter names
   - Handle all command types
   - _Requirements: 13.4_
 
-- [ ]* 24.1 Write property test for pretty-printing
+- [x]* 24.1 Write property test for pretty-printing
   - **Property 11: Pretty-print completeness**
   - **Validates: Requirements 13.4**
 
-- [ ] 25. Implement utility functions
+- [x] 25. Implement utility functions
   - Create utils.py module
   - Implement get_recommended_backend() for platform detection
   - Implement helper functions for color conversion
   - Implement validation functions for parameters
   - _Requirements: 16.1, 16.2_
 
-- [ ] 26. Create demo application structure
+- [x] 26. Create demo application structure
   - Create demo/demo_ttk.py
   - Implement command-line argument parsing (--backend option)
   - Implement backend selection logic

@@ -1,16 +1,34 @@
 """
-TTK Utils Package
+TTK utility functions.
 
-This package provides utility functions for the TTK library, including:
-- Platform detection and backend recommendation
-- Color conversion utilities
-- Parameter validation functions
-- Helper functions for common operations
+This module provides helper functions for platform detection, color conversion,
+and parameter validation.
 """
 
-# Utility functions will be added as they are implemented
-# from ttk.utils.platform_utils import get_recommended_backend
-# from ttk.utils.color_utils import rgb_to_terminal_color
-# from ttk.utils.validation import validate_color_pair, validate_coordinates
+from ttk.utils.utils import (
+    get_recommended_backend,
+    rgb_to_normalized,
+    normalized_to_rgb,
+    rgb_to_hex,
+    hex_to_rgb,
+    validate_rgb,
+    validate_color_pair_id,
+    validate_coordinates,
+    validate_dimensions,
+    clamp,
+    clamp_rgb,
+)
 
-__all__ = []
+__all__ = [
+    'get_recommended_backend',
+    'rgb_to_normalized',
+    'normalized_to_rgb',
+    'rgb_to_hex',
+    'hex_to_rgb',
+    'validate_rgb',
+    'validate_color_pair_id',
+    'validate_coordinates',
+    'validate_dimensions',
+    'clamp',
+    'clamp_rgb',
+]

@@ -23,6 +23,14 @@ This project follows a clean directory structure that separates different types 
 - TTK tests should import from the ttk package: `from ttk.module import Class`
 - Example: `ttk/test/test_input_event.py`, `ttk/test/test_renderer_abc.py`
 
+### TTK Library Demo Files (`ttk/demo/`)
+- **TTK-specific demo files** must be placed in the `/ttk/demo` directory
+- This keeps TTK library demos separate from TFM application demos
+- Demo files should follow the naming convention `demo_*.py`
+- TTK demos should import from the ttk package: `from ttk.module import Class`
+- Example: `ttk/demo/demo_ttk.py`, `ttk/demo/test_interface.py`
+- These demos showcase TTK library capabilities and serve as usage examples
+
 ### TTK Library Documentation (`ttk/doc/`)
 - **TTK end-user documentation** should be placed in the `/ttk/doc` directory
 - **TTK developer documentation** should be placed in the `/ttk/doc/dev` directory
@@ -168,12 +176,13 @@ When creating both end-user and developer documentation:
 - `doc/CONFIGURATION_EXAMPLES.md` - Example configurations for common use cases
 - No developer doc needed - just examples, not implementation
 
-### Demo Files (`demo/`)
-- **ALL demo and example files** should be placed in the `/demo` directory
+### TFM Demo Files (`demo/`)
+- **TFM-specific demo and example files** should be placed in the `/demo` directory
 - Demo scripts: `demo/demo_*.py`
 - Example configurations: `demo/example_*.py`
 - Interactive demonstrations: `demo/interactive_*.py`
 - Sample data files: `demo/sample_*`
+- **Note**: TTK library demos should be in `ttk/demo/` instead
 
 ### External Tools (`tools/`)
 - **ALL external programs and scripts** should be placed in the `/tools` directory
@@ -210,14 +219,15 @@ When creating both end-user and developer documentation:
 
 1. **TFM test files** → Always use `test/test_<feature_name>.py`
 2. **TTK test files** → Always use `ttk/test/test_<feature_name>.py`
-3. **TTK end-user documentation** → Always use `ttk/doc/<FEATURE_NAME>_<TYPE>.md`
-4. **TTK developer documentation** → Always use `ttk/doc/dev/<COMPONENT_NAME>_<TYPE>.md`
-5. **TFM end-user documentation** → Always use `doc/<FEATURE_NAME>_<TYPE>.md`
-6. **TFM developer documentation** → Always use `doc/dev/<SYSTEM_NAME>_<TYPE>.md`
-7. **Demo scripts** → Always use `demo/demo_<feature_name>.py`
-8. **External tools** → Always use `tools/<tool_name>.<ext>`
-9. **Source code** → Always use `src/tfm_<module_name>.py`
-10. **Temporary files** → Always use `temp/<temp_file_name>.<ext>`
+3. **TTK demo files** → Always use `ttk/demo/demo_<feature_name>.py`
+4. **TTK end-user documentation** → Always use `ttk/doc/<FEATURE_NAME>_<TYPE>.md`
+5. **TTK developer documentation** → Always use `ttk/doc/dev/<COMPONENT_NAME>_<TYPE>.md`
+6. **TFM end-user documentation** → Always use `doc/<FEATURE_NAME>_<TYPE>.md`
+7. **TFM developer documentation** → Always use `doc/dev/<SYSTEM_NAME>_<TYPE>.md`
+8. **TFM demo scripts** → Always use `demo/demo_<feature_name>.py`
+9. **External tools** → Always use `tools/<tool_name>.<ext>`
+10. **Source code** → Always use `src/tfm_<module_name>.py`
+11. **Temporary files** → Always use `temp/<temp_file_name>.<ext>`
 
 ### When Moving Existing Files
 
@@ -231,11 +241,12 @@ When creating both end-user and developer documentation:
 ```
 test/test_remote_log_monitoring.py          # TFM test file
 ttk/test/test_input_event.py                # TTK test file
+ttk/demo/demo_ttk.py                         # TTK demo file
 ttk/doc/API_REFERENCE.md                    # TTK end-user documentation
 ttk/doc/dev/METAL_INITIALIZATION_IMPLEMENTATION.md  # TTK developer documentation
 doc/REMOTE_LOG_MONITORING_FEATURE.md        # TFM end-user feature documentation
 doc/dev/LOG_MANAGER_SYSTEM.md               # TFM developer system documentation
-demo/demo_remote_log.py                     # Demo script
+demo/demo_remote_log.py                     # TFM demo script
 tools/log_analyzer.py                       # External tool
 src/tfm_log_manager.py                      # Source code
 temp/temp_refactoring_test.py               # Temporary test program
@@ -245,9 +256,10 @@ temp/TEMP_FEATURE_ANALYSIS.md               # Temporary documentation
 #### Incorrect Placement (to be avoided)
 ```
 remote_log_test.py                          # Should be in test/
+demo_ttk.py                                 # TTK demo, should be in ttk/demo/
 doc/dev/METAL_BACKEND_IMPLEMENTATION.md     # TTK doc, should be in ttk/doc/dev/
 REMOTE_LOG_DOCS.md                          # Should be in doc/ (end-user) or doc/dev/ (developer)
-log_demo.py                                 # Should be in demo/
+log_demo.py                                 # Should be in demo/ (TFM) or ttk/demo/ (TTK)
 analyze_logs.sh                             # Should be in tools/
 TEMP_REFACTORING_SUMMARY.md                 # Should be in temp/
 verify_bugfix.py                            # Should be in temp/
