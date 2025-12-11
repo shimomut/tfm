@@ -14,8 +14,8 @@ __version__ = "0.1.0"
 __author__ = "TFM Development Team"
 
 # Import main abstract classes for convenience
-from ttk.renderer import Renderer, TextAttribute
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from .renderer import Renderer, TextAttribute
+from .input_event import InputEvent, KeyCode, ModifierKey
 
 __all__ = [
     'Renderer',

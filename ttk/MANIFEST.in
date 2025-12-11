@@ -1,9 +1,16 @@
 include README.md
-include LICENSE
 include pyproject.toml
-recursive-include ttk *.py
-recursive-include ttk py.typed
-recursive-exclude * __pycache__
-recursive-exclude * *.pyc
-recursive-exclude * *.pyo
-recursive-exclude * .DS_Store
+include py.typed
+include __init__.py
+include renderer.py
+include input_event.py
+recursive-include backends *.py
+recursive-include serialization *.py
+recursive-include utils *.py
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude .DS_Store
+prune test
+prune demo
+prune doc

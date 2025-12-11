@@ -289,7 +289,7 @@
   - **Property 13: Backend input equivalence**
   - **Validates: Requirements 2.3, 3.4**
 
-- [ ] 47. Create library documentation
+- [x] 47. Create library documentation
   - Write README.md with library overview and quick start
   - Document all public APIs with examples
   - Create usage guide for implementing new backends
@@ -297,18 +297,18 @@
   - Include examples for common use cases
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 16.4_
 
-- [ ] 48. Create package configuration
+- [x] 48. Create package configuration
   - Create setup.py or pyproject.toml
   - Define package metadata (name, version, description)
   - Specify dependencies (curses is built-in, PyObjC for Metal)
   - Configure package for distribution
   - _Requirements: 16.3_
 
-- [ ] 49. Test library independence from TFM
+- [x] 49. Test library independence from TFM
   - Verify no TFM-specific imports or dependencies
   - Verify library can be used standalone
   - Test with a simple non-TFM application
   - _Requirements: 16.5_
 
-- [ ] 50. Final checkpoint - Verify all requirements are met
+- [x] 50. Final checkpoint - Verify all requirements are met
   - Ensure all tests pass, ask the user if questions arise.

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "TUI Toolkit - A generic rendering library for character-grid-based applications"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "TFM Development Team"}
 ]
@@ -16,7 +16,6 @@ keywords = ["tui", "terminal", "rendering", "curses", "metal", "gui"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -50,7 +49,14 @@ Repository = "https://github.com/tfm/ttk"
 Issues = "https://github.com/tfm/ttk/issues"
 
 [tool.setuptools]
+# Explicit package configuration for flat layout
 packages = ["ttk", "ttk.backends", "ttk.serialization", "ttk.utils"]
+
+[tool.setuptools.package-dir]
+"ttk" = "."
+"ttk.backends" = "backends"
+"ttk.serialization" = "serialization"  
+"ttk.utils" = "utils"
 
 [tool.setuptools.package-data]
 ttk = ["py.typed"]
