@@ -197,12 +197,9 @@ class CursesBackend(Renderer):
         if not 0 <= color_pair <= 255:
             raise ValueError(f"Color pair must be in range 0-255, got {color_pair}")
         
-        try:
-            self.stdscr.hline(row, col, ord(char[0]), length,
-                            curses.color_pair(color_pair))
-        except curses.error:
-            # Ignore out-of-bounds errors
-            pass
+        # Use draw_text for Unicode characters (like box-drawing chars)
+        # curses.hline() doesn't handle Unicode properly
+        self.draw_text(row, col, char[0] * length, color_pair)
     
     def draw_vline(self, row: int, col: int, char: str,
                    length: int, color_pair: int = 0) -> None:
@@ -224,12 +221,10 @@ class CursesBackend(Renderer):
         if not 0 <= color_pair <= 255:
             raise ValueError(f"Color pair must be in range 0-255, got {color_pair}")
         
-        try:
-            self.stdscr.vline(row, col, ord(char[0]), length,
-                            curses.color_pair(color_pair))
-        except curses.error:
-            # Ignore out-of-bounds errors
-            pass
+        # Draw vertical line by drawing character at each row
+        # curses.vline() doesn't handle Unicode properly
+        for i in range(length):
+            self.draw_text(row + i, col, char[0], color_pair)
     
     def draw_rect(self, row: int, col: int, height: int, width: int,
                   color_pair: int = 0, filled: bool = False) -> None:
@@ -237,7 +232,7 @@ class CursesBackend(Renderer):
         Draw rectangle.
         
         This method draws either a filled rectangle (using spaces) or an
-        outlined rectangle (using line characters).
+        outlined rectangle (using box-drawing characters).
         
         Args:
             row: Top-left row position
@@ -260,19 +255,38 @@ class CursesBackend(Renderer):
             for r in range(row, row + height):
                 self.draw_text(r, col, ' ' * width, color_pair)
         else:
-            # Draw outline
+            # Draw outline using box-drawing characters
             if height > 0 and width > 0:
-                # Top and bottom edges
-                if width > 0:
-                    self.draw_hline(row, col, '-', width, color_pair)
-                    if height > 1:
-                        self.draw_hline(row + height - 1, col, '-', width, color_pair)
-                
-                # Left and right edges
-                if height > 0:
-                    self.draw_vline(row, col, '|', height, color_pair)
-                    if width > 1:
-                        self.draw_vline(row, col + width - 1, '|', height, color_pair)
+                # Draw corners and edges
+                if height == 1:
+                    # Single row - just draw horizontal line with corners
+                    if width == 1:
+                        self.draw_text(row, col, '┌', color_pair)
+                    elif width == 2:
+                        self.draw_text(row, col, '┌┐', color_pair)
+                    else:
+                        line = '┌' + '─' * (width - 2) + '┐'
+                        self.draw_text(row, col, line, color_pair)
+                elif width == 1:
+                    # Single column - just draw vertical line with corners
+                    self.draw_text(row, col, '┌', color_pair)
+                    for r in range(row + 1, row + height - 1):
+                        self.draw_text(r, col, '│', color_pair)
+                    self.draw_text(row + height - 1, col, '└', color_pair)
+                else:
+                    # Full rectangle with all corners and edges
+                    # Top edge
+                    top_line = '┌' + '─' * (width - 2) + '┐'
+                    self.draw_text(row, col, top_line, color_pair)
+                    
+                    # Middle rows with left and right edges
+                    for r in range(row + 1, row + height - 1):
+                        self.draw_text(r, col, '│', color_pair)
+                        self.draw_text(r, col + width - 1, '│', color_pair)
+                    
+                    # Bottom edge
+                    bottom_line = '└' + '─' * (width - 2) + '┘'
+                    self.draw_text(row + height - 1, col, bottom_line, color_pair)
     
     def refresh(self) -> None:
         """

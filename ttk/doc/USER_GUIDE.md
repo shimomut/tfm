@@ -396,15 +396,19 @@ renderer.draw_text(3, 0, "Bold + Underline",
 ### Drawing Lines
 
 ```python
-# Horizontal line
-renderer.draw_hline(5, 0, '-', 40)
+# Horizontal line using box-drawing character (recommended)
+renderer.draw_hline(5, 0, '─', 40)
 
-# Vertical line
-renderer.draw_vline(0, 10, '|', 20)
+# Vertical line using box-drawing character (recommended)
+renderer.draw_vline(0, 10, '│', 20)
 
-# Colored lines
-renderer.draw_hline(10, 0, '=', 40, color_pair=1)
-renderer.draw_vline(0, 20, '|', 20, color_pair=2)
+# Colored lines with box-drawing characters
+renderer.draw_hline(10, 0, '─', 40, color_pair=1)
+renderer.draw_vline(0, 20, '│', 20, color_pair=2)
+
+# ASCII alternatives (for compatibility)
+renderer.draw_hline(15, 0, '-', 40)
+renderer.draw_vline(0, 30, '|', 20)
 ```
 
 ### Drawing Rectangles

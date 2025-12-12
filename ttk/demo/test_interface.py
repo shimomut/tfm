@@ -76,6 +76,9 @@ class TestInterface:
         
         # Color pair 10: Gray on black
         self.renderer.init_color_pair(10, (128, 128, 128), (0, 0, 0))
+        
+        # Color pair 11: Black on blue (for filled rectangles)
+        self.renderer.init_color_pair(11, (0, 0, 0), (0, 0, 255))
     
     def draw_header(self, row: int):
         """
@@ -188,28 +191,28 @@ class TestInterface:
         row += 1
         
         # Draw outlined rectangle
-        if row + 5 < rows and cols >= 30:
-            self.renderer.draw_text(row, 2, "Outlined rectangle:", 10)
-            self.renderer.draw_rect(row + 1, 2, 4, 20, 3, filled=False)
+        if row + 4 < rows and cols >= 30:
+            self.renderer.draw_text(row, 2, "Outlined:", 10)
+            self.renderer.draw_rect(row, 12, 4, 15, 3, filled=False)
+            
+            # Draw filled rectangle next to it
+            if cols >= 50:
+                self.renderer.draw_text(row, 28, "Filled:", 10)
+                self.renderer.draw_rect(row, 36, 3, 12, 11, filled=True)
+            
             row += 5
         
-        # Draw filled rectangle
-        if row + 5 < rows and cols >= 30:
-            self.renderer.draw_text(row, 2, "Filled rectangle:", 10)
-            self.renderer.draw_rect(row + 1, 2, 3, 15, 4, filled=True)
+        # Draw horizontal and vertical lines - simplified conditions
+        if row + 5 < rows and cols >= 20:
+            # Draw horizontal line
+            self.renderer.draw_text(row, 2, "H line:", 10)
+            self.renderer.draw_hline(row, 10, '─', min(15, cols - 11), 5)
+            row += 2
+            
+            # Draw vertical line
+            self.renderer.draw_text(row, 2, "V line:", 10)
+            self.renderer.draw_vline(row, 10, '│', min(4, rows - row - 1), 6)
             row += 5
-        
-        # Draw horizontal line
-        if row + 2 < rows and cols >= 30:
-            self.renderer.draw_text(row, 2, "Horizontal line:", 10)
-            self.renderer.draw_hline(row + 1, 2, '-', 25, 5)
-            row += 3
-        
-        # Draw vertical line
-        if row + 6 < rows and cols >= 30:
-            self.renderer.draw_text(row, 2, "Vertical line:", 10)
-            self.renderer.draw_vline(row + 1, 2, '|', 5, 6)
-            row += 7
         
         return row
     
@@ -389,7 +392,7 @@ class TestInterface:
         if row < rows - 5:
             row = self.draw_attribute_test(row)
         
-        if row < rows - 10:
+        if row < rows - 6:
             row = self.draw_shape_test(row)
         
         if row < rows - 5:

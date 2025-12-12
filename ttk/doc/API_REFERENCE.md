@@ -137,11 +137,14 @@ Draw a horizontal line.
 
 **Example:**
 ```python
-# Draw a horizontal line of dashes
-renderer.draw_hline(5, 0, '-', 40, color_pair=1)
+# Draw a horizontal line using box-drawing character (recommended)
+renderer.draw_hline(5, 0, '─', 40, color_pair=1)
 
 # Draw a horizontal line of equals signs
 renderer.draw_hline(10, 5, '=', 30)
+
+# ASCII alternative (for compatibility)
+renderer.draw_hline(15, 0, '-', 40)
 ```
 
 ##### `draw_vline(row: int, col: int, char: str, length: int, color_pair: int = 0) -> None`
@@ -157,8 +160,11 @@ Draw a vertical line.
 
 **Example:**
 ```python
-# Draw a vertical line of pipes
-renderer.draw_vline(0, 10, '|', 20, color_pair=1)
+# Draw a vertical line using box-drawing character (recommended)
+renderer.draw_vline(0, 10, '│', 20, color_pair=1)
+
+# ASCII alternative (for compatibility)
+renderer.draw_vline(0, 15, '|', 20)
 ```
 
 ##### `draw_rect(row: int, col: int, height: int, width: int, color_pair: int = 0, filled: bool = False) -> None`
