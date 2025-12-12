@@ -1234,7 +1234,7 @@ if COCOA_AVAILABLE:
                 
                 This method is called by the Cocoa event loop when the view needs
                 to be redrawn. It iterates through the character grid and renders
-                each non-empty cell.
+                each cell with proper background colors.
                 
                 PyObjC Method Name Translation:
                     Objective-C: drawRect:
@@ -1243,11 +1243,10 @@ if COCOA_AVAILABLE:
                 
                 The rendering process:
                 1. Iterate through each cell in the character grid
-                2. Skip empty cells (space with default color pair) for performance
-                3. Calculate pixel position using coordinate transformation
-                4. Draw background rectangle for the cell
-                5. Create NSAttributedString with font, color, and attributes
-                6. Draw the character at the calculated position
+                2. Calculate pixel position using coordinate transformation
+                3. Draw background rectangle for the cell
+                4. Create NSAttributedString with font, color, and attributes
+                5. Draw the character at the calculated position
                 
                 Args:
                     rect: NSRect indicating the region that needs to be redrawn
@@ -1263,11 +1262,6 @@ if COCOA_AVAILABLE:
                     for col in range(self.backend.cols):
                         # Get cell data: (char, color_pair, attributes)
                         char, color_pair, attributes = self.backend.grid[row][col]
-                        
-                        # Skip empty cells (space with default color pair) for performance
-                        # This optimization significantly improves rendering speed
-                        if char == ' ' and color_pair == 0:
-                            continue
                         
                         # Calculate pixel position using coordinate transformation
                         # IMPORTANT: Coordinate system transformation
@@ -1312,6 +1306,10 @@ if COCOA_AVAILABLE:
                             self.backend.char_height
                         )
                         Cocoa.NSRectFill(cell_rect)
+                        
+                        # Skip drawing the character if it's a space (background is already drawn)
+                        if char == ' ':
+                            continue
                         
                         # Create foreground color for the character
                         fg_color = Cocoa.NSColor.colorWithRed_green_blue_alpha_(
