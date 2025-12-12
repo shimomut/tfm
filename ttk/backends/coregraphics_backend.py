@@ -66,7 +66,7 @@ Example Usage:
     backend = CoreGraphicsBackend(
         window_title="My TTK App",
         font_name="Menlo",
-        font_size=14,
+        font_size=12,
         rows=24,
         cols=80
     )
@@ -117,7 +117,7 @@ class CoreGraphicsBackend(Renderer):
     """
     
     def __init__(self, window_title: str = "TTK Application",
-                 font_name: str = "Menlo", font_size: int = 14,
+                 font_name: str = "Menlo", font_size: int = 12,
                  rows: int = 24, cols: int = 80):
         """
         Initialize the CoreGraphics backend.
@@ -219,8 +219,8 @@ class CoreGraphicsBackend(Renderer):
         Calculate fixed character width and height from the font.
         
         Uses the character 'M' (typically the widest in monospace fonts) to
-        determine dimensions. Adds 20% line spacing to the height for better
-        readability.
+        determine dimensions. No line spacing is added to ensure box-drawing
+        characters connect seamlessly.
         """
         # Create an attributed string with the font to measure character size
         test_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
@@ -232,9 +232,9 @@ class CoreGraphicsBackend(Renderer):
         size = test_string.size()
         
         # Store character dimensions
-        # Width is exact, height gets 20% line spacing
+        # Use exact font dimensions without line spacing for seamless box-drawing
         self.char_width = int(size.width)
-        self.char_height = int(size.height * 1.2)
+        self.char_height = int(size.height)
     
     def _create_window(self) -> None:
         """

@@ -44,7 +44,7 @@ def main():
         window_title="TTK Unicode & Emoji Demo",
         rows=30,
         cols=80,
-        font_size=16
+        font_size=12
     )
     
     try:

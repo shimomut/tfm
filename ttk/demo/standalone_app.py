@@ -207,7 +207,7 @@ def create_backend(backend_name: str) -> Renderer:
         return CoreGraphicsBackend(
             window_title="TTK Standalone Application",
             font_name="Menlo",
-            font_size=14
+            font_size=12
         )
     else:
         raise ValueError(

@@ -76,7 +76,7 @@ class DemoApplication:
             return CoreGraphicsBackend(
                 window_title="TTK Demo Application - CoreGraphics",
                 font_name="Menlo",
-                font_size=14
+                font_size=12
             )
         else:
             raise ValueError(
