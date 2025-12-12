@@ -8,7 +8,7 @@ TTK provides an abstract rendering API that allows text-based applications to ru
 
 Write your application once using TTK's simple API, and it can run:
 - In a terminal using the curses backend
-- As a native macOS desktop application using the Metal backend
+- As a native macOS desktop application using the CoreGraphics backend
 - On any platform with a custom backend implementation
 
 ## Features
@@ -16,8 +16,7 @@ Write your application once using TTK's simple API, and it can run:
 - **Backend Agnostic**: Write your application once, run on multiple platforms
 - **Multiple Backends**: 
   - Curses backend for terminal applications (Linux, macOS, BSD)
-  - CoreGraphics backend for native macOS desktop applications (simple, lightweight)
-  - Metal backend for native macOS desktop applications (GPU-accelerated)
+  - CoreGraphics backend for native macOS desktop applications (native text rendering)
 - **Simple API**: Clean, well-documented interface for rendering operations
 - **Input Handling**: Unified input event system across all backends
 - **Color Support**: Full RGB color support with 256 color pairs
@@ -37,16 +36,10 @@ This installs TTK with the curses backend, which works on all Unix-like systems.
 
 ### macOS Desktop Support
 
-For native macOS desktop applications, TTK provides two backends:
+For native macOS desktop applications, install the CoreGraphics backend:
 
-**CoreGraphics Backend** (recommended for most applications):
 ```bash
 pip install pyobjc-framework-Cocoa
-```
-
-**Metal Backend** (for GPU-accelerated rendering):
-```bash
-pip install ttk[metal]
 ```
 
 ### Development Installation
@@ -123,14 +116,14 @@ finally:
     renderer.shutdown()
 ```
 
-### macOS Desktop Application (Metal)
+### macOS Desktop Application (CoreGraphics)
 
 ```python
-from ttk.backends.metal_backend import MetalBackend
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk import KeyCode
 
-# Create Metal backend for GPU-accelerated rendering
-renderer = MetalBackend(
+# Create CoreGraphics backend for native macOS rendering
+renderer = CoreGraphicsBackend(
     window_title="My Desktop App",
     font_name="Menlo",
     font_size=14
@@ -138,7 +131,7 @@ renderer = MetalBackend(
 renderer.initialize()
 
 try:
-    # Same drawing code works with Metal backend!
+    # Same drawing code works with CoreGraphics backend!
     renderer.init_color_pair(1, (255, 255, 255), (30, 30, 30))
     renderer.draw_text(0, 0, "Desktop Application", color_pair=1)
     renderer.refresh()
@@ -163,9 +156,6 @@ backend_name = get_recommended_backend()
 if backend_name == 'coregraphics':
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
     renderer = CoreGraphicsBackend()
-elif backend_name == 'metal':
-    from ttk.backends.metal_backend import MetalBackend
-    renderer = MetalBackend()
 else:
     from ttk.backends.curses_backend import CursesBackend
     renderer = CursesBackend()
@@ -241,16 +231,13 @@ python -m ttk.demo.demo_ttk --backend curses
 
 # macOS desktop version (CoreGraphics)
 python -m ttk.demo.demo_ttk --backend coregraphics
-
-# macOS desktop version (Metal)
-python -m ttk.demo.demo_ttk --backend metal
 ```
 
 ## Requirements
 
 - **Python**: 3.8 or higher
 - **Curses backend**: Built-in on Unix-like systems (Linux, macOS, BSD)
-- **Metal backend**: macOS only, requires PyObjC
+- **CoreGraphics backend**: macOS only, requires PyObjC
 
 ## Project Structure
 
@@ -262,8 +249,7 @@ ttk/
 ├── backends/                # Backend implementations
 │   ├── __init__.py
 │   ├── curses_backend.py    # Terminal backend
-│   ├── coregraphics_backend.py  # macOS desktop backend (CoreGraphics)
-│   └── metal_backend.py     # macOS desktop backend (Metal)
+│   └── coregraphics_backend.py  # macOS desktop backend (CoreGraphics)
 ├── serialization/           # Command serialization
 │   └── command_serializer.py
 ├── utils/                   # Utility functions
@@ -344,13 +330,11 @@ renderer.refresh_region(row=5, col=10, height=10, width=20)
 | Curses  | macOS    | ✅ Stable |
 | Curses  | BSD      | ✅ Stable |
 | CoreGraphics | macOS | ✅ Stable |
-| Metal   | macOS    | ✅ Stable |
 
 ## Performance
 
 - **Curses backend**: Optimized for terminal rendering
 - **CoreGraphics backend**: Native macOS text rendering, < 10ms for 80x24 grid
-- **Metal backend**: GPU-accelerated, 60 FPS performance
 - **Partial updates**: All backends support efficient region updates
 - **Minimal overhead**: Thin abstraction layer over platform APIs
 
@@ -363,7 +347,6 @@ TTK is currently in active development. The core API is stable, but new features
 - ✅ Core rendering API
 - ✅ Curses backend (stable)
 - ✅ CoreGraphics backend (stable)
-- ✅ Metal backend (stable)
 - ✅ Input event system
 - ✅ Color management
 - ✅ Text attributes

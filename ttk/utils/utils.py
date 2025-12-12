@@ -14,19 +14,19 @@ def get_recommended_backend() -> str:
     Get the recommended rendering backend for the current platform.
     
     Returns:
-        str: 'metal' for macOS, 'curses' for all other platforms
+        str: 'coregraphics' for macOS, 'curses' for all other platforms
         
     Example:
         >>> backend_name = get_recommended_backend()
-        >>> if backend_name == 'metal':
-        ...     from ttk.backends.metal_backend import MetalBackend
-        ...     renderer = MetalBackend()
+        >>> if backend_name == 'coregraphics':
+        ...     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+        ...     renderer = CoreGraphicsBackend()
         ... else:
         ...     from ttk.backends.curses_backend import CursesBackend
         ...     renderer = CursesBackend()
     """
     if platform.system() == 'Darwin':
-        return 'metal'
+        return 'coregraphics'
     return 'curses'
 
 

@@ -467,9 +467,9 @@ renderer = CoreGraphicsBackend(
     font_size=14
 )
 
-# macOS desktop application - Metal (GPU-accelerated)
-from ttk.backends.metal_backend import MetalBackend
-renderer = MetalBackend(
+# macOS desktop application - CoreGraphics (native rendering)
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+renderer = CoreGraphicsBackend(
     window_title="My App",
     font_name="Menlo",
     font_size=14
@@ -493,9 +493,6 @@ backend_name = get_recommended_backend()
 if backend_name == 'coregraphics':
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
     renderer = CoreGraphicsBackend()
-elif backend_name == 'metal':
-    from ttk.backends.metal_backend import MetalBackend
-    renderer = MetalBackend()
 else:
     from ttk.backends.curses_backend import CursesBackend
     renderer = CursesBackend()
@@ -509,7 +506,6 @@ Allow users to choose the backend:
 import argparse
 from ttk.backends.curses_backend import CursesBackend
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-from ttk.backends.metal_backend import MetalBackend
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--backend', 

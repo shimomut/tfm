@@ -17,8 +17,8 @@ def test_basic_imports():
         from ttk.backends.curses_backend import CursesBackend
         print("✓ CursesBackend imported successfully")
         
-        from ttk.backends.metal_backend import MetalBackend
-        print("✓ MetalBackend imported successfully")
+        from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+        print("✓ CoreGraphicsBackend imported successfully")
         
         # Import serialization
         from ttk.serialization.command_serializer import (

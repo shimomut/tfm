@@ -7,7 +7,7 @@ that allows applications to run on different platforms without modification.
 
 Supported backends:
 - Curses: Terminal-based rendering using Python's curses library
-- Metal: Native macOS desktop applications with GPU-accelerated rendering
+- CoreGraphics: Native macOS desktop applications with native text rendering
 """
 
 __version__ = "0.1.0"

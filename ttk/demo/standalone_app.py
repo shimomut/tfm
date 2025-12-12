@@ -15,8 +15,9 @@ This is a minimal example showing:
 No TFM-specific code or concepts are used.
 """
 
+import argparse
+import platform
 import sys
-import time
 from ttk import Renderer, InputEvent, KeyCode, ModifierKey, TextAttribute
 from ttk.backends.curses_backend import CursesBackend
 from ttk.utils import get_recommended_backend
@@ -141,39 +142,118 @@ class SimpleTextApp:
         self.backend.shutdown()
 
 
+def parse_arguments():
+    """
+    Parse command-line arguments.
+    
+    Returns:
+        Namespace object with parsed arguments
+    """
+    parser = argparse.ArgumentParser(
+        description='TTK Standalone Application - Demonstrates TTK independence from TFM',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Auto-detect best backend for platform
+  python ttk/demo/standalone_app.py
+  
+  # Use curses backend explicitly
+  python ttk/demo/standalone_app.py --backend curses
+  
+  # Use CoreGraphics backend (macOS only)
+  python ttk/demo/standalone_app.py --backend coregraphics
+        """
+    )
+    
+    parser.add_argument(
+        '--backend',
+        choices=['curses', 'coregraphics', 'auto'],
+        default='auto',
+        help='Rendering backend to use (default: auto)'
+    )
+    
+    return parser.parse_args()
+
+
+def create_backend(backend_name: str) -> Renderer:
+    """
+    Create the appropriate rendering backend.
+    
+    Args:
+        backend_name: Name of backend to create ('curses', 'coregraphics', or 'auto')
+        
+    Returns:
+        Renderer instance for the selected backend
+        
+    Raises:
+        ValueError: If backend selection fails or backend is unavailable
+    """
+    # Auto-detect backend if requested
+    if backend_name == 'auto':
+        backend_name = get_recommended_backend()
+        print(f"Auto-detected backend: {backend_name}")
+    
+    # Create backend instance
+    if backend_name == 'curses':
+        return CursesBackend()
+    elif backend_name == 'coregraphics':
+        # Check if we're on macOS
+        if platform.system() != 'Darwin':
+            raise ValueError(
+                "CoreGraphics backend is only available on macOS. "
+                "Use --backend curses for other platforms."
+            )
+        from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+        return CoreGraphicsBackend(
+            window_title="TTK Standalone Application",
+            font_name="Menlo",
+            font_size=14
+        )
+    else:
+        raise ValueError(
+            f"Unknown backend: {backend_name}. "
+            "Valid options are: curses, coregraphics, auto"
+        )
+
+
 def main():
     """Main entry point."""
+    # Parse command-line arguments
+    args = parse_arguments()
+    
     print("Starting TTK Standalone Application...")
     print("This demonstrates TTK can be used without TFM.")
     print()
     
-    # Get recommended backend
-    backend_name = get_recommended_backend()
-    print(f"Using backend: {backend_name}")
-    
-    # Create backend
-    if backend_name == 'curses':
-        backend = CursesBackend()
-    else:
-        print(f"Backend '{backend_name}' not available in this demo")
-        print("Falling back to curses backend")
-        backend = CursesBackend()
-    
-    # Create and run application
-    app = SimpleTextApp(backend)
-    
     try:
-        app.initialize()
-        app.run()
+        # Create backend
+        backend = create_backend(args.backend)
+        print(f"Using backend: {args.backend}")
+        
+        # Create and run application
+        app = SimpleTextApp(backend)
+        
+        try:
+            app.initialize()
+            app.run()
+        except Exception as e:
+            print(f"Error running application: {e}")
+            import traceback
+            traceback.print_exc()
+            return 1
+        
+        print("\nApplication exited successfully.")
+        print("This demonstrates TTK is fully independent from TFM!")
+        return 0
+        
+    except ValueError as e:
+        print(f"Error: {e}")
+        return 1
     except Exception as e:
-        print(f"Error running application: {e}")
+        print(f"Unexpected error: {e}")
         import traceback
         traceback.print_exc()
         return 1
-    
-    print("\nApplication exited successfully.")
-    print("This demonstrates TTK is fully independent from TFM!")
-    return 0
 
 
 if __name__ == '__main__':

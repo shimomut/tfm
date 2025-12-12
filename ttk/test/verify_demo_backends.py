@@ -19,7 +19,7 @@ from unittest.mock import Mock, patch, MagicMock
 from ttk.demo.demo_ttk import DemoApplication
 from ttk.demo.test_interface import TestInterface, create_test_interface
 from ttk.backends.curses_backend import CursesBackend
-from ttk.backends.metal_backend import MetalBackend
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.input_event import InputEvent, KeyCode, ModifierKey
 
 
@@ -234,30 +234,30 @@ class TestBackendEquivalence:
         curses_backend = Mock(spec=CursesBackend)
         curses_backend.get_dimensions.return_value = (24, 80)
         
-        metal_backend = Mock(spec=MetalBackend)
-        metal_backend.get_dimensions.return_value = (24, 80)
+        coregraphics_backend = Mock(spec=CoreGraphicsBackend)
+        coregraphics_backend.get_dimensions.return_value = (24, 80)
         
         # Create test interfaces
         curses_interface = TestInterface(curses_backend, enable_performance_monitoring=False)
-        metal_interface = TestInterface(metal_backend, enable_performance_monitoring=False)
+        coregraphics_interface = TestInterface(coregraphics_backend, enable_performance_monitoring=False)
         
         # Both should initialize colors the same way
         curses_interface.initialize_colors()
-        metal_interface.initialize_colors()
+        coregraphics_interface.initialize_colors()
         
-        assert curses_backend.init_color_pair.call_count == metal_backend.init_color_pair.call_count
+        assert curses_backend.init_color_pair.call_count == coregraphics_backend.init_color_pair.call_count
         
         # Both should draw the same interface
         curses_interface.draw_interface()
-        metal_interface.draw_interface()
+        coregraphics_interface.draw_interface()
         
         # Both should call the same drawing operations
         assert curses_backend.clear.called
-        assert metal_backend.clear.called
+        assert coregraphics_backend.clear.called
         assert curses_backend.draw_text.called
-        assert metal_backend.draw_text.called
+        assert coregraphics_backend.draw_text.called
         assert curses_backend.refresh.called
-        assert metal_backend.refresh.called
+        assert coregraphics_backend.refresh.called
     
     def test_both_backends_handle_same_input(self):
         """Test that both backends handle input events the same way."""
@@ -265,23 +265,23 @@ class TestBackendEquivalence:
         curses_backend = Mock(spec=CursesBackend)
         curses_backend.get_dimensions.return_value = (24, 80)
         
-        metal_backend = Mock(spec=MetalBackend)
-        metal_backend.get_dimensions.return_value = (24, 80)
+        coregraphics_backend = Mock(spec=CoreGraphicsBackend)
+        coregraphics_backend.get_dimensions.return_value = (24, 80)
         
         # Create test interfaces
         curses_interface = TestInterface(curses_backend, enable_performance_monitoring=False)
-        metal_interface = TestInterface(metal_backend, enable_performance_monitoring=False)
+        coregraphics_interface = TestInterface(coregraphics_backend, enable_performance_monitoring=False)
         
         # Test same input event
         event = InputEvent(key_code=ord('t'), modifiers=ModifierKey.NONE, char='t')
         
         curses_result = curses_interface.handle_input(event)
-        metal_result = metal_interface.handle_input(event)
+        coregraphics_result = coregraphics_interface.handle_input(event)
         
         # Both should handle the event the same way
-        assert curses_result == metal_result
-        assert curses_interface.last_input == metal_interface.last_input
-        assert len(curses_interface.input_history) == len(metal_interface.input_history)
+        assert curses_result == coregraphics_result
+        assert curses_interface.last_input == coregraphics_interface.last_input
+        assert len(curses_interface.input_history) == len(coregraphics_interface.input_history)
     
     def test_both_backends_handle_resize_same_way(self):
         """Test that both backends handle resize events the same way."""
@@ -289,18 +289,18 @@ class TestBackendEquivalence:
         curses_backend = Mock(spec=CursesBackend)
         curses_backend.get_dimensions.return_value = (24, 80)
         
-        metal_backend = Mock(spec=MetalBackend)
-        metal_backend.get_dimensions.return_value = (24, 80)
+        coregraphics_backend = Mock(spec=CoreGraphicsBackend)
+        coregraphics_backend.get_dimensions.return_value = (24, 80)
         
         # Create test interfaces
         curses_interface = TestInterface(curses_backend, enable_performance_monitoring=False)
-        metal_interface = TestInterface(metal_backend, enable_performance_monitoring=False)
+        coregraphics_interface = TestInterface(coregraphics_backend, enable_performance_monitoring=False)
         
         # Test resize event
         event = InputEvent(key_code=KeyCode.RESIZE, modifiers=ModifierKey.NONE)
         
         curses_result = curses_interface.handle_input(event)
-        metal_result = metal_interface.handle_input(event)
+        coregraphics_result = coregraphics_interface.handle_input(event)
         
         # Both should handle resize the same way
         assert curses_result == metal_result

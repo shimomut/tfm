@@ -728,10 +728,10 @@ TTK includes several backend implementations you can study:
 - Shows how to use NSAttributedString for text rendering
 - Demonstrates coordinate system transformation
 
-### MetalBackend (`ttk/backends/metal_backend.py`)
-- GPU-accelerated rendering using Apple's Metal framework
-- More complex implementation (~1000+ lines)
-- Shows advanced rendering pipeline setup
+### CoreGraphicsBackend (`ttk/backends/coregraphics_backend.py`)
+- Native macOS rendering using Apple's CoreGraphics framework
+- Moderate complexity implementation (~800+ lines)
+- Shows native text rendering and window management
 - Good example of shader-based rendering
 
 ## Resources

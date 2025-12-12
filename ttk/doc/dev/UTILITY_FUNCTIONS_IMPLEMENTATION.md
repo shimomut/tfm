@@ -27,9 +27,9 @@ Returns the recommended rendering backend for the current platform.
 from ttk.utils import get_recommended_backend
 
 backend_name = get_recommended_backend()
-if backend_name == 'metal':
-    from ttk.backends.metal_backend import MetalBackend
-    renderer = MetalBackend()
+if backend_name == 'coregraphics':
+    from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+    renderer = CoreGraphicsBackend()
 else:
     from ttk.backends.curses_backend import CursesBackend
     renderer = CursesBackend()

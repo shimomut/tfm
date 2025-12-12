@@ -13,7 +13,7 @@ import pytest
 
 from ttk.demo.demo_ttk import DemoApplication, parse_arguments
 from ttk.backends.curses_backend import CursesBackend
-from ttk.backends.metal_backend import MetalBackend
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 
 
 class TestDemoApplication:
@@ -33,10 +33,10 @@ class TestDemoApplication:
         assert app.renderer is None
         assert app.running is False
     
-    def test_init_with_metal_backend(self):
-        """Test initialization with metal backend."""
-        app = DemoApplication('metal')
-        assert app.backend_name == 'metal'
+    def test_init_with_coregraphics_backend(self):
+        """Test initialization with coregraphics backend."""
+        app = DemoApplication('coregraphics')
+        assert app.backend_name == 'coregraphics'
         assert app.renderer is None
         assert app.running is False
     

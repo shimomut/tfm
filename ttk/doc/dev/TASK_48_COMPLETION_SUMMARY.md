@@ -131,7 +131,7 @@ Created `ttk/test/test_standalone_package.py` to verify:
 import ttk
 from ttk import Renderer, InputEvent, KeyCode, ModifierKey, TextAttribute
 from ttk.backends.curses_backend import CursesBackend
-from ttk.backends.metal_backend import MetalBackend
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.serialization.command_serializer import serialize_command
 from ttk.utils.utils import get_recommended_backend
 ```

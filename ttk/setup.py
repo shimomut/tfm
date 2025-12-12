@@ -47,8 +47,7 @@ setup(
     
     # Optional dependencies
     extras_require={
-        'metal': [
-            'pyobjc-framework-Metal>=9.0; sys_platform == "darwin"',
+        'coregraphics': [
             'pyobjc-framework-Cocoa>=9.0; sys_platform == "darwin"',
             'pyobjc-framework-CoreText>=9.0; sys_platform == "darwin"',
         ],
@@ -76,7 +75,7 @@ setup(
     ],
     
     # Keywords
-    keywords='tui terminal rendering curses metal gui',
+    keywords='tui terminal rendering curses coregraphics gui',
     
     # Project URLs
     project_urls={

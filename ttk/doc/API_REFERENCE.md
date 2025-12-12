@@ -12,7 +12,7 @@ This document provides a complete reference for the TTK (TUI Toolkit) library AP
   - [TextAttribute](#textattribute)
 - [Backend Implementations](#backend-implementations)
   - [CursesBackend](#cursesbackend)
-  - [MetalBackend](#metalbackend)
+  - [CoreGraphicsBackend](#coregraphicsbackend)
 - [Serialization](#serialization)
 - [Utilities](#utilities)
 
@@ -590,14 +590,14 @@ finally:
     renderer.shutdown()
 ```
 
-### MetalBackend
+### CoreGraphicsBackend
 
-Native macOS desktop application backend using Apple's Metal framework.
+Native macOS desktop application backend using Apple's CoreGraphics framework.
 
 ```python
-from ttk.backends.metal_backend import MetalBackend
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 
-renderer = MetalBackend(
+renderer = CoreGraphicsBackend(
     window_title="My Application",
     font_name="Menlo",
     font_size=14
@@ -612,17 +612,17 @@ renderer = MetalBackend(
 - `font_size`: Font size in points (default: 14)
 
 **Features:**
-- GPU-accelerated rendering
+- Native macOS text rendering
 - Native macOS window
 - Full RGB color support
-- 60 FPS performance
+- High performance (< 10ms for 80x24 grid)
 - Monospace font validation
 
 **Example:**
 ```python
-from ttk.backends.metal_backend import MetalBackend
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 
-renderer = MetalBackend(
+renderer = CoreGraphicsBackend(
     window_title="Desktop File Manager",
     font_name="Monaco",
     font_size=12
@@ -709,7 +709,7 @@ print(pretty_print_command(cmd))
 from ttk.utils.platform_utils import get_recommended_backend
 
 backend_name = get_recommended_backend()
-# Returns: 'metal' on macOS, 'curses' on other platforms
+# Returns: 'coregraphics' on macOS, 'curses' on other platforms
 ```
 
 ### Color Utilities
@@ -775,7 +775,7 @@ TTK uses a character-based coordinate system:
 
 Drawing operations with coordinates outside the window bounds are handled gracefully:
 - Curses backend: Ignores out-of-bounds drawing
-- Metal backend: Clips to window boundaries
+- CoreGraphics backend: Clips to window boundaries
 
 **Example:**
 ```python

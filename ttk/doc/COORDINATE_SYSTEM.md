@@ -114,7 +114,7 @@ renderer.draw_text(rows - 1, cols - 5, "This text extends beyond window")
 
 **Behavior:**
 - **Curses backend**: Ignores out-of-bounds drawing
-- **Metal backend**: Clips to window boundaries
+- **CoreGraphics backend**: Clips to window boundaries
 - **No exceptions**: Out-of-bounds drawing never crashes
 
 ### Coordinate Validation
@@ -261,16 +261,16 @@ The curses backend approximates RGB colors to terminal colors:
 renderer.init_color_pair(1, (255, 128, 64), (32, 32, 32))
 ```
 
-#### Metal Backend
+#### CoreGraphics Backend
 
-The Metal backend supports full RGB colors:
+The CoreGraphics backend supports full RGB colors:
 
 - **True RGB**: Exact color reproduction
 - **No approximation**: Colors appear exactly as specified
 - **Consistent**: Same colors across different displays
 
 ```python
-# This color will be exact in Metal backend
+# This color will be exact in CoreGraphics backend
 renderer.init_color_pair(1, (255, 128, 64), (32, 32, 32))
 ```
 
@@ -511,5 +511,5 @@ renderer.init_color_pair(2, (0, 255, 0), (0, 0, 0))  # Green
 - **Out-of-bounds**: Handled gracefully, no crashes
 - **Color pairs**: 256 available (0-255), initialize once
 - **RGB values**: 0-255 for each component
-- **Backend differences**: Curses approximates, Metal is exact
+- **Backend differences**: Curses approximates, CoreGraphics is exact
 - **Best practice**: Validate inputs, handle resize, use relative positioning

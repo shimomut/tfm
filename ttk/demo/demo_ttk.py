@@ -3,17 +3,16 @@
 TTK Demo Application
 
 This demo application demonstrates the TTK library's rendering capabilities
-with both curses and Metal backends. It provides a test interface to verify
+with both curses and CoreGraphics backends. It provides a test interface to verify
 that both backends work correctly and produce equivalent output.
 
 Usage:
-    python ttk/demo/demo_ttk.py [--backend {curses|metal|coregraphics}]
-    python -m ttk.demo.demo_ttk [--backend {curses|metal|coregraphics}]
+    python ttk/demo/demo_ttk.py [--backend {curses|coregraphics}]
+    python -m ttk.demo.demo_ttk [--backend {curses|coregraphics}]
 
 Options:
     --backend    Choose rendering backend (default: auto-detect)
                  - curses: Terminal-based rendering
-                 - metal: Native macOS desktop rendering (macOS only)
                  - coregraphics: Native macOS CoreGraphics rendering (macOS only)
                  - auto: Automatically select best backend for platform
 """
@@ -29,7 +28,6 @@ if __name__ == '__main__':
     sys.path.insert(0, str(parent_dir))
 
 from ttk.backends.curses_backend import CursesBackend
-from ttk.backends.metal_backend import MetalBackend
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.utils.utils import get_recommended_backend
 from ttk.renderer import Renderer
@@ -44,7 +42,7 @@ class DemoApplication:
         Initialize the demo application.
         
         Args:
-            backend_name: Name of backend to use ('curses', 'metal', or 'auto')
+            backend_name: Name of backend to use ('curses', 'coregraphics', or 'auto')
         """
         self.backend_name = backend_name
         self.renderer: Renderer = None
@@ -68,18 +66,6 @@ class DemoApplication:
         # Create backend instance
         if self.backend_name == 'curses':
             return CursesBackend()
-        elif self.backend_name == 'metal':
-            # Check if we're on macOS
-            if platform.system() != 'Darwin':
-                raise ValueError(
-                    "Metal backend is only available on macOS. "
-                    "Use --backend curses for other platforms."
-                )
-            return MetalBackend(
-                window_title="TTK Demo Application",
-                font_name="Monaco",
-                font_size=14
-            )
         elif self.backend_name == 'coregraphics':
             # Check if we're on macOS
             if platform.system() != 'Darwin':
@@ -95,7 +81,7 @@ class DemoApplication:
         else:
             raise ValueError(
                 f"Unknown backend: {self.backend_name}. "
-                "Valid options are: curses, metal, coregraphics, auto"
+                "Valid options are: curses, coregraphics, auto"
             )
     
     def initialize(self):
@@ -168,9 +154,6 @@ Examples:
   # Use curses backend explicitly
   python ttk/demo/demo_ttk.py --backend curses
   
-  # Use Metal backend (macOS only)
-  python ttk/demo/demo_ttk.py --backend metal
-  
   # Use CoreGraphics backend (macOS only)
   python ttk/demo/demo_ttk.py --backend coregraphics
         """
@@ -178,7 +161,7 @@ Examples:
     
     parser.add_argument(
         '--backend',
-        choices=['curses', 'metal', 'coregraphics', 'auto'],
+        choices=['curses', 'coregraphics', 'auto'],
         default='auto',
         help='Rendering backend to use (default: auto)'
     )
