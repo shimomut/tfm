@@ -526,6 +526,70 @@ finally:
     renderer.shutdown()
 ```
 
+### CoreGraphicsBackend
+
+Native macOS desktop application backend using Apple's CoreGraphics (Quartz 2D) framework.
+
+```python
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+
+renderer = CoreGraphicsBackend(
+    window_title="My Application",
+    font_name="Menlo",
+    font_size=14
+)
+```
+
+**Platform Support:** macOS only
+
+**Requirements:**
+- macOS 10.13 or later
+- PyObjC framework: `pip install pyobjc-framework-Cocoa`
+
+**Parameters:**
+- `window_title`: Title for the native window (default: "TextGrid Application")
+- `font_name`: Monospace font name (default: "Menlo")
+- `font_size`: Font size in points (default: 14)
+
+**Features:**
+- Native macOS text rendering with NSAttributedString
+- High-quality font rendering with automatic font fallback
+- Full RGB color support (256 color pairs)
+- Unicode and emoji support
+- All text attributes (bold, underline, reverse)
+- Native window controls (close, minimize, resize)
+- Simple implementation (~300 lines of code)
+
+**Example:**
+```python
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+from ttk import KeyCode
+
+renderer = CoreGraphicsBackend(
+    window_title="Desktop File Manager",
+    font_name="Monaco",
+    font_size=12
+)
+renderer.initialize()
+
+try:
+    # Initialize colors
+    renderer.init_color_pair(1, (255, 255, 255), (30, 30, 30))
+    
+    # Draw text
+    renderer.draw_text(0, 0, "Desktop Application", color_pair=1)
+    renderer.refresh()
+    
+    # Event loop
+    while True:
+        event = renderer.get_input()
+        if event and event.key_code == KeyCode.ESCAPE:
+            break
+    
+finally:
+    renderer.shutdown()
+```
+
 ### MetalBackend
 
 Native macOS desktop application backend using Apple's Metal framework.

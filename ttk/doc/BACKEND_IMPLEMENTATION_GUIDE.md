@@ -712,6 +712,28 @@ This minimal backend can be used for testing without requiring a real display.
 4. Document platform-specific requirements
 5. Submit your backend to the TTK project (if open source)
 
+## Example Backends
+
+TTK includes several backend implementations you can study:
+
+### CursesBackend (`ttk/backends/curses_backend.py`)
+- Terminal-based rendering using Python's curses library
+- Works on all Unix-like systems
+- Good example of handling terminal-specific features
+
+### CoreGraphicsBackend (`ttk/backends/coregraphics_backend.py`)
+- Native macOS rendering using CoreGraphics/Quartz 2D
+- Simple implementation (~300 lines)
+- Excellent example of native platform integration
+- Shows how to use NSAttributedString for text rendering
+- Demonstrates coordinate system transformation
+
+### MetalBackend (`ttk/backends/metal_backend.py`)
+- GPU-accelerated rendering using Apple's Metal framework
+- More complex implementation (~1000+ lines)
+- Shows advanced rendering pipeline setup
+- Good example of shader-based rendering
+
 ## Resources
 
 - [API Reference](API_REFERENCE.md) - Complete API documentation

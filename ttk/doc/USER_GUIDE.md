@@ -37,13 +37,28 @@ This installs TTK with the curses backend, which works on all Unix-like systems 
 
 ### macOS Desktop Support
 
-For native macOS desktop applications with the Metal backend:
+For native macOS desktop applications, TTK provides two backends:
 
+**CoreGraphics Backend** (recommended for most applications):
+```bash
+pip install pyobjc-framework-Cocoa
+```
+
+The CoreGraphics backend provides:
+- Simple, lightweight implementation (~300 lines)
+- Native macOS text rendering quality
+- Full Unicode and emoji support
+- Automatic font fallback
+
+**Metal Backend** (for GPU-accelerated rendering):
 ```bash
 pip install ttk[metal]
 ```
 
-This installs additional dependencies needed for Metal rendering.
+The Metal backend provides:
+- GPU-accelerated rendering
+- 60 FPS performance
+- More complex implementation (~1000+ lines)
 
 ### Development Installation
 
@@ -444,7 +459,15 @@ Select the appropriate backend for your platform:
 from ttk.backends.curses_backend import CursesBackend
 renderer = CursesBackend()
 
-# macOS desktop application
+# macOS desktop application - CoreGraphics (recommended)
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+renderer = CoreGraphicsBackend(
+    window_title="My App",
+    font_name="Menlo",
+    font_size=14
+)
+
+# macOS desktop application - Metal (GPU-accelerated)
 from ttk.backends.metal_backend import MetalBackend
 renderer = MetalBackend(
     window_title="My App",
@@ -452,6 +475,11 @@ renderer = MetalBackend(
     font_size=14
 )
 ```
+
+**Which macOS backend should I use?**
+
+- **CoreGraphics**: Best for most applications. Simple, lightweight, excellent text quality.
+- **Metal**: Use when you need GPU acceleration or 60 FPS rendering.
 
 ### Automatic Backend Selection
 
@@ -462,7 +490,10 @@ from ttk.utils.platform_utils import get_recommended_backend
 
 backend_name = get_recommended_backend()
 
-if backend_name == 'metal':
+if backend_name == 'coregraphics':
+    from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+    renderer = CoreGraphicsBackend()
+elif backend_name == 'metal':
     from ttk.backends.metal_backend import MetalBackend
     renderer = MetalBackend()
 else:
@@ -477,14 +508,19 @@ Allow users to choose the backend:
 ```python
 import argparse
 from ttk.backends.curses_backend import CursesBackend
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.backends.metal_backend import MetalBackend
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--backend', choices=['curses', 'metal'],
-                   default='curses', help='Rendering backend')
+parser.add_argument('--backend', 
+                   choices=['curses', 'coregraphics', 'metal'],
+                   default='curses', 
+                   help='Rendering backend')
 args = parser.parse_args()
 
-if args.backend == 'metal':
+if args.backend == 'coregraphics':
+    renderer = CoreGraphicsBackend()
+elif args.backend == 'metal':
     renderer = MetalBackend()
 else:
     renderer = CursesBackend()
@@ -637,7 +673,7 @@ pip install ttk[metal]
 
 ### Terminal Colors Look Wrong
 
-The curses backend approximates RGB colors to terminal colors. For accurate colors, use the Metal backend on macOS.
+The curses backend approximates RGB colors to terminal colors. For accurate colors, use the CoreGraphics or Metal backend on macOS.
 
 ### Application Doesn't Respond to Input
 
@@ -677,6 +713,13 @@ To manually fix a corrupted terminal:
 reset
 ```
 
+### CoreGraphics Backend Not Available
+
+The CoreGraphics backend requires macOS and PyObjC. Install with:
+```bash
+pip install pyobjc-framework-Cocoa
+```
+
 ### Metal Backend Not Available
 
 The Metal backend requires macOS and PyObjC. Install with:
@@ -686,8 +729,8 @@ pip install ttk[metal]
 
 ### Font Validation Error
 
-The Metal backend only supports monospace fonts. Use fonts like:
-- Menlo
+The CoreGraphics and Metal backends only support monospace fonts. Use fonts like:
+- Menlo (default)
 - Monaco
 - Courier New
 - SF Mono

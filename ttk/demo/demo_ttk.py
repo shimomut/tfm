@@ -7,13 +7,14 @@ with both curses and Metal backends. It provides a test interface to verify
 that both backends work correctly and produce equivalent output.
 
 Usage:
-    python ttk/demo/demo_ttk.py [--backend {curses|metal}]
-    python -m ttk.demo.demo_ttk [--backend {curses|metal}]
+    python ttk/demo/demo_ttk.py [--backend {curses|metal|coregraphics}]
+    python -m ttk.demo.demo_ttk [--backend {curses|metal|coregraphics}]
 
 Options:
     --backend    Choose rendering backend (default: auto-detect)
                  - curses: Terminal-based rendering
                  - metal: Native macOS desktop rendering (macOS only)
+                 - coregraphics: Native macOS CoreGraphics rendering (macOS only)
                  - auto: Automatically select best backend for platform
 """
 
@@ -29,6 +30,7 @@ if __name__ == '__main__':
 
 from ttk.backends.curses_backend import CursesBackend
 from ttk.backends.metal_backend import MetalBackend
+from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.utils.utils import get_recommended_backend
 from ttk.renderer import Renderer
 from ttk.demo.test_interface import create_test_interface
@@ -78,10 +80,22 @@ class DemoApplication:
                 font_name="Monaco",
                 font_size=14
             )
+        elif self.backend_name == 'coregraphics':
+            # Check if we're on macOS
+            if platform.system() != 'Darwin':
+                raise ValueError(
+                    "CoreGraphics backend is only available on macOS. "
+                    "Use --backend curses for other platforms."
+                )
+            return CoreGraphicsBackend(
+                window_title="TTK Demo Application - CoreGraphics",
+                font_name="Menlo",
+                font_size=14
+            )
         else:
             raise ValueError(
                 f"Unknown backend: {self.backend_name}. "
-                "Valid options are: curses, metal, auto"
+                "Valid options are: curses, metal, coregraphics, auto"
             )
     
     def initialize(self):
@@ -156,12 +170,15 @@ Examples:
   
   # Use Metal backend (macOS only)
   python ttk/demo/demo_ttk.py --backend metal
+  
+  # Use CoreGraphics backend (macOS only)
+  python ttk/demo/demo_ttk.py --backend coregraphics
         """
     )
     
     parser.add_argument(
         '--backend',
-        choices=['curses', 'metal', 'auto'],
+        choices=['curses', 'metal', 'coregraphics', 'auto'],
         default='auto',
         help='Rendering backend to use (default: auto)'
     )
