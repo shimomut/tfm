@@ -146,6 +146,7 @@ class CoreGraphicsBackend(Renderer):
         
         # These will be initialized in initialize()
         self.window = None
+        self.window_delegate = None
         self.view = None
         self.font = None
         self.char_width = 0
@@ -157,22 +158,33 @@ class CoreGraphicsBackend(Renderer):
         self.cursor_visible = False
         self.cursor_row = 0
         self.cursor_col = 0
+        
+        # Window state
+        self.should_close = False
     
     def initialize(self) -> None:
         """
         Initialize the rendering backend and create the window.
         
         This method:
-        1. Loads and validates the monospace font
-        2. Calculates character dimensions
-        3. Creates the window and view
-        4. Initializes the character grid
-        5. Sets up default color pairs
+        1. Sets up the NSApplication as a proper GUI application
+        2. Loads and validates the monospace font
+        3. Calculates character dimensions
+        4. Creates the window and view
+        5. Initializes the character grid
+        6. Sets up default color pairs
         
         Raises:
             ValueError: If the specified font is not found
             RuntimeError: If window creation fails
         """
+        # Set up NSApplication as a proper GUI application
+        app = Cocoa.NSApplication.sharedApplication()
+        
+        # Set activation policy to regular application (shows in Dock, can be focused)
+        # This is critical for receiving keyboard events
+        app.setActivationPolicy_(Cocoa.NSApplicationActivationPolicyRegular)
+        
         # Load and validate font
         self._load_font()
         
@@ -274,6 +286,10 @@ class CoreGraphicsBackend(Renderer):
         # PyObjC method: setTitle_() corresponds to Objective-C setTitle:
         self.window.setTitle_(self.window_title)
         
+        # Create window delegate to handle window events
+        self.window_delegate = TTKWindowDelegate.alloc().initWithBackend_(self)
+        self.window.setDelegate_(self.window_delegate)
+        
         # Create and set up the custom TTKView
         content_rect = self.window.contentView().frame()
         # Use our custom initializer: initWithFrame_backend_()
@@ -285,6 +301,13 @@ class CoreGraphicsBackend(Renderer):
         # makeKeyAndOrderFront_() corresponds to Objective-C makeKeyAndOrderFront:
         # The parameter (None) is the sender, which we don't need
         self.window.makeKeyAndOrderFront_(None)
+        
+        # Make the view the first responder to receive keyboard events
+        self.window.makeFirstResponder_(self.view)
+        
+        # Activate the application to bring it to front
+        app = Cocoa.NSApplication.sharedApplication()
+        app.activateIgnoringOtherApps_(True)
     
     def _initialize_grid(self) -> None:
         """
@@ -754,6 +777,15 @@ class CoreGraphicsBackend(Renderer):
             event = backend.get_input(timeout_ms=-1)
             print(f"User pressed: {event.char}")
         """
+        # Check if window should close
+        if self.should_close:
+            # Return a special quit event (Q key)
+            return InputEvent(
+                key_code=ord('Q'),
+                modifiers=ModifierKey.NONE,
+                char='Q'
+            )
+        
         # Get the shared application instance
         app = Cocoa.NSApplication.sharedApplication()
         
@@ -771,12 +803,26 @@ class CoreGraphicsBackend(Renderer):
             # Corresponds to Objective-C: dateWithTimeIntervalSinceNow:
             until_date = Cocoa.NSDate.dateWithTimeIntervalSinceNow_(timeout_seconds)
         
-        # Define event mask for keyboard events
-        # We're interested in key down, key up, and modifier flag changes
+        # Define event mask for all events we care about
         event_mask = (
             Cocoa.NSEventMaskKeyDown |
             Cocoa.NSEventMaskKeyUp |
-            Cocoa.NSEventMaskFlagsChanged
+            Cocoa.NSEventMaskFlagsChanged |
+            Cocoa.NSEventMaskLeftMouseDown |
+            Cocoa.NSEventMaskLeftMouseUp |
+            Cocoa.NSEventMaskRightMouseDown |
+            Cocoa.NSEventMaskRightMouseUp |
+            Cocoa.NSEventMaskMouseMoved |
+            Cocoa.NSEventMaskLeftMouseDragged |
+            Cocoa.NSEventMaskRightMouseDragged |
+            Cocoa.NSEventMaskMouseEntered |
+            Cocoa.NSEventMaskMouseExited |
+            Cocoa.NSEventMaskScrollWheel |
+            Cocoa.NSEventMaskAppKitDefined |
+            Cocoa.NSEventMaskSystemDefined |
+            Cocoa.NSEventMaskApplicationDefined |
+            Cocoa.NSEventMaskPeriodic |
+            Cocoa.NSEventMaskCursorUpdate
         )
         
         # Poll for next event using PyObjC method name translation
@@ -799,6 +845,9 @@ class CoreGraphicsBackend(Renderer):
         # This allows the event to be processed by the normal Cocoa event chain
         # PyObjC method: sendEvent_() corresponds to Objective-C sendEvent:
         app.sendEvent_(event)
+        
+        # Update the display after processing events
+        app.updateWindows()
         
         # Translate the NSEvent to InputEvent
         return self._translate_event(event)
@@ -1014,6 +1063,108 @@ class CoreGraphicsBackend(Renderer):
         if self.cursor_visible and self.view:
             self.view.setNeedsDisplay_(True)
 
+
+# Define TTKWindowDelegate class for handling window events
+if COCOA_AVAILABLE:
+    try:
+        # Try to get existing class first
+        TTKWindowDelegate = objc.lookUpClass('TTKWindowDelegate')
+    except objc.nosuchclass_error:
+        # Class doesn't exist yet, create it
+        class TTKWindowDelegate(Cocoa.NSObject):
+            """
+            Window delegate for handling window events.
+            
+            This delegate handles window close events and resize events,
+            allowing the application to respond appropriately.
+            """
+            
+            def initWithBackend_(self, backend):
+                """
+                Initialize the window delegate with a backend reference.
+                
+                Args:
+                    backend: Reference to the CoreGraphicsBackend instance
+                
+                Returns:
+                    self: The initialized delegate instance
+                """
+                self = objc.super(TTKWindowDelegate, self).init()
+                if self is None:
+                    return None
+                
+                self.backend = backend
+                return self
+            
+            def windowShouldClose_(self, sender):
+                """
+                Handle window close button click.
+                
+                This method is called when the user clicks the window close button.
+                We set a flag to indicate the window should close, which will be
+                picked up by get_input().
+                
+                Args:
+                    sender: The window that is requesting to close
+                
+                Returns:
+                    bool: True to allow the window to close
+                """
+                self.backend.should_close = True
+                return True
+            
+            def windowDidResize_(self, notification):
+                """
+                Handle window resize events.
+                
+                This method is called when the window is resized. We recalculate
+                the grid dimensions based on the new window size and reinitialize
+                the character grid.
+                
+                Args:
+                    notification: NSNotification containing resize information
+                """
+                # Get the new content view size
+                content_rect = self.backend.window.contentView().frame()
+                new_width = int(content_rect.size.width)
+                new_height = int(content_rect.size.height)
+                
+                # Calculate new grid dimensions
+                new_cols = max(1, new_width // self.backend.char_width)
+                new_rows = max(1, new_height // self.backend.char_height)
+                
+                # Only update if dimensions actually changed
+                if new_cols != self.backend.cols or new_rows != self.backend.rows:
+                    # Store old grid
+                    old_grid = self.backend.grid
+                    old_rows = self.backend.rows
+                    old_cols = self.backend.cols
+                    
+                    # Update dimensions
+                    self.backend.cols = new_cols
+                    self.backend.rows = new_rows
+                    
+                    # Create new grid
+                    new_grid = [
+                        [(' ', 0, 0) for _ in range(new_cols)]
+                        for _ in range(new_rows)
+                    ]
+                    
+                    # Copy old content to new grid (as much as fits)
+                    for row in range(min(old_rows, new_rows)):
+                        for col in range(min(old_cols, new_cols)):
+                            new_grid[row][col] = old_grid[row][col]
+                    
+                    # Update grid
+                    self.backend.grid = new_grid
+                    
+                    # Trigger redraw
+                    self.backend.view.setNeedsDisplay_(True)
+else:
+    # Provide a dummy class when PyObjC is not available
+    class TTKWindowDelegate:
+        """Dummy TTKWindowDelegate class when PyObjC is not available."""
+        pass
 
 # Define TTKView class with proper PyObjC registration
 # Use try/except to handle the case where the class is already registered
