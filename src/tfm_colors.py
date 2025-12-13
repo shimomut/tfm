@@ -720,31 +720,31 @@ def get_line_number_color():
 
 def get_syntax_color(token_type):
     """
-    Get syntax highlighting color pair and attributes for a token type.
+    Get syntax highlighting color pair for a token type.
     
     Returns:
-        Tuple[int, int]: (color_pair, attributes)
+        int: color_pair constant
     """
     # Map pygments token types to our color pairs
     token_str = str(token_type)
     
     if 'Keyword' in token_str:
-        return COLOR_SYNTAX_KEYWORD, TextAttribute.NORMAL
+        return COLOR_SYNTAX_KEYWORD
     elif 'String' in token_str or 'Literal.String' in token_str:
-        return COLOR_SYNTAX_STRING, TextAttribute.NORMAL
+        return COLOR_SYNTAX_STRING
     elif 'Comment' in token_str:
-        return COLOR_SYNTAX_COMMENT, TextAttribute.NORMAL
+        return COLOR_SYNTAX_COMMENT
     elif 'Number' in token_str or 'Literal.Number' in token_str:
-        return COLOR_SYNTAX_NUMBER, TextAttribute.NORMAL
+        return COLOR_SYNTAX_NUMBER
     elif 'Operator' in token_str or 'Punctuation' in token_str:
-        return COLOR_SYNTAX_OPERATOR, TextAttribute.NORMAL
+        return COLOR_SYNTAX_OPERATOR
     elif 'Builtin' in token_str or 'Name.Builtin' in token_str:
-        return COLOR_SYNTAX_BUILTIN, TextAttribute.NORMAL
+        return COLOR_SYNTAX_BUILTIN
     elif 'Name' in token_str:
-        return COLOR_SYNTAX_NAME, TextAttribute.NORMAL
+        return COLOR_SYNTAX_NAME
     else:
         # Default to regular text color
-        return COLOR_REGULAR_FILE, TextAttribute.NORMAL
+        return COLOR_REGULAR_FILE
 
 def get_search_color():
     """

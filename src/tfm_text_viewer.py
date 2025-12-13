@@ -7,6 +7,7 @@ for popular file formats using pygments (optional dependency).
 """
 
 import os
+import traceback
 from tfm_path import Path
 from typing import List, Tuple, Optional, Dict, Any
 import re
@@ -421,15 +422,41 @@ class TextViewer:
     
     def get_display_dimensions(self) -> Tuple[int, int, int, int]:
         """Get the dimensions for the text display area"""
-        height, width = self.renderer.get_dimensions()
-        
-        # Reserve space for header (2 lines) and status bar (1 line)
-        start_y = 2
-        display_height = height - 3  # Header (2) + status bar (1)
-        start_x = 0
-        display_width = width
-        
-        return start_y, start_x, display_height, display_width
+        try:
+            dimensions = self.renderer.get_dimensions()
+            
+            # Ensure we got a tuple of two integers
+            if not isinstance(dimensions, tuple) or len(dimensions) != 2:
+                print(f"Warning: get_dimensions() returned unexpected value: {dimensions} (type: {type(dimensions)})")
+                # Fallback to reasonable defaults
+                height, width = 24, 80
+            else:
+                height, width = dimensions
+            
+            # Ensure height and width are integers
+            if not isinstance(height, int) or not isinstance(width, int):
+                print(f"Warning: get_dimensions() returned non-integer values: height={height} (type: {type(height)}), width={width} (type: {type(width)})")
+                height, width = 24, 80
+            
+            # Reserve space for header (2 lines) and status bar (1 line)
+            start_y = 2
+            display_height = max(1, height - 3)  # Header (2) + status bar (1), ensure at least 1
+            start_x = 0
+            display_width = max(1, width)  # Ensure at least 1
+            
+            # Final validation - ensure all return values are integers
+            assert isinstance(start_y, int), f"start_y is not int: {type(start_y)}"
+            assert isinstance(start_x, int), f"start_x is not int: {type(start_x)}"
+            assert isinstance(display_height, int), f"display_height is not int: {type(display_height)}"
+            assert isinstance(display_width, int), f"display_width is not int: {type(display_width)}"
+            
+            return start_y, start_x, display_height, display_width
+            
+        except Exception as e:
+            print(f"Error in get_display_dimensions: {e}")
+            traceback.print_exc()
+            # Return safe defaults
+            return 2, 0, 21, 80
     
     def draw_header(self):
         """Draw the viewer header"""
@@ -938,4 +965,5 @@ def view_text_file(renderer, file_path: Path) -> bool:
         return True
     except Exception as e:
         print(f"Error: Unexpected error viewing text file {file_path}: {e}")
+        traceback.print_exc()
         return False
