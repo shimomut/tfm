@@ -1955,6 +1955,8 @@ class FileManager:
                 init_colors(self.renderer, new_scheme)
                 print(f"Switched to {new_scheme} color scheme")
                 self.print_color_scheme_info()
+                # Clear screen to apply new background color immediately
+                self.clear_screen_with_background()
                 self.needs_full_redraw = True
                 
             elif option == "Toggle fallback color scheme":
@@ -1965,6 +1967,8 @@ class FileManager:
                 init_colors(self.renderer, color_scheme)
                 status = "enabled" if new_state else "disabled"
                 print(f"Fallback color mode: {status}")
+                # Clear screen to apply new background color immediately
+                self.clear_screen_with_background()
                 self.needs_full_redraw = True
         
         # Define the view options
@@ -2212,6 +2216,8 @@ class FileManager:
         
         # Print detailed color scheme info to log
         self.print_color_scheme_info()
+        # Clear screen to apply new background color immediately
+        self.clear_screen_with_background()
         self.needs_full_redraw = True
     
     def show_help_dialog(self):
@@ -2837,6 +2843,8 @@ class FileManager:
             print(f"Switched to {new_scheme} color scheme")
             # Print detailed color scheme info to log
             self.print_color_scheme_info()
+            # Clear screen to apply new background color immediately
+            self.clear_screen_with_background()
             self.needs_full_redraw = True
         elif self.is_key_for_action(event, 'select_all'):
             self.select_all()

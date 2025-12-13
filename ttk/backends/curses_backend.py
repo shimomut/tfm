@@ -390,6 +390,24 @@ class CursesBackend(Renderer):
         curses.init_pair(pair_id, fg, bg)
         self.color_pairs_initialized.add(pair_id)
     
+    def clear_color_cache(self) -> None:
+        """
+        Clear the color pair cache to allow reinitialization.
+        
+        This method clears the internal cache of initialized color pairs,
+        allowing them to be reinitialized with new colors. This is useful
+        when switching color schemes.
+        
+        Note: This does not clear color pair 1 (default white on black)
+        to maintain terminal background consistency.
+        """
+        # Keep color pair 1 (default background)
+        self.color_pairs_initialized = {1}
+        # Clear RGB to color cache to allow new color definitions
+        self.rgb_to_color_cache.clear()
+        # Reset color index for fullcolor mode
+        self.next_color_index = 16
+    
     def _rgb_to_curses_color(self, rgb: Tuple[int, int, int]) -> int:
         """
         Convert RGB to curses color code.

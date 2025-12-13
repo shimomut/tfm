@@ -287,6 +287,11 @@ def init_colors(renderer, color_scheme=None):
     if color_scheme:
         current_color_scheme = color_scheme
     
+    # Clear color cache to allow reinitialization with new colors
+    # This is essential for color scheme switching to work properly
+    if hasattr(renderer, 'clear_color_cache'):
+        renderer.clear_color_cache()
+    
     # Get RGB colors for current scheme
     rgb_colors = get_current_rgb_colors()
     
