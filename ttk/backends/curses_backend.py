@@ -90,6 +90,36 @@ class CursesBackend(Renderer):
             # Ignore errors during cleanup
             pass
     
+    def suspend(self) -> None:
+        """
+        Suspend curses to allow external programs to run.
+        
+        This method calls curses.endwin() to restore the terminal to normal mode,
+        allowing external programs to use the terminal. The curses state is preserved
+        and can be restored by calling resume().
+        """
+        try:
+            if self.stdscr:
+                curses.endwin()
+        except Exception:
+            # Ignore errors during suspend
+            pass
+    
+    def resume(self) -> None:
+        """
+        Resume curses after external program execution.
+        
+        This method restores the curses display after suspend() was called.
+        It refreshes the screen to restore the previous display state.
+        """
+        try:
+            if self.stdscr:
+                # Refresh the screen to restore curses mode
+                self.stdscr.refresh()
+        except Exception:
+            # Ignore errors during resume
+            pass
+    
     def get_dimensions(self) -> Tuple[int, int]:
         """
         Get terminal dimensions.

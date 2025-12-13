@@ -1125,14 +1125,14 @@ class FileManager:
                 # Use configured program from file associations
                 try:
                     # Suspend curses
-                    self.external_program_manager.suspend_curses(self.stdscr)
+                    self.external_program_manager.suspend_curses()
                     
                     # Launch the program
                     result = subprocess.run(command + [str(selected_file)], 
                                           cwd=str(current_pane['path']))
                     
                     # Resume curses
-                    self.external_program_manager.resume_curses(self.stdscr)
+                    self.external_program_manager.resume_curses()
                     
                     if result.returncode == 0:
                         print(f"Opened file: {selected_file.name}")
@@ -1143,7 +1143,7 @@ class FileManager:
                     
                 except Exception as e:
                     # Resume curses even if there's an error
-                    self.external_program_manager.resume_curses(self.stdscr)
+                    self.external_program_manager.resume_curses()
                     print(f"Error opening file: {e}")
                     self.needs_full_redraw = True
             elif is_text_file(selected_file):
@@ -1999,13 +1999,13 @@ class FileManager:
                     editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
                     
                     # Suspend curses
-                    self.external_program_manager.suspend_curses(self.stdscr)
+                    self.external_program_manager.suspend_curses()
                     
                     # Launch the text editor as a subprocess
                     result = subprocess.run([editor, config_path])
                     
                     # Resume curses
-                    self.external_program_manager.resume_curses(self.stdscr)
+                    self.external_program_manager.resume_curses()
                     
                     if result.returncode == 0:
                         print(f"Edited config file: {config_path}")
@@ -2016,12 +2016,12 @@ class FileManager:
                     
                 except FileNotFoundError:
                     # Resume curses even if editor not found
-                    self.external_program_manager.resume_curses(self.stdscr)
+                    self.external_program_manager.resume_curses()
                     print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
                     print("You can manually edit the file at: " + config_path)
                 except Exception as e:
                     # Resume curses even if there's an error
-                    self.external_program_manager.resume_curses(self.stdscr)
+                    self.external_program_manager.resume_curses()
                     print(f"Error opening config file: {e}")
                     print("You can manually edit the file at: " + config_path)
                 
@@ -2241,14 +2241,14 @@ class FileManager:
             # Use configured program from file associations
             try:
                 # Suspend curses
-                self.external_program_manager.suspend_curses(self.stdscr)
+                self.external_program_manager.suspend_curses()
                 
                 # Launch the viewer
                 result = subprocess.run(command + [str(selected_file)], 
                                       cwd=str(current_pane['path']))
                 
                 # Resume curses
-                self.external_program_manager.resume_curses(self.stdscr)
+                self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
                     print(f"Viewed file: {selected_file.name}")
@@ -2259,7 +2259,7 @@ class FileManager:
                 
             except Exception as e:
                 # Resume curses even if there's an error
-                self.external_program_manager.resume_curses(self.stdscr)
+                self.external_program_manager.resume_curses()
                 print(f"Error viewing file: {e}")
                 self.needs_full_redraw = True
         else:
@@ -2310,14 +2310,14 @@ class FileManager:
             # Use configured program from file associations
             try:
                 # Suspend curses
-                self.external_program_manager.suspend_curses(self.stdscr)
+                self.external_program_manager.suspend_curses()
                 
                 # Launch the editor
                 result = subprocess.run(command + [str(selected_file)], 
                                       cwd=str(current_pane['path']))
                 
                 # Resume curses
-                self.external_program_manager.resume_curses(self.stdscr)
+                self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
                     print(f"Edited file: {selected_file.name}")
@@ -2326,11 +2326,11 @@ class FileManager:
                     
             except FileNotFoundError:
                 # Resume curses even if editor not found
-                self.external_program_manager.resume_curses(self.stdscr)
+                self.external_program_manager.resume_curses()
                 print(f"Editor not found. Please check your file associations configuration.")
             except Exception as e:
                 # Resume curses even if there's an error
-                self.external_program_manager.resume_curses(self.stdscr)
+                self.external_program_manager.resume_curses()
                 print(f"Error launching editor: {e}")
         else:
             # Fallback to TEXT_EDITOR config for files without association
@@ -2338,14 +2338,14 @@ class FileManager:
             
             try:
                 # Suspend curses
-                self.external_program_manager.suspend_curses(self.stdscr)
+                self.external_program_manager.suspend_curses()
                 
                 # Launch the text editor
                 result = subprocess.run([editor, str(selected_file)], 
                                       cwd=str(current_pane['path']))
                 
                 # Resume curses
-                self.external_program_manager.resume_curses(self.stdscr)
+                self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
                     print(f"Edited file: {selected_file.name}")
@@ -2354,11 +2354,11 @@ class FileManager:
                     
             except FileNotFoundError:
                 # Resume curses even if editor not found
-                self.external_program_manager.resume_curses(self.stdscr)
+                self.external_program_manager.resume_curses()
                 print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
             except Exception as e:
                 # Resume curses even if there's an error
-                self.external_program_manager.resume_curses(self.stdscr)
+                self.external_program_manager.resume_curses()
                 print(f"Error launching editor: {e}")
     
     def copy_selected_files(self):

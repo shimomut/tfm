@@ -346,8 +346,12 @@ class ExternalProgramManager:
     
     def suspend_curses(self):
         """Suspend the renderer to allow external programs to run"""
-        self.renderer.suspend()
+        # Check if the renderer has a suspend method (CursesBackend does)
+        if hasattr(self.renderer, 'suspend'):
+            self.renderer.suspend()
         
     def resume_curses(self):
         """Resume the renderer after external program execution"""
-        self.renderer.resume()
+        # Check if the renderer has a resume method (CursesBackend does)
+        if hasattr(self.renderer, 'resume'):
+            self.renderer.resume()
