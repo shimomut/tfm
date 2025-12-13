@@ -349,6 +349,10 @@ class CursesBackend(Renderer):
         This method initializes a color pair with the specified RGB colors.
         The curses backend approximates RGB colors to the nearest terminal color.
         
+        For UI bars with gray backgrounds (headers/footers/status), we use 
+        reverse video (white-on-black becomes black-on-white) to create visible
+        contrast that simulates the gray bar appearance.
+        
         Args:
             pair_id: Color pair index (1-255, 0 is reserved)
             fg_color: Foreground color as (R, G, B) tuple (0-255 each)
@@ -374,9 +378,23 @@ class CursesBackend(Renderer):
         if pair_id in self.color_pairs_initialized:
             return
         
-        # Convert RGB to curses color (simplified - use closest terminal color)
+        # Convert RGB to curses color
         fg = self._rgb_to_curses_color(fg_color)
         bg = self._rgb_to_curses_color(bg_color)
+        
+        # Special handling for UI bars (headers, footers, status, boundaries)
+        # These have light foreground (220,220,220) and dark gray background (51,63,76)
+        # Both map to WHITE, so we need to create contrast
+        if fg == curses.COLOR_WHITE and bg == curses.COLOR_WHITE:
+            fg_brightness = sum(fg_color) / 3
+            bg_brightness = sum(bg_color) / 3
+            bg_saturation = max(bg_color) - min(bg_color)
+            
+            # If foreground is bright (>200) and background is dark gray (<100)
+            # Use reverse video: black text on white background
+            if fg_brightness > 200 and bg_brightness < 100 and bg_saturation < 40:
+                fg = curses.COLOR_BLACK
+                bg = curses.COLOR_WHITE
         
         curses.init_pair(pair_id, fg, bg)
         self.color_pairs_initialized.add(pair_id)
@@ -385,8 +403,8 @@ class CursesBackend(Renderer):
         """
         Convert RGB to curses color code.
         
-        This is a simplified mapping to the 8 basic terminal colors.
-        More sophisticated implementations could use 256-color mode.
+        This maps RGB colors to the 8 basic terminal colors, attempting to
+        preserve the visual appearance as much as possible.
         
         Args:
             rgb: RGB color tuple (R, G, B) with values 0-255
@@ -396,23 +414,58 @@ class CursesBackend(Renderer):
         """
         r, g, b = rgb
         
-        # Simple color mapping based on RGB values
-        if r < 128 and g < 128 and b < 128:
+        # Calculate brightness
+        brightness = (r + g + b) / 3
+        
+        # Very dark colors (near black)
+        if brightness < 30:
             return curses.COLOR_BLACK
-        elif r > 200 and g > 200 and b > 200:
+        
+        # Very bright colors (near white)
+        if brightness > 200:
             return curses.COLOR_WHITE
-        elif r > g and r > b:
-            return curses.COLOR_RED
-        elif g > r and g > b:
-            return curses.COLOR_GREEN
-        elif b > r and b > g:
-            return curses.COLOR_BLUE
-        elif r > 128 and g > 128:
+        
+        # Calculate saturation and dominant color
+        max_component = max(r, g, b)
+        min_component = min(r, g, b)
+        saturation = max_component - min_component
+        
+        # Low saturation (gray tones) - map based on brightness
+        if saturation < 40:
+            # Dark gray (like 51,63,76 or 80,80,80) -> map to white for visibility
+            if brightness < 100:
+                return curses.COLOR_WHITE
+            # Medium gray (like 128,128,128) -> map to white
+            elif brightness < 180:
+                return curses.COLOR_WHITE
+            # Light gray (like 220,220,220) -> map to white
+            else:
+                return curses.COLOR_WHITE
+        
+        # Saturated colors - determine dominant hue
+        # Yellow-ish colors (like 204,204,120 for directories)
+        if r > 180 and g > 180 and b < 150:
             return curses.COLOR_YELLOW
-        elif r > 128 and b > 128:
-            return curses.COLOR_MAGENTA
-        elif g > 128 and b > 128:
+        # Green colors (like 51,229,51 for executables or 0,255,0 for strings)
+        elif g > max(r, b) + 50:
+            return curses.COLOR_GREEN
+        # Blue colors (like 40,80,160 for selected or 100,200,255 for system logs)
+        elif b > max(r, g) + 30:
+            return curses.COLOR_BLUE
+        # Cyan colors (like 0,255,255 for built-ins)
+        elif g > 180 and b > 180 and r < 100:
             return curses.COLOR_CYAN
+        # Magenta colors (like 255,0,255 for operators)
+        elif r > 180 and b > 180 and g < 100:
+            return curses.COLOR_MAGENTA
+        # Red colors (like 255,0,0 for errors)
+        elif r > max(g, b) + 50:
+            return curses.COLOR_RED
+        # Yellow (for numbers like 255,255,0)
+        elif r > 180 and g > 180:
+            return curses.COLOR_YELLOW
+        
+        # Default to white for unclassified colors
         return curses.COLOR_WHITE
     
     def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
