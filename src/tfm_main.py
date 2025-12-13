@@ -187,7 +187,7 @@ class FileManager:
                 return
                 
             # Truncate text if it would exceed screen width
-            max_len = width - x - 1  # Leave space to avoid last column
+            max_len = width - x
             if max_len <= 0:
                 return
                 
@@ -624,10 +624,10 @@ class FileManager:
         left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         right_pane_width = width - left_pane_width
         
-        # Clear header area (avoid last column)
+        # Clear header area
         try:
             color_pair, attributes = get_header_color()
-            self.renderer.draw_text(0, 0, " " * (width - 1), color_pair=color_pair, attributes=attributes)
+            self.renderer.draw_text(0, 0, " " * width, color_pair=color_pair, attributes=attributes)
         except Exception:
             pass
         
@@ -924,7 +924,7 @@ class FileManager:
         # Progress display takes precedence over everything else during operations
         if self.progress_manager.is_operation_active():
             # Fill entire status line with background color
-            status_line = " " * (width - 1)
+            status_line = " " * width
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
             # Get formatted progress text from progress manager
@@ -944,7 +944,7 @@ class FileManager:
         # If in isearch mode, show isearch interface
         if self.isearch_mode:
             # Fill entire status line with background color
-            status_line = " " * (width - 1)
+            status_line = " " * width
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
             # Show isearch prompt and pattern
@@ -1002,7 +1002,7 @@ class FileManager:
         
         # Draw status line with background color
         # Fill entire status line with background color
-        status_line = " " * (width - 1)
+        status_line = " " * width
         self.safe_addstr(status_y, 0, status_line, get_status_color())
         
         # Draw status info and controls
