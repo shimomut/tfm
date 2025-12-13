@@ -135,11 +135,14 @@ def _get_backend_options(backend_name, args):
         - window_title: Application window title
         - font_name: Font to use for rendering
         - font_size: Font size in points
-        - window_width: Initial window width in pixels
-        - window_height: Initial window height in pixels
+        - rows: Initial window height in character rows
+        - cols: Initial window width in character columns
         
         Options can be customized via user configuration (DESKTOP_FONT_NAME,
         DESKTOP_FONT_SIZE, DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT).
+        
+        Window dimensions in pixels are converted to character dimensions
+        using approximate character size calculations based on font size.
     
     Args:
         backend_name: Name of the backend ('curses' or 'coregraphics')
@@ -150,13 +153,10 @@ def _get_backend_options(backend_name, args):
     """
     if backend_name == 'coregraphics':
         # Default CoreGraphics options
-        options = {
-            'window_title': 'TFM - TUI File Manager',
-            'font_name': 'Menlo',
-            'font_size': 14,
-            'window_width': 1200,
-            'window_height': 800,
-        }
+        font_name = 'Menlo'
+        font_size = 14
+        window_width = 1200
+        window_height = 800
         
         # Try to load custom options from configuration
         try:
@@ -165,23 +165,39 @@ def _get_backend_options(backend_name, args):
             
             # Override with user configuration if available
             if hasattr(config, 'DESKTOP_FONT_NAME'):
-                options['font_name'] = config.DESKTOP_FONT_NAME
+                font_name = config.DESKTOP_FONT_NAME
             
             if hasattr(config, 'DESKTOP_FONT_SIZE'):
-                options['font_size'] = config.DESKTOP_FONT_SIZE
+                font_size = config.DESKTOP_FONT_SIZE
             
             if hasattr(config, 'DESKTOP_WINDOW_WIDTH'):
-                options['window_width'] = config.DESKTOP_WINDOW_WIDTH
+                window_width = config.DESKTOP_WINDOW_WIDTH
             
             if hasattr(config, 'DESKTOP_WINDOW_HEIGHT'):
-                options['window_height'] = config.DESKTOP_WINDOW_HEIGHT
+                window_height = config.DESKTOP_WINDOW_HEIGHT
         
         except Exception as e:
             # If config loading fails, just use defaults
             print(f"Warning: Could not load desktop mode configuration: {e}", file=sys.stderr)
             print("Using default desktop mode options", file=sys.stderr)
         
-        return options
+        # Calculate approximate character dimensions from pixel dimensions
+        # These are rough estimates - the backend will calculate exact dimensions
+        # based on the actual font metrics
+        char_width = font_size * 0.6  # Approximate width for monospace fonts
+        char_height = font_size * 1.2  # Approximate height with line spacing
+        
+        cols = int(window_width / char_width)
+        rows = int(window_height / char_height)
+        
+        # Return options that match CoreGraphicsBackend.__init__ parameters
+        return {
+            'window_title': 'TFM - TUI File Manager',
+            'font_name': font_name,
+            'font_size': font_size,
+            'rows': rows,
+            'cols': cols,
+        }
     
     # Curses backend needs no special options
     return {}
