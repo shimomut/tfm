@@ -388,6 +388,10 @@ class TextViewer:
     
     def handle_isearch_input(self, event: InputEvent) -> bool:
         """Handle input while in isearch mode. Returns True if key was handled."""
+        # Handle None event
+        if event is None:
+            return False
+        
         if event.key_code == KeyCode.ESCAPE:
             self.exit_isearch_mode()
             return True
@@ -770,6 +774,10 @@ class TextViewer:
     
     def handle_key(self, event: InputEvent) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
+        # Handle None event
+        if event is None:
+            return True
+        
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
         # Handle isearch mode input first
