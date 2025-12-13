@@ -1150,7 +1150,7 @@ class FileManager:
                 # Fallback to text viewer for text files without association
                 self.renderer.set_cursor_visibility(False)
                 
-                if view_text_file(self.stdscr, selected_file):
+                if view_text_file(self.renderer, selected_file):
                     print(f"Viewed file: {selected_file.name}")
                 else:
                     self.show_info(f"File: {selected_file.name}")
@@ -2269,7 +2269,7 @@ class FileManager:
                 try:
                     self.renderer.set_cursor_visibility(False)
                     
-                    if view_text_file(self.stdscr, selected_file):
+                    if view_text_file(self.renderer, selected_file):
                         print(f"Viewed text file: {selected_file.name}")
                     else:
                         print(f"Failed to view file: {selected_file.name}")
@@ -2747,7 +2747,7 @@ class FileManager:
         
         # Handle general dialog input
         if self.general_dialog.is_active:
-            if self.general_dialog.handle_key(event):
+            if self.general_dialog.handle_input(event):
                 return True  # General dialog handled the event
         
         # Handle quick choice mode input

@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from tfm_main import FileManager
 from tfm_config import get_config
 from ttk import KeyCode
+from ttk.input_event import InputEvent
 
 
 def test_dialog_rendering_optimization():
@@ -49,7 +50,7 @@ def test_dialog_rendering_optimization():
     assert fm._check_dialog_content_changed() == False, "Should not detect content change after marking unchanged"
     
     # Test 5: Check that text input marks content as changed
-    fm.general_dialog.handle_key(ord('a'))  # Type a character
+    fm.general_dialog.handle_input(InputEvent(ord('a'), 'a'))  # Type a character
     assert fm.general_dialog.content_changed == True, "Content should be marked as changed after text input"
     
     # Test 6: Check list dialog content change tracking
