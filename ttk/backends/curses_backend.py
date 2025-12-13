@@ -408,6 +408,31 @@ class CursesBackend(Renderer):
         # Reset color index for fullcolor mode
         self.next_color_index = 16
     
+    def set_fullcolor_mode(self, enabled: bool) -> None:
+        """
+        Enable or disable fullcolor mode.
+        
+        When fullcolor mode is enabled, colors are rendered using exact RGB values
+        (if the terminal supports it). When disabled, colors are approximated to
+        the nearest 8/16 basic terminal colors.
+        
+        This is useful for testing color approximation or working with terminals
+        that have issues with custom color definitions.
+        
+        Args:
+            enabled: True to enable fullcolor mode, False to use 8/16 color approximation
+        """
+        self.fullcolor_mode = enabled
+    
+    def get_fullcolor_mode(self) -> bool:
+        """
+        Check if fullcolor mode is currently enabled.
+        
+        Returns:
+            bool: True if fullcolor mode is enabled, False if using 8/16 color approximation
+        """
+        return self.fullcolor_mode
+    
     def _rgb_to_curses_color(self, rgb: Tuple[int, int, int]) -> int:
         """
         Convert RGB to curses color code.

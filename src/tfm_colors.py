@@ -287,6 +287,11 @@ def init_colors(renderer, color_scheme=None):
     if color_scheme:
         current_color_scheme = color_scheme
     
+    # Set fullcolor mode based on force_fallback_colors flag
+    # When force_fallback_colors is True, disable fullcolor mode to use 8/16 color approximation
+    if hasattr(renderer, 'set_fullcolor_mode'):
+        renderer.set_fullcolor_mode(not force_fallback_colors)
+    
     # Clear color cache to allow reinitialization with new colors
     # This is essential for color scheme switching to work properly
     if hasattr(renderer, 'clear_color_cache'):
