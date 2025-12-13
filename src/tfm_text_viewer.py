@@ -27,6 +27,7 @@ except ImportError:
 from tfm_colors import *
 from tfm_const import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width, split_at_width, safe_get_display_width
+from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 
 
 class TextViewer:
@@ -623,8 +624,11 @@ class TextViewer:
             # Use original line count for line number width calculation
             line_num_width = len(str(len(self.lines))) + 2
         
-        # Available width for content
-        content_width = display_width - line_num_width
+        # Reserve space for scroll bar if needed
+        scroll_bar_width = calculate_scrollbar_width(len(display_lines), display_height)
+        
+        # Available width for content (account for line numbers and scroll bar)
+        content_width = display_width - line_num_width - scroll_bar_width
         
         # Get background color for filling empty areas
         bg_color_pair, bg_attrs = get_background_color_pair()
@@ -730,6 +734,10 @@ class TextViewer:
                 # Stop if we've filled the line
                 if display_x - x_pos >= content_width:
                     break
+        
+        # Draw scroll bar on the right side using unified implementation
+        draw_scrollbar(self.renderer, start_y, display_width - 1, display_height, 
+                      len(display_lines), self.scroll_offset)
     
     def get_original_line_number(self, display_line_index: int) -> int:
         """

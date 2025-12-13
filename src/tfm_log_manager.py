@@ -12,6 +12,7 @@ from datetime import datetime
 from collections import deque
 from tfm_const import LOG_TIME_FORMAT, MAX_LOG_MESSAGES
 from tfm_colors import get_log_color, get_status_color
+from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 
 
 class LogCapture:
@@ -359,7 +360,7 @@ class LogManager:
             display_height = height  # Use full height for messages
             
             # Reserve space for scrollbar if we have messages
-            scrollbar_width = 1 if len(self.log_messages) > display_height else 0
+            scrollbar_width = calculate_scrollbar_width(len(self.log_messages), display_height)
             content_width = width - scrollbar_width
             
             if self.log_messages and display_height > 0:
@@ -394,9 +395,11 @@ class LogManager:
                     color_pair, attributes = get_log_color(source)
                     renderer.draw_text(y, 0, log_line.ljust(content_width)[:content_width], color_pair=color_pair, attributes=attributes)
                 
-                # Draw scrollbar if needed
+                # Draw scrollbar if needed using unified implementation
+                # Use inverted=True because scroll_offset=0 means bottom (newest messages)
                 if scrollbar_width > 0:
-                    self._draw_scrollbar(renderer, y_start, height, width, total_messages, display_height)
+                    draw_scrollbar(renderer, y_start, width - 1, height, 
+                                 total_messages, self.log_scroll_offset, inverted=True)
             
         except Exception:
             pass  # Ignore drawing errors
@@ -405,54 +408,7 @@ class LogManager:
             # This ensures updates are marked as processed even if drawing fails
             self.mark_log_updates_processed()
     
-    def _draw_scrollbar(self, renderer, y_start, height, width, total_messages, display_height):
-        """Draw a scrollbar for the log pane"""
-        try:
-            from tfm_colors import get_boundary_color, get_status_color
-            from ttk.renderer import TextAttribute
-            
-            scrollbar_x = width - 1
-            
-            # Calculate scrollbar position and size
-            if total_messages <= display_height:
-                # No scrolling needed, fill entire scrollbar
-                status_color_pair, status_attrs = get_status_color()
-                for y in range(height):
-                    renderer.draw_text(y_start + y, scrollbar_x, "█", color_pair=status_color_pair, attributes=status_attrs)
-            else:
-                # Calculate thumb position and size
-                # Thumb size represents the visible portion
-                thumb_size = max(1, int((display_height / total_messages) * height))
-                
-                # Calculate thumb position based on scroll offset
-                # When scroll_offset is 0, we're at the bottom (newest messages)
-                # When scroll_offset is max, we're at the top (oldest messages)
-                max_scroll = total_messages - display_height
-                if max_scroll > 0:
-                    # Invert the scroll position since 0 means bottom in our system
-                    scroll_ratio = self.log_scroll_offset / max_scroll
-                    thumb_start = int((height - thumb_size) * (1 - scroll_ratio))
-                else:
-                    thumb_start = height - thumb_size
-                
-                thumb_end = min(height, thumb_start + thumb_size)
-                
-                # Get colors once
-                status_color_pair, status_attrs = get_status_color()
-                boundary_color_pair, boundary_attrs = get_boundary_color()
-                
-                # Draw scrollbar track and thumb
-                for y in range(height):
-                    y_pos = y_start + y
-                    if thumb_start <= y < thumb_end:
-                        # Draw thumb
-                        renderer.draw_text(y_pos, scrollbar_x, "█", color_pair=status_color_pair, attributes=status_attrs)
-                    else:
-                        # Draw track
-                        renderer.draw_text(y_pos, scrollbar_x, "│", color_pair=boundary_color_pair, attributes=boundary_attrs)
-                        
-        except Exception:
-            pass  # Ignore drawing errors
+
     
     def stop_remote_server(self):
         """Stop the remote server and close all connections"""

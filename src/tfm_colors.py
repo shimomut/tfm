@@ -59,6 +59,10 @@ COLOR_SEARCH_CURRENT = 23    # Current search match highlighting
 # Background color pair
 COLOR_BACKGROUND = 27        # Background color for filling areas
 
+# Scroll bar colors
+COLOR_SCROLLBAR = 29         # Scroll bar track
+COLOR_SCROLLBAR_THUMB = 30   # Scroll bar thumb (movable part)
+
 # Current color scheme
 current_color_scheme = 'dark'
 
@@ -158,6 +162,15 @@ COLOR_SCHEMES = {
             'color_num': 119,
             'rgb': (40, 80, 160)    # Medium blue background for current search match
         },
+        # Scroll bar colors
+        'SCROLLBAR_FG': {
+            'color_num': 148,
+            'rgb': (80, 80, 80)     # Dark gray for scroll bar track
+        },
+        'SCROLLBAR_THUMB_FG': {
+            'color_num': 149,
+            'rgb': (150, 150, 150)  # Light gray for scroll bar thumb
+        },
         'DEFAULT_FG': {
             'color_num': 146,
             'rgb': (220, 220, 220)  # Light gray for default foreground
@@ -253,6 +266,15 @@ COLOR_SCHEMES = {
         'SEARCH_CURRENT_BG': {
             'color_num': 139,
             'rgb': (140, 200, 255)    # Light blue background for current search match
+        },
+        # Scroll bar colors
+        'SCROLLBAR_FG': {
+            'color_num': 150,
+            'rgb': (180, 180, 180)  # Light gray for scroll bar track
+        },
+        'SCROLLBAR_THUMB_FG': {
+            'color_num': 151,
+            'rgb': (100, 100, 100)  # Medium gray for scroll bar thumb
         },
         'DEFAULT_FG': {
             'color_num': 148,
@@ -383,6 +405,12 @@ def init_colors(renderer, color_scheme=None):
     # Search highlighting color pairs
     renderer.init_color_pair(COLOR_SEARCH_MATCH, default_fg, search_match_bg)
     renderer.init_color_pair(COLOR_SEARCH_CURRENT, default_fg, search_current_bg)
+    
+    # Scroll bar colors
+    scrollbar_fg = rgb_colors['SCROLLBAR_FG']['rgb']
+    scrollbar_thumb_fg = rgb_colors['SCROLLBAR_THUMB_FG']['rgb']
+    renderer.init_color_pair(COLOR_SCROLLBAR, scrollbar_fg, default_bg)
+    renderer.init_color_pair(COLOR_SCROLLBAR_THUMB, scrollbar_thumb_fg, default_bg)
     
     # Background color pair for filling areas
     renderer.init_color_pair(COLOR_BACKGROUND, default_fg, default_bg)
@@ -787,3 +815,21 @@ def get_color_with_attrs(color_pair):
         Tuple[int, int]: (color_pair, TextAttribute.NORMAL)
     """
     return color_pair, TextAttribute.NORMAL
+
+def get_scrollbar_color():
+    """
+    Get scroll bar track color pair and attributes.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_SCROLLBAR, TextAttribute.NORMAL
+
+def get_scrollbar_thumb_color():
+    """
+    Get scroll bar thumb color pair and attributes.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_SCROLLBAR_THUMB, TextAttribute.NORMAL

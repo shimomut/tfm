@@ -8,6 +8,7 @@ from ttk import TextAttribute, KeyCode
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, get_safe_functions
+from tfm_scrollbar import draw_scrollbar
 
 
 class BaseListDialog:
@@ -331,7 +332,7 @@ class BaseListDialog:
                 self.renderer.draw_text(y, start_x, display_text, color_pair=status_color_pair, attributes=item_attributes)
                 
     def draw_scrollbar(self, items_list, start_y, content_height, scrollbar_x):
-        """Draw scrollbar if needed
+        """Draw scrollbar if needed using unified implementation
         
         Args:
             items_list: List of items
@@ -339,24 +340,8 @@ class BaseListDialog:
             content_height: Height of content area
             scrollbar_x: X position for scrollbar
         """
-        height, _ = self.renderer.get_dimensions()
-        
-        if len(items_list) > content_height:
-            # Calculate scroll thumb position
-            total_items = len(items_list)
-            if total_items > 0:
-                thumb_pos = int((self.scroll / max(1, total_items - content_height)) * (content_height - 1))
-                thumb_pos = max(0, min(content_height - 1, thumb_pos))
-                
-                status_color_pair, _ = get_status_color()
-                for i in range(content_height):
-                    y = start_y + i
-                    if y < height:
-                        if i == thumb_pos:
-                            self.renderer.draw_text(y, scrollbar_x, "█", color_pair=status_color_pair, attributes=TextAttribute.BOLD)
-                        else:
-                            # Note: TTK doesn't have A_DIM, using NORMAL instead
-                            self.renderer.draw_text(y, scrollbar_x, "░", color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
+        draw_scrollbar(self.renderer, start_y, scrollbar_x, content_height, 
+                      len(items_list), self.scroll)
                             
     def draw_help_text(self, help_text, y, start_x, dialog_width):
         """Draw help text at the bottom of the dialog

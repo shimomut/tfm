@@ -10,6 +10,7 @@ from tfm_colors import get_status_color
 from tfm_config import config_manager
 from tfm_wide_char_utils import get_display_width, get_safe_functions
 from tfm_input_compat import ensure_input_event
+from tfm_scrollbar import draw_scrollbar
 
 
 class InfoDialog(BaseListDialog):
@@ -218,26 +219,10 @@ class InfoDialog(BaseListDialog):
             total_lines = len(self.lines)
             scroll_pos = self.scroll
             
-            # Scroll bar on the right side
+            # Scroll bar on the right side using unified implementation
             scrollbar_x = start_x + dialog_width - 2
-            scrollbar_start_y = content_start_y
-            scrollbar_height = content_height
-            
-            # Calculate scroll thumb position
-            if total_lines > 0:
-                thumb_pos = int((scroll_pos / max(1, total_lines - content_height)) * (scrollbar_height - 1))
-                thumb_pos = max(0, min(scrollbar_height - 1, thumb_pos))
-                
-                for i in range(scrollbar_height):
-                    y = scrollbar_start_y + i
-                    if y < height:
-                        if i == thumb_pos:
-                            self.renderer.draw_text(y, scrollbar_x, "█", 
-                                                   color_pair=border_color_pair, attributes=border_attributes)
-                        else:
-                            # Note: TTK doesn't have A_DIM, using NORMAL instead
-                            self.renderer.draw_text(y, scrollbar_x, "░", 
-                                                   color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
+            draw_scrollbar(self.renderer, content_start_y, scrollbar_x, content_height,
+                         total_lines, scroll_pos)
         
         # Draw help text at bottom
         help_text = "↑↓:scroll  PgUp/PgDn:page  Home/End:top/bottom  Q/ESC:close"
