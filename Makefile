@@ -7,6 +7,8 @@ help:
 	@echo ""
 	@echo "Available commands:"
 	@echo "  run          - Run TFM"
+	@echo "  run-debug    - Run TFM with debug mode (full stack traces)"
+	@echo "  run-log      - Run TFM with remote log monitoring"
 	@echo "  test         - Run all tests"
 	@echo "  test-quick   - Run quick verification tests"
 	@echo "  clean        - Clean up temporary files"
@@ -19,6 +21,9 @@ run:
 	@python3 tfm.py
 
 run-debug:
+	@python3 tfm.py --debug
+
+run-log:
 	@python3 tfm.py --remote-log-port 8123
 
 monitor-log:

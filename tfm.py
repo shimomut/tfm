@@ -8,6 +8,7 @@ A terminal-based file manager using curses with dual-pane interface.
 import sys
 import os
 import argparse
+import traceback
 from pathlib import Path
 
 # Setup module path for both development and installed package environments
@@ -90,6 +91,12 @@ def create_parser():
              'tfm-init (test exact TFM initialization sequence), diagnose (diagnose color issues)'
     )
     
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Enable debug mode (print full stack traces for uncaught exceptions)'
+    )
+    
     return parser
 
 def main():
@@ -99,6 +106,10 @@ def main():
     try:
         # Parse arguments
         args = parser.parse_args()
+        
+        # Store debug mode in environment for access by other modules
+        if args.debug:
+            os.environ['TFM_DEBUG'] = '1'
         
         # Handle color testing mode
         if args.color_test:
@@ -151,7 +162,16 @@ def main():
         print("\nTFM interrupted by user", file=sys.stderr)
         sys.exit(130)  # Standard exit code for SIGINT
     except Exception as e:
-        print(f"Error running TFM: {e}", file=sys.stderr)
+        # In debug mode, print full stack trace
+        if os.environ.get('TFM_DEBUG') == '1':
+            print("\n" + "="*60, file=sys.stderr)
+            print("UNCAUGHT EXCEPTION (Debug Mode)", file=sys.stderr)
+            print("="*60, file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            print("="*60, file=sys.stderr)
+        else:
+            print(f"Error running TFM: {e}", file=sys.stderr)
+            print("Run with --debug flag for full stack trace", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

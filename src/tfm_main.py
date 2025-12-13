@@ -936,7 +936,7 @@ class FileManager:
 
         # If in quick choice mode, show quick choice bar
         if self.quick_choice_bar.is_active:
-            self.quick_choice_bar.draw(self.stdscr, self.safe_addstr, status_y, width)
+            self.quick_choice_bar.draw(status_y, width)
             return
         
         # All dialogs are now handled as overlays in main drawing loop
