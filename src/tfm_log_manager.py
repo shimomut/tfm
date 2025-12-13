@@ -349,7 +349,7 @@ class LogManager:
             return True
         return False
     
-    def draw_log_pane(self, stdscr, y_start, height, width):
+    def draw_log_pane(self, renderer, y_start, height, width):
         """Draw the log pane at the specified position"""
         if height <= 0:
             return
@@ -391,12 +391,12 @@ class LogManager:
                         log_line = log_line[:content_width - 4] + "..."
                     
                     # Get color based on source
-                    color = get_log_color(source)
-                    stdscr.addstr(y, 0, log_line.ljust(content_width)[:content_width], color)
+                    color_pair, attributes = get_log_color(source)
+                    renderer.draw_text(y, 0, log_line.ljust(content_width)[:content_width], color_pair=color_pair, attributes=attributes)
                 
                 # Draw scrollbar if needed
                 if scrollbar_width > 0:
-                    self._draw_scrollbar(stdscr, y_start, height, width, total_messages, display_height)
+                    self._draw_scrollbar(renderer, y_start, height, width, total_messages, display_height)
             
         except Exception:
             pass  # Ignore drawing errors
@@ -405,18 +405,20 @@ class LogManager:
             # This ensures updates are marked as processed even if drawing fails
             self.mark_log_updates_processed()
     
-    def _draw_scrollbar(self, stdscr, y_start, height, width, total_messages, display_height):
+    def _draw_scrollbar(self, renderer, y_start, height, width, total_messages, display_height):
         """Draw a scrollbar for the log pane"""
         try:
             from tfm_colors import get_boundary_color, get_status_color
+            from ttk.renderer import TextAttribute
             
             scrollbar_x = width - 1
             
             # Calculate scrollbar position and size
             if total_messages <= display_height:
                 # No scrolling needed, fill entire scrollbar
+                status_color_pair, status_attrs = get_status_color()
                 for y in range(height):
-                    stdscr.addstr(y_start + y, scrollbar_x, "█", get_status_color())
+                    renderer.draw_text(y_start + y, scrollbar_x, "█", color_pair=status_color_pair, attributes=status_attrs)
             else:
                 # Calculate thumb position and size
                 # Thumb size represents the visible portion
@@ -435,15 +437,19 @@ class LogManager:
                 
                 thumb_end = min(height, thumb_start + thumb_size)
                 
+                # Get colors once
+                status_color_pair, status_attrs = get_status_color()
+                boundary_color_pair, boundary_attrs = get_boundary_color()
+                
                 # Draw scrollbar track and thumb
                 for y in range(height):
                     y_pos = y_start + y
                     if thumb_start <= y < thumb_end:
                         # Draw thumb
-                        stdscr.addstr(y_pos, scrollbar_x, "█", get_status_color())
+                        renderer.draw_text(y_pos, scrollbar_x, "█", color_pair=status_color_pair, attributes=status_attrs)
                     else:
                         # Draw track
-                        stdscr.addstr(y_pos, scrollbar_x, "│", get_boundary_color())
+                        renderer.draw_text(y_pos, scrollbar_x, "│", color_pair=boundary_color_pair, attributes=boundary_attrs)
                         
         except Exception:
             pass  # Ignore drawing errors
