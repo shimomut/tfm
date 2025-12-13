@@ -4,18 +4,19 @@ TUI File Manager - Info Dialog Component
 Provides scrollable information dialog functionality
 """
 
-import curses
+from ttk import TextAttribute, KeyCode
 from tfm_base_list_dialog import BaseListDialog
 from tfm_colors import get_status_color
 from tfm_config import config_manager
 from tfm_wide_char_utils import get_display_width, get_safe_functions
+from tfm_input_compat import ensure_input_event
 
 
 class InfoDialog(BaseListDialog):
     """Scrollable information dialog component"""
     
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, renderer=None):
+        super().__init__(config, renderer)
         
         # Info dialog specific state
         self.title = ""
@@ -42,19 +43,34 @@ class InfoDialog(BaseListDialog):
         self.lines = []
         self.content_changed = True  # Mark content as changed when exiting
         
-    def handle_input(self, key):
-        """Handle input while in info dialog mode"""
-        if key == 27 or key == ord('q') or key == ord('Q'):  # ESC or Q - close
+    def handle_input(self, event):
+        """Handle input while in info dialog mode
+        
+        Args:
+            event: InputEvent from TTK
+            
+        Returns:
+            True if key was handled, False otherwise
+        """
+        # Backward compatibility: convert integer key codes to InputEvent
+        event = ensure_input_event(event)
+        
+        if not event:
+            return False
+            
+        # ESC or Q - close
+        if event.key_code == KeyCode.ESCAPE or (event.char and event.char.lower() == 'q'):
             self.exit()
             return True
-        elif key == curses.KEY_UP:
-            # Scroll up
+        # Up arrow - scroll up
+        elif event.key_code == KeyCode.UP:
             if self.scroll > 0:
                 self.scroll -= 1
             # Always mark content as changed for any handled key to ensure continued rendering
             self.content_changed = True
             return True
-        elif key == curses.KEY_DOWN:
+        # Down arrow - scroll down
+        elif event.key_code == KeyCode.DOWN:
             # Scroll down - calculate max scroll based on current content
             # We'll use a default content height for now, this will be refined in draw()
             content_height = 10  # Default, will be calculated properly in draw()
@@ -64,13 +80,15 @@ class InfoDialog(BaseListDialog):
             # Always mark content as changed for any handled key to ensure continued rendering
             self.content_changed = True
             return True
-        elif key == curses.KEY_PPAGE:  # Page Up
+        # Page Up
+        elif event.key_code == KeyCode.PAGE_UP:
             old_scroll = self.scroll
             self.scroll = max(0, self.scroll - 10)
             # Always mark content as changed for any handled key to ensure continued rendering
             self.content_changed = True
             return True
-        elif key == curses.KEY_NPAGE:  # Page Down
+        # Page Down
+        elif event.key_code == KeyCode.PAGE_DOWN:
             content_height = 10  # Default, will be calculated properly in draw()
             max_scroll = max(0, len(self.lines) - content_height)
             old_scroll = self.scroll
@@ -78,13 +96,15 @@ class InfoDialog(BaseListDialog):
             # Always mark content as changed for any handled key to ensure continued rendering
             self.content_changed = True
             return True
-        elif key == curses.KEY_HOME:  # Home - go to top
+        # Home - go to top
+        elif event.key_code == KeyCode.HOME:
             if self.scroll != 0:
                 self.scroll = 0
             # Always mark content as changed for any handled key to ensure continued rendering
             self.content_changed = True
             return True
-        elif key == curses.KEY_END:  # End - go to bottom
+        # End - go to bottom
+        elif event.key_code == KeyCode.END:
             content_height = 10  # Default, will be calculated properly in draw()
             max_scroll = max(0, len(self.lines) - content_height)
             if self.scroll != max_scroll:
@@ -98,9 +118,9 @@ class InfoDialog(BaseListDialog):
         """Check if this dialog needs to be redrawn"""
         return self.content_changed
     
-    def draw(self, stdscr, safe_addstr_func):
+    def draw(self):
         """Draw the info dialog overlay"""
-        height, width = stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         
         # Calculate dialog dimensions using configuration
         width_ratio = getattr(self.config, 'INFO_DIALOG_WIDTH_RATIO', 0.8)
@@ -116,38 +136,38 @@ class InfoDialog(BaseListDialog):
         start_x = (width - dialog_width) // 2
         
         # Draw dialog background
-        # Use hline() to properly clear wide characters underneath
+        # Use draw_hline() to properly clear wide characters underneath
+        status_color_pair, status_attributes = get_status_color()
+        
         for y in range(start_y, start_y + dialog_height):
             if y < height and start_x >= 0 and start_x < width:
                 columns_to_fill = min(dialog_width, width - start_x)
-                try:
-                    stdscr.hline(y, start_x, ' ', columns_to_fill, get_status_color())
-                except curses.error:
-                    try:
-                        bg_line = " " * columns_to_fill
-                        safe_addstr_func(y, start_x, bg_line, get_status_color())
-                    except curses.error:
-                        pass
+                self.renderer.draw_hline(y, start_x, ' ', columns_to_fill, color_pair=status_color_pair)
         
         # Draw border
-        border_color = get_status_color() | curses.A_BOLD
+        border_color_pair, _ = get_status_color()
+        border_attributes = TextAttribute.BOLD
         
         # Top border
         if start_y >= 0:
             top_line = "┌" + "─" * (dialog_width - 2) + "┐"
-            safe_addstr_func(start_y, start_x, top_line[:dialog_width], border_color)
+            self.renderer.draw_text(start_y, start_x, top_line[:dialog_width], 
+                                   color_pair=border_color_pair, attributes=border_attributes)
         
         # Side borders
         for y in range(start_y + 1, start_y + dialog_height - 1):
             if y < height:
-                safe_addstr_func(y, start_x, "│", border_color)
+                self.renderer.draw_text(y, start_x, "│", 
+                                       color_pair=border_color_pair, attributes=border_attributes)
                 if start_x + dialog_width - 1 < width:
-                    safe_addstr_func(y, start_x + dialog_width - 1, "│", border_color)
+                    self.renderer.draw_text(y, start_x + dialog_width - 1, "│", 
+                                           color_pair=border_color_pair, attributes=border_attributes)
         
         # Bottom border
         if start_y + dialog_height - 1 < height:
             bottom_line = "└" + "─" * (dialog_width - 2) + "┘"
-            safe_addstr_func(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], border_color)
+            self.renderer.draw_text(start_y + dialog_height - 1, start_x, bottom_line[:dialog_width], 
+                                   color_pair=border_color_pair, attributes=border_attributes)
         
         # Draw title using wide character utilities
         if self.title and start_y >= 0:
@@ -159,7 +179,8 @@ class InfoDialog(BaseListDialog):
             title_width = get_width(title_text)
             title_x = start_x + (dialog_width - title_width) // 2
             if title_x >= start_x and title_x + title_width <= start_x + dialog_width:
-                safe_addstr_func(start_y, title_x, title_text, border_color)
+                self.renderer.draw_text(start_y, title_x, title_text, 
+                                       color_pair=border_color_pair, attributes=border_attributes)
         
         # Calculate content area
         content_start_y = start_y + 2
@@ -189,7 +210,7 @@ class InfoDialog(BaseListDialog):
                     display_line = truncate_text(line, content_width, "")
                 else:
                     display_line = line
-                safe_addstr_func(y, content_start_x, display_line, get_status_color())
+                self.renderer.draw_text(y, content_start_x, display_line, color_pair=status_color_pair)
         
         # Draw scroll indicators
         if len(self.lines) > content_height:
@@ -211,9 +232,12 @@ class InfoDialog(BaseListDialog):
                     y = scrollbar_start_y + i
                     if y < height:
                         if i == thumb_pos:
-                            safe_addstr_func(y, scrollbar_x, "█", border_color)
+                            self.renderer.draw_text(y, scrollbar_x, "█", 
+                                                   color_pair=border_color_pair, attributes=border_attributes)
                         else:
-                            safe_addstr_func(y, scrollbar_x, "░", get_status_color() | curses.A_DIM)
+                            # Note: TTK doesn't have A_DIM, using NORMAL instead
+                            self.renderer.draw_text(y, scrollbar_x, "░", 
+                                                   color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw help text at bottom
         help_text = "↑↓:scroll  PgUp/PgDn:page  Home/End:top/bottom  Q/ESC:close"
@@ -223,14 +247,18 @@ class InfoDialog(BaseListDialog):
             if help_width <= content_width:
                 help_x = start_x + (dialog_width - help_width) // 2
                 if help_x >= start_x:
-                    safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+                    # Note: TTK doesn't have A_DIM, using NORMAL instead
+                    self.renderer.draw_text(help_y, help_x, help_text, 
+                                           color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
             else:
                 # Truncate help text if too wide
                 truncated_help = truncate_text(help_text, content_width, "...")
                 help_width = get_width(truncated_help)
                 help_x = start_x + (dialog_width - help_width) // 2
                 if help_x >= start_x:
-                    safe_addstr_func(help_y, help_x, truncated_help, get_status_color() | curses.A_DIM)
+                    # Note: TTK doesn't have A_DIM, using NORMAL instead
+                    self.renderer.draw_text(help_y, help_x, truncated_help, 
+                                           color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False

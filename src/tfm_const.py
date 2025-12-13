@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 TUI File Manager - Constants and Configuration
+
+Note: Most key codes are now handled by TTK's KeyCode enum (ttk.input_event.KeyCode).
+Standard keys like ENTER, TAB, ESCAPE, arrow keys, function keys, etc. should use
+KeyCode values. Only terminal-specific key codes that aren't standardized in TTK
+are defined here.
 """
 
 # Version information
@@ -18,22 +23,13 @@ MAX_LOG_MESSAGES = 1000
 
 # Color constants moved to tfm_colors.py
 
-# Key codes (for reference)
-KEY_TAB = 9
-KEY_ENTER_1 = 10
-KEY_ENTER_2 = 13
-KEY_BACKSPACE_1 = 8
-KEY_BACKSPACE_2 = 127
-# Modifier key combinations
-KEY_ESC = 27              # ESC key
+# Terminal-specific key codes
+# These are terminal-dependent codes that may vary across different terminal emulators.
+# For standard keys (ENTER, TAB, arrows, etc.), use TTK's KeyCode enum instead.
 
-
-KEY_SHIFT_COMMA = 60      # '<' - Shift+comma
-KEY_SHIFT_PERIOD = 62     # '>' - Shift+period
-KEY_SHIFT_LBRACKET = 123  # '{' - Shift+[
-KEY_SHIFT_RBRACKET = 125  # '}' - Shift+]
-KEY_UNDERSCORE = 95       # '_' - Shift+-
-# Shift key combinations for log scrolling (terminal-dependent)
+# Shift+Arrow key combinations for log scrolling (terminal-dependent)
+# Note: These codes vary by terminal emulator and may not work in all environments.
+# Some terminals send regular arrow codes (258/259) for Shift+Arrow.
 KEY_SHIFT_UP_1 = 337      # Shift+Up in some terminals
 KEY_SHIFT_DOWN_1 = 336    # Shift+Down in some terminals  
 KEY_SHIFT_UP_2 = 393      # Alternative Shift+Up code
@@ -42,7 +38,6 @@ KEY_SHIFT_LEFT_1 = 545    # Shift+Left in some terminals
 KEY_SHIFT_RIGHT_1 = 560   # Shift+Right in some terminals
 KEY_SHIFT_LEFT_2 = 393    # Alternative Shift+Left code
 KEY_SHIFT_RIGHT_2 = 402   # Alternative Shift+Right code
-# Note: Shift+Arrow keys may send regular arrow codes (258/259) in some terminals
 
 # File size formatting thresholds
 SIZE_KB = 1024

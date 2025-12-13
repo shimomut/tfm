@@ -4,6 +4,7 @@
 
 - [Getting Started](#getting-started)
 - [Installation](#installation)
+- [Desktop Mode (macOS)](#desktop-mode-macos)
 - [Basic Usage](#basic-usage)
 - [Core Features](#core-features)
 - [File Operations](#file-operations)
@@ -26,6 +27,7 @@ TFM (Terminal File Manager) is a powerful dual-pane file manager for the termina
 ### What Makes TFM Special
 
 - **Dual-pane interface** for efficient file operations between directories
+- **Dual-mode operation** - Run in terminal or as native desktop app (macOS)
 - **AWS S3 integration** for seamless cloud storage management
 - **Advanced search** with content search and filtering
 - **Extensible** with external programs and custom key bindings
@@ -37,10 +39,15 @@ TFM (Terminal File Manager) is a powerful dual-pane file manager for the termina
 
 ### System Requirements
 
-#### Minimum Requirements
+#### Terminal Mode Requirements (All Platforms)
 - **Python 3.9+**: Core language requirement
 - **Terminal**: Any terminal with curses support
 - **Operating System**: macOS, Linux, or Windows with compatible terminal
+
+#### Desktop Mode Requirements (macOS Only)
+- **Python 3.9+**: Core language requirement
+- **macOS**: 10.13 (High Sierra) or later
+- **PyObjC**: Install with `pip install pyobjc-framework-Cocoa`
 
 #### Recommended Setup
 - **Python 3.11+**: For best performance and compatibility
@@ -113,6 +120,17 @@ export AWS_DEFAULT_REGION=us-west-2
 # No additional setup required
 ```
 
+#### Desktop Mode (macOS Only)
+```bash
+pip install pyobjc-framework-Cocoa
+```
+**Benefits**:
+- Native macOS application window
+- GPU-accelerated rendering at 60 FPS
+- Resizable window with full-screen support
+- True RGB colors with better accuracy
+- Customizable fonts and window size
+
 ### Platform-Specific Setup
 
 #### macOS
@@ -171,6 +189,115 @@ python3 tfm.py --color-test info
 # Interactive color testing
 python3 tfm.py --color-test interactive
 ```
+
+---
+
+## Desktop Mode (macOS)
+
+TFM can run as a native macOS desktop application with GPU acceleration, providing a modern windowed experience while maintaining the same keyboard-driven interface.
+
+### Quick Start
+
+```bash
+# Install PyObjC (one-time setup)
+pip install pyobjc-framework-Cocoa
+
+# Run in desktop mode
+python3 tfm.py --desktop
+
+# Or use the full backend syntax
+python3 tfm.py --backend coregraphics
+```
+
+### Features
+
+Desktop mode provides several advantages over terminal mode:
+
+- **Native Window**: Resizable macOS window with standard window controls
+- **GPU Acceleration**: Smooth 60 FPS rendering using Metal/CoreGraphics
+- **Better Colors**: True RGB color support with accurate color reproduction
+- **Font Customization**: Choose your preferred monospace font and size
+- **Full-Screen Support**: Native macOS full-screen mode
+- **Window Persistence**: Window size and position are remembered
+
+### Configuration
+
+Desktop mode settings are configured in `~/.tfm/config.py`:
+
+```python
+# Backend selection
+PREFERRED_BACKEND = 'coregraphics'  # Use desktop mode by default
+
+# Desktop mode settings (macOS only)
+DESKTOP_FONT_NAME = 'Menlo'         # Font name
+DESKTOP_FONT_SIZE = 14              # Font size in points
+DESKTOP_WINDOW_WIDTH = 1200         # Initial window width in pixels
+DESKTOP_WINDOW_HEIGHT = 800         # Initial window height in pixels
+```
+
+#### Available Fonts
+
+Common monospace fonts on macOS:
+- `Menlo` (default) - Apple's default monospace font
+- `Monaco` - Classic Mac monospace font
+- `SF Mono` - San Francisco Mono (if installed)
+- `Courier New` - Traditional monospace font
+- `Fira Code` - Popular programming font (if installed)
+- `JetBrains Mono` - Modern programming font (if installed)
+
+### Backend Selection Priority
+
+TFM selects the rendering backend in this order:
+
+1. **Command-line flag**: `--backend` or `--desktop` overrides everything
+2. **Configuration file**: `PREFERRED_BACKEND` setting in `~/.tfm/config.py`
+3. **Default**: Falls back to terminal mode (`curses` backend)
+
+### Automatic Fallback
+
+If desktop mode is requested but unavailable, TFM automatically falls back to terminal mode:
+
+```bash
+# Desktop mode requested but PyObjC not installed
+python3 tfm.py --desktop
+# Output: Error: PyObjC is required for CoreGraphics backend
+#         Install with: pip install pyobjc-framework-Cocoa
+#         Falling back to curses backend
+```
+
+### Keyboard Shortcuts
+
+All keyboard shortcuts work identically in both terminal and desktop modes. The same key bindings apply regardless of which backend you're using.
+
+### Performance
+
+Desktop mode provides excellent performance:
+- **Rendering**: 60 FPS with GPU acceleration
+- **Responsiveness**: Immediate input handling
+- **Large Directories**: Smooth scrolling even with thousands of files
+- **Search Operations**: Non-blocking UI updates
+
+### Troubleshooting Desktop Mode
+
+**Desktop mode doesn't start:**
+- Verify you're on macOS (desktop mode is macOS-only)
+- Install PyObjC: `pip install pyobjc-framework-Cocoa`
+- Check Python version (3.9+ required)
+
+**Window doesn't appear:**
+- Check console output for error messages
+- Verify PyObjC installation: `python3 -c "import objc; print('OK')"`
+- Try terminal mode first to verify TFM works: `python3 tfm.py`
+
+**Font issues:**
+- Verify font name is correct (case-sensitive)
+- Use `Font Book.app` to check installed fonts
+- Fall back to default: Remove `DESKTOP_FONT_NAME` from config
+
+**Performance issues:**
+- Desktop mode should run at 60 FPS
+- Check Activity Monitor for CPU/GPU usage
+- Try reducing window size in configuration
 
 ---
 
@@ -482,9 +609,17 @@ PROGRAMS = [
 
 ### Basic Usage
 ```bash
-python3 tfm.py                    # Default startup
+python3 tfm.py                    # Default startup (terminal mode)
+python3 tfm.py --desktop          # Desktop mode (macOS only)
 python3 tfm.py --left ~/projects  # Specify left pane
 python3 tfm.py --right ~/docs     # Specify right pane
+```
+
+### Backend Selection
+```bash
+python3 tfm.py --backend curses        # Terminal mode (default)
+python3 tfm.py --backend coregraphics  # Desktop mode (macOS)
+python3 tfm.py --desktop               # Shorthand for desktop mode
 ```
 
 ### Advanced Options
@@ -495,6 +630,15 @@ python3 tfm.py --right ~/docs     # Specify right pane
 --help                           # Show help
 ```
 
+### Combined Options
+```bash
+# Desktop mode with custom directories
+python3 tfm.py --desktop --left ~/projects --right ~/docs
+
+# Terminal mode with remote logging
+python3 tfm.py --backend curses --remote-log-port 8888
+```
+
 **See detailed documentation**: [Command Line Directory Arguments Feature](COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md)
 
 ---
@@ -502,6 +646,15 @@ python3 tfm.py --right ~/docs     # Specify right pane
 ## Troubleshooting
 
 ### Common Issues
+
+#### Desktop mode not starting (macOS)
+- Verify PyObjC is installed: `pip install pyobjc-framework-Cocoa`
+- Check Python version: `python3 --version` (3.9+ required)
+- Try terminal mode first: `python3 tfm.py`
+- Check console output for error messages
+
+#### Desktop mode on non-macOS systems
+Desktop mode only works on macOS. On other platforms, TFM automatically falls back to terminal mode.
 
 #### Colors not working
 Try `--color-test diagnose` to check terminal support
@@ -521,6 +674,11 @@ Verify AWS credentials and bucket permissions
 
 #### File operations failing
 Check file permissions and disk space
+
+#### Performance issues
+- Desktop mode provides better performance with GPU acceleration
+- Install `pygments` for faster syntax highlighting
+- Check available memory for large directory operations
 
 ### Getting Help
 - Press **?** for built-in help

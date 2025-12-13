@@ -4,19 +4,19 @@ TUI File Manager - List Dialog Component
 Provides searchable list dialog functionality
 """
 
-import curses
+from ttk import TextAttribute
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
-from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
 from tfm_config import get_favorite_directories, get_programs
+from tfm_input_compat import ensure_input_event
 
 
 class ListDialog(BaseListDialog):
     """Searchable list dialog component"""
     
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, renderer=None):
+        super().__init__(config, renderer)
         
         # List dialog specific state
         self.title = ""
@@ -60,14 +60,21 @@ class ListDialog(BaseListDialog):
         self.custom_help_text = None
         self.content_changed = True  # Mark content as changed when exiting
         
-    def handle_input(self, key):
-        """Handle input while in list dialog mode"""
+    def handle_input(self, event):
+        """Handle input while in list dialog mode
+        
+        Args:
+            event: InputEvent from TTK renderer (or integer key code for backward compatibility)
+        """
+        # Backward compatibility: convert integer key codes to InputEvent
+        event = ensure_input_event(event)
+        
         # Check custom key handler first
-        if self.custom_key_handler and self.custom_key_handler(key):
+        if self.custom_key_handler and self.custom_key_handler(event):
             return True
             
         # Use base class navigation handling
-        result = self.handle_common_navigation(key, self.filtered_items)
+        result = self.handle_common_navigation(event, self.filtered_items)
         
         if result == 'cancel':
             # Store callback before exiting
@@ -123,7 +130,7 @@ class ListDialog(BaseListDialog):
         """Check if this dialog needs to be redrawn"""
         return self.content_changed
     
-    def draw(self, stdscr, safe_addstr_func):
+    def draw(self):
         """Draw the searchable list dialog overlay"""
         # Get configuration values
         width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
@@ -133,16 +140,16 @@ class ListDialog(BaseListDialog):
         
         # Draw dialog frame
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
-            stdscr, safe_addstr_func, self.title, width_ratio, height_ratio, min_width, min_height
+            self.title, width_ratio, height_ratio, min_width, min_height
         )
         
         # Draw search input
         search_y = start_y + 2
-        self.draw_text_input(stdscr, safe_addstr_func, search_y, start_x, dialog_width, "Search: ")
+        self.draw_text_input(search_y, start_x, dialog_width, "Search: ")
         
         # Draw separator
         sep_y = start_y + 3
-        self.draw_separator(stdscr, safe_addstr_func, sep_y, start_x, dialog_width)
+        self.draw_separator(sep_y, start_x, dialog_width)
         
         # Calculate list area
         list_start_y = start_y + 4
@@ -151,18 +158,19 @@ class ListDialog(BaseListDialog):
         content_width = dialog_width - 4
         
         # Draw list items
-        self.draw_list_items(stdscr, safe_addstr_func, self.filtered_items, 
+        self.draw_list_items(self.filtered_items, 
                            list_start_y, list_end_y, content_start_x, content_width)
         
         # Draw scrollbar
         scrollbar_x = start_x + dialog_width - 2
         content_height = list_end_y - list_start_y + 1
-        self.draw_scrollbar(stdscr, safe_addstr_func, self.filtered_items, 
+        self.draw_scrollbar(self.filtered_items, 
                           list_start_y, content_height, scrollbar_x)
         
         # Draw status info
+        height, _ = self.renderer.get_dimensions()
         status_y = start_y + dialog_height - 2
-        if status_y < stdscr.getmaxyx()[0]:
+        if status_y < height:
             if self.filtered_items:
                 status_text = f"{self.selected + 1}/{len(self.filtered_items)} items"
                 if len(self.filtered_items) != len(self.items):
@@ -177,7 +185,9 @@ class ListDialog(BaseListDialog):
             content_width = dialog_width - 4
             if len(status_text) <= content_width:
                 status_x = start_x + (dialog_width - len(status_text)) // 2
-                safe_addstr_func(status_y, status_x, status_text, get_status_color() | curses.A_DIM)
+                status_color_pair, _ = get_status_color()
+                # Note: TTK doesn't have A_DIM, using NORMAL instead
+                self.renderer.draw_text(status_y, status_x, status_text, color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw help text
         if self.custom_help_text:
@@ -186,7 +196,7 @@ class ListDialog(BaseListDialog):
             help_text = "↑↓:select  Enter:choose  Type:search  Backspace:clear  ESC:cancel"
         
         help_y = start_y + dialog_height - 1
-        self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
+        self.draw_help_text(help_text, help_y, start_x, dialog_width)
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False

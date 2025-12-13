@@ -20,7 +20,7 @@ Fix:
 - This ensures the dialog continues to be rendered after any key press
 """
 
-import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
 import sys
@@ -53,7 +53,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.search_dialog.content_changed = False  # Simulate after drawing
         
         # Press left key
-        result = self.search_dialog.handle_input(curses.KEY_LEFT)
+        result = self.search_dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         
         # Verify the fix
         self.assertTrue(result, "Left key should be handled")
@@ -69,7 +69,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.search_dialog.content_changed = False  # Simulate after drawing
         
         # Press right key
-        result = self.search_dialog.handle_input(curses.KEY_RIGHT)
+        result = self.search_dialog.handle_input(InputEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE))
         
         # Verify the fix
         self.assertTrue(result, "Right key should be handled")
@@ -81,14 +81,14 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
     def test_all_navigation_keys_set_content_changed(self):
         """Test that all navigation keys properly set content_changed"""
         navigation_keys = [
-            curses.KEY_LEFT,
-            curses.KEY_RIGHT, 
-            curses.KEY_UP,
-            curses.KEY_DOWN,
-            curses.KEY_PPAGE,
-            curses.KEY_NPAGE,
-            curses.KEY_HOME,
-            curses.KEY_END
+            KeyCode.LEFT,
+            KeyCode.RIGHT, 
+            KeyCode.UP,
+            KeyCode.DOWN,
+            KeyCode.PAGE_UP,
+            KeyCode.PAGE_DOWN,
+            KeyCode.HOME,
+            KeyCode.END
         ]
         
         for key in navigation_keys:
@@ -148,7 +148,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.assertFalse(self.search_dialog.needs_redraw(), "Dialog should not need redraw after being drawn")
         
         # Step 3: Press left key immediately (the problematic scenario)
-        result = self.search_dialog.handle_input(curses.KEY_LEFT)
+        result = self.search_dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         
         # Step 4: Verify dialog is still visible
         self.assertTrue(result, "Left key should be handled")

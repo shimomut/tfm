@@ -6,7 +6,7 @@ This test systematically tests all possible keys on all dialogs to find
 any cases where a key returns True but doesn't set content_changed.
 """
 
-import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
 import sys
@@ -42,15 +42,15 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
         
         # Common keys that often cause issues
         self.test_keys = [
-            (curses.KEY_LEFT, 'LEFT'),
-            (curses.KEY_RIGHT, 'RIGHT'),
-            (curses.KEY_UP, 'UP'),
-            (curses.KEY_DOWN, 'DOWN'),
-            (curses.KEY_PPAGE, 'PAGE_UP'),
-            (curses.KEY_NPAGE, 'PAGE_DOWN'),
-            (curses.KEY_HOME, 'HOME'),
-            (curses.KEY_END, 'END'),
-            (curses.KEY_BACKSPACE, 'BACKSPACE'),
+            (KeyCode.LEFT, 'LEFT'),
+            (KeyCode.RIGHT, 'RIGHT'),
+            (KeyCode.UP, 'UP'),
+            (KeyCode.DOWN, 'DOWN'),
+            (KeyCode.PAGE_UP, 'PAGE_UP'),
+            (KeyCode.PAGE_DOWN, 'PAGE_DOWN'),
+            (KeyCode.HOME, 'HOME'),
+            (KeyCode.END, 'END'),
+            (KeyCode.BACKSPACE, 'BACKSPACE'),
             (127, 'DELETE'),  # DEL key
             (ord('a'), 'LETTER_A'),
             (ord(' '), 'SPACE'),
@@ -176,7 +176,7 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
         search_dialog = SearchDialog(self.config)
         search_dialog.show('filename')
         search_dialog.content_changed = False
-        result = search_dialog.handle_input(curses.KEY_LEFT)
+        result = search_dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "SearchDialog should handle LEFT key")
         self.assertTrue(search_dialog.content_changed, "SearchDialog LEFT key should set content_changed")
         
@@ -184,7 +184,7 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
         info_dialog = InfoDialog(self.config)
         info_dialog.show("Help", ["Line 1", "Line 2"])
         info_dialog.content_changed = False
-        result = info_dialog.handle_input(curses.KEY_UP)
+        result = info_dialog.handle_input(InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "InfoDialog should handle UP key")
         self.assertTrue(info_dialog.content_changed, "InfoDialog UP key should set content_changed")
         
@@ -192,7 +192,7 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
         batch_dialog = BatchRenameDialog(self.config)
         batch_dialog.show([Path('/tmp/file1.txt')])
         batch_dialog.content_changed = False
-        result = batch_dialog.handle_input(curses.KEY_LEFT)
+        result = batch_dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         if result and result is not False:  # If key was handled
             self.assertTrue(batch_dialog.content_changed, "BatchRenameDialog LEFT key should set content_changed")
             

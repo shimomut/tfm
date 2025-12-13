@@ -6,11 +6,12 @@ A text file viewer component for TFM that supports syntax highlighting
 for popular file formats using pygments (optional dependency).
 """
 
-import curses
 import os
 from tfm_path import Path
 from typing import List, Tuple, Optional, Dict, Any
 import re
+from ttk.input_event import InputEvent, KeyCode
+from ttk.renderer import TextAttribute
 
 # Try to import pygments for syntax highlighting
 try:
@@ -30,8 +31,8 @@ from tfm_wide_char_utils import get_display_width, truncate_to_width, split_at_w
 class TextViewer:
     """Text file viewer with syntax highlighting support"""
     
-    def __init__(self, stdscr, file_path: Path):
-        self.stdscr = stdscr
+    def __init__(self, renderer, file_path: Path):
+        self.renderer = renderer
         self.file_path = file_path
         self.lines = []  # List of strings (plain text lines)
         self.highlighted_lines = []  # List of lists of (text, color) tuples
@@ -76,14 +77,14 @@ class TextViewer:
                     # Check if it contains null bytes (common in binary files)
                     if b'\x00' in binary_content[:1024]:
                         self.lines = ["[Binary file - cannot display as text]"]
-                        self.highlighted_lines = [[("[Binary file - cannot display as text]", curses.color_pair(COLOR_REGULAR_FILE))]]
+                        self.highlighted_lines = [[("[Binary file - cannot display as text]", COLOR_REGULAR_FILE)]]
                         return
                     else:
                         # Try to decode as latin-1 as a last resort (it can decode any byte sequence)
                         content = binary_content.decode('latin-1', errors='replace')
                 except Exception:
                     self.lines = ["[Binary file - cannot display as text]"]
-                    self.highlighted_lines = [[("[Binary file - cannot display as text]", curses.color_pair(COLOR_REGULAR_FILE))]]
+                    self.highlighted_lines = [[("[Binary file - cannot display as text]", COLOR_REGULAR_FILE)]]
                     return
                 
             # Split into lines
@@ -94,30 +95,30 @@ class TextViewer:
                 self.apply_syntax_highlighting(content)
             else:
                 # Create plain highlighted lines (no colors)
-                self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
+                self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
                 
         except FileNotFoundError:
             error_msg = f"File not found: {self.file_path}"
             self.lines = [error_msg]
-            self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
+            self.highlighted_lines = [[(error_msg, COLOR_ERROR)]]
         except PermissionError:
             error_msg = f"Permission denied: {self.file_path}"
             self.lines = [error_msg]
-            self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
+            self.highlighted_lines = [[(error_msg, COLOR_ERROR)]]
         except OSError as e:
             error_msg = f"Error reading file: {e}"
             self.lines = [error_msg]
-            self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
+            self.highlighted_lines = [[(error_msg, COLOR_ERROR)]]
         except Exception as e:
             error_msg = f"Unexpected error reading file: {e}"
             self.lines = [error_msg]
-            self.highlighted_lines = [[(error_msg, curses.color_pair(COLOR_ERROR))]]
+            self.highlighted_lines = [[(error_msg, COLOR_ERROR)]]
     
     def apply_syntax_highlighting(self, content: str):
-        """Apply syntax highlighting using pygments and curses colors"""
+        """Apply syntax highlighting using pygments and TTK colors"""
         if not PYGMENTS_AVAILABLE:
             # Create plain highlighted lines (no colors)
-            self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
+            self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
             return
             
         try:
@@ -175,9 +176,10 @@ class TextViewer:
             # Convert tokens to highlighted lines
             self.highlighted_lines = self.tokens_to_highlighted_lines(tokens)
             
-        except Exception:
+        except Exception as e:
             # If highlighting fails, create plain highlighted lines
-            self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
+            print(f"Warning: Syntax highlighting failed: {e}")
+            self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
     
     def tokens_to_highlighted_lines(self, tokens) -> List[List[Tuple[str, int]]]:
         """Convert pygments tokens to lines of (text, color) tuples"""
@@ -382,36 +384,36 @@ class TextViewer:
         self.isearch_matches = []
         self.isearch_match_index = 0
     
-    def handle_isearch_input(self, key) -> bool:
+    def handle_isearch_input(self, event: InputEvent) -> bool:
         """Handle input while in isearch mode. Returns True if key was handled."""
-        if key == 27:  # ESC - exit isearch mode
+        if event.key_code == KeyCode.ESCAPE:
             self.exit_isearch_mode()
             return True
-        elif key == curses.KEY_ENTER or key == 10 or key == 13:
+        elif event.key_code == KeyCode.ENTER:
             # Enter - exit isearch mode and keep current position
             self.exit_isearch_mode()
             return True
-        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
+        elif event.key_code == KeyCode.BACKSPACE:
             # Backspace - remove last character
             if self.isearch_pattern:
                 self.isearch_pattern = self.isearch_pattern[:-1]
                 self.update_isearch_matches()
             return True
-        elif key == curses.KEY_UP:
+        elif event.key_code == KeyCode.UP:
             # Up arrow - go to previous match
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
                 self.jump_to_match()
             return True
-        elif key == curses.KEY_DOWN:
+        elif event.key_code == KeyCode.DOWN:
             # Down arrow - go to next match
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
                 self.jump_to_match()
             return True
-        elif 32 <= key <= 126:  # Printable characters
-            # Add character to isearch pattern
-            self.isearch_pattern += chr(key)
+        elif event.char and len(event.char) == 1 and 32 <= ord(event.char) <= 126:
+            # Printable characters
+            self.isearch_pattern += event.char
             self.update_isearch_matches()
             return True
         
@@ -419,7 +421,7 @@ class TextViewer:
     
     def get_display_dimensions(self) -> Tuple[int, int, int, int]:
         """Get the dimensions for the text display area"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         
         # Reserve space for header (2 lines) and status bar (1 line)
         start_y = 2
@@ -431,14 +433,14 @@ class TextViewer:
     
     def draw_header(self):
         """Draw the viewer header"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
+        
+        # Get header color
+        header_color_pair, header_attrs = get_header_color()
         
         # Clear header area with colored background
-        try:
-            self.stdscr.addstr(0, 0, " " * (width - 1), get_header_color())
-            self.stdscr.addstr(1, 0, " " * (width - 1), get_header_color())
-        except curses.error:
-            pass
+        self.renderer.draw_text(0, 0, " " * (width - 1), header_color_pair, header_attrs)
+        self.renderer.draw_text(1, 0, " " * (width - 1), header_color_pair, header_attrs)
         
         # File path and info - use polymorphic display methods
         display_prefix = self.file_path.get_display_prefix()
@@ -453,10 +455,7 @@ class TextViewer:
         if len(file_info) > width - 4:
             file_info = "..." + file_info[-(width-7):]
         
-        try:
-            self.stdscr.addstr(0, 2, file_info, get_header_color())
-        except curses.error:
-            pass
+        self.renderer.draw_text(0, 2, file_info, header_color_pair, header_attrs)
         
         # Controls line or isearch interface
         if self.isearch_mode:
@@ -467,34 +466,31 @@ class TextViewer:
                 isearch_prompt += match_info
             isearch_prompt += " [ESC:exit ↑↓:navigate]"
             
-            try:
-                self.stdscr.addstr(1, 2, isearch_prompt[:width-4], get_search_color())
-            except curses.error:
-                pass
+            search_color_pair, search_attrs = get_search_color()
+            self.renderer.draw_text(1, 2, isearch_prompt[:width-4], search_color_pair, search_attrs)
         else:
             # Show normal controls
             controls = "q:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:numbers w:wrap s:syntax"
             
-            try:
-                # Center the controls or left-align if too long
-                if len(controls) + 4 < width:
-                    controls_x = (width - len(controls)) // 2
-                else:
-                    controls_x = 2
-                self.stdscr.addstr(1, controls_x, controls[:width-4], get_status_color())
-            except curses.error:
-                pass
+            # Center the controls or left-align if too long
+            if len(controls) + 4 < width:
+                controls_x = (width - len(controls)) // 2
+            else:
+                controls_x = 2
+            
+            status_color_pair, status_attrs = get_status_color()
+            self.renderer.draw_text(1, controls_x, controls[:width-4], status_color_pair, status_attrs)
     
     def draw_status_bar(self):
         """Draw the status bar at the bottom of the viewer"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         status_y = height - 1  # Bottom line
         
+        # Get status color
+        status_color_pair, status_attrs = get_status_color()
+        
         # Clear status bar area with colored background
-        try:
-            self.stdscr.addstr(status_y, 0, " " * (width - 1), get_status_color())
-        except curses.error:
-            pass
+        self.renderer.draw_text(status_y, 0, " " * (width - 1), status_color_pair, status_attrs)
         
         # Calculate current position info
         if self.wrap_lines:
@@ -580,18 +576,12 @@ class TextViewer:
         right_status = f" {' | '.join(right_parts)} "
         
         # Draw left status
-        try:
-            self.stdscr.addstr(status_y, 0, left_status, get_status_color())
-        except curses.error:
-            pass
+        self.renderer.draw_text(status_y, 0, left_status, status_color_pair, status_attrs)
         
         # Draw right status (right-aligned)
-        try:
-            right_x = max(len(left_status) + 2, width - len(right_status))
-            if right_x < width:
-                self.stdscr.addstr(status_y, right_x, right_status, get_status_color())
-        except curses.error:
-            pass
+        right_x = max(len(left_status) + 2, width - len(right_status))
+        if right_x < width:
+            self.renderer.draw_text(status_y, right_x, right_status, status_color_pair, status_attrs)
     
     def draw_content(self):
         """Draw the file content with syntax highlighting and wide character support"""
@@ -610,19 +600,15 @@ class TextViewer:
         content_width = display_width - line_num_width
         
         # Get background color for filling empty areas
-        bg_color_pair = get_background_color_pair()
+        bg_color_pair, bg_attrs = get_background_color_pair()
         
         # Draw visible lines
         for i in range(display_height):
             line_index = self.scroll_offset + i
             y_pos = start_y + i
             
-            # Fill the entire line with background color instead of using clrtoeol()
-            try:
-                self.stdscr.addstr(y_pos, start_x, ' ' * (display_width - 1), bg_color_pair)
-                self.stdscr.move(y_pos, start_x)
-            except curses.error:
-                pass
+            # Fill the entire line with background color
+            self.renderer.draw_text(y_pos, start_x, ' ' * (display_width - 1), bg_color_pair, bg_attrs)
             
             if line_index >= len(display_lines):
                 continue
@@ -634,10 +620,8 @@ class TextViewer:
                 # For now, show the display line index + 1 (this could be improved)
                 original_line_num = self.get_original_line_number(line_index) if self.wrap_lines else line_index + 1
                 line_num = f"{original_line_num:>{line_num_width-1}} "
-                try:
-                    self.stdscr.addstr(y_pos, x_pos, line_num, get_line_number_color())
-                except curses.error:
-                    pass
+                line_num_color_pair, line_num_attrs = get_line_number_color()
+                self.renderer.draw_text(y_pos, x_pos, line_num, line_num_color_pair, line_num_attrs)
                 x_pos += line_num_width
             
             # Get the highlighted line (list of (text, color) tuples)
@@ -702,18 +686,17 @@ class TextViewer:
                 
                 # Draw the text with its color
                 if visible_text:
-                    try:
-                        # Use search highlight color for matches
-                        display_color = color
-                        if is_current_match:
-                            display_color = get_search_current_color()
-                        elif is_search_match:
-                            display_color = get_search_match_color()
-                        
-                        self.stdscr.addstr(y_pos, display_x, visible_text, display_color)
-                        display_x += get_display_width(visible_text)
-                    except curses.error:
-                        pass
+                    # Use search highlight color for matches
+                    if is_current_match:
+                        display_color_pair, display_attrs = get_search_current_color()
+                    elif is_search_match:
+                        display_color_pair, display_attrs = get_search_match_color()
+                    else:
+                        # color is a color pair constant, need to get attributes
+                        display_color_pair, display_attrs = get_color_with_attrs(color)
+                    
+                    self.renderer.draw_text(y_pos, display_x, visible_text, display_color_pair, display_attrs)
+                    display_x += get_display_width(visible_text)
                 
                 current_display_col += text_display_width
                 
@@ -750,118 +733,112 @@ class TextViewer:
         
         return min(estimated_line, len(self.lines))
     
-    def handle_key(self, key) -> bool:
+    def handle_key(self, event: InputEvent) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
         # Handle isearch mode input first
         if self.isearch_mode:
-            if self.handle_isearch_input(key):
+            if self.handle_isearch_input(event):
                 return True  # Isearch mode handled the key
         
-        if key == ord('q') or key == ord('Q') or key == 27:  # q, Q, or ESC
+        # Check for character-based commands
+        if event.char:
+            char_lower = event.char.lower()
+            if char_lower == 'q':
+                return False
+            elif char_lower == 'n':
+                self.show_line_numbers = not self.show_line_numbers
+            elif char_lower == 'w':
+                # When toggling wrap mode, adjust scroll position to maintain context
+                old_scroll = self.scroll_offset
+                self.wrap_lines = not self.wrap_lines
+                
+                # Reset horizontal offset when enabling wrap mode
+                if self.wrap_lines:
+                    self.horizontal_offset = 0
+                
+                # Try to maintain approximate scroll position
+                if self.wrap_lines:
+                    # When enabling wrap, we might need to adjust scroll position
+                    # since wrapped lines will be longer
+                    display_lines = self.get_wrapped_lines()
+                    max_scroll = max(0, len(display_lines) - display_height)
+                    self.scroll_offset = min(old_scroll, max_scroll)
+            elif char_lower == 's':
+                if PYGMENTS_AVAILABLE:
+                    self.syntax_highlighting = not self.syntax_highlighting
+                    # Re-apply highlighting without reloading the file
+                    if self.syntax_highlighting:
+                        content = '\n'.join(self.lines)
+                        self.apply_syntax_highlighting(content)
+                    else:
+                        # Create plain highlighted lines (no colors)
+                        self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
+            elif char_lower == 'f':
+                # Enter isearch mode
+                self.enter_isearch_mode()
+        
+        # Check for special keys
+        if event.key_code == KeyCode.ESCAPE:
             return False
-            
-        elif key == curses.KEY_UP:
+        elif event.key_code == KeyCode.UP:
             if self.scroll_offset > 0:
                 self.scroll_offset -= 1
-                
-        elif key == curses.KEY_DOWN:
+        elif event.key_code == KeyCode.DOWN:
             # Use display lines for scrolling when wrapping is enabled
             display_lines = self.get_wrapped_lines()
             max_scroll = max(0, len(display_lines) - display_height)
             if self.scroll_offset < max_scroll:
                 self.scroll_offset += 1
-                
-        elif key == curses.KEY_LEFT:
+        elif event.key_code == KeyCode.LEFT:
             # Use display width units for horizontal scrolling
             if self.horizontal_offset > 0:
                 self.horizontal_offset = max(0, self.horizontal_offset - 1)
-                
-        elif key == curses.KEY_RIGHT:
+        elif event.key_code == KeyCode.RIGHT:
             # Increment horizontal offset by display width units
             self.horizontal_offset += 1
-            
-        elif key == curses.KEY_PPAGE:  # Page Up
+        elif event.key_code == KeyCode.PAGE_UP:
             self.scroll_offset = max(0, self.scroll_offset - display_height)
-            
-        elif key == curses.KEY_NPAGE:  # Page Down
+        elif event.key_code == KeyCode.PAGE_DOWN:
             # Use display lines for page scrolling when wrapping is enabled
             display_lines = self.get_wrapped_lines()
             max_scroll = max(0, len(display_lines) - display_height)
             self.scroll_offset = min(max_scroll, self.scroll_offset + display_height)
-            
-        elif key == curses.KEY_HOME:
+        elif event.key_code == KeyCode.HOME:
             self.scroll_offset = 0
             self.horizontal_offset = 0
-            
-        elif key == curses.KEY_END:
+        elif event.key_code == KeyCode.END:
             # Use display lines for end positioning when wrapping is enabled
             display_lines = self.get_wrapped_lines()
             max_scroll = max(0, len(display_lines) - display_height)
             self.scroll_offset = max_scroll
             
-        elif key == ord('n') or key == ord('N'):
-            self.show_line_numbers = not self.show_line_numbers
-            
-        elif key == ord('w') or key == ord('W'):
-            # When toggling wrap mode, adjust scroll position to maintain context
-            old_scroll = self.scroll_offset
-            self.wrap_lines = not self.wrap_lines
-            
-            # Reset horizontal offset when enabling wrap mode
-            if self.wrap_lines:
-                self.horizontal_offset = 0
-            
-            # Try to maintain approximate scroll position
-            if self.wrap_lines:
-                # When enabling wrap, we might need to adjust scroll position
-                # since wrapped lines will be longer
-                display_lines = self.get_wrapped_lines()
-                max_scroll = max(0, len(display_lines) - display_height)
-                self.scroll_offset = min(old_scroll, max_scroll)
-            
-        elif key == ord('s') or key == ord('S'):
-            if PYGMENTS_AVAILABLE:
-                self.syntax_highlighting = not self.syntax_highlighting
-                # Re-apply highlighting without reloading the file
-                if self.syntax_highlighting:
-                    content = '\n'.join(self.lines)
-                    self.apply_syntax_highlighting(content)
-                else:
-                    # Create plain highlighted lines (no colors)
-                    self.highlighted_lines = [[(line, curses.color_pair(COLOR_REGULAR_FILE))] for line in self.lines]
-        
-        elif key == ord('f') or key == ord('F'):
-            # Enter isearch mode
-            self.enter_isearch_mode()
-            
         return True
     
     def run(self):
         """Main viewer loop"""
-        curses.curs_set(0)  # Hide cursor
-        self.stdscr.timeout(-1)  # Block indefinitely for input
+        self.renderer.set_cursor_visibility(False)
         
         # Initial draw
-        self.stdscr.clear()
+        self.renderer.clear()
         self.draw_header()
         self.draw_content()
         self.draw_status_bar()
-        self.stdscr.refresh()
+        self.renderer.refresh()
         
         while True:
             # Handle input - this will block until a key is pressed
             try:
-                key = self.stdscr.getch()
-                if not self.handle_key(key):
+                event = self.renderer.get_input()
+                if not self.handle_key(event):
                     break
                     
                 # Only redraw after handling input - no full clear to avoid flicker
                 self.draw_header()
                 self.draw_content()
                 self.draw_status_bar()
-                self.stdscr.refresh()
+                self.renderer.refresh()
                 
             except KeyboardInterrupt:
                 break
@@ -932,12 +909,12 @@ def is_text_file(file_path: Path) -> bool:
         return False
 
 
-def view_text_file(stdscr, file_path: Path) -> bool:
+def view_text_file(renderer, file_path: Path) -> bool:
     """
     View a text file with syntax highlighting
     
     Args:
-        stdscr: curses screen object
+        renderer: TTK renderer object
         file_path: Path to the file to view
         
     Returns:
@@ -950,7 +927,7 @@ def view_text_file(stdscr, file_path: Path) -> bool:
         return False
     
     try:
-        viewer = TextViewer(stdscr, file_path)
+        viewer = TextViewer(renderer, file_path)
         viewer.run()
         return True
     except (OSError, IOError) as e:

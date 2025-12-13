@@ -46,6 +46,19 @@ def create_parser():
     )
     
     parser.add_argument(
+        '--backend',
+        type=str,
+        choices=['curses', 'coregraphics'],
+        help='Rendering backend to use (default: curses)'
+    )
+    
+    parser.add_argument(
+        '--desktop',
+        action='store_true',
+        help='Run as desktop application (shorthand for --backend coregraphics)'
+    )
+    
+    parser.add_argument(
         '--remote-log-port',
         type=int,
         metavar='PORT',
@@ -100,15 +113,35 @@ def main():
         # Set ESC delay to 100ms BEFORE any curses-related imports for responsive ESC key
         os.environ.setdefault('ESCDELAY', '100')
         
-        # Import and run the main application
-        from tfm_main import main as tfm_main
-        import curses
+        # Select backend based on arguments and configuration
+        from tfm_backend_selector import select_backend
+        backend_name, backend_options = select_backend(args)
         
-        # Pass arguments to main function
-        curses.wrapper(tfm_main, 
-                      remote_log_port=args.remote_log_port,
-                      left_dir=args.left,
-                      right_dir=args.right)
+        # Create TTK renderer directly based on selected backend
+        if backend_name == 'curses':
+            from ttk.backends.curses_backend import CursesBackend
+            renderer = CursesBackend()
+        elif backend_name == 'coregraphics':
+            from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+            renderer = CoreGraphicsBackend(**backend_options)
+        else:
+            raise ValueError(f"Unknown backend: {backend_name}")
+        
+        try:
+            # Initialize the renderer
+            renderer.initialize()
+            
+            # Import and run the main application
+            from tfm_main import main as tfm_main
+            
+            # Pass renderer to tfm_main instead of using curses.wrapper
+            tfm_main(renderer,
+                    remote_log_port=args.remote_log_port,
+                    left_dir=args.left,
+                    right_dir=args.right)
+        finally:
+            # Ensure renderer is properly shut down
+            renderer.shutdown()
         
     except ImportError as e:
         print(f"Error importing TFM modules: {e}", file=sys.stderr)

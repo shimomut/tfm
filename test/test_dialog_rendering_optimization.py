@@ -6,7 +6,6 @@ Test script to verify dialog rendering optimization
 import sys
 import os
 import time
-import curses
 from unittest.mock import Mock, patch
 
 # Add src directory to path
@@ -14,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_main import FileManager
 from tfm_config import get_config
+from ttk import KeyCode
 
 
 def test_dialog_rendering_optimization():
@@ -61,7 +61,7 @@ def test_dialog_rendering_optimization():
     assert fm.list_dialog.content_changed == False, "List dialog content should be marked as unchanged"
     
     # Simulate navigation
-    fm.list_dialog.handle_input(curses.KEY_DOWN)
+    fm.list_dialog.handle_input(InputEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE))
     assert fm.list_dialog.content_changed == True, "List dialog content should be marked as changed after navigation"
     
     print("✓ All dialog rendering optimization tests passed!")

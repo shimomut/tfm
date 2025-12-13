@@ -4,14 +4,14 @@ TUI File Manager - Drives Dialog Component
 Provides storage/drive selection functionality including local filesystem and S3 buckets
 """
 
-import curses
 import threading
 import time
+from ttk import KeyCode, TextAttribute
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
-from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
+from tfm_input_compat import ensure_input_event
 
 # AWS S3 support - import boto3 with fallback
 try:
@@ -62,8 +62,8 @@ class DriveEntry:
 class DrivesDialog(BaseListDialog):
     """Drives dialog component for storage/drive selection"""
     
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, renderer=None):
+        super().__init__(config, renderer)
         
         # Drives dialog specific state
         self.drives = []  # List of all available drives
@@ -116,13 +116,20 @@ class DrivesDialog(BaseListDialog):
         # Reset animation
         self.progress_animator.reset()
         
-    def handle_input(self, key):
-        """Handle input while in drives dialog mode"""
+    def handle_input(self, event):
+        """Handle input while in drives dialog mode
+        
+        Args:
+            event: InputEvent from TTK renderer (or integer key code for backward compatibility)
+        """
+        # Backward compatibility: convert integer key codes to InputEvent
+        event = ensure_input_event(event)
+        
         # Use base class navigation handling with thread safety
         with self.s3_lock:
             current_filtered = self.filtered_drives.copy()
         
-        result = self.handle_common_navigation(key, current_filtered)
+        result = self.handle_common_navigation(event, current_filtered)
         
         if result == 'cancel':
             # Cancel S3 scan before exiting
@@ -145,7 +152,7 @@ class DrivesDialog(BaseListDialog):
             return True
         elif result:
             # Update selection in thread-safe manner for navigation keys
-            if key in [curses.KEY_UP, curses.KEY_DOWN, curses.KEY_PPAGE, curses.KEY_NPAGE, curses.KEY_HOME, curses.KEY_END]:
+            if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
                 with self.s3_lock:
                     # The base class already updated self.selected, just need to adjust scroll
                     self._adjust_scroll(len(self.filtered_drives))
@@ -346,24 +353,25 @@ class DrivesDialog(BaseListDialog):
         # Always redraw when loading S3 to animate progress indicator
         return self.content_changed or self.loading_s3
     
-    def draw(self, stdscr, safe_addstr_func):
+    def draw(self):
         """Draw the drives dialog overlay"""
         # Draw dialog frame
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
-            stdscr, safe_addstr_func, "Select Drive/Storage", 0.7, 0.8, 50, 18
+            "Select Drive/Storage", 0.7, 0.8, 50, 18
         )
         
         # Draw filter input
         search_y = start_y + 2
-        self.draw_text_input(stdscr, safe_addstr_func, search_y, start_x, dialog_width, "Filter: ")
+        self.draw_text_input(search_y, start_x, dialog_width, "Filter: ")
         
         # Draw separator
         sep_y = start_y + 3
-        self.draw_separator(stdscr, safe_addstr_func, sep_y, start_x, dialog_width)
+        self.draw_separator(sep_y, start_x, dialog_width)
         
         # Draw status with animated progress indicator (thread-safe)
         status_y = start_y + 4
-        if status_y < stdscr.getmaxyx()[0]:
+        height, width = self.renderer.get_dimensions()
+        if status_y < height:
             with self.s3_lock:
                 drive_count = len(self.drives)
                 filtered_count = len(self.filtered_drives)
@@ -378,7 +386,8 @@ class DrivesDialog(BaseListDialog):
                     status_text = self.progress_animator.get_status_text("Loading S3", context_info, is_loading)
                     
                     # Use brighter color for active loading
-                    status_color = get_status_color() | curses.A_BOLD
+                    color_pair, _ = get_status_color()
+                    attributes = TextAttribute.BOLD
                 else:
                     if self.text_editor.text.strip():
                         status_text = f"Drives: {filtered_count} (filtered from {drive_count})"
@@ -387,9 +396,10 @@ class DrivesDialog(BaseListDialog):
                         local_count = sum(1 for drive in self.drives if drive.drive_type == 'local')
                         status_text = f"Drives: {drive_count} ({local_count} local, {s3_count} S3)"
                     
-                    status_color = get_status_color() | curses.A_DIM
+                    color_pair, _ = get_status_color()
+                    attributes = TextAttribute.DIM
             
-            safe_addstr_func(status_y, start_x + 2, status_text[:dialog_width - 4], status_color)
+            self.renderer.draw_text(status_y, start_x + 2, status_text[:dialog_width - 4], color_pair, attributes)
         
         # Calculate results area
         results_start_y = start_y + 5
@@ -405,19 +415,19 @@ class DrivesDialog(BaseListDialog):
         with self.s3_lock:
             current_filtered = self.filtered_drives.copy()
         
-        self.draw_list_items(stdscr, safe_addstr_func, current_filtered, 
+        self.draw_list_items(current_filtered, 
                            results_start_y, results_end_y, content_start_x, content_width, format_drive)
         
         # Draw scrollbar
         scrollbar_x = start_x + dialog_width - 2
         content_height = results_end_y - results_start_y + 1
-        self.draw_scrollbar(stdscr, safe_addstr_func, current_filtered, 
+        self.draw_scrollbar(current_filtered, 
                           results_start_y, content_height, scrollbar_x)
         
         # Draw help text
         help_text = "Enter: Select | Type: Filter | ESC: Cancel"
         help_y = start_y + dialog_height - 2
-        self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
+        self.draw_help_text(help_text, help_y, start_x, dialog_width)
         
         # Automatically mark as not needing redraw after drawing (unless still loading)
         if not self.loading_s3:

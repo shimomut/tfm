@@ -1,6 +1,8 @@
 # TFM - TUI File Manager
 
-A powerful terminal-based file manager built with Python's curses library. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, advanced text editing, and professional-grade features.
+A powerful file manager that runs both in the terminal and as a native desktop application. Navigate your filesystem with keyboard shortcuts in a clean, intuitive dual-pane interface with comprehensive file operations, advanced text editing, and professional-grade features.
+
+**Run in Terminal Mode** (all platforms) or **Desktop Mode** (macOS native app with GPU acceleration).
 
 ## Key Features
 
@@ -40,8 +42,19 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 1. Ensure you have Python 3.9+ installed
 2. Clone or download TFM
 3. Run the file manager:
+   
+   **Terminal Mode** (all platforms):
    ```bash
    python3 tfm.py
+   ```
+   
+   **Desktop Mode** (macOS only):
+   ```bash
+   # Install PyObjC for desktop mode
+   pip install pyobjc-framework-Cocoa
+   
+   # Run as native desktop application
+   python3 tfm.py --desktop
    ```
 
 ### Essential Controls
@@ -157,40 +170,73 @@ For detailed information on all features, see the [User Guide](doc/TFM_USER_GUID
 ## Command Line Options
 
 ```bash
+# Run in terminal mode (default)
+python3 tfm.py
+
+# Run in desktop mode (macOS only)
+python3 tfm.py --desktop
+python3 tfm.py --backend coregraphics  # Alternative syntax
+
 # Specify startup directories
 python3 tfm.py --left /path/to/projects --right /path/to/documents
 
 # Enable remote log monitoring
 python3 tfm.py --remote-log-port 8888
 
-# Combined usage
-python3 tfm.py --left ./src --right ./test --remote-log-port 8888
+# Combined usage - desktop mode with custom directories
+python3 tfm.py --desktop --left ./src --right ./test
 
 # Help and version
 python3 tfm.py --help
 python3 tfm.py --version
 ```
 
+### Backend Selection
+
+TFM supports two rendering backends:
+
+- **Terminal Mode** (`--backend curses`): Traditional terminal interface, works on all platforms
+- **Desktop Mode** (`--backend coregraphics` or `--desktop`): Native macOS application with GPU acceleration
+
+Desktop mode provides:
+- Native macOS window with resizing and full-screen support
+- GPU-accelerated rendering at 60 FPS
+- Customizable fonts and window size
+- Better color accuracy with true RGB colors
+
+See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desktop mode configuration.
+
 ## Installation
 
 ### Requirements
+
+**Terminal Mode** (all platforms):
 - Python 3.9+ with curses library (built-in on Unix systems)
 - Terminal with curses support
+
+**Desktop Mode** (macOS only):
+- Python 3.9+
+- PyObjC framework: `pip install pyobjc-framework-Cocoa`
 
 ### Optional Dependencies
 ```bash
 pip install pygments  # Enhanced syntax highlighting
 pip install boto3     # AWS S3 support
+pip install pyobjc-framework-Cocoa  # Desktop mode (macOS only)
 ```
 
 ### Installation Options
 ```bash
-# Run directly
+# Run directly in terminal mode
 python3 tfm.py
+
+# Run in desktop mode (macOS)
+python3 tfm.py --desktop
 
 # Install from source
 python3 setup.py install
 tfm
+tfm --desktop  # Desktop mode after installation
 ```
 
 ## Configuration
@@ -237,12 +283,19 @@ The log client provides color-coded output for different log sources and handles
 
 **Installation Issues:**
 - Ensure Python 3.9+ is installed
-- Check terminal compatibility with curses library
+- Check terminal compatibility with curses library (terminal mode)
+- Install PyObjC for desktop mode: `pip install pyobjc-framework-Cocoa`
+
+**Desktop Mode Issues:**
+- Desktop mode only works on macOS
+- If PyObjC is missing, TFM automatically falls back to terminal mode
+- Check console output for backend initialization messages
 
 **Performance Issues:**
 - Install `pygments` for better text viewer performance
 - Check available memory for large directory operations
 - First access to large archives may be slow while structure is cached
+- Desktop mode provides better performance with GPU acceleration
 
 **Archive Issues:**
 - Verify archive file is not corrupted

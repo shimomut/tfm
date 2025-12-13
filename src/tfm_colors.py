@@ -1,7 +1,17 @@
 """
 Color definitions and initialization for TFM (Terminal File Manager)
 """
-import curses
+from typing import Tuple, Optional
+try:
+    from ttk import TextAttribute
+except ImportError:
+    # Fallback for when TTK is not available (during testing)
+    from enum import IntEnum
+    class TextAttribute(IntEnum):
+        NORMAL = 0
+        BOLD = 1
+        UNDERLINE = 2
+        REVERSE = 4
 
 # Color pair constants
 
@@ -259,288 +269,219 @@ def get_current_rgb_colors():
     """Get RGB colors for the current color scheme"""
     return COLOR_SCHEMES.get(current_color_scheme, COLOR_SCHEMES['dark'])
 
-# Fallback color schemes for terminals without RGB support
-FALLBACK_COLOR_SCHEMES = {
-    'dark': {
-        'HEADER_BG': curses.COLOR_BLUE,         # Dark blue-gray → blue
-        'FOOTER_BG': curses.COLOR_BLUE,         # Dark blue-gray → blue
-        'STATUS_BG': curses.COLOR_BLUE,         # Dark blue-gray → blue
-        'BOUNDARY_BG': curses.COLOR_BLUE,       # Dark blue-gray → blue
-        'DIRECTORY_FG': curses.COLOR_YELLOW,    # (204,204,120) yellowish → yellow
-        'EXECUTABLE_FG': curses.COLOR_GREEN,    # (51,229,51) bright green → green
-        'SELECTED_BG': curses.COLOR_BLUE,       # (40,80,160) dark blue → blue
-        'SELECTED_INACTIVE_BG': curses.COLOR_BLACK,  # (80,80,80) dark gray → black
-        'REGULAR_FILE_FG': curses.COLOR_WHITE,  # (220,220,220) light gray → white
-        'LOG_STDOUT_FG': curses.COLOR_WHITE,    # (220,220,220) light gray → white
-        'LOG_SYSTEM_FG': curses.COLOR_CYAN,     # (100,200,255) light blue → cyan
-        'LINE_NUMBERS_FG': curses.COLOR_WHITE,  # (128,128,128) gray → white
-        # Syntax highlighting fallback colors
-        'SYNTAX_KEYWORD_FG': curses.COLOR_YELLOW,   # (255,119,0) orange → yellow
-        'SYNTAX_STRING_FG': curses.COLOR_GREEN,     # (0,255,0) green → green
-        'SYNTAX_COMMENT_FG': curses.COLOR_WHITE,    # (128,128,128) gray → white
-        'SYNTAX_NUMBER_FG': curses.COLOR_YELLOW,    # (255,255,0) yellow → yellow
-        'SYNTAX_OPERATOR_FG': curses.COLOR_MAGENTA, # (255,0,255) magenta → magenta
-        'SYNTAX_BUILTIN_FG': curses.COLOR_CYAN,     # (0,255,255) cyan → cyan
-        'SYNTAX_NAME_FG': curses.COLOR_WHITE,       # (220,220,220) light gray → white
-        # Search highlighting fallback colors
-        'SEARCH_MATCH_BG': curses.COLOR_BLUE,       # (30,60,120) dark blue → blue
-        'SEARCH_CURRENT_BG': curses.COLOR_BLUE,     # (40,80,160) blue → blue
-        # Default colors
-        'DEFAULT_FG': curses.COLOR_WHITE,           # (220,220,220) light gray → white
-        'DEFAULT_BG': curses.COLOR_BLACK            # (0,0,0) black → black
-    },
-    'light': {
-        'HEADER_BG': curses.COLOR_WHITE,        # (220,220,220) light gray → white
-        'FOOTER_BG': curses.COLOR_WHITE,        # (220,220,220) light gray → white
-        'STATUS_BG': curses.COLOR_WHITE,        # (220,220,220) light gray → white
-        'BOUNDARY_BG': curses.COLOR_WHITE,      # (220,220,220) light gray → white
-        'DIRECTORY_FG': curses.COLOR_YELLOW,    # (160,120,0) brown/yellow → yellow
-        'EXECUTABLE_FG': curses.COLOR_GREEN,    # (0,160,0) dark green → green
-        'SELECTED_BG': curses.COLOR_CYAN,       # (120,160,255) light blue → cyan
-        'SELECTED_INACTIVE_BG': curses.COLOR_WHITE,  # (160,160,160) gray → white (closest available)
-        'REGULAR_FILE_FG': curses.COLOR_BLACK,  # (60,60,60) dark gray → black
-        'LOG_STDOUT_FG': curses.COLOR_BLACK,    # (60,60,60) dark gray → black
-        'LOG_SYSTEM_FG': curses.COLOR_BLUE,     # (50,100,160) dark blue → blue
-        'LINE_NUMBERS_FG': curses.COLOR_BLACK,  # (128,128,128) gray → black (closest available)
-        # Syntax highlighting fallback colors
-        'SYNTAX_KEYWORD_FG': curses.COLOR_MAGENTA,  # (128,0,128) purple → magenta
-        'SYNTAX_STRING_FG': curses.COLOR_GREEN,     # (0,128,0) dark green → green
-        'SYNTAX_COMMENT_FG': curses.COLOR_BLACK,    # (128,128,128) gray → black
-        'SYNTAX_NUMBER_FG': curses.COLOR_BLUE,      # (0,0,200) blue → blue
-        'SYNTAX_OPERATOR_FG': curses.COLOR_RED,     # (200,0,0) red → red
-        'SYNTAX_BUILTIN_FG': curses.COLOR_CYAN,     # (0,128,128) teal → cyan
-        'SYNTAX_NAME_FG': curses.COLOR_BLACK,       # (64,64,64) dark gray → black
-        # Search highlighting fallback colors
-        'SEARCH_MATCH_BG': curses.COLOR_CYAN,       # (180,240,255) very light blue → cyan
-        'SEARCH_CURRENT_BG': curses.COLOR_CYAN,     # (140,200,255) light blue → cyan
-        # Default colors
-        'DEFAULT_FG': curses.COLOR_BLACK,           # (0,0,0) black → black
-        'DEFAULT_BG': curses.COLOR_WHITE            # (255,255,255) white → white
-    }
-}
+# Note: Fallback color schemes are no longer needed with TTK
+# TTK always supports full RGB colors, so these are kept only for
+# backward compatibility during migration and will be removed later
 
-# Backward compatibility - use current scheme's fallback colors
-def get_current_fallback_colors():
-    """Get fallback colors for the current color scheme"""
-    return FALLBACK_COLOR_SCHEMES.get(current_color_scheme, FALLBACK_COLOR_SCHEMES['dark'])
-
-def init_colors(color_scheme=None):
-    """Initialize all color pairs for the application"""
-    global current_color_scheme
+def init_colors(renderer, color_scheme=None):
+    """
+    Initialize all color pairs for the application using TTK renderer.
+    
+    Args:
+        renderer: TTK Renderer instance
+        color_scheme: Optional color scheme name ('dark' or 'light')
+    """
+    global current_color_scheme, default_background_color, default_foreground_color
     
     # Set color scheme from parameter or use current
     if color_scheme:
         current_color_scheme = color_scheme
     
-    curses.start_color()
-    
-    # Get colors for current scheme
+    # Get RGB colors for current scheme
     rgb_colors = get_current_rgb_colors()
-    fallback_colors = get_current_fallback_colors()
     
-    # Check if terminal supports RGB colors and fallback mode is not forced
-    can_change_color = curses.can_change_color() and not force_fallback_colors
+    # Extract RGB tuples from color definitions
+    header_bg = rgb_colors['HEADER_BG']['rgb']
+    footer_bg = rgb_colors['FOOTER_BG']['rgb']
+    status_bg = rgb_colors['STATUS_BG']['rgb']
+    boundary_bg = rgb_colors['BOUNDARY_BG']['rgb']
+    directory_fg = rgb_colors['DIRECTORY_FG']['rgb']
+    executable_fg = rgb_colors['EXECUTABLE_FG']['rgb']
+    selected_bg = rgb_colors['SELECTED_BG']['rgb']
+    selected_inactive_bg = rgb_colors['SELECTED_INACTIVE_BG']['rgb']
+    regular_file_fg = rgb_colors['REGULAR_FILE_FG']['rgb']
+    log_stdout_fg = rgb_colors['LOG_STDOUT_FG']['rgb']
+    log_system_fg = rgb_colors['LOG_SYSTEM_FG']['rgb']
+    line_numbers_fg = rgb_colors['LINE_NUMBERS_FG']['rgb']
+    # Syntax highlighting colors
+    syntax_keyword_fg = rgb_colors['SYNTAX_KEYWORD_FG']['rgb']
+    syntax_string_fg = rgb_colors['SYNTAX_STRING_FG']['rgb']
+    syntax_comment_fg = rgb_colors['SYNTAX_COMMENT_FG']['rgb']
+    syntax_number_fg = rgb_colors['SYNTAX_NUMBER_FG']['rgb']
+    syntax_operator_fg = rgb_colors['SYNTAX_OPERATOR_FG']['rgb']
+    syntax_builtin_fg = rgb_colors['SYNTAX_BUILTIN_FG']['rgb']
+    syntax_name_fg = rgb_colors['SYNTAX_NAME_FG']['rgb']
+    # Search highlighting colors
+    search_match_bg = rgb_colors['SEARCH_MATCH_BG']['rgb']
+    search_current_bg = rgb_colors['SEARCH_CURRENT_BG']['rgb']
+    # Default colors
+    default_fg = rgb_colors['DEFAULT_FG']['rgb']
+    default_bg = rgb_colors['DEFAULT_BG']['rgb']
     
-    # Initialize custom RGB colors if supported and not in fallback mode
-    if can_change_color:
-        rgb_success = True
-        try:
-            # Define all custom RGB colors from current scheme
-            for color_name, color_def in rgb_colors.items():
-                color_num = color_def['color_num']
-                r, g, b = color_def['rgb']
-                
-                # Convert RGB (0-255) to curses scale (0-1000)
-                r_curses = int((r / 255.0) * 1000)
-                g_curses = int((g / 255.0) * 1000)
-                b_curses = int((b / 255.0) * 1000)
-                
-                curses.init_color(color_num, r_curses, g_curses, b_curses)
-            
-            # Use custom RGB colors
-            header_bg = rgb_colors['HEADER_BG']['color_num']
-            footer_bg = rgb_colors['FOOTER_BG']['color_num']
-            status_bg = rgb_colors['STATUS_BG']['color_num']
-            boundary_bg = rgb_colors['BOUNDARY_BG']['color_num']
-            directory_fg = rgb_colors['DIRECTORY_FG']['color_num']
-            executable_fg = rgb_colors['EXECUTABLE_FG']['color_num']
-            selected_bg = rgb_colors['SELECTED_BG']['color_num']
-            selected_inactive_bg = rgb_colors['SELECTED_INACTIVE_BG']['color_num']
-            regular_file_fg = rgb_colors['REGULAR_FILE_FG']['color_num']
-            log_stdout_fg = rgb_colors['LOG_STDOUT_FG']['color_num']
-            log_system_fg = rgb_colors['LOG_SYSTEM_FG']['color_num']
-            line_numbers_fg = rgb_colors['LINE_NUMBERS_FG']['color_num']
-            # Syntax highlighting colors
-            syntax_keyword_fg = rgb_colors['SYNTAX_KEYWORD_FG']['color_num']
-            syntax_string_fg = rgb_colors['SYNTAX_STRING_FG']['color_num']
-            syntax_comment_fg = rgb_colors['SYNTAX_COMMENT_FG']['color_num']
-            syntax_number_fg = rgb_colors['SYNTAX_NUMBER_FG']['color_num']
-            syntax_operator_fg = rgb_colors['SYNTAX_OPERATOR_FG']['color_num']
-            syntax_builtin_fg = rgb_colors['SYNTAX_BUILTIN_FG']['color_num']
-            syntax_name_fg = rgb_colors['SYNTAX_NAME_FG']['color_num']
-            # Search highlighting colors
-            search_match_bg = rgb_colors['SEARCH_MATCH_BG']['color_num']
-            search_current_bg = rgb_colors['SEARCH_CURRENT_BG']['color_num']
-            # Default colors
-            default_fg = rgb_colors['DEFAULT_FG']['color_num']
-            default_bg = rgb_colors['DEFAULT_BG']['color_num']
-            
-        except curses.error:
-            rgb_success = False
-    
-    # Use fallback colors if RGB not supported, failed, or fallback mode is forced
-    if not can_change_color or not rgb_success or force_fallback_colors:
-        # Print message about using fallback colors
-        if force_fallback_colors:
-            print(f"Fallback color mode enabled - using fallback colors for {current_color_scheme} scheme")
-        elif not curses.can_change_color():
-            print(f"Terminal does not support RGB colors - using fallback colors for {current_color_scheme} scheme")
-        else:
-            print(f"RGB color initialization failed - using fallback colors for {current_color_scheme} scheme")
-        
-        # For light scheme, force use of standard curses colors to avoid RGB issues
-        if current_color_scheme == 'light':
-            print("Light scheme: Using standard curses colors for better compatibility")
-        header_bg = fallback_colors['HEADER_BG']
-        footer_bg = fallback_colors['FOOTER_BG']
-        status_bg = fallback_colors['STATUS_BG']
-        boundary_bg = fallback_colors['BOUNDARY_BG']
-        directory_fg = fallback_colors['DIRECTORY_FG']
-        executable_fg = fallback_colors['EXECUTABLE_FG']
-        selected_bg = fallback_colors['SELECTED_BG']
-        selected_inactive_bg = fallback_colors['SELECTED_INACTIVE_BG']
-        regular_file_fg = fallback_colors['REGULAR_FILE_FG']
-        log_stdout_fg = fallback_colors['LOG_STDOUT_FG']
-        log_system_fg = fallback_colors['LOG_SYSTEM_FG']
-        line_numbers_fg = fallback_colors['LINE_NUMBERS_FG']
-        # Syntax highlighting fallback colors
-        syntax_keyword_fg = fallback_colors['SYNTAX_KEYWORD_FG']
-        syntax_string_fg = fallback_colors['SYNTAX_STRING_FG']
-        syntax_comment_fg = fallback_colors['SYNTAX_COMMENT_FG']
-        syntax_number_fg = fallback_colors['SYNTAX_NUMBER_FG']
-        syntax_operator_fg = fallback_colors['SYNTAX_OPERATOR_FG']
-        syntax_builtin_fg = fallback_colors['SYNTAX_BUILTIN_FG']
-        syntax_name_fg = fallback_colors['SYNTAX_NAME_FG']
-        # Search highlighting fallback colors
-        search_match_bg = fallback_colors['SEARCH_MATCH_BG']
-        search_current_bg = fallback_colors['SEARCH_CURRENT_BG']
-        # Default colors
-        default_fg = fallback_colors['DEFAULT_FG']
-        default_bg = fallback_colors['DEFAULT_BG']
-    
-    # Use scheme-specific default colors
-    bg_color = default_bg
-    header_text_color = default_fg
-    
-    # Initialize color pairs
-    
-    # File type colors (normal)
-    curses.init_pair(COLOR_REGULAR_FILE, regular_file_fg, bg_color)
-    curses.init_pair(COLOR_DIRECTORIES, directory_fg, bg_color)
-    curses.init_pair(COLOR_EXECUTABLES, executable_fg, bg_color)
-    
-    # File type colors (selected)
-    curses.init_pair(COLOR_REGULAR_FILE_SELECTED, regular_file_fg, selected_bg)
-    curses.init_pair(COLOR_DIRECTORIES_SELECTED, directory_fg, selected_bg)
-    curses.init_pair(COLOR_EXECUTABLES_SELECTED, executable_fg, selected_bg)
-    
-    # File type colors (selected inactive) - use dedicated background and underline
-    curses.init_pair(COLOR_REGULAR_FILE_SELECTED_INACTIVE, regular_file_fg, selected_inactive_bg)
-    curses.init_pair(COLOR_DIRECTORIES_SELECTED_INACTIVE, directory_fg, selected_inactive_bg)
-    curses.init_pair(COLOR_EXECUTABLES_SELECTED_INACTIVE, executable_fg, selected_inactive_bg)
-    
-    # Interface colors
-    curses.init_pair(COLOR_HEADER, header_text_color, header_bg)
-    curses.init_pair(COLOR_FOOTER, header_text_color, footer_bg)
-    curses.init_pair(COLOR_STATUS, header_text_color, status_bg)
-    curses.init_pair(COLOR_BOUNDARY, header_text_color, boundary_bg)
-    curses.init_pair(COLOR_ERROR, curses.COLOR_RED, bg_color)
-    
-    # Log colors
-    curses.init_pair(COLOR_LOG_STDOUT, log_stdout_fg, bg_color)
-    curses.init_pair(COLOR_LOG_SYSTEM, log_system_fg, bg_color)
-    curses.init_pair(COLOR_LINE_NUMBERS, line_numbers_fg, bg_color)
-    # Syntax highlighting color pairs
-    curses.init_pair(COLOR_SYNTAX_KEYWORD, syntax_keyword_fg, bg_color)
-    curses.init_pair(COLOR_SYNTAX_STRING, syntax_string_fg, bg_color)
-    curses.init_pair(COLOR_SYNTAX_COMMENT, syntax_comment_fg, bg_color)
-    curses.init_pair(COLOR_SYNTAX_NUMBER, syntax_number_fg, bg_color)
-    curses.init_pair(COLOR_SYNTAX_OPERATOR, syntax_operator_fg, bg_color)
-    curses.init_pair(COLOR_SYNTAX_BUILTIN, syntax_builtin_fg, bg_color)
-    curses.init_pair(COLOR_SYNTAX_NAME, syntax_name_fg, bg_color)
-    # Search highlighting color pairs
-    search_text_color = default_fg
-    curses.init_pair(COLOR_SEARCH_MATCH, search_text_color, search_match_bg)
-    curses.init_pair(COLOR_SEARCH_CURRENT, search_text_color, search_current_bg)
-    
-    # Background color pair for filling areas
-    curses.init_pair(COLOR_BACKGROUND, default_fg, default_bg)
-    
-    # Store the default colors globally for use by the application
-    global default_background_color, default_foreground_color
+    # Store default colors for later use
     default_background_color = default_bg
     default_foreground_color = default_fg
+    
+    # Initialize color pairs using TTK renderer
+    # Note: Color pair 0 is reserved for default colors
+    
+    # File type colors (normal)
+    renderer.init_color_pair(COLOR_REGULAR_FILE, regular_file_fg, default_bg)
+    renderer.init_color_pair(COLOR_DIRECTORIES, directory_fg, default_bg)
+    renderer.init_color_pair(COLOR_EXECUTABLES, executable_fg, default_bg)
+    
+    # File type colors (selected)
+    renderer.init_color_pair(COLOR_REGULAR_FILE_SELECTED, regular_file_fg, selected_bg)
+    renderer.init_color_pair(COLOR_DIRECTORIES_SELECTED, directory_fg, selected_bg)
+    renderer.init_color_pair(COLOR_EXECUTABLES_SELECTED, executable_fg, selected_bg)
+    
+    # File type colors (selected inactive)
+    renderer.init_color_pair(COLOR_REGULAR_FILE_SELECTED_INACTIVE, regular_file_fg, selected_inactive_bg)
+    renderer.init_color_pair(COLOR_DIRECTORIES_SELECTED_INACTIVE, directory_fg, selected_inactive_bg)
+    renderer.init_color_pair(COLOR_EXECUTABLES_SELECTED_INACTIVE, executable_fg, selected_inactive_bg)
+    
+    # Interface colors
+    renderer.init_color_pair(COLOR_HEADER, default_fg, header_bg)
+    renderer.init_color_pair(COLOR_FOOTER, default_fg, footer_bg)
+    renderer.init_color_pair(COLOR_STATUS, default_fg, status_bg)
+    renderer.init_color_pair(COLOR_BOUNDARY, default_fg, boundary_bg)
+    renderer.init_color_pair(COLOR_ERROR, (255, 0, 0), default_bg)  # Red for errors
+    
+    # Log colors
+    renderer.init_color_pair(COLOR_LOG_STDOUT, log_stdout_fg, default_bg)
+    renderer.init_color_pair(COLOR_LOG_SYSTEM, log_system_fg, default_bg)
+    renderer.init_color_pair(COLOR_LINE_NUMBERS, line_numbers_fg, default_bg)
+    
+    # Syntax highlighting color pairs
+    renderer.init_color_pair(COLOR_SYNTAX_KEYWORD, syntax_keyword_fg, default_bg)
+    renderer.init_color_pair(COLOR_SYNTAX_STRING, syntax_string_fg, default_bg)
+    renderer.init_color_pair(COLOR_SYNTAX_COMMENT, syntax_comment_fg, default_bg)
+    renderer.init_color_pair(COLOR_SYNTAX_NUMBER, syntax_number_fg, default_bg)
+    renderer.init_color_pair(COLOR_SYNTAX_OPERATOR, syntax_operator_fg, default_bg)
+    renderer.init_color_pair(COLOR_SYNTAX_BUILTIN, syntax_builtin_fg, default_bg)
+    renderer.init_color_pair(COLOR_SYNTAX_NAME, syntax_name_fg, default_bg)
+    
+    # Search highlighting color pairs
+    renderer.init_color_pair(COLOR_SEARCH_MATCH, default_fg, search_match_bg)
+    renderer.init_color_pair(COLOR_SEARCH_CURRENT, default_fg, search_current_bg)
+    
+    # Background color pair for filling areas
+    renderer.init_color_pair(COLOR_BACKGROUND, default_fg, default_bg)
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
-    """Get the appropriate color for a file based on its properties"""
+    """
+    Get the appropriate color pair and attributes for a file based on its properties.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
     # Handle selected files with common background color
     if is_selected and is_active:
         if is_dir:
-            return curses.color_pair(COLOR_DIRECTORIES_SELECTED)
+            return COLOR_DIRECTORIES_SELECTED, TextAttribute.NORMAL
         elif is_executable:
-            return curses.color_pair(COLOR_EXECUTABLES_SELECTED)
+            return COLOR_EXECUTABLES_SELECTED, TextAttribute.NORMAL
         else:
-            return curses.color_pair(COLOR_REGULAR_FILE_SELECTED)
+            return COLOR_REGULAR_FILE_SELECTED, TextAttribute.NORMAL
     
     # Handle inactive selection with dedicated colors
     if is_selected:
         if is_dir:
-            return curses.color_pair(COLOR_DIRECTORIES_SELECTED_INACTIVE)
+            return COLOR_DIRECTORIES_SELECTED_INACTIVE, TextAttribute.NORMAL
         elif is_executable:
-            return curses.color_pair(COLOR_EXECUTABLES_SELECTED_INACTIVE)
+            return COLOR_EXECUTABLES_SELECTED_INACTIVE, TextAttribute.NORMAL
         else:
-            return curses.color_pair(COLOR_REGULAR_FILE_SELECTED_INACTIVE)
+            return COLOR_REGULAR_FILE_SELECTED_INACTIVE, TextAttribute.NORMAL
     
     # Normal (unselected) files
     if is_dir:
-        return curses.color_pair(COLOR_DIRECTORIES)
+        return COLOR_DIRECTORIES, TextAttribute.NORMAL
     elif is_executable:
-        return curses.color_pair(COLOR_EXECUTABLES)
+        return COLOR_EXECUTABLES, TextAttribute.NORMAL
     else:
-        return curses.color_pair(COLOR_REGULAR_FILE)
+        return COLOR_REGULAR_FILE, TextAttribute.NORMAL
+
+
 
 def get_header_color(is_active=False):
-    """Get header color with optional bold for active panes"""
+    """
+    Get header color pair and attributes with optional bold for active panes.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
     if is_active:
-        return curses.color_pair(COLOR_HEADER) | curses.A_BOLD
+        return COLOR_HEADER, TextAttribute.BOLD
     else:
-        return curses.color_pair(COLOR_HEADER)
+        return COLOR_HEADER, TextAttribute.NORMAL
 
 def get_footer_color(is_active=False):
-    """Get footer color with optional bold for active panes"""
+    """
+    Get footer color pair and attributes with optional bold for active panes.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
     if is_active:
-        return curses.color_pair(COLOR_FOOTER) | curses.A_BOLD
+        return COLOR_FOOTER, TextAttribute.BOLD
     else:
-        return curses.color_pair(COLOR_FOOTER)
+        return COLOR_FOOTER, TextAttribute.NORMAL
 
 def get_status_color():
-    """Get status line color"""
-    return curses.color_pair(COLOR_STATUS)
+    """
+    Get status line color pair and attributes.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    
+    Note: During migration, some code may still expect a single integer.
+    Use get_status_color_legacy() for backward compatibility.
+    """
+    return COLOR_STATUS, TextAttribute.NORMAL
+
+def get_status_color_legacy():
+    """
+    Legacy function that returns color as a single integer for backward compatibility.
+    
+    This function is deprecated and will be removed after migration is complete.
+    Use get_status_color() instead which returns (color_pair, attributes) tuple.
+    
+    Returns:
+        int: Combined color pair and attributes (curses-style)
+    """
+    # Return just the color pair for backward compatibility
+    return COLOR_STATUS
 
 def get_error_color():
-    """Get error message color"""
-    return curses.color_pair(COLOR_ERROR)
+    """
+    Get error message color pair and attributes.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_ERROR, TextAttribute.NORMAL
 
 def get_boundary_color():
-    """Get boundary color for pane separators"""
-    return curses.color_pair(COLOR_BOUNDARY)
+    """
+    Get boundary color pair and attributes for pane separators.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_BOUNDARY, TextAttribute.NORMAL
 
 def get_color_capabilities():
-    """Get information about terminal color capabilities"""
+    """
+    Get information about terminal color capabilities.
+    
+    Note: This function is deprecated and will be removed in a future version.
+    TTK handles color capabilities internally.
+    """
+    # Return basic info - TTK handles color capabilities
     info = {
-        'colors': curses.COLORS if hasattr(curses, 'COLORS') else 8,
-        'color_pairs': curses.COLOR_PAIRS if hasattr(curses, 'COLOR_PAIRS') else 64,
-        'can_change_color': curses.can_change_color(),
+        'colors': 256,  # TTK supports full RGB
+        'color_pairs': 256,
+        'can_change_color': True,  # TTK always supports RGB
     }
     return info
 
@@ -631,36 +572,25 @@ def print_all_color_schemes():
     print(f"\nCurrent active scheme: {current_color_scheme}")
 
 def print_color_support_info():
-    """Print information about terminal color support"""
-    try:
-        # This will only work if curses has been initialized
-        if hasattr(curses, 'COLORS'):
-            colors = curses.COLORS
-            pairs = curses.COLOR_PAIRS if hasattr(curses, 'COLOR_PAIRS') else 'Unknown'
-            can_change = curses.can_change_color()
-            
-            print("Terminal Color Support:")
-            print(f"  Colors available: {colors}")
-            print(f"  Color pairs: {pairs}")
-            print(f"  RGB support: {'Yes' if can_change else 'No'}")
-            print(f"  Current scheme: {current_color_scheme}")
-            
-            # Check for default color support
-            has_default_colors = hasattr(curses, 'assume_default_colors')
-            print(f"  Default colors support: {'Yes' if has_default_colors else 'No'}")
-            
-            if can_change:
-                print("  Status: Using RGB colors")
-            else:
-                print("  Status: Using fallback colors")
-        else:
-            print("Color support information not available (curses not initialized)")
-    except Exception as e:
-        print(f"Cannot determine color support: {e}")
+    """
+    Print information about terminal color support.
+    
+    Note: This function is deprecated. TTK always supports full RGB colors.
+    """
+    print("Terminal Color Support:")
+    print(f"  Colors available: 256 (full RGB)")
+    print(f"  Color pairs: 256")
+    print(f"  RGB support: Yes (TTK)")
+    print(f"  Current scheme: {current_color_scheme}")
+    print(f"  Status: Using RGB colors via TTK")
 
 def check_default_colors_support():
-    """Check if terminal supports default color changes"""
-    return hasattr(curses, 'assume_default_colors')
+    """
+    Check if terminal supports default color changes.
+    
+    Note: This function is deprecated. TTK always supports default colors.
+    """
+    return True  # TTK always supports default colors
 
 def get_default_background_color():
     """Get the default background color for the current scheme"""
@@ -671,46 +601,50 @@ def get_default_foreground_color():
     return default_foreground_color
 
 def get_background_color_pair():
-    """Get a color pair that can be used for background areas"""
-    try:
-        # Return the dedicated background color pair
-        return curses.color_pair(COLOR_BACKGROUND)
-    except Exception as e:
-        print(f"Warning: Could not get background color pair: {e}")
-        return 0
+    """
+    Get a color pair that can be used for background areas.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_BACKGROUND, TextAttribute.NORMAL
 
-def apply_background_to_window(window):
-    """Apply the color scheme background to a curses window using addstr() method"""
+def apply_background_to_window(renderer, height, width):
+    """
+    Apply the color scheme background using TTK renderer.
+    
+    Args:
+        renderer: TTK Renderer instance
+        height: Window height in characters
+        width: Window width in characters
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
     try:
         if default_background_color is not None:
-            # Get window dimensions
-            height, width = window.getmaxyx()
-            bg_attr = get_background_color_pair()
+            color_pair, attributes = get_background_color_pair()
             
             # Fill the window with spaces using the background color
             for y in range(height):
                 try:
-                    # Fill each line with spaces, leaving room for cursor at end
-                    window.addstr(y, 0, ' ' * (width - 1), bg_attr)
-                except curses.error:
+                    renderer.draw_text(y, 0, ' ' * width, color_pair=color_pair, attributes=attributes)
+                except Exception:
                     pass  # Ignore errors at screen edges
-            
-            # Move cursor back to top-left
-            try:
-                window.move(0, 0)
-            except curses.error:
-                pass
             
             return True
     except Exception as e:
-        print(f"Warning: Could not apply background to window: {e}")
+        print(f"Warning: Could not apply background: {e}")
     return False
 
-def define_rgb_color(color_num, red, green, blue):
+def define_rgb_color(renderer, color_num, red, green, blue):
     """
-    Define a custom RGB color
+    Define a custom RGB color using TTK renderer.
+    
+    Note: This function is deprecated. Use renderer.init_color_pair() directly.
     
     Args:
+        renderer: TTK Renderer instance
         color_num: Color number to define (usually 8-255)
         red: Red component (0-255)
         green: Green component (0-255) 
@@ -719,18 +653,11 @@ def define_rgb_color(color_num, red, green, blue):
     Returns:
         True if successful, False if not supported
     """
-    if not curses.can_change_color():
-        return False
-    
     try:
-        # Convert 0-255 RGB to 0-1000 scale used by curses
-        r = int((red / 255.0) * 1000)
-        g = int((green / 255.0) * 1000)
-        b = int((blue / 255.0) * 1000)
-        
-        curses.init_color(color_num, r, g, b)
+        # TTK always supports RGB colors
+        # This is a no-op since colors are defined via init_color_pair
         return True
-    except curses.error:
+    except Exception:
         return False
 
 def add_custom_rgb_color(name, color_num, rgb_tuple):
@@ -748,51 +675,96 @@ def add_custom_rgb_color(name, color_num, rgb_tuple):
     }
 
 def get_log_color(source):
-    """Get appropriate color for log messages based on source"""
+    """
+    Get appropriate color pair and attributes for log messages based on source.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
     if source == "STDERR":
-        return curses.color_pair(COLOR_ERROR)  # Red for stderr
+        return COLOR_ERROR, TextAttribute.NORMAL  # Red for stderr
     elif source == "SYSTEM":
-        return curses.color_pair(COLOR_LOG_SYSTEM)  # Light blue for system messages
+        return COLOR_LOG_SYSTEM, TextAttribute.NORMAL  # Light blue for system messages
     elif source == "STDOUT":
-        return curses.color_pair(COLOR_LOG_STDOUT)  # Medium gray for stdout
+        return COLOR_LOG_STDOUT, TextAttribute.NORMAL  # Medium gray for stdout
     else:
-        return curses.color_pair(COLOR_LOG_STDOUT)  # Default to stdout color
+        return COLOR_LOG_STDOUT, TextAttribute.NORMAL  # Default to stdout color
 
 def get_line_number_color():
-    """Get line number color for text viewer"""
-    return curses.color_pair(COLOR_LINE_NUMBERS)
+    """
+    Get line number color pair and attributes for text viewer.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_LINE_NUMBERS, TextAttribute.NORMAL
 
 def get_syntax_color(token_type):
-    """Get syntax highlighting color for a token type"""
+    """
+    Get syntax highlighting color pair and attributes for a token type.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
     # Map pygments token types to our color pairs
     token_str = str(token_type)
     
     if 'Keyword' in token_str:
-        return curses.color_pair(COLOR_SYNTAX_KEYWORD)
+        return COLOR_SYNTAX_KEYWORD, TextAttribute.NORMAL
     elif 'String' in token_str or 'Literal.String' in token_str:
-        return curses.color_pair(COLOR_SYNTAX_STRING)
+        return COLOR_SYNTAX_STRING, TextAttribute.NORMAL
     elif 'Comment' in token_str:
-        return curses.color_pair(COLOR_SYNTAX_COMMENT)
+        return COLOR_SYNTAX_COMMENT, TextAttribute.NORMAL
     elif 'Number' in token_str or 'Literal.Number' in token_str:
-        return curses.color_pair(COLOR_SYNTAX_NUMBER)
+        return COLOR_SYNTAX_NUMBER, TextAttribute.NORMAL
     elif 'Operator' in token_str or 'Punctuation' in token_str:
-        return curses.color_pair(COLOR_SYNTAX_OPERATOR)
+        return COLOR_SYNTAX_OPERATOR, TextAttribute.NORMAL
     elif 'Builtin' in token_str or 'Name.Builtin' in token_str:
-        return curses.color_pair(COLOR_SYNTAX_BUILTIN)
+        return COLOR_SYNTAX_BUILTIN, TextAttribute.NORMAL
     elif 'Name' in token_str:
-        return curses.color_pair(COLOR_SYNTAX_NAME)
+        return COLOR_SYNTAX_NAME, TextAttribute.NORMAL
     else:
         # Default to regular text color
-        return curses.color_pair(COLOR_REGULAR_FILE)
+        return COLOR_REGULAR_FILE, TextAttribute.NORMAL
 
 def get_search_color():
-    """Get search interface color (same as status color)"""
-    return curses.color_pair(COLOR_STATUS)
+    """
+    Get search interface color pair and attributes (same as status color).
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_STATUS, TextAttribute.NORMAL
 
 def get_search_match_color():
-    """Get search match highlighting color"""
-    return curses.color_pair(COLOR_SEARCH_MATCH)
+    """
+    Get search match highlighting color pair and attributes.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_SEARCH_MATCH, TextAttribute.NORMAL
 
 def get_search_current_color():
-    """Get current search match highlighting color"""
-    return curses.color_pair(COLOR_SEARCH_CURRENT)
+    """
+    Get current search match highlighting color pair and attributes.
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    return COLOR_SEARCH_CURRENT, TextAttribute.NORMAL
+
+def get_color_with_attrs(color_pair):
+    """
+    Convert a color pair constant to (color_pair, attributes) tuple.
+    
+    This is a helper function for components that store color pair constants
+    and need to convert them to the TTK API format.
+    
+    Args:
+        color_pair: Color pair constant (e.g., COLOR_REGULAR_FILE)
+        
+    Returns:
+        Tuple[int, int]: (color_pair, TextAttribute.NORMAL)
+    """
+    return color_pair, TextAttribute.NORMAL

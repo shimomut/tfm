@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 import unittest
 from unittest.mock import Mock, patch
 from tfm_single_line_text_edit import SingleLineTextEdit
+from ttk import TextAttribute
 
 
 class TestCursorRenderingBug(unittest.TestCase):
@@ -42,7 +43,7 @@ class TestCursorRenderingBug(unittest.TestCase):
         def mock_addstr(y, x, text, attr=0):
             drawn_items.append({
                 'y': y, 'x': x, 'text': text, 'attr': attr,
-                'is_cursor': bool(attr & 0x40000)  # curses.A_REVERSE
+                'is_cursor': bool(attr & TextAttribute.REVERSE)
             })
         
         mock_stdscr.addstr = mock_addstr
@@ -76,7 +77,7 @@ class TestCursorRenderingBug(unittest.TestCase):
         def mock_addstr(y, x, text, attr=0):
             drawn_items.append({
                 'y': y, 'x': x, 'text': text, 'attr': attr,
-                'is_cursor': bool(attr & 0x40000)  # curses.A_REVERSE
+                'is_cursor': bool(attr & TextAttribute.REVERSE)
             })
         
         mock_stdscr.addstr = mock_addstr
@@ -115,7 +116,7 @@ class TestCursorRenderingBug(unittest.TestCase):
                 def mock_addstr(y, x, text, attr=0):
                     drawn_items.append({
                         'y': y, 'x': x, 'text': text, 'attr': attr,
-                        'is_cursor': bool(attr & 0x40000)
+                        'is_cursor': bool(attr & TextAttribute.REVERSE)
                     })
                 
                 mock_stdscr.addstr = mock_addstr

@@ -4,21 +4,21 @@ TUI File Manager - Jump Dialog Component
 Provides directory jumping functionality with threading support
 """
 
-import curses
 import threading
 import time
+from ttk import TextAttribute, KeyCode
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
-from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
+from tfm_input_compat import ensure_input_event
 
 
 class JumpDialog(BaseListDialog):
     """Jump dialog component for directory navigation with threading support"""
     
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, renderer=None):
+        super().__init__(config, renderer)
         
         # Jump dialog specific state
         self.directories = []  # List of all directories found
@@ -85,13 +85,23 @@ class JumpDialog(BaseListDialog):
         # Reset animation
         self.progress_animator.reset()
         
-    def handle_input(self, key):
-        """Handle input while in jump dialog mode"""
+    def handle_input(self, event):
+        """Handle input while in jump dialog mode
+        
+        Args:
+            event: InputEvent from TTK
+        """
+        # Backward compatibility: convert integer key codes to InputEvent
+        event = ensure_input_event(event)
+        
+        if not event:
+            return False
+            
         # Use base class navigation handling with thread safety
         with self.scan_lock:
             current_filtered = self.filtered_directories.copy()
         
-        result = self.handle_common_navigation(key, current_filtered)
+        result = self.handle_common_navigation(event, current_filtered)
         
         if result == 'cancel':
             # Cancel scan before exiting
@@ -114,7 +124,7 @@ class JumpDialog(BaseListDialog):
             return True
         elif result:
             # Update selection in thread-safe manner for navigation keys
-            if key in [curses.KEY_UP, curses.KEY_DOWN, curses.KEY_PPAGE, curses.KEY_NPAGE, curses.KEY_HOME, curses.KEY_END]:
+            if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
                 with self.scan_lock:
                     # The base class already updated self.selected, just need to adjust scroll
                     self._adjust_scroll(len(self.filtered_directories))
@@ -335,24 +345,28 @@ class JumpDialog(BaseListDialog):
         # Always redraw when scanning to animate progress indicator
         return self.content_changed or self.searching
     
-    def draw(self, stdscr, safe_addstr_func):
+    def draw(self):
         """Draw the jump dialog overlay"""
+        if not self.renderer:
+            return
+            
         # Draw dialog frame
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
-            stdscr, safe_addstr_func, "Jump to Directory", 0.8, 0.8, 60, 20
+            "Jump to Directory", 0.8, 0.8, 60, 20
         )
         
         # Draw filter input
         search_y = start_y + 2
-        self.draw_text_input(stdscr, safe_addstr_func, search_y, start_x, dialog_width, "Filter: ")
+        self.draw_text_input(search_y, start_x, dialog_width, "Filter: ")
         
         # Draw separator
         sep_y = start_y + 3
-        self.draw_separator(stdscr, safe_addstr_func, sep_y, start_x, dialog_width)
+        self.draw_separator(sep_y, start_x, dialog_width)
         
         # Draw results count with animated progress indicator (thread-safe)
         count_y = start_y + 4
-        if count_y < stdscr.getmaxyx()[0]:
+        height, width = self.renderer.get_dimensions()
+        if count_y < height:
             with self.scan_lock:
                 directory_count = len(self.directories)
                 filtered_count = len(self.filtered_directories)
@@ -368,7 +382,8 @@ class JumpDialog(BaseListDialog):
                     count_text = self.progress_animator.get_status_text("Scanning", context_info, is_searching)
                     
                     # Use brighter color for active scan
-                    count_color = get_status_color() | curses.A_BOLD
+                    color_pair, _ = get_status_color()
+                    count_attributes = TextAttribute.BOLD
                 else:
                     if self.text_editor.text.strip():
                         count_text = f"Directories: {filtered_count} (filtered from {directory_count})"
@@ -378,9 +393,11 @@ class JumpDialog(BaseListDialog):
                     if directory_count >= self.max_directories:
                         count_text += " (limit reached)"
                     
-                    count_color = get_status_color() | curses.A_DIM
+                    color_pair, _ = get_status_color()
+                    count_attributes = TextAttribute.NORMAL
             
-            safe_addstr_func(count_y, start_x + 2, count_text[:dialog_width - 4], count_color)
+            self.renderer.draw_text(count_y, start_x + 2, count_text[:dialog_width - 4], 
+                                   color_pair=color_pair, attributes=count_attributes)
         
         # Calculate results area
         results_start_y = start_y + 5
@@ -396,19 +413,19 @@ class JumpDialog(BaseListDialog):
         with self.scan_lock:
             current_filtered = self.filtered_directories.copy()
         
-        self.draw_list_items(stdscr, safe_addstr_func, current_filtered, 
+        self.draw_list_items(current_filtered, 
                            results_start_y, results_end_y, content_start_x, content_width, format_directory)
         
         # Draw scrollbar
         scrollbar_x = start_x + dialog_width - 2
         content_height = results_end_y - results_start_y + 1
-        self.draw_scrollbar(stdscr, safe_addstr_func, current_filtered, 
+        self.draw_scrollbar(current_filtered, 
                           results_start_y, content_height, scrollbar_x)
         
         # Draw help text
         help_text = "Enter: Jump | Type: Filter | ESC: Cancel"
         help_y = start_y + dialog_height - 2
-        self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
+        self.draw_help_text(help_text, help_y, start_x, dialog_width)
         
         # Automatically mark as not needing redraw after drawing (unless still searching)
         if not self.searching:

@@ -3,7 +3,6 @@
 TUI File Manager - A terminal-based file manager using curses
 """
 
-import curses
 import os
 import stat
 import shutil
@@ -23,10 +22,14 @@ from datetime import datetime
 from collections import deque
 from tfm_single_line_text_edit import SingleLineTextEdit
 
+# Import TTK input event system
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk.renderer import TextAttribute
+
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, is_special_key_bound_to_with_selection, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
+from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, is_special_key_bound_to_with_selection, is_input_event_bound_to, is_input_event_bound_to_with_selection, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
 from tfm_text_viewer import view_text_file, is_text_file
 
 # Import new modular components
@@ -49,8 +52,9 @@ from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_cache_manager import CacheManager
 
 class FileManager:
-    def __init__(self, stdscr, remote_log_port=None, left_dir=None, right_dir=None):
-        self.stdscr = stdscr
+    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None):
+        self.renderer = renderer
+        self.stdscr = renderer  # Keep stdscr as alias for compatibility during migration
         
         # Load configuration
         self.config = get_config()
@@ -65,7 +69,7 @@ class FileManager:
         # Initialize colors BEFORE any stdout/stderr redirection
         # This prevents issues where LogManager's stdout redirection interferes with color detection
         color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-        init_colors(color_scheme)
+        init_colors(renderer, color_scheme)
         
         # Initialize modular components
         self.log_manager = LogManager(self.config, remote_port=remote_log_port)
@@ -101,7 +105,7 @@ class FileManager:
         self.batch_rename_dialog = BatchRenameDialog(self.config)
         self.quick_choice_bar = QuickChoiceBar(self.config)
         self.general_dialog = GeneralPurposeDialog(self.config)
-        self.external_program_manager = ExternalProgramManager(self.config, self.log_manager)
+        self.external_program_manager = ExternalProgramManager(self.config, self.log_manager, renderer)
         self.progress_manager = ProgressManager()
         self.cache_manager = CacheManager(self.log_manager)
         self.archive_operations = ArchiveOperations(self.log_manager, self.cache_manager, self.progress_manager)
@@ -136,9 +140,9 @@ class FileManager:
         # Colors already initialized before LogManager creation to prevent
         # stdout/stderr redirection from interfering with color detection
         
-        # Configure curses
-        curses.curs_set(0)  # Hide cursor
-        self.stdscr.keypad(True)
+        # Configure renderer
+        self.renderer.set_cursor_visibility(False)  # Hide cursor
+        # Note: TTK handles special keys automatically through InputEvent, no keypad() needed
         
         # Track startup time for delayed redraw
         self.startup_time = time.time()
@@ -166,10 +170,17 @@ class FileManager:
             # TFM should still work without user directories
             print(f"Warning: Could not create TFM user directories: {e}", file=sys.stderr)
         
-    def safe_addstr(self, y, x, text, attr=curses.A_NORMAL):
-        """Safely add string to screen, handling boundary conditions"""
+    def safe_addstr(self, y, x, text, attr=None):
+        """Safely add string to screen, handling boundary conditions
+        
+        Args:
+            y: Row position
+            x: Column position
+            text: Text to display
+            attr: Either a tuple of (color_pair, attributes) or None for default
+        """
         try:
-            height, width = self.stdscr.getmaxyx()
+            height, width = self.renderer.get_dimensions()
             
             # Check bounds
             if y < 0 or y >= height or x < 0 or x >= width:
@@ -181,59 +192,43 @@ class FileManager:
                 return
                 
             truncated_text = text[:max_len] if len(text) > max_len else text
-            self.stdscr.addstr(y, x, truncated_text, attr)
-        except curses.error:
-            pass  # Ignore curses errors
+            
+            # Handle attr parameter - should be a tuple of (color_pair, attributes)
+            if attr is None:
+                color_pair = 0
+                attributes = TextAttribute.NORMAL
+            elif isinstance(attr, tuple) and len(attr) == 2:
+                color_pair, attributes = attr
+            else:
+                # Legacy: single integer, treat as color_pair with no attributes
+                color_pair = attr if isinstance(attr, int) else 0
+                attributes = TextAttribute.NORMAL
+            
+            self.renderer.draw_text(y, x, truncated_text, color_pair=color_pair, attributes=attributes)
+        except Exception:
+            pass  # Ignore rendering errors
     
     def clear_screen_with_background(self):
         """Clear screen and apply proper background color for current scheme"""
         try:
-            # Try to apply background color to the window
-            from tfm_colors import apply_background_to_window, get_background_color_pair
+            # Clear the screen using TTK renderer
+            self.renderer.clear()
             
-            # Clear the screen first
-            self.stdscr.clear()
-            
-            # Try to apply the background color
-            if apply_background_to_window(self.stdscr):
-                # Background applied successfully
-                pass
-            else:
-                # Fallback: manually fill screen with background color
-                try:
-                    height, width = self.stdscr.getmaxyx()
-                    bg_color_pair = get_background_color_pair()
-                    
-                    # Fill the screen with spaces using the background color
-                    for y in range(height):
-                        try:
-                            self.stdscr.addstr(y, 0, ' ' * (width - 1), bg_color_pair)
-                        except curses.error:
-                            pass  # Ignore errors at screen edges
-                    
-                    # Move cursor back to top
-                    self.stdscr.move(0, 0)
-                except curses.error as e:
-                    print(f"Warning: Could not move cursor during background clear: {e}")
-                except Exception as e:
-                    print(f"Warning: Background clear operation failed: {e}")
+            # TTK renderer handles background color automatically
+            # No need for manual background filling
             
         except Exception as e:
             # Any other error, use regular clear
             print(f"Warning: Screen clear with background failed: {e}")
-            self.stdscr.clear()
+            self.renderer.clear()
 
-    def is_key_for_action(self, key, action):
-        """Check if a key matches a configured action and respects selection requirements"""
+    def is_key_for_action(self, event, action):
+        """Check if an input event matches a configured action and respects selection requirements"""
         current_pane = self.get_current_pane()
         has_selection = len(current_pane['selected_files']) > 0
         
-        if 32 <= key <= 126:  # Printable ASCII
-            key_char = chr(key)
-            return is_key_bound_to_with_selection(key_char, action, has_selection)
-        else:
-            # Special key (non-printable)
-            return is_special_key_bound_to_with_selection(key, action, has_selection)
+        # Use the new InputEvent-aware function
+        return is_input_event_bound_to_with_selection(event, action, has_selection)
         
     def count_files_and_dirs(self, pane_data):
         """Count directories and files in a pane"""
@@ -258,9 +253,9 @@ class FileManager:
         
         try:
             # Left pane footer with active indicator
-            left_color = get_footer_color(self.pane_manager.active_pane == 'left')
-            self.stdscr.addstr(y, 2, left_footer, left_color)
-        except curses.error:
+            left_color_pair, left_attributes = get_footer_color(self.pane_manager.active_pane == 'left')
+            self.renderer.draw_text(y, 2, left_footer, color_pair=left_color_pair, attributes=left_attributes)
+        except Exception:
             pass
             
         # Right pane footer  
@@ -280,9 +275,9 @@ class FileManager:
         
         try:
             # Right pane footer with active indicator
-            right_color = get_footer_color(self.pane_manager.active_pane == 'right')
-            self.stdscr.addstr(y, left_pane_width + 2, right_footer, right_color)
-        except curses.error:
+            right_color_pair, right_attributes = get_footer_color(self.pane_manager.active_pane == 'right')
+            self.renderer.draw_text(y, left_pane_width + 2, right_footer, color_pair=right_color_pair, attributes=right_attributes)
+        except Exception:
             pass
             
     def toggle_selection(self):
@@ -348,7 +343,7 @@ class FileManager:
             # Both panes show same directory, just sync cursor position
             if self.pane_manager.sync_cursor_to_other_pane(print):
                 # Adjust scroll offset if needed to keep selection visible
-                height, width = self.stdscr.getmaxyx()
+                height, width = self.renderer.get_dimensions()
                 calculated_height = int(height * self.log_height_ratio)
                 log_height = calculated_height if self.log_height_ratio > 0 else 0
                 display_height = height - log_height - 3
@@ -361,7 +356,7 @@ class FileManager:
                 self.refresh_files(current_pane)
                 
                 # Try to restore cursor position for this directory
-                height, width = self.stdscr.getmaxyx()
+                height, width = self.renderer.get_dimensions()
                 calculated_height = int(height * self.log_height_ratio)
                 log_height = calculated_height if self.log_height_ratio > 0 else 0
                 display_height = height - log_height - 3
@@ -383,7 +378,7 @@ class FileManager:
             # Both panes show same directory, just sync cursor position
             if self.pane_manager.sync_cursor_from_current_pane(print):
                 # Adjust scroll offset if needed to keep selection visible
-                height, width = self.stdscr.getmaxyx()
+                height, width = self.renderer.get_dimensions()
                 calculated_height = int(height * self.log_height_ratio)
                 log_height = calculated_height if self.log_height_ratio > 0 else 0
                 display_height = height - log_height - 3
@@ -396,7 +391,7 @@ class FileManager:
                 self.refresh_files(other_pane)
                 
                 # Try to restore cursor position for this directory
-                height, width = self.stdscr.getmaxyx()
+                height, width = self.renderer.get_dimensions()
                 calculated_height = int(height * self.log_height_ratio)
                 log_height = calculated_height if self.log_height_ratio > 0 else 0
                 display_height = height - log_height - 3
@@ -413,7 +408,7 @@ class FileManager:
         if self.pane_manager.sync_cursor_to_other_pane(print):
             # Adjust scroll offset if needed to keep selection visible
             current_pane = self.get_current_pane()
-            height, width = self.stdscr.getmaxyx()
+            height, width = self.renderer.get_dimensions()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
             display_height = height - log_height - 3
@@ -426,7 +421,7 @@ class FileManager:
         if self.pane_manager.sync_cursor_from_current_pane(print):
             # Adjust scroll offset if needed to keep selection visible
             other_pane = self.get_inactive_pane()
-            height, width = self.stdscr.getmaxyx()
+            height, width = self.renderer.get_dimensions()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
             display_height = height - log_height - 3
@@ -436,7 +431,7 @@ class FileManager:
         
     def restore_cursor_position(self, pane_data):
         """Restore cursor position from history - wrapper for pane_manager method"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         display_height = height - log_height - 3
@@ -448,7 +443,7 @@ class FileManager:
     
     def adjust_scroll_for_selection(self, pane_data):
         """Adjust scroll for selection - wrapper for pane_manager method"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         display_height = height - log_height - 3
@@ -555,14 +550,14 @@ class FileManager:
     def get_log_scroll_percentage(self):
         """Calculate the current log scroll position as a percentage"""
         # Calculate display height for accurate scroll percentage
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         return self.log_manager.get_log_scroll_percentage(log_height)
     
     def _get_log_pane_height(self):
         """Calculate the current log pane height in lines"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         return log_height
@@ -625,14 +620,15 @@ class FileManager:
     
     def draw_header(self):
         """Draw the header with pane paths and controls"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         right_pane_width = width - left_pane_width
         
         # Clear header area (avoid last column)
         try:
-            self.stdscr.addstr(0, 0, " " * (width - 1), get_header_color())
-        except curses.error:
+            color_pair, attributes = get_header_color()
+            self.renderer.draw_text(0, 0, " " * (width - 1), color_pair=color_pair, attributes=attributes)
+        except Exception:
             pass
         
         # Left pane path with safety checks
@@ -643,17 +639,18 @@ class FileManager:
             if safe_get_display_width(left_path) > max_left_path_width:
                 left_path = truncate_to_width(left_path, max_left_path_width, "...")
             
-            left_color = get_header_color(self.pane_manager.active_pane == 'left')
+            color_pair, attributes = get_header_color(self.pane_manager.active_pane == 'left')
             try:
-                self.stdscr.addstr(0, 2, left_path, left_color)
-            except curses.error:
+                self.renderer.draw_text(0, 2, left_path, color_pair=color_pair, attributes=attributes)
+            except Exception:
                 pass  # Ignore drawing errors for narrow panes
         
         # Separator with bounds check
         if 0 <= left_pane_width < width:
             try:
-                self.stdscr.addstr(0, left_pane_width, "│", get_boundary_color())
-            except curses.error:
+                color_pair, attributes = get_boundary_color()
+                self.renderer.draw_text(0, left_pane_width, "│", color_pair=color_pair, attributes=attributes)
+            except Exception:
                 pass
         
         # Right pane path with safety checks
@@ -664,12 +661,12 @@ class FileManager:
             if safe_get_display_width(right_path) > max_right_path_width:
                 right_path = truncate_to_width(right_path, max_right_path_width, "...")
                 
-            right_color = get_header_color(self.pane_manager.active_pane == 'right')
+            right_color_pair, right_attributes = get_header_color(self.pane_manager.active_pane == 'right')
             try:
                 right_start_x = left_pane_width + 2
                 if right_start_x < width:
-                    self.stdscr.addstr(0, right_start_x, right_path, right_color)
-            except curses.error:
+                    self.renderer.draw_text(0, right_start_x, right_path, color_pair=right_color_pair, attributes=right_attributes)
+            except Exception:
                 pass  # Ignore drawing errors for narrow panes
         
         # No controls in header anymore - moved to status bar
@@ -679,10 +676,10 @@ class FileManager:
         # Safety checks to prevent crashes
         if pane_width < 10:  # Minimum viable pane width
             return
-        if start_x < 0 or start_x >= self.stdscr.getmaxyx()[1]:
+        if start_x < 0 or start_x >= self.renderer.get_dimensions()[1]:
             return
             
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         # Allow log pane to be completely hidden (0 height) when ratio is 0
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
@@ -699,12 +696,13 @@ class FileManager:
             
             try:
                 from tfm_colors import get_error_color
-                self.stdscr.addstr(message_y, message_x, message, get_error_color())
-            except (curses.error, ImportError):
+                error_color_pair, error_attributes = get_error_color()
+                self.renderer.draw_text(message_y, message_x, message, color_pair=error_color_pair, attributes=error_attributes)
+            except (Exception, ImportError):
                 # Fallback if color function not available or position invalid
                 try:
-                    self.stdscr.addstr(message_y, start_x + 2, message)
-                except curses.error:
+                    self.renderer.draw_text(message_y, start_x + 2, message)
+                except Exception:
                     pass
             return
         
@@ -748,13 +746,13 @@ class FileManager:
             # Handle search match highlighting (takes precedence over multi-selection)
             if is_search_match and not is_selected:
                 # Highlight search matches with underline
-                base_color = get_file_color(is_dir, is_executable, False, False)
-                color = base_color | curses.A_UNDERLINE
+                color_pair, _ = get_file_color(is_dir, is_executable, False, False)
+                color = (color_pair, TextAttribute.UNDERLINE)
             # Handle multi-selection highlighting
             elif is_multi_selected and not is_selected:
                 # Get base color and add standout for multi-selected files
-                base_color = get_file_color(is_dir, is_executable, False, False)
-                color = base_color | curses.A_STANDOUT
+                color_pair, _ = get_file_color(is_dir, is_executable, False, False)
+                color = (color_pair, TextAttribute.STANDOUT)
                 
             # Add selection marker for multi-selected files
             selection_marker = "●" if is_multi_selected else " "
@@ -846,13 +844,16 @@ class FileManager:
                 max_line_width = pane_width - 2
                 if safe_get_display_width(line) > max_line_width:
                     line = truncate_to_width(line, max_line_width, "")
-                self.stdscr.addstr(y, start_x + 1, line, color)
-            except curses.error:
+                
+                # Color is already a tuple of (color_pair, attributes)
+                color_pair, attributes = color
+                self.renderer.draw_text(y, start_x + 1, line, color_pair=color_pair, attributes=attributes)
+            except Exception:
                 pass  # Ignore if we can't write to screen edge
                 
     def draw_files(self):
         """Draw both file panes"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         left_pane_width = int(width * self.pane_manager.left_pane_ratio)
         right_pane_width = width - left_pane_width
         # Allow log pane to be completely hidden (0 height) when ratio is 0
@@ -865,8 +866,9 @@ class FileManager:
         # Draw vertical separator for file panes
         for y in range(1, file_pane_bottom):
             try:
-                self.stdscr.addstr(y, left_pane_width, "│", get_boundary_color())
-            except curses.error:
+                boundary_color_pair, boundary_attributes = get_boundary_color()
+                self.renderer.draw_text(y, left_pane_width, "│", color_pair=boundary_color_pair, attributes=boundary_attributes)
+            except Exception:
                 pass
         
         # Draw left pane
@@ -877,7 +879,7 @@ class FileManager:
         
     def draw_log_pane(self):
         """Draw the log pane at the bottom"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         # Allow log pane to be completely hidden (0 height) when ratio is 0
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
@@ -894,11 +896,12 @@ class FileManager:
         # Draw horizontal separator and file list footers
         try:
             separator_line = "─" * width
-            self.stdscr.addstr(footer_y, 0, separator_line, get_boundary_color())
+            boundary_color_pair, boundary_attributes = get_boundary_color()
+            self.renderer.draw_text(footer_y, 0, separator_line, color_pair=boundary_color_pair, attributes=boundary_attributes)
             
             # Always draw file list footers
             self.draw_file_footers(footer_y, left_pane_width)
-        except curses.error:
+        except Exception:
             pass
             
         # If log pane is hidden (0 height), don't draw log content
@@ -913,7 +916,7 @@ class FileManager:
                 
     def draw_status(self):
         """Draw status line with file info and controls"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         status_y = height - 1
         
         current_pane = self.get_current_pane()
@@ -966,14 +969,18 @@ class FileManager:
             if len(isearch_prompt) + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
                 if help_x > len(isearch_prompt) + 4:  # Ensure no overlap
-                    self.safe_addstr(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+                    # Get status color and add DIM attribute
+                    status_color_pair = get_status_color()
+                    self.safe_addstr(status_y, help_x, help_text, (status_color_pair, TextAttribute.DIM))
             else:
                 # Shorter help text for narrow terminals
                 short_help = "ESC:exit Enter:accept ↑↓:nav"
                 if len(isearch_prompt) + len(short_help) + 6 < width:
                     help_x = width - len(short_help) - 3
                     if help_x > len(isearch_prompt) + 4:
-                        self.safe_addstr(status_y, help_x, short_help, get_status_color() | curses.A_DIM)
+                        # Get status color and add DIM attribute
+                        status_color_pair = get_status_color()
+                        self.safe_addstr(status_y, help_x, short_help, (status_color_pair, TextAttribute.DIM))
             return
         
         # Normal status display
@@ -1141,7 +1148,7 @@ class FileManager:
                     self.needs_full_redraw = True
             elif is_text_file(selected_file):
                 # Fallback to text viewer for text files without association
-                curses.curs_set(0)
+                self.renderer.set_cursor_visibility(False)
                 
                 if view_text_file(self.stdscr, selected_file):
                     print(f"Viewed file: {selected_file.name}")
@@ -1155,17 +1162,20 @@ class FileManager:
             
     def show_error(self, message):
         """Show error message"""
-        height, width = self.stdscr.getmaxyx()
-        self.stdscr.addstr(height - 1, 2, f"ERROR: {message}", get_error_color())
-        self.stdscr.refresh()
-        curses.napms(2000)  # Show for 2 seconds
+        height, width = self.renderer.get_dimensions()
+        error_color_pair, error_attributes = get_error_color()
+        self.renderer.draw_text(height - 1, 2, f"ERROR: {message}", color_pair=error_color_pair, attributes=error_attributes)
+        self.renderer.refresh()
+        import time
+        time.sleep(2.0)  # Show for 2 seconds
         
     def show_info(self, message):
         """Show info message"""
-        height, width = self.stdscr.getmaxyx()
-        self.stdscr.addstr(height - 1, 2, message)
-        self.stdscr.refresh()
-        curses.napms(1500)  # Show for 1.5 seconds
+        height, width = self.renderer.get_dimensions()
+        self.renderer.draw_text(height - 1, 2, message)
+        self.renderer.refresh()
+        import time
+        time.sleep(1.5)  # Show for 1.5 seconds
         
     def find_matches(self, pattern):
         """Find all files matching the fnmatch patterns in current pane
@@ -1206,7 +1216,7 @@ class FileManager:
             
     def adjust_scroll_for_selection(self, pane_data):
         """Ensure the selected item is visible by adjusting scroll offset"""
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         display_height = height - log_height - 3  # Reserve space for header, footer, and status
@@ -1704,7 +1714,7 @@ class FileManager:
             
         # Refresh screen if dialog was drawn or full redraw occurred
         if dialog_drawn or self.needs_full_redraw:
-            self.stdscr.refresh()
+            self.renderer.refresh()
             
         return dialog_drawn
 
@@ -1733,7 +1743,7 @@ class FileManager:
             self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
         
         # Refresh screen immediately
-        self.stdscr.refresh()
+        self.renderer.refresh()
         self.needs_full_redraw = False
         self.needs_dialog_redraw = False
 
@@ -1872,7 +1882,7 @@ class FileManager:
             self.refresh_files(current_pane)
             
             # Try to restore cursor position for this directory
-            height, width = self.stdscr.getmaxyx()
+            height, width = self.renderer.get_dimensions()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
             display_height = height - log_height - 3
@@ -1895,8 +1905,8 @@ class FileManager:
     def show_programs_dialog(self):
         """Show external programs using the searchable list dialog"""
         def execute_program_wrapper(program):
-            self.stdscr = self.external_program_manager.execute_external_program(
-                self.stdscr, self.pane_manager, program
+            self.external_program_manager.execute_external_program(
+                self.pane_manager, program
             )
             self.needs_full_redraw = True
         
@@ -2257,7 +2267,7 @@ class FileManager:
             if is_text_file(selected_file):
                 # Fallback to built-in text viewer for text files
                 try:
-                    curses.curs_set(0)
+                    self.renderer.set_cursor_visibility(False)
                     
                     if view_text_file(self.stdscr, selected_file):
                         print(f"Viewed text file: {selected_file.name}")
@@ -2415,7 +2425,7 @@ class FileManager:
         # Force a screen refresh to show progress
         try:
             self.draw_status()
-            self.stdscr.refresh()
+            self.renderer.refresh()
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     
@@ -2480,23 +2490,24 @@ class FileManager:
         print("Legacy TAR extraction method called - this should not happen")
         pass
         
-    def handle_isearch_input(self, key):
+    def handle_isearch_input(self, event):
         """Handle input while in isearch mode"""
-        if key == 27:  # ESC - exit isearch mode
+        if event.key_code == KeyCode.ESCAPE:
+            # ESC - exit isearch mode
             self.exit_isearch_mode()
             return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+        elif event.key_code == KeyCode.ENTER:
             # Enter - exit isearch mode and keep current position
             self.exit_isearch_mode()
             return True
-        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_1 or key == KEY_BACKSPACE_2:
+        elif event.key_code == KeyCode.BACKSPACE:
             # Backspace - remove last character
             if self.isearch_pattern:
                 self.isearch_pattern = self.isearch_pattern[:-1]
                 self.update_isearch_matches()
                 self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_UP:
+        elif event.key_code == KeyCode.UP:
             # Up arrow - go to previous match
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
@@ -2504,7 +2515,7 @@ class FileManager:
                 current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
-        elif key == curses.KEY_DOWN:
+        elif event.key_code == KeyCode.DOWN:
             # Down arrow - go to next match
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
@@ -2512,9 +2523,9 @@ class FileManager:
                 current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
-        elif 32 <= key <= 126:  # Printable characters
+        elif event.is_printable():
             # Add character to isearch pattern
-            self.isearch_pattern += chr(key)
+            self.isearch_pattern += event.char
             self.update_isearch_matches()
             self.needs_full_redraw = True
             return True
@@ -2651,7 +2662,7 @@ class FileManager:
         
         # Adjust scroll with proper display height
         current_pane = self.get_current_pane()
-        height, width = self.stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         display_height = height - log_height - 3
@@ -2725,54 +2736,54 @@ class FileManager:
         
         return False
 
-    def handle_key_input(self, key):
-        """Handle key input and return True if the key was processed"""
+    def handle_key_input(self, event):
+        """Handle input event and return True if the event was processed"""
         current_pane = self.get_current_pane()
         
         # Handle isearch mode input first
         if self.isearch_mode:
-            if self.handle_isearch_input(key):
-                return True  # Isearch mode handled the key
+            if self.handle_isearch_input(event):
+                return True  # Isearch mode handled the event
         
         # Handle general dialog input
         if self.general_dialog.is_active:
-            if self.general_dialog.handle_key(key):
-                return True  # General dialog handled the key
+            if self.general_dialog.handle_key(event):
+                return True  # General dialog handled the event
         
         # Handle quick choice mode input
         if self.quick_choice_bar.is_active:
-            if self.handle_quick_choice_input(key):
-                return True  # Quick choice mode handled the key
+            if self.handle_quick_choice_input(event):
+                return True  # Quick choice mode handled the event
         
         # Handle info dialog mode input
         if self.info_dialog.is_active:
-            if self.handle_info_dialog_input(key):
-                return True  # Info dialog mode handled the key
+            if self.handle_info_dialog_input(event):
+                return True  # Info dialog mode handled the event
         
         # Handle list dialog mode input
         if self.list_dialog.is_active:
-            if self.handle_list_dialog_input(key):
-                return True  # List dialog mode handled the key
+            if self.handle_list_dialog_input(event):
+                return True  # List dialog mode handled the event
         
         # Handle search dialog mode input
         if self.search_dialog.is_active:
-            if self.handle_search_dialog_input(key):
-                return True  # Search dialog mode handled the key
+            if self.handle_search_dialog_input(event):
+                return True  # Search dialog mode handled the event
         
         # Handle jump dialog mode input
         if self.jump_dialog.is_active:
-            if self.handle_jump_dialog_input(key):
-                return True  # Jump dialog mode handled the key
+            if self.handle_jump_dialog_input(event):
+                return True  # Jump dialog mode handled the event
         
         # Handle drives dialog mode input
         if self.drives_dialog.is_active:
-            if self.handle_drives_dialog_input(key):
-                return True  # Drives dialog mode handled the key
+            if self.handle_drives_dialog_input(event):
+                return True  # Drives dialog mode handled the event
         
         # Handle batch rename dialog mode input
         if self.batch_rename_dialog.is_active:
-            if self.handle_batch_rename_input(key):
-                return True  # Batch rename mode handled the key
+            if self.handle_batch_rename_input(event):
+                return True  # Batch rename mode handled the event
         
         # Skip regular key processing if any dialog is open
         # This prevents conflicts like starting isearch mode while help dialog is open
@@ -2782,7 +2793,7 @@ class FileManager:
             return True
         
         # Handle main application keys
-        if self.is_key_for_action(key, 'quit'):
+        if self.is_key_for_action(event, 'quit'):
             def quit_callback(confirmed):
                 if confirmed:
                     # Set a flag to exit the main loop
@@ -2795,21 +2806,21 @@ class FileManager:
                 quit_callback(True)
 
 
-        elif key == KEY_TAB:  # Tab key - switch panes
+        elif event.key_code == KeyCode.TAB:  # Tab key - switch panes
             self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
             self.needs_full_redraw = True
-        elif key == curses.KEY_UP:
+        elif event.key_code == KeyCode.UP:
             if current_pane['selected_index'] > 0:
                 current_pane['selected_index'] -= 1
                 self.needs_full_redraw = True
-        elif key == curses.KEY_DOWN:
+        elif event.key_code == KeyCode.DOWN:
             if current_pane['selected_index'] < len(current_pane['files']) - 1:
                 current_pane['selected_index'] += 1
                 self.needs_full_redraw = True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+        elif event.key_code == KeyCode.ENTER:
             self.handle_enter()
             self.needs_full_redraw = True
-        elif self.is_key_for_action(key, 'toggle_hidden'):
+        elif self.is_key_for_action(event, 'toggle_hidden'):
             self.file_operations.toggle_hidden_files()
             # Reset both panes
             self.pane_manager.left_pane['selected_index'] = 0
@@ -2817,26 +2828,26 @@ class FileManager:
             self.pane_manager.right_pane['selected_index'] = 0
             self.pane_manager.right_pane['scroll_offset'] = 0
             self.needs_full_redraw = True
-        elif self.is_key_for_action(key, 'toggle_color_scheme'):
+        elif self.is_key_for_action(event, 'toggle_color_scheme'):
             # Toggle between dark and light color schemes
             new_scheme = toggle_color_scheme()
             # Reinitialize colors with the new scheme
-            init_colors(new_scheme)
+            init_colors(self.renderer, new_scheme)
             print(f"Switched to {new_scheme} color scheme")
             # Print detailed color scheme info to log
             self.print_color_scheme_info()
             self.needs_full_redraw = True
-        elif self.is_key_for_action(key, 'select_all'):
+        elif self.is_key_for_action(event, 'select_all'):
             self.select_all()
-        elif self.is_key_for_action(key, 'unselect_all'):
+        elif self.is_key_for_action(event, 'unselect_all'):
             self.unselect_all()
-        elif key == curses.KEY_PPAGE:  # Page Up - file navigation only
+        elif event.key_code == KeyCode.PAGE_UP:  # Page Up - file navigation only
             current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
             self.needs_full_redraw = True
-        elif key == curses.KEY_NPAGE:  # Page Down - file navigation only
+        elif event.key_code == KeyCode.PAGE_DOWN:  # Page Down - file navigation only
             current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
             self.needs_full_redraw = True
-        elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_2 or key == KEY_BACKSPACE_1:  # Backspace - go to parent directory
+        elif event.key_code == KeyCode.BACKSPACE:  # Backspace - go to parent directory
             # Check if we're at the root of an archive
             current_path_str = str(current_pane['path'])
             if current_path_str.startswith('archive://') and current_path_str.endswith('#'):
@@ -2914,7 +2925,7 @@ class FileManager:
                 except PermissionError:
                     self.show_error("Permission denied")
                     self.needs_full_redraw = True
-        elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
+        elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
             if current_pane['path'] != current_pane['path'].parent:
                 try:
                     # Save current cursor position before changing directory
@@ -2935,7 +2946,7 @@ class FileManager:
                     self.needs_full_redraw = True
                 except PermissionError:
                     self.show_error("Permission denied")
-        elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
+        elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
             if current_pane['path'] != current_pane['path'].parent:
                 try:
                     # Save current cursor position before changing directory
@@ -2956,123 +2967,124 @@ class FileManager:
                     self.needs_full_redraw = True
                 except PermissionError:
                     self.show_error("Permission denied")
-        elif key == curses.KEY_RIGHT and self.pane_manager.active_pane == 'left':  # Right arrow in left pane - switch to right pane
+        elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left':  # Right arrow in left pane - switch to right pane
             self.pane_manager.active_pane = 'right'
             self.needs_full_redraw = True
-        elif key == curses.KEY_LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
+        elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
             self.pane_manager.active_pane = 'left'
             self.needs_full_redraw = True
-        elif key in (KEY_SHIFT_UP_1,KEY_SHIFT_UP_2):  # Shift+Up
+        elif event.key_code in (KEY_SHIFT_UP_1, KEY_SHIFT_UP_2):  # Shift+Up
             if self.log_manager.scroll_log_up(1):
                 self.needs_full_redraw = True
-        elif key in (KEY_SHIFT_DOWN_1, KEY_SHIFT_DOWN_2):  # Shift+Down
+        elif event.key_code in (KEY_SHIFT_DOWN_1, KEY_SHIFT_DOWN_2):  # Shift+Down
             if self.log_manager.scroll_log_down(1):
                 self.needs_full_redraw = True
-        elif key in (KEY_SHIFT_LEFT_1, KEY_SHIFT_LEFT_2):  # Shift+Left - fast scroll to older messages
+        elif event.key_code in (KEY_SHIFT_LEFT_1, KEY_SHIFT_LEFT_2):  # Shift+Left - fast scroll to older messages
             log_height = self._get_log_pane_height()
             if self.log_manager.scroll_log_up(max(1, log_height)):
                 self.needs_full_redraw = True
-        elif key in (KEY_SHIFT_RIGHT_1, KEY_SHIFT_RIGHT_2):  # Shift+Right - fast scroll to newer messages
+        elif event.key_code in (KEY_SHIFT_RIGHT_1, KEY_SHIFT_RIGHT_2):  # Shift+Right - fast scroll to newer messages
             log_height = self._get_log_pane_height()
             if self.log_manager.scroll_log_down(max(1, log_height)):
                 self.needs_full_redraw = True
-        elif self.is_key_for_action(key, 'select_file'):  # Toggle file selection
+        elif self.is_key_for_action(event, 'select_file'):  # Toggle file selection
             self.toggle_selection()
             self.needs_full_redraw = True
-        elif key == 27:  # ESC key - check for Option key sequences
-            # Option+Space sends 194 followed by 160
-            next_key = self.stdscr.getch()
-            # Log unknown ESC sequence for debugging
-            print(f"Unknown ESC sequence: 27, {next_key}")
-        elif self.is_key_for_action(key, 'select_all_files'):  # Toggle all files selection
+        elif event.key_code == KeyCode.ESCAPE:  # ESC key - check for Option key sequences
+            # Option+Space sends ESC followed by another key
+            next_event = self.renderer.get_input(timeout_ms=100)
+            if next_event:
+                # Log unknown ESC sequence for debugging
+                print(f"Unknown ESC sequence: ESC, {next_event.key_code}")
+        elif self.is_key_for_action(event, 'select_all_files'):  # Toggle all files selection
             self.toggle_all_files_selection()
-        elif self.is_key_for_action(key, 'select_all_items'):  # Toggle all items selection
+        elif self.is_key_for_action(event, 'select_all_items'):  # Toggle all items selection
             self.toggle_all_items_selection()
-        elif self.is_key_for_action(key, 'sync_current_to_other'):  # Sync current pane to other
+        elif self.is_key_for_action(event, 'sync_current_to_other'):  # Sync current pane to other
             self.sync_current_to_other()
-        elif self.is_key_for_action(key, 'sync_other_to_current'):  # Sync other pane to current
+        elif self.is_key_for_action(event, 'sync_other_to_current'):  # Sync other pane to current
             self.sync_other_to_current()
-        elif self.is_key_for_action(key, 'search_dialog'):  # Show search dialog (filename)
+        elif self.is_key_for_action(event, 'search_dialog'):  # Show search dialog (filename)
             self.show_search_dialog('filename')
-        elif self.is_key_for_action(key, 'jump_dialog'):  # Show jump dialog (Shift+J)
+        elif self.is_key_for_action(event, 'jump_dialog'):  # Show jump dialog (Shift+J)
             self.show_jump_dialog()
-        elif self.is_key_for_action(key, 'drives_dialog'):  # Show drives dialog
+        elif self.is_key_for_action(event, 'drives_dialog'):  # Show drives dialog
             self.show_drives_dialog()
-        elif self.is_key_for_action(key, 'search_content'):  # Show search dialog (content)
+        elif self.is_key_for_action(event, 'search_content'):  # Show search dialog (content)
             self.show_search_dialog('content')
-        elif self.is_key_for_action(key, 'edit_file'):  # Edit existing file
+        elif self.is_key_for_action(event, 'edit_file'):  # Edit existing file
             self.edit_selected_file()
-        elif self.is_key_for_action(key, 'create_file'):  # Create new file
+        elif self.is_key_for_action(event, 'create_file'):  # Create new file
             self.enter_create_file_mode()
-        elif self.is_key_for_action(key, 'create_directory'):  # Create new directory
+        elif self.is_key_for_action(event, 'create_directory'):  # Create new directory
             self.enter_create_directory_mode()
-        elif self.is_key_for_action(key, 'toggle_fallback_colors'):  # Toggle fallback color mode
+        elif self.is_key_for_action(event, 'toggle_fallback_colors'):  # Toggle fallback color mode
             self.toggle_fallback_color_mode()
-        elif self.is_key_for_action(key, 'view_options'):  # Show view options
+        elif self.is_key_for_action(event, 'view_options'):  # Show view options
             self.show_view_options()
-        elif self.is_key_for_action(key, 'settings_menu'):  # Show settings menu
+        elif self.is_key_for_action(event, 'settings_menu'):  # Show settings menu
             self.show_settings_menu()
-        elif self.is_key_for_action(key, 'search'):  # Search key - enter isearch mode
+        elif self.is_key_for_action(event, 'search'):  # Search key - enter isearch mode
             self.enter_isearch_mode()
-        elif self.is_key_for_action(key, 'filter'):  # Filter key - enter filter mode
+        elif self.is_key_for_action(event, 'filter'):  # Filter key - enter filter mode
             self.enter_filter_mode()
-        elif self.is_key_for_action(key, 'clear_filter'):  # Clear filter key
+        elif self.is_key_for_action(event, 'clear_filter'):  # Clear filter key
             self.clear_filter()
-        elif self.is_key_for_action(key, 'sort_menu'):  # Sort menu
+        elif self.is_key_for_action(event, 'sort_menu'):  # Sort menu
             self.show_sort_menu()
-        elif self.is_key_for_action(key, 'quick_sort_name'):  # Quick sort by name
+        elif self.is_key_for_action(event, 'quick_sort_name'):  # Quick sort by name
             self.quick_sort('name')
-        elif self.is_key_for_action(key, 'quick_sort_size'):  # Quick sort by size
+        elif self.is_key_for_action(event, 'quick_sort_size'):  # Quick sort by size
             self.quick_sort('size')
-        elif self.is_key_for_action(key, 'quick_sort_date'):  # Quick sort by date
+        elif self.is_key_for_action(event, 'quick_sort_date'):  # Quick sort by date
             self.quick_sort('date')
-        elif self.is_key_for_action(key, 'quick_sort_ext'):  # Quick sort by extension
+        elif self.is_key_for_action(event, 'quick_sort_ext'):  # Quick sort by extension
             self.quick_sort('ext')
-        elif self.is_key_for_action(key, 'file_details'):  # Show file details
+        elif self.is_key_for_action(event, 'file_details'):  # Show file details
             self.show_file_details()
-        elif self.is_key_for_action(key, 'view_file'):  # View file
+        elif self.is_key_for_action(event, 'view_file'):  # View file
             self.view_selected_file()
-        elif self.is_key_for_action(key, 'copy_files'):  # Copy selected files
+        elif self.is_key_for_action(event, 'copy_files'):  # Copy selected files
             self.copy_selected_files()
-        elif self.is_key_for_action(key, 'move_files'):  # Move selected files
+        elif self.is_key_for_action(event, 'move_files'):  # Move selected files
             self.move_selected_files()
-        elif self.is_key_for_action(key, 'delete_files'):  # Delete selected files
+        elif self.is_key_for_action(event, 'delete_files'):  # Delete selected files
             self.delete_selected_files()
-        elif self.is_key_for_action(key, 'create_archive'):  # Create archive
+        elif self.is_key_for_action(event, 'create_archive'):  # Create archive
             self.enter_create_archive_mode()
-        elif self.is_key_for_action(key, 'extract_archive'):  # Extract archive
+        elif self.is_key_for_action(event, 'extract_archive'):  # Extract archive
             self.extract_selected_archive()
-        elif self.is_key_for_action(key, 'rename_file'):  # Rename file
+        elif self.is_key_for_action(event, 'rename_file'):  # Rename file
             self.enter_rename_mode()
-        elif self.is_key_for_action(key, 'favorites'):  # Show favorite directories
+        elif self.is_key_for_action(event, 'favorites'):  # Show favorite directories
             self.show_favorite_directories()
-        elif self.is_key_for_action(key, 'history'):  # Show history
+        elif self.is_key_for_action(event, 'history'):  # Show history
             self.show_history()
-        elif self.is_key_for_action(key, 'programs'):  # Show external programs
+        elif self.is_key_for_action(event, 'programs'):  # Show external programs
             self.show_programs_dialog()
-        elif self.is_key_for_action(key, 'compare_selection'):  # Show compare selection menu
+        elif self.is_key_for_action(event, 'compare_selection'):  # Show compare selection menu
             self.show_compare_selection_dialog()
-        elif self.is_key_for_action(key, 'help'):  # Show help dialog
+        elif self.is_key_for_action(event, 'help'):  # Show help dialog
             self.show_help_dialog()
-        elif self.is_key_for_action(key, 'adjust_pane_left'):  # Adjust pane boundary left
+        elif self.is_key_for_action(event, 'adjust_pane_left'):  # Adjust pane boundary left
             self.adjust_pane_boundary('left')
-        elif self.is_key_for_action(key, 'adjust_pane_right'):  # Adjust pane boundary right
+        elif self.is_key_for_action(event, 'adjust_pane_right'):  # Adjust pane boundary right
             self.adjust_pane_boundary('right')
-        elif self.is_key_for_action(key, 'adjust_log_up'):  # Adjust log boundary up
+        elif self.is_key_for_action(event, 'adjust_log_up'):  # Adjust log boundary up
             self.adjust_log_boundary('down')
-        elif self.is_key_for_action(key, 'adjust_log_down'):  # Adjust log boundary down
+        elif self.is_key_for_action(event, 'adjust_log_down'):  # Adjust log boundary down
             self.adjust_log_boundary('up')
-        elif self.is_key_for_action(key, 'reset_log_height'):  # Reset log pane height
+        elif self.is_key_for_action(event, 'reset_log_height'):  # Reset log pane height
             self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
             self.needs_full_redraw = True
             print(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
-        elif key == ord('-'):  # '-' key - reset pane ratio to 50/50
+        elif event.key_code == ord('-'):  # '-' key - reset pane ratio to 50/50
             self.pane_manager.left_pane_ratio = 0.5
             self.needs_full_redraw = True
             print("Pane split reset to 50% | 50%")
-        elif self.is_key_for_action(key, 'subshell'):  # Sub-shell mode
-            self.stdscr = self.external_program_manager.enter_subshell_mode(
-                self.stdscr, self.pane_manager
+        elif self.is_key_for_action(event, 'subshell'):  # Sub-shell mode
+            self.external_program_manager.enter_subshell_mode(
+                self.pane_manager
             )
             self.needs_full_redraw = True
         else:
@@ -3096,7 +3108,7 @@ class FileManager:
             self.draw_status()
             
             # Refresh screen
-            self.stdscr.refresh()
+            self.renderer.refresh()
         
         # Draw dialogs if needed
         self._draw_dialogs_if_needed()
@@ -3122,13 +3134,12 @@ class FileManager:
                 self.needs_full_redraw = True
             
             # Get user input with timeout to allow timer checks
-            self.stdscr.timeout(16)  # 16ms timeout
-            key = self.stdscr.getch()
+            event = self.renderer.get_input(timeout_ms=16)  # 16ms timeout
             
-            # If no key was pressed (timeout), continue to next iteration
-            if key == -1:
+            # If no event was received (timeout), continue to next iteration
+            if event is None:
                 pass  # Continue to drawing
-            elif key == curses.KEY_RESIZE:  # Terminal window resized - handle at top level
+            elif event.key_code == KeyCode.RESIZE:  # Terminal window resized - handle at top level
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()
                 self.needs_full_redraw = True
@@ -3136,13 +3147,13 @@ class FileManager:
                 # Check if operation is in progress
                 if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
                     # Only allow ESC key to cancel operation
-                    if key == 27:  # ESC key
+                    if event.key_code == KeyCode.ESCAPE:
                         self.operation_cancelled = True
                         print("Cancelling operation...")
                     # Ignore all other keys during operation
                 else:
                     # Handle normal key input
-                    self.handle_key_input(key)
+                    self.handle_key_input(event)
             
             # Draw interface after handling input
             self.draw_interface()
@@ -3215,7 +3226,7 @@ class FileManager:
         """Restore cursor positions for both panes during startup."""
         try:
             # Calculate display height for cursor restoration
-            height, width = self.stdscr.getmaxyx()
+            height, width = self.renderer.get_dimensions()
             calculated_height = int(height * self.log_height_ratio)
             log_height = calculated_height if self.log_height_ratio > 0 else 0
             display_height = height - log_height - 3
@@ -3324,11 +3335,11 @@ class FileManager:
             print(f"Warning: Could not load search history: {e}")
             return []
 
-def main(stdscr, remote_log_port=None, left_dir=None, right_dir=None):
+def main(renderer, remote_log_port=None, left_dir=None, right_dir=None):
     """Main function to run the file manager"""
     fm = None
     try:
-        fm = FileManager(stdscr, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir)
+        fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir)
         fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
@@ -3355,4 +3366,9 @@ def main(stdscr, remote_log_port=None, left_dir=None, right_dir=None):
         cleanup_state_manager()
 
 if __name__ == "__main__":
-    curses.wrapper(main)
+    # Note: tfm_main.py should not be run directly anymore.
+    # Use tfm.py which creates the appropriate TTK renderer.
+    print("Error: tfm_main.py should not be run directly.")
+    print("Please use: python tfm.py")
+    import sys
+    sys.exit(1)

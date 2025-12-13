@@ -4,24 +4,24 @@ TUI File Manager - Search Dialog Component
 Provides file and content search functionality with threading support
 """
 
-import curses
 import fnmatch
 import re
 import threading
 import time
+from ttk import TextAttribute, KeyCode
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
-from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_wide_char_utils import get_display_width, get_safe_functions
+from tfm_input_compat import ensure_input_event
 
 
 class SearchDialog(BaseListDialog):
     """Search dialog component for filename and content search with threading support"""
     
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, renderer=None):
+        super().__init__(config, renderer)
         
         # Search dialog specific state
         self.search_type = 'filename'  # 'filename' or 'content'
@@ -78,10 +78,20 @@ class SearchDialog(BaseListDialog):
         # Reset animation
         self.progress_animator.reset()
         
-    def handle_input(self, key):
-        """Handle input while in search dialog mode"""
+    def handle_input(self, event):
+        """Handle input while in search dialog mode
+        
+        Args:
+            event: InputEvent from TTK (or integer key code for backward compatibility)
+        """
+        # Backward compatibility: convert integer key codes to InputEvent
+        event = ensure_input_event(event)
+        
+        if not event:
+            return False
+            
         # Handle Tab key for search type switching first
-        if key == ord('\t'):  # Tab - switch between filename and content search
+        if event.key_code == KeyCode.TAB:
             self.search_type = 'content' if self.search_type == 'filename' else 'filename'
             self.content_changed = True  # Mark content as changed when switching search type
             return ('search', None)
@@ -90,7 +100,7 @@ class SearchDialog(BaseListDialog):
         with self.search_lock:
             current_results = self.results.copy()
         
-        result = self.handle_common_navigation(key, current_results)
+        result = self.handle_common_navigation(event, current_results)
         
         if result == 'cancel':
             # Cancel search before exiting
@@ -112,7 +122,7 @@ class SearchDialog(BaseListDialog):
             return ('search', None)
         elif result:
             # Update selection in thread-safe manner for navigation keys
-            if key in [curses.KEY_UP, curses.KEY_DOWN, curses.KEY_PPAGE, curses.KEY_NPAGE, curses.KEY_HOME, curses.KEY_END]:
+            if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
                 with self.search_lock:
                     # The base class already updated self.selected, just need to adjust scroll
                     self._adjust_scroll(len(self.results))
@@ -381,9 +391,11 @@ class SearchDialog(BaseListDialog):
         # Always redraw when searching to animate progress indicator
         return self.content_changed or self.searching
     
-    def draw(self, stdscr, safe_addstr_func):
+    def draw(self):
         """Draw the search dialog overlay"""
-        
+        if not self.renderer:
+            return
+            
         # Get display prefix from the search root path if available
         display_prefix = ""
         with self.search_lock:
@@ -397,26 +409,29 @@ class SearchDialog(BaseListDialog):
         else:
             title_text = f"Search ({self.search_type.title()})"
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(
-            stdscr, safe_addstr_func, title_text, 0.8, 0.8, 60, 20
+            title_text, 0.8, 0.8, 60, 20
         )
         
         # Draw pattern input
         search_y = start_y + 2
-        self.draw_text_input(stdscr, safe_addstr_func, search_y, start_x, dialog_width, "Pattern: ")
+        self.draw_text_input(search_y, start_x, dialog_width, "Pattern: ")
         
         # Draw search type indicator
         type_y = start_y + 3
-        if type_y < stdscr.getmaxyx()[0]:
+        height, width = self.renderer.get_dimensions()
+        if type_y < height:
             type_text = f"Mode: {self.search_type.title()} (Tab to switch)"
-            safe_addstr_func(type_y, start_x + 2, type_text[:dialog_width - 4], get_status_color() | curses.A_DIM)
+            color_pair, attributes = get_status_color()
+            self.renderer.draw_text(type_y, start_x + 2, type_text[:dialog_width - 4], 
+                                   color_pair=color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw separator
         sep_y = start_y + 4
-        self.draw_separator(stdscr, safe_addstr_func, sep_y, start_x, dialog_width)
+        self.draw_separator(sep_y, start_x, dialog_width)
         
         # Draw results count with animated progress indicator (thread-safe)
         count_y = start_y + 5
-        if count_y < stdscr.getmaxyx()[0]:
+        if count_y < height:
             with self.search_lock:
                 result_count = len(self.results)
                 is_searching = self.searching
@@ -431,16 +446,19 @@ class SearchDialog(BaseListDialog):
                     count_text = self.progress_animator.get_status_text("Searching", context_info, is_searching)
                     
                     # Use brighter color for active search
-                    count_color = get_status_color() | curses.A_BOLD
+                    color_pair, _ = get_status_color()
+                    count_attributes = TextAttribute.BOLD
                 else:
                     if result_count >= self.max_search_results:
                         count_text = f"Results: {result_count} (limit reached)"
                     else:
                         count_text = f"Results: {result_count}"
                     
-                    count_color = get_status_color() | curses.A_DIM
+                    color_pair, _ = get_status_color()
+                    count_attributes = TextAttribute.NORMAL
             
-            safe_addstr_func(count_y, start_x + 2, count_text[:dialog_width - 4], count_color)
+            self.renderer.draw_text(count_y, start_x + 2, count_text[:dialog_width - 4], 
+                                   color_pair=color_pair, attributes=count_attributes)
         
         # Calculate results area
         results_start_y = start_y + 6
@@ -461,19 +479,19 @@ class SearchDialog(BaseListDialog):
         with self.search_lock:
             current_results = self.results.copy()
         
-        self.draw_list_items(stdscr, safe_addstr_func, current_results, 
+        self.draw_list_items(current_results, 
                            results_start_y, results_end_y, content_start_x, content_width, format_result)
         
         # Draw scrollbar
         scrollbar_x = start_x + dialog_width - 2
         content_height = results_end_y - results_start_y + 1
-        self.draw_scrollbar(stdscr, safe_addstr_func, current_results, 
+        self.draw_scrollbar(current_results, 
                           results_start_y, content_height, scrollbar_x)
         
         # Draw help text
         help_text = "Enter: Select | Tab: Switch mode | ESC: Cancel"
         help_y = start_y + dialog_height - 2
-        self.draw_help_text(stdscr, safe_addstr_func, help_text, help_y, start_x, dialog_width)
+        self.draw_help_text(help_text, help_y, start_x, dialog_width)
         
         # Automatically mark as not needing redraw after drawing (unless still searching)
         if not self.searching:

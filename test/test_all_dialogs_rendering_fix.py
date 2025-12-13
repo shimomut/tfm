@@ -6,7 +6,7 @@ This test verifies that all dialogs properly handle keys without causing
 rendering issues (dialogs disappearing due to content_changed not being set).
 """
 
-import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
 import sys
@@ -69,10 +69,10 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
             
         # Test various keys
         keys_to_test = [
-            (curses.KEY_LEFT, 'LEFT'),
-            (curses.KEY_RIGHT, 'RIGHT'),
-            (curses.KEY_UP, 'UP'),
-            (curses.KEY_DOWN, 'DOWN'),
+            (KeyCode.LEFT, 'LEFT'),
+            (KeyCode.RIGHT, 'RIGHT'),
+            (KeyCode.UP, 'UP'),
+            (KeyCode.DOWN, 'DOWN'),
         ]
         
         for key, key_name in keys_to_test:
@@ -89,10 +89,10 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
             
         # Test various keys
         keys_to_test = [
-            (curses.KEY_LEFT, 'LEFT'),
-            (curses.KEY_RIGHT, 'RIGHT'),
-            (curses.KEY_UP, 'UP'),
-            (curses.KEY_DOWN, 'DOWN'),
+            (KeyCode.LEFT, 'LEFT'),
+            (KeyCode.RIGHT, 'RIGHT'),
+            (KeyCode.UP, 'UP'),
+            (KeyCode.DOWN, 'DOWN'),
         ]
         
         for key, key_name in keys_to_test:
@@ -110,10 +110,10 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
             
         # Test various keys
         keys_to_test = [
-            (curses.KEY_LEFT, 'LEFT'),
-            (curses.KEY_RIGHT, 'RIGHT'),
-            (curses.KEY_UP, 'UP'),
-            (curses.KEY_DOWN, 'DOWN'),
+            (KeyCode.LEFT, 'LEFT'),
+            (KeyCode.RIGHT, 'RIGHT'),
+            (KeyCode.UP, 'UP'),
+            (KeyCode.DOWN, 'DOWN'),
         ]
         
         for key, key_name in keys_to_test:
@@ -131,12 +131,12 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
             
         # Test various keys, especially UP which was the reported issue
         keys_to_test = [
-            (curses.KEY_UP, 'UP'),
-            (curses.KEY_DOWN, 'DOWN'),
-            (curses.KEY_PPAGE, 'PAGE_UP'),
-            (curses.KEY_NPAGE, 'PAGE_DOWN'),
-            (curses.KEY_HOME, 'HOME'),
-            (curses.KEY_END, 'END'),
+            (KeyCode.UP, 'UP'),
+            (KeyCode.DOWN, 'DOWN'),
+            (KeyCode.PAGE_UP, 'PAGE_UP'),
+            (KeyCode.PAGE_DOWN, 'PAGE_DOWN'),
+            (KeyCode.HOME, 'HOME'),
+            (KeyCode.END, 'END'),
         ]
         
         for key, key_name in keys_to_test:
@@ -154,10 +154,10 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
             
         # Test various keys
         keys_to_test = [
-            (curses.KEY_UP, 'UP'),
-            (curses.KEY_DOWN, 'DOWN'),
-            (curses.KEY_PPAGE, 'PAGE_UP'),
-            (curses.KEY_NPAGE, 'PAGE_DOWN'),
+            (KeyCode.UP, 'UP'),
+            (KeyCode.DOWN, 'DOWN'),
+            (KeyCode.PAGE_UP, 'PAGE_UP'),
+            (KeyCode.PAGE_DOWN, 'PAGE_DOWN'),
         ]
         
         for key, key_name in keys_to_test:
@@ -184,7 +184,7 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
         self.assertFalse(dialog.needs_redraw(), "Dialog should not need redraw after being drawn")
         
         # Step 3: Press UP key immediately (the problematic scenario)
-        result = dialog.handle_input(curses.KEY_UP)
+        result = dialog.handle_input(InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE))
         
         # Step 4: Verify dialog is still visible
         self.assertTrue(result, "UP key should be handled")

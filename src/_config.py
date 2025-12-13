@@ -15,6 +15,17 @@ from tfm_external_programs import tfm_tool
 class Config:
     """User configuration for TFM"""
     
+    # Backend settings
+    PREFERRED_BACKEND = 'curses'  # 'curses' or 'coregraphics'
+    # - 'curses': Terminal mode (default, works on all platforms)
+    # - 'coregraphics': Desktop mode (macOS only, requires PyObjC)
+    
+    # Desktop mode settings (for CoreGraphics backend)
+    DESKTOP_FONT_NAME = 'Menlo'  # Font name for desktop mode
+    DESKTOP_FONT_SIZE = 14  # Font size for desktop mode
+    DESKTOP_WINDOW_WIDTH = 1200  # Initial window width in pixels
+    DESKTOP_WINDOW_HEIGHT = 800  # Initial window height in pixels
+    
     # Display settings
     SHOW_HIDDEN_FILES = False
     DEFAULT_LEFT_PANE_RATIO = 0.5  # 0.1 to 0.9

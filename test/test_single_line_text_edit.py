@@ -3,7 +3,6 @@
 Test script for SingleLineTextEdit class
 """
 
-import curses
 import sys
 import os
 
@@ -11,6 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_single_line_text_edit import SingleLineTextEdit
+from ttk import InputEvent, KeyCode
 
 
 def test_basic_functionality():
@@ -81,40 +81,44 @@ def test_key_handling():
     editor = SingleLineTextEdit("test")
     
     # Test printable characters
-    result = editor.handle_key(ord('X'))
+    event = InputEvent(key_code=ord('X'), modifiers=0, char='X')
+    result = editor.handle_key(event)
     assert result
     assert editor.get_text() == "testX"
     
-    # Test cursor keys - use numeric values since curses may not be initialized
+    # Test cursor keys
     editor.move_cursor_home()
-    # KEY_RIGHT is typically 261
-    result = editor.handle_key(261)
+    event = InputEvent(key_code=KeyCode.RIGHT, modifiers=0)
+    result = editor.handle_key(event)
     print(f"Debug: KEY_RIGHT returned {result}, cursor at {editor.get_cursor_pos()}")
-    if result:
-        assert editor.get_cursor_pos() == 1
+    assert result
+    assert editor.get_cursor_pos() == 1
     
-    # KEY_LEFT is typically 260  
-    result = editor.handle_key(260)
+    event = InputEvent(key_code=KeyCode.LEFT, modifiers=0)
+    result = editor.handle_key(event)
     print(f"Debug: KEY_LEFT returned {result}, cursor at {editor.get_cursor_pos()}")
-    if result:
-        assert editor.get_cursor_pos() == 0
+    assert result
+    assert editor.get_cursor_pos() == 0
     
-    # Test home/end keys - KEY_END is typically 269, KEY_HOME is 262
-    result = editor.handle_key(269)  # KEY_END
+    # Test home/end keys
+    event = InputEvent(key_code=KeyCode.END, modifiers=0)
+    result = editor.handle_key(event)
     print(f"Debug: KEY_END returned {result}, cursor at {editor.get_cursor_pos()}")
     assert result
     assert editor.get_cursor_pos() == len(editor.get_text())
     
-    result = editor.handle_key(262)  # KEY_HOME
+    event = InputEvent(key_code=KeyCode.HOME, modifiers=0)
+    result = editor.handle_key(event)
     print(f"Debug: KEY_HOME returned {result}, cursor at {editor.get_cursor_pos()}")
     assert result
     assert editor.get_cursor_pos() == 0
     
-    # Test backspace (multiple possible key codes)
+    # Test backspace
     editor.move_cursor_right()
     original_text = editor.get_text()
     original_pos = editor.get_cursor_pos()
-    result = editor.handle_key(127)  # Common backspace code
+    event = InputEvent(key_code=KeyCode.BACKSPACE, modifiers=0)
+    result = editor.handle_key(event)
     print(f"Debug: Before backspace: '{original_text}' at pos {original_pos}")
     print(f"Debug: After backspace: '{editor.get_text()}' at pos {editor.get_cursor_pos()}")
     assert result

@@ -6,39 +6,39 @@ Manages user configuration for the Two-File Manager.
 Configuration is stored in ~/.tfm/config.py as a Python class.
 """
 
-import curses
 import fnmatch
 import importlib.util
 import os
 import sys
 from tfm_path import Path
+from ttk import KeyCode
 
 
-# Special key name to curses key code mapping
+# Special key name to TTK KeyCode mapping
 SPECIAL_KEY_MAP = {
-    'HOME': curses.KEY_HOME,
-    'END': curses.KEY_END,
-    'PPAGE': curses.KEY_PPAGE,
-    'NPAGE': curses.KEY_NPAGE,
-    'UP': curses.KEY_UP,
-    'DOWN': curses.KEY_DOWN,
-    'LEFT': curses.KEY_LEFT,
-    'RIGHT': curses.KEY_RIGHT,
-    'BACKSPACE': curses.KEY_BACKSPACE,
-    'DELETE': curses.KEY_DC,
-    'INSERT': curses.KEY_IC,
-    'F1': curses.KEY_F1,
-    'F2': curses.KEY_F2,
-    'F3': curses.KEY_F3,
-    'F4': curses.KEY_F4,
-    'F5': curses.KEY_F5,
-    'F6': curses.KEY_F6,
-    'F7': curses.KEY_F7,
-    'F8': curses.KEY_F8,
-    'F9': curses.KEY_F9,
-    'F10': curses.KEY_F10,
-    'F11': curses.KEY_F11,
-    'F12': curses.KEY_F12,
+    'HOME': KeyCode.HOME,
+    'END': KeyCode.END,
+    'PPAGE': KeyCode.PAGE_UP,
+    'NPAGE': KeyCode.PAGE_DOWN,
+    'UP': KeyCode.UP,
+    'DOWN': KeyCode.DOWN,
+    'LEFT': KeyCode.LEFT,
+    'RIGHT': KeyCode.RIGHT,
+    'BACKSPACE': KeyCode.BACKSPACE,
+    'DELETE': KeyCode.DELETE,
+    'INSERT': KeyCode.INSERT,
+    'F1': KeyCode.F1,
+    'F2': KeyCode.F2,
+    'F3': KeyCode.F3,
+    'F4': KeyCode.F4,
+    'F5': KeyCode.F5,
+    'F6': KeyCode.F6,
+    'F7': KeyCode.F7,
+    'F8': KeyCode.F8,
+    'F9': KeyCode.F9,
+    'F10': KeyCode.F10,
+    'F11': KeyCode.F11,
+    'F12': KeyCode.F12,
 }
 
 # Reverse mapping for display purposes
@@ -47,6 +47,15 @@ SPECIAL_KEY_NAMES = {v: k for k, v in SPECIAL_KEY_MAP.items()}
 
 class DefaultConfig:
     """Default configuration values for TFM"""
+    
+    # Backend settings
+    PREFERRED_BACKEND = 'curses'  # 'curses' or 'coregraphics'
+    
+    # Desktop mode settings (for CoreGraphics backend)
+    DESKTOP_FONT_NAME = 'Menlo'
+    DESKTOP_FONT_SIZE = 14
+    DESKTOP_WINDOW_WIDTH = 1200
+    DESKTOP_WINDOW_HEIGHT = 800
     
     # Display settings
     SHOW_HIDDEN_FILES = False
@@ -308,6 +317,24 @@ class ConfigManager:
         """Validate configuration values"""
         errors = []
         
+        # Validate backend selection
+        if hasattr(config, 'PREFERRED_BACKEND'):
+            if config.PREFERRED_BACKEND not in ['curses', 'coregraphics']:
+                errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
+        
+        # Validate desktop mode settings
+        if hasattr(config, 'DESKTOP_FONT_SIZE'):
+            if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
+                errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")
+        
+        if hasattr(config, 'DESKTOP_WINDOW_WIDTH'):
+            if not isinstance(config.DESKTOP_WINDOW_WIDTH, int) or config.DESKTOP_WINDOW_WIDTH < 400:
+                errors.append("DESKTOP_WINDOW_WIDTH must be an integer >= 400")
+        
+        if hasattr(config, 'DESKTOP_WINDOW_HEIGHT'):
+            if not isinstance(config.DESKTOP_WINDOW_HEIGHT, int) or config.DESKTOP_WINDOW_HEIGHT < 300:
+                errors.append("DESKTOP_WINDOW_HEIGHT must be an integer >= 300")
+        
         # Validate ratios
         if hasattr(config, 'DEFAULT_LEFT_PANE_RATIO'):
             if not (0.1 <= config.DEFAULT_LEFT_PANE_RATIO <= 0.9):
@@ -424,6 +451,53 @@ class ConfigManager:
             return False
         return self.is_action_available(action, has_selection)
     
+    def is_input_event_bound_to_action(self, event, action):
+        """
+        Check if an InputEvent is bound to a specific action.
+        
+        Args:
+            event: InputEvent from TTK renderer
+            action: Action name to check
+            
+        Returns:
+            bool: True if event is bound to the action
+        """
+        if not event:
+            return False
+        
+        # Import here to avoid circular dependency
+        from tfm_input_utils import input_event_to_key_char
+        
+        key_char = input_event_to_key_char(event)
+        if not key_char:
+            return False
+        
+        return self.is_key_bound_to_action(key_char, action)
+    
+    def is_input_event_bound_to_action_with_selection(self, event, action, has_selection):
+        """
+        Check if an InputEvent is bound to a specific action and respects selection requirements.
+        
+        Args:
+            event: InputEvent from TTK renderer
+            action: Action name to check
+            has_selection: Whether files are currently selected
+            
+        Returns:
+            bool: True if event is bound to the action and selection requirement is met
+        """
+        if not event:
+            return False
+        
+        # Import here to avoid circular dependency
+        from tfm_input_utils import input_event_to_key_char
+        
+        key_char = input_event_to_key_char(event)
+        if not key_char:
+            return False
+        
+        return self.is_key_bound_to_action_with_selection(key_char, action, has_selection)
+    
     def get_action_for_key(self, key):
         """
         Get the action bound to a key (character or special key code).
@@ -500,6 +574,35 @@ def is_special_key_bound_to(key_code, action):
 def is_special_key_bound_to_with_selection(key_code, action, has_selection):
     """Check if a special key is bound to a specific action and available for current selection status"""
     return config_manager.is_special_key_bound_to_action_with_selection(key_code, action, has_selection)
+
+
+def is_input_event_bound_to(event, action):
+    """
+    Check if an InputEvent is bound to a specific action.
+    
+    Args:
+        event: InputEvent from TTK renderer
+        action: Action name to check
+        
+    Returns:
+        bool: True if event is bound to the action
+    """
+    return config_manager.is_input_event_bound_to_action(event, action)
+
+
+def is_input_event_bound_to_with_selection(event, action, has_selection):
+    """
+    Check if an InputEvent is bound to a specific action and respects selection requirements.
+    
+    Args:
+        event: InputEvent from TTK renderer
+        action: Action name to check
+        has_selection: Whether files are currently selected
+        
+    Returns:
+        bool: True if event is bound to the action and selection requirement is met
+    """
+    return config_manager.is_input_event_bound_to_action_with_selection(event, action, has_selection)
 
 
 def get_action_for_key(key):

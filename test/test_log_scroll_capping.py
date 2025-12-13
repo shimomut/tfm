@@ -16,7 +16,7 @@ def test_log_scroll_capping():
     try:
         from tfm_log_manager import LogManager
         from tfm_config import get_config
-        import curses
+        from ttk.input_event import InputEvent, KeyCode, ModifierKey
         
         config = get_config()
         log_manager = LogManager(config)
