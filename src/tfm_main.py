@@ -1952,7 +1952,7 @@ class FileManager:
             elif option == "Toggle color scheme (dark/light)":
                 from tfm_colors import toggle_color_scheme, init_colors
                 new_scheme = toggle_color_scheme()
-                init_colors(new_scheme)
+                init_colors(self.renderer, new_scheme)
                 print(f"Switched to {new_scheme} color scheme")
                 self.print_color_scheme_info()
                 self.needs_full_redraw = True
@@ -1962,7 +1962,7 @@ class FileManager:
                 new_state = toggle_fallback_mode()
                 # Re-initialize colors with current scheme
                 color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-                init_colors(color_scheme)
+                init_colors(self.renderer, color_scheme)
                 status = "enabled" if new_state else "disabled"
                 print(f"Fallback color mode: {status}")
                 self.needs_full_redraw = True
@@ -2040,7 +2040,7 @@ class FileManager:
                     # Apply any config changes that need immediate effect
                     if hasattr(self.config, 'COLOR_SCHEME'):
                         from tfm_colors import init_colors
-                        init_colors(self.config.COLOR_SCHEME)
+                        init_colors(self.renderer, self.config.COLOR_SCHEME)
                         print(f"Applied color scheme: {self.config.COLOR_SCHEME}")
                     
                     if hasattr(self.config, 'SHOW_HIDDEN_FILES'):
@@ -2203,7 +2203,8 @@ class FileManager:
         fallback_enabled = toggle_fallback_mode()
         
         # Reinitialize colors with the new mode
-        init_colors()
+        color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+        init_colors(self.renderer, color_scheme)
         
         # Log the change
         mode_text = "enabled" if fallback_enabled else "disabled"

@@ -35,6 +35,9 @@ class CursesBackend(Renderer):
         """
         self.stdscr = None
         self.color_pairs_initialized = set()
+        self.fullcolor_mode = False
+        self.next_color_index = 16  # Start after basic 16 colors
+        self.rgb_to_color_cache = {}  # Cache RGB -> color index mappings
     
     def initialize(self) -> None:
         """
@@ -42,7 +45,7 @@ class CursesBackend(Renderer):
         
         This method:
         - Initializes the curses library
-        - Sets up color support
+        - Sets up color support (fullcolor if available, 8/16 colors otherwise)
         - Configures terminal modes (no echo, cbreak, keypad)
         - Hides the cursor by default
         - Sets black background for the terminal
@@ -53,6 +56,13 @@ class CursesBackend(Renderer):
         try:
             self.stdscr = curses.initscr()
             curses.start_color()
+            
+            # Check if terminal supports fullcolor mode (256+ colors and color redefinition)
+            self.fullcolor_mode = (
+                curses.COLORS >= 256 and 
+                curses.can_change_color()
+            )
+            
             curses.noecho()
             curses.cbreak()
             self.stdscr.keypad(True)
@@ -86,9 +96,9 @@ class CursesBackend(Renderer):
                 curses.echo()
                 curses.nocbreak()
                 curses.endwin()
-        except Exception:
-            # Ignore errors during cleanup
-            pass
+        except (curses.error, OSError) as e:
+            # Ignore errors during cleanup - terminal may already be in bad state
+            print(f"Warning: Error during curses shutdown: {e}")
     
     def suspend(self) -> None:
         """
@@ -101,9 +111,8 @@ class CursesBackend(Renderer):
         try:
             if self.stdscr:
                 curses.endwin()
-        except Exception:
-            # Ignore errors during suspend
-            pass
+        except (curses.error, OSError) as e:
+            print(f"Warning: Error suspending curses: {e}")
     
     def resume(self) -> None:
         """
@@ -116,9 +125,8 @@ class CursesBackend(Renderer):
             if self.stdscr:
                 # Refresh the screen to restore curses mode
                 self.stdscr.refresh()
-        except Exception:
-            # Ignore errors during resume
-            pass
+        except (curses.error, OSError) as e:
+            print(f"Warning: Error resuming curses: {e}")
     
     def get_dimensions(self) -> Tuple[int, int]:
         """
@@ -347,11 +355,8 @@ class CursesBackend(Renderer):
         Initialize color pair.
         
         This method initializes a color pair with the specified RGB colors.
-        The curses backend approximates RGB colors to the nearest terminal color.
-        
-        For UI bars with gray backgrounds (headers/footers/status), we use 
-        reverse video (white-on-black becomes black-on-white) to create visible
-        contrast that simulates the gray bar appearance.
+        In fullcolor mode, it creates custom colors with exact RGB values.
+        In 8/16 color mode, it approximates RGB colors to the nearest terminal color.
         
         Args:
             pair_id: Color pair index (1-255, 0 is reserved)
@@ -378,23 +383,9 @@ class CursesBackend(Renderer):
         if pair_id in self.color_pairs_initialized:
             return
         
-        # Convert RGB to curses color
+        # Convert RGB to curses color (fullcolor or approximated)
         fg = self._rgb_to_curses_color(fg_color)
         bg = self._rgb_to_curses_color(bg_color)
-        
-        # Special handling for UI bars (headers, footers, status, boundaries)
-        # These have light foreground (220,220,220) and dark gray background (51,63,76)
-        # Both map to WHITE, so we need to create contrast
-        if fg == curses.COLOR_WHITE and bg == curses.COLOR_WHITE:
-            fg_brightness = sum(fg_color) / 3
-            bg_brightness = sum(bg_color) / 3
-            bg_saturation = max(bg_color) - min(bg_color)
-            
-            # If foreground is bright (>200) and background is dark gray (<100)
-            # Use reverse video: black text on white background
-            if fg_brightness > 200 and bg_brightness < 100 and bg_saturation < 40:
-                fg = curses.COLOR_BLACK
-                bg = curses.COLOR_WHITE
         
         curses.init_pair(pair_id, fg, bg)
         self.color_pairs_initialized.add(pair_id)
@@ -403,6 +394,64 @@ class CursesBackend(Renderer):
         """
         Convert RGB to curses color code.
         
+        In fullcolor mode, creates a custom color with exact RGB values.
+        In 8/16 color mode, approximates RGB to the nearest terminal color.
+        
+        Args:
+            rgb: RGB color tuple (R, G, B) with values 0-255
+            
+        Returns:
+            int: Curses color code
+        """
+        # Check cache first
+        if rgb in self.rgb_to_color_cache:
+            return self.rgb_to_color_cache[rgb]
+        
+        if self.fullcolor_mode:
+            color_index = self._create_fullcolor(rgb)
+        else:
+            color_index = self._approximate_to_basic_color(rgb)
+        
+        # Cache the result
+        self.rgb_to_color_cache[rgb] = color_index
+        return color_index
+    
+    def _create_fullcolor(self, rgb: Tuple[int, int, int]) -> int:
+        """
+        Create a custom color with exact RGB values in fullcolor mode.
+        
+        Args:
+            rgb: RGB color tuple (R, G, B) with values 0-255
+            
+        Returns:
+            int: Color index for the newly created color
+        """
+        # Check if we've run out of color slots
+        if self.next_color_index >= curses.COLORS:
+            # Fallback to approximation if we run out of color slots
+            return self._approximate_to_basic_color(rgb)
+        
+        try:
+            color_index = self.next_color_index
+            self.next_color_index += 1
+            
+            # Convert RGB from 0-255 to curses range 0-1000
+            r = int((rgb[0] / 255.0) * 1000)
+            g = int((rgb[1] / 255.0) * 1000)
+            b = int((rgb[2] / 255.0) * 1000)
+            
+            # Initialize the custom color
+            curses.init_color(color_index, r, g, b)
+            return color_index
+        except (curses.error, ValueError, OSError) as e:
+            # If init_color fails, fallback to approximation
+            print(f"Warning: Failed to create custom color RGB{rgb}: {e}")
+            return self._approximate_to_basic_color(rgb)
+    
+    def _approximate_to_basic_color(self, rgb: Tuple[int, int, int]) -> int:
+        """
+        Approximate RGB to one of the 8 basic terminal colors.
+        
         This maps RGB colors to the 8 basic terminal colors, attempting to
         preserve the visual appearance as much as possible.
         
@@ -410,7 +459,7 @@ class CursesBackend(Renderer):
             rgb: RGB color tuple (R, G, B) with values 0-255
             
         Returns:
-            int: Curses color code
+            int: Curses color code (0-7)
         """
         r, g, b = rgb
         
@@ -495,7 +544,8 @@ class CursesBackend(Renderer):
                 return None
             
             return self._translate_curses_key(key)
-        except curses.error:
+        except curses.error as e:
+            # Timeout or input error
             return None
     
     def _translate_curses_key(self, key: int) -> InputEvent:
@@ -562,9 +612,9 @@ class CursesBackend(Renderer):
         """
         try:
             curses.curs_set(1 if visible else 0)
-        except curses.error:
+        except curses.error as e:
             # Some terminals don't support cursor visibility control
-            pass
+            print(f"Warning: Cannot set cursor visibility: {e}")
     
     def move_cursor(self, row: int, col: int) -> None:
         """
