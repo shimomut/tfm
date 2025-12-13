@@ -841,16 +841,20 @@ class CoreGraphicsBackend(Renderer):
         if event is None:
             return None
         
-        # Dispatch the event to ensure proper handling by the system
-        # This allows the event to be processed by the normal Cocoa event chain
-        # PyObjC method: sendEvent_() corresponds to Objective-C sendEvent:
-        app.sendEvent_(event)
+        # Translate the NSEvent to InputEvent first
+        input_event = self._translate_event(event)
+        
+        # Only dispatch the event to the system if we didn't handle it
+        # This prevents the beep sound that occurs when unhandled key events
+        # are sent through the Cocoa event chain
+        if input_event is None:
+            # We didn't handle this event, let the system process it
+            app.sendEvent_(event)
         
         # Update the display after processing events
         app.updateWindows()
         
-        # Translate the NSEvent to InputEvent
-        return self._translate_event(event)
+        return input_event
     
     def _translate_event(self, event) -> Optional[InputEvent]:
         """
