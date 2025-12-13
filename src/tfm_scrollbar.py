@@ -6,7 +6,7 @@ This module provides a consistent scroll bar implementation used across
 all TFM components including text viewer, log pane, and dialogs.
 """
 
-from tfm_colors import get_scrollbar_color, get_scrollbar_thumb_color
+from tfm_colors import get_scrollbar_color
 
 
 def draw_scrollbar(renderer, start_y, x_pos, display_height, total_items, scroll_offset, inverted=False):
@@ -15,8 +15,8 @@ def draw_scrollbar(renderer, start_y, x_pos, display_height, total_items, scroll
     
     This function provides a consistent scroll bar implementation used across
     all TFM components. It draws a vertical scroll bar with:
-    - Track: │ character in scroll bar color
-    - Thumb: █ character in scroll bar thumb color
+    - Track: space character (background color shows through)
+    - Thumb: █ character in scroll bar color
     
     The thumb size represents the proportion of visible content, and its position
     indicates the current scroll offset.
@@ -46,9 +46,8 @@ def draw_scrollbar(renderer, start_y, x_pos, display_height, total_items, scroll
     if total_items <= display_height:
         return
     
-    # Get scroll bar colors
+    # Get scroll bar color (single color pair for both track and thumb)
     scrollbar_color_pair, scrollbar_attrs = get_scrollbar_color()
-    scrollbar_thumb_color_pair, scrollbar_thumb_attrs = get_scrollbar_thumb_color()
     
     # Calculate scroll bar thumb position and size
     # Thumb size represents the visible portion of the document
@@ -68,15 +67,15 @@ def draw_scrollbar(renderer, start_y, x_pos, display_height, total_items, scroll
     
     thumb_end = thumb_start + thumb_size
     
-    # Draw the scroll bar
+    # Draw the scroll bar using a single color pair with different characters
     for i in range(display_height):
         y = start_y + i
         if thumb_start <= i < thumb_end:
-            # Draw thumb (the movable part)
-            renderer.draw_text(y, x_pos, "█", scrollbar_thumb_color_pair, scrollbar_thumb_attrs)
+            # Draw thumb (the movable part) - solid block character
+            renderer.draw_text(y, x_pos, "█", scrollbar_color_pair, scrollbar_attrs)
         else:
-            # Draw track (the background)
-            renderer.draw_text(y, x_pos, "│", scrollbar_color_pair, scrollbar_attrs)
+            # Draw track (the background) - space character (background shows through)
+            renderer.draw_text(y, x_pos, " ", scrollbar_color_pair, scrollbar_attrs)
 
 
 def calculate_scrollbar_width(total_items, display_height):

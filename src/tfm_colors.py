@@ -60,8 +60,7 @@ COLOR_SEARCH_CURRENT = 23    # Current search match highlighting
 COLOR_BACKGROUND = 27        # Background color for filling areas
 
 # Scroll bar colors
-COLOR_SCROLLBAR = 29         # Scroll bar track
-COLOR_SCROLLBAR_THUMB = 30   # Scroll bar thumb (movable part)
+COLOR_SCROLLBAR = 29         # Scroll bar (uses different characters for track and thumb)
 
 # Current color scheme
 current_color_scheme = 'dark'
@@ -165,11 +164,11 @@ COLOR_SCHEMES = {
         # Scroll bar colors
         'SCROLLBAR_FG': {
             'color_num': 148,
-            'rgb': (80, 80, 80)     # Dark gray for scroll bar track
+            'rgb': (150, 150, 150)  # Light gray for scroll bar (thumb uses █, track uses │)
         },
-        'SCROLLBAR_THUMB_FG': {
+        'SCROLLBAR_BG': {
             'color_num': 149,
-            'rgb': (150, 150, 150)  # Light gray for scroll bar thumb
+            'rgb': (60, 60, 60)     # Dark gray for scroll bar
         },
         'DEFAULT_FG': {
             'color_num': 146,
@@ -270,11 +269,11 @@ COLOR_SCHEMES = {
         # Scroll bar colors
         'SCROLLBAR_FG': {
             'color_num': 150,
-            'rgb': (180, 180, 180)  # Light gray for scroll bar track
+            'rgb': (60, 60, 60)     # Dark gray for scroll bar (thumb uses █, track uses │)
         },
-        'SCROLLBAR_THUMB_FG': {
+        'SCROLLBAR_BG': {
             'color_num': 151,
-            'rgb': (100, 100, 100)  # Medium gray for scroll bar thumb
+            'rgb': (150, 150, 150)  # Light gray background for scroll bar
         },
         'DEFAULT_FG': {
             'color_num': 148,
@@ -408,9 +407,8 @@ def init_colors(renderer, color_scheme=None):
     
     # Scroll bar colors
     scrollbar_fg = rgb_colors['SCROLLBAR_FG']['rgb']
-    scrollbar_thumb_fg = rgb_colors['SCROLLBAR_THUMB_FG']['rgb']
-    renderer.init_color_pair(COLOR_SCROLLBAR, scrollbar_fg, default_bg)
-    renderer.init_color_pair(COLOR_SCROLLBAR_THUMB, scrollbar_thumb_fg, default_bg)
+    scrollbar_bg = rgb_colors['SCROLLBAR_BG']['rgb']
+    renderer.init_color_pair(COLOR_SCROLLBAR, scrollbar_fg, scrollbar_bg)
     
     # Background color pair for filling areas
     renderer.init_color_pair(COLOR_BACKGROUND, default_fg, default_bg)
@@ -818,18 +816,13 @@ def get_color_with_attrs(color_pair):
 
 def get_scrollbar_color():
     """
-    Get scroll bar track color pair and attributes.
+    Get scroll bar color pair and attributes.
+    
+    The scrollbar uses a single color pair with different characters:
+    - Track: space character (background color shows through)
+    - Thumb: █ (solid block)
     
     Returns:
         Tuple[int, int]: (color_pair, attributes)
     """
     return COLOR_SCROLLBAR, TextAttribute.NORMAL
-
-def get_scrollbar_thumb_color():
-    """
-    Get scroll bar thumb color pair and attributes.
-    
-    Returns:
-        Tuple[int, int]: (color_pair, attributes)
-    """
-    return COLOR_SCROLLBAR_THUMB, TextAttribute.NORMAL
