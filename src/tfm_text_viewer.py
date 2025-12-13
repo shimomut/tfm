@@ -465,9 +465,9 @@ class TextViewer:
         # Get header color
         header_color_pair, header_attrs = get_header_color()
         
-        # Clear header area with colored background
-        self.renderer.draw_text(0, 0, " " * (width - 1), header_color_pair, header_attrs)
-        self.renderer.draw_text(1, 0, " " * (width - 1), header_color_pair, header_attrs)
+        # Clear header area with colored background - fill entire width
+        self.renderer.draw_text(0, 0, " " * width, header_color_pair, header_attrs)
+        self.renderer.draw_text(1, 0, " " * width, header_color_pair, header_attrs)
         
         # File path and info - use polymorphic display methods
         display_prefix = self.file_path.get_display_prefix()
@@ -516,8 +516,8 @@ class TextViewer:
         # Get status color
         status_color_pair, status_attrs = get_status_color()
         
-        # Clear status bar area with colored background
-        self.renderer.draw_text(status_y, 0, " " * (width - 1), status_color_pair, status_attrs)
+        # Clear status bar area with colored background - fill entire width
+        self.renderer.draw_text(status_y, 0, " " * width, status_color_pair, status_attrs)
         
         # Calculate current position info
         if self.wrap_lines:
@@ -634,8 +634,8 @@ class TextViewer:
             line_index = self.scroll_offset + i
             y_pos = start_y + i
             
-            # Fill the entire line with background color
-            self.renderer.draw_text(y_pos, start_x, ' ' * (display_width - 1), bg_color_pair, bg_attrs)
+            # Fill the entire line with background color - fill entire width
+            self.renderer.draw_text(y_pos, start_x, ' ' * display_width, bg_color_pair, bg_attrs)
             
             if line_index >= len(display_lines):
                 continue
