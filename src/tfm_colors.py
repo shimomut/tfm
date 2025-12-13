@@ -14,9 +14,10 @@ except ImportError:
         REVERSE = 4
 
 # Color pair constants
+# Note: Color pair 1 is reserved for terminal background in curses backend
 
 # File type colors (normal)
-COLOR_REGULAR_FILE = 1       # Regular files
+COLOR_REGULAR_FILE = 28      # Regular files (changed from 1 to avoid conflict with terminal background)
 COLOR_DIRECTORIES = 2        # Directories
 COLOR_EXECUTABLES = 3        # Executable files
 
@@ -299,6 +300,14 @@ def init_colors(renderer, color_scheme=None):
     
     # Get RGB colors for current scheme
     rgb_colors = get_current_rgb_colors()
+    
+    # Extract default background color first
+    default_bg = rgb_colors['DEFAULT_BG']['rgb']
+    
+    # Update terminal background color to match the color scheme
+    # This ensures all areas (including where no characters are drawn) have the correct background
+    if hasattr(renderer, 'update_background'):
+        renderer.update_background(default_bg)
     
     # Extract RGB tuples from color definitions
     header_bg = rgb_colors['HEADER_BG']['rgb']

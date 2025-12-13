@@ -408,6 +408,29 @@ class CursesBackend(Renderer):
         # Reset color index for fullcolor mode
         self.next_color_index = 16
     
+    def update_background(self, bg_color: Tuple[int, int, int]) -> None:
+        """
+        Update the terminal background color.
+        
+        This method updates the background color of the entire terminal window.
+        It should be called after color scheme changes to ensure all areas
+        (including those where no characters are drawn) have the correct background.
+        
+        Args:
+            bg_color: Background color as (R, G, B) tuple (0-255 each)
+        """
+        try:
+            # Convert RGB to curses color
+            bg = self._rgb_to_curses_color(bg_color)
+            
+            # Reinitialize color pair 1 with new background
+            curses.init_pair(1, curses.COLOR_WHITE, bg)
+            
+            # Apply the new background to the entire terminal
+            self.stdscr.bkgd(' ', curses.color_pair(1))
+        except (curses.error, OSError) as e:
+            print(f"Warning: Could not update background: {e}")
+    
     def set_fullcolor_mode(self, enabled: bool) -> None:
         """
         Enable or disable fullcolor mode.

@@ -1960,10 +1960,10 @@ class FileManager:
                 self.needs_full_redraw = True
                 
             elif option == "Toggle fallback color scheme":
-                from tfm_colors import toggle_fallback_mode, init_colors, is_fallback_mode
+                from tfm_colors import toggle_fallback_mode, init_colors, is_fallback_mode, get_current_color_scheme
                 new_state = toggle_fallback_mode()
                 # Re-initialize colors with current scheme
-                color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+                color_scheme = get_current_color_scheme()
                 init_colors(self.renderer, color_scheme)
                 status = "enabled" if new_state else "disabled"
                 print(f"Fallback color mode: {status}")
@@ -2201,13 +2201,13 @@ class FileManager:
     
     def toggle_fallback_color_mode(self):
         """Toggle fallback color mode on/off"""
-        from tfm_colors import toggle_fallback_mode, init_colors, is_fallback_mode
+        from tfm_colors import toggle_fallback_mode, init_colors, is_fallback_mode, get_current_color_scheme
         
         # Toggle the fallback mode
         fallback_enabled = toggle_fallback_mode()
         
         # Reinitialize colors with the new mode
-        color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+        color_scheme = get_current_color_scheme()
         init_colors(self.renderer, color_scheme)
         
         # Log the change
