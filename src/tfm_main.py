@@ -750,9 +750,9 @@ class FileManager:
                 color = (color_pair, TextAttribute.UNDERLINE)
             # Handle multi-selection highlighting
             elif is_multi_selected and not is_selected:
-                # Get base color and add standout for multi-selected files
+                # Get base color and add reverse video for multi-selected files
                 color_pair, _ = get_file_color(is_dir, is_executable, False, False)
-                color = (color_pair, TextAttribute.STANDOUT)
+                color = (color_pair, TextAttribute.REVERSE)
                 
             # Add selection marker for multi-selected files
             selection_marker = "●" if is_multi_selected else " "
