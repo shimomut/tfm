@@ -40,7 +40,8 @@ run-debug:
 	@python3 tfm.py --backend $(BACKEND) --debug
 
 run-log:
-	@python3 tfm.py --remote-log-port 8123
+	@echo "Running TFM with remote log monitoring (backend: $(BACKEND))..."
+	@python3 tfm.py --backend $(BACKEND) --remote-log-port 8123
 
 monitor-log:
 	@python3 tools/tfm_log_client.py localhost 8123
