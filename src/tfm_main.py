@@ -97,14 +97,14 @@ class FileManager:
         self.pane_manager = PaneManager(self.config, initial_left_dir, initial_right_dir, self.state_manager)
         self.file_operations = FileOperations(self.config)
         self.file_operations.log_manager = self.log_manager  # Set log_manager for error reporting
-        self.list_dialog = ListDialog(self.config)
-        self.info_dialog = InfoDialog(self.config)
-        self.search_dialog = SearchDialog(self.config)
-        self.jump_dialog = JumpDialog(self.config)
-        self.drives_dialog = DrivesDialog(self.config)
-        self.batch_rename_dialog = BatchRenameDialog(self.config)
-        self.quick_choice_bar = QuickChoiceBar(self.config)
-        self.general_dialog = GeneralPurposeDialog(self.config)
+        self.list_dialog = ListDialog(self.config, renderer)
+        self.info_dialog = InfoDialog(self.config, renderer)
+        self.search_dialog = SearchDialog(self.config, renderer)
+        self.jump_dialog = JumpDialog(self.config, renderer)
+        self.drives_dialog = DrivesDialog(self.config, renderer)
+        self.batch_rename_dialog = BatchRenameDialog(self.config, renderer)
+        self.quick_choice_bar = QuickChoiceBar(self.config, renderer)
+        self.general_dialog = GeneralPurposeDialog(self.config, renderer)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager, renderer)
         self.progress_manager = ProgressManager()
         self.cache_manager = CacheManager(self.log_manager)
@@ -969,18 +969,18 @@ class FileManager:
             if len(isearch_prompt) + len(help_text) + 6 < width:
                 help_x = width - len(help_text) - 3
                 if help_x > len(isearch_prompt) + 4:  # Ensure no overlap
-                    # Get status color and add DIM attribute
-                    status_color_pair = get_status_color()
-                    self.safe_addstr(status_y, help_x, help_text, (status_color_pair, TextAttribute.DIM))
+                    # Get status color
+                    status_color_pair, status_attributes = get_status_color()
+                    self.renderer.draw_text(status_y, help_x, help_text, status_color_pair, status_attributes)
             else:
                 # Shorter help text for narrow terminals
                 short_help = "ESC:exit Enter:accept ↑↓:nav"
                 if len(isearch_prompt) + len(short_help) + 6 < width:
                     help_x = width - len(short_help) - 3
                     if help_x > len(isearch_prompt) + 4:
-                        # Get status color and add DIM attribute
-                        status_color_pair = get_status_color()
-                        self.safe_addstr(status_y, help_x, short_help, (status_color_pair, TextAttribute.DIM))
+                        # Get status color
+                        status_color_pair, status_attributes = get_status_color()
+                        self.renderer.draw_text(status_y, help_x, short_help, status_color_pair, status_attributes)
             return
         
         # Normal status display
@@ -1690,25 +1690,25 @@ class FileManager:
         
         if dialog_content_changed or self.needs_full_redraw:
             if self.general_dialog.is_active:
-                self.general_dialog.draw(self.stdscr, self.safe_addstr)
+                self.general_dialog.draw()
                 dialog_drawn = True
             elif self.list_dialog.is_active:
-                self.list_dialog.draw(self.stdscr, self.safe_addstr)
+                self.list_dialog.draw()
                 dialog_drawn = True
             elif self.info_dialog.is_active:
-                self.info_dialog.draw(self.stdscr, self.safe_addstr)
+                self.info_dialog.draw()
                 dialog_drawn = True
             elif self.search_dialog.is_active:
-                self.search_dialog.draw(self.stdscr, self.safe_addstr)
+                self.search_dialog.draw()
                 dialog_drawn = True
             elif self.jump_dialog.is_active:
-                self.jump_dialog.draw(self.stdscr, self.safe_addstr)
+                self.jump_dialog.draw()
                 dialog_drawn = True
             elif self.drives_dialog.is_active:
-                self.drives_dialog.draw(self.stdscr, self.safe_addstr)
+                self.drives_dialog.draw()
                 dialog_drawn = True
             elif self.batch_rename_dialog.is_active:
-                self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
+                self.batch_rename_dialog.draw()
                 dialog_drawn = True
             
             
@@ -1730,17 +1730,17 @@ class FileManager:
         
         # Draw dialog overlays
         if self.list_dialog.is_active:
-            self.list_dialog.draw(self.stdscr, self.safe_addstr)
+            self.list_dialog.draw()
         elif self.info_dialog.is_active:
-            self.info_dialog.draw(self.stdscr, self.safe_addstr)
+            self.info_dialog.draw()
         elif self.search_dialog.is_active:
-            self.search_dialog.draw(self.stdscr, self.safe_addstr)
+            self.search_dialog.draw()
         elif self.jump_dialog.is_active:
-            self.jump_dialog.draw(self.stdscr, self.safe_addstr)
+            self.jump_dialog.draw()
         elif self.drives_dialog.is_active:
-            self.drives_dialog.draw(self.stdscr, self.safe_addstr)
+            self.drives_dialog.draw()
         elif self.batch_rename_dialog.is_active:
-            self.batch_rename_dialog.draw(self.stdscr, self.safe_addstr)
+            self.batch_rename_dialog.draw()
         
         # Refresh screen immediately
         self.renderer.refresh()

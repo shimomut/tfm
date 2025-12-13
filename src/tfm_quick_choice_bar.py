@@ -99,15 +99,15 @@ class QuickChoiceBar:
             return
         
         # Get status color
-        status_color_pair = get_status_color()
+        status_color_pair, status_attributes = get_status_color()
         
         # Fill entire status line with background color
         status_line = " " * (width - 1)
-        self.renderer.draw_text(status_y, 0, status_line, status_color_pair)
+        self.renderer.draw_text(status_y, 0, status_line, status_color_pair, status_attributes)
         
         # Show dialog message
         message = f"{self.message} "
-        self.renderer.draw_text(status_y, 2, message, status_color_pair)
+        self.renderer.draw_text(status_y, 2, message, status_color_pair, status_attributes)
         
         button_start_x = len(message) + 4
         
@@ -121,7 +121,7 @@ class QuickChoiceBar:
                                       TextAttribute.BOLD | TextAttribute.REVERSE)
             else:
                 button_text = f" {choice_text} "
-                self.renderer.draw_text(status_y, button_start_x, button_text, status_color_pair)
+                self.renderer.draw_text(status_y, button_start_x, button_text, status_color_pair, status_attributes)
             
             if button_start_x + len(button_text) < width - 2:
                 button_start_x += len(button_text) + 1
@@ -142,7 +142,7 @@ class QuickChoiceBar:
             help_x = width - len(help_text) - 3
             if help_x > button_start_x + 4:  # Ensure no overlap
                 self.renderer.draw_text(status_y, help_x, help_text, 
-                                      status_color_pair, TextAttribute.NORMAL)
+                                      status_color_pair, status_attributes)
 
 
 class QuickChoiceBarHelpers:

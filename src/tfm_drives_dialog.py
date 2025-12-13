@@ -396,8 +396,7 @@ class DrivesDialog(BaseListDialog):
                         local_count = sum(1 for drive in self.drives if drive.drive_type == 'local')
                         status_text = f"Drives: {drive_count} ({local_count} local, {s3_count} S3)"
                     
-                    color_pair, _ = get_status_color()
-                    attributes = TextAttribute.DIM
+                    color_pair, attributes = get_status_color()
             
             self.renderer.draw_text(status_y, start_x + 2, status_text[:dialog_width - 4], color_pair, attributes)
         

@@ -225,7 +225,7 @@ class GeneralPurposeDialog:
             if help_x > input_end_x + 2:  # At least 2 chars gap
                 self.renderer.draw_text(status_y, help_x, self.help_text, 
                                        color_pair=status_color, 
-                                       attributes=TextAttribute.DIM)
+                                       attributes=TextAttribute.NORMAL)
 
 
 # Helper functions for common dialog patterns

@@ -431,15 +431,17 @@ class BatchRenameDialog(BaseListDialog):
         nav_help_y = start_y + 4
         if nav_help_y < height:
             nav_help_text = "Navigation: ↑/↓=Switch fields, Tab=Alt switch, PgUp/PgDn=Scroll preview"
+            status_color_pair, _ = get_status_color()
             renderer.draw_text(nav_help_y, content_start_x, nav_help_text[:content_width], 
-                             color_pair=get_status_color(), attributes=TextAttribute.DIM)
+                             color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw help for macros
         help_y = start_y + 5
         if help_y < height:
             help_text = "Macros: \\0=full name, \\1-\\9=regex groups, \\d=index"
+            status_color_pair, _ = get_status_color()
             renderer.draw_text(help_y, content_start_x, help_text[:content_width], 
-                             color_pair=get_status_color(), attributes=TextAttribute.DIM)
+                             color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw separator line
         sep_y = start_y + 6
@@ -475,8 +477,7 @@ class BatchRenameDialog(BaseListDialog):
                     # Format preview line
                     if original == new:
                         status = "UNCHANGED"
-                        status_color_pair = get_status_color()
-                        status_attributes = TextAttribute.DIM
+                        status_color_pair, status_attributes = get_status_color()
                     elif conflict:
                         status = "CONFLICT!"
                         status_color_pair = COLOR_ERROR
@@ -522,8 +523,9 @@ class BatchRenameDialog(BaseListDialog):
             no_preview_y = preview_start_y + 2
             if no_preview_y < height:
                 no_preview_text = "Enter regex pattern and destination to see preview"
+                status_color_pair, _ = get_status_color()
                 renderer.draw_text(no_preview_y, content_start_x, no_preview_text, 
-                                 color_pair=get_status_color(), attributes=TextAttribute.DIM)
+                                 color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw help text with safe positioning
         help_y = start_y + dialog_height - 2
@@ -535,8 +537,9 @@ class BatchRenameDialog(BaseListDialog):
                 help_x = start_x + (dialog_width - help_width) // 2
                 # Ensure help text fits within terminal bounds
                 if help_x >= 0 and help_x < width and help_x + help_width <= width:
+                    status_color_pair, _ = get_status_color()
                     renderer.draw_text(help_y, help_x, help_text, 
-                                     color_pair=get_status_color(), attributes=TextAttribute.DIM)
+                                     color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
             else:
                 # Truncate help text if too wide
                 truncate_text = safe_funcs['truncate_to_width']
@@ -547,8 +550,9 @@ class BatchRenameDialog(BaseListDialog):
                     help_x = start_x + (dialog_width - help_width) // 2
                     # Ensure truncated help text fits within terminal bounds
                     if help_x >= 0 and help_x < width and help_x + help_width <= width:
+                        status_color_pair, _ = get_status_color()
                         renderer.draw_text(help_y, help_x, truncated_help, 
-                                         color_pair=get_status_color(), attributes=TextAttribute.DIM)
+                                         color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False
