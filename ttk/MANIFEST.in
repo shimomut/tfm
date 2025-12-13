@@ -1,0 +1,16 @@
+include README.md
+include pyproject.toml
+include py.typed
+include __init__.py
+include renderer.py
+include input_event.py
+recursive-include backends *.py
+recursive-include serialization *.py
+recursive-include utils *.py
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude .DS_Store
+prune test
+prune demo
+prune doc

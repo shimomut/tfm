@@ -11,7 +11,7 @@ This module provides a reusable SingleLineTextEdit class that handles:
 - Wide character support for proper display and editing
 """
 
-import curses
+from ttk import TextAttribute, KeyCode
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, truncate_to_width, get_safe_functions
 
@@ -128,56 +128,51 @@ class SingleLineTextEdit:
             return True
         return False
         
-    def handle_key(self, key, handle_vertical_nav=False):
+    def handle_key(self, event, handle_vertical_nav=False):
         """
         Handle a key press and update the text/cursor accordingly
         
         Args:
-            key (int): The key code from curses
+            event: InputEvent from TTK
             handle_vertical_nav (bool): Whether to handle Up/Down keys for cursor movement
             
         Returns:
             bool: True if the key was handled, False otherwise
         """
-        # Handle cursor movement keys (use both curses constants and common numeric values)
-        if key == 260 or (hasattr(curses, 'KEY_LEFT') and key == curses.KEY_LEFT):
+        if not event:
+            return False
+            
+        # Handle cursor movement keys
+        if event.key_code == KeyCode.LEFT:
             return self.move_cursor_left()
-        elif key == 261 or (hasattr(curses, 'KEY_RIGHT') and key == curses.KEY_RIGHT):
+        elif event.key_code == KeyCode.RIGHT:
             return self.move_cursor_right()
-        elif key == 262 or (hasattr(curses, 'KEY_HOME') and key == curses.KEY_HOME):
+        elif event.key_code == KeyCode.HOME:
             return self.move_cursor_home()
-        elif key == 269 or (hasattr(curses, 'KEY_END') and key == curses.KEY_END):
+        elif event.key_code == KeyCode.END:
             return self.move_cursor_end()
-        elif handle_vertical_nav and (key == 259 or (hasattr(curses, 'KEY_UP') and key == curses.KEY_UP)):
+        elif handle_vertical_nav and event.key_code == KeyCode.UP:
             # Up arrow - move to beginning of line when vertical nav is enabled
             return self.move_cursor_home()
-        elif handle_vertical_nav and (key == 258 or (hasattr(curses, 'KEY_DOWN') and key == curses.KEY_DOWN)):
+        elif handle_vertical_nav and event.key_code == KeyCode.DOWN:
             # Down arrow - move to end of line when vertical nav is enabled
             return self.move_cursor_end()
-        elif (key == 263 or key == 127 or key == 8 or 
-              (hasattr(curses, 'KEY_BACKSPACE') and key == curses.KEY_BACKSPACE)):
+        elif event.key_code == KeyCode.BACKSPACE:
             return self.backspace()
-        elif key == 330 or (hasattr(curses, 'KEY_DC') and key == curses.KEY_DC):  # Delete key
+        elif event.key_code == KeyCode.DELETE:
             return self.delete_char_at_cursor()
-        elif 32 <= key <= 126:  # ASCII printable characters
-            return self.insert_char(chr(key))
-        elif key > 126:  # Extended characters (including wide characters)
-            try:
-                # Handle Unicode characters beyond ASCII range
-                char = chr(key)
-                return self.insert_char(char)
-            except (ValueError, OverflowError):
-                # Invalid character code
-                return False
+        elif event.is_printable() and event.char:
+            # Handle printable characters
+            return self.insert_char(event.char)
         
         return False
         
-    def draw(self, stdscr, y, x, max_width, label="", is_active=True):
+    def draw(self, renderer, y, x, max_width, label="", is_active=True):
         """
         Draw the text field with cursor highlighting, supporting wide characters
         
         Args:
-            stdscr: The curses screen object
+            renderer: TTK Renderer instance
             y (int): Y coordinate to draw at
             x (int): X coordinate to draw at
             max_width (int): Maximum width for the entire field
@@ -197,15 +192,19 @@ class SingleLineTextEdit:
         if text_max_width <= 0:
             return
         
+        # Get color and attributes
+        base_color, default_attributes = get_status_color()
+        base_attributes = TextAttribute.BOLD if is_active else default_attributes
+        
         # Draw the label
-        base_color = get_status_color() | (curses.A_BOLD if is_active else 0)
-        self._safe_addstr(stdscr, y, x, label, base_color)
+        self._safe_draw_text(renderer, y, x, label, base_color, base_attributes)
         
         # Handle empty text case
         if not self.text:
             if is_active:
                 # Show cursor at beginning of empty field
-                self._safe_addstr(stdscr, y, text_start_x, " ", base_color | curses.A_REVERSE)
+                self._safe_draw_text(renderer, y, text_start_x, " ", base_color, 
+                                   base_attributes | TextAttribute.REVERSE)
             return
         
         # Ensure cursor is within bounds
@@ -275,10 +274,11 @@ class SingleLineTextEdit:
             
             if i == cursor_in_visible and is_active:
                 # Draw cursor character with reversed colors
-                self._safe_addstr(stdscr, y, current_x, char, base_color | curses.A_REVERSE)
+                self._safe_draw_text(renderer, y, current_x, char, base_color, 
+                                   base_attributes | TextAttribute.REVERSE)
             else:
                 # Draw normal character
-                self._safe_addstr(stdscr, y, current_x, char, base_color)
+                self._safe_draw_text(renderer, y, current_x, char, base_color, base_attributes)
             
             # Advance cursor position by character's display width
             current_x += char_width
@@ -287,7 +287,8 @@ class SingleLineTextEdit:
         if cursor_in_visible >= len(visible_text) and is_active:
             # Make sure we have space to draw the cursor
             if current_x < x + max_width:
-                self._safe_addstr(stdscr, y, current_x, " ", base_color | curses.A_REVERSE)
+                self._safe_draw_text(renderer, y, current_x, " ", base_color, 
+                                   base_attributes | TextAttribute.REVERSE)
             elif len(visible_text) > 0:
                 # If we're at the edge, we need to be more careful with wide characters
                 # Find the last character that we can highlight as cursor
@@ -296,12 +297,13 @@ class SingleLineTextEdit:
                     last_char = visible_text[last_char_pos]
                     last_char_width = get_width(last_char)
                     last_char_x = current_x - last_char_width
-                    self._safe_addstr(stdscr, y, last_char_x, last_char, base_color | curses.A_REVERSE)
+                    self._safe_draw_text(renderer, y, last_char_x, last_char, base_color, 
+                                       base_attributes | TextAttribute.REVERSE)
     
-    def _safe_addstr(self, stdscr, y, x, text, attr=0):
-        """Safely add string to screen, handling boundary conditions and wide characters"""
+    def _safe_draw_text(self, renderer, y, x, text, color_pair, attributes):
+        """Safely draw text to screen, handling boundary conditions and wide characters"""
         try:
-            height, width = stdscr.getmaxyx()
+            height, width = renderer.get_dimensions()
             if 0 <= y < height and 0 <= x < width:
                 # Get safe wide character functions
                 safe_funcs = get_safe_functions()
@@ -315,7 +317,7 @@ class SingleLineTextEdit:
                 if get_width(text) > max_display_width:
                     text = truncate_text(text, max_display_width, "")
                 
-                stdscr.addstr(y, x, text, attr)
-        except curses.error:
-            # Ignore curses errors (e.g., writing to bottom-right corner)
+                renderer.draw_text(y, x, text, color_pair=color_pair, attributes=attributes)
+        except Exception:
+            # Ignore rendering errors (e.g., writing to bottom-right corner)
             pass

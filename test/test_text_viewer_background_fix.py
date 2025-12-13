@@ -9,6 +9,7 @@ background color instead of leaving them with the default terminal background.
 import os
 import sys
 import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 import tempfile
 from pathlib import Path
 

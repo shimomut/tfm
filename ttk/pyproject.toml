@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ttk"
+version = "0.1.0"
+description = "TUI Toolkit - A generic rendering library for character-grid-based applications"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+authors = [
+    {name = "TFM Development Team"}
+]
+keywords = ["tui", "terminal", "rendering", "curses", "metal", "gui"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: User Interfaces",
+    "Topic :: Terminals",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+metal = [
+    "pyobjc-framework-Metal>=9.0; sys_platform == 'darwin'",
+    "pyobjc-framework-Cocoa>=9.0; sys_platform == 'darwin'",
+    "pyobjc-framework-CoreText>=9.0; sys_platform == 'darwin'",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/tfm/ttk"
+Documentation = "https://github.com/tfm/ttk/blob/main/README.md"
+Repository = "https://github.com/tfm/ttk"
+Issues = "https://github.com/tfm/ttk/issues"
+
+[tool.setuptools]
+# Explicit package configuration for flat layout
+packages = ["ttk", "ttk.backends", "ttk.serialization", "ttk.utils"]
+
+[tool.setuptools.package-dir]
+"ttk" = "."
+"ttk.backends" = "backends"
+"ttk.serialization" = "serialization"  
+"ttk.utils" = "utils"
+
+[tool.setuptools.package-data]
+ttk = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=ttk --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["ttk"]
+omit = ["*/tests/*", "*/demo/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

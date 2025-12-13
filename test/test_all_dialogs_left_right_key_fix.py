@@ -6,7 +6,7 @@ This test verifies that all dialogs that extend BaseListDialog properly handle
 left and right keys without causing rendering issues.
 """
 
-import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
 import sys
@@ -39,7 +39,7 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
         # Test left key
         dialog.show('filename')
         dialog.content_changed = False
-        result = dialog.handle_input(curses.KEY_LEFT)
+        result = dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "SearchDialog should handle left key")
         self.assertTrue(dialog.content_changed, "SearchDialog should set content_changed after left key")
         self.assertTrue(dialog.needs_redraw(), "SearchDialog should need redraw after left key")
@@ -47,7 +47,7 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
         # Test right key
         dialog.show('filename')
         dialog.content_changed = False
-        result = dialog.handle_input(curses.KEY_RIGHT)
+        result = dialog.handle_input(InputEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "SearchDialog should handle right key")
         self.assertTrue(dialog.content_changed, "SearchDialog should set content_changed after right key")
         self.assertTrue(dialog.needs_redraw(), "SearchDialog should need redraw after right key")
@@ -63,7 +63,7 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
         # Test left key
         dialog.show(root_dir)
         dialog.content_changed = False
-        result = dialog.handle_input(curses.KEY_LEFT)
+        result = dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "JumpDialog should handle left key")
         self.assertTrue(dialog.content_changed, "JumpDialog should set content_changed after left key")
         self.assertTrue(dialog.needs_redraw(), "JumpDialog should need redraw after left key")
@@ -71,7 +71,7 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
         # Test right key
         dialog.show(root_dir)
         dialog.content_changed = False
-        result = dialog.handle_input(curses.KEY_RIGHT)
+        result = dialog.handle_input(InputEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "JumpDialog should handle right key")
         self.assertTrue(dialog.content_changed, "JumpDialog should set content_changed after right key")
         self.assertTrue(dialog.needs_redraw(), "JumpDialog should need redraw after right key")
@@ -87,7 +87,7 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
         # Test left key
         dialog.show("Test Dialog", test_items, callback)
         dialog.content_changed = False
-        result = dialog.handle_input(curses.KEY_LEFT)
+        result = dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "ListDialog should handle left key")
         self.assertTrue(dialog.content_changed, "ListDialog should set content_changed after left key")
         self.assertTrue(dialog.needs_redraw(), "ListDialog should need redraw after left key")
@@ -95,7 +95,7 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
         # Test right key
         dialog.show("Test Dialog", test_items, callback)
         dialog.content_changed = False
-        result = dialog.handle_input(curses.KEY_RIGHT)
+        result = dialog.handle_input(InputEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "ListDialog should handle right key")
         self.assertTrue(dialog.content_changed, "ListDialog should set content_changed after right key")
         self.assertTrue(dialog.needs_redraw(), "ListDialog should need redraw after right key")
@@ -121,7 +121,7 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
                     dialog.show("Test", ['item1', 'item2'], callback)
                 
                 # Test both left and right keys
-                for key_name, key_code in [('LEFT', curses.KEY_LEFT), ('RIGHT', curses.KEY_RIGHT)]:
+                for key_name, key_code in [('LEFT', KeyCode.LEFT), ('RIGHT', KeyCode.RIGHT)]:
                     with self.subTest(key=key_name):
                         # Reset state
                         dialog.content_changed = False

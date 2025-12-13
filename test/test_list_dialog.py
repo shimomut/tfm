@@ -4,6 +4,7 @@ Test script for the new searchable list dialog feature
 """
 
 import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 import sys
 from pathlib import Path
 

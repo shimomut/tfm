@@ -4,21 +4,21 @@ TUI File Manager - Batch Rename Dialog Component
 Provides batch file renaming functionality with regex patterns
 """
 
-import curses
 import re
+from ttk import TextAttribute, KeyCode
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
 from tfm_single_line_text_edit import SingleLineTextEdit
-from tfm_const import KEY_ENTER_1, KEY_ENTER_2, KEY_TAB
 from tfm_colors import get_status_color, COLOR_ERROR
 from tfm_wide_char_utils import get_display_width, get_safe_functions
+from tfm_input_compat import ensure_input_event
 
 
 class BatchRenameDialog(BaseListDialog):
     """Batch rename dialog component for renaming multiple files with regex patterns"""
     
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, renderer=None):
+        super().__init__(config, renderer)
         
         # Batch rename dialog specific state
         self.regex_editor = SingleLineTextEdit()
@@ -68,12 +68,27 @@ class BatchRenameDialog(BaseListDialog):
             return True
         return False
         
-    def handle_input(self, key):
-        """Handle input while in batch rename mode"""
-        if key == 27:  # ESC - cancel batch rename
+    def handle_input(self, event):
+        """Handle input while in batch rename mode
+        
+        Args:
+            event: InputEvent from TTK
+            
+        Returns:
+            Tuple of (action, data) or True/False
+        """
+        # Backward compatibility: convert integer key codes to InputEvent
+        event = ensure_input_event(event)
+        
+        if not event:
+            return False
+            
+        # ESC - cancel batch rename
+        if event.key_code == KeyCode.ESCAPE:
             return ('cancel', None)
             
-        elif key == KEY_TAB:  # Tab - switch between regex and destination input
+        # Tab - switch between regex and destination input
+        elif event.key_code == KeyCode.TAB:
             if self.active_field == 'regex':
                 self.switch_field('destination')
             else:
@@ -81,8 +96,8 @@ class BatchRenameDialog(BaseListDialog):
             self.content_changed = True  # Mark content as changed when switching fields
             return ('field_switch', None)
             
-        elif key == curses.KEY_UP:
-            # Up arrow - move to regex field (previous field)
+        # Up arrow - move to regex field (previous field)
+        elif event.key_code == KeyCode.UP:
             if self.switch_field('regex'):
                 self.content_changed = True  # Mark content as changed when switching fields
                 return ('field_switch', None)
@@ -90,8 +105,8 @@ class BatchRenameDialog(BaseListDialog):
             self.content_changed = True
             return True
             
-        elif key == curses.KEY_DOWN:
-            # Down arrow - move to destination field (next field)
+        # Down arrow - move to destination field (next field)
+        elif event.key_code == KeyCode.DOWN:
             if self.switch_field('destination'):
                 self.content_changed = True  # Mark content as changed when switching fields
                 return ('field_switch', None)
@@ -99,7 +114,8 @@ class BatchRenameDialog(BaseListDialog):
             self.content_changed = True
             return True
             
-        elif key == curses.KEY_PPAGE:  # Page Up - scroll preview up
+        # Page Up - scroll preview up
+        elif event.key_code == KeyCode.PAGE_UP:
             if self.scroll > 0:
                 self.scroll = max(0, self.scroll - 10)
                 self.content_changed = True  # Mark content as changed when scrolling
@@ -108,7 +124,8 @@ class BatchRenameDialog(BaseListDialog):
             self.content_changed = True
             return True
             
-        elif key == curses.KEY_NPAGE:  # Page Down - scroll preview down
+        # Page Down - scroll preview down
+        elif event.key_code == KeyCode.PAGE_DOWN:
             if self.preview:
                 max_scroll = max(0, len(self.preview) - 10)
                 self.scroll = min(max_scroll, self.scroll + 10)
@@ -118,8 +135,8 @@ class BatchRenameDialog(BaseListDialog):
             self.content_changed = True
             return True
             
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
-            # Enter - perform batch rename
+        # Enter - perform batch rename
+        elif event.key_code == KeyCode.ENTER:
             regex_text = self.regex_editor.get_text()
             dest_text = self.destination_editor.get_text()
             if regex_text and dest_text:
@@ -130,7 +147,9 @@ class BatchRenameDialog(BaseListDialog):
         else:
             # Let the active editor handle other keys
             active_editor = self.get_active_editor()
-            if active_editor.handle_key(key):
+            
+            # Pass the InputEvent directly to SingleLineTextEdit
+            if active_editor.handle_key(event):
                 # Text changed, update preview
                 self.content_changed = True  # Mark content as changed when text changes
                 return ('text_changed', None)
@@ -256,9 +275,12 @@ class BatchRenameDialog(BaseListDialog):
         """Check if this dialog needs to be redrawn"""
         return self.content_changed
     
-    def draw(self, stdscr, safe_addstr_func):
+    def draw(self):
         """Draw the batch rename dialog overlay"""
-        height, width = stdscr.getmaxyx()
+        if not self.renderer:
+            return
+            
+        height, width = self.renderer.get_dimensions()
         
         # Calculate dialog dimensions safely for narrow terminals
         desired_width = int(width * 0.9)
@@ -276,21 +298,25 @@ class BatchRenameDialog(BaseListDialog):
         start_x = max(0, (width - dialog_width) // 2)
         
         # Draw dialog background
-        # Use hline() to properly clear wide characters underneath
+        # Use draw_hline() to properly clear wide characters underneath
+        status_color_pair, status_attributes = get_status_color()
+        
         for y in range(start_y, start_y + dialog_height):
             if y < height and y >= 0 and start_x >= 0 and start_x < width:
                 columns_to_fill = min(dialog_width, width - start_x)
                 try:
-                    stdscr.hline(y, start_x, ' ', columns_to_fill, get_status_color())
-                except curses.error:
+                    self.renderer.draw_hline(y, start_x, ' ', columns_to_fill, color_pair=status_color_pair)
+                except Exception as e:
+                    # Fallback to draw_text if draw_hline fails
                     try:
                         bg_line = " " * columns_to_fill
-                        safe_addstr_func(y, start_x, bg_line, get_status_color())
-                    except curses.error:
+                        self.renderer.draw_text(y, start_x, bg_line, color_pair=status_color_pair)
+                    except Exception:
                         pass
         
         # Draw border with safe drawing
-        border_color = get_status_color() | curses.A_BOLD
+        border_color_pair, _ = get_status_color()
+        border_attributes = TextAttribute.BOLD
         
         # Top border
         if start_y >= 0 and start_y < height:
@@ -299,18 +325,18 @@ class BatchRenameDialog(BaseListDialog):
             if start_x + len(top_line) > width:
                 top_line = top_line[:width - start_x]
             if top_line:
-                safe_addstr_func(start_y, start_x, top_line, border_color)
+                self.renderer.draw_text(start_y, start_x, top_line, color_pair=border_color_pair, attributes=border_attributes)
         
         # Side borders
         for y in range(start_y + 1, start_y + dialog_height - 1):
             if y < height and y >= 0:
                 # Left border
                 if start_x >= 0 and start_x < width:
-                    safe_addstr_func(y, start_x, "│", border_color)
+                    self.renderer.draw_text(y, start_x, "│", color_pair=border_color_pair, attributes=border_attributes)
                 # Right border
                 right_x = start_x + dialog_width - 1
                 if right_x >= 0 and right_x < width:
-                    safe_addstr_func(y, right_x, "│", border_color)
+                    self.renderer.draw_text(y, right_x, "│", color_pair=border_color_pair, attributes=border_attributes)
         
         # Bottom border
         bottom_y = start_y + dialog_height - 1
@@ -320,7 +346,7 @@ class BatchRenameDialog(BaseListDialog):
             if start_x + len(bottom_line) > width:
                 bottom_line = bottom_line[:width - start_x]
             if bottom_line:
-                safe_addstr_func(bottom_y, start_x, bottom_line, border_color)
+                self.renderer.draw_text(bottom_y, start_x, bottom_line, color_pair=border_color_pair, attributes=border_attributes)
         
         # Draw title using wide character utilities with safe positioning
         title_text = f" Batch Rename ({len(self.files)} files) "
@@ -339,7 +365,7 @@ class BatchRenameDialog(BaseListDialog):
         title_x = start_x + (dialog_width - title_width) // 2
         # Ensure title fits within terminal bounds
         if title_x >= 0 and title_x < width and title_x + title_width <= width:
-            safe_addstr_func(start_y, title_x, title_text, border_color)
+            self.renderer.draw_text(start_y, title_x, title_text, color_pair=border_color_pair, attributes=border_attributes)
         
         # Content area
         content_start_x = start_x + 2
@@ -352,7 +378,7 @@ class BatchRenameDialog(BaseListDialog):
         if regex_y < height:
             # Draw regex input field using SingleLineTextEdit
             self.regex_editor.draw(
-                stdscr, regex_y, content_start_x, content_width,
+                self.renderer, regex_y, content_start_x, content_width,
                 regex_label,
                 is_active=(self.active_field == 'regex')
             )
@@ -364,7 +390,7 @@ class BatchRenameDialog(BaseListDialog):
         if dest_y < height:
             # Draw destination input field using SingleLineTextEdit
             self.destination_editor.draw(
-                stdscr, dest_y, content_start_x, content_width,
+                self.renderer, dest_y, content_start_x, content_width,
                 dest_label,
                 is_active=(self.active_field == 'destination')
             )
@@ -373,25 +399,32 @@ class BatchRenameDialog(BaseListDialog):
         nav_help_y = start_y + 4
         if nav_help_y < height:
             nav_help_text = "Navigation: ↑/↓=Switch fields, Tab=Alt switch, PgUp/PgDn=Scroll preview"
-            safe_addstr_func(nav_help_y, content_start_x, nav_help_text[:content_width], get_status_color() | curses.A_DIM)
+            status_color_pair, _ = get_status_color()
+            self.renderer.draw_text(nav_help_y, content_start_x, nav_help_text[:content_width], 
+                             color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw help for macros
         help_y = start_y + 5
         if help_y < height:
             help_text = "Macros: \\0=full name, \\1-\\9=regex groups, \\d=index"
-            safe_addstr_func(help_y, content_start_x, help_text[:content_width], get_status_color() | curses.A_DIM)
+            status_color_pair, _ = get_status_color()
+            self.renderer.draw_text(help_y, content_start_x, help_text[:content_width], 
+                             color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw separator line
         sep_y = start_y + 6
         if sep_y < height:
             sep_line = "├" + "─" * (dialog_width - 2) + "┤"
-            safe_addstr_func(sep_y, start_x, sep_line[:dialog_width], border_color)
+            self.renderer.draw_text(sep_y, start_x, sep_line[:dialog_width], 
+                             color_pair=border_color_pair, attributes=border_attributes)
         
         # Draw preview header
         preview_header_y = start_y + 7
         if preview_header_y < height:
             header_text = "Preview:"
-            safe_addstr_func(preview_header_y, content_start_x, header_text, get_status_color() | curses.A_BOLD)
+            header_color_pair, _ = get_status_color()
+            self.renderer.draw_text(preview_header_y, content_start_x, header_text, 
+                             color_pair=header_color_pair, attributes=TextAttribute.BOLD)
         
         # Calculate preview area
         preview_start_y = start_y + 8
@@ -413,16 +446,18 @@ class BatchRenameDialog(BaseListDialog):
                     # Format preview line
                     if original == new:
                         status = "UNCHANGED"
-                        status_color = get_status_color() | curses.A_DIM
+                        status_color_pair, status_attributes = get_status_color()
                     elif conflict:
                         status = "CONFLICT!"
-                        status_color = curses.color_pair(COLOR_ERROR) | curses.A_BOLD
+                        status_color_pair = COLOR_ERROR
+                        status_attributes = TextAttribute.BOLD
                     elif not valid:
                         status = "INVALID!"
-                        status_color = curses.color_pair(COLOR_ERROR) | curses.A_BOLD
+                        status_color_pair = COLOR_ERROR
+                        status_attributes = TextAttribute.BOLD
                     else:
                         status = "OK"
-                        status_color = get_status_color()
+                        status_color_pair, status_attributes = get_status_color()
                     
                     # Create preview line using wide character utilities
                     max_name_width = (content_width - 20) // 2
@@ -449,13 +484,16 @@ class BatchRenameDialog(BaseListDialog):
                     if get_width(preview_line) > content_width:
                         preview_line = truncate_text(preview_line, content_width, "")
                     
-                    safe_addstr_func(y, content_start_x, preview_line, status_color)
+                    self.renderer.draw_text(y, content_start_x, preview_line, 
+                                     color_pair=status_color_pair, attributes=status_attributes)
         else:
             # No preview available
             no_preview_y = preview_start_y + 2
             if no_preview_y < height:
                 no_preview_text = "Enter regex pattern and destination to see preview"
-                safe_addstr_func(no_preview_y, content_start_x, no_preview_text, get_status_color() | curses.A_DIM)
+                status_color_pair, _ = get_status_color()
+                self.renderer.draw_text(no_preview_y, content_start_x, no_preview_text, 
+                                 color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw help text with safe positioning
         help_y = start_y + dialog_height - 2
@@ -467,7 +505,9 @@ class BatchRenameDialog(BaseListDialog):
                 help_x = start_x + (dialog_width - help_width) // 2
                 # Ensure help text fits within terminal bounds
                 if help_x >= 0 and help_x < width and help_x + help_width <= width:
-                    safe_addstr_func(help_y, help_x, help_text, get_status_color() | curses.A_DIM)
+                    status_color_pair, _ = get_status_color()
+                    self.renderer.draw_text(help_y, help_x, help_text, 
+                                     color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
             else:
                 # Truncate help text if too wide
                 truncate_text = safe_funcs['truncate_to_width']
@@ -478,10 +518,14 @@ class BatchRenameDialog(BaseListDialog):
                     help_x = start_x + (dialog_width - help_width) // 2
                     # Ensure truncated help text fits within terminal bounds
                     if help_x >= 0 and help_x < width and help_x + help_width <= width:
-                        safe_addstr_func(help_y, help_x, truncated_help, get_status_color() | curses.A_DIM)
+                        status_color_pair, _ = get_status_color()
+                        self.renderer.draw_text(help_y, help_x, truncated_help, 
+                                         color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False
+    
+
 
 
 class BatchRenameDialogHelpers:

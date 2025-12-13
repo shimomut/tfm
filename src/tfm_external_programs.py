@@ -3,7 +3,6 @@
 TFM External Programs Module - Handles external program execution and subshell features
 """
 
-import curses
 import os
 import subprocess
 import sys
@@ -89,25 +88,26 @@ def get_selected_or_cursor_files(pane_data):
 class ExternalProgramManager:
     """Manages external program execution and subshell functionality"""
     
-    def __init__(self, config, log_manager):
+    def __init__(self, config, log_manager, renderer=None):
         self.config = config
         self.log_manager = log_manager
+        self.renderer = renderer
     
 
 
 
     
-    def execute_external_program(self, stdscr, pane_manager, program):
+    def execute_external_program(self, pane_manager, program):
         """Execute an external program with environment variables set"""
         # Restore stdout/stderr temporarily
         self.log_manager.restore_stdio()
         
         # Clear the screen and reset cursor
-        stdscr.clear()
-        stdscr.refresh()
+        self.renderer.clear()
+        self.renderer.refresh()
         
-        # Reset terminal to normal mode
-        curses.endwin()
+        # Suspend the renderer to allow external program to run
+        self.renderer.suspend()
         
         try:
             # Get current pane information
@@ -201,15 +201,13 @@ class ExternalProgramManager:
             input()
         
         finally:
-            # Reinitialize curses
-            stdscr = curses.initscr()
-            curses.curs_set(0)  # Hide cursor
-            stdscr.keypad(True)
+            # Resume the renderer
+            self.renderer.resume()
             
             # Reinitialize colors with configured scheme
             from tfm_colors import init_colors
             color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-            init_colors(color_scheme)
+            init_colors(self.renderer, color_scheme)
             
             # Restore stdout/stderr capture
             from tfm_log_manager import LogCapture
@@ -218,20 +216,18 @@ class ExternalProgramManager:
             
             # Log return from program execution
             print(f"Returned from external program: {program['name']}")
-            
-            return stdscr  # Return the reinitialized screen
     
-    def enter_subshell_mode(self, stdscr, pane_manager):
+    def enter_subshell_mode(self, pane_manager):
         """Enter sub-shell mode with environment variables set"""
         # Restore stdout/stderr temporarily
         self.log_manager.restore_stdio()
         
         # Clear the screen and reset cursor
-        stdscr.clear()
-        stdscr.refresh()
+        self.renderer.clear()
+        self.renderer.refresh()
         
-        # Reset terminal to normal mode
-        curses.endwin()
+        # Suspend the renderer to allow subshell to run
+        self.renderer.suspend()
         
         try:
             # Get current pane information
@@ -332,15 +328,13 @@ class ExternalProgramManager:
             input("Press Enter to continue...")
         
         finally:
-            # Reinitialize curses
-            stdscr = curses.initscr()
-            curses.curs_set(0)  # Hide cursor
-            stdscr.keypad(True)
+            # Resume the renderer
+            self.renderer.resume()
             
             # Reinitialize colors with configured scheme
             from tfm_colors import init_colors
             color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-            init_colors(color_scheme)
+            init_colors(self.renderer, color_scheme)
             
             # Restore stdout/stderr capture  
             from tfm_log_manager import LogCapture
@@ -349,14 +343,15 @@ class ExternalProgramManager:
             
             # Log return from sub-shell
             print("Returned from sub-shell mode")
-            
-            return stdscr  # Return the reinitialized screen
     
-    def suspend_curses(self, stdscr):
-        """Suspend the curses system to allow external programs to run"""
-        curses.endwin()
+    def suspend_curses(self):
+        """Suspend the renderer to allow external programs to run"""
+        # Check if the renderer has a suspend method (CursesBackend does)
+        if hasattr(self.renderer, 'suspend'):
+            self.renderer.suspend()
         
-    def resume_curses(self, stdscr):
-        """Resume the curses system after external program execution"""
-        stdscr.refresh()
-        curses.curs_set(0)  # Hide cursor
+    def resume_curses(self):
+        """Resume the renderer after external program execution"""
+        # Check if the renderer has a resume method (CursesBackend does)
+        if hasattr(self.renderer, 'resume'):
+            self.renderer.resume()

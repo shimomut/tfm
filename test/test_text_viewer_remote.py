@@ -15,11 +15,8 @@ from unittest.mock import Mock, patch, MagicMock
 # Add src directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-# Mock curses before importing TextViewer
-with patch('curses.color_pair') as mock_color_pair:
-    mock_color_pair.return_value = 1
-    from tfm_path import Path
-    from tfm_text_viewer import TextViewer, is_text_file, view_text_file
+from tfm_path import Path
+from tfm_text_viewer import TextViewer, is_text_file, view_text_file
 
 
 class TestTextViewerRemote(unittest.TestCase):
@@ -30,10 +27,6 @@ class TestTextViewerRemote(unittest.TestCase):
         self.mock_stdscr = Mock()
         self.mock_stdscr.getmaxyx.return_value = (24, 80)
         
-        # Mock curses functions
-        self.curses_patcher = patch('curses.color_pair', return_value=1)
-        self.curses_patcher.start()
-        
         # Create a temporary local file for comparison
         self.temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
         self.temp_file.write("Line 1\nLine 2\nLine 3\n")
@@ -42,7 +35,6 @@ class TestTextViewerRemote(unittest.TestCase):
     
     def tearDown(self):
         """Clean up test fixtures"""
-        self.curses_patcher.stop()
         try:
             os.unlink(self.temp_file.name)
         except OSError:

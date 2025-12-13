@@ -27,6 +27,7 @@ def test_create_directory_functionality():
         
         # Test 1: Check that move_selected_files calls enter_create_directory_mode when no files selected
         from tfm_main import FileManager
+        from ttk.input_event import InputEvent, KeyCode, ModifierKey
         import curses
         
         # Mock curses for testing

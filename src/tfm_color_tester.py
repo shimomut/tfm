@@ -4,13 +4,20 @@ TFM Color Testing Module
 
 Provides comprehensive color debugging and testing functionality to help diagnose
 color rendering issues across different terminals and environments.
+
+SPECIAL NOTE: This is a diagnostic/testing tool that requires direct curses access
+for low-level terminal color testing. It is not part of the core TFM application
+and is only used via the --color-test command-line option. This is the only TFM
+source file that retains a curses import for diagnostic purposes.
 """
 
-import curses
 import sys
 import os
 import time
 from tfm_path import Path
+
+# Special case: This diagnostic tool requires direct curses access for testing
+import curses
 
 # Import TFM color modules
 from tfm_colors import (

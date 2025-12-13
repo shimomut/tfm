@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
 from unittest.mock import Mock, MagicMock
-import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 
 from tfm_base_list_dialog import BaseListDialog
 from tfm_list_dialog import ListDialog
@@ -57,7 +57,7 @@ class TestBaseListDialog(unittest.TestCase):
         
     def test_handle_common_navigation_select(self):
         """Test ENTER key handling"""
-        result = self.base_dialog.handle_common_navigation(curses.KEY_ENTER, ["item1", "item2"])
+        result = self.base_dialog.handle_common_navigation(KeyCode.ENTER, ["item1", "item2"])
         self.assertEqual(result, 'select')
         
     def test_handle_common_navigation_up_down(self):
@@ -65,12 +65,12 @@ class TestBaseListDialog(unittest.TestCase):
         items = ["item1", "item2", "item3"]
         
         # Test DOWN key
-        result = self.base_dialog.handle_common_navigation(curses.KEY_DOWN, items)
+        result = self.base_dialog.handle_common_navigation(KeyCode.DOWN, items)
         self.assertTrue(result)
         self.assertEqual(self.base_dialog.selected, 1)
         
         # Test UP key
-        result = self.base_dialog.handle_common_navigation(curses.KEY_UP, items)
+        result = self.base_dialog.handle_common_navigation(KeyCode.UP, items)
         self.assertTrue(result)
         self.assertEqual(self.base_dialog.selected, 0)
         
@@ -135,7 +135,7 @@ class TestListDialog(unittest.TestCase):
         self.list_dialog.show("Test", items, callback)
         self.list_dialog.selected = 1
         
-        result = self.list_dialog.handle_input(curses.KEY_ENTER)
+        result = self.list_dialog.handle_input(InputEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE))
         
         self.assertTrue(result)
         self.assertFalse(self.list_dialog.is_active)  # Should exit

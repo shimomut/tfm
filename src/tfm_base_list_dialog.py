@@ -4,18 +4,19 @@ TUI File Manager - Base List Dialog Component
 Provides common functionality for list-based dialogs
 """
 
-import curses
+from ttk import TextAttribute, KeyCode
 from tfm_single_line_text_edit import SingleLineTextEdit
-from tfm_const import KEY_ENTER_1, KEY_ENTER_2
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, get_safe_functions
+from tfm_scrollbar import draw_scrollbar
 
 
 class BaseListDialog:
     """Base class for list-based dialog components"""
     
-    def __init__(self, config):
+    def __init__(self, config, renderer=None):
         self.config = config
+        self.renderer = renderer
         
         # Common dialog state
         self.is_active = False
@@ -30,44 +31,51 @@ class BaseListDialog:
         self.scroll = 0
         self.text_editor.clear()
         
-    def handle_common_navigation(self, key, items_list):
+    def handle_common_navigation(self, event, items_list):
         """Handle common navigation keys for list dialogs
         
         Args:
-            key: The input key
+            event: The InputEvent
             items_list: List of items to navigate through
             
         Returns:
             True if key was handled, False otherwise
         """
-        if key == 27:  # ESC - cancel
+        if not event:
+            return False
+            
+        # ESC - cancel
+        if event.key_code == KeyCode.ESCAPE:
             return 'cancel'
-        elif key == curses.KEY_UP:
-            # Move selection up
+        # Up arrow - move selection up
+        elif event.key_code == KeyCode.UP:
             if items_list and self.selected > 0:
                 self.selected -= 1
                 self._adjust_scroll(len(items_list))
             return True
-        elif key == curses.KEY_DOWN:
-            # Move selection down
+        # Down arrow - move selection down
+        elif event.key_code == KeyCode.DOWN:
             if items_list and self.selected < len(items_list) - 1:
                 self.selected += 1
                 self._adjust_scroll(len(items_list))
             return True
-        elif key == curses.KEY_PPAGE:  # Page Up
+        # Page Up
+        elif event.key_code == KeyCode.PAGE_UP:
             if items_list:
                 self.selected = max(0, self.selected - 10)
                 self._adjust_scroll(len(items_list))
             return True
-        elif key == curses.KEY_NPAGE:  # Page Down
+        # Page Down
+        elif event.key_code == KeyCode.PAGE_DOWN:
             if items_list:
                 self.selected = min(len(items_list) - 1, self.selected + 10)
                 self._adjust_scroll(len(items_list))
             return True
-        elif key == curses.KEY_HOME:  # Home
+        # Home
+        elif event.key_code == KeyCode.HOME:
             # If there's text in editor, let editor handle it for cursor movement
             if self.text_editor.text:
-                if self.text_editor.handle_key(key):
+                if self.text_editor.handle_key(event):
                     return True
             else:
                 # If no text, use for list navigation
@@ -75,10 +83,11 @@ class BaseListDialog:
                     self.selected = 0
                     self.scroll = 0
             return True
-        elif key == curses.KEY_END:  # End
+        # End
+        elif event.key_code == KeyCode.END:
             # If there's text in editor, let editor handle it for cursor movement
             if self.text_editor.text:
-                if self.text_editor.handle_key(key):
+                if self.text_editor.handle_key(event):
                     return True
             else:
                 # If no text, use for list navigation
@@ -86,21 +95,22 @@ class BaseListDialog:
                     self.selected = len(items_list) - 1
                     self._adjust_scroll(len(items_list))
             return True
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+        # Enter
+        elif event.key_code == KeyCode.ENTER:
             return 'select'
-        elif key == curses.KEY_LEFT or key == curses.KEY_RIGHT:
-            # Let the editor handle cursor movement keys
-            if self.text_editor.handle_key(key):
+        # Left/Right arrows - let editor handle
+        elif event.key_code in (KeyCode.LEFT, KeyCode.RIGHT):
+            if self.text_editor.handle_key(event):
                 return 'text_changed'
             return True
-        elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:
-            # Let the editor handle backspace
-            if self.text_editor.handle_key(key):
+        # Backspace - let editor handle
+        elif event.key_code == KeyCode.BACKSPACE:
+            if self.text_editor.handle_key(event):
                 return 'text_changed'
             return True
-        elif isinstance(key, int) and 32 <= key <= 126:  # Printable characters
-            # Let the editor handle printable characters
-            if self.text_editor.handle_key(key):
+        # Printable characters - let editor handle
+        elif event.char and len(event.char) == 1 and 32 <= ord(event.char) <= 126:
+            if self.text_editor.handle_key(event):
                 return 'text_changed'
             return True
         return False
@@ -130,12 +140,10 @@ class BaseListDialog:
         elif self.selected >= self.scroll + content_height:
             self.scroll = self.selected - content_height + 1
             
-    def draw_dialog_frame(self, stdscr, safe_addstr_func, title, width_ratio=0.6, height_ratio=0.7, min_width=40, min_height=15):
+    def draw_dialog_frame(self, title, width_ratio=0.6, height_ratio=0.7, min_width=40, min_height=15):
         """Draw the basic dialog frame and return dimensions
         
         Args:
-            stdscr: The curses screen object
-            safe_addstr_func: Safe string drawing function
             title: Dialog title text
             width_ratio: Dialog width as ratio of screen width
             height_ratio: Dialog height as ratio of screen height
@@ -145,7 +153,7 @@ class BaseListDialog:
         Returns:
             Tuple of (start_y, start_x, dialog_width, dialog_height)
         """
-        height, width = stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         
         # Calculate dialog dimensions safely for narrow terminals
         desired_width = int(width * width_ratio)
@@ -164,27 +172,22 @@ class BaseListDialog:
         
         # Draw dialog background
         # When there are wide characters in the underlying content, we need to
-        # ensure the background properly clears them. Use hline() which is more
-        # reliable for clearing areas than addstr() with spaces.
+        # ensure the background properly clears them. Use draw_hline() which is more
+        # reliable for clearing areas than draw_text() with spaces.
+        status_color_pair, status_attributes = get_status_color()
+        
         for y in range(start_y, start_y + dialog_height):
             if y < height and y >= 0 and start_x >= 0 and start_x < width:
                 # Calculate the number of columns to fill
                 columns_to_fill = min(dialog_width, width - start_x)
                 
-                try:
-                    # Use hline() to draw a horizontal line of spaces
-                    # This is more reliable than addstr() for clearing wide characters
-                    stdscr.hline(y, start_x, ' ', columns_to_fill, get_status_color())
-                except curses.error:
-                    # Fallback to addstr if hline fails
-                    try:
-                        bg_line = " " * columns_to_fill
-                        safe_addstr_func(y, start_x, bg_line, get_status_color())
-                    except curses.error:
-                        pass
+                # Use draw_hline() to draw a horizontal line of spaces
+                # This is more reliable than draw_text() for clearing wide characters
+                self.renderer.draw_hline(y, start_x, ' ', columns_to_fill, color_pair=status_color_pair)
         
-        # Draw border with safe drawing
-        border_color = get_status_color() | curses.A_BOLD
+        # Draw border
+        border_color_pair, _ = get_status_color()
+        border_attributes = TextAttribute.BOLD
         
         # Top border
         if start_y >= 0 and start_y < height:
@@ -193,18 +196,18 @@ class BaseListDialog:
             if start_x + len(top_line) > width:
                 top_line = top_line[:width - start_x]
             if top_line:
-                safe_addstr_func(start_y, start_x, top_line, border_color)
+                self.renderer.draw_text(start_y, start_x, top_line, color_pair=border_color_pair, attributes=border_attributes)
         
         # Side borders
         for y in range(start_y + 1, start_y + dialog_height - 1):
             if y < height and y >= 0:
                 # Left border
                 if start_x >= 0 and start_x < width:
-                    safe_addstr_func(y, start_x, "│", border_color)
+                    self.renderer.draw_text(y, start_x, "│", color_pair=border_color_pair, attributes=border_attributes)
                 # Right border
                 right_x = start_x + dialog_width - 1
                 if right_x >= 0 and right_x < width:
-                    safe_addstr_func(y, right_x, "│", border_color)
+                    self.renderer.draw_text(y, right_x, "│", color_pair=border_color_pair, attributes=border_attributes)
         
         # Bottom border
         bottom_y = start_y + dialog_height - 1
@@ -214,7 +217,7 @@ class BaseListDialog:
             if start_x + len(bottom_line) > width:
                 bottom_line = bottom_line[:width - start_x]
             if bottom_line:
-                safe_addstr_func(bottom_y, start_x, bottom_line, border_color)
+                self.renderer.draw_text(bottom_y, start_x, bottom_line, color_pair=border_color_pair, attributes=border_attributes)
         
         # Draw title using wide character utilities with safe positioning
         if title and start_y >= 0 and start_y < height:
@@ -234,51 +237,48 @@ class BaseListDialog:
             title_x = start_x + (dialog_width - title_width) // 2
             # Ensure title fits within terminal bounds
             if title_x >= 0 and title_x < width and title_x + title_width <= width:
-                safe_addstr_func(start_y, title_x, title_text, border_color)
+                self.renderer.draw_text(start_y, title_x, title_text, color_pair=border_color_pair, attributes=border_attributes)
         
         return start_y, start_x, dialog_width, dialog_height
         
-    def draw_text_input(self, stdscr, safe_addstr_func, y, start_x, dialog_width, prompt, is_active=True):
+    def draw_text_input(self, y, start_x, dialog_width, prompt, is_active=True):
         """Draw text input field using the text editor
         
         Args:
-            stdscr: The curses screen object
-            safe_addstr_func: Safe string drawing function
             y: Y position to draw at
             start_x: X position of dialog start
             dialog_width: Width of the dialog
             prompt: Prompt text to display
             is_active: Whether the input is active
         """
-        if y < stdscr.getmaxyx()[0]:
+        height, _ = self.renderer.get_dimensions()
+        if y < height:
             max_input_width = dialog_width - 4  # Leave some margin
             self.text_editor.draw(
-                stdscr, y, start_x + 2, max_input_width,
+                self.renderer, y, start_x + 2, max_input_width,
                 prompt,
                 is_active=is_active
             )
             
-    def draw_separator(self, stdscr, safe_addstr_func, y, start_x, dialog_width):
+    def draw_separator(self, y, start_x, dialog_width):
         """Draw a horizontal separator line
         
         Args:
-            stdscr: The curses screen object
-            safe_addstr_func: Safe string drawing function
             y: Y position to draw at
             start_x: X position of dialog start
             dialog_width: Width of the dialog
         """
-        if y < stdscr.getmaxyx()[0]:
-            border_color = get_status_color() | curses.A_BOLD
+        height, _ = self.renderer.get_dimensions()
+        if y < height:
+            border_color_pair, _ = get_status_color()
+            border_attributes = TextAttribute.BOLD
             sep_line = "├" + "─" * (dialog_width - 2) + "┤"
-            safe_addstr_func(y, start_x, sep_line[:dialog_width], border_color)
+            self.renderer.draw_text(y, start_x, sep_line[:dialog_width], color_pair=border_color_pair, attributes=border_attributes)
             
-    def draw_list_items(self, stdscr, safe_addstr_func, items_list, start_y, end_y, start_x, content_width, format_item_func=None):
+    def draw_list_items(self, items_list, start_y, end_y, start_x, content_width, format_item_func=None):
         """Draw list items with selection highlighting
         
         Args:
-            stdscr: The curses screen object
-            safe_addstr_func: Safe string drawing function
             items_list: List of items to display
             start_y: Starting Y position for list
             end_y: Ending Y position for list
@@ -286,7 +286,7 @@ class BaseListDialog:
             content_width: Width available for content
             format_item_func: Optional function to format items (item) -> str
         """
-        height = stdscr.getmaxyx()[0]
+        height, _ = self.renderer.get_dimensions()
         content_height = end_y - start_y + 1
         
         # Update scroll with actual content height
@@ -318,59 +318,41 @@ class BaseListDialog:
                     item_text = truncate_text(item_text, available_width, "...")
                 
                 # Add selection indicator
+                status_color_pair, _ = get_status_color()
                 if is_selected:
                     display_text = f"► {item_text}"
-                    item_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
+                    item_attributes = TextAttribute.BOLD | TextAttribute.REVERSE
                 else:
                     display_text = f"  {item_text}"
-                    item_color = get_status_color()
+                    item_attributes = TextAttribute.NORMAL
                 
                 # Ensure text fits using display width
                 if get_width(display_text) > content_width:
                     display_text = truncate_text(display_text, content_width, "")
-                safe_addstr_func(y, start_x, display_text, item_color)
+                self.renderer.draw_text(y, start_x, display_text, color_pair=status_color_pair, attributes=item_attributes)
                 
-    def draw_scrollbar(self, stdscr, safe_addstr_func, items_list, start_y, content_height, scrollbar_x):
-        """Draw scrollbar if needed
+    def draw_scrollbar(self, items_list, start_y, content_height, scrollbar_x):
+        """Draw scrollbar if needed using unified implementation
         
         Args:
-            stdscr: The curses screen object
-            safe_addstr_func: Safe string drawing function
             items_list: List of items
             start_y: Starting Y position for scrollbar
             content_height: Height of content area
             scrollbar_x: X position for scrollbar
         """
-        height = stdscr.getmaxyx()[0]
-        
-        if len(items_list) > content_height:
-            # Calculate scroll thumb position
-            total_items = len(items_list)
-            if total_items > 0:
-                thumb_pos = int((self.scroll / max(1, total_items - content_height)) * (content_height - 1))
-                thumb_pos = max(0, min(content_height - 1, thumb_pos))
-                
-                border_color = get_status_color() | curses.A_BOLD
-                for i in range(content_height):
-                    y = start_y + i
-                    if y < height:
-                        if i == thumb_pos:
-                            safe_addstr_func(y, scrollbar_x, "█", border_color)
-                        else:
-                            safe_addstr_func(y, scrollbar_x, "░", get_status_color() | curses.A_DIM)
+        draw_scrollbar(self.renderer, start_y, scrollbar_x, content_height, 
+                      len(items_list), self.scroll)
                             
-    def draw_help_text(self, stdscr, safe_addstr_func, help_text, y, start_x, dialog_width):
+    def draw_help_text(self, help_text, y, start_x, dialog_width):
         """Draw help text at the bottom of the dialog
         
         Args:
-            stdscr: The curses screen object
-            safe_addstr_func: Safe string drawing function
             help_text: Help text to display
             y: Y position to draw at
             start_x: X position of dialog start
             dialog_width: Width of the dialog
         """
-        height = stdscr.getmaxyx()[0]
+        height, _ = self.renderer.get_dimensions()
         
         if y < height:
             # Get safe wide character functions
@@ -381,14 +363,18 @@ class BaseListDialog:
             content_width = dialog_width - 4
             help_width = get_width(help_text)
             
+            status_color_pair, _ = get_status_color()
+            # Note: TTK doesn't have A_DIM, using NORMAL instead
+            help_attributes = TextAttribute.NORMAL
+            
             if help_width <= content_width:
                 help_x = start_x + (dialog_width - help_width) // 2
                 if help_x >= start_x:
-                    safe_addstr_func(y, help_x, help_text, get_status_color() | curses.A_DIM)
+                    self.renderer.draw_text(y, help_x, help_text, color_pair=status_color_pair, attributes=help_attributes)
             else:
                 # Truncate help text if too wide
                 truncated_help = truncate_text(help_text, content_width, "...")
                 help_width = get_width(truncated_help)
                 help_x = start_x + (dialog_width - help_width) // 2
                 if help_x >= start_x:
-                    safe_addstr_func(y, help_x, truncated_help, get_status_color() | curses.A_DIM)
+                    self.renderer.draw_text(y, help_x, truncated_help, color_pair=status_color_pair, attributes=help_attributes)

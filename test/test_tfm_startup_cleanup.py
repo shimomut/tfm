@@ -12,7 +12,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import Mock, patch
-import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))

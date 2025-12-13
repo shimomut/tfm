@@ -9,10 +9,11 @@ various overlay dialog types including:
 - Future: Multi-line dialogs, choice dialogs, etc.
 """
 
-import curses
+from ttk import TextAttribute, KeyCode
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, get_safe_functions
+from tfm_input_compat import ensure_input_event
 
 
 class DialogType:
@@ -26,14 +27,16 @@ class DialogType:
 class GeneralPurposeDialog:
     """A flexible dialog system for various TFM dialog needs"""
     
-    def __init__(self, config=None):
+    def __init__(self, config=None, renderer=None):
         """
         Initialize the dialog system
         
         Args:
             config: TFM configuration object
+            renderer: TTK Renderer instance
         """
         self.config = config
+        self.renderer = renderer
         self.is_active = False
         self.dialog_type = None
         self.content_changed = True  # Track if content needs redraw
@@ -87,28 +90,31 @@ class GeneralPurposeDialog:
         """Set the text in the input field"""
         self.text_editor.set_text(text)
     
-    def handle_key(self, key):
+    def handle_input(self, event):
         """
-        Handle key input for the dialog
+        Handle input for the dialog
         
         Args:
-            key (int): The key code from curses
+            event: InputEvent from TTK (or integer key code for backward compatibility)
             
         Returns:
-            bool: True if the key was handled, False otherwise
+            bool: True if the event was handled, False otherwise
         """
-        if not self.is_active:
+        # Backward compatibility: convert integer key codes to InputEvent
+        event = ensure_input_event(event)
+        
+        if not self.is_active or not event:
             return False
         
         if self.dialog_type == DialogType.STATUS_LINE_INPUT:
-            return self._handle_status_line_input_key(key)
+            return self._handle_status_line_input(event)
         
         return False
     
-    def _handle_status_line_input_key(self, key):
-        """Handle key input for status line input dialog"""
+    def _handle_status_line_input(self, event):
+        """Handle input for status line input dialog"""
         # Handle ESC - cancel
-        if key == 27:  # ESC
+        if event.key_code == KeyCode.ESCAPE:
             # Store callback before hiding
             cancel_callback = self.cancel_callback
             self.hide()
@@ -118,7 +124,7 @@ class GeneralPurposeDialog:
             return True
         
         # Handle Enter - confirm
-        elif key == curses.KEY_ENTER or key == 10 or key == 13:
+        elif event.key_code == KeyCode.ENTER:
             # Store callback and text before hiding
             callback = self.callback
             text = self.text_editor.get_text()
@@ -130,45 +136,51 @@ class GeneralPurposeDialog:
         
         # Handle text editing
         else:
-            # Check if text editor handled the key (content changed)
-            handled = self.text_editor.handle_key(key)
-            if handled:
-                self.content_changed = True  # Mark content as changed
-            return handled
+            # Convert InputEvent to key code for SingleLineTextEdit (which hasn't been migrated yet)
+            # This is a temporary workaround until task 26 migrates SingleLineTextEdit
+            from tfm_input_utils import input_event_to_curses_key
+            key = input_event_to_curses_key(event)
+            if key is not None:
+                handled = self.text_editor.handle_key(key)
+                if handled:
+                    self.content_changed = True  # Mark content as changed
+                return handled
+            return False
     
     def needs_redraw(self):
         """Check if this dialog needs to be redrawn"""
         return self.content_changed
     
-    def draw(self, stdscr, safe_addstr_func):
+    def draw(self):
         """
-        Draw the dialog
-        
-        Args:
-            stdscr: The curses screen object
-            safe_addstr_func: Function to safely add strings to screen
+        Draw the dialog using TTK renderer
         """
-        if not self.is_active:
+        if not self.is_active or not self.renderer:
             return
         
         if self.dialog_type == DialogType.STATUS_LINE_INPUT:
-            self._draw_status_line_input(stdscr, safe_addstr_func)
+            self._draw_status_line_input()
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False
     
-    def _draw_status_line_input(self, stdscr, safe_addstr_func):
+    def _draw_status_line_input(self):
         """Draw status line input dialog with wide character support"""
-        height, width = stdscr.getmaxyx()
+        height, width = self.renderer.get_dimensions()
         status_y = height - 1
         
         # Get safe wide character functions
         safe_funcs = get_safe_functions()
         get_width = safe_funcs['get_display_width']
         
+        # Get status color and attributes
+        status_color, status_attrs = get_status_color()
+        
         # Fill entire status line with background color
         status_line = " " * (width - 1)
-        safe_addstr_func(status_y, 0, status_line, get_status_color())
+        self.renderer.draw_text(status_y, 0, status_line, 
+                               color_pair=status_color, 
+                               attributes=status_attrs)
         
         # Calculate help text space and position first using display width
         help_text_width = get_width(self.help_text) if self.help_text else 0
@@ -193,12 +205,15 @@ class GeneralPurposeDialog:
             max_field_width = min_field_width
             show_help = False  # Disable help if no space
         
-        # Draw input field using SingleLineTextEdit
-        self.text_editor.draw(
-            stdscr, status_y, 2, max_field_width,
-            self.prompt_text,
-            is_active=True
-        )
+        # Get stdscr from renderer for SingleLineTextEdit (which hasn't been migrated yet)
+        stdscr = getattr(self.renderer, 'stdscr', None)
+        if stdscr:
+            # Draw input field using SingleLineTextEdit
+            self.text_editor.draw(
+                stdscr, status_y, 2, max_field_width,
+                self.prompt_text,
+                is_active=True
+            )
         
         # Show help text on the right if we determined it should be shown
         if show_help and self.help_text:
@@ -208,7 +223,9 @@ class GeneralPurposeDialog:
             input_text_width = get_width(self.text_editor.text)
             input_end_x = 2 + min(max_field_width, prompt_width + input_text_width + 1)
             if help_x > input_end_x + 2:  # At least 2 chars gap
-                safe_addstr_func(status_y, help_x, self.help_text, get_status_color() | curses.A_DIM)
+                self.renderer.draw_text(status_y, help_x, self.help_text, 
+                                       color_pair=status_color, 
+                                       attributes=TextAttribute.NORMAL)
 
 
 # Helper functions for common dialog patterns

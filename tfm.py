@@ -8,6 +8,7 @@ A terminal-based file manager using curses with dual-pane interface.
 import sys
 import os
 import argparse
+import traceback
 from pathlib import Path
 
 # Setup module path for both development and installed package environments
@@ -46,6 +47,19 @@ def create_parser():
     )
     
     parser.add_argument(
+        '--backend',
+        type=str,
+        choices=['curses', 'coregraphics'],
+        help='Rendering backend to use (default: curses)'
+    )
+    
+    parser.add_argument(
+        '--desktop',
+        action='store_true',
+        help='Run as desktop application (shorthand for --backend coregraphics)'
+    )
+    
+    parser.add_argument(
         '--remote-log-port',
         type=int,
         metavar='PORT',
@@ -77,6 +91,12 @@ def create_parser():
              'tfm-init (test exact TFM initialization sequence), diagnose (diagnose color issues)'
     )
     
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Enable debug mode (print full stack traces for uncaught exceptions)'
+    )
+    
     return parser
 
 def main():
@@ -86,6 +106,10 @@ def main():
     try:
         # Parse arguments
         args = parser.parse_args()
+        
+        # Store debug mode in environment for access by other modules
+        if args.debug:
+            os.environ['TFM_DEBUG'] = '1'
         
         # Handle color testing mode
         if args.color_test:
@@ -100,15 +124,35 @@ def main():
         # Set ESC delay to 100ms BEFORE any curses-related imports for responsive ESC key
         os.environ.setdefault('ESCDELAY', '100')
         
-        # Import and run the main application
-        from tfm_main import main as tfm_main
-        import curses
+        # Select backend based on arguments and configuration
+        from tfm_backend_selector import select_backend
+        backend_name, backend_options = select_backend(args)
         
-        # Pass arguments to main function
-        curses.wrapper(tfm_main, 
-                      remote_log_port=args.remote_log_port,
-                      left_dir=args.left,
-                      right_dir=args.right)
+        # Create TTK renderer directly based on selected backend
+        if backend_name == 'curses':
+            from ttk.backends.curses_backend import CursesBackend
+            renderer = CursesBackend()
+        elif backend_name == 'coregraphics':
+            from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+            renderer = CoreGraphicsBackend(**backend_options)
+        else:
+            raise ValueError(f"Unknown backend: {backend_name}")
+        
+        try:
+            # Initialize the renderer
+            renderer.initialize()
+            
+            # Import and run the main application
+            from tfm_main import main as tfm_main
+            
+            # Pass renderer to tfm_main instead of using curses.wrapper
+            tfm_main(renderer,
+                    remote_log_port=args.remote_log_port,
+                    left_dir=args.left,
+                    right_dir=args.right)
+        finally:
+            # Ensure renderer is properly shut down
+            renderer.shutdown()
         
     except ImportError as e:
         print(f"Error importing TFM modules: {e}", file=sys.stderr)
@@ -118,7 +162,16 @@ def main():
         print("\nTFM interrupted by user", file=sys.stderr)
         sys.exit(130)  # Standard exit code for SIGINT
     except Exception as e:
-        print(f"Error running TFM: {e}", file=sys.stderr)
+        # In debug mode, print full stack trace
+        if os.environ.get('TFM_DEBUG') == '1':
+            print("\n" + "="*60, file=sys.stderr)
+            print("UNCAUGHT EXCEPTION (Debug Mode)", file=sys.stderr)
+            print("="*60, file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            print("="*60, file=sys.stderr)
+        else:
+            print(f"Error running TFM: {e}", file=sys.stderr)
+            print("Run with --debug flag for full stack trace", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ Test script for the help dialog functionality
 """
 
 import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 import sys
 
 

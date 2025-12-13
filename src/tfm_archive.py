@@ -2894,7 +2894,7 @@ class ArchiveUI:
         # Force a screen refresh to show progress
         try:
             self.file_manager.draw_status()
-            self.file_manager.stdscr.refresh()
+            self.file_manager.renderer.refresh()
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     

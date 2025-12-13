@@ -147,8 +147,8 @@ def test_user_interaction_during_search():
         time.sleep(0.03)
         
         # User navigates (simulate down arrow)
-        import curses
-        search_dialog.handle_input(curses.KEY_DOWN)
+        from ttk.input_event import InputEvent, KeyCode, ModifierKey
+        search_dialog.handle_input(InputEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE))
         events.append('USER: Navigated down')
         
         time.sleep(0.03)

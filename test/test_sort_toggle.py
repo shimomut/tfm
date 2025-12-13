@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from pathlib import Path
 from tfm_main import FileManager
 import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 
 def test_sort_toggle():
     """Test the sort toggle functionality without curses"""

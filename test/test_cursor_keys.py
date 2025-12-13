@@ -9,6 +9,7 @@ import unittest.mock
 # Mock curses before importing anything else
 sys.modules['curses'] = unittest.mock.MagicMock()
 import curses
+from ttk.input_event import InputEvent, KeyCode, ModifierKey
 
 sys.path.insert(0, 'src')
 
@@ -39,10 +40,10 @@ def test_cursor_key_handling():
         
         # Test that editors can handle cursor keys
         test_keys = [
-            ('curses.KEY_LEFT', curses.KEY_LEFT),
-            ('curses.KEY_RIGHT', curses.KEY_RIGHT),
-            ('curses.KEY_HOME', curses.KEY_HOME),
-            ('curses.KEY_END', curses.KEY_END),
+            ('KeyCode.LEFT', KeyCode.LEFT),
+            ('KeyCode.RIGHT', KeyCode.RIGHT),
+            ('KeyCode.HOME', KeyCode.HOME),
+            ('KeyCode.END', KeyCode.END),
         ]
         
         print("✓ Testing list_dialog text_editor cursor key handling:")

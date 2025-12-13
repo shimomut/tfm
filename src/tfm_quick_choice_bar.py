@@ -4,16 +4,16 @@ TUI File Manager - Quick Choice Bar Component
 Provides quick choice dialog functionality displayed in the status bar
 """
 
-import curses
-from tfm_const import KEY_ENTER_1, KEY_ENTER_2
+from ttk import KeyCode, TextAttribute
 from tfm_colors import get_status_color
 
 
 class QuickChoiceBar:
     """Quick choice bar component for displaying choice dialogs in the status bar"""
     
-    def __init__(self, config):
+    def __init__(self, config, renderer=None):
         self.config = config
+        self.renderer = renderer
         
         # Quick choice bar state
         self.is_active = False
@@ -47,26 +47,30 @@ class QuickChoiceBar:
         self.callback = None
         self.selected = 0
         
-    def handle_input(self, key):
-        """Handle input while in quick choice mode"""
-        if key == 27:  # ESC - cancel
+    def handle_input(self, event):
+        """Handle input while in quick choice mode
+        
+        Args:
+            event: InputEvent from TTK renderer
+        """
+        if event.key_code == KeyCode.ESCAPE:
             return ('cancel', None)
             
-        elif key == curses.KEY_LEFT:
+        elif event.key_code == KeyCode.LEFT:
             # Move selection left
             if self.choices:
                 self.selected = (self.selected - 1) % len(self.choices)
                 return ('selection_changed', None)
             return True
             
-        elif key == curses.KEY_RIGHT:
+        elif event.key_code == KeyCode.RIGHT:
             # Move selection right
             if self.choices:
                 self.selected = (self.selected + 1) % len(self.choices)
                 return ('selection_changed', None)
             return True
             
-        elif key == curses.KEY_ENTER or key == KEY_ENTER_1 or key == KEY_ENTER_2:
+        elif event.key_code == KeyCode.ENTER:
             # Execute selected action
             if self.choices and 0 <= self.selected < len(self.choices):
                 selected_choice = self.choices[self.selected]
@@ -74,9 +78,9 @@ class QuickChoiceBar:
             return ('execute', None)
             
         else:
-            # Check for quick key matches
-            key_char = chr(key).lower() if 32 <= key <= 126 else None
-            if key_char:
+            # Check for quick key matches with character input
+            if event.char:
+                key_char = event.char.lower()
                 for choice in self.choices:
                     if "key" in choice and choice["key"] and choice["key"].lower() == key_char:
                         # Found matching quick key
@@ -84,22 +88,26 @@ class QuickChoiceBar:
         
         return False
         
-    def draw(self, stdscr, safe_addstr_func, status_y, width):
+    def draw(self, status_y, width):
         """Draw the quick choice bar in the status line
         
         Args:
-            stdscr: The curses screen object
-            safe_addstr_func: Function to safely add strings to screen
             status_y: Y coordinate of the status line
             width: Screen width
         """
+        if not self.renderer:
+            return
+        
+        # Get status color
+        status_color_pair, status_attributes = get_status_color()
+        
         # Fill entire status line with background color
         status_line = " " * (width - 1)
-        safe_addstr_func(status_y, 0, status_line, get_status_color())
+        self.renderer.draw_text(status_y, 0, status_line, status_color_pair, status_attributes)
         
         # Show dialog message
         message = f"{self.message} "
-        safe_addstr_func(status_y, 2, message, get_status_color())
+        self.renderer.draw_text(status_y, 2, message, status_color_pair, status_attributes)
         
         button_start_x = len(message) + 4
         
@@ -107,14 +115,15 @@ class QuickChoiceBar:
             choice_text = choice["text"]
             if i == self.selected:
                 # Highlight selected option with bold and standout
-                button_color = get_status_color() | curses.A_BOLD | curses.A_STANDOUT
                 button_text = f"[{choice_text}]"
+                self.renderer.draw_text(status_y, button_start_x, button_text, 
+                                      status_color_pair, 
+                                      TextAttribute.BOLD | TextAttribute.REVERSE)
             else:
-                button_color = get_status_color()
                 button_text = f" {choice_text} "
+                self.renderer.draw_text(status_y, button_start_x, button_text, status_color_pair, status_attributes)
             
             if button_start_x + len(button_text) < width - 2:
-                safe_addstr_func(status_y, button_start_x, button_text, button_color)
                 button_start_x += len(button_text) + 1
         
         # Generate help text based on available quick keys
@@ -132,7 +141,8 @@ class QuickChoiceBar:
         if button_start_x + len(help_text) + 6 < width:
             help_x = width - len(help_text) - 3
             if help_x > button_start_x + 4:  # Ensure no overlap
-                safe_addstr_func(status_y, help_x, help_text, get_status_color() | curses.A_DIM)
+                self.renderer.draw_text(status_y, help_x, help_text, 
+                                      status_color_pair, status_attributes)
 
 
 class QuickChoiceBarHelpers:

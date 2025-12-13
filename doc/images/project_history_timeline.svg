@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1400" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .timeline-line { stroke: #4a90e2; stroke-width: 6; fill: none; }
+      .phase-box { fill: #f0f4f8; stroke: #4a90e2; stroke-width: 3; }
+      .phase-title { font-family: Arial, sans-serif; font-size: 22px; font-weight: bold; fill: #2c3e50; }
+      .phase-time { font-family: Arial, sans-serif; font-size: 18px; fill: #7f8c8d; }
+      .phase-features { font-family: Arial, sans-serif; font-size: 16px; fill: #34495e; }
+      .milestone { fill: #e74c3c; stroke: #c0392b; stroke-width: 3; }
+      .milestone-text { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; fill: #e74c3c; }
+      .title { font-family: Arial, sans-serif; font-size: 32px; font-weight: bold; fill: #2c3e50; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 18px; fill: #7f8c8d; }
+      .phase1 { fill: #e8f5e9; stroke: #4caf50; }
+      .phase2 { fill: #fff3e0; stroke: #ff9800; }
+      .phase3 { fill: #e3f2fd; stroke: #2196f3; }
+      .phase4 { fill: #f3e5f5; stroke: #9c27b0; }
+      .arrow { fill: none; stroke: #4a90e2; stroke-width: 3; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#4a90e2" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="700" y="50" text-anchor="middle" class="title">TFM Project Evolution</text>
+  <text x="700" y="80" text-anchor="middle" class="subtitle">September - December 2025</text>
+  
+  <!-- Timeline axis -->
+  <line x1="100" y1="400" x2="1300" y2="400" class="timeline-line"/>
+  
+  <!-- Phase 1: First 24 Hours -->
+  <rect x="100" y="120" width="280" height="160" class="phase-box phase1" rx="10"/>
+  <text x="240" y="155" text-anchor="middle" class="phase-title">Core Foundation</text>
+  <text x="240" y="185" text-anchor="middle" class="phase-time">First 24 Hours</text>
+  <text x="120" y="220" class="phase-features">• Complete file manager</text>
+  <text x="120" y="245" class="phase-features">• Text editor/viewer</text>
+  <text x="120" y="270" class="phase-features">• Version 0.90</text>
+  <circle cx="240" cy="400" r="10" class="milestone"/>
+  <line x1="240" y1="280" x2="240" y2="390" class="arrow"/>
+  
+  <!-- Phase 2: Weeks 2-4 -->
+  <rect x="420" y="120" width="280" height="160" class="phase-box phase2" rx="10"/>
+  <text x="560" y="155" text-anchor="middle" class="phase-title">Enhancement</text>
+  <text x="560" y="185" text-anchor="middle" class="phase-time">Weeks 2-4</text>
+  <text x="440" y="220" class="phase-features">• S3 integration</text>
+  <text x="440" y="245" class="phase-features">• Archive browsing</text>
+  <text x="440" y="270" class="phase-features">• Threading</text>
+  <circle cx="560" cy="400" r="10" class="milestone"/>
+  <line x1="560" y1="280" x2="560" y2="390" class="arrow"/>
+  
+  <!-- Phase 3: Month 2 -->
+  <rect x="740" y="120" width="280" height="160" class="phase-box phase3" rx="10"/>
+  <text x="880" y="155" text-anchor="middle" class="phase-title">Internationalization</text>
+  <text x="880" y="185" text-anchor="middle" class="phase-time">Month 2</text>
+  <text x="760" y="220" class="phase-features">• Wide character support</text>
+  <text x="760" y="245" class="phase-features">• CJK languages</text>
+  <text x="760" y="270" class="phase-features">• Stability</text>
+  <circle cx="880" cy="400" r="10" class="milestone"/>
+  <line x1="880" y1="280" x2="880" y2="390" class="arrow"/>
+  
+  <!-- Phase 4: Month 3 -->
+  <rect x="1060" y="120" width="280" height="160" class="phase-box phase4" rx="10"/>
+  <text x="1200" y="155" text-anchor="middle" class="phase-title">TTK Revolution</text>
+  <text x="1200" y="185" text-anchor="middle" class="phase-time">Month 3</text>
+  <text x="1080" y="220" class="phase-features">• Backend abstraction</text>
+  <text x="1080" y="245" class="phase-features">• Cross-platform</text>
+  <text x="1080" y="270" class="phase-features">• Version 0.98</text>
+  <circle cx="1200" cy="400" r="10" class="milestone"/>
+  <line x1="1200" y1="280" x2="1200" y2="390" class="arrow"/>
+  
+  <!-- Key Milestones on timeline -->
+  <circle cx="180" cy="400" r="8" fill="#27ae60"/>
+  <text x="180" y="440" text-anchor="middle" class="milestone-text">3 hrs</text>
+  
+  <circle cx="300" cy="400" r="8" fill="#27ae60"/>
+  <text x="300" y="440" text-anchor="middle" class="milestone-text">12 hrs</text>
+  
+  <circle cx="500" cy="400" r="8" fill="#f39c12"/>
+  <text x="500" y="440" text-anchor="middle" class="milestone-text">Week 2</text>
+  
+  <circle cx="620" cy="400" r="8" fill="#f39c12"/>
+  <text x="620" y="440" text-anchor="middle" class="milestone-text">Week 4</text>
+  
+  <circle cx="1020" cy="400" r="8" fill="#9b59b6"/>
+  <text x="1020" y="440" text-anchor="middle" class="milestone-text">Dec 10</text>
+  
+  <!-- Architecture Evolution -->
+  <text x="100" y="520" class="phase-title">Architecture Evolution</text>
+  
+  <!-- Storage Layer -->
+  <rect x="100" y="550" width="360" height="120" class="phase-box" rx="8"/>
+  <text x="120" y="580" class="phase-title" font-size="20">Storage</text>
+  <text x="130" y="610" class="phase-features">Local → Archives → S3</text>
+  <text x="130" y="640" class="phase-features">Virtual directories</text>
+  
+  <!-- UI Architecture -->
+  <rect x="520" y="550" width="360" height="120" class="phase-box" rx="8"/>
+  <text x="540" y="580" class="phase-title" font-size="20">UI Framework</text>
+  <text x="550" y="610" class="phase-features">Curses → TTK abstraction</text>
+  <text x="550" y="640" class="phase-features">Multi-backend support</text>
+  
+  <!-- Statistics -->
+  <rect x="940" y="550" width="360" height="120" class="phase-box" rx="8"/>
+  <text x="960" y="580" class="phase-title" font-size="20">Project Stats</text>
+  <text x="970" y="610" class="phase-features">402+ commits in 3 months</text>
+  <text x="970" y="640" class="phase-features">2 major versions released</text>
+  
+  <!-- Footer -->
+  <text x="700" y="740" text-anchor="middle" class="subtitle" font-size="20">Terminal App → Cross-Platform Framework</text>
+</svg>

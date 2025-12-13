@@ -12,6 +12,7 @@ from datetime import datetime
 from collections import deque
 from tfm_const import LOG_TIME_FORMAT, MAX_LOG_MESSAGES
 from tfm_colors import get_log_color, get_status_color
+from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 
 
 class LogCapture:
@@ -349,7 +350,7 @@ class LogManager:
             return True
         return False
     
-    def draw_log_pane(self, stdscr, y_start, height, width):
+    def draw_log_pane(self, renderer, y_start, height, width):
         """Draw the log pane at the specified position"""
         if height <= 0:
             return
@@ -359,7 +360,7 @@ class LogManager:
             display_height = height  # Use full height for messages
             
             # Reserve space for scrollbar if we have messages
-            scrollbar_width = 1 if len(self.log_messages) > display_height else 0
+            scrollbar_width = calculate_scrollbar_width(len(self.log_messages), display_height)
             content_width = width - scrollbar_width
             
             if self.log_messages and display_height > 0:
@@ -391,12 +392,14 @@ class LogManager:
                         log_line = log_line[:content_width - 4] + "..."
                     
                     # Get color based on source
-                    color = get_log_color(source)
-                    stdscr.addstr(y, 0, log_line.ljust(content_width)[:content_width], color)
+                    color_pair, attributes = get_log_color(source)
+                    renderer.draw_text(y, 0, log_line.ljust(content_width)[:content_width], color_pair=color_pair, attributes=attributes)
                 
-                # Draw scrollbar if needed
+                # Draw scrollbar if needed using unified implementation
+                # Use inverted=True because scroll_offset=0 means bottom (newest messages)
                 if scrollbar_width > 0:
-                    self._draw_scrollbar(stdscr, y_start, height, width, total_messages, display_height)
+                    draw_scrollbar(renderer, y_start, width - 1, height, 
+                                 total_messages, self.log_scroll_offset, inverted=True)
             
         except Exception:
             pass  # Ignore drawing errors
@@ -405,48 +408,7 @@ class LogManager:
             # This ensures updates are marked as processed even if drawing fails
             self.mark_log_updates_processed()
     
-    def _draw_scrollbar(self, stdscr, y_start, height, width, total_messages, display_height):
-        """Draw a scrollbar for the log pane"""
-        try:
-            from tfm_colors import get_boundary_color, get_status_color
-            
-            scrollbar_x = width - 1
-            
-            # Calculate scrollbar position and size
-            if total_messages <= display_height:
-                # No scrolling needed, fill entire scrollbar
-                for y in range(height):
-                    stdscr.addstr(y_start + y, scrollbar_x, "█", get_status_color())
-            else:
-                # Calculate thumb position and size
-                # Thumb size represents the visible portion
-                thumb_size = max(1, int((display_height / total_messages) * height))
-                
-                # Calculate thumb position based on scroll offset
-                # When scroll_offset is 0, we're at the bottom (newest messages)
-                # When scroll_offset is max, we're at the top (oldest messages)
-                max_scroll = total_messages - display_height
-                if max_scroll > 0:
-                    # Invert the scroll position since 0 means bottom in our system
-                    scroll_ratio = self.log_scroll_offset / max_scroll
-                    thumb_start = int((height - thumb_size) * (1 - scroll_ratio))
-                else:
-                    thumb_start = height - thumb_size
-                
-                thumb_end = min(height, thumb_start + thumb_size)
-                
-                # Draw scrollbar track and thumb
-                for y in range(height):
-                    y_pos = y_start + y
-                    if thumb_start <= y < thumb_end:
-                        # Draw thumb
-                        stdscr.addstr(y_pos, scrollbar_x, "█", get_status_color())
-                    else:
-                        # Draw track
-                        stdscr.addstr(y_pos, scrollbar_x, "│", get_boundary_color())
-                        
-        except Exception:
-            pass  # Ignore drawing errors
+
     
     def stop_remote_server(self):
         """Stop the remote server and close all connections"""
