@@ -49,4 +49,5 @@ temp/
 # Test artifacts (but keep test fixtures)
 test/demo_*_test_*/
 # Note: test/test_edit.txt and test/test_syntax.json are test fixtures and should be tracked
-.coverage
+
+/profiling_output

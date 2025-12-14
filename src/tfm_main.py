@@ -50,11 +50,20 @@ from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
 from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_cache_manager import CacheManager
+from tfm_profiling import ProfilingManager
 
 class FileManager:
-    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None):
+    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_enabled=False):
         self.renderer = renderer
         self.stdscr = renderer  # Keep stdscr as alias for compatibility during migration
+        
+        # Initialize profiling manager if enabled
+        # This must be done early to ensure zero overhead when disabled
+        self.profiling_manager = ProfilingManager(enabled=profiling_enabled) if profiling_enabled else None
+        
+        # Display profiling mode message if enabled
+        if self.profiling_manager:
+            print("Profiling mode enabled - performance data will be collected")
         
         # Load configuration
         self.config = get_config()
@@ -3129,6 +3138,10 @@ class FileManager:
     def run(self):
         """Main application loop"""
         while True:
+            # Start frame timing for FPS tracking
+            if self.profiling_manager:
+                self.profiling_manager.start_frame()
+            
             # Check if we should quit
             if self.should_quit:
                 break
@@ -3161,11 +3174,23 @@ class FileManager:
                         print("Cancelling operation...")
                     # Ignore all other keys during operation
                 else:
-                    # Handle normal key input
-                    self.handle_key_input(event)
+                    # Handle normal key input with profiling if enabled
+                    if self.profiling_manager:
+                        self.profiling_manager.profile_key_handling(self.handle_key_input, event)
+                    else:
+                        self.handle_key_input(event)
             
-            # Draw interface after handling input
-            self.draw_interface()
+            # Draw interface after handling input with profiling if enabled
+            if self.profiling_manager:
+                self.profiling_manager.profile_rendering(self.draw_interface)
+            else:
+                self.draw_interface()
+            
+            # End frame timing and print FPS if needed
+            if self.profiling_manager:
+                self.profiling_manager.end_frame()
+                if self.profiling_manager.should_print_fps():
+                    self.profiling_manager.print_fps()
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
@@ -3344,11 +3369,11 @@ class FileManager:
             print(f"Warning: Could not load search history: {e}")
             return []
 
-def main(renderer, remote_log_port=None, left_dir=None, right_dir=None):
+def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_enabled=False):
     """Main function to run the file manager"""
     fm = None
     try:
-        fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir)
+        fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, profiling_enabled=profiling_enabled)
         fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C

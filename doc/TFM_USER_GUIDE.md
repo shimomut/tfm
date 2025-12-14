@@ -552,6 +552,40 @@ TFM shows animated progress indicators during long-running operations like searc
 
 **See detailed documentation**: [Log Redraw Trigger Feature](LOG_REDRAW_TRIGGER_FEATURE.md)
 
+### Performance Profiling
+Enable performance profiling to investigate rendering and input handling performance:
+
+```bash
+# Enable profiling mode
+python3 tfm.py --profile
+```
+
+When profiling is enabled:
+- **FPS measurements** are printed every 5 seconds
+- **Profile files** are generated for key events and rendering
+- **Profile data** is saved to `profiling_output/` directory
+
+#### Analyzing Profile Files
+
+Use Python's pstats module:
+```bash
+python3 -m pstats profiling_output/key_profile_*.prof
+```
+
+Or use snakeviz for visual analysis:
+```bash
+pip install snakeviz
+snakeviz profiling_output/render_profile_*.prof
+```
+
+#### Use Cases
+- Investigating slow rendering or key response
+- Comparing terminal vs desktop mode performance
+- Testing performance optimizations
+- Benchmarking on different systems
+
+**See detailed documentation**: [Performance Profiling Feature](PERFORMANCE_PROFILING_FEATURE.md)
+
 ---
 
 ## Customization
@@ -626,6 +660,7 @@ python3 tfm.py --desktop               # Shorthand for desktop mode
 ```bash
 --remote-log-port 8888            # Enable remote monitoring
 --color-test info                 # Test color support
+--profile                         # Enable performance profiling
 --version                         # Show version
 --help                           # Show help
 ```
@@ -637,6 +672,9 @@ python3 tfm.py --desktop --left ~/projects --right ~/docs
 
 # Terminal mode with remote logging
 python3 tfm.py --backend curses --remote-log-port 8888
+
+# Desktop mode with profiling
+python3 tfm.py --desktop --profile
 ```
 
 **See detailed documentation**: [Command Line Directory Arguments Feature](COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md)
@@ -685,6 +723,7 @@ Check file permissions and disk space
 - Check feature documentation below
 - Use `--help` command line option
 - Enable remote logging for debugging
+- Use `--profile` for performance profiling
 
 **See detailed documentation**: [Help Dialog Feature](HELP_DIALOG_FEATURE.md)
 
@@ -715,6 +754,10 @@ For detailed information about specific features, see these dedicated guides:
 - [Log Redraw Trigger Feature](LOG_REDRAW_TRIGGER_FEATURE.md) - Real-time log updates
 - [Status Bar Feature](STATUS_BAR_FEATURE.md) - Status information display
 - [Wide Character Support Feature](WIDE_CHARACTER_SUPPORT_FEATURE.md) - International character display
+
+### Performance and Debugging
+- [Performance Profiling Feature](PERFORMANCE_PROFILING_FEATURE.md) - Performance analysis and optimization
+- [Performance Testing Guide](PERFORMANCE_TESTING_GUIDE.md) - Comprehensive performance testing
 
 ### Integration and Extensions
 - [Beyond Compare Integration](BEYONDCOMPARE_INTEGRATION.md) - File comparison tool integration

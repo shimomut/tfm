@@ -104,6 +104,35 @@ class TestCommandLineArguments(unittest.TestCase):
         
         # The actual override behavior is tested in the integration test
         # This test just ensures the arguments are available for that logic
+    
+    def test_profile_flag_default(self):
+        """Test that --profile flag defaults to False"""
+        args = self.parser.parse_args([])
+        self.assertFalse(args.profile)
+    
+    def test_profile_flag_enabled(self):
+        """Test that --profile flag can be enabled"""
+        args = self.parser.parse_args(['--profile'])
+        self.assertTrue(args.profile)
+    
+    def test_profile_flag_with_other_options(self):
+        """Test that --profile flag works with other options"""
+        args = self.parser.parse_args([
+            '--profile',
+            '--left', self.left_test_dir,
+            '--right', self.right_test_dir,
+            '--remote-log-port', '8888'
+        ])
+        self.assertTrue(args.profile)
+        self.assertEqual(args.left, self.left_test_dir)
+        self.assertEqual(args.right, self.right_test_dir)
+        self.assertEqual(args.remote_log_port, 8888)
+    
+    def test_help_includes_profile_option(self):
+        """Test that help text includes the --profile option"""
+        help_text = self.parser.format_help()
+        self.assertIn('--profile', help_text)
+        self.assertIn('profiling', help_text.lower())
 
 if __name__ == '__main__':
     unittest.main()

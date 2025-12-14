@@ -97,6 +97,12 @@ def create_parser():
         help='Enable debug mode (print full stack traces for uncaught exceptions)'
     )
     
+    parser.add_argument(
+        '--profile',
+        action='store_true',
+        help='Enable performance profiling mode (collects FPS data and generates profiling files)'
+    )
+    
     return parser
 
 def main():
@@ -149,7 +155,8 @@ def main():
             tfm_main(renderer,
                     remote_log_port=args.remote_log_port,
                     left_dir=args.left,
-                    right_dir=args.right)
+                    right_dir=args.right,
+                    profiling_enabled=args.profile)
         finally:
             # Ensure renderer is properly shut down
             renderer.shutdown()
