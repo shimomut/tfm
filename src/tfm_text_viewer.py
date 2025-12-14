@@ -43,6 +43,7 @@ class TextViewer:
         self.show_line_numbers = True
         self.wrap_lines = False
         self.syntax_highlighting = PYGMENTS_AVAILABLE
+        self.tab_width = 4  # Number of spaces per tab
         
         # Isearch mode state
         self.isearch_mode = False
@@ -53,6 +54,35 @@ class TextViewer:
         # Load file content
         self.load_file()
         
+    def expand_tabs(self, line: str) -> str:
+        """
+        Expand tab characters to spaces, respecting column positions.
+        
+        Args:
+            line: Line of text that may contain tab characters
+            
+        Returns:
+            Line with tabs expanded to spaces
+        """
+        if '\t' not in line:
+            return line
+        
+        result = []
+        col = 0
+        
+        for char in line:
+            if char == '\t':
+                # Calculate spaces needed to reach next tab stop
+                spaces_to_add = self.tab_width - (col % self.tab_width)
+                result.append(' ' * spaces_to_add)
+                col += spaces_to_add
+            else:
+                result.append(char)
+                # Account for wide characters in column calculation
+                col += get_display_width(char)
+        
+        return ''.join(result)
+    
     def load_file(self):
         """Load and process the text file"""
         try:
@@ -89,12 +119,14 @@ class TextViewer:
                     self.highlighted_lines = [[("[Binary file - cannot display as text]", COLOR_REGULAR_FILE)]]
                     return
                 
-            # Split into lines
-            self.lines = content.splitlines()
+            # Split into lines and expand tabs
+            self.lines = [self.expand_tabs(line) for line in content.splitlines()]
             
             # Apply syntax highlighting if enabled
             if self.syntax_highlighting:
-                self.apply_syntax_highlighting(content)
+                # Re-create content with expanded tabs for syntax highlighting
+                expanded_content = '\n'.join(self.lines)
+                self.apply_syntax_highlighting(expanded_content)
             else:
                 # Create plain highlighted lines (no colors)
                 self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
@@ -697,12 +729,14 @@ class TextViewer:
                     # Need to skip some characters from the beginning
                     visible_text = ""
                     skip_width = 0
+                    char_index = 0
                     for char in text:
                         char_width = get_display_width(char)
                         if skip_width + char_width > start_offset_cols:
-                            visible_text = text[text.index(char):]
+                            visible_text = text[char_index:]
                             break
                         skip_width += char_width
+                        char_index += 1
                     if not visible_text:
                         current_display_col += text_display_width
                         continue
