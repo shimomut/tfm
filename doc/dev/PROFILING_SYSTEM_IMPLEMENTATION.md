@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the technical implementation of TFM's performance profiling system. The system provides real-time FPS tracking and detailed profiling data for key event handling and rendering operations using Python's cProfile module.
+This document describes the technical implementation of TFM's performance profiling system. The system provides real-time FPS tracking and automatically captures detailed profiling data when performance issues are detected. It uses intelligent triggering to profile the entire main loop when FPS drops below 30 for more than 1 second, capturing 2 seconds of execution using Python's cProfile module.
 
 ## Architecture
 
@@ -22,14 +22,21 @@ This document describes the technical implementation of TFM's performance profil
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │              Main Loop (run() method)                 │  │
 │  │  ┌─────────────────────────────────────────────────┐ │  │
-│  │  │  1. Get Input (with timeout)                    │ │  │
+│  │  │  1. Start Loop Iteration                        │ │  │
+│  │  │     - Record frame time                         │ │  │
+│  │  │     - Check if profiling should start           │ │  │
 │  │  │     ↓                                            │ │  │
-│  │  │  2. Handle Key Input ← [Profile if enabled]     │ │  │
+│  │  │  2. Get Input (with timeout)                    │ │  │
 │  │  │     ↓                                            │ │  │
-│  │  │  3. Draw Interface ← [Profile if enabled]       │ │  │
+│  │  │  3. Handle Key Input                            │ │  │
 │  │  │     ↓                                            │ │  │
-│  │  │  4. Update FPS Counter ← [If profiling enabled] │ │  │
+│  │  │  4. Draw Interface                              │ │  │
+│  │  │     ↓                                            │ │  │
+│  │  │  5. End Loop Iteration                          │ │  │
+│  │  │     - Check if profiling should stop            │ │  │
+│  │  │     - Print FPS if interval elapsed             │ │  │
 │  │  └─────────────────────────────────────────────────┘ │  │
+│  │  [Entire loop is profiled when FPS < 30 for > 1s]   │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                        │
@@ -38,11 +45,19 @@ This document describes the technical implementation of TFM's performance profil
 │                   Profiling System                           │
 │                   (tfm_profiling.py)                         │
 │  ┌──────────────────┐  ┌──────────────────┐                 │
-│  │  FPS Tracker     │  │  cProfile Wrapper│                 │
-│  │  - Frame times   │  │  - Key profiling │                 │
-│  │  - FPS calc      │  │  - Render profile│                 │
-│  │  - Periodic print│  │  - File output   │                 │
+│  │  FPS Tracker     │  │  Profile Writer  │                 │
+│  │  - Frame times   │  │  - Output dir    │                 │
+│  │  - FPS calc      │  │  - File naming   │                 │
+│  │  - Low FPS detect│  │  - Async write   │                 │
+│  │  - Periodic print│  │  - Error handling│                 │
 │  └──────────────────┘  └──────────────────┘                 │
+│  ┌──────────────────────────────────────────┐               │
+│  │  Profiling Manager                       │               │
+│  │  - Trigger detection (FPS < 30 for > 1s) │               │
+│  │  - cProfile enable/disable               │               │
+│  │  - Duration control (2 seconds)          │               │
+│  │  - Profile file generation               │               │
+│  └──────────────────────────────────────────┘               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,14 +73,22 @@ This document describes the technical implementation of TFM's performance profil
 
 ```python
 class ProfilingManager:
-    def __init__(self, enabled: bool, output_dir: str = "profiling_output"):
-        """Initialize profiling manager with enabled state and output directory"""
+    def __init__(self, enabled: bool, output_dir: str = "profiling_output",
+                 profile_duration: float = 2.0):
+        """Initialize profiling manager with enabled state, output directory, and duration"""
         
-    def start_frame(self) -> None:
-        """Mark the start of a new frame for FPS tracking"""
+    def start_loop_iteration(self) -> None:
+        """Mark the start of a main loop iteration
+        - Records frame time for FPS tracking
+        - Checks if profiling should be triggered (FPS < 30 for > 1s)
+        - Starts profiling if conditions are met
+        """
         
-    def end_frame(self) -> None:
-        """Mark the end of a frame and update FPS"""
+    def end_loop_iteration(self) -> None:
+        """Mark the end of a main loop iteration
+        - Checks if profiling duration has elapsed
+        - Stops profiling and saves profile file if duration reached
+        """
         
     def should_print_fps(self) -> bool:
         """Check if 5 seconds have elapsed since last FPS print"""
@@ -73,23 +96,37 @@ class ProfilingManager:
     def print_fps(self) -> None:
         """Print current FPS to stdout with timestamp"""
         
-    def profile_key_handling(self, func: Callable, *args, **kwargs) -> Any:
-        """Profile a key handling function and save results"""
+    def _start_profiling(self) -> None:
+        """Start profiling the main loop
+        - Creates cProfile.Profile instance
+        - Enables profiling
+        - Records start time
+        - Prints notification message
+        """
         
-    def profile_rendering(self, func: Callable, *args, **kwargs) -> Any:
-        """Profile a rendering function and save results"""
+    def _stop_profiling(self) -> None:
+        """Stop profiling and save the profile data
+        - Disables profiling
+        - Writes profile file asynchronously
+        - Resets low FPS tracking
+        - Prints completion message
+        """
 ```
 
 **State Management**:
 - `enabled`: Boolean flag controlling profiling state
 - `output_dir`: Directory for profile file output
-- `frame_times`: Deque of recent frame timestamps for FPS calculation
-- `last_print_time`: Timestamp of last FPS print
-- `last_frame_time`: Timestamp of last frame start
+- `profile_duration`: Duration in seconds to profile once triggered (default: 2.0)
+- `fps_tracker`: FPSTracker instance for frame timing and low FPS detection
+- `profile_writer`: ProfileWriter instance for file I/O
+- `current_profiler`: Active cProfile.Profile instance (None when not profiling)
+- `profiling_active`: Boolean flag indicating if profiling is currently running
+- `profiling_start_time`: Timestamp when profiling started (None when not profiling)
+- `loop_profile_count`: Counter for number of profiles generated
 
-### FPS Tracking
+### FPS Tracking and Low FPS Detection
 
-**Algorithm**:
+**FPS Calculation Algorithm**:
 ```python
 def calculate_fps(self) -> float:
     """Calculate FPS from recent frame times"""
@@ -105,43 +142,126 @@ def calculate_fps(self) -> float:
     return 0.0
 ```
 
+**Low FPS Detection Algorithm**:
+```python
+def is_low_fps_sustained(self) -> bool:
+    """Check if FPS has been below threshold for sustained duration"""
+    current_fps = self.calculate_fps()
+    current_time = time.time()
+    
+    if current_fps < self.low_fps_threshold:  # 30 FPS
+        if self.low_fps_start_time is None:
+            # Start tracking low FPS period
+            self.low_fps_start_time = current_time
+        elif current_time - self.low_fps_start_time >= self.low_fps_duration:  # 1 second
+            # Low FPS has been sustained for required duration
+            return True
+    else:
+        # FPS is acceptable, reset tracking
+        self.low_fps_start_time = None
+    
+    return False
+```
+
 **Implementation Details**:
 - Uses `collections.deque` with `maxlen=60` for sliding window
 - Tracks frame start times, not durations
 - Calculates FPS from time span of recent frames
 - Prints every 5 seconds to avoid output spam
+- Detects sustained low FPS (< 30 FPS for > 1 second)
+- Resets low FPS tracking when FPS recovers or after profiling
+
+### Intelligent Profiling Trigger System
+
+**Trigger Logic**:
+```python
+def start_loop_iteration(self) -> None:
+    """Check if profiling should be triggered"""
+    if not self.enabled:
+        return
+    
+    self.fps_tracker.record_frame()
+    
+    # Check if we should start profiling due to sustained low FPS
+    if not self.profiling_active and self.fps_tracker.is_low_fps_sustained():
+        self._start_profiling()
+```
+
+**Profiling Duration Control**:
+```python
+def end_loop_iteration(self) -> None:
+    """Check if profiling duration has elapsed"""
+    if not self.enabled:
+        return
+    
+    # If profiling is active, check if duration has elapsed
+    if self.profiling_active:
+        elapsed = time.time() - self.profiling_start_time
+        if elapsed >= self.profile_duration:  # 2 seconds
+            self._stop_profiling()
+```
+
+**Why This Approach**:
+- **Automatic**: No manual intervention needed to capture performance issues
+- **Targeted**: Only profiles when there's an actual problem (FPS < 30)
+- **Sustained**: Requires 1 second of low FPS to avoid false triggers
+- **Comprehensive**: Captures entire main loop (input + rendering + all operations)
+- **Duration-based**: Profiles for 2 seconds to get representative sample
+- **Low overhead**: Only active when performance is already degraded
 
 ### Profile Generation
 
 **cProfile Integration**:
 ```python
-def profile_function(self, func: Callable, operation_type: str, 
-                    *args, **kwargs) -> Any:
-    """Profile a function call and save results"""
-    profiler = cProfile.Profile()
-    profiler.enable()
+def _start_profiling(self) -> None:
+    """Start profiling the main loop"""
+    self.current_profiler = cProfile.Profile()
+    self.current_profiler.enable()
+    self.profiling_active = True
+    self.profiling_start_time = time.time()
     
-    try:
-        result = func(*args, **kwargs)
-    finally:
-        profiler.disable()
-        
-        # Generate filename and write profile
-        filename = self._generate_filename(operation_type)
-        filepath = os.path.join(self.output_dir, filename)
-        profiler.dump_stats(filepath)
-        
-        print(f"Profile saved: {filepath}")
+    fps = self.fps_tracker.calculate_fps()
+    print(f"[PROFILING] Started profiling - FPS dropped to {fps:.2f} "
+          f"(will profile for {self.profile_duration}s)")
+
+def _stop_profiling(self) -> None:
+    """Stop profiling and save the profile data"""
+    self.current_profiler.disable()
+    self.profiling_active = False
     
-    return result
+    elapsed = time.time() - self.profiling_start_time
+    
+    # Write profile asynchronously (non-blocking)
+    self._write_profile_async(self.current_profiler, "loop")
+    
+    # Reset tracking
+    self.fps_tracker.reset_low_fps_tracking()
+    self.current_profiler = None
+    self.profiling_start_time = None
+    
+    print(f"[PROFILING] Stopped profiling after {elapsed:.2f}s - profile saved")
 ```
 
 **Filename Generation**:
 ```python
-def _generate_filename(self, operation_type: str) -> str:
+def generate_filename(self, operation_type: str) -> str:
     """Generate timestamped filename for profile"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     return f"{operation_type}_profile_{timestamp}.prof"
+```
+
+**Asynchronous File Writing**:
+```python
+def _write_profile_async(self, profiler: cProfile.Profile, operation_type: str) -> None:
+    """Write profile data asynchronously to avoid blocking main loop"""
+    def write_in_background():
+        filepath = self.profile_writer.write_profile(profiler, operation_type)
+        if filepath:
+            self.loop_profile_count += 1
+            print(f"{operation_type.capitalize()} profile written to: {filepath}")
+    
+    thread = threading.Thread(target=write_in_background, daemon=True)
+    thread.start()
 ```
 
 ### Output Directory Management

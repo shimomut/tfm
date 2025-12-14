@@ -3138,9 +3138,9 @@ class FileManager:
     def run(self):
         """Main application loop"""
         while True:
-            # Start frame timing for FPS tracking
+            # Start loop iteration timing and check if profiling should be triggered
             if self.profiling_manager:
-                self.profiling_manager.start_frame()
+                self.profiling_manager.start_loop_iteration()
             
             # Check if we should quit
             if self.should_quit:
@@ -3174,21 +3174,15 @@ class FileManager:
                         print("Cancelling operation...")
                     # Ignore all other keys during operation
                 else:
-                    # Handle normal key input with profiling if enabled
-                    if self.profiling_manager:
-                        self.profiling_manager.profile_key_handling(self.handle_key_input, event)
-                    else:
-                        self.handle_key_input(event)
+                    # Handle normal key input
+                    self.handle_key_input(event)
             
-            # Draw interface after handling input with profiling if enabled
-            if self.profiling_manager:
-                self.profiling_manager.profile_rendering(self.draw_interface)
-            else:
-                self.draw_interface()
+            # Draw interface after handling input
+            self.draw_interface()
             
-            # End frame timing and print FPS if needed
+            # End loop iteration and print FPS if needed
             if self.profiling_manager:
-                self.profiling_manager.end_frame()
+                self.profiling_manager.end_loop_iteration()
                 if self.profiling_manager.should_print_fps():
                     self.profiling_manager.print_fps()
         

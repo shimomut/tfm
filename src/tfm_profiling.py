@@ -22,17 +22,23 @@ from typing import Callable, Any, Optional
 class FPSTracker:
     """Track frame timing and calculate frames per second"""
     
-    def __init__(self, window_size: int = 60, print_interval: float = 5.0):
+    def __init__(self, window_size: int = 60, print_interval: float = 5.0, 
+                 low_fps_threshold: float = 30.0, low_fps_duration: float = 1.0):
         """
         Initialize FPS tracker
         
         Args:
             window_size: Number of recent frames to track for FPS calculation
             print_interval: Interval in seconds between FPS prints
+            low_fps_threshold: FPS threshold below which is considered "low"
+            low_fps_duration: Duration in seconds FPS must stay low to trigger profiling
         """
         self.frame_times = deque(maxlen=window_size)
         self.last_print_time = time.time()
         self.print_interval = print_interval
+        self.low_fps_threshold = low_fps_threshold
+        self.low_fps_duration = low_fps_duration
+        self.low_fps_start_time = None
     
     def record_frame(self) -> None:
         """Record current frame timestamp"""
@@ -55,6 +61,34 @@ class FPSTracker:
         if time_span > 0:
             return (len(self.frame_times) - 1) / time_span
         return 0.0
+    
+    def is_low_fps_sustained(self) -> bool:
+        """
+        Check if FPS has been below threshold for sustained duration
+        
+        Returns:
+            True if FPS has been low for more than low_fps_duration seconds
+        """
+        current_fps = self.calculate_fps()
+        current_time = time.time()
+        
+        if current_fps < self.low_fps_threshold:
+            # FPS is low
+            if self.low_fps_start_time is None:
+                # Start tracking low FPS period
+                self.low_fps_start_time = current_time
+            elif current_time - self.low_fps_start_time >= self.low_fps_duration:
+                # Low FPS has been sustained for required duration
+                return True
+        else:
+            # FPS is acceptable, reset tracking
+            self.low_fps_start_time = None
+        
+        return False
+    
+    def reset_low_fps_tracking(self) -> None:
+        """Reset low FPS tracking after profiling is triggered"""
+        self.low_fps_start_time = None
     
     def should_print(self) -> bool:
         """Check if print interval has elapsed"""
@@ -281,44 +315,100 @@ class ProfilingManager:
     """Central coordinator for all profiling activities"""
     
     def __init__(self, enabled: bool = False, output_dir: str = "profiling_output",
-                 render_profile_interval: int = 100):
+                 profile_duration: float = 2.0):
         """
         Initialize profiling manager
         
         Args:
             enabled: Whether profiling is active
             output_dir: Directory for profiling output
-            render_profile_interval: Profile every Nth render call (0 = profile all)
+            profile_duration: Duration in seconds to profile once triggered
         """
         self.enabled = enabled
         self.output_dir = output_dir
-        self.render_profile_interval = render_profile_interval
+        self.profile_duration = profile_duration
         
         if self.enabled:
             self.fps_tracker = FPSTracker()
             self.profile_writer = ProfileWriter(output_dir)
-            self.key_profile_count = 0
-            self.render_profile_count = 0
-            self.render_call_count = 0
+            self.loop_profile_count = 0
+            self.current_profiler = None
+            self.profiling_active = False
+            self.profiling_start_time = None
         else:
             self.fps_tracker = None
             self.profile_writer = None
-            self.key_profile_count = 0
-            self.render_profile_count = 0
-            self.render_call_count = 0
+            self.loop_profile_count = 0
+            self.current_profiler = None
+            self.profiling_active = False
+            self.profiling_start_time = None
     
-    def start_frame(self) -> None:
-        """Mark the start of a new frame for FPS tracking"""
-        # Optimization: Single check for enabled state
+    def start_loop_iteration(self) -> None:
+        """
+        Mark the start of a main loop iteration
+        
+        Checks if profiling should be triggered based on sustained low FPS
+        """
         if not self.enabled:
             return
+        
         self.fps_tracker.record_frame()
+        
+        # Check if we should start profiling due to sustained low FPS
+        if not self.profiling_active and self.fps_tracker.is_low_fps_sustained():
+            self._start_profiling()
     
-    def end_frame(self) -> None:
-        """Mark the end of a frame and update FPS"""
-        # Currently no action needed at frame end
-        # FPS is calculated from frame start times
-        pass
+    def end_loop_iteration(self) -> None:
+        """Mark the end of a main loop iteration"""
+        if not self.enabled:
+            return
+        
+        # If profiling is active, check if duration has elapsed
+        if self.profiling_active:
+            elapsed = time.time() - self.profiling_start_time
+            if elapsed >= self.profile_duration:
+                self._stop_profiling()
+    
+    def _start_profiling(self) -> None:
+        """Start profiling the main loop"""
+        try:
+            self.current_profiler = cProfile.Profile()
+            self.current_profiler.enable()
+            self.profiling_active = True
+            self.profiling_start_time = time.time()
+            fps = self.fps_tracker.calculate_fps()
+            print(f"[PROFILING] Started profiling - FPS dropped to {fps:.2f} (will profile for {self.profile_duration}s)")
+        except Exception as e:
+            print(f"Warning: Could not start profiling: {e}", file=sys.stderr)
+            self.profiling_active = False
+            self.current_profiler = None
+            self.profiling_start_time = None
+    
+    def _stop_profiling(self) -> None:
+        """Stop profiling and save the profile data"""
+        if not self.current_profiler:
+            return
+        
+        try:
+            self.current_profiler.disable()
+            self.profiling_active = False
+            
+            elapsed = time.time() - self.profiling_start_time
+            
+            # Write profile asynchronously
+            self._write_profile_async(self.current_profiler, "loop")
+            
+            # Reset tracking
+            self.fps_tracker.reset_low_fps_tracking()
+            self.current_profiler = None
+            self.profiling_start_time = None
+            
+            print(f"[PROFILING] Stopped profiling after {elapsed:.2f}s - profile saved")
+        except Exception as e:
+            print(f"Warning: Error stopping profiling: {e}", file=sys.stderr)
+            self.profiling_active = False
+            self.current_profiler = None
+            self.profiling_start_time = None
     
     def should_print_fps(self) -> bool:
         """Check if 5 seconds have elapsed since last FPS print"""
@@ -339,85 +429,7 @@ class ProfilingManager:
             # Handle any unexpected errors in FPS calculation/formatting
             print(f"Warning: Error printing FPS: {e}", file=sys.stderr)
     
-    def profile_key_handling(self, func: Callable, *args, **kwargs) -> Any:
-        """
-        Profile a key handling function and save results
-        
-        Args:
-            func: Function to profile
-            *args: Positional arguments for function
-            **kwargs: Keyword arguments for function
-            
-        Returns:
-            Result of function call
-        """
-        # Optimization: Early return for disabled state (zero overhead)
-        if not self.enabled:
-            return func(*args, **kwargs)
-        
-        try:
-            profiler = cProfile.Profile()
-            profiler.enable()
-            
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                profiler.disable()
-                
-                # Optimization: Write profile asynchronously to avoid blocking
-                self._write_profile_async(profiler, "key")
-            
-            return result
-        except Exception as e:
-            # If profiling fails, still execute the function without profiling
-            print(f"Warning: Key profiling failed, continuing without profiling: {e}", 
-                  file=sys.stderr)
-            return func(*args, **kwargs)
-    
-    def profile_rendering(self, func: Callable, *args, **kwargs) -> Any:
-        """
-        Profile a rendering function and save results
-        
-        Optimization: Only profiles every Nth render call to reduce overhead
-        
-        Args:
-            func: Function to profile
-            *args: Positional arguments for function
-            **kwargs: Keyword arguments for function
-            
-        Returns:
-            Result of function call
-        """
-        # Optimization: Early return for disabled state (zero overhead)
-        if not self.enabled:
-            return func(*args, **kwargs)
-        
-        # Optimization: Conditional profiling - only profile every Nth frame
-        self.render_call_count += 1
-        should_profile = (self.render_profile_interval == 0 or 
-                         self.render_call_count % self.render_profile_interval == 0)
-        
-        if not should_profile:
-            return func(*args, **kwargs)
-        
-        try:
-            profiler = cProfile.Profile()
-            profiler.enable()
-            
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                profiler.disable()
-                
-                # Optimization: Write profile asynchronously to avoid blocking
-                self._write_profile_async(profiler, "render")
-            
-            return result
-        except Exception as e:
-            # If profiling fails, still execute the function without profiling
-            print(f"Warning: Render profiling failed, continuing without profiling: {e}", 
-                  file=sys.stderr)
-            return func(*args, **kwargs)
+
     
     def get_output_dir(self) -> str:
         """Get the profiling output directory path"""
@@ -437,10 +449,7 @@ class ProfilingManager:
             try:
                 filepath = self.profile_writer.write_profile(profiler, operation_type)
                 if filepath:
-                    if operation_type == "key":
-                        self.key_profile_count += 1
-                    else:
-                        self.render_profile_count += 1
+                    self.loop_profile_count += 1
                     print(f"{operation_type.capitalize()} profile written to: {filepath}")
                 else:
                     # write_profile returns empty string on failure

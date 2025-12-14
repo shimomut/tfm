@@ -2,7 +2,9 @@
 
 ## Overview
 
-TFM includes a built-in performance profiling system that helps developers investigate and optimize rendering and input handling performance. The profiling system provides real-time FPS (frames per second) measurements and detailed profiling data for key event handling and rendering operations.
+TFM includes a built-in performance profiling system that helps developers investigate and optimize performance. The profiling system provides real-time FPS (frames per second) measurements and automatically captures detailed profiling data when performance issues are detected.
+
+The system uses intelligent triggering: when FPS drops below 30 and stays low for more than 1 second, it automatically captures a 2-second profile of the main loop to help identify bottlenecks.
 
 This feature is particularly useful when investigating performance issues with the CoreGraphics backend or when optimizing TFM's performance on different systems.
 
@@ -25,7 +27,8 @@ Profiling mode enabled - performance data will be collected
 
 When profiling is enabled:
 - **FPS measurements** are printed to stdout every 5 seconds
-- **Profile files** are automatically generated for key events and rendering operations
+- **Automatic profiling** triggers when FPS drops below 30 for more than 1 second
+- **Profile files** are automatically generated capturing 2 seconds of main loop execution
 - **Profile data** is saved to the `profiling_output/` directory
 
 ## FPS Monitoring
@@ -57,9 +60,17 @@ Each FPS line includes:
 
 ### Automatic Profile Generation
 
-TFM automatically generates profile files for:
-- **Key event handling**: When you press keys
-- **Rendering operations**: When the interface is drawn
+TFM automatically generates profile files when performance issues are detected:
+- **Trigger condition**: FPS drops below 30 and stays low for more than 1 second
+- **Capture duration**: 2 seconds of main loop execution
+- **Content**: Complete profile of input handling, rendering, and all operations in the main loop
+
+When profiling is triggered, you'll see messages like:
+```
+[PROFILING] Started profiling - FPS dropped to 28.45 (will profile for 2.0s)
+Loop profile written to: profiling_output/loop_profile_20241213_143022_123456.prof
+[PROFILING] Stopped profiling after 2.01s - profile saved
+```
 
 ### Profile File Location
 
@@ -67,19 +78,18 @@ All profile files are saved to the `profiling_output/` directory in your current
 
 ```
 profiling_output/
-├── key_profile_20241213_143022_123456.prof
-├── key_profile_20241213_143025_789012.prof
-├── render_profile_20241213_143022_234567.prof
-├── render_profile_20241213_143025_890123.prof
+├── loop_profile_20241213_143022_123456.prof
+├── loop_profile_20241213_143025_789012.prof
+├── loop_profile_20241213_143530_345678.prof
 └── README.txt
 ```
 
 ### Profile File Naming
 
 Profile files use descriptive names with timestamps:
-- **Format**: `{operation_type}_profile_{timestamp}.prof`
-- **Operation types**: `key` (key handling) or `render` (rendering)
+- **Format**: `loop_profile_{timestamp}.prof`
 - **Timestamp**: `YYYYMMDD_HHMMSS_microseconds` for uniqueness
+- **Content**: 2 seconds of main loop execution (approximately 60-120 iterations)
 
 ### README File
 
@@ -93,7 +103,7 @@ The simplest way to analyze profile files is with Python's built-in `pstats` mod
 
 ```bash
 # Analyze a specific profile file
-python3 -m pstats profiling_output/key_profile_20241213_143022_123456.prof
+python3 -m pstats profiling_output/loop_profile_20241213_143022_123456.prof
 ```
 
 This opens an interactive prompt where you can use commands like:
@@ -137,7 +147,7 @@ For a more visual analysis, install and use snakeviz:
 pip install snakeviz
 
 # Visualize a profile file
-snakeviz profiling_output/key_profile_20241213_143022_123456.prof
+snakeviz profiling_output/loop_profile_20241213_143022_123456.prof
 ```
 
 This opens a web browser with an interactive visualization showing:
@@ -153,42 +163,44 @@ To compare performance before and after optimizations:
 ```bash
 # Generate baseline profile
 python3 tfm.py --profile
-# Use TFM, then quit
+# Trigger slow performance (e.g., navigate large directory)
+# Wait for profiling to trigger and complete
+# Quit TFM
 
 # Make optimizations to code
 
 # Generate new profile
 python3 tfm.py --profile
-# Use TFM with same operations, then quit
+# Perform same operations to trigger profiling
+# Wait for profiling to complete
+# Quit TFM
 
 # Compare the profiles
-python3 -m pstats profiling_output/key_profile_baseline.prof
+python3 -m pstats profiling_output/loop_profile_baseline.prof
 # Note the cumulative times for key functions
 
-python3 -m pstats profiling_output/key_profile_optimized.prof
+python3 -m pstats profiling_output/loop_profile_optimized.prof
 # Compare cumulative times to see improvements
 ```
 
 ## Use Cases
 
-### Investigating Slow Rendering
+### Investigating Performance Issues
 
-If TFM feels sluggish when drawing the interface:
-
-1. **Enable profiling**: `python3 tfm.py --profile`
-2. **Navigate and interact**: Perform actions that feel slow
-3. **Check FPS output**: Look for FPS drops below 30
-4. **Analyze render profiles**: Find which rendering functions are slow
-5. **Optimize**: Focus on functions with high cumulative time
-
-### Investigating Slow Key Response
-
-If key presses feel delayed:
+If TFM feels sluggish:
 
 1. **Enable profiling**: `python3 tfm.py --profile`
-2. **Press keys**: Perform the slow operations
-3. **Analyze key profiles**: Find bottlenecks in key handling
-4. **Optimize**: Focus on functions called during key handling
+2. **Reproduce the issue**: Perform actions that feel slow
+3. **Wait for automatic profiling**: System will detect FPS drop and capture profile
+4. **Check console output**: Look for profiling start/stop messages
+5. **Analyze profile**: Find which functions are consuming the most time
+6. **Optimize**: Focus on functions with high cumulative time
+
+The profile will show you the complete picture of where time is spent:
+- Input handling (`get_input`, `handle_key_input`)
+- Rendering (`draw_interface`, backend rendering calls)
+- File operations (`iterdir`, `stat`)
+- Any other operations in the main loop
 
 ### Comparing Backend Performance
 
@@ -275,7 +287,9 @@ Don't use profiling mode for:
 **Problem**: `profiling_output/` directory is empty
 
 **Solutions**:
-- Interact with TFM (press keys, navigate) to trigger profiling
+- **Trigger low FPS**: Profiling only activates when FPS drops below 30 for more than 1 second
+- Try operations that might be slow: navigate to large directories, scroll quickly, resize window
+- Check FPS output to see if it's dropping below 30
 - Check file permissions in the current directory
 - Look for error messages about file I/O
 - Verify the directory was created
@@ -312,19 +326,24 @@ Don't use profiling mode for:
 
 ## Advanced Usage
 
-### Custom Profiling Sessions
+### Triggering Profiling Intentionally
 
-For targeted profiling of specific operations:
+To capture profiles of specific operations:
 
 ```bash
 # Start TFM with profiling
 python3 tfm.py --profile
 
-# Perform ONLY the operation you want to profile
-# For example: navigate to a large directory
+# Perform operations that cause FPS to drop below 30:
+# - Navigate to directories with thousands of files
+# - Scroll rapidly through large file lists
+# - Resize the window repeatedly
+# - Switch between panes quickly
 
-# Quit immediately after
-# This keeps profile files focused on that operation
+# Wait for profiling to trigger (watch for console messages)
+# Profile will automatically capture 2 seconds of execution
+
+# Quit after profiling completes
 ```
 
 ### Automated Performance Testing
@@ -359,22 +378,26 @@ quit
 EOF
 ```
 
-### Profiling Specific Code Paths
+### Understanding Profile Triggers
 
-To profile specific operations, modify the code temporarily:
+The profiling system uses intelligent triggering:
 
-```python
-# In your test code
-from tfm_profiling import ProfilingManager
+**Trigger Conditions:**
+- FPS drops below 30 FPS
+- Low FPS is sustained for more than 1 second
+- Profiling is not already active
 
-profiler = ProfilingManager(enabled=True)
+**Capture Behavior:**
+- Profiles for 2 seconds (configurable in code)
+- Captures complete main loop execution
+- Includes all operations: input, rendering, file I/O, etc.
+- Stops automatically after duration elapses
 
-# Profile a specific function
-result = profiler.profile_key_handling(my_function, arg1, arg2)
-
-# Or profile rendering
-profiler.profile_rendering(my_render_function)
-```
+**Why This Approach:**
+- Captures real performance issues as they happen
+- Provides comprehensive view of bottlenecks
+- Avoids profiling when performance is good
+- Reduces overhead during normal operation
 
 ## Related Features
 
