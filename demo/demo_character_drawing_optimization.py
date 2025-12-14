@@ -1,181 +1,229 @@
-#!/usr/bin/env python3
 """
-Demo script to visualize the character drawing performance bottleneck.
+Demo script for character drawing optimization.
 
-This demo creates a live TFM instance with a grid filled with non-space characters
-to demonstrate the 0.03 seconds character drawing performance issue in the
-CoreGraphics backend.
+This demo provides visual verification of the character drawing optimization
+by displaying a full grid of characters with various attributes and allowing
+interactive testing.
 
-The demo will:
-1. Launch TFM with the CoreGraphics backend
-2. Fill the screen with colorful text using various attributes
-3. Display timing information showing the t4-t3 (character drawing) phase
-4. Allow you to see the performance impact in real-time
-
-Usage:
-    python demo/demo_character_drawing_optimization.py
-
-Expected output:
-    - You should see timing output in the console showing t4-t3 ≈ 0.03 seconds
-    - The screen will be filled with colorful characters
-    - Each redraw will show the performance metrics
+Requirements: 4.1, 4.2, 4.3, 4.4, 4.5
 """
 
 import sys
 import time
 from pathlib import Path
 
-# Add src directory to path
-src_path = Path(__file__).parent.parent / 'src'
-sys.path.insert(0, str(src_path))
-
-# Add ttk directory to path
-ttk_path = Path(__file__).parent.parent / 'ttk'
-sys.path.insert(0, str(ttk_path))
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-    from ttk.text_attribute import TextAttribute
+    from ttk.renderer import TextAttribute
+    from ttk.input_event import KeyCode
     import Cocoa
-    COREGRAPHICS_AVAILABLE = True
-except ImportError:
-    COREGRAPHICS_AVAILABLE = False
+    BACKEND_AVAILABLE = True
+except ImportError as e:
+    print(f"CoreGraphics backend not available: {e}")
+    BACKEND_AVAILABLE = False
 
 
-def create_performance_test_content(backend):
+def draw_test_pattern(backend, pattern_type="full"):
     """
-    Fill the backend grid with content that maximizes character drawing workload.
-    
-    This creates a worst-case scenario for character drawing performance by:
-    - Using all non-space characters (every character must be drawn)
-    - Using multiple color pairs
-    - Applying various text attributes (bold, underline, reverse)
+    Draw various test patterns to demonstrate character drawing.
     
     Args:
-        backend: The CoreGraphics backend instance
+        backend: CoreGraphicsBackend instance
+        pattern_type: Type of pattern to draw
+            - "full": Full grid with all characters
+            - "colors": Color gradient demonstration
+            - "attributes": Attribute demonstration
+            - "mixed": Mixed attributes and colors
     """
-    rows, cols = backend.rows, backend.cols
+    backend.clear()
     
-    # Initialize color pairs
-    backend.init_pair(0, (255, 255, 255), (0, 0, 0))    # White on black
-    backend.init_pair(1, (255, 100, 100), (0, 0, 0))    # Light red
-    backend.init_pair(2, (100, 255, 100), (0, 0, 0))    # Light green
-    backend.init_pair(3, (100, 100, 255), (0, 0, 0))    # Light blue
-    backend.init_pair(4, (255, 255, 100), (0, 0, 0))    # Light yellow
-    backend.init_pair(5, (255, 100, 255), (0, 0, 0))    # Light magenta
-    backend.init_pair(6, (100, 255, 255), (0, 0, 0))    # Light cyan
-    backend.init_pair(7, (200, 200, 200), (0, 0, 0))    # Light gray
+    if pattern_type == "full":
+        # Full grid with various characters
+        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
+        
+        for row in range(backend.rows):
+            for col in range(backend.cols):
+                char = chars[(row * backend.cols + col) % len(chars)]
+                color_pair = (row % 5) + 1
+                
+                attributes = 0
+                if row % 3 == 0:
+                    attributes |= TextAttribute.BOLD
+                if row % 4 == 0:
+                    attributes |= TextAttribute.UNDERLINE
+                if row % 5 == 0:
+                    attributes |= TextAttribute.REVERSE
+                
+                backend.draw_text(row, col, char, color_pair=color_pair, attributes=attributes)
     
-    # Create a pattern of characters
-    char_set = "█▓▒░▄▀■□▪▫●○◆◇★☆♠♣♥♦"
+    elif pattern_type == "colors":
+        # Color gradient demonstration
+        backend.draw_text(0, 0, "Color Pairs Demonstration", color_pair=0, attributes=TextAttribute.BOLD)
+        
+        for i in range(1, 6):
+            text = f"Color Pair {i}: " + "█" * 60
+            backend.draw_text(i + 1, 2, text, color_pair=i)
     
-    # Fill the grid with a colorful pattern
-    for row in range(rows):
-        for col in range(cols):
-            # Create a wave pattern with different characters
-            char_index = (row + col) % len(char_set)
-            char = char_set[char_index]
-            
-            # Use different colors in horizontal bands
-            color_pair = (row // 3) % 8
-            
-            # Apply attributes in a pattern
-            attributes = 0
-            if row % 4 == 0:
-                attributes |= TextAttribute.BOLD
-            if col % 6 == 0:
-                attributes |= TextAttribute.UNDERLINE
-            if (row + col) % 10 == 0:
-                attributes |= TextAttribute.REVERSE
-            
-            backend.addch(row, col, char, color_pair, attributes)
+    elif pattern_type == "attributes":
+        # Attribute demonstration
+        backend.draw_text(0, 0, "Text Attributes Demonstration", color_pair=0, attributes=TextAttribute.BOLD)
+        
+        backend.draw_text(2, 2, "Normal text", color_pair=1)
+        backend.draw_text(3, 2, "Bold text", color_pair=1, attributes=TextAttribute.BOLD)
+        backend.draw_text(4, 2, "Underlined text", color_pair=1, attributes=TextAttribute.UNDERLINE)
+        backend.draw_text(5, 2, "Reverse video text", color_pair=1, attributes=TextAttribute.REVERSE)
+        backend.draw_text(6, 2, "Bold + Underline", color_pair=1, 
+                         attributes=TextAttribute.BOLD | TextAttribute.UNDERLINE)
+        backend.draw_text(7, 2, "Bold + Reverse", color_pair=1,
+                         attributes=TextAttribute.BOLD | TextAttribute.REVERSE)
+        backend.draw_text(8, 2, "All attributes", color_pair=1,
+                         attributes=TextAttribute.BOLD | TextAttribute.UNDERLINE | TextAttribute.REVERSE)
     
-    # Add a title at the top
-    title = " CHARACTER DRAWING PERFORMANCE TEST "
-    title_col = (cols - len(title)) // 2
-    for i, char in enumerate(title):
-        backend.addch(0, title_col + i, char, 4, TextAttribute.BOLD)
+    elif pattern_type == "mixed":
+        # Mixed pattern with various attributes and colors
+        backend.draw_text(0, 0, "Mixed Pattern - Performance Test", color_pair=0, attributes=TextAttribute.BOLD)
+        
+        # Create a checkerboard pattern with different attributes
+        for row in range(2, backend.rows):
+            for col in range(backend.cols):
+                if (row + col) % 2 == 0:
+                    char = "█"
+                    color_pair = ((row + col) % 5) + 1
+                    attributes = 0
+                else:
+                    char = "▓"
+                    color_pair = ((row + col + 1) % 5) + 1
+                    attributes = TextAttribute.BOLD
+                
+                backend.draw_text(row, col, char, color_pair=color_pair, attributes=attributes)
     
-    # Add performance info
-    info_lines = [
-        "This demo demonstrates the character drawing bottleneck",
-        "Watch the console for timing output (t4-t3 ≈ 0.03 seconds)",
-        "Press Ctrl+C to exit"
-    ]
-    
-    for i, line in enumerate(info_lines):
-        start_col = (cols - len(line)) // 2
-        for j, char in enumerate(line):
-            if start_col + j < cols:
-                backend.addch(2 + i, start_col + j, char, 7, 0)
+    backend.refresh()
 
 
-def main():
-    """Run the character drawing performance demo."""
-    if not COREGRAPHICS_AVAILABLE:
-        print("Error: CoreGraphics backend not available")
-        print("This demo requires macOS with PyObjC installed")
-        return 1
+def draw_help_screen(backend):
+    """Draw help screen with key bindings."""
+    backend.clear()
+    
+    backend.draw_text(0, 0, "Character Drawing Optimization Demo", color_pair=0, attributes=TextAttribute.BOLD)
+    backend.draw_text(1, 0, "=" * 80, color_pair=0)
+    
+    backend.draw_text(3, 2, "This demo demonstrates the character drawing optimization.", color_pair=1)
+    backend.draw_text(4, 2, "Press keys to switch between different test patterns:", color_pair=1)
+    
+    backend.draw_text(6, 4, "1 - Full grid pattern (maximum workload)", color_pair=2)
+    backend.draw_text(7, 4, "2 - Color pairs demonstration", color_pair=2)
+    backend.draw_text(8, 4, "3 - Text attributes demonstration", color_pair=2)
+    backend.draw_text(9, 4, "4 - Mixed pattern (checkerboard)", color_pair=2)
+    backend.draw_text(10, 4, "H - Show this help screen", color_pair=2)
+    backend.draw_text(11, 4, "Q - Quit", color_pair=2)
+    
+    backend.draw_text(13, 2, "Performance Information:", color_pair=1, attributes=TextAttribute.BOLD)
+    backend.draw_text(14, 4, "Watch the console output for timing information (t4-t3).", color_pair=3)
+    backend.draw_text(15, 4, "Baseline: ~30ms (0.03 seconds)", color_pair=3)
+    backend.draw_text(16, 4, "Target after optimization: <10ms (0.01 seconds)", color_pair=3)
+    
+    backend.draw_text(18, 2, "Press any key to continue...", color_pair=4, attributes=TextAttribute.BOLD)
+    
+    backend.refresh()
+
+
+def run_demo():
+    """
+    Run the interactive demo.
+    
+    This demo allows users to:
+    1. View different test patterns
+    2. See timing information in real-time
+    3. Verify visual correctness
+    4. Compare performance before/after optimization
+    """
+    if not BACKEND_AVAILABLE:
+        print("ERROR: CoreGraphics backend not available")
+        print("This demo requires macOS and PyObjC")
+        return False
     
     print("=" * 70)
-    print("Character Drawing Performance Demo")
+    print("Character Drawing Optimization Demo")
     print("=" * 70)
     print()
-    print("This demo will launch a window showing the character drawing")
-    print("performance bottleneck in the CoreGraphics backend.")
+    print("This demo provides visual verification of character drawing.")
+    print("Timing information (t4-t3) will be printed to the console.")
     print()
-    print("Expected behavior:")
-    print("  - Console will show timing output for each redraw")
-    print("  - t4-t3 (character drawing phase) should be ≈ 0.03 seconds (30ms)")
-    print("  - Target after optimization: < 0.01 seconds (10ms)")
-    print()
-    print("Press Ctrl+C to exit the demo")
-    print("=" * 70)
+    print("Starting demo...")
     print()
     
     # Create backend
-    backend = CoreGraphicsBackend(rows=24, cols=80)
-    
-    # Fill with performance test content
-    create_performance_test_content(backend)
-    
-    # Create and show window
-    app = Cocoa.NSApplication.sharedApplication()
-    
-    # Create window
-    window_rect = Cocoa.NSMakeRect(100, 100, 
-                                   80 * backend.char_width, 
-                                   24 * backend.char_height)
-    window = Cocoa.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-        window_rect,
-        Cocoa.NSWindowStyleMaskTitled | 
-        Cocoa.NSWindowStyleMaskClosable |
-        Cocoa.NSWindowStyleMaskMiniaturizable,
-        Cocoa.NSBackingStoreBuffered,
-        False
+    backend = CoreGraphicsBackend(
+        window_title="Character Drawing Optimization Demo",
+        font_name="Menlo",
+        font_size=12,
+        rows=24,
+        cols=80
     )
     
-    window.setTitle_("Character Drawing Performance Demo")
-    window.setContentView_(backend._view)
-    window.makeKeyAndOrderFront_(None)
-    
-    # Force initial draw
-    backend._view.setNeedsDisplay_(True)
-    
-    print("Window opened. Watch the console for timing output.")
-    print("Each redraw will show performance metrics.")
-    print()
-    
-    # Run the application
     try:
-        app.run()
-    except KeyboardInterrupt:
-        print()
-        print("Demo terminated by user")
-        return 0
-    
-    return 0
+        # Initialize backend
+        backend.initialize()
+        
+        # Initialize color pairs
+        backend.init_color_pair(1, (255, 255, 255), (0, 0, 255))  # White on blue
+        backend.init_color_pair(2, (255, 255, 0), (0, 0, 0))      # Yellow on black
+        backend.init_color_pair(3, (0, 255, 0), (0, 0, 0))        # Green on black
+        backend.init_color_pair(4, (255, 0, 0), (0, 0, 0))        # Red on black
+        backend.init_color_pair(5, (0, 255, 255), (0, 0, 0))      # Cyan on black
+        
+        # Show help screen
+        draw_help_screen(backend)
+        
+        # Main event loop
+        current_pattern = "help"
+        running = True
+        
+        while running:
+            # Get input
+            event = backend.get_input(timeout_ms=100)
+            
+            if event is None:
+                continue
+            
+            # Handle key presses
+            if event.char:
+                key = event.char.upper()
+                
+                if key == 'Q':
+                    running = False
+                elif key == 'H':
+                    current_pattern = "help"
+                    draw_help_screen(backend)
+                elif key == '1':
+                    current_pattern = "full"
+                    print("\n--- Switching to Full Grid Pattern ---")
+                    draw_test_pattern(backend, "full")
+                elif key == '2':
+                    current_pattern = "colors"
+                    print("\n--- Switching to Color Pairs Pattern ---")
+                    draw_test_pattern(backend, "colors")
+                elif key == '3':
+                    current_pattern = "attributes"
+                    print("\n--- Switching to Attributes Pattern ---")
+                    draw_test_pattern(backend, "attributes")
+                elif key == '4':
+                    current_pattern = "mixed"
+                    print("\n--- Switching to Mixed Pattern ---")
+                    draw_test_pattern(backend, "mixed")
+        
+        print("\nDemo complete.")
+        return True
+        
+    finally:
+        # Clean up
+        backend.shutdown()
 
 
-if __name__ == '__main__':
-    sys.exit(main())
+if __name__ == "__main__":
+    success = run_demo()
+    sys.exit(0 if success else 1)

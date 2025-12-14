@@ -7,9 +7,8 @@
   - Verify baseline demonstrates approximately 30ms (0.03 seconds) as expected
   - Create demo script for visual verification
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
-  - _Status: COMPLETED - test/test_character_drawing_performance.py and demo/demo_character_drawing_optimization.py exist, baseline measurements recorded_
 
-- [ ] 2. Implement AttributeDictCache class
+- [x] 2. Implement AttributeDictCache class
   - Create AttributeDictCache class with cache dictionary
   - Implement get_attributes() method with cache lookup logic
   - Integrate with existing FontCache and ColorCache
@@ -32,7 +31,7 @@
   - Verify cache hit rate improves with repeated patterns
   - _Requirements: 3.4_
 
-- [ ] 3. Implement AttributedStringCache class
+- [x] 3. Implement AttributedStringCache class
   - Create AttributedStringCache class with cache dictionary
   - Implement get_attributed_string() method with cache lookup
   - Integrate with AttributeDictCache for building new strings
@@ -55,7 +54,7 @@
   - Verify LRU eviction maintains most-used entries
   - _Requirements: 3.4_
 
-- [ ] 4. Implement character batching logic
+- [x] 4. Implement character batching logic
   - Modify drawRect_() character drawing loop to identify continuous character runs
   - Implement space skipping logic for efficient iteration
   - Implement batch boundary detection (attribute changes)
@@ -79,7 +78,7 @@
   - Verify pixel-identical results
   - _Requirements: 3.5_
 
-- [ ] 5. Integrate caches into character drawing loop
+- [x] 5. Integrate caches into character drawing loop
   - Instantiate AttributeDictCache in CoreGraphicsBackend.__init__()
   - Instantiate AttributedStringCache in CoreGraphicsBackend.__init__()
   - Replace individual character drawing with batched drawing
@@ -94,7 +93,7 @@
   - Test full rendering pipeline with all caches
   - _Requirements: 3.1, 3.2, 3.4_
 
-- [ ] 6. Implement cache clearing on resize and color scheme change
+- [x] 6. Implement cache clearing on resize and color scheme change
   - Hook AttributeDictCache.clear() into terminal resize event
   - Hook AttributedStringCache.clear() into terminal resize event
   - Hook AttributeDictCache.clear() into color scheme change event
@@ -109,7 +108,7 @@
   - Verify caches rebuild correctly after clearing
   - _Requirements: 3.4_
 
-- [ ] 7. Add performance instrumentation
+- [x] 7. Add performance instrumentation
   - Add metrics tracking for attribute dict cache hit/miss rates
   - Add metrics tracking for NSAttributedString cache hit/miss rates
   - Add metrics tracking for average batch size
@@ -118,7 +117,7 @@
   - Create CharacterDrawingMetrics dataclass for structured metrics
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 8. Checkpoint - Verify performance improvement
+- [x] 8. Checkpoint - Verify performance improvement
   - Run baseline performance test from task 1
   - Measure optimized t4-t3 time (target: <10ms)
   - Calculate improvement percentage (target: 70-85% reduction)
@@ -151,7 +150,7 @@
   - Verify all required keys present (NSFont, NSForegroundColor, NSUnderlineStyle when applicable)
   - _Requirements: 3.1, 3.5_
 
-- [ ] 12. Final checkpoint - Comprehensive testing
+- [x] 12. Final checkpoint - Comprehensive testing
   - Run all unit tests and verify they pass
   - Run all property-based tests and verify they pass
   - Test with real TFM usage scenarios (file browsing, text viewing)

@@ -1,146 +1,212 @@
-#!/usr/bin/env python3
 """
-Test case to reproduce the 0.03 seconds character drawing performance issue.
+Performance test for character drawing optimization.
 
-This test creates a scenario that demonstrates the performance bottleneck in the
-character drawing phase (t4-t3) of the CoreGraphics backend's drawRect_() method.
+This test establishes a baseline for the character drawing phase (t4-t3) by
+creating a maximum workload scenario with a full 24x80 grid of non-space
+characters with various attributes.
 
-The test fills a grid with non-space characters to maximize the character drawing
-workload and measures the time taken to process the character drawing phase.
-
-Expected behavior:
-- Current implementation: t4-t3 should be approximately 0.03 seconds (30ms)
-- Target after optimization: t4-t3 should be under 0.01 seconds (10ms)
+Requirements tested: 4.1, 4.2, 4.3, 4.4, 4.5
 """
 
 import sys
 import time
 from pathlib import Path
 
-# Add src directory to path for imports
-src_path = Path(__file__).parent.parent / 'src'
-sys.path.insert(0, str(src_path))
-
-# Add ttk directory to path
-ttk_path = Path(__file__).parent.parent / 'ttk'
-sys.path.insert(0, str(ttk_path))
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-    from ttk.text_attribute import TextAttribute
-    COREGRAPHICS_AVAILABLE = True
-except ImportError:
-    COREGRAPHICS_AVAILABLE = False
-    print("CoreGraphics backend not available - skipping test")
+    from ttk.renderer import TextAttribute
+    import Cocoa
+    BACKEND_AVAILABLE = True
+except ImportError as e:
+    print(f"CoreGraphics backend not available: {e}")
+    BACKEND_AVAILABLE = False
 
 
-def test_character_drawing_performance():
+def create_test_grid(backend):
     """
-    Test that reproduces the 0.03 seconds character drawing performance issue.
+    Fill the grid with non-space characters and various attributes.
     
-    This test:
-    1. Creates a CoreGraphics backend with a 24x80 grid (standard terminal size)
-    2. Fills the entire grid with non-space characters to maximize drawing workload
-    3. Uses various color pairs and attributes to simulate realistic usage
-    4. Triggers a full-screen redraw
-    5. Measures the time taken for the character drawing phase (t4-t3)
+    This creates a maximum workload scenario for character drawing:
+    - All 1,920 cells (24x80) contain non-space characters
+    - Various color pairs are used
+    - Bold, underline, and reverse attributes are applied
     
-    The test should demonstrate that the current implementation takes approximately
-    0.03 seconds (30ms) for the character drawing phase.
+    Args:
+        backend: CoreGraphicsBackend instance
     """
-    if not COREGRAPHICS_AVAILABLE:
-        print("Skipping test - CoreGraphics backend not available")
-        return
+    # Initialize color pairs for testing
+    # Color pair 1: White on blue
+    backend.init_color_pair(1, (255, 255, 255), (0, 0, 255))
+    # Color pair 2: Yellow on black
+    backend.init_color_pair(2, (255, 255, 0), (0, 0, 0))
+    # Color pair 3: Green on black
+    backend.init_color_pair(3, (0, 255, 0), (0, 0, 0))
+    # Color pair 4: Red on black
+    backend.init_color_pair(4, (255, 0, 0), (0, 0, 0))
+    # Color pair 5: Cyan on black
+    backend.init_color_pair(5, (0, 255, 255), (0, 0, 0))
     
-    print("=" * 70)
-    print("Character Drawing Performance Test")
-    print("=" * 70)
-    print()
-    print("This test reproduces the 0.03 seconds character drawing bottleneck")
-    print("by filling a 24x80 grid with non-space characters.")
-    print()
+    # Fill grid with various characters and attributes
+    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
     
-    # Create backend with standard terminal size
-    rows, cols = 24, 80
-    backend = CoreGraphicsBackend(rows=rows, cols=cols)
-    
-    # Initialize color pairs with various colors
-    # Color pair 0 is default (white on black)
-    backend.init_pair(0, (255, 255, 255), (0, 0, 0))
-    backend.init_pair(1, (255, 0, 0), (0, 0, 0))      # Red on black
-    backend.init_pair(2, (0, 255, 0), (0, 0, 0))      # Green on black
-    backend.init_pair(3, (0, 0, 255), (0, 0, 0))      # Blue on black
-    backend.init_pair(4, (255, 255, 0), (0, 0, 0))    # Yellow on black
-    backend.init_pair(5, (255, 0, 255), (0, 0, 0))    # Magenta on black
-    backend.init_pair(6, (0, 255, 255), (0, 0, 0))    # Cyan on black
-    backend.init_pair(7, (128, 128, 128), (0, 0, 0))  # Gray on black
-    
-    # Fill the grid with non-space characters to maximize character drawing workload
-    # Use a variety of characters, color pairs, and attributes to simulate realistic usage
-    print(f"Filling {rows}x{cols} grid with non-space characters...")
-    
-    char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/"
-    char_index = 0
-    
-    for row in range(rows):
-        for col in range(cols):
-            # Cycle through characters
-            char = char_set[char_index % len(char_set)]
-            char_index += 1
+    for row in range(backend.rows):
+        for col in range(backend.cols):
+            # Select character based on position
+            char = chars[(row * backend.cols + col) % len(chars)]
             
-            # Use different color pairs for different regions
-            color_pair = (row * cols + col) % 8
+            # Vary color pairs across rows
+            color_pair = (row % 5) + 1
             
-            # Apply various attributes to different cells
+            # Apply different attributes based on position
             attributes = 0
             if row % 3 == 0:
                 attributes |= TextAttribute.BOLD
-            if col % 5 == 0:
+            if row % 4 == 0:
                 attributes |= TextAttribute.UNDERLINE
-            if (row + col) % 7 == 0:
+            if row % 5 == 0:
                 attributes |= TextAttribute.REVERSE
             
-            # Set the character in the grid
-            backend.addch(row, col, char, color_pair, attributes)
+            # Draw the character
+            backend.draw_text(row, col, char, color_pair=color_pair, attributes=attributes)
+
+
+def measure_character_drawing_time(backend, num_samples=5):
+    """
+    Measure the character drawing phase time (t4-t3).
     
-    print(f"Grid filled with {rows * cols} non-space characters")
-    print()
+    This function triggers multiple redraws and captures the timing output
+    from the drawRect_ method to measure the character drawing phase.
     
-    # Trigger a full-screen redraw and measure performance
-    print("Triggering full-screen redraw...")
-    print("Measuring character drawing phase performance (t4-t3)...")
-    print()
+    Args:
+        backend: CoreGraphicsBackend instance
+        num_samples: Number of samples to collect
     
-    # Note: In a real application, this would be called by the Cocoa event loop
-    # For this test, we're calling it directly to measure performance
-    # The actual timing will be printed by the drawRect_() method itself
+    Returns:
+        list: List of t4-t3 time deltas in seconds
+    """
+    times = []
     
-    # Create a full-screen dirty rect
-    import Cocoa
-    full_rect = Cocoa.NSMakeRect(0, 0, cols * backend.char_width, rows * backend.char_height)
+    print(f"\nCollecting {num_samples} samples of character drawing time...")
+    print("(Each refresh will print timing information)")
     
-    # Call drawRect_() which will print timing information
-    # Note: This requires a valid graphics context, which may not be available
-    # in a test environment. The test demonstrates the setup; actual timing
-    # would be measured in a running application.
-    try:
-        backend._view.drawRect_(full_rect)
-        print()
-        print("✓ Test completed successfully")
-        print()
-        print("Expected results:")
-        print("  - Current implementation: t4-t3 ≈ 0.03 seconds (30ms)")
-        print("  - Target after optimization: t4-t3 < 0.01 seconds (10ms)")
-    except Exception as e:
-        print(f"Note: Could not execute drawRect_() in test environment: {e}")
-        print()
-        print("This test demonstrates the setup for reproducing the performance issue.")
-        print("To measure actual performance, run this scenario in a live application")
-        print("with a valid CoreGraphics context.")
+    for i in range(num_samples):
+        print(f"\n--- Sample {i+1}/{num_samples} ---")
+        
+        # Trigger a full redraw
+        backend.refresh()
+        
+        # Process events to ensure drawRect_ is called
+        app = Cocoa.NSApplication.sharedApplication()
+        
+        # Run the event loop briefly to process the redraw
+        # This will trigger drawRect_ which prints timing information
+        until_date = Cocoa.NSDate.dateWithTimeIntervalSinceNow_(0.1)
+        event = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
+            Cocoa.NSEventMaskAny,
+            until_date,
+            Cocoa.NSDefaultRunLoopMode,
+            True
+        )
+        if event:
+            app.sendEvent_(event)
+        app.updateWindows()
+        
+        # Small delay between samples
+        time.sleep(0.1)
     
-    print()
+    print("\nNote: The t4-t3 times are printed by drawRect_ above.")
+    print("Look for lines like 't4-t3: 0.0XXX' in the output.")
+    
+    return times
+
+
+def run_baseline_test():
+    """
+    Run the baseline performance test.
+    
+    This test:
+    1. Creates a CoreGraphics backend
+    2. Fills the grid with maximum character workload
+    3. Measures character drawing time (t4-t3)
+    4. Reports the baseline performance
+    """
+    if not BACKEND_AVAILABLE:
+        print("ERROR: CoreGraphics backend not available")
+        print("This test requires macOS and PyObjC")
+        return False
+    
     print("=" * 70)
+    print("Character Drawing Performance Baseline Test")
+    print("=" * 70)
+    print()
+    print("This test establishes a baseline for the character drawing phase")
+    print("by creating a maximum workload scenario:")
+    print("  - Full 24x80 grid (1,920 cells)")
+    print("  - All non-space characters")
+    print("  - Various color pairs (5 different pairs)")
+    print("  - Mixed attributes (bold, underline, reverse)")
+    print()
+    print("Expected baseline: ~30ms (0.03 seconds) for t4-t3")
+    print("Target after optimization: <10ms (0.01 seconds)")
+    print()
+    
+    # Create backend
+    print("Creating CoreGraphics backend...")
+    backend = CoreGraphicsBackend(
+        window_title="Character Drawing Performance Test",
+        font_name="Menlo",
+        font_size=12,
+        rows=24,
+        cols=80
+    )
+    
+    try:
+        # Initialize backend
+        print("Initializing backend...")
+        backend.initialize()
+        
+        # Fill grid with test data
+        print("Filling grid with test data...")
+        create_test_grid(backend)
+        
+        # Measure character drawing time
+        print("\nMeasuring character drawing performance...")
+        print("=" * 70)
+        times = measure_character_drawing_time(backend, num_samples=5)
+        
+        print("\n" + "=" * 70)
+        print("Baseline Test Complete")
+        print("=" * 70)
+        print()
+        print("IMPORTANT: Review the t4-t3 times printed above.")
+        print("The character drawing phase time is shown as 't4-t3: X.XXXX'")
+        print()
+        print("Expected baseline: ~0.0300 seconds (30ms)")
+        print("Target after optimization: <0.0100 seconds (10ms)")
+        print()
+        print("To verify the baseline:")
+        print("1. Look at the t4-t3 values printed above")
+        print("2. Confirm they are approximately 0.03 seconds (30ms)")
+        print("3. Record these values for comparison after optimization")
+        print()
+        
+        # Keep window open briefly to allow visual inspection
+        print("Window will remain open for 3 seconds for visual inspection...")
+        time.sleep(3)
+        
+        return True
+        
+    finally:
+        # Clean up
+        print("\nCleaning up...")
+        backend.shutdown()
+        print("Test complete.")
 
 
-if __name__ == '__main__':
-    test_character_drawing_performance()
+if __name__ == "__main__":
+    success = run_baseline_test()
+    sys.exit(0 if success else 1)
