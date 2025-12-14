@@ -2563,35 +2563,35 @@ if COCOA_AVAILABLE:
                             batch_chars.append(char)
                             col += 1
                         
-                        # Draw the batched string using cached NSAttributedString
+                        # Draw the batched characters individually at their grid positions
+                        # While we batch characters with the same attributes together for cache efficiency,
+                        # we must draw each character at its exact grid position to maintain alignment.
+                        # Drawing multiple characters as a single string would cause misalignment because
+                        # NSAttributedString uses proportional spacing even with monospace fonts.
                         if batch_chars:
-                            # Calculate x-coordinate for batch start position
-                            x_start = start_col_batch * char_width
-                            
-                            # Combine characters into a single string
-                            batch_text = ''.join(batch_chars)
-                            
                             # Determine if underline attribute is present
                             has_underline = bool(start_attributes & TextAttribute.UNDERLINE)
                             
                             # Convert attributes to string for cache key
-                            # This allows the cache to distinguish between different attribute combinations
                             font_key = str(start_attributes)
                             
-                            # Get cached NSAttributedString
-                            # This eliminates the overhead of:
-                            # 1. Creating attribute dictionary
-                            # 2. NSAttributedString.alloc().initWithString_attributes_()
-                            # The cache returns a pre-built NSAttributedString ready for drawing
-                            attr_string = self.backend._attr_string_cache.get_attributed_string(
-                                batch_text,
-                                font_key,
-                                start_fg_rgb,
-                                has_underline
-                            )
-                            
-                            # Draw the entire batch with a single drawAtPoint_() call
-                            attr_string.drawAtPoint_(Cocoa.NSMakePoint(x_start, y))
+                            # Draw each character at its exact grid position
+                            for i, char in enumerate(batch_chars):
+                                # Calculate exact x-coordinate for this character's grid position
+                                x_pos = (start_col_batch + i) * char_width
+                                
+                                # Get cached NSAttributedString for single character
+                                # The cache is particularly effective for repeated characters
+                                # like spaces, dots, slashes in file listings
+                                attr_string = self.backend._attr_string_cache.get_attributed_string(
+                                    char,
+                                    font_key,
+                                    start_fg_rgb,
+                                    has_underline
+                                )
+                                
+                                # Draw character at its exact grid position
+                                attr_string.drawAtPoint_(Cocoa.NSMakePoint(x_pos, y))
 
                 # Draw cursor if visible
                 if self.backend.cursor_visible:
