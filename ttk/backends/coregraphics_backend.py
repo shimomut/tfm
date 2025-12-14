@@ -1151,6 +1151,7 @@ class CoreGraphicsBackend(Renderer):
         
         # Window state
         self.should_close = False
+        self.resize_pending = False
     
     def initialize(self) -> None:
         """
@@ -1985,6 +1986,15 @@ class CoreGraphicsBackend(Renderer):
             event = backend.get_input(timeout_ms=-1)
             print(f"User pressed: {event.char}")
         """
+        # Check if window was resized
+        if self.resize_pending:
+            self.resize_pending = False
+            return InputEvent(
+                key_code=KeyCode.RESIZE,
+                modifiers=ModifierKey.NONE,
+                char=None
+            )
+        
         # Check if window should close
         if self.should_close:
             # Return a special quit event (Q key)
@@ -2379,6 +2389,9 @@ if COCOA_AVAILABLE:
                     # This ensures cached NSAttributedString objects are rebuilt with new dimensions
                     if hasattr(self.backend, '_attr_string_cache') and self.backend._attr_string_cache is not None:
                         self.backend._attr_string_cache.clear()
+                    
+                    # Set flag to generate resize event in get_input()
+                    self.backend.resize_pending = True
                     
                     # Trigger redraw
                     self.backend.view.setNeedsDisplay_(True)
