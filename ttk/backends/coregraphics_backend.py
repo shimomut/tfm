@@ -1095,7 +1095,8 @@ class CoreGraphicsBackend(Renderer):
     
     def __init__(self, window_title: str = "TTK Application",
                  font_name: str = "Menlo", font_size: int = 12,
-                 rows: int = 24, cols: int = 80):
+                 rows: int = 24, cols: int = 80,
+                 frame_autosave_name: Optional[str] = None):
         """
         Initialize the CoreGraphics backend.
         
@@ -1105,6 +1106,9 @@ class CoreGraphicsBackend(Renderer):
             font_size: Font size in points (default: 14)
             rows: Initial grid height in characters (default: 24)
             cols: Initial grid width in characters (default: 80)
+            frame_autosave_name: Optional name for NSWindow frame autosave.
+                               If provided, enables automatic window geometry persistence.
+                               If None, defaults to "TTKApplication".
         
         Raises:
             RuntimeError: If PyObjC is not installed
@@ -1120,6 +1124,9 @@ class CoreGraphicsBackend(Renderer):
         self.font_size = font_size
         self.rows = rows
         self.cols = cols
+        
+        # Store frame autosave name (use default if not provided)
+        self.frame_autosave_name = frame_autosave_name or "TTKApplication"
         
         # These will be initialized in initialize()
         self.window = None
@@ -1286,6 +1293,21 @@ class CoreGraphicsBackend(Renderer):
         # PyObjC method: setTitle_() corresponds to Objective-C setTitle:
         self.window.setTitle_(self.window_title)
         
+        # Enable automatic window frame persistence
+        # This tells macOS to automatically save and restore the window's
+        # position and size using NSUserDefaults
+        # Use the configurable frame autosave name
+        try:
+            self.window.setFrameAutosaveName_(self.frame_autosave_name)
+        except (AttributeError, TypeError) as e:
+            # Handle cases where window object doesn't support frame autosave
+            # or autosave name is invalid
+            print(f"Warning: Could not enable window geometry persistence: {e}")
+        except Exception as e:
+            # Catch any other unexpected errors
+            # Log warning but continue - persistence is non-critical
+            print(f"Warning: Unexpected error enabling window geometry persistence: {e}")
+        
         # Create window delegate to handle window events
         self.window_delegate = TTKWindowDelegate.alloc().initWithBackend_(self)
         self.window.setDelegate_(self.window_delegate)
@@ -1413,6 +1435,95 @@ class CoreGraphicsBackend(Renderer):
         self.cursor_visible = False
         self.cursor_row = 0
         self.cursor_col = 0
+    
+    def reset_window_geometry(self) -> bool:
+        """
+        Reset window geometry to default size and position.
+        
+        This method clears the saved window frame from NSUserDefaults and
+        resets the window to the default size and position specified in
+        configuration. This is useful for recovering from undesirable window
+        states or when the saved geometry becomes problematic.
+        
+        The method performs the following operations:
+        1. Clears the saved frame from NSUserDefaults
+        2. Synchronizes NSUserDefaults to ensure changes are persisted
+        3. Calculates default window dimensions from grid size and character size
+        4. Creates a default frame at position (100, 100)
+        5. Applies the default frame to the window
+        6. Logs the reset action for debugging purposes
+        
+        Returns:
+            bool: True if reset was successful, False if an error occurred
+        
+        Example:
+            backend = CoreGraphicsBackend()
+            backend.initialize()
+            
+            # ... window is moved/resized by user ...
+            
+            # Reset to defaults
+            success = backend.reset_window_geometry()
+            if success:
+                print("Window geometry reset successfully")
+            else:
+                print("Failed to reset window geometry")
+        
+        Note:
+            This method requires that the window has been created (initialize()
+            has been called). If called before initialization, it will return
+            False with a warning message.
+        """
+        # Check if window exists
+        if self.window is None:
+            print("Warning: Cannot reset window geometry - window not initialized")
+            return False
+        
+        try:
+            # Clear the saved frame from NSUserDefaults
+            user_defaults = Cocoa.NSUserDefaults.standardUserDefaults()
+            frame_key = f"NSWindow Frame {self.frame_autosave_name}"
+            user_defaults.removeObjectForKey_(frame_key)
+            
+            # Synchronize to ensure changes are persisted immediately
+            user_defaults.synchronize()
+            
+        except (AttributeError, TypeError) as e:
+            # Handle cases where NSUserDefaults methods are not available
+            # or frame key is invalid
+            print(f"Warning: Could not clear saved window frame from NSUserDefaults: {e}")
+            # Continue with reset even if clearing fails
+        except Exception as e:
+            # Catch any other unexpected errors during NSUserDefaults operations
+            print(f"Warning: Unexpected error clearing saved window frame: {e}")
+            # Continue with reset even if clearing fails
+        
+        try:
+            # Calculate default window dimensions from grid size and character size
+            window_width = self.cols * self.char_width
+            window_height = self.rows * self.char_height
+            
+            # Create default frame at position (100, 100)
+            # This matches the default position used in _create_window()
+            default_frame = Cocoa.NSMakeRect(100, 100, window_width, window_height)
+            
+            # Apply default frame to window
+            # The second parameter (True) tells the window to redisplay after resizing
+            self.window.setFrame_display_(default_frame, True)
+            
+            # Log the reset action for debugging purposes
+            print(f"Window geometry reset to defaults: {window_width}x{window_height} at (100, 100)")
+            return True
+            
+        except (AttributeError, TypeError) as e:
+            # Handle cases where window object doesn't support setFrame_display_
+            # or frame parameters are invalid
+            print(f"Warning: Could not apply default window frame: {e}")
+            return False
+        except Exception as e:
+            # Catch any other unexpected errors during frame application
+            print(f"Warning: Unexpected error resetting window geometry: {e}")
+            return False
     
     def get_dimensions(self) -> Tuple[int, int]:
         """
