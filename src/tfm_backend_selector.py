@@ -197,6 +197,7 @@ def _get_backend_options(backend_name, args):
             'font_size': font_size,
             'rows': rows,
             'cols': cols,
+            'frame_autosave_name': 'TFMMainWindow',
         }
     
     # Curses backend needs no special options
