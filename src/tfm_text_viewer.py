@@ -502,7 +502,7 @@ class TextViewer:
             self.renderer.draw_text(1, 2, isearch_prompt[:width-4], search_color_pair, search_attrs)
         else:
             # Show normal controls
-            controls = "q:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:numbers w:wrap s:syntax"
+            controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:numbers w:wrap s:syntax"
             
             # Center the controls or left-align if too long
             if len(controls) + 4 < width:
@@ -824,6 +824,8 @@ class TextViewer:
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
+            return False
+        elif event.key_code == KeyCode.ENTER:
             return False
         elif event.key_code == KeyCode.UP:
             if self.scroll_offset > 0:
