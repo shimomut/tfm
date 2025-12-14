@@ -136,16 +136,12 @@ class GeneralPurposeDialog:
         
         # Handle text editing
         else:
-            # Convert InputEvent to key code for SingleLineTextEdit (which hasn't been migrated yet)
-            # This is a temporary workaround until task 26 migrates SingleLineTextEdit
-            from tfm_input_utils import input_event_to_curses_key
-            key = input_event_to_curses_key(event)
-            if key is not None:
-                handled = self.text_editor.handle_key(key)
-                if handled:
-                    self.content_changed = True  # Mark content as changed
-                return handled
-            return False
+            # Pass InputEvent directly to SingleLineTextEdit
+            # SingleLineTextEdit already handles InputEvent objects
+            handled = self.text_editor.handle_key(event)
+            if handled:
+                self.content_changed = True  # Mark content as changed
+            return handled
     
     def needs_redraw(self):
         """Check if this dialog needs to be redrawn"""
@@ -205,15 +201,12 @@ class GeneralPurposeDialog:
             max_field_width = min_field_width
             show_help = False  # Disable help if no space
         
-        # Get stdscr from renderer for SingleLineTextEdit (which hasn't been migrated yet)
-        stdscr = getattr(self.renderer, 'stdscr', None)
-        if stdscr:
-            # Draw input field using SingleLineTextEdit
-            self.text_editor.draw(
-                stdscr, status_y, 2, max_field_width,
-                self.prompt_text,
-                is_active=True
-            )
+        # Draw input field using SingleLineTextEdit
+        self.text_editor.draw(
+            self.renderer, status_y, 2, max_field_width,
+            self.prompt_text,
+            is_active=True
+        )
         
         # Show help text on the right if we determined it should be shown
         if show_help and self.help_text:
