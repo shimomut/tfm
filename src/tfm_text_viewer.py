@@ -36,7 +36,8 @@ class TextViewer:
     def __init__(self, renderer, file_path: Path):
         self.renderer = renderer
         self.file_path = file_path
-        self.lines = []  # List of strings (plain text lines)
+        self.original_lines = []  # Original lines with tabs preserved
+        self.lines = []  # List of strings (plain text lines with tabs expanded)
         self.highlighted_lines = []  # List of lists of (text, color) tuples
         self.scroll_offset = 0
         self.horizontal_offset = 0
@@ -83,6 +84,23 @@ class TextViewer:
         
         return ''.join(result)
     
+    def refresh_tab_expansion(self):
+        """
+        Re-expand tabs in original lines with current tab width.
+        This is called when tab width changes or file is first loaded.
+        """
+        # Expand tabs in original lines
+        self.lines = [self.expand_tabs(line) for line in self.original_lines]
+        
+        # Apply syntax highlighting if enabled
+        if self.syntax_highlighting:
+            # Re-create content with expanded tabs for syntax highlighting
+            expanded_content = '\n'.join(self.lines)
+            self.apply_syntax_highlighting(expanded_content)
+        else:
+            # Create plain highlighted lines (no colors)
+            self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
+    
     def load_file(self):
         """Load and process the text file"""
         try:
@@ -108,6 +126,7 @@ class TextViewer:
                     binary_content = self.file_path.read_bytes()
                     # Check if it contains null bytes (common in binary files)
                     if b'\x00' in binary_content[:1024]:
+                        self.original_lines = ["[Binary file - cannot display as text]"]
                         self.lines = ["[Binary file - cannot display as text]"]
                         self.highlighted_lines = [[("[Binary file - cannot display as text]", COLOR_REGULAR_FILE)]]
                         return
@@ -115,36 +134,35 @@ class TextViewer:
                         # Try to decode as latin-1 as a last resort (it can decode any byte sequence)
                         content = binary_content.decode('latin-1', errors='replace')
                 except Exception:
+                    self.original_lines = ["[Binary file - cannot display as text]"]
                     self.lines = ["[Binary file - cannot display as text]"]
                     self.highlighted_lines = [[("[Binary file - cannot display as text]", COLOR_REGULAR_FILE)]]
                     return
                 
-            # Split into lines and expand tabs
-            self.lines = [self.expand_tabs(line) for line in content.splitlines()]
+            # Store original lines with tabs preserved
+            self.original_lines = content.splitlines()
             
-            # Apply syntax highlighting if enabled
-            if self.syntax_highlighting:
-                # Re-create content with expanded tabs for syntax highlighting
-                expanded_content = '\n'.join(self.lines)
-                self.apply_syntax_highlighting(expanded_content)
-            else:
-                # Create plain highlighted lines (no colors)
-                self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
+            # Expand tabs for display
+            self.refresh_tab_expansion()
                 
         except FileNotFoundError:
             error_msg = f"File not found: {self.file_path}"
+            self.original_lines = [error_msg]
             self.lines = [error_msg]
             self.highlighted_lines = [[(error_msg, COLOR_ERROR)]]
         except PermissionError:
             error_msg = f"Permission denied: {self.file_path}"
+            self.original_lines = [error_msg]
             self.lines = [error_msg]
             self.highlighted_lines = [[(error_msg, COLOR_ERROR)]]
         except OSError as e:
             error_msg = f"Error reading file: {e}"
+            self.original_lines = [error_msg]
             self.lines = [error_msg]
             self.highlighted_lines = [[(error_msg, COLOR_ERROR)]]
         except Exception as e:
             error_msg = f"Unexpected error reading file: {e}"
+            self.original_lines = [error_msg]
             self.lines = [error_msg]
             self.highlighted_lines = [[(error_msg, COLOR_ERROR)]]
     
@@ -534,7 +552,7 @@ class TextViewer:
             self.renderer.draw_text(1, 2, isearch_prompt[:width-4], search_color_pair, search_attrs)
         else:
             # Show normal controls
-            controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:numbers w:wrap s:syntax"
+            controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:numbers w:wrap s:syntax t:tab-width"
             
             # Center the controls or left-align if too long
             if len(controls) + 4 < width:
@@ -633,6 +651,7 @@ class TextViewer:
             options.append("WRAP")
         if PYGMENTS_AVAILABLE and self.syntax_highlighting:
             options.append("SYNTAX")
+        options.append(f"TAB:{self.tab_width}")
         
         if options:
             right_parts.extend(options)
@@ -855,6 +874,17 @@ class TextViewer:
             elif char_lower == 'f':
                 # Enter isearch mode
                 self.enter_isearch_mode()
+            elif char_lower == 't':
+                # Cycle through tab widths: 2, 4, 8
+                if self.tab_width == 2:
+                    self.tab_width = 4
+                elif self.tab_width == 4:
+                    self.tab_width = 8
+                else:
+                    self.tab_width = 2
+                
+                # Re-expand tabs with new tab width
+                self.refresh_tab_expansion()
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
