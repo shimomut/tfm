@@ -55,6 +55,18 @@ The CoreGraphics backend's drawRect_() method contains a performance bottleneck 
 
 ### Requirement 4
 
+**User Story:** As a developer, I want a reproducible test case that demonstrates the performance bottleneck, so that I can measure the impact of optimizations.
+
+#### Acceptance Criteria
+
+1. WHEN running the performance test THEN the system SHALL create a scenario with maximum character drawing workload
+2. WHEN the test fills the grid THEN the system SHALL use non-space characters across the entire 24x80 grid
+3. WHEN the test applies attributes THEN the system SHALL use various color pairs, bold, underline, and reverse attributes
+4. WHEN measuring the baseline THEN the system SHALL demonstrate t4-t3 time of approximately 0.03 seconds (30ms)
+5. WHEN the test executes THEN the system SHALL provide clear timing output for the character drawing phase
+
+### Requirement 5
+
 **User Story:** As a developer, I want to verify that optimizations work correctly, so that I can ensure no regressions are introduced.
 
 #### Acceptance Criteria

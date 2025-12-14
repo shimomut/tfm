@@ -1,341 +1,530 @@
-# Design Document
+# Character Drawing Optimization Design
 
 ## Overview
 
-The CoreGraphics backend's drawRect_() method contains a performance bottleneck in the character drawing phase (Phase 2). Profiling reveals that drawing characters takes approximately 0.03 seconds (30ms) for a full-screen update. This design document analyzes the root causes and proposes optimizations to reduce this time to under 0.01 seconds (10ms).
+This design addresses the performance bottleneck in the CoreGraphics backend's character drawing phase. Current profiling shows the "Draw characters" section (t4-t3) takes approximately 30ms for a full-screen update, which is unacceptable for responsive UI rendering. The goal is to reduce this to under 10ms through systematic optimization of NSAttributedString creation, attribute dictionary management, and character iteration patterns.
+
+The optimization will focus on minimizing object allocations, reducing dictionary operations, and implementing strategic caching while maintaining pixel-perfect visual compatibility with the current implementation.
 
 ## Architecture
 
-The current rendering pipeline in drawRect_() consists of five phases:
+### Current Implementation Analysis
 
-1. **Calculate dirty region** (t1-t0): Determine which cells need redrawing
-2. **Iterate and batch backgrounds** (t2-t1): Loop through cells, accumulate into batches ✅ OPTIMIZED (0.65ms)
-3. **Draw batched backgrounds** (t3-t2): Render all background rectangles
-4. **Draw characters** (t4-t3): Render all non-space characters ⚠️ BOTTLENECK (30ms)
-5. **Draw cursor** (t5-t4): Render cursor if visible
+The character drawing phase currently follows this pattern:
 
-The bottleneck occurs in phase 4, where we iterate through every cell in the dirty region and create NSAttributedString objects for non-space characters.
+1. **Iterate through dirty region cells** - Loop over rows and columns in the dirty rectangle
+2. **Skip space characters** - Optimization to avoid drawing spaces
+3. **Build attribute dictionary** - Create a new dictionary for each character with NSFont, NSForegroundColor, and optional NSUnderlineStyle
+4. **Create NSAttributedString** - Instantiate a new attributed string for each character
+5. **Draw to context** - Render the attributed string at the calculated position
+
+**Identified Bottlenecks:**
+- Dictionary allocation for every non-space character
+- NSAttributedString object creation for every character
+- Repeated font and color object lookups from caches
+- Python dictionary operations for attribute building
+
+### Proposed Architecture
+
+The optimized architecture will implement a multi-level caching and batching strategy:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            Character Drawing Phase (Phase 2)                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │   Attribute Dictionary Cache                          │ │
+│  │   Key: (font_key, color_rgb, underline)              │ │
+│  │   Value: Pre-built NSDictionary                       │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                           ↓                                 │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │   NSAttributedString Cache                            │ │
+│  │   Key: (string, font_key, color_rgb, underline)      │ │
+│  │   Value: Pre-built NSAttributedString                 │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                           ↓                                 │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │   Character Drawing Loop with Batching                │ │
+│  │   - Iterate dirty region row by row                   │ │
+│  │   - Identify runs of characters with same attributes  │ │
+│  │   - Batch continuous characters into single string    │ │
+│  │   - Lookup/create cached NSAttributedString           │ │
+│  │   - Single drawAtPoint_ call per batch                │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Architectural Changes:**
+
+1. **Character Batching:** Instead of drawing each character individually, identify continuous runs of characters with identical attributes and draw them as a single string
+2. **NSAttributedString Caching:** Cache pre-built NSAttributedString objects to eliminate repeated instantiation overhead
+3. **Dual-Level Caching:** Attribute dictionaries cached for building new strings, NSAttributedString objects cached for reuse
 
 ## Components and Interfaces
 
-### Current Implementation Analysis
+### 1. Attribute Dictionary Cache
 
-The character drawing code (lines 2015-2070) performs these operations for each non-space cell:
+**Purpose:** Eliminate repeated dictionary allocations by caching pre-built attribute dictionaries.
 
+**Interface:**
 ```python
-for row in range(start_row, end_row):
-    for col in range(start_col, end_col):
-        # 1. Grid access
-        char, color_pair, attributes = grid[row][col]
-        
-        # 2. Skip spaces
+class AttributeDictCache:
+    def __init__(self, font_cache: FontCache, color_cache: ColorCache):
+        self._cache: Dict[Tuple[str, Tuple[int, int, int], bool], NSDictionary] = {}
+        self._font_cache = font_cache
+        self._color_cache = color_cache
+    
+    def get_attributes(self, font_key: str, color_rgb: Tuple[int, int, int], 
+                      underline: bool) -> NSDictionary:
+        """Get or create cached attribute dictionary."""
+        pass
+    
+    def clear(self):
+        """Clear the cache when needed."""
+        pass
+```
+
+**Key Design Decisions:**
+- Cache key uses tuple of (font_key, color_rgb, underline) for fast lookup
+- Pre-builds NSDictionary objects to avoid Python dict → NSDictionary conversion overhead
+- Integrates with existing FontCache and ColorCache
+- Cache clearing strategy: clear on terminal resize or color scheme change
+
+### 2. NSAttributedString Cache
+
+**Purpose:** Eliminate repeated NSAttributedString instantiation by caching pre-built attributed strings.
+
+**Interface:**
+```python
+class AttributedStringCache:
+    def __init__(self, attr_dict_cache: AttributeDictCache):
+        self._cache: Dict[Tuple[str, str, Tuple[int, int, int], bool], NSAttributedString] = {}
+        self._attr_dict_cache = attr_dict_cache
+        self._max_cache_size = 1000  # Limit cache growth
+    
+    def get_attributed_string(self, text: str, font_key: str, 
+                             color_rgb: Tuple[int, int, int], 
+                             underline: bool) -> NSAttributedString:
+        """Get or create cached NSAttributedString."""
+        pass
+    
+    def clear(self):
+        """Clear the cache when needed."""
+        pass
+```
+
+**Key Design Decisions:**
+- Cache key includes the actual text string plus all attributes
+- Implements LRU eviction when cache exceeds max_cache_size
+- Particularly effective for repeated strings (common in file listings: "..", ".", common extensions)
+- Integrates with AttributeDictCache for building new strings
+- Cache clearing strategy: clear on terminal resize or color scheme change
+
+**Performance Impact:**
+- Eliminates NSAttributedString.alloc().initWithString_attributes_() overhead for repeated strings
+- Most effective for common patterns: directory names, file extensions, repeated UI elements
+- Batched strings also benefit from caching when patterns repeat
+
+### 3. Optimized Character Drawing Loop with Batching
+
+**Current Pattern (One drawAtPoint_ per character):**
+```python
+for row in range(dirty_top, dirty_bottom):
+    for col in range(dirty_left, dirty_right):
+        char = grid[row][col]['char']
         if char == ' ':
             continue
         
-        # 3. Calculate position (2 multiplications)
-        x = col * char_width
-        y = (rows - row - 1) * char_height
-        
-        # 4. Color pair lookup
-        fg_rgb, bg_rgb = color_pairs.get(color_pair, color_pairs[0])
-        
-        # 5. Handle reverse video
-        if attributes & TextAttribute.REVERSE:
-            fg_rgb, bg_rgb = bg_rgb, fg_rgb
-        
-        # 6. Get cached color
-        fg_color = self.backend._color_cache.get_color(*fg_rgb)
-        
-        # 7. Get cached font
-        font = self.backend._font_cache.get_font(attributes)
-        
-        # 8. Build attributes dictionary (3-4 key-value pairs)
-        text_attributes = {
-            Cocoa.NSFontAttributeName: font,
-            Cocoa.NSForegroundColorAttributeName: fg_color
+        # Build attributes dict (SLOW)
+        attrs = {
+            NSFontAttributeName: font_cache.get_font(...),
+            NSForegroundColorAttributeName: color_cache.get_color(...),
         }
-        if attributes & TextAttribute.UNDERLINE:
-            text_attributes[Cocoa.NSUnderlineStyleAttributeName] = (
-                Cocoa.NSUnderlineStyleSingle
-            )
+        if underline:
+            attrs[NSUnderlineStyleAttributeName] = NSUnderlineStyleSingle
         
-        # 9. Create NSAttributedString (object allocation)
-        attr_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
-            char,
-            text_attributes
-        )
-        
-        # 10. Draw character (CoreGraphics API call)
-        attr_string.drawAtPoint_(Cocoa.NSMakePoint(x, y))
+        # Create attributed string (SLOW)
+        attr_str = NSAttributedString.alloc().initWithString_attributes_(char, attrs)
+        attr_str.drawAtPoint_(NSPoint(x, y))  # One call per character
 ```
 
-### Performance Analysis
+**Optimized Pattern (Batching + Caching):**
+```python
+for row in range(dirty_top, dirty_bottom):
+    col = dirty_left
+    while col < dirty_right:
+        # Skip leading spaces
+        while col < dirty_right and grid[row][col]['char'] == ' ':
+            col += 1
+        
+        if col >= dirty_right:
+            break
+        
+        # Start of a run - get attributes for first character
+        start_col = col
+        start_attrs = (font_key, color_rgb, underline)
+        batch_chars = []
+        
+        # Collect continuous characters with same attributes
+        while col < dirty_right:
+            char = grid[row][col]['char']
+            if char == ' ':
+                break
+            
+            current_attrs = (font_key, color_rgb, underline)
+            if current_attrs != start_attrs:
+                break
+            
+            batch_chars.append(char)
+            col += 1
+        
+        # Draw the batched string with cached NSAttributedString
+        if batch_chars:
+            batch_text = ''.join(batch_chars)
+            attr_str = attributed_string_cache.get_attributed_string(
+                batch_text, *start_attrs
+            )
+            attr_str.drawAtPoint_(NSPoint(x_start, y))  # One call per batch
+```
 
-For a 24x80 grid (1920 cells), assuming ~50% are non-space characters (960 characters):
-- **960 grid accesses**: `grid[row][col]`
-- **1920 multiplications**: 2 per cell for x and y calculations
-- **960 dictionary lookups**: `color_pairs.get()`
-- **960 conditional checks**: reverse video and underline
-- **960 cache lookups**: font and color cache
-- **960 dictionary allocations**: `text_attributes` dictionary
-- **960 NSAttributedString creations**: Object allocation and initialization
-- **960 CoreGraphics API calls**: `drawAtPoint_()`
+**Key Optimizations:**
+1. **Batching:** Multiple characters drawn with single drawAtPoint_() call
+2. **NSAttributedString Caching:** Reuse pre-built attributed strings
+3. **Attribute Dictionary Caching:** Fast attribute lookup for new strings
+4. **Space Skipping:** Skip entire runs of spaces efficiently
 
-The primary bottlenecks are:
-1. **NSAttributedString creation overhead**: Creating 960 objects per frame is expensive
-2. **Dictionary allocations**: Creating 960 `text_attributes` dictionaries
-3. **Repeated calculations**: Y-coordinate calculated for every cell (same as Phase 1)
-4. **Attribute access overhead**: Repeated access to `self.backend` attributes
+**Performance Impact:**
+- Reduces drawAtPoint_() calls from ~1920 (24x80) to ~50-200 (depending on attribute changes)
+- Eliminates most NSAttributedString instantiations through caching
+- Particularly effective for file listings with repeated patterns
+
+### 4. Integration with Existing Caches
+
+The new caching layers will integrate with:
+
+- **FontCache** - Provides NSFont objects for different text attributes
+- **ColorCache** - Provides NSColor objects for RGB values
+- **Existing drawRect_() structure** - Changes to character drawing loop, but maintains overall flow
+
+**Cache Hierarchy:**
+```
+FontCache ──┐
+            ├──> AttributeDictCache ──> AttributedStringCache ──> Drawing Loop
+ColorCache ─┘
+```
+
+**Cache Lifecycle:**
+- All caches cleared on terminal resize
+- All caches cleared on color scheme change
+- AttributedStringCache implements LRU eviction for memory management
 
 ## Data Models
 
-No changes to data models are required. The optimization focuses on algorithmic improvements and reducing object creation overhead.
+### Attribute Dictionary Cache Entry
+
+```python
+AttrDictCacheKey = Tuple[str, Tuple[int, int, int], bool]
+# (font_key, (r, g, b), underline)
+
+AttrDictCacheValue = NSDictionary
+# Pre-built dictionary with NSFont, NSForegroundColor, optional NSUnderlineStyle
+```
+
+**Cache Key Components:**
+- `font_key`: String identifying font attributes (e.g., "normal", "bold", "bold_underline")
+- `color_rgb`: Tuple of (red, green, blue) values (0-255)
+- `underline`: Boolean indicating if underline style should be applied
+
+**Cache Value:**
+- Immutable NSDictionary containing all required text attributes
+- Created once and reused for all characters with same attributes
+
+### NSAttributedString Cache Entry
+
+```python
+AttrStringCacheKey = Tuple[str, str, Tuple[int, int, int], bool]
+# (text, font_key, (r, g, b), underline)
+
+AttrStringCacheValue = NSAttributedString
+# Pre-built NSAttributedString ready for drawing
+```
+
+**Cache Key Components:**
+- `text`: The actual string content (single character or batched string)
+- `font_key`: String identifying font attributes
+- `color_rgb`: Tuple of (red, green, blue) values (0-255)
+- `underline`: Boolean indicating if underline style should be applied
+
+**Cache Value:**
+- Immutable NSAttributedString object ready for drawAtPoint_()
+- Eliminates alloc().initWithString_attributes_() overhead
+
+**Cache Size Management:**
+- Maximum 1000 entries (configurable)
+- LRU eviction when limit reached
+- Common strings cached: "..", ".", file extensions, repeated directory names
+
+### Performance Metrics Data Model
+
+```python
+@dataclass
+class CharacterDrawingMetrics:
+    total_time: float                    # Total time for character drawing phase (t4-t3)
+    characters_drawn: int                # Number of non-space characters drawn
+    batches_drawn: int                   # Number of drawAtPoint_() calls made
+    avg_batch_size: float                # Average characters per batch
+    attr_dict_cache_hits: int           # Attribute dict cache hits
+    attr_dict_cache_misses: int         # Attribute dict cache misses
+    attr_string_cache_hits: int         # NSAttributedString cache hits
+    attr_string_cache_misses: int       # NSAttributedString cache misses
+    avg_time_per_char: float            # Average time per character (microseconds)
+    avg_time_per_batch: float           # Average time per batch (microseconds)
+```
 
 ## Correctness Properties
 
-*A property is a characteristic or behavior that should hold true across all valid executions of a system-essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
+*A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
-### Property Reflection
+### Property 1: Visual Output Equivalence
+*For any* grid state and dirty region, the optimized character drawing implementation SHALL produce pixel-identical output to the original implementation.
 
-After reviewing the acceptance criteria, I identified the following testable properties:
+**Validates: Requirements 3.5**
 
-1. Performance property (1.1): Character drawing completes in under 10ms
-2. Correctness property (3.5, 4.1): Optimized code produces identical visual output
-3. Performance improvement property (4.2, 4.4): Optimized version is measurably faster
+**Testing Strategy:** Capture screenshots before and after optimization, compare pixel-by-pixel.
 
-Properties 3.5 and 4.1 are redundant - they both test that the optimized code produces identical output. We can combine these into a single comprehensive property.
+### Property 2: Performance Improvement
+*For any* full-screen character drawing operation, the optimized implementation SHALL complete in under 10ms (compared to baseline ~30ms).
 
-Properties 4.2 and 4.4 are also redundant - they both test performance improvement. We can combine these into a single property.
-
-After eliminating redundancy, we have three unique properties:
-1. Performance target property
-2. Correctness property (identical output)
-3. Performance improvement property
-
-### Correctness Properties
-
-Property 1: Character drawing performance target
-*For any* grid state with a 24x80 dirty region containing non-space characters, the character drawing phase should complete in under 0.01 seconds (10ms)
 **Validates: Requirements 1.1**
 
-Property 2: Visual output equivalence
-*For any* grid state and dirty region, the optimized implementation should produce identical visual output to the original implementation
-**Validates: Requirements 3.5, 4.1**
+**Testing Strategy:** Run performance test with maximum character workload, measure t4-t3 delta.
 
-Property 3: Performance improvement
-*For any* grid state with a full-screen dirty region, the optimized implementation should be measurably faster than the original implementation (at least 50% faster)
-**Validates: Requirements 4.2, 4.4**
+### Property 3: Attribute Dictionary Cache Correctness
+*For any* sequence of character drawing operations with identical attributes, the attribute dictionary cache SHALL return the same NSDictionary object on subsequent lookups.
 
-## Proposed Optimizations
+**Validates: Requirements 3.4**
 
-### Optimization 1: Cache Frequently Accessed Attributes (Similar to Phase 1)
+**Testing Strategy:** Verify cache returns same object reference for identical keys.
 
-**Problem**: `self.backend.char_width`, `self.backend.char_height`, `self.backend.rows`, etc. are accessed in every iteration.
+### Property 5: NSAttributedString Cache Correctness
+*For any* sequence of character drawing operations with identical text and attributes, the NSAttributedString cache SHALL return the same NSAttributedString object on subsequent lookups.
 
-**Solution**: Reuse the cached values from Phase 1 or cache them again at the start of Phase 2:
+**Validates: Requirements 3.4**
 
-```python
-# Already cached in Phase 1, reuse them
-char_width = self.backend.char_width
-char_height = self.backend.char_height
-rows = self.backend.rows
-grid = self.backend.grid
-color_pairs = self.backend.color_pairs
-```
+**Testing Strategy:** Verify cache returns same object reference for identical (text, attributes) keys.
 
-**Expected Impact**: Reduces attribute access overhead by ~960 accesses per frame.
+### Property 6: Batching Correctness
+*For any* row of characters, batching continuous characters with identical attributes SHALL produce the same visual output as drawing each character individually.
 
-### Optimization 2: Pre-calculate Row Y-Coordinates (Similar to Phase 1)
+**Validates: Requirements 3.5**
 
-**Problem**: `(rows - row - 1) * char_height` is recalculated for every cell in the same row.
+**Testing Strategy:** Compare output of batched vs. individual character drawing.
 
-**Solution**: Calculate y-coordinate once per row:
+### Property 4: Attribute Dictionary Completeness
+*For any* cached attribute dictionary, it SHALL contain all required keys (NSFont, NSForegroundColor, and NSUnderlineStyle when applicable).
 
-```python
-for row in range(start_row, end_row):
-    y = (rows - row - 1) * char_height  # Calculate once per row
-    for col in range(start_col, end_col):
-        # ... rest of loop
-```
+**Validates: Requirements 3.1, 3.5**
 
-**Expected Impact**: Reduces multiplications from 1920 to 24 (98% reduction).
-
-### Optimization 3: Cache Attribute Dictionaries
-
-**Problem**: Creating a new dictionary for every character is expensive. Most characters use the same font and color combinations.
-
-**Solution**: Create a cache of attribute dictionaries keyed by (font, color, underline):
-
-```python
-# At class level
-self._attr_dict_cache = {}
-
-# In drawing loop
-cache_key = (font, fg_color, bool(attributes & TextAttribute.UNDERLINE))
-if cache_key not in self._attr_dict_cache:
-    text_attributes = {
-        Cocoa.NSFontAttributeName: font,
-        Cocoa.NSForegroundColorAttributeName: fg_color
-    }
-    if attributes & TextAttribute.UNDERLINE:
-        text_attributes[Cocoa.NSUnderlineStyleAttributeName] = (
-            Cocoa.NSUnderlineStyleSingle
-        )
-    self._attr_dict_cache[cache_key] = text_attributes
-else:
-    text_attributes = self._attr_dict_cache[cache_key]
-```
-
-**Expected Impact**: Reduces dictionary allocations from 960 to ~10-20 per frame (95-98% reduction).
-
-### Optimization 4: Batch Character Drawing
-
-**Problem**: Creating 960 NSAttributedString objects and making 960 drawAtPoint_() calls is expensive.
-
-**Solution**: Investigate batching characters with the same attributes into a single NSAttributedString:
-
-```python
-# Accumulate characters with same attributes
-char_batch = []
-for col in range(start_col, end_col):
-    if same_attributes:
-        char_batch.append(char)
-    else:
-        # Draw accumulated batch
-        draw_batch(char_batch)
-        char_batch = [char]
-```
-
-**Expected Impact**: Potentially significant reduction in NSAttributedString creations and API calls.
-
-**Trade-off**: More complex code, may not work well with variable-width fonts or complex layouts.
-
-### Optimization 5: Use NSString drawAtPoint:withAttributes: Directly
-
-**Problem**: Creating NSAttributedString objects adds overhead.
-
-**Solution**: Use NSString's drawAtPoint:withAttributes: method directly:
-
-```python
-# Instead of creating NSAttributedString
-ns_string = Cocoa.NSString.stringWithString_(char)
-ns_string.drawAtPoint_withAttributes_(
-    Cocoa.NSMakePoint(x, y),
-    text_attributes
-)
-```
-
-**Expected Impact**: Eliminates NSAttributedString allocation overhead, potentially 20-30% faster.
-
-## Implementation Strategy
-
-We will implement optimizations incrementally and measure the impact of each:
-
-1. **Phase 1**: Implement Optimizations 1-2 (caching, pre-calculation)
-   - Low-risk, proven optimizations from Phase 1
-   - Measure performance improvement
-   - Verify correctness
-
-2. **Phase 2**: Implement Optimization 3 (attribute dictionary caching)
-   - Medium complexity, high potential impact
-   - Measure performance improvement
-   - Verify correctness
-
-3. **Phase 3**: Evaluate Optimization 5 (NSString direct drawing)
-   - Test if it provides significant improvement
-   - Simpler than batching (Optimization 4)
-   - Measure actual impact
-
-4. **Phase 4**: Consider Optimization 4 (batching) if needed
-   - Only if we haven't reached the 10ms target
-   - Most complex, evaluate trade-offs carefully
+**Testing Strategy:** Inspect cached dictionaries to verify all required attributes are present.
 
 ## Error Handling
 
-The optimization should maintain the same error handling behavior as the original implementation:
-- Handle missing color pairs gracefully (fall back to default)
-- Handle missing fonts gracefully (fall back to default)
-- Maintain exception handling for any unexpected errors
+### Cache Management Errors
+
+**Scenario:** Cache grows too large in memory
+- **Detection:** Monitor cache size during operation
+- **Response:** Implement LRU eviction or clear cache on memory pressure
+- **Recovery:** Cache will rebuild entries as needed
+
+**Scenario:** Font or color cache returns None
+- **Detection:** Check return values from font_cache.get_font() and color_cache.get_color()
+- **Response:** Log warning and skip character drawing for that cell
+- **Recovery:** Character will be drawn on next frame when cache is populated
+
+### Drawing Errors
+
+**Scenario:** NSAttributedString creation fails
+- **Detection:** Catch exceptions during initWithString_attributes_()
+- **Response:** Log error with character and attributes, continue with next character
+- **Recovery:** Skip problematic character, maintain rendering stability
+
+**Scenario:** Drawing outside bounds
+- **Detection:** Validate x, y coordinates before drawAtPoint_()
+- **Response:** Skip drawing for out-of-bounds characters
+- **Recovery:** Continue with remaining characters in dirty region
 
 ## Testing Strategy
 
 ### Unit Testing
 
-Unit tests will verify:
-- Correct caching of attributes
-- Correct pre-calculation of y-coordinates
-- Correct attribute dictionary caching
-- Edge cases (empty dirty region, single character, full screen)
+**Test Coverage:**
+1. **Attribute Dictionary Cache Tests**
+   - Test cache hit/miss behavior
+   - Verify correct attribute dictionary construction
+   - Test cache clearing functionality
+   - Verify integration with font and color caches
+
+2. **NSAttributedString Cache Tests**
+   - Test cache hit/miss behavior for repeated strings
+   - Verify LRU eviction when cache limit reached
+   - Test cache clearing functionality
+   - Verify correct attributed string construction
+
+3. **Character Batching Tests**
+   - Test identification of continuous character runs
+   - Verify correct batch boundary detection (attribute changes)
+   - Test space skipping within batching logic
+   - Verify correct coordinate calculations for batches
+
+4. **Character Drawing Loop Tests**
+   - Test batching with various attribute patterns
+   - Verify correct attribute lookup
+   - Test dirty region iteration
+   - Verify coordinate calculations
+
+5. **Edge Cases**
+   - Empty dirty region
+   - Single character dirty region
+   - Full-screen dirty region
+   - Row with all same attributes (maximum batching)
+   - Row with all different attributes (no batching benefit)
+   - Alternating attributes (worst case for batching)
+   - Rows with leading/trailing spaces
 
 ### Property-Based Testing
 
-Property-based tests will verify the three correctness properties:
+**Property Tests:**
+1. **Visual Equivalence Property Test**
+   - Generate random grid states with various attributes
+   - Render with both original and optimized implementations
+   - Compare output pixel-by-pixel
+   - **Validates: Property 1**
 
-1. **Performance Target Property Test**:
-   - Generate random grid states with various characters
-   - Measure character drawing time for full-screen dirty region
-   - Assert time < 0.01 seconds (10ms)
-   - Run 100 iterations to account for variance
+2. **Performance Property Test**
+   - Generate maximum workload scenarios (full grid, all non-space)
+   - Measure character drawing phase time
+   - Verify time is consistently under 10ms threshold
+   - **Validates: Property 2**
 
-2. **Visual Output Equivalence Property Test**:
-   - Generate random grid states
-   - Run both original and optimized implementations
-   - Compare the visual output (same characters, positions, colors, attributes)
-   - Run 100 iterations with different grid states
+3. **Attribute Dictionary Cache Consistency Property Test**
+   - Generate random sequences of attribute lookups
+   - Verify cache returns consistent results for same keys
+   - Verify cache hit rate improves with repeated patterns
+   - **Validates: Property 3**
 
-3. **Performance Improvement Property Test**:
-   - Generate random grid states
-   - Measure time for both implementations
-   - Assert optimized is at least 50% faster
-   - Run 100 iterations to account for variance
+4. **NSAttributedString Cache Consistency Property Test**
+   - Generate random sequences of (text, attributes) lookups
+   - Verify cache returns consistent results for same keys
+   - Verify LRU eviction maintains most-used entries
+   - **Validates: Property 5**
+
+5. **Batching Correctness Property Test**
+   - Generate random rows with various attribute patterns
+   - Compare batched drawing output to individual character drawing
+   - Verify pixel-identical results
+   - **Validates: Property 6**
+
+### Performance Testing
+
+**Baseline Measurement:**
+- Create test scenario with 24x80 grid filled with non-space characters
+- Apply various color pairs, bold, underline, and reverse attributes
+- Measure t4-t3 time delta (expected: ~30ms)
+- Record as baseline for comparison
+
+**Optimization Measurement:**
+- Run same test scenario with optimized implementation
+- Measure t4-t3 time delta (target: <10ms)
+- Calculate improvement percentage
+- Verify visual output matches baseline
+
+**Test Script:** `test/test_character_drawing_performance.py`
+**Demo Script:** `demo/demo_character_drawing_optimization.py`
 
 ### Integration Testing
 
-Integration tests will:
-- Run the full drawRect_() method with optimized character drawing
-- Verify visual output matches original implementation
-- Use existing visual correctness tests
-- Measure end-to-end rendering performance
+**Full Rendering Pipeline:**
+1. Test character drawing optimization within complete drawRect_() flow
+2. Verify all rendering phases work correctly together
+3. Test with real TFM usage scenarios (file browsing, text viewing)
+4. Verify no visual regressions in actual application use
 
-## Performance Targets
+**Cache Integration:**
+1. Test attribute dict cache with existing font cache
+2. Test attribute dict cache with existing color cache
+3. Test NSAttributedString cache with attribute dict cache
+4. Verify all caches clear on terminal resize
+5. Verify all caches clear on color scheme change
+6. Test LRU eviction in NSAttributedString cache under memory pressure
 
-Based on the analysis, we expect the following improvements:
+## Implementation Notes
 
-| Optimization | Expected Time Reduction |
-|-------------|------------------------|
-| Baseline (current) | 30.0ms |
-| After Opt 1-2 (caching + pre-calc) | 25.0ms (-17%) |
-| After Opt 3 (attr dict cache) | 15.0ms (-40%) |
-| After Opt 5 (NSString direct) | 8.0ms (-47%) |
-| **Target** | **< 10.0ms** |
+### Optimization Priorities
 
-These are estimates based on the analysis. Actual results will be measured during implementation.
+1. **Highest Impact:** Character batching (reduces drawAtPoint_() calls by 10-40x)
+2. **High Impact:** NSAttributedString caching (eliminates repeated instantiation)
+3. **High Impact:** Attribute dictionary caching (eliminates dictionary operations)
+4. **Medium Impact:** Efficient space skipping in batching logic
+5. **Low Impact:** Loop micro-optimizations (already efficient)
 
-## Risks and Mitigation
+**Expected Performance Gains:**
+- Batching: 50-70% reduction in drawing time (fewer CoreGraphics calls)
+- NSAttributedString caching: 20-30% additional reduction (for repeated patterns)
+- Attribute dictionary caching: 10-15% additional reduction (faster string creation)
+- Combined: 70-85% total reduction (30ms → 5-9ms)
 
-### Risk 1: Optimizations Don't Achieve Target
+### Compatibility Considerations
 
-**Mitigation**: If optimizations 1-3 and 5 don't reach the target, we have optimization 4 (batching) as a fallback. If that's still insufficient, we may need to consider:
-- Using Core Text API directly (lower-level than NSAttributedString)
-- Implementing character drawing in Objective-C or Swift
-- Caching rendered character glyphs as images
+- Maintain compatibility with existing FontCache and ColorCache interfaces
+- No changes required to grid data structure
+- Minimal changes to drawRect_() method signature
+- Cache clearing hooks into existing resize and color scheme change events
 
-### Risk 2: Correctness Regression
+### Performance Monitoring
 
-**Mitigation**: Comprehensive property-based testing will catch any correctness issues. We'll run 100+ iterations with random grid states to ensure the optimized code produces identical results.
+Add instrumentation to track:
+- Attribute dictionary cache hit/miss rates
+- NSAttributedString cache hit/miss rates
+- Average batch size (characters per drawAtPoint_() call)
+- Number of batches per frame
+- Average time per character
+- Average time per batch
+- Total characters drawn per frame
+- Cache sizes and memory usage
+- Batching efficiency (actual vs. theoretical maximum)
 
-### Risk 3: Code Maintainability
+### Future Enhancements
 
-**Mitigation**: We'll prioritize optimizations that maintain code clarity. Optimization 4 (batching) will only be implemented if necessary, and we'll document the trade-offs clearly.
+Potential further optimizations (out of scope for this feature):
+- GPU-accelerated text rendering using Metal
+- Pre-rendered glyph atlas for common characters
+- Incremental dirty region tracking to minimize redraws
+- Multi-threaded batch preparation (prepare batches while drawing previous frame)
+- Adaptive cache sizing based on available memory
 
-### Risk 4: Cache Memory Overhead
+## Dependencies
 
-**Mitigation**: The attribute dictionary cache will be bounded in size (limited by the number of unique font/color/underline combinations). We'll monitor memory usage and implement cache eviction if needed.
+- **Existing Components:**
+  - FontCache (src/tfm_backend_coregraphics.py)
+  - ColorCache (src/tfm_backend_coregraphics.py)
+  - CoreGraphicsBackend.drawRect_() method
+  
+- **External Libraries:**
+  - PyObjC (Cocoa, AppKit, Foundation)
+  - CoreGraphics framework
 
-## Future Enhancements
+- **Testing Dependencies:**
+  - pytest for unit tests
+  - Hypothesis for property-based tests
+  - Performance profiling tools (cProfile, time module)
 
-After achieving the performance target, we can consider:
-1. **Glyph caching**: Cache rendered character glyphs as images
-2. **Core Text API**: Use lower-level Core Text for more control
-3. **Parallel processing**: Use multiple threads for large dirty regions
-4. **GPU acceleration**: Investigate using Metal for text rendering (future spec)
+## Success Criteria
+
+1. **Performance:** Character drawing phase (t4-t3) completes in <10ms for full-screen updates
+2. **Correctness:** Pixel-identical visual output compared to original implementation
+3. **Stability:** No crashes or visual artifacts during normal operation
+4. **Maintainability:** Code remains clean and well-documented
+5. **Test Coverage:** All properties verified through automated tests
