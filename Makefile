@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-debug run-log monitor-log test test-quick clean install dev-install lint format demo
+.PHONY: help run run-debug run-profile monitor-log test test-quick clean install dev-install lint format demo
 
 # Backend selection (default: curses)
 # Usage: make run BACKEND=coregraphics
@@ -12,8 +12,9 @@ help:
 	@echo ""
 	@echo "Available commands:"
 	@echo "  run          - Run TFM"
-	@echo "  run-debug    - Run TFM with debug mode (full stack traces)"
-	@echo "  run-log      - Run TFM with remote log monitoring"
+	@echo "  run-debug    - Run TFM with debug mode and remote log monitoring"
+	@echo "  run-profile  - Run TFM with performance profiling enabled"
+	@echo "  monitor-log  - Connect to remote log monitoring (port 8123)"
 	@echo "  test         - Run all tests"
 	@echo "  test-quick   - Run quick verification tests"
 	@echo "  clean        - Clean up temporary files"
@@ -36,12 +37,12 @@ run:
 	@python3 tfm.py --backend $(BACKEND)
 
 run-debug:
-	@echo "Running TFM with debug mode (backend: $(BACKEND))..."
-	@python3 tfm.py --backend $(BACKEND) --debug
+	@echo "Running TFM with debug mode and remote log monitoring (backend: $(BACKEND))..."
+	@python3 tfm.py --backend $(BACKEND) --debug --remote-log-port 8123
 
-run-log:
-	@echo "Running TFM with remote log monitoring (backend: $(BACKEND))..."
-	@python3 tfm.py --backend $(BACKEND) --remote-log-port 8123
+run-profile:
+	@echo "Running TFM with performance profiling (backend: $(BACKEND))..."
+	@python3 tfm.py --backend $(BACKEND) --profile
 
 monitor-log:
 	@python3 tools/tfm_log_client.py localhost 8123
