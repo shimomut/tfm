@@ -1294,6 +1294,11 @@ class CoreGraphicsBackend(Renderer):
         # PyObjC method: setTitle_() corresponds to Objective-C setTitle:
         self.window.setTitle_(self.window_title)
         
+        # Store initial window size before frame restoration
+        initial_content_rect = self.window.contentView().frame()
+        initial_width = int(initial_content_rect.size.width)
+        initial_height = int(initial_content_rect.size.height)
+        
         # Enable automatic window frame persistence
         # This tells macOS to automatically save and restore the window's
         # position and size using NSUserDefaults
@@ -1308,6 +1313,28 @@ class CoreGraphicsBackend(Renderer):
             # Catch any other unexpected errors
             # Log warning but continue - persistence is non-critical
             print(f"Warning: Unexpected error enabling window geometry persistence: {e}")
+        
+        # Check if window size changed after frame restoration
+        # setFrameAutosaveName_() immediately restores the saved frame if one exists,
+        # but this happens before the delegate is set up, so no windowDidResize_
+        # notification is sent. We need to manually detect this and set the resize flag.
+        restored_content_rect = self.window.contentView().frame()
+        restored_width = int(restored_content_rect.size.width)
+        restored_height = int(restored_content_rect.size.height)
+        
+        if restored_width != initial_width or restored_height != initial_height:
+            # Window size was restored to a different size
+            # Calculate new grid dimensions
+            new_cols = max(1, restored_width // self.char_width)
+            new_rows = max(1, restored_height // self.char_height)
+            
+            # Update dimensions if they changed
+            if new_cols != self.cols or new_rows != self.rows:
+                self.cols = new_cols
+                self.rows = new_rows
+                # Grid will be initialized with new dimensions in _initialize_grid()
+                # Set flag to generate resize event in get_input()
+                self.resize_pending = True
         
         # Create window delegate to handle window events
         self.window_delegate = TTKWindowDelegate.alloc().initWithBackend_(self)
