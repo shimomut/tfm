@@ -1144,11 +1144,6 @@ class CoreGraphicsBackend(Renderer):
         
         # Window state
         self.should_close = False
-        
-        # Performance metrics (updated during drawRect_)
-        self._last_drawing_time = 0.0
-        self._last_characters_drawn = 0
-        self._last_batches_drawn = 0
     
     def initialize(self) -> None:
         """
@@ -1459,31 +1454,17 @@ class CoreGraphicsBackend(Renderer):
         attr_string_hits = self._attr_string_cache.get_hit_count() if self._attr_string_cache else 0
         attr_string_misses = self._attr_string_cache.get_miss_count() if self._attr_string_cache else 0
         
-        # Use stored values from last drawRect_ call
-        total_time = self._last_drawing_time
-        characters_drawn = self._last_characters_drawn
-        batches_drawn = self._last_batches_drawn
-        
-        # Calculate average batch size
-        avg_batch_size = characters_drawn / batches_drawn if batches_drawn > 0 else 0.0
-        
-        # Calculate average time per character (in microseconds)
-        avg_time_per_char = (total_time * 1_000_000) / characters_drawn if characters_drawn > 0 else 0.0
-        
-        # Calculate average time per batch (in microseconds)
-        avg_time_per_batch = (total_time * 1_000_000) / batches_drawn if batches_drawn > 0 else 0.0
-        
         return CharacterDrawingMetrics(
-            total_time=total_time,
-            characters_drawn=characters_drawn,
-            batches_drawn=batches_drawn,
-            avg_batch_size=avg_batch_size,
+            total_time=0.0,
+            characters_drawn=0,
+            batches_drawn=0,
+            avg_batch_size=0.0,
             attr_dict_cache_hits=attr_dict_hits,
             attr_dict_cache_misses=attr_dict_misses,
             attr_string_cache_hits=attr_string_hits,
             attr_string_cache_misses=attr_string_misses,
-            avg_time_per_char=avg_time_per_char,
-            avg_time_per_batch=avg_time_per_batch
+            avg_time_per_char=0.0,
+            avg_time_per_batch=0.0
         )
     
     def reset_character_drawing_metrics(self):
@@ -2385,8 +2366,6 @@ if COCOA_AVAILABLE:
                     rect: NSRect indicating the region that needs to be redrawn
                 """
 
-                t0 = time.time()
-
                 # Get the current graphics context (may be None if not in drawing context)
                 graphics_context = Cocoa.NSGraphicsContext.currentContext()
                 if graphics_context is None:
@@ -2405,8 +2384,6 @@ if COCOA_AVAILABLE:
                 # Create a batcher to accumulate adjacent cells with same background color
                 batcher = RectangleBatcher()
                 
-                t1 = time.time()
-
                 # ============================================================
                 # DIRTY REGION ITERATION - OPTIMIZED FOR PERFORMANCE
                 # ============================================================
@@ -2494,8 +2471,6 @@ if COCOA_AVAILABLE:
                     # This is called after each row to handle row boundaries correctly
                     batcher.finish_row()
                 
-                t2 = time.time()
-
                 # Draw all batched backgrounds using cached colors
                 for batch in batcher.get_batches():
                     # Get cached NSColor for the background
@@ -2509,8 +2484,6 @@ if COCOA_AVAILABLE:
                     # Draw the batched background with a single API call
                     Cocoa.NSRectFill(batch_rect)
                 
-                t3 = time.time()
-
                 # Phase 2: Draw characters with batching and caching optimization
                 # Instead of drawing each character individually, we identify continuous
                 # runs of characters with the same attributes and draw them as a single
@@ -2533,11 +2506,6 @@ if COCOA_AVAILABLE:
                 # - Reduces drawAtPoint_() calls from ~1920 to ~50-200 per frame
                 # - Eliminates most NSAttributedString instantiations through caching
                 # - Combined: 70-85% reduction in character drawing time
-                
-                # Performance metrics tracking (store as instance variables for later retrieval)
-                self.backend._last_characters_drawn = 0
-                self.backend._last_batches_drawn = 0
-                self.backend._last_drawing_time = 0.0
                 
                 # Reuse cached attributes from Phase 1
                 for row in range(start_row, end_row):
@@ -2603,10 +2571,6 @@ if COCOA_AVAILABLE:
                             # Combine characters into a single string
                             batch_text = ''.join(batch_chars)
                             
-                            # Track metrics
-                            self.backend._last_characters_drawn += len(batch_chars)
-                            self.backend._last_batches_drawn += 1
-                            
                             # Determine if underline attribute is present
                             has_underline = bool(start_attributes & TextAttribute.UNDERLINE)
                             
@@ -2628,11 +2592,6 @@ if COCOA_AVAILABLE:
                             
                             # Draw the entire batch with a single drawAtPoint_() call
                             attr_string.drawAtPoint_(Cocoa.NSMakePoint(x_start, y))
-                
-                t4 = time.time()
-                
-                # Store character drawing time for metrics
-                self.backend._last_drawing_time = t4 - t3
 
                 # Draw cursor if visible
                 if self.backend.cursor_visible:
@@ -2654,15 +2613,6 @@ if COCOA_AVAILABLE:
                         char_height
                     )
                     Cocoa.NSRectFill(cursor_rect)
-
-                t5 = time.time()
-
-                # print time deltas in 0.00 format
-                print(f"t1-t0: {t1-t0:.4f}")
-                print(f"t2-t1: {t2-t1:.4f}")
-                print(f"t3-t2: {t3-t2:.4f}")
-                print(f"t4-t3: {t4-t3:.4f}")
-                print(f"t5-t4: {t5-t4:.4f}")
 
             def acceptsFirstResponder(self):
                 """
