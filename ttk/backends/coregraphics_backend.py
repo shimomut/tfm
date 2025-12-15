@@ -80,7 +80,7 @@ Example Usage:
     backend.refresh()
     
     # Get keyboard input
-    event = backend.get_input(timeout_ms=-1)  # Block until input
+    event = backend.get_event(timeout_ms=-1)  # Block until event
     if event:
         print(f"Key pressed: {event.char}")
     
@@ -101,7 +101,7 @@ except ImportError:
 
 # Import TTK base classes
 from ttk.renderer import Renderer, TextAttribute
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk.input_event import Event, KeyEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
 from typing import Tuple, Optional, List, Dict, Any
 from dataclasses import dataclass
 
@@ -1985,51 +1985,47 @@ class CoreGraphicsBackend(Renderer):
         if hasattr(self, '_attr_string_cache') and self._attr_string_cache is not None:
             self._attr_string_cache.clear()
     
-    def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+    def get_event(self, timeout_ms: int = -1) -> Optional[Event]:
         """
-        Get the next input event from the macOS event system.
+        Get the next event from the macOS event system.
         
-        This method polls the macOS event queue for keyboard events and
-        translates them into TTK's unified InputEvent format. It supports
-        blocking, non-blocking, and timed input modes.
+        This method polls the macOS event queue for keyboard, mouse, and system events
+        and translates them into TTK's unified Event format. It supports
+        blocking, non-blocking, and timed event modes.
         
         Args:
             timeout_ms: Timeout in milliseconds.
-                       -1: Block indefinitely until input is available
-                        0: Non-blocking, return immediately if no input
-                       >0: Wait up to timeout_ms milliseconds for input
+                       -1: Block indefinitely until an event is available
+                        0: Non-blocking, return immediately if no event
+                       >0: Wait up to timeout_ms milliseconds for an event
         
         Returns:
-            Optional[InputEvent]: An InputEvent object if input is available,
-                                 or None if the timeout expires with no input.
+            Optional[Event]: An Event object if an event is available,
+                            or None if the timeout expires with no event.
         
         Example:
-            # Non-blocking check for input
-            event = backend.get_input(timeout_ms=0)
+            # Non-blocking check for event
+            event = backend.get_event(timeout_ms=0)
             if event:
                 print(f"Got key: {event.key_code}")
             
-            # Blocking wait for input
-            event = backend.get_input(timeout_ms=-1)
+            # Blocking wait for event
+            event = backend.get_event(timeout_ms=-1)
             print(f"User pressed: {event.char}")
         """
         # Check if window was resized
         if self.resize_pending:
             self.resize_pending = False
-            return InputEvent(
-                key_code=KeyCode.RESIZE,
-                modifiers=ModifierKey.NONE,
-                char=None
+            return SystemEvent(
+                event_type=SystemEventType.RESIZE
             )
         
         # Check if window should close
         if self.should_close:
-            # Return a special quit event (Q key) only once
+            # Return a system close event only once
             self.should_close = False
-            return InputEvent(
-                key_code=ord('Q'),
-                modifiers=ModifierKey.NONE,
-                char='Q'
+            return SystemEvent(
+                event_type=SystemEventType.CLOSE
             )
         
         # Get the shared application instance
@@ -2087,7 +2083,7 @@ class CoreGraphicsBackend(Renderer):
         if event is None:
             return None
         
-        # Translate the NSEvent to InputEvent first
+        # Translate the NSEvent to TTK's Event first
         input_event = self._translate_event(event)
         
         # Only dispatch the event to the system if we didn't handle it
@@ -2102,12 +2098,12 @@ class CoreGraphicsBackend(Renderer):
         
         return input_event
     
-    def _translate_event(self, event) -> Optional[InputEvent]:
+    def _translate_event(self, event) -> Optional[KeyEvent]:
         """
-        Translate a macOS NSEvent to a TTK InputEvent.
+        Translate a macOS NSEvent to a TTK KeyEvent.
         
         This method converts macOS-specific keyboard events into TTK's unified
-        InputEvent format. It handles:
+        KeyEvent format. It handles:
         - Keyboard events: Maps macOS key codes to TTK KeyCode values
         - Modifier keys: Extracts Shift, Control, Alt, Command states
         - Printable characters: Preserves character information
@@ -2116,8 +2112,8 @@ class CoreGraphicsBackend(Renderer):
             event: NSEvent object from macOS event system
         
         Returns:
-            Optional[InputEvent]: Translated InputEvent, or None if the event
-                                 type is not supported or cannot be translated.
+            Optional[KeyEvent]: Translated KeyEvent, or None if the event
+                               type is not supported or cannot be translated.
         """
         if event is None:
             return None
@@ -2180,7 +2176,7 @@ class CoreGraphicsBackend(Renderer):
         # Check if this is a special key
         if key_code in key_map:
             ttk_key_code = key_map[key_code]
-            return InputEvent(
+            return KeyEvent(
                 key_code=ttk_key_code,
                 modifiers=modifiers,
                 char=None  # Special keys don't have printable characters
@@ -2190,25 +2186,25 @@ class CoreGraphicsBackend(Renderer):
         if char and len(char) == 1:
             # Handle special characters that might come through as printable
             if char == '\r' or char == '\n':
-                return InputEvent(
+                return KeyEvent(
                     key_code=KeyCode.ENTER,
                     modifiers=modifiers,
                     char=None
                 )
             elif char == '\t':
-                return InputEvent(
+                return KeyEvent(
                     key_code=KeyCode.TAB,
                     modifiers=modifiers,
                     char=None
                 )
             elif char == '\x1b':  # Escape
-                return InputEvent(
+                return KeyEvent(
                     key_code=KeyCode.ESCAPE,
                     modifiers=modifiers,
                     char=None
                 )
             elif char == '\x7f':  # Delete/Backspace
-                return InputEvent(
+                return KeyEvent(
                     key_code=KeyCode.BACKSPACE,
                     modifiers=modifiers,
                     char=None
@@ -2216,7 +2212,7 @@ class CoreGraphicsBackend(Renderer):
             else:
                 # Regular printable character
                 code_point = ord(char)
-                return InputEvent(
+                return KeyEvent(
                     key_code=code_point,
                     modifiers=modifiers,
                     char=char

@@ -10,7 +10,7 @@ import curses
 from typing import Tuple, Optional
 
 from ttk.renderer import Renderer, TextAttribute
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk.input_event import Event, KeyEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
 
 
 class CursesBackend(Renderer):
@@ -22,7 +22,7 @@ class CursesBackend(Renderer):
     colors, text attributes, and keyboard input.
     
     The backend handles curses initialization and cleanup, translates curses
-    key codes to the abstract InputEvent format, and provides graceful handling
+    key codes to the abstract TTK's KeyEvent format, and provides graceful handling
     of out-of-bounds drawing operations.
     """
     
@@ -583,11 +583,11 @@ class CursesBackend(Renderer):
         # Default to white for unclassified colors
         return curses.COLOR_WHITE
     
-    def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+    def get_event(self, timeout_ms: int = -1) -> Optional[Event]:
         """
-        Get input from terminal.
+        Get event from terminal.
         
-        This method retrieves the next input event from the terminal.
+        This method retrieves the next event from the terminal.
         It supports blocking, non-blocking, and timeout modes.
         
         Args:
@@ -597,7 +597,7 @@ class CursesBackend(Renderer):
                        >0: Wait up to timeout_ms milliseconds
         
         Returns:
-            Optional[InputEvent]: InputEvent if input is available, None if timeout
+            Optional[Event]: Event if input is available, None if timeout
         """
         if timeout_ms >= 0:
             self.stdscr.timeout(timeout_ms)
@@ -614,20 +614,24 @@ class CursesBackend(Renderer):
             # Timeout or input error
             return None
     
-    def _translate_curses_key(self, key: int) -> InputEvent:
+    def _translate_curses_key(self, key: int) -> Event:
         """
-        Translate curses key code to InputEvent.
+        Translate curses key code to Event.
         
-        This method maps curses key codes to the abstract InputEvent format,
+        This method maps curses key codes to the abstract Event format,
         handling special keys, printable characters, and modifier keys.
         
         Args:
             key: Curses key code
             
         Returns:
-            InputEvent: Translated input event
+            Event: Translated event (KeyEvent or SystemEvent)
         """
         modifiers = ModifierKey.NONE
+        
+        # Handle resize event separately (it's a system event, not a key event)
+        if key == curses.KEY_RESIZE:
+            return SystemEvent(event_type=SystemEventType.RESIZE)
         
         # Map curses keys to KeyCode
         key_map = {
@@ -642,7 +646,6 @@ class CursesBackend(Renderer):
             curses.KEY_DC: KeyCode.DELETE,
             curses.KEY_IC: KeyCode.INSERT,
             curses.KEY_BACKSPACE: KeyCode.BACKSPACE,
-            curses.KEY_RESIZE: KeyCode.RESIZE,
         }
         
         # Function keys
@@ -650,24 +653,24 @@ class CursesBackend(Renderer):
             key_map[curses.KEY_F1 + i] = KeyCode.F1 + i
         
         if key in key_map:
-            return InputEvent(key_code=key_map[key], modifiers=modifiers)
+            return KeyEvent(key_code=key_map[key], modifiers=modifiers)
         
         # Printable character
         if 32 <= key <= 126:
-            return InputEvent(key_code=key, modifiers=modifiers, char=chr(key))
+            return KeyEvent(key_code=key, modifiers=modifiers, char=chr(key))
         
         # Special characters
         if key == 10 or key == 13:
-            return InputEvent(key_code=KeyCode.ENTER, modifiers=modifiers)
+            return KeyEvent(key_code=KeyCode.ENTER, modifiers=modifiers)
         elif key == 27:
-            return InputEvent(key_code=KeyCode.ESCAPE, modifiers=modifiers)
+            return KeyEvent(key_code=KeyCode.ESCAPE, modifiers=modifiers)
         elif key == 9:
-            return InputEvent(key_code=KeyCode.TAB, modifiers=modifiers)
+            return KeyEvent(key_code=KeyCode.TAB, modifiers=modifiers)
         elif key == 127:
-            return InputEvent(key_code=KeyCode.BACKSPACE, modifiers=modifiers)
+            return KeyEvent(key_code=KeyCode.BACKSPACE, modifiers=modifiers)
         
         # Default: return the key code as-is
-        return InputEvent(key_code=key, modifiers=modifiers)
+        return KeyEvent(key_code=key, modifiers=modifiers)
     
     def set_cursor_visibility(self, visible: bool) -> None:
         """

@@ -1,8 +1,8 @@
 """
-TTK Input Event Module
+TTK Event Module
 
-This module defines the input event system for TTK, providing a unified
-representation of user input across all backends.
+This module defines the event system for TTK, providing a unified
+representation of user input, system events, and mouse events across all backends.
 """
 
 from enum import IntEnum
@@ -48,11 +48,12 @@ class KeyCode(IntEnum):
     PAGE_UP = 1204
     PAGE_DOWN = 1205
     
-    # Mouse event marker
-    MOUSE = 2000
-    
-    # Window events
+
+
+class SystemEventType(IntEnum):
+    """Event types for system events."""
     RESIZE = 3000
+    CLOSE = 3001
 
 
 class ModifierKey(IntEnum):
@@ -65,14 +66,27 @@ class ModifierKey(IntEnum):
 
 
 @dataclass
-class InputEvent:
-    """Represents a user input event."""
+class Event:
+    """
+    Base class for all events (keyboard, mouse, system).
+    
+    This is the abstract base for all event types in TTK. Specific event types
+    like KeyEvent, MouseEvent, and SystemEvent inherit from this class.
+    """
+    pass
+
+
+@dataclass
+class KeyEvent(Event):
+    """
+    Represents a keyboard input event.
+    
+    This class captures keyboard events including regular key presses,
+    special keys (arrows, function keys, etc.), and modifier key states.
+    """
     key_code: int  # KeyCode value or Unicode code point
     modifiers: int  # Bitwise OR of ModifierKey values
     char: Optional[str] = None  # Character for printable keys
-    mouse_row: Optional[int] = None  # For mouse events
-    mouse_col: Optional[int] = None  # For mouse events
-    mouse_button: Optional[int] = None  # 1=left, 2=middle, 3=right
     
     def is_printable(self) -> bool:
         """Check if this is a printable character."""
@@ -85,3 +99,45 @@ class InputEvent:
     def has_modifier(self, modifier: ModifierKey) -> bool:
         """Check if a specific modifier key is pressed."""
         return (self.modifiers & modifier) != 0
+
+
+@dataclass
+class MouseEvent(Event):
+    """
+    Represents a mouse input event.
+    
+    This class captures mouse events including clicks, movement, and scrolling.
+    """
+    mouse_row: int  # Row position of mouse event
+    mouse_col: int  # Column position of mouse event
+    mouse_button: Optional[int] = None  # 1=left, 2=middle, 3=right, None=movement
+
+
+@dataclass
+class SystemEvent(Event):
+    """
+    Represents a system event.
+    
+    This class captures system-level events like window resize, window close,
+    and other system notifications.
+    """
+    event_type: int  # SystemEventType value for system events (e.g., SystemEventType.RESIZE)
+    
+    @property
+    def key_code(self) -> int:
+        """Backward compatibility: return event_type as key_code."""
+        return self.event_type
+    
+    @property
+    def modifiers(self) -> int:
+        """Backward compatibility: system events have no modifiers."""
+        return ModifierKey.NONE
+    
+    @property
+    def char(self) -> Optional[str]:
+        """Backward compatibility: system events have no character."""
+        return None
+    
+    def is_resize(self) -> bool:
+        """Check if this is a window resize event."""
+        return self.event_type == SystemEventType.RESIZE

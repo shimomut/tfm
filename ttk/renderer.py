@@ -338,38 +338,39 @@ class Renderer(ABC):
         pass
     
     @abstractmethod
-    def get_input(self, timeout_ms: int = -1) -> Optional['InputEvent']:
+    def get_event(self, timeout_ms: int = -1) -> Optional['Event']:
         """
-        Get the next input event.
+        Get the next event (keyboard, mouse, or system event).
         
-        This method retrieves the next user input event from the event queue.
+        This method retrieves the next event from the event queue. Events can be
+        keyboard input, mouse actions, or system events (like window resize).
         It can operate in blocking mode (wait indefinitely), non-blocking mode
         (return immediately), or with a timeout.
         
         Args:
             timeout_ms: Timeout in milliseconds.
-                       -1 (default): Block indefinitely until input is available
-                        0: Non-blocking, return immediately if no input
-                       >0: Wait up to timeout_ms milliseconds for input
+                       -1 (default): Block indefinitely until an event is available
+                        0: Non-blocking, return immediately if no event
+                       >0: Wait up to timeout_ms milliseconds for an event
         
         Returns:
-            Optional[InputEvent]: An InputEvent object if input is available,
-                                 or None if the timeout expires with no input.
+            Optional[Event]: An Event object if an event is available,
+                            or None if the timeout expires with no event.
                                  
-        Note: The InputEvent type will be defined in the input_event module.
+        Note: The Event type is defined in the ttk.event module.
         
         Example:
-            # Blocking wait for input
-            event = renderer.get_input()
+            # Blocking wait for event
+            event = renderer.get_event()
             
-            # Non-blocking check for input
-            event = renderer.get_input(timeout_ms=0)
+            # Non-blocking check for event
+            event = renderer.get_event(timeout_ms=0)
             if event is not None:
-                # Process input
+                # Process event
                 pass
             
-            # Wait up to 100ms for input
-            event = renderer.get_input(timeout_ms=100)
+            # Wait up to 100ms for event
+            event = renderer.get_event(timeout_ms=100)
         """
         pass
     
@@ -413,3 +414,12 @@ class Renderer(ABC):
             renderer.move_cursor(5, 10)
         """
         pass
+    
+    def get_input(self, timeout_ms: int = -1) -> Optional['Event']:
+        """
+        Deprecated: Use get_event() instead.
+        
+        This method is provided for backward compatibility and simply calls
+        get_event(). New code should use get_event() directly.
+        """
+        return self.get_event(timeout_ms)
