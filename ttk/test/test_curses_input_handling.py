@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import Mock, patch, MagicMock
 
 from ttk.backends.curses_backend import CursesBackend
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 
 
 class TestCursesInputHandling(unittest.TestCase):

@@ -8,7 +8,7 @@ import os
 # Add parent directory to path to allow importing ttk
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from ttk.input_event import KeyCode, ModifierKey, InputEvent
+from ttk import KeyCode, ModifierKey, KeyEvent
 
 
 def test_keycode_values():
@@ -63,9 +63,9 @@ def test_modifier_key_combinations():
 
 
 def test_input_event_creation():
-    """Test creating InputEvent instances."""
+    """Test creating KeyEvent instances."""
     # Printable character
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
     assert event.key_code == ord('a')
     assert event.modifiers == ModifierKey.NONE
     assert event.char == 'a'
@@ -74,13 +74,13 @@ def test_input_event_creation():
     assert event.mouse_button is None
     
     # Special key
-    event = InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.SHIFT)
+    event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.SHIFT)
     assert event.key_code == KeyCode.UP
     assert event.modifiers == ModifierKey.SHIFT
     assert event.char is None
     
     # Mouse event
-    event = InputEvent(
+    event = KeyEvent(
         key_code=KeyCode.MOUSE,
         modifiers=ModifierKey.NONE,
         mouse_row=10,
@@ -96,52 +96,52 @@ def test_input_event_creation():
 def test_is_printable():
     """Test is_printable() method."""
     # Printable character
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
     assert event.is_printable() is True
     
     # Special key
-    event = InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
+    event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
     assert event.is_printable() is False
     
     # Empty char
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='')
     assert event.is_printable() is False
     
     # Multi-character string (shouldn't happen, but test it)
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='ab')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='ab')
     assert event.is_printable() is False
 
 
 def test_is_special_key():
     """Test is_special_key() method."""
     # Special keys (>= 1000)
-    event = InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
+    event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
     assert event.is_special_key() is True
     
-    event = InputEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE)
+    event = KeyEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE)
     assert event.is_special_key() is True
     
-    event = InputEvent(key_code=KeyCode.DELETE, modifiers=ModifierKey.NONE)
+    event = KeyEvent(key_code=KeyCode.DELETE, modifiers=ModifierKey.NONE)
     assert event.is_special_key() is True
     
     # Printable characters (< 1000)
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
     assert event.is_special_key() is False
     
-    event = InputEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE)
+    event = KeyEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE)
     assert event.is_special_key() is False
 
 
 def test_has_modifier():
     """Test has_modifier() method."""
     # Single modifier
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.SHIFT, char='A')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.SHIFT, char='A')
     assert event.has_modifier(ModifierKey.SHIFT) is True
     assert event.has_modifier(ModifierKey.CONTROL) is False
     assert event.has_modifier(ModifierKey.ALT) is False
     
     # Multiple modifiers
-    event = InputEvent(
+    event = KeyEvent(
         key_code=ord('a'),
         modifiers=ModifierKey.SHIFT | ModifierKey.CONTROL,
         char='A'
@@ -151,14 +151,14 @@ def test_has_modifier():
     assert event.has_modifier(ModifierKey.ALT) is False
     
     # No modifiers
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
     assert event.has_modifier(ModifierKey.SHIFT) is False
     assert event.has_modifier(ModifierKey.CONTROL) is False
 
 
 def test_input_event_with_all_modifiers():
-    """Test InputEvent with all modifier keys pressed."""
-    event = InputEvent(
+    """Test KeyEvent with all modifier keys pressed."""
+    event = KeyEvent(
         key_code=ord('a'),
         modifiers=ModifierKey.SHIFT | ModifierKey.CONTROL | ModifierKey.ALT | ModifierKey.COMMAND,
         char='A'

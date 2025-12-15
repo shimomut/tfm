@@ -129,7 +129,7 @@ Created `ttk/test/test_standalone_package.py` to verify:
 #### Import Verification
 ```python
 import ttk
-from ttk import Renderer, InputEvent, KeyCode, ModifierKey, TextAttribute
+from ttk import Renderer, KeyEvent, KeyCode, ModifierKey, TextAttribute
 from ttk.backends.curses_backend import CursesBackend
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.serialization.command_serializer import serialize_command
@@ -150,7 +150,7 @@ The package uses a flat layout where `ttk/` directory contains the package files
 Updated `ttk/__init__.py` to use relative imports:
 ```python
 from .renderer import Renderer, TextAttribute
-from .input_event import InputEvent, KeyCode, ModifierKey
+from .input_event import KeyEvent, KeyCode, ModifierKey
 ```
 
 This ensures the package works correctly when installed.

@@ -26,7 +26,7 @@ if sys.platform != 'darwin':
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
     from ttk.renderer import Renderer, TextAttribute
-    from ttk.input_event import InputEvent
+    from ttk import KeyEvent
     COREGRAPHICS_AVAILABLE = True
 except ImportError:
     COREGRAPHICS_AVAILABLE = False

@@ -31,7 +31,7 @@ This ensures that resize events trigger an immediate redraw of the interface wit
 The `handle_input()` method was updated to properly handle resize events:
 
 ```python
-def handle_input(self, event: InputEvent) -> bool:
+def handle_input(self, event: KeyEvent) -> bool:
     # Handle resize events
     if event.key_code == KeyCode.RESIZE:
         # Window was resized - redraw interface with new dimensions
@@ -63,7 +63,7 @@ The `draw_interface()` method already queries window dimensions dynamically usin
 #### Resize Event Flow
 
 1. User resizes the window
-2. Backend detects resize and generates `InputEvent` with `key_code=KeyCode.RESIZE`
+2. Backend detects resize and generates `KeyEvent` with `key_code=KeyCode.RESIZE`
 3. Main loop receives the resize event
 4. Interface is redrawn with `draw_interface()`
 5. All sections query current dimensions and adapt layout
@@ -166,7 +166,7 @@ The resize handling works with both backends:
 - **Curses backend**: Terminal resize events are translated to `KeyCode.RESIZE`
 - **Metal backend**: Window resize events are translated to `KeyCode.RESIZE`
 
-Both backends use the same `InputEvent` structure, ensuring consistent behavior.
+Both backends use the same `KeyEvent` structure, ensuring consistent behavior.
 
 ### Performance Considerations
 

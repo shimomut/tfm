@@ -16,7 +16,7 @@ Compare this to the Metal backend which requires 1000+ lines.
 
 from typing import Tuple, Optional
 from ttk.renderer import Renderer, TextAttribute
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk.input_event import KeyEvent, KeyCode, ModifierKey
 
 try:
     import Cocoa
@@ -142,7 +142,7 @@ class CoreGraphicsBackend(Renderer):
             raise ValueError(f"Color pair ID must be 1-255, got {pair_id}")
         self.color_pairs[pair_id] = (fg_color, bg_color)
     
-    def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+    def get_input(self, timeout_ms: int = -1) -> Optional[KeyEvent]:
         """Get input event."""
         # Process events
         if timeout_ms == 0:
@@ -167,11 +167,11 @@ class CoreGraphicsBackend(Renderer):
         # Dispatch event
         Cocoa.NSApp.sendEvent_(event)
         
-        # Translate to InputEvent
+        # Translate to KeyEvent
         return self._translate_event(event)
     
-    def _translate_event(self, event) -> Optional[InputEvent]:
-        """Translate NSEvent to InputEvent."""
+    def _translate_event(self, event) -> Optional[KeyEvent]:
+        """Translate NSEvent to KeyEvent."""
         event_type = event.type()
         
         if event_type == Cocoa.NSEventTypeKeyDown:
@@ -190,7 +190,7 @@ class CoreGraphicsBackend(Renderer):
             if modifiers & Cocoa.NSEventModifierFlagCommand:
                 modifier_mask |= ModifierKey.COMMAND
             
-            return InputEvent(
+            return KeyEvent(
                 key_code=key_code,
                 char=char if char else None,
                 modifiers=modifier_mask

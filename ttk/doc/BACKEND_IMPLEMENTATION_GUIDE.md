@@ -18,7 +18,7 @@ A TTK backend is a class that inherits from the `Renderer` abstract base class a
 
 1. **Window Management**: Creating and managing the rendering surface
 2. **Drawing Operations**: Rendering text, shapes, and colors
-3. **Input Handling**: Translating platform-specific input to InputEvent objects
+3. **Input Handling**: Translating platform-specific input to KeyEvent objects
 4. **Resource Management**: Initializing and cleaning up platform resources
 
 ## Backend Requirements
@@ -58,7 +58,7 @@ Create a new file in `ttk/backends/` for your backend:
 # ttk/backends/my_backend.py
 
 from ttk.renderer import Renderer
-from ttk.input_event import InputEvent
+from ttk.input_event import KeyEvent
 from typing import Tuple, Optional
 
 class MyBackend(Renderer):
@@ -291,7 +291,7 @@ def _init_platform_color_pair(self, pair_id: int,
 ### Step 8: Implement Input Handling
 
 ```python
-def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+def get_input(self, timeout_ms: int = -1) -> Optional[KeyEvent]:
     """Get the next input event."""
     # Poll platform event system
     platform_event = self._poll_platform_event(timeout_ms)
@@ -299,7 +299,7 @@ def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
     if platform_event is None:
         return None
     
-    # Translate to InputEvent
+    # Translate to KeyEvent
     return self._translate_platform_event(platform_event)
 
 def _poll_platform_event(self, timeout_ms: int):
@@ -307,8 +307,8 @@ def _poll_platform_event(self, timeout_ms: int):
     # Your platform-specific event polling code
     pass
 
-def _translate_platform_event(self, platform_event) -> InputEvent:
-    """Translate platform event to InputEvent."""
+def _translate_platform_event(self, platform_event) -> KeyEvent:
+    """Translate platform event to KeyEvent."""
     from ttk.input_event import KeyCode, ModifierKey
     
     # Extract event data
@@ -316,8 +316,8 @@ def _translate_platform_event(self, platform_event) -> InputEvent:
     modifiers = self._get_modifiers(platform_event)
     char = self._get_char(platform_event)
     
-    # Create InputEvent
-    return InputEvent(
+    # Create KeyEvent
+    return KeyEvent(
         key_code=key_code,
         modifiers=modifiers,
         char=char
@@ -381,7 +381,7 @@ Here's a complete list of methods you must implement:
 10. `refresh() -> None` - Refresh entire window
 11. `refresh_region(row, col, height, width) -> None` - Refresh region
 12. `init_color_pair(pair_id, fg_color, bg_color) -> None` - Initialize color pair
-13. `get_input(timeout_ms) -> Optional[InputEvent]` - Get input event
+13. `get_input(timeout_ms) -> Optional[KeyEvent]` - Get input event
 14. `set_cursor_visibility(visible) -> None` - Set cursor visibility
 15. `move_cursor(row, col) -> None` - Move cursor
 
@@ -603,7 +603,7 @@ Here's a complete minimal backend implementation:
 # ttk/backends/minimal_backend.py
 
 from ttk.renderer import Renderer
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk.input_event import KeyEvent, KeyCode, ModifierKey
 from typing import Tuple, Optional
 
 class MinimalBackend(Renderer):
@@ -691,7 +691,7 @@ class MinimalBackend(Renderer):
         self.commands.append(('init_color_pair', pair_id, fg_color, bg_color))
         self.color_pairs[pair_id] = (fg_color, bg_color)
     
-    def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+    def get_input(self, timeout_ms: int = -1) -> Optional[KeyEvent]:
         # Return None (no input available)
         return None
     

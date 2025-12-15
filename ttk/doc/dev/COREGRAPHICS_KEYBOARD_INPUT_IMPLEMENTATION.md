@@ -2,14 +2,14 @@
 
 ## Overview
 
-This document describes the implementation of keyboard input handling for the CoreGraphics backend. The implementation provides full support for keyboard events with timeout modes, modifier key detection, and event translation to TTK's unified InputEvent format.
+This document describes the implementation of keyboard input handling for the CoreGraphics backend. The implementation provides full support for keyboard events with timeout modes, modifier key detection, and event translation to TTK's unified KeyEvent format.
 
 ## Implementation Summary
 
 The keyboard input handling consists of three main components:
 
 1. **`get_input(timeout_ms)`** - Main entry point for retrieving keyboard events
-2. **`_translate_event(event)`** - Translates NSEvent to InputEvent
+2. **`_translate_event(event)`** - Translates NSEvent to KeyEvent
 3. **`_extract_modifiers(event)`** - Extracts modifier key flags
 
 ## Architecture
@@ -29,9 +29,9 @@ Receive NSEvent (or None if timeout)
     ↓
 Dispatch event with NSApp.sendEvent_
     ↓
-Translate NSEvent to InputEvent
+Translate NSEvent to KeyEvent
     ↓
-Return InputEvent to application
+Return KeyEvent to application
 ```
 
 ### Timeout Modes
@@ -58,7 +58,7 @@ The implementation supports three timeout modes:
 ### get_input Method
 
 ```python
-def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+def get_input(self, timeout_ms: int = -1) -> Optional[KeyEvent]:
     """
     Get the next input event from the macOS event system.
     
@@ -69,7 +69,7 @@ def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
                    >0: Wait up to timeout_ms milliseconds for input
     
     Returns:
-        Optional[InputEvent]: An InputEvent object if input is available,
+        Optional[KeyEvent]: An KeyEvent object if input is available,
                              or None if the timeout expires with no input.
     """
 ```
@@ -124,7 +124,7 @@ def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
 
 ### Event Translation
 
-The `_translate_event` method converts NSEvent objects to InputEvent objects:
+The `_translate_event` method converts NSEvent objects to KeyEvent objects:
 
 **Key Code Mapping:**
 
@@ -260,7 +260,7 @@ This implementation satisfies the following requirements:
 
 ### Requirement 6: Keyboard Input Handling
 
-✅ **6.1**: NSEvent key codes are translated to TTK InputEvent objects  
+✅ **6.1**: NSEvent key codes are translated to TTK KeyEvent objects  
 ✅ **6.2**: Modifier keys (Shift, Control, Alt, Command) are detected and reported  
 ✅ **6.3**: Special keys (arrows, function keys, Enter, Escape, etc.) have consistent codes  
 ✅ **6.4**: Supports blocking, non-blocking, and timed input modes  
@@ -314,7 +314,7 @@ Potential future improvements:
 - **Apple Documentation**: [NSEvent Class Reference](https://developer.apple.com/documentation/appkit/nsevent)
 - **PyObjC Documentation**: [PyObjC Framework](https://pyobjc.readthedocs.io/)
 - **TTK Renderer Interface**: `ttk/renderer.py`
-- **TTK InputEvent**: `ttk/input_event.py`
+- **TTK KeyEvent**: `ttk/input_event.py`
 
 ## Conclusion
 

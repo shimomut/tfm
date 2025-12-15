@@ -30,7 +30,7 @@ Created `ttk/test/test_library_independence.py` with the following tests:
 - **Purpose**: Verify TTK can be used in a simple application
 - **Method**: Create and test a minimal application using TTK APIs
 - **Components Tested**:
-  - InputEvent creation and methods
+  - KeyEvent creation and methods
   - Command serialization and parsing
   - Backend recommendation
   - TextAttribute combinations
@@ -45,7 +45,7 @@ Created `ttk/test/test_library_independence.py` with the following tests:
 #### Test 5: Generic Naming
 - **Purpose**: Verify TTK uses generic, reusable naming
 - **Method**: Check all public classes have generic names
-- **Expected Classes**: Renderer, InputEvent, KeyCode, ModifierKey, TextAttribute
+- **Expected Classes**: Renderer, KeyEvent, KeyCode, ModifierKey, TextAttribute
 - **Result**: ✅ PASS - All class names are generic
 
 #### Test 6: Documentation Independence
@@ -78,7 +78,7 @@ class SimpleTextApp:
     def __init__(self, backend: Renderer)
     def initialize(self)
     def draw(self)
-    def handle_input(self, event: InputEvent) -> bool
+    def handle_input(self, event: KeyEvent) -> bool
     def run(self)
     def shutdown(self)
 ```
@@ -142,7 +142,7 @@ TTK Library Independence Test Suite
 ### What Makes TTK Independent
 
 1. **Clean API Design**
-   - All classes use generic names (Renderer, InputEvent, etc.)
+   - All classes use generic names (Renderer, KeyEvent, etc.)
    - No TFM-specific terminology in public API
    - Backend-agnostic abstractions
 

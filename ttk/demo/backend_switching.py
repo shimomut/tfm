@@ -33,7 +33,7 @@ if __name__ == '__main__':
 from ttk.backends.curses_backend import CursesBackend
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.renderer import Renderer, TextAttribute
-from ttk.input_event import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 
 
 class BackendSwitchingDemo:
@@ -172,7 +172,7 @@ class BackendSwitchingDemo:
         
         self.frame_count += 1
     
-    def handle_input(self, event: InputEvent) -> bool:
+    def handle_input(self, event: KeyEvent) -> bool:
         """
         Handle input events.
         

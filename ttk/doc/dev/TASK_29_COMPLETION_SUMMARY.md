@@ -22,7 +22,7 @@ All requirements for Task 29 were already satisfied by the existing implementati
 The `TestInterface.handle_input()` method processes all keyboard input:
 
 ```python
-def handle_input(self, event: InputEvent) -> bool:
+def handle_input(self, event: KeyEvent) -> bool:
     """
     Handle input events.
     
@@ -130,7 +130,7 @@ The implementation handles all special keys defined in `KeyCode`:
 - **Mouse events:** MOUSE
 
 All special keys are:
-1. Properly detected via `InputEvent.is_special_key()`
+1. Properly detected via `KeyEvent.is_special_key()`
 2. Stored in input history
 3. Displayed in the input echo area
 4. Processed without crashing the application
@@ -156,32 +156,32 @@ Comprehensive unit tests exist in `ttk/test/test_test_interface.py`:
 ```python
 def test_handle_input_quit_lowercase(self):
     """Test handling 'q' to quit."""
-    event = InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
+    event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
     result = self.interface.handle_input(event)
     self.assertFalse(result)
 
 def test_handle_input_quit_uppercase(self):
     """Test handling 'Q' to quit."""
-    event = InputEvent(key_code=ord('Q'), modifiers=ModifierKey.NONE, char='Q')
+    event = KeyEvent(key_code=ord('Q'), modifiers=ModifierKey.NONE, char='Q')
     result = self.interface.handle_input(event)
     self.assertFalse(result)
 
 def test_handle_input_escape(self):
     """Test handling ESC key to quit."""
-    event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
+    event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
     result = self.interface.handle_input(event)
     self.assertFalse(result)
 
 def test_handle_input_special_key(self):
     """Test handling special keys."""
-    event = InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
+    event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
     result = self.interface.handle_input(event)
     self.assertTrue(result)
     self.assertEqual(self.interface.last_input, event)
 
 def test_draw_input_echo_with_modifiers(self):
     """Test input echo displays modifiers correctly."""
-    event = InputEvent(
+    event = KeyEvent(
         key_code=ord('A'),
         modifiers=ModifierKey.SHIFT | ModifierKey.CONTROL,
         char='A'

@@ -9,7 +9,7 @@ demonstrates TTK rendering capabilities.
 import unittest
 from unittest.mock import Mock, MagicMock, call
 from ttk.demo.test_interface import TestInterface, create_test_interface
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 from ttk.renderer import TextAttribute
 
 
@@ -146,7 +146,7 @@ class TestTestInterface(unittest.TestCase):
     def test_draw_input_echo_with_input(self):
         """Test input echo area with input."""
         # Set up some input
-        event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
+        event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
         self.interface.last_input = event
         self.interface.input_history = [event]
         
@@ -165,7 +165,7 @@ class TestTestInterface(unittest.TestCase):
     def test_draw_input_echo_with_modifiers(self):
         """Test input echo displays modifiers correctly."""
         # Set up input with modifiers
-        event = InputEvent(
+        event = KeyEvent(
             key_code=ord('A'),
             modifiers=ModifierKey.SHIFT | ModifierKey.CONTROL,
             char='A'
@@ -194,7 +194,7 @@ class TestTestInterface(unittest.TestCase):
     
     def test_handle_input_printable(self):
         """Test handling printable character input."""
-        event = InputEvent(key_code=ord('x'), modifiers=ModifierKey.NONE, char='x')
+        event = KeyEvent(key_code=ord('x'), modifiers=ModifierKey.NONE, char='x')
         
         result = self.interface.handle_input(event)
         
@@ -207,7 +207,7 @@ class TestTestInterface(unittest.TestCase):
     
     def test_handle_input_quit_lowercase(self):
         """Test handling 'q' to quit."""
-        event = InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
+        event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
         
         result = self.interface.handle_input(event)
         
@@ -216,7 +216,7 @@ class TestTestInterface(unittest.TestCase):
     
     def test_handle_input_quit_uppercase(self):
         """Test handling 'Q' to quit."""
-        event = InputEvent(key_code=ord('Q'), modifiers=ModifierKey.NONE, char='Q')
+        event = KeyEvent(key_code=ord('Q'), modifiers=ModifierKey.NONE, char='Q')
         
         result = self.interface.handle_input(event)
         
@@ -225,7 +225,7 @@ class TestTestInterface(unittest.TestCase):
     
     def test_handle_input_escape(self):
         """Test handling ESC key to quit."""
-        event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
         
         result = self.interface.handle_input(event)
         
@@ -234,7 +234,7 @@ class TestTestInterface(unittest.TestCase):
     
     def test_handle_input_special_key(self):
         """Test handling special keys."""
-        event = InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
         
         result = self.interface.handle_input(event)
         
@@ -248,7 +248,7 @@ class TestTestInterface(unittest.TestCase):
         """Test that input history is limited."""
         # Add more than 20 inputs
         for i in range(25):
-            event = InputEvent(key_code=ord('a') + i, modifiers=ModifierKey.NONE, char=chr(ord('a') + i))
+            event = KeyEvent(key_code=ord('a') + i, modifiers=ModifierKey.NONE, char=chr(ord('a') + i))
             self.interface.handle_input(event)
         
         # History should be limited to 20
@@ -257,7 +257,7 @@ class TestTestInterface(unittest.TestCase):
     def test_run_basic_flow(self):
         """Test basic run flow."""
         # Set up mock to return quit event after one iteration
-        quit_event = InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
+        quit_event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
         self.mock_renderer.get_input.return_value = quit_event
         
         # Run the interface
@@ -279,7 +279,7 @@ class TestTestInterface(unittest.TestCase):
         self.mock_renderer.get_input.side_effect = [
             None,  # Timeout
             None,  # Timeout
-            InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')  # Quit
+            KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')  # Quit
         ]
         
         # Run the interface
@@ -330,7 +330,7 @@ class TestTestInterfaceEdgeCases(unittest.TestCase):
     
     def test_handle_input_with_mouse_event(self):
         """Test handling mouse events."""
-        event = InputEvent(
+        event = KeyEvent(
             key_code=KeyCode.MOUSE,
             modifiers=ModifierKey.NONE,
             mouse_row=10,

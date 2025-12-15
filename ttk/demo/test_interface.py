@@ -12,7 +12,7 @@ produce equivalent output across different platforms.
 
 from typing import Optional
 from ttk.renderer import Renderer, TextAttribute
-from ttk.input_event import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 from ttk.demo.performance import PerformanceMonitor
 
 
@@ -411,7 +411,7 @@ class TestInterface:
         if self.performance_monitor:
             self.performance_monitor.end_render()
     
-    def handle_input(self, event: InputEvent) -> bool:
+    def handle_input(self, event: KeyEvent) -> bool:
         """
         Handle input events.
         

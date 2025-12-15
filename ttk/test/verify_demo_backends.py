@@ -20,7 +20,7 @@ from ttk.demo.demo_ttk import DemoApplication
 from ttk.demo.test_interface import TestInterface, create_test_interface
 from ttk.backends.curses_backend import CursesBackend
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 
 
 class TestDemoWithCursesBackend:
@@ -91,7 +91,7 @@ class TestDemoWithCursesBackend:
         interface = TestInterface(mock_backend, enable_performance_monitoring=False)
         
         # Test printable character input
-        event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
+        event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
         result = interface.handle_input(event)
         
         assert result is True  # Should continue running
@@ -106,13 +106,13 @@ class TestDemoWithCursesBackend:
         interface = TestInterface(mock_backend, enable_performance_monitoring=False)
         
         # Test quit with 'q'
-        event = InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
+        event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
         result = interface.handle_input(event)
         
         assert result is False  # Should quit
         
         # Test quit with ESC
-        event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
         result = interface.handle_input(event)
         
         assert result is False  # Should quit
@@ -125,7 +125,7 @@ class TestDemoWithCursesBackend:
         interface = TestInterface(mock_backend, enable_performance_monitoring=False)
         
         # Test resize event
-        event = InputEvent(key_code=KeyCode.RESIZE, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.RESIZE, modifiers=ModifierKey.NONE)
         result = interface.handle_input(event)
         
         assert result is True  # Should continue running
@@ -202,7 +202,7 @@ class TestDemoWithMetalBackend:
         interface = TestInterface(mock_backend, enable_performance_monitoring=False)
         
         # Test printable character input
-        event = InputEvent(key_code=ord('x'), modifiers=ModifierKey.NONE, char='x')
+        event = KeyEvent(key_code=ord('x'), modifiers=ModifierKey.NONE, char='x')
         result = interface.handle_input(event)
         
         assert result is True  # Should continue running
@@ -217,7 +217,7 @@ class TestDemoWithMetalBackend:
         interface = TestInterface(mock_backend, enable_performance_monitoring=False)
         
         # Test resize event
-        event = InputEvent(key_code=KeyCode.RESIZE, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.RESIZE, modifiers=ModifierKey.NONE)
         result = interface.handle_input(event)
         
         assert result is True  # Should continue running
@@ -273,7 +273,7 @@ class TestBackendEquivalence:
         coregraphics_interface = TestInterface(coregraphics_backend, enable_performance_monitoring=False)
         
         # Test same input event
-        event = InputEvent(key_code=ord('t'), modifiers=ModifierKey.NONE, char='t')
+        event = KeyEvent(key_code=ord('t'), modifiers=ModifierKey.NONE, char='t')
         
         curses_result = curses_interface.handle_input(event)
         coregraphics_result = coregraphics_interface.handle_input(event)
@@ -297,7 +297,7 @@ class TestBackendEquivalence:
         coregraphics_interface = TestInterface(coregraphics_backend, enable_performance_monitoring=False)
         
         # Test resize event
-        event = InputEvent(key_code=KeyCode.RESIZE, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.RESIZE, modifiers=ModifierKey.NONE)
         
         curses_result = curses_interface.handle_input(event)
         coregraphics_result = coregraphics_interface.handle_input(event)

@@ -49,7 +49,7 @@ def main():
         "Abstract rendering API defined",
         [
             ("Renderer ABC exists", lambda: Path(ttk_root / "renderer.py").exists()),
-            ("InputEvent module exists", lambda: Path(ttk_root / "input_event.py").exists()),
+            ("KeyEvent module exists (input_event.py)", lambda: Path(ttk_root / "input_event.py").exists()),
             ("Drawing operations defined", lambda: check_renderer_methods()),
             ("Input handling defined", lambda: check_input_event()),
             ("Window management defined", lambda: check_window_management()),
@@ -184,11 +184,11 @@ def check_renderer_methods():
 
 
 def check_input_event():
-    """Check InputEvent implementation."""
-    from ttk.input_event import InputEvent, KeyCode, ModifierKey
+    """Check KeyEvent implementation."""
+    from ttk import KeyEvent, KeyCode, ModifierKey
     # Check that classes exist and have required attributes
     # For dataclass, check instance has the fields
-    ie = InputEvent(key_code=65, modifiers=0)
+    ie = KeyEvent(key_code=65, modifiers=0)
     return (
         hasattr(ie, 'key_code') and
         hasattr(ie, 'modifiers') and

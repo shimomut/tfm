@@ -9,7 +9,7 @@ events and updates the UI layout accordingly.
 import unittest
 from unittest.mock import Mock, MagicMock, call
 from ttk.demo.test_interface import TestInterface
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 
 
 class TestResizeHandling(unittest.TestCase):
@@ -35,7 +35,7 @@ class TestResizeHandling(unittest.TestCase):
     def test_resize_event_detection(self):
         """Test that resize events are properly detected."""
         # Create a resize event
-        resize_event = InputEvent(
+        resize_event = KeyEvent(
             key_code=KeyCode.RESIZE,
             modifiers=ModifierKey.NONE
         )
@@ -55,7 +55,7 @@ class TestResizeHandling(unittest.TestCase):
     def test_resize_triggers_redraw(self):
         """Test that resize events trigger interface redraw."""
         # Create a resize event
-        resize_event = InputEvent(
+        resize_event = KeyEvent(
             key_code=KeyCode.RESIZE,
             modifiers=ModifierKey.NONE
         )
@@ -183,7 +183,7 @@ class TestResizeHandling(unittest.TestCase):
     def test_resize_does_not_affect_quit_functionality(self):
         """Test that resize events don't interfere with quit functionality."""
         # Create a resize event
-        resize_event = InputEvent(
+        resize_event = KeyEvent(
             key_code=KeyCode.RESIZE,
             modifiers=ModifierKey.NONE
         )
@@ -193,7 +193,7 @@ class TestResizeHandling(unittest.TestCase):
         self.assertTrue(result)  # Should continue running
         
         # Create a quit event
-        quit_event = InputEvent(
+        quit_event = KeyEvent(
             key_code=ord('q'),
             modifiers=ModifierKey.NONE,
             char='q'
@@ -207,7 +207,7 @@ class TestResizeHandling(unittest.TestCase):
         """Test handling multiple consecutive resize events."""
         # Create multiple resize events
         for _ in range(5):
-            resize_event = InputEvent(
+            resize_event = KeyEvent(
                 key_code=KeyCode.RESIZE,
                 modifiers=ModifierKey.NONE
             )
@@ -235,7 +235,7 @@ class TestResizeIntegration(unittest.TestCase):
     def test_resize_between_normal_inputs(self):
         """Test resize events interspersed with normal input."""
         # Normal input
-        normal_event = InputEvent(
+        normal_event = KeyEvent(
             key_code=ord('a'),
             modifiers=ModifierKey.NONE,
             char='a'
@@ -244,7 +244,7 @@ class TestResizeIntegration(unittest.TestCase):
         self.assertEqual(len(self.interface.input_history), 1)
         
         # Resize event
-        resize_event = InputEvent(
+        resize_event = KeyEvent(
             key_code=KeyCode.RESIZE,
             modifiers=ModifierKey.NONE
         )
@@ -252,7 +252,7 @@ class TestResizeIntegration(unittest.TestCase):
         self.assertEqual(len(self.interface.input_history), 1)  # Still 1
         
         # Another normal input
-        normal_event2 = InputEvent(
+        normal_event2 = KeyEvent(
             key_code=ord('b'),
             modifiers=ModifierKey.NONE,
             char='b'

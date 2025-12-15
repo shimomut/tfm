@@ -6,7 +6,7 @@ This document provides a complete reference for the TTK (TUI Toolkit) library AP
 
 - [Core Classes](#core-classes)
   - [Renderer](#renderer)
-  - [InputEvent](#inputevent)
+  - [KeyEvent](#KeyEvent)
   - [KeyCode](#keycode)
   - [ModifierKey](#modifierkey)
   - [TextAttribute](#textattribute)
@@ -244,14 +244,14 @@ renderer.draw_text(1, 0, "Yellow on black", color_pair=2)
 
 #### Input Handling
 
-##### `get_input(timeout_ms: int = -1) -> Optional[InputEvent]`
+##### `get_input(timeout_ms: int = -1) -> Optional[KeyEvent]`
 
 Get the next input event.
 
 **Parameters:**
 - `timeout_ms`: Timeout in milliseconds. -1 for blocking, 0 for non-blocking.
 
-**Returns:** `InputEvent` if input is available, `None` if timeout expires.
+**Returns:** `KeyEvent` if input is available, `None` if timeout expires.
 
 **Example:**
 ```python
@@ -299,7 +299,7 @@ renderer.move_cursor(10, 20)
 renderer.set_cursor_visibility(True)
 ```
 
-### InputEvent
+### KeyEvent
 
 Represents a user input event with a unified interface across backends.
 
@@ -308,7 +308,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 @dataclass
-class InputEvent:
+class KeyEvent:
     """Represents a user input event."""
     key_code: int  # KeyCode value or Unicode code point
     modifiers: int  # Bitwise OR of ModifierKey values

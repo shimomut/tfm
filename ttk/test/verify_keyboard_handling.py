@@ -20,7 +20,7 @@ sys.path.insert(0, str(parent_dir))
 
 from unittest.mock import Mock
 from ttk.demo.test_interface import TestInterface
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 
 
 def verify_keyboard_handling():
@@ -43,7 +43,7 @@ def verify_keyboard_handling():
     # Test 1: Handle printable character input
     print("Test 1: Handle printable character input")
     print("-" * 70)
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
     result = interface.handle_input(event)
     
     assert result == True, "Should continue running for printable character"
@@ -58,7 +58,7 @@ def verify_keyboard_handling():
     # Test 2: Display key codes
     print("Test 2: Display key codes")
     print("-" * 70)
-    event2 = InputEvent(key_code=ord('X'), modifiers=ModifierKey.NONE, char='X')
+    event2 = KeyEvent(key_code=ord('X'), modifiers=ModifierKey.NONE, char='X')
     interface.handle_input(event2)
     
     # Verify input is stored with correct key code
@@ -85,7 +85,7 @@ def verify_keyboard_handling():
     ]
     
     for key_code, description in special_keys:
-        event = InputEvent(key_code=key_code, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=key_code, modifiers=ModifierKey.NONE)
         result = interface.handle_input(event)
         
         assert result == True, f"Should continue running for {description}"
@@ -107,7 +107,7 @@ def verify_keyboard_handling():
     ]
     
     for modifiers, description in modifier_tests:
-        event = InputEvent(key_code=ord('A'), modifiers=modifiers, char='A')
+        event = KeyEvent(key_code=ord('A'), modifiers=modifiers, char='A')
         interface.handle_input(event)
         
         assert interface.last_input.modifiers == modifiers, f"Should store correct modifiers for {description}"
@@ -132,7 +132,7 @@ def verify_keyboard_handling():
     # Test 5: Quit with 'q'
     print("Test 5: Quit with 'q'")
     print("-" * 70)
-    event_q = InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
+    event_q = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
     result = interface.handle_input(event_q)
     
     assert result == False, "Should stop running when 'q' is pressed"
@@ -143,7 +143,7 @@ def verify_keyboard_handling():
     # Test 6: Quit with 'Q' (uppercase)
     print("Test 6: Quit with 'Q' (uppercase)")
     print("-" * 70)
-    event_Q = InputEvent(key_code=ord('Q'), modifiers=ModifierKey.NONE, char='Q')
+    event_Q = KeyEvent(key_code=ord('Q'), modifiers=ModifierKey.NONE, char='Q')
     result = interface.handle_input(event_Q)
     
     assert result == False, "Should stop running when 'Q' is pressed"
@@ -154,7 +154,7 @@ def verify_keyboard_handling():
     # Test 7: Quit with ESC
     print("Test 7: Quit with ESC")
     print("-" * 70)
-    event_esc = InputEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
+    event_esc = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
     result = interface.handle_input(event_esc)
     
     assert result == False, "Should stop running when ESC is pressed"
@@ -169,7 +169,7 @@ def verify_keyboard_handling():
     
     # Add several inputs
     for i in range(10):
-        event = InputEvent(key_code=ord('a') + i, modifiers=ModifierKey.NONE, char=chr(ord('a') + i))
+        event = KeyEvent(key_code=ord('a') + i, modifiers=ModifierKey.NONE, char=chr(ord('a') + i))
         interface2.handle_input(event)
     
     assert len(interface2.input_history) == 10, "Should store input history"
@@ -177,7 +177,7 @@ def verify_keyboard_handling():
     
     # Add more to test limit
     for i in range(15):
-        event = InputEvent(key_code=ord('A') + i, modifiers=ModifierKey.NONE, char=chr(ord('A') + i))
+        event = KeyEvent(key_code=ord('A') + i, modifiers=ModifierKey.NONE, char=chr(ord('A') + i))
         interface2.handle_input(event)
     
     assert len(interface2.input_history) == 20, "Should limit history to 20 entries"
@@ -190,7 +190,7 @@ def verify_keyboard_handling():
     interface3 = TestInterface(mock_renderer, enable_performance_monitoring=False)
     
     # Add some input
-    event = InputEvent(key_code=ord('x'), modifiers=ModifierKey.SHIFT, char='X')
+    event = KeyEvent(key_code=ord('x'), modifiers=ModifierKey.SHIFT, char='X')
     interface3.handle_input(event)
     
     # Draw input echo (should not crash)

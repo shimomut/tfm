@@ -18,7 +18,7 @@ No TFM-specific code or concepts are used.
 import argparse
 import platform
 import sys
-from ttk import Renderer, InputEvent, KeyCode, ModifierKey, TextAttribute
+from ttk import Renderer, KeyEvent, KeyCode, ModifierKey, TextAttribute
 from ttk.backends.curses_backend import CursesBackend
 from ttk.utils import get_recommended_backend
 
@@ -90,7 +90,7 @@ class SimpleTextApp:
         # Refresh display
         self.backend.refresh()
         
-    def handle_input(self, event: InputEvent) -> bool:
+    def handle_input(self, event: KeyEvent) -> bool:
         """
         Handle input event.
         

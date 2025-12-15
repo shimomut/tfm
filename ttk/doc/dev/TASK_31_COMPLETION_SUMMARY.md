@@ -105,6 +105,6 @@ The demo application is ready for use and demonstrates that the TTK library prov
 
 According to the implementation plan, the next tasks are:
 - Task 32: Write unit tests for Renderer ABC
-- Task 33: Write unit tests for InputEvent
+- Task 33: Write unit tests for KeyEvent
 - Task 34-35: Write unit tests for backend implementations
 - Tasks 36-46: Write property-based tests for various components

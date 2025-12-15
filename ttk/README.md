@@ -245,7 +245,7 @@ python -m ttk.demo.demo_ttk --backend coregraphics
 ttk/
 ├── __init__.py              # Main package initialization
 ├── renderer.py              # Abstract Renderer base class
-├── input_event.py           # Input event system (KeyCode, ModifierKey, InputEvent)
+├── input_event.py           # Input event system (KeyCode, ModifierKey, KeyEvent)
 ├── backends/                # Backend implementations
 │   ├── __init__.py
 │   ├── curses_backend.py    # Terminal backend

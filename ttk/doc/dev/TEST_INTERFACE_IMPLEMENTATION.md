@@ -107,7 +107,7 @@ Displays:
 ### Input Handling
 
 ```python
-def handle_input(self, event: InputEvent) -> bool:
+def handle_input(self, event: KeyEvent) -> bool:
     """Handle input events."""
 ```
 
@@ -224,7 +224,7 @@ Benefits:
 Input history is:
 - Limited to 20 entries (prevents memory growth)
 - Displays last 5 entries (keeps UI clean)
-- Stores full InputEvent objects (preserves all details)
+- Stores full KeyEvent objects (preserves all details)
 
 ### 4. Factory Function
 

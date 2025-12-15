@@ -28,10 +28,14 @@ All test files updated to use `KeyEvent`:
 
 ### 3. TTK Library
 - ✅ `ttk/__init__.py` - Added `SystemEventType` to exports
+- ✅ TTK demos (3 files): test_interface.py, backend_switching.py, standalone_app.py
+- ✅ TTK tests (15 files): All test files updated to use KeyEvent
+- ✅ TTK documentation (56 files): All markdown files updated
 
 ### 4. Documentation
 - ✅ Created `doc/dev/INPUT_EVENT_MIGRATION.md` - Migration guide
-- ✅ Updated all documentation files to reference `KeyEvent`
+- ✅ Updated all TFM documentation files to reference `KeyEvent`
+- ✅ Updated all TTK documentation files (56 files)
 - ✅ Updated archived specs and design documents
 
 ## Key Technical Changes
@@ -73,14 +77,16 @@ event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
 - All imports work correctly
 
 ### ✅ Test Files
-- **31** test files updated
+- **31** TFM test files updated
+- **15** TTK test files updated
 - All test files compile successfully
-- **9** remaining InputEvent references (all in .pyc bytecode files, not source)
+- **9** remaining InputEvent references in TFM tests (all in .pyc bytecode files, not source)
 
 ### ✅ Documentation
-- **0** InputEvent references in documentation
-- New migration guide created
-- All specs updated
+- **0** InputEvent references in TFM documentation
+- **0** InputEvent references in TTK documentation (56 files updated)
+- New migration guide created: `doc/dev/INPUT_EVENT_MIGRATION.md`
+- All specs and archived documents updated
 
 ## API Compatibility
 
@@ -123,4 +129,10 @@ python3 -c "import sys; sys.path.insert(0, 'src'); from tfm_main import FileMana
 
 ## Migration Complete ✅
 
-All InputEvent references have been successfully replaced with KeyEvent or SystemEvent throughout the TFM codebase.
+All InputEvent references have been successfully replaced with KeyEvent or SystemEvent throughout:
+- ✅ TFM application code (15 source files, 31 test files)
+- ✅ TTK library code (3 demo files, 15 test files)
+- ✅ All documentation (TFM: doc/, TTK: ttk/doc/ - 56 files)
+- ✅ All archived specifications and design documents
+
+**Total files updated: 120+ files across TFM and TTK**

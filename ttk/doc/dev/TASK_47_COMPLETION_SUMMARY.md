@@ -33,7 +33,7 @@ Task 47 has been completed successfully. Comprehensive documentation has been cr
 - Complete reference for all public APIs
 - Detailed documentation for:
   - Renderer abstract base class (all 15 methods)
-  - InputEvent class and methods
+  - KeyEvent class and methods
   - KeyCode enum with all key codes
   - ModifierKey enum with all modifiers
   - TextAttribute enum with all attributes

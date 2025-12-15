@@ -265,7 +265,7 @@ None of these are character-grid applications.
 
 3. **Handle input events** (~100 lines)
    - Override `NSView` event methods
-   - Translate to `InputEvent` objects
+   - Translate to `KeyEvent` objects
    - Handle keyboard, mouse, resize
 
 4. **Color management** (~50 lines)

@@ -14,7 +14,7 @@ All 18 requirements from the requirements document have been successfully implem
 - **Status**: COMPLETE
 - **Implementation**: 
   - `ttk/renderer.py` - Renderer ABC with all abstract methods
-  - `ttk/input_event.py` - InputEvent, KeyCode, ModifierKey classes
+  - `ttk/input_event.py` - KeyEvent, KeyCode, ModifierKey classes
   - Comprehensive docstrings for all methods
 - **Verification**: All abstract methods defined and documented
 
@@ -151,7 +151,7 @@ All 18 requirements from the requirements document have been successfully implem
 
 ### Test Categories
 1. **Renderer ABC Tests**: ✓ Passing
-2. **InputEvent Tests**: ✓ Passing
+2. **KeyEvent Tests**: ✓ Passing
 3. **CursesBackend Tests**: ✓ All passing
 4. **MetalBackend Tests**: ✓ Core tests passing (PyObjC tests require full setup)
 5. **Command Serialization Tests**: ✓ All passing
@@ -163,7 +163,7 @@ All 18 requirements from the requirements document have been successfully implem
 
 ### Core Components
 - ✓ Abstract Renderer API
-- ✓ InputEvent system
+- ✓ KeyEvent system
 - ✓ CursesBackend (terminal)
 - ✓ MetalBackend (macOS desktop)
 - ✓ Command serialization

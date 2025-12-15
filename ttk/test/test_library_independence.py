@@ -71,7 +71,7 @@ def test_no_tfm_runtime_dependencies():
     # Import TTK
     try:
         import ttk
-        from ttk import Renderer, InputEvent, KeyCode, ModifierKey, TextAttribute
+        from ttk import Renderer, KeyEvent, KeyCode, ModifierKey, TextAttribute
         from ttk.backends.curses_backend import CursesBackend
         from ttk.serialization.command_serializer import serialize_command, parse_command
         from ttk.utils import get_recommended_backend
@@ -102,21 +102,21 @@ def test_standalone_application():
     
     try:
         # Import TTK components
-        from ttk import Renderer, InputEvent, KeyCode, ModifierKey, TextAttribute
+        from ttk import Renderer, KeyEvent, KeyCode, ModifierKey, TextAttribute
         from ttk.serialization.command_serializer import serialize_command, parse_command
         from ttk.utils import get_recommended_backend
         
         print("✓ Successfully imported TTK components")
         
-        # Test InputEvent creation
-        event = InputEvent(
+        # Test KeyEvent creation
+        event = KeyEvent(
             key_code=KeyCode.ENTER,
             modifiers=ModifierKey.CONTROL,
             char=None
         )
         assert event.key_code == KeyCode.ENTER
         assert event.has_modifier(ModifierKey.CONTROL)
-        print("✓ InputEvent works correctly")
+        print("✓ KeyEvent works correctly")
         
         # Test command serialization with proper dataclass
         from ttk.serialization.command_serializer import DrawTextCommand
@@ -196,7 +196,7 @@ def test_generic_naming():
         
         # Check main classes have generic names
         expected_classes = [
-            'Renderer', 'InputEvent', 'KeyCode', 'ModifierKey', 'TextAttribute'
+            'Renderer', 'KeyEvent', 'KeyCode', 'ModifierKey', 'TextAttribute'
         ]
         
         for class_name in expected_classes:

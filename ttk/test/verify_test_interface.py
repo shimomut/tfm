@@ -15,7 +15,7 @@ sys.path.insert(0, str(parent_dir))
 
 from unittest.mock import Mock
 from ttk.demo.test_interface import TestInterface, create_test_interface
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 from ttk.renderer import TextAttribute
 
 
@@ -105,18 +105,18 @@ def verify_input_handling():
     interface = TestInterface(mock_renderer)
     
     # Test printable character
-    event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
+    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
     result = interface.handle_input(event)
     assert result is True
     assert interface.last_input == event
     
     # Test quit command
-    quit_event = InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
+    quit_event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
     result = interface.handle_input(quit_event)
     assert result is False
     
     # Test ESC key
-    esc_event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
+    esc_event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
     result = interface.handle_input(esc_event)
     assert result is False
     

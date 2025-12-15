@@ -22,7 +22,7 @@ from ttk.demo.backend_switching import (
     parse_arguments
 )
 from ttk.renderer import Renderer, TextAttribute
-from ttk.input_event import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 
 
 class TestBackendSwitchingDemo(unittest.TestCase):
@@ -94,7 +94,7 @@ class TestBackendSwitchingDemo(unittest.TestCase):
     
     def test_handle_input_quit_lowercase(self):
         """Test handling quit command with lowercase 'q'."""
-        event = InputEvent(key_code=ord('q'), char='q', modifiers=0)
+        event = KeyEvent(key_code=ord('q'), char='q', modifiers=0)
         
         result = self.demo.handle_input(event)
         
@@ -102,7 +102,7 @@ class TestBackendSwitchingDemo(unittest.TestCase):
     
     def test_handle_input_quit_uppercase(self):
         """Test handling quit command with uppercase 'Q'."""
-        event = InputEvent(key_code=ord('Q'), char='Q', modifiers=0)
+        event = KeyEvent(key_code=ord('Q'), char='Q', modifiers=0)
         
         result = self.demo.handle_input(event)
         
@@ -110,7 +110,7 @@ class TestBackendSwitchingDemo(unittest.TestCase):
     
     def test_handle_input_escape(self):
         """Test handling ESC key."""
-        event = InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0)
         
         result = self.demo.handle_input(event)
         
@@ -118,7 +118,7 @@ class TestBackendSwitchingDemo(unittest.TestCase):
     
     def test_handle_input_resize(self):
         """Test handling resize event."""
-        event = InputEvent(key_code=KeyCode.RESIZE, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.RESIZE, char=None, modifiers=0)
         
         result = self.demo.handle_input(event)
         
@@ -126,7 +126,7 @@ class TestBackendSwitchingDemo(unittest.TestCase):
     
     def test_handle_input_regular_key(self):
         """Test handling regular key press."""
-        event = InputEvent(key_code=ord('a'), char='a', modifiers=0)
+        event = KeyEvent(key_code=ord('a'), char='a', modifiers=0)
         
         result = self.demo.handle_input(event)
         
@@ -135,7 +135,7 @@ class TestBackendSwitchingDemo(unittest.TestCase):
     def test_run_with_quit(self):
         """Test running demo and quitting."""
         # Mock get_input to return quit event
-        quit_event = InputEvent(key_code=ord('q'), char='q', modifiers=0)
+        quit_event = KeyEvent(key_code=ord('q'), char='q', modifiers=0)
         self.mock_renderer.get_input.return_value = quit_event
         
         self.demo.run()
@@ -281,10 +281,10 @@ class TestBackendIndependence(unittest.TestCase):
         
         # Test same input events
         test_events = [
-            InputEvent(key_code=ord('q'), char='q', modifiers=0),
-            InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0),
-            InputEvent(key_code=KeyCode.RESIZE, char=None, modifiers=0),
-            InputEvent(key_code=ord('a'), char='a', modifiers=0),
+            KeyEvent(key_code=ord('q'), char='q', modifiers=0),
+            KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0),
+            KeyEvent(key_code=KeyCode.RESIZE, char=None, modifiers=0),
+            KeyEvent(key_code=ord('a'), char='a', modifiers=0),
         ]
         
         for event in test_events:

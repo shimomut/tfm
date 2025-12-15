@@ -10,7 +10,7 @@ def test_basic_imports():
     """Test that all main TTK components can be imported."""
     try:
         # Import main abstract classes
-        from ttk import Renderer, TextAttribute, InputEvent, KeyCode, ModifierKey
+        from ttk import Renderer, TextAttribute, KeyEvent, KeyCode, ModifierKey
         print("✓ Main classes imported successfully")
         
         # Import backends

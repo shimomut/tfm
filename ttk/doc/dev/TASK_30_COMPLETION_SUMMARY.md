@@ -34,7 +34,7 @@ if event.key_code == KeyCode.RESIZE:
 - Resize events don't update the `last_input` field
 
 ```python
-def handle_input(self, event: InputEvent) -> bool:
+def handle_input(self, event: KeyEvent) -> bool:
     # Handle resize events
     if event.key_code == KeyCode.RESIZE:
         # Window was resized - redraw interface with new dimensions
