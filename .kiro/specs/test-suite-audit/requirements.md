@@ -2,9 +2,9 @@
 
 ## Introduction
 
-This specification defines a reusable process for auditing and updating test suites. When applied to a project, this process identifies and addresses unnecessary, redundant, outdated, or non-functional test programs. The goal is to maintain a clean, efficient, and reliable test suite that accurately reflects the current state of the codebase while removing technical debt.
+This specification defines a reusable process for auditing and updating test suites using Kiro's AI capabilities. When applied to a project, this process leverages AI analysis to identify and address unnecessary, redundant, outdated, or non-functional test programs. The goal is to maintain a clean, efficient, and reliable test suite that accurately reflects the current state of the codebase while removing technical debt.
 
-This is a process specification that can be referenced whenever test suite maintenance is needed.
+This is a process specification that can be referenced whenever test suite maintenance is needed. The process relies on Kiro's AI to perform intelligent analysis rather than automated scripts, as AI can better understand context, semantics, and nuanced relationships between tests and code.
 
 ## Glossary
 
@@ -17,8 +17,9 @@ This is a process specification that can be referenced whenever test suite maint
 - **Test Coverage**: The extent to which the codebase is tested by the test suite
 - **Integration Test**: A test that verifies multiple components working together
 - **Unit Test**: A test that verifies a single component in isolation
-- **Audit Process**: The systematic examination of test programs to identify issues
+- **Audit Process**: The AI-assisted systematic examination of test programs to identify issues
 - **Update Process**: The application of fixes to address identified test issues
+- **AI Analysis**: The use of Kiro's AI capabilities to understand code semantics, relationships, and context for intelligent test evaluation
 
 ## Requirements
 
@@ -28,10 +29,10 @@ This is a process specification that can be referenced whenever test suite maint
 
 #### Acceptance Criteria
 
-1. WHEN analyzing a test program THEN the audit process SHALL determine if the tested functionality still exists in the codebase
-2. WHEN a test program tests non-existent functionality THEN the audit process SHALL flag it as unnecessary
-3. WHEN the audit completes THEN the audit process SHALL provide a list of all unnecessary test programs with justification
-4. WHEN an unnecessary test is identified THEN the audit process SHALL verify the functionality is not present in any source file
+1. WHEN analyzing a test program THEN Kiro's AI SHALL determine if the tested functionality still exists in the codebase by examining source files and understanding code semantics
+2. WHEN a test program tests non-existent functionality THEN Kiro's AI SHALL flag it as unnecessary with contextual reasoning
+3. WHEN the audit completes THEN Kiro's AI SHALL provide a list of all unnecessary test programs with justification based on codebase analysis
+4. WHEN an unnecessary test is identified THEN Kiro's AI SHALL verify the functionality is not present in any source file through semantic code understanding
 
 ### Requirement 2
 
@@ -39,10 +40,10 @@ This is a process specification that can be referenced whenever test suite maint
 
 #### Acceptance Criteria
 
-1. WHEN analyzing test programs THEN the audit process SHALL identify tests that cover the same functionality
-2. WHEN multiple tests cover identical functionality THEN the audit process SHALL flag them as redundant
-3. WHEN redundant tests are identified THEN the audit process SHALL recommend which test to keep based on comprehensiveness and clarity
-4. WHEN the audit completes THEN the audit process SHALL provide a list of redundant test groups with consolidation recommendations
+1. WHEN analyzing test programs THEN Kiro's AI SHALL identify tests that cover the same functionality by understanding test semantics and purpose
+2. WHEN multiple tests cover identical functionality THEN Kiro's AI SHALL flag them as redundant with reasoning about the overlap
+3. WHEN redundant tests are identified THEN Kiro's AI SHALL recommend which test to keep based on comprehensiveness, clarity, and code quality assessment
+4. WHEN the audit completes THEN Kiro's AI SHALL provide a list of redundant test groups with consolidation recommendations
 
 ### Requirement 3
 
@@ -50,10 +51,10 @@ This is a process specification that can be referenced whenever test suite maint
 
 #### Acceptance Criteria
 
-1. WHEN analyzing a test program THEN the audit process SHALL detect usage of deprecated imports or APIs
-2. WHEN a test uses outdated patterns THEN the audit process SHALL flag it as outdated
-3. WHEN outdated tests are identified THEN the audit process SHALL provide specific examples of deprecated usage
-4. WHEN the audit completes THEN the audit process SHALL provide a list of outdated test programs with modernization recommendations
+1. WHEN analyzing a test program THEN Kiro's AI SHALL detect usage of deprecated imports or APIs by comparing against current codebase patterns
+2. WHEN a test uses outdated patterns THEN Kiro's AI SHALL flag it as outdated with explanation of why the pattern is obsolete
+3. WHEN outdated tests are identified THEN Kiro's AI SHALL provide specific examples of deprecated usage and suggest modern alternatives
+4. WHEN the audit completes THEN Kiro's AI SHALL provide a list of outdated test programs with modernization recommendations
 
 ### Requirement 4
 
@@ -61,11 +62,11 @@ This is a process specification that can be referenced whenever test suite maint
 
 #### Acceptance Criteria
 
-1. WHEN attempting to execute a test program THEN the audit process SHALL capture any execution failures
-2. WHEN a test fails to import required modules THEN the audit process SHALL flag it as non-functional with import error details
-3. WHEN a test has syntax errors THEN the audit process SHALL flag it as non-functional with syntax error details
-4. WHEN a test fails during execution THEN the audit process SHALL flag it as non-functional with failure details
-5. WHEN the audit completes THEN the audit process SHALL provide a list of non-functional test programs with error diagnostics
+1. WHEN attempting to execute a test program THEN Kiro's AI SHALL capture any execution failures through test execution
+2. WHEN a test fails to import required modules THEN Kiro's AI SHALL flag it as non-functional with import error details and suggest fixes
+3. WHEN a test has syntax errors THEN Kiro's AI SHALL flag it as non-functional with syntax error details and correction recommendations
+4. WHEN a test fails during execution THEN Kiro's AI SHALL flag it as non-functional with failure details and root cause analysis
+5. WHEN the audit completes THEN Kiro's AI SHALL provide a list of non-functional test programs with error diagnostics and remediation steps
 
 ### Requirement 5
 
@@ -73,11 +74,11 @@ This is a process specification that can be referenced whenever test suite maint
 
 #### Acceptance Criteria
 
-1. WHEN the audit completes THEN the audit process SHALL generate a comprehensive report document
-2. WHEN generating the report THEN the audit process SHALL include summary statistics for each category
-3. WHEN generating the report THEN the audit process SHALL include detailed findings for each flagged test
-4. WHEN generating the report THEN the audit process SHALL include actionable recommendations for each issue
-5. WHEN generating the report THEN the audit process SHALL organize findings by priority and impact
+1. WHEN the audit completes THEN Kiro's AI SHALL generate a comprehensive report document with intelligent analysis
+2. WHEN generating the report THEN Kiro's AI SHALL include summary statistics for each category with contextual insights
+3. WHEN generating the report THEN Kiro's AI SHALL include detailed findings for each flagged test with reasoning
+4. WHEN generating the report THEN Kiro's AI SHALL include actionable recommendations for each issue based on codebase understanding
+5. WHEN generating the report THEN Kiro's AI SHALL organize findings by priority and impact using intelligent assessment
 
 ### Requirement 6
 
@@ -97,11 +98,11 @@ This is a process specification that can be referenced whenever test suite maint
 
 #### Acceptance Criteria
 
-1. WHEN analyzing a test program THEN the audit process SHALL categorize it by type
-2. WHEN categorizing tests THEN the audit process SHALL distinguish between unit tests and integration tests
-3. WHEN categorizing tests THEN the audit process SHALL identify the primary component or feature being tested
-4. WHEN the audit completes THEN the audit process SHALL provide a categorized inventory of all test programs
-5. WHEN the audit completes THEN the audit process SHALL identify areas with insufficient test coverage
+1. WHEN analyzing a test program THEN Kiro's AI SHALL categorize it by type through semantic understanding of test structure and purpose
+2. WHEN categorizing tests THEN Kiro's AI SHALL distinguish between unit tests and integration tests based on test scope and dependencies
+3. WHEN categorizing tests THEN Kiro's AI SHALL identify the primary component or feature being tested through code analysis
+4. WHEN the audit completes THEN Kiro's AI SHALL provide a categorized inventory of all test programs with intelligent grouping
+5. WHEN the audit completes THEN Kiro's AI SHALL identify areas with insufficient test coverage through codebase analysis
 
 ### Requirement 8
 
@@ -109,10 +110,10 @@ This is a process specification that can be referenced whenever test suite maint
 
 #### Acceptance Criteria
 
-1. WHEN analyzing test filenames THEN the audit process SHALL verify they follow the pattern test_*.py
-2. WHEN a test filename does not follow conventions THEN the audit process SHALL flag it as inconsistent
-3. WHEN test function names are analyzed THEN the audit process SHALL verify they follow the pattern test_*
-4. WHEN the audit completes THEN the audit process SHALL provide a list of naming inconsistencies with correction recommendations
+1. WHEN analyzing test filenames THEN Kiro's AI SHALL verify they follow the pattern test_*.py and project conventions
+2. WHEN a test filename does not follow conventions THEN Kiro's AI SHALL flag it as inconsistent with suggested corrections
+3. WHEN test function names are analyzed THEN Kiro's AI SHALL verify they follow the pattern test_* and are descriptive
+4. WHEN the audit completes THEN Kiro's AI SHALL provide a list of naming inconsistencies with correction recommendations
 
 ### Requirement 9
 
@@ -120,8 +121,8 @@ This is a process specification that can be referenced whenever test suite maint
 
 #### Acceptance Criteria
 
-1. WHEN analyzing source files THEN the audit process SHALL identify modules without corresponding test files
-2. WHEN analyzing source files THEN the audit process SHALL identify public functions and classes without test coverage
-3. WHEN missing test coverage is identified THEN the audit process SHALL prioritize gaps based on code complexity and criticality
-4. WHEN the audit completes THEN the audit process SHALL provide a list of untested components with recommendations for new tests
-5. WHEN creating new tests THEN the update process SHALL follow established naming conventions and patterns
+1. WHEN analyzing source files THEN Kiro's AI SHALL identify modules without corresponding test files through codebase examination
+2. WHEN analyzing source files THEN Kiro's AI SHALL identify public functions and classes without test coverage using semantic analysis
+3. WHEN missing test coverage is identified THEN Kiro's AI SHALL prioritize gaps based on code complexity, criticality, and usage patterns
+4. WHEN the audit completes THEN Kiro's AI SHALL provide a list of untested components with recommendations for new tests
+5. WHEN creating new tests THEN Kiro's AI SHALL follow established naming conventions and patterns identified in the existing test suite
