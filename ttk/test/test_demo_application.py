@@ -46,21 +46,21 @@ class TestDemoApplication:
         backend = app.select_backend()
         assert isinstance(backend, CursesBackend)
     
-    def test_select_backend_metal(self):
-        """Test selecting metal backend."""
-        app = DemoApplication('metal')
+    def test_select_backend_coregraphics(self):
+        """Test selecting coregraphics backend."""
+        app = DemoApplication('coregraphics')
         backend = app.select_backend()
-        assert isinstance(backend, MetalBackend)
+        assert isinstance(backend, CoreGraphicsBackend)
     
     def test_select_backend_auto_detection(self):
         """Test auto backend detection."""
         app = DemoApplication('auto')
         backend = app.select_backend()
         
-        # Should select metal on macOS, curses elsewhere
+        # Should select coregraphics on macOS, curses elsewhere
         if platform.system() == 'Darwin':
-            assert isinstance(backend, MetalBackend)
-            assert app.backend_name == 'metal'
+            assert isinstance(backend, CoreGraphicsBackend)
+            assert app.backend_name == 'coregraphics'
         else:
             assert isinstance(backend, CursesBackend)
             assert app.backend_name == 'curses'
@@ -73,19 +73,19 @@ class TestDemoApplication:
             app.select_backend()
         
         assert "Unknown backend: invalid" in str(exc_info.value)
-        assert "Valid options are: curses, metal, auto" in str(exc_info.value)
+        assert "Valid options are: curses, coregraphics, auto" in str(exc_info.value)
     
-    def test_select_backend_metal_on_non_macos(self, monkeypatch):
-        """Test error when selecting metal backend on non-macOS."""
+    def test_select_backend_coregraphics_on_non_macos(self, monkeypatch):
+        """Test error when selecting coregraphics backend on non-macOS."""
         # Mock platform.system to return non-Darwin
         monkeypatch.setattr(platform, 'system', lambda: 'Linux')
         
-        app = DemoApplication('metal')
+        app = DemoApplication('coregraphics')
         
         with pytest.raises(ValueError) as exc_info:
             app.select_backend()
         
-        assert "Metal backend is only available on macOS" in str(exc_info.value)
+        assert "CoreGraphics backend is only available on macOS" in str(exc_info.value)
         assert "Use --backend curses" in str(exc_info.value)
 
 
@@ -104,11 +104,11 @@ class TestCommandLineArguments:
         args = parse_arguments()
         assert args.backend == 'curses'
     
-    def test_parse_arguments_metal(self, monkeypatch):
-        """Test parsing metal backend argument."""
-        monkeypatch.setattr(sys, 'argv', ['demo_ttk.py', '--backend', 'metal'])
+    def test_parse_arguments_coregraphics(self, monkeypatch):
+        """Test parsing coregraphics backend argument."""
+        monkeypatch.setattr(sys, 'argv', ['demo_ttk.py', '--backend', 'coregraphics'])
         args = parse_arguments()
-        assert args.backend == 'metal'
+        assert args.backend == 'coregraphics'
     
     def test_parse_arguments_auto(self, monkeypatch):
         """Test parsing auto backend argument."""

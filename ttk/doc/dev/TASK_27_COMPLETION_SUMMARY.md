@@ -142,8 +142,8 @@ Test interface properly integrated
 # With curses backend (terminal)
 python ttk/demo/demo_ttk.py --backend curses
 
-# With Metal backend (macOS desktop)
-python ttk/demo/demo_ttk.py --backend metal
+# With CoreGraphics backend (macOS desktop)
+python ttk/demo/demo_ttk.py --backend coregraphics
 
 # Auto-detect best backend
 python ttk/demo/demo_ttk.py

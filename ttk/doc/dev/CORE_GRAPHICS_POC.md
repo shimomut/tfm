@@ -2,7 +2,7 @@
 
 ## Minimal Working Implementation
 
-This document shows a minimal Core Graphics backend implementation to demonstrate its simplicity compared to Metal.
+This document shows a minimal Core Graphics backend implementation to demonstrate its simplicity.
 
 ## Complete Implementation (~300 lines)
 
@@ -11,7 +11,7 @@ This document shows a minimal Core Graphics backend implementation to demonstrat
 TTK Core Graphics Backend - Minimal Implementation
 
 This is a complete, working backend using Core Graphics for text rendering.
-Compare this to the Metal backend which requires 1000+ lines.
+Simple, maintainable, and high-quality.
 """
 
 from typing import Tuple, Optional

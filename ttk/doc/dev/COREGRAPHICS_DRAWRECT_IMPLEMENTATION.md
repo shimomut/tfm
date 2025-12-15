@@ -200,12 +200,12 @@ Potential improvements for future versions:
 - **Curses**: Uses terminal control sequences, limited to terminal capabilities
 - **CoreGraphics**: Direct pixel rendering, full control over appearance
 
-### vs. Metal Backend
+### CoreGraphics Advantages
 
-- **Metal**: GPU-accelerated, complex shader pipeline, texture atlases
-- **CoreGraphics**: CPU-based, simple direct rendering, no GPU state management
-
-The CoreGraphics approach is simpler (~100 lines for drawRect_ vs ~300+ for Metal rendering pipeline) while providing equivalent functionality for TTK's character-grid use case.
+- **Simple Implementation**: Direct rendering without complex pipeline setup
+- **Native Text Quality**: Uses NSAttributedString for high-quality text rendering
+- **Maintainable**: Clean, straightforward code (~100 lines for drawRect_)
+- **Full Unicode Support**: Handles all Unicode characters and emoji natively
 
 ## Conclusion
 

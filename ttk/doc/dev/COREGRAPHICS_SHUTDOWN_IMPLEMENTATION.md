@@ -231,6 +231,4 @@ Potential future enhancements to the shutdown implementation:
 
 - [CoreGraphics Window Creation Implementation](COREGRAPHICS_WINDOW_CREATION_IMPLEMENTATION.md)
 <!-- CoreGraphics Initialization documentation not yet created -->
-<!-- Metal Shutdown Implementation documentation not yet created -->
-<!-- CoreGraphics backend spec files not included in repository -->
 <!-- CoreGraphics backend spec files not included in repository -->

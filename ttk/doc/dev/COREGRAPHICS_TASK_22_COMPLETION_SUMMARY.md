@@ -160,14 +160,14 @@ Python strings and NSAttributedString handle these naturally without special cod
 
 ## Advantages of CoreGraphics Approach
 
-Compared to lower-level approaches (like Metal):
+Advantages of the CoreGraphics approach:
 
 1. **No Special Unicode Code:** NSAttributedString handles everything
 2. **No Font Management:** CoreText provides automatic fallback
 3. **No Glyph Positioning:** CoreText handles complex scripts
 4. **No Texture Atlas:** No need to manage glyph textures
 5. **High Quality:** Native macOS text rendering quality
-6. **Simplicity:** ~300 lines total vs ~1000+ for Metal
+6. **Simplicity:** Clean, maintainable implementation (~300 lines total)
 
 ## Files Created/Modified
 

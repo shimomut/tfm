@@ -172,7 +172,7 @@ The project has two demo applications:
 - Full-featured test interface
 - Performance monitoring
 - More extensive testing
-- Supports Metal backend too
+- Supports CoreGraphics backend too
 - Auto-detection of best backend
 
 ### backend_switching.py (Focused Demo)

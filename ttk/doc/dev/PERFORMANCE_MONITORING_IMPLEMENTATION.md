@@ -185,7 +185,6 @@ Potential improvements for future versions:
 3. **Historical Graphs**: Display FPS/render time trends over time
 4. **Export Metrics**: Save performance data to file for analysis
 5. **Comparison Mode**: Compare performance between backends
-6. **GPU Metrics**: Track GPU utilization for Metal backend
 
 ## Related Documentation
 

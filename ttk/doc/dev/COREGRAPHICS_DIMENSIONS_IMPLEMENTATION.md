@@ -203,9 +203,7 @@ def get_dimensions(self) -> Tuple[int, int]:
 
 The curses backend queries the terminal for current dimensions, while CoreGraphics returns stored values. Both approaches are valid for their respective contexts.
 
-### Metal Backend
 
-The Metal backend (if implemented) would likely use a similar approach to CoreGraphics, storing and returning grid dimensions directly.
 
 ## Summary
 

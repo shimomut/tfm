@@ -7,8 +7,7 @@ high-quality text rendering while maintaining full compatibility with the abstra
 Renderer API.
 
 The CoreGraphics backend uses Apple's Cocoa and CoreGraphics frameworks through
-PyObjC to provide native macOS text rendering quality with minimal code complexity
-(~300 lines vs ~1000+ for Metal).
+PyObjC to provide native macOS text rendering quality with minimal code complexity.
 
 Requirements:
     - macOS operating system

@@ -1,7 +1,7 @@
 # Task 31 Completion Summary: Demo Application Backend Verification
 
 ## Overview
-Task 31 is a checkpoint task to verify that the demo application works correctly with both the curses and Metal backends. This ensures that all previous implementation tasks integrate properly and that both backends provide equivalent functionality.
+Task 31 is a checkpoint task to verify that the demo application works correctly with both the curses and CoreGraphics backends. This ensures that all previous implementation tasks integrate properly and that both backends provide equivalent functionality.
 
 ## Implementation Details
 
@@ -17,9 +17,9 @@ Created comprehensive verification tests in `ttk/test/verify_demo_backends.py` w
 - Quit command handling ('q' and ESC keys)
 - Resize event handling
 
-#### 2. Metal Backend Tests (6 tests)
-- Demo application initialization with Metal backend (macOS only)
-- Test interface creation with Metal backend
+#### 2. CoreGraphics Backend Tests (6 tests)
+- Demo application initialization with CoreGraphics backend (macOS only)
+- Test interface creation with CoreGraphics backend
 - Color initialization (10+ color pairs)
 - Drawing operations (clear, draw_text, refresh)
 - Input handling (printable characters)
@@ -32,7 +32,7 @@ Created comprehensive verification tests in `ttk/test/verify_demo_backends.py` w
 
 #### 4. Integration Tests (3 tests)
 - Complete lifecycle with curses backend
-- Complete lifecycle with Metal backend
+- Complete lifecycle with CoreGraphics backend
 - Auto backend selection based on platform
 
 ## Test Results
@@ -50,7 +50,7 @@ All 19 tests pass successfully:
 3. **Drawing Operations**: Both backends execute the same drawing commands
 4. **Input Handling**: Both backends handle input events identically
 5. **Resize Handling**: Both backends handle window resize events correctly
-6. **Platform Detection**: Auto backend selection works correctly (Metal on macOS, curses elsewhere)
+6. **Platform Detection**: Auto backend selection works correctly (CoreGraphics on macOS, curses elsewhere)
 
 ## Requirements Validated
 
@@ -58,7 +58,7 @@ This checkpoint verifies integration of requirements from previous tasks:
 
 - **Requirement 1.1-1.4**: Renderer ABC and backend implementation
 - **Requirement 2.1-2.5**: Curses backend functionality
-- **Requirement 3.1-3.6**: Metal backend functionality
+- **Requirement 3.1-3.6**: CoreGraphics backend functionality
 - **Requirement 4.1-4.6**: Drawing operations
 - **Requirement 5.1-5.5**: Input handling
 - **Requirement 6.1-6.6**: Demo application features
@@ -79,7 +79,7 @@ This checkpoint verifies integration of requirements from previous tasks:
 ## Verification Checklist
 
 - [x] Demo application initializes with curses backend
-- [x] Demo application initializes with Metal backend (macOS)
+- [x] Demo application initializes with CoreGraphics backend (macOS)
 - [x] Test interface creates with both backends
 - [x] Color initialization works with both backends
 - [x] Drawing operations work with both backends
@@ -99,7 +99,7 @@ Task 31 checkpoint is complete. The verification tests confirm that:
 4. The test interface demonstrates all TTK capabilities
 5. Platform-specific backend selection works as expected
 
-The demo application is ready for use and demonstrates that the TTK library provides a consistent API across both curses and Metal backends.
+The demo application is ready for use and demonstrates that the TTK library provides a consistent API across both curses and CoreGraphics backends.
 
 ## Next Steps
 

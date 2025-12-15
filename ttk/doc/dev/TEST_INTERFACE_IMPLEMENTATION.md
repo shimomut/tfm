@@ -153,8 +153,8 @@ def run(self):
 # With curses backend
 python ttk/demo/demo_ttk.py --backend curses
 
-# With Metal backend (macOS only)
-python ttk/demo/demo_ttk.py --backend metal
+# With CoreGraphics backend (macOS only)
+python ttk/demo/demo_ttk.py --backend coregraphics
 
 # Auto-detect backend
 python ttk/demo/demo_ttk.py
@@ -264,7 +264,7 @@ Potential improvements:
 
 1. **Performance Metrics**: Add FPS counter and render time display
 2. **Interactive Tests**: Allow user to trigger specific rendering operations
-3. **Backend Comparison**: Side-by-side comparison of curses vs Metal
+3. **Backend Comparison**: Side-by-side comparison of curses vs CoreGraphics
 4. **Animation Demo**: Demonstrate smooth animation capabilities
 5. **Mouse Interaction**: Interactive mouse event demonstration
 

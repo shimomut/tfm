@@ -214,7 +214,6 @@ The most transformative period in the project's history:
 ### Mid December - **TTK Revolution**:
 - **TTK (Terminal Toolkit) library created**
 - Backend abstraction (Curses, CoreGraphics)
-- Metal backend exploration (later removed)
 - **CoreGraphics backend for macOS**
 - TTK demo applications
 - Font rendering and window management

@@ -38,7 +38,7 @@ Task 47 has been completed successfully. Comprehensive documentation has been cr
   - ModifierKey enum with all modifiers
   - TextAttribute enum with all attributes
   - CursesBackend implementation
-  - MetalBackend implementation
+  - CoreGraphicsBackend implementation
   - Serialization functions
   - Utility functions
 - Code examples for every API method
@@ -118,7 +118,7 @@ Task 47 has been completed successfully. Comprehensive documentation has been cr
 - Color pairs explained
 - RGB color values
 - Color pair limits
-- Backend color differences (curses vs Metal)
+- Backend color differences (curses vs CoreGraphics)
 - Color utilities
 - Color scheme organization
 - Best practices (caching dimensions, initializing colors once, relative positioning, resize handling, validation)

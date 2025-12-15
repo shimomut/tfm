@@ -135,7 +135,7 @@ def test_standalone_application():
         
         # Test backend recommendation
         backend = get_recommended_backend()
-        assert backend in ['curses', 'metal']
+        assert backend in ['curses', 'coregraphics']
         print(f"✓ Backend recommendation works (recommended: {backend})")
         
         # Test TextAttribute combinations

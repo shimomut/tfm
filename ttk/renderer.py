@@ -326,7 +326,7 @@ class Renderer(ABC):
             ValueError: If any RGB component is outside the range 0-255
             
         Note: The curses backend may approximate RGB colors to the nearest
-        terminal color. The Metal backend uses exact RGB values.
+        terminal color. The CoreGraphics backend uses exact RGB values.
         
         Example:
             # Initialize color pair 1 with white text on blue background

@@ -4,9 +4,8 @@
 .PHONY: help demo-ttk demo-performance demo-standalone demo-test-interface demo-all test clean install install-dev uninstall build
 
 # Backend selection (default: curses)
-# Usage: make demo-ttk BACKEND=metal
-# Valid options: auto, curses, metal
-# Note: Metal backend is under development, use curses for now
+# Usage: make demo-ttk BACKEND=coregraphics
+# Valid options: auto, curses, coregraphics
 BACKEND ?= curses
 
 # Default target - show help
@@ -17,7 +16,6 @@ help:
 	@echo "Installation:"
 	@echo "  make install               - Install TTK to Python (pip install .)"
 	@echo "  make install-dev           - Install TTK in development mode (pip install -e .)"
-	@echo "  make install-metal         - Install TTK with Metal backend support (macOS only)"
 	@echo "  make uninstall             - Uninstall TTK from Python"
 	@echo "  make build                 - Build distribution packages (wheel and sdist)"
 	@echo ""
@@ -31,14 +29,14 @@ help:
 	@echo "Backend Selection:"
 	@echo "  BACKEND=curses             - Use curses (terminal) backend (default)"
 	@echo "  BACKEND=auto               - Auto-detect best backend"
-	@echo "  BACKEND=metal              - Use Metal (macOS desktop) backend (NOT YET FUNCTIONAL)"
+	@echo "  BACKEND=coregraphics       - Use CoreGraphics (macOS desktop) backend"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make install-dev                 # Install for development"
-	@echo "  make demo-ttk                    # Auto-detect backend"
-	@echo "  make demo-ttk BACKEND=curses     # Force curses backend"
-	@echo "  make demo-ttk BACKEND=metal      # Force Metal backend (macOS only)"
-	@echo "  make demo-all BACKEND=metal      # Run all demos with Metal"
+	@echo "  make install-dev                      # Install for development"
+	@echo "  make demo-ttk                         # Auto-detect backend"
+	@echo "  make demo-ttk BACKEND=curses          # Force curses backend"
+	@echo "  make demo-ttk BACKEND=coregraphics    # Force CoreGraphics backend (macOS only)"
+	@echo "  make demo-all BACKEND=coregraphics    # Run all demos with CoreGraphics"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test                  - Run all TTK tests"
@@ -94,11 +92,6 @@ install-dev:
 	@pip3 install -e .
 	@echo "TTK installed in development mode!"
 	@echo "Changes to source files will be reflected immediately."
-
-install-metal:
-	@echo "Installing TTK with Metal backend support (macOS only)..."
-	@pip3 install ".[metal]"
-	@echo "TTK installed with Metal backend support!"
 
 uninstall:
 	@echo "Uninstalling TTK from Python..."

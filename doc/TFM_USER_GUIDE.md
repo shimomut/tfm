@@ -225,7 +225,7 @@ python3 tfm.py --backend coregraphics
 Desktop mode provides several advantages over terminal mode:
 
 - **Native Window**: Resizable macOS window with standard window controls
-- **GPU Acceleration**: Smooth 60 FPS rendering using Metal/CoreGraphics
+- **High-Quality Rendering**: Smooth rendering using CoreGraphics
 - **Better Colors**: True RGB color support with accurate color reproduction
 - **Font Customization**: Choose your preferred monospace font and size
 - **Full-Screen Support**: Native macOS full-screen mode

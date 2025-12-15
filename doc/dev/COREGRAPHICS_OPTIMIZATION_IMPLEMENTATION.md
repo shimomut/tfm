@@ -314,9 +314,7 @@ If additional performance is needed (target: 60+ FPS):
    - Estimated improvement: 10-20% additional gain
    - Trade-off: More complex state management
 
-4. **Metal Backend**: Use Metal instead of CoreGraphics for GPU acceleration
-   - Estimated improvement: 100-200% additional gain
-   - Trade-off: Significant implementation effort
+
 
 ## Maintenance Guidelines
 

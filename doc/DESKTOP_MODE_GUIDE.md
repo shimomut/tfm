@@ -35,7 +35,7 @@ When you launch TFM in desktop mode:
 
 ### Performance Benefits
 
-- **GPU Acceleration**: Smooth 60 FPS rendering using Metal/CoreGraphics
+- **High-Quality Rendering**: Smooth rendering using CoreGraphics
 - **Better Responsiveness**: Immediate input handling
 - **Smooth Scrolling**: No tearing or lag when navigating large directories
 - **Lower CPU Usage**: GPU handles rendering, freeing up CPU

@@ -195,7 +195,6 @@ While the current optimization meets all requirements, potential future improvem
 1. **Incremental dirty region tracking** - Only redraw cells that actually changed
 2. **Batch caching** - Cache batches between frames if grid unchanged
 3. **Parallel processing** - Use multiple threads for large dirty regions
-4. **GPU acceleration** - Investigate Metal for rendering (separate spec)
 
 These enhancements are outside the scope of this specification but could provide additional performance gains.
 

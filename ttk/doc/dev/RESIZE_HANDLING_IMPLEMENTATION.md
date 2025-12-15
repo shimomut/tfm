@@ -121,14 +121,14 @@ The resize handling works automatically when running the demo application:
 # Run with curses backend (terminal)
 python ttk/demo/demo_ttk.py --backend curses
 
-# Run with Metal backend (macOS)
-python ttk/demo/demo_ttk.py --backend metal
+# Run with CoreGraphics backend (macOS)
+python ttk/demo/demo_ttk.py --backend coregraphics
 ```
 
 ### Testing Resize Behavior
 
 1. Launch the demo application
-2. Resize the terminal window (curses) or application window (Metal)
+2. Resize the terminal window (curses) or application window (CoreGraphics)
 3. Observe that:
    - The interface redraws immediately
    - Corner markers move to new positions
@@ -164,7 +164,7 @@ python -m pytest ttk/test/test_test_interface.py -v
 The resize handling works with both backends:
 
 - **Curses backend**: Terminal resize events are translated to `KeyCode.RESIZE`
-- **Metal backend**: Window resize events are translated to `KeyCode.RESIZE`
+- **CoreGraphics backend**: Window resize events are translated to `KeyCode.RESIZE`
 
 Both backends use the same `KeyEvent` structure, ensuring consistent behavior.
 

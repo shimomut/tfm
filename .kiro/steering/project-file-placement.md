@@ -48,7 +48,7 @@ This project follows a clean directory structure that separates different types 
 - Implementation details: `ttk/doc/dev/COMPONENT_NAME_IMPLEMENTATION.md`
 - Architecture documentation: `ttk/doc/dev/ARCHITECTURE.md`
 - Technical specifications: `ttk/doc/dev/SPECIFICATION_NAME_SPEC.md`
-- Example: `ttk/doc/dev/METAL_INITIALIZATION_IMPLEMENTATION.md`
+- Example: `ttk/doc/dev/COREGRAPHICS_BACKEND_IMPLEMENTATION.md`
 
 ### TFM Documentation (`doc/`)
 - **TFM end-user documentation** should be placed in the `/doc` directory
@@ -243,7 +243,7 @@ test/test_remote_log_monitoring.py          # TFM test file
 ttk/test/test_input_event.py                # TTK test file
 ttk/demo/demo_ttk.py                         # TTK demo file
 ttk/doc/API_REFERENCE.md                    # TTK end-user documentation
-ttk/doc/dev/METAL_INITIALIZATION_IMPLEMENTATION.md  # TTK developer documentation
+ttk/doc/dev/COREGRAPHICS_BACKEND_IMPLEMENTATION.md  # TTK developer documentation
 doc/REMOTE_LOG_MONITORING_FEATURE.md        # TFM end-user feature documentation
 doc/dev/LOG_MANAGER_SYSTEM.md               # TFM developer system documentation
 demo/demo_remote_log.py                     # TFM demo script
@@ -257,7 +257,7 @@ temp/TEMP_FEATURE_ANALYSIS.md               # Temporary documentation
 ```
 remote_log_test.py                          # Should be in test/
 demo_ttk.py                                 # TTK demo, should be in ttk/demo/
-doc/dev/METAL_BACKEND_IMPLEMENTATION.md     # TTK doc, should be in ttk/doc/dev/
+doc/dev/COREGRAPHICS_BACKEND_IMPLEMENTATION.md  # TTK doc, should be in ttk/doc/dev/
 REMOTE_LOG_DOCS.md                          # Should be in doc/ (end-user) or doc/dev/ (developer)
 log_demo.py                                 # Should be in demo/ (TFM) or ttk/demo/ (TTK)
 analyze_logs.sh                             # Should be in tools/

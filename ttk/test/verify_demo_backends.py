@@ -3,7 +3,7 @@
 Verification test for Task 31: Demo application works with both backends.
 
 This test verifies that the demo application can successfully:
-1. Initialize with both curses and Metal backends
+1. Initialize with both curses and CoreGraphics backends
 2. Create and configure the test interface
 3. Render the test interface without errors
 4. Handle input events correctly
@@ -133,22 +133,22 @@ class TestDemoWithCursesBackend:
         assert event not in interface.input_history  # Resize events not in history
 
 
-class TestDemoWithMetalBackend:
-    """Test demo application with Metal backend."""
+class TestDemoWithCoreGraphicsBackend:
+    """Test demo application with CoreGraphics backend."""
     
-    @pytest.mark.skipif(platform.system() != 'Darwin', reason="Metal backend only available on macOS")
-    def test_demo_initializes_with_metal(self):
-        """Test that demo application initializes successfully with Metal backend."""
-        app = DemoApplication('metal')
+    @pytest.mark.skipif(platform.system() != 'Darwin', reason="CoreGraphics backend only available on macOS")
+    def test_demo_initializes_with_coregraphics(self):
+        """Test that demo application initializes successfully with CoreGraphics backend."""
+        app = DemoApplication('coregraphics')
         backend = app.select_backend()
         
-        assert isinstance(backend, MetalBackend)
-        assert app.backend_name == 'metal'
+        assert isinstance(backend, CoreGraphicsBackend)
+        assert app.backend_name == 'coregraphics'
     
-    def test_test_interface_creates_with_metal(self):
-        """Test that test interface can be created with Metal backend."""
-        # Create a mock Metal backend
-        mock_backend = Mock(spec=MetalBackend)
+    def test_test_interface_creates_with_coregraphics(self):
+        """Test that test interface can be created with CoreGraphics backend."""
+        # Create a mock CoreGraphics backend
+        mock_backend = Mock(spec=CoreGraphicsBackend)
         mock_backend.get_dimensions.return_value = (50, 120)
         
         # Create test interface
@@ -157,9 +157,9 @@ class TestDemoWithMetalBackend:
         assert isinstance(interface, TestInterface)
         assert interface.renderer is mock_backend
     
-    def test_test_interface_initializes_colors_metal(self):
-        """Test that test interface initializes colors with Metal backend."""
-        mock_backend = Mock(spec=MetalBackend)
+    def test_test_interface_initializes_colors_coregraphics(self):
+        """Test that test interface initializes colors with CoreGraphics backend."""
+        mock_backend = Mock(spec=CoreGraphicsBackend)
         mock_backend.get_dimensions.return_value = (50, 120)
         
         interface = TestInterface(mock_backend)
@@ -180,9 +180,9 @@ class TestDemoWithMetalBackend:
         # Color pair 9: Black on white (input echo)
         assert any(call[0] == (9, (0, 0, 0), (255, 255, 255)) for call in calls)
     
-    def test_test_interface_draws_with_metal(self):
-        """Test that test interface can draw with Metal backend."""
-        mock_backend = Mock(spec=MetalBackend)
+    def test_test_interface_draws_with_coregraphics(self):
+        """Test that test interface can draw with CoreGraphics backend."""
+        mock_backend = Mock(spec=CoreGraphicsBackend)
         mock_backend.get_dimensions.return_value = (60, 150)
         
         interface = TestInterface(mock_backend, enable_performance_monitoring=False)
@@ -194,9 +194,9 @@ class TestDemoWithMetalBackend:
         assert mock_backend.draw_text.called
         assert mock_backend.refresh.called
     
-    def test_test_interface_handles_input_metal(self):
-        """Test that test interface handles input with Metal backend."""
-        mock_backend = Mock(spec=MetalBackend)
+    def test_test_interface_handles_input_coregraphics(self):
+        """Test that test interface handles input with CoreGraphics backend."""
+        mock_backend = Mock(spec=CoreGraphicsBackend)
         mock_backend.get_dimensions.return_value = (50, 120)
         
         interface = TestInterface(mock_backend, enable_performance_monitoring=False)
@@ -209,9 +209,9 @@ class TestDemoWithMetalBackend:
         assert interface.last_input == event
         assert event in interface.input_history
     
-    def test_test_interface_handles_resize_metal(self):
-        """Test that test interface handles resize events with Metal backend."""
-        mock_backend = Mock(spec=MetalBackend)
+    def test_test_interface_handles_resize_coregraphics(self):
+        """Test that test interface handles resize events with CoreGraphics backend."""
+        mock_backend = Mock(spec=CoreGraphicsBackend)
         mock_backend.get_dimensions.return_value = (50, 120)
         
         interface = TestInterface(mock_backend, enable_performance_monitoring=False)
@@ -303,9 +303,9 @@ class TestBackendEquivalence:
         coregraphics_result = coregraphics_interface.handle_input(event)
         
         # Both should handle resize the same way
-        assert curses_result == metal_result
-        assert curses_interface.last_input == metal_interface.last_input
-        assert len(curses_interface.input_history) == len(metal_interface.input_history)
+        assert curses_result == coregraphics_result
+        assert curses_interface.last_input == coregraphics_interface.last_input
+        assert len(curses_interface.input_history) == len(coregraphics_interface.input_history)
 
 
 class TestDemoApplicationIntegration:
@@ -326,9 +326,9 @@ class TestDemoApplicationIntegration:
         # Should still not be running until initialized
         assert app.running is False
     
-    def test_demo_app_lifecycle_metal(self):
-        """Test complete lifecycle of demo app with Metal backend."""
-        app = DemoApplication('metal')
+    def test_demo_app_lifecycle_coregraphics(self):
+        """Test complete lifecycle of demo app with CoreGraphics backend."""
+        app = DemoApplication('coregraphics')
         
         # Should start not running
         assert app.running is False
@@ -337,9 +337,9 @@ class TestDemoApplicationIntegration:
         # Select backend (will fail on non-macOS, which is expected)
         if platform.system() == 'Darwin':
             backend = app.select_backend()
-            assert isinstance(backend, MetalBackend)
+            assert isinstance(backend, CoreGraphicsBackend)
         else:
-            with pytest.raises(ValueError, match="Metal backend is only available on macOS"):
+            with pytest.raises(ValueError, match="CoreGraphics backend is only available on macOS"):
                 app.select_backend()
     
     def test_demo_app_auto_backend_selection(self):
@@ -349,8 +349,8 @@ class TestDemoApplicationIntegration:
         
         # Should select appropriate backend for platform
         if platform.system() == 'Darwin':
-            assert isinstance(backend, MetalBackend)
-            assert app.backend_name == 'metal'
+            assert isinstance(backend, CoreGraphicsBackend)
+            assert app.backend_name == 'coregraphics'
         else:
             assert isinstance(backend, CursesBackend)
             assert app.backend_name == 'curses'

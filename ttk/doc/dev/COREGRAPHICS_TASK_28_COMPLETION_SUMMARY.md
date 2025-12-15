@@ -170,7 +170,7 @@ ttk/test/test_backend_switching_demo.py::TestBackendIndependence::test_same_code
 ### demo_ttk.py (Comprehensive)
 - Full-featured test interface
 - Performance monitoring
-- Supports Metal backend too
+- Supports CoreGraphics backend too
 - Auto-detection capability
 - More complex
 

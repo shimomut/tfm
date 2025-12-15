@@ -21,7 +21,7 @@ This guide will help you get started with TTK (TUI Toolkit) and build character-
 TTK is a rendering library that provides a unified API for building character-grid-based applications. Write your application once, and it can run:
 
 - In a terminal using the curses backend
-- As a native macOS desktop application using the Metal backend
+- As a native macOS desktop application using the CoreGraphics backend
 
 TTK handles all the platform-specific details, so you can focus on your application logic.
 
@@ -37,28 +37,18 @@ This installs TTK with the curses backend, which works on all Unix-like systems 
 
 ### macOS Desktop Support
 
-For native macOS desktop applications, TTK provides two backends:
+For native macOS desktop applications, install PyObjC:
 
-**CoreGraphics Backend** (recommended for most applications):
 ```bash
 pip install pyobjc-framework-Cocoa
 ```
 
 The CoreGraphics backend provides:
-- Simple, lightweight implementation (~300 lines)
+- Simple, lightweight implementation
 - Native macOS text rendering quality
 - Full Unicode and emoji support
 - Automatic font fallback
-
-**Metal Backend** (for GPU-accelerated rendering):
-```bash
-pip install ttk[metal]
-```
-
-The Metal backend provides:
-- GPU-accelerated rendering
-- 60 FPS performance
-- More complex implementation (~1000+ lines)
+- Smooth rendering performance
 
 ### Development Installation
 
@@ -107,7 +97,7 @@ python hello_ttk.py
 
 ### The Renderer
 
-The `Renderer` is the main interface for all drawing and input operations. You never use the `Renderer` class directly—instead, you use a specific backend implementation like `CursesBackend` or `MetalBackend`.
+The `Renderer` is the main interface for all drawing and input operations. You never use the `Renderer` class directly—instead, you use a specific backend implementation like `CursesBackend` or `CoreGraphicsBackend`.
 
 ### Character Grid
 
@@ -283,7 +273,7 @@ renderer.draw_text(0, 0, "Default colors", color_pair=0)
 - You can define up to 255 color pairs (IDs 1-255)
 - Color pair 0 is reserved for defaults
 - The curses backend approximates RGB colors to terminal colors
-- The Metal backend supports full RGB colors
+- The CoreGraphics backend supports full RGB colors
 
 ## Handling Input
 
@@ -482,8 +472,7 @@ renderer = CoreGraphicsBackend(
 
 **Which macOS backend should I use?**
 
-- **CoreGraphics**: Best for most applications. Simple, lightweight, excellent text quality.
-- **Metal**: Use when you need GPU acceleration or 60 FPS rendering.
+- **CoreGraphics**: Best for macOS desktop applications. Simple, lightweight, excellent text quality.
 
 ### Automatic Backend Selection
 
@@ -513,15 +502,13 @@ from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--backend', 
-                   choices=['curses', 'coregraphics', 'metal'],
+                   choices=['curses', 'coregraphics'],
                    default='curses', 
                    help='Rendering backend')
 args = parser.parse_args()
 
 if args.backend == 'coregraphics':
     renderer = CoreGraphicsBackend()
-elif args.backend == 'metal':
-    renderer = MetalBackend()
 else:
     renderer = CursesBackend()
 ```
@@ -666,14 +653,9 @@ Make sure TTK is installed:
 pip install ttk
 ```
 
-For Metal backend:
-```bash
-pip install ttk[metal]
-```
-
 ### Terminal Colors Look Wrong
 
-The curses backend approximates RGB colors to terminal colors. For accurate colors, use the CoreGraphics or Metal backend on macOS.
+The curses backend approximates RGB colors to terminal colors. For accurate colors, use the CoreGraphics backend on macOS.
 
 ### Application Doesn't Respond to Input
 
@@ -720,16 +702,9 @@ The CoreGraphics backend requires macOS and PyObjC. Install with:
 pip install pyobjc-framework-Cocoa
 ```
 
-### Metal Backend Not Available
-
-The Metal backend requires macOS and PyObjC. Install with:
-```bash
-pip install ttk[metal]
-```
-
 ### Font Validation Error
 
-The CoreGraphics and Metal backends only support monospace fonts. Use fonts like:
+The CoreGraphics backend only supports monospace fonts. Use fonts like:
 - Menlo (default)
 - Monaco
 - Courier New
