@@ -187,7 +187,9 @@ class BaseListDialog:
         
         # Draw border
         border_color_pair, _ = get_status_color()
-        border_attributes = TextAttribute.BOLD
+        # Use NORMAL instead of BOLD to avoid gaps in box-drawing characters
+        # BOLD can cause rendering issues with vertical lines in some terminals/fonts
+        border_attributes = TextAttribute.NORMAL
         
         # Top border
         if start_y >= 0 and start_y < height:
