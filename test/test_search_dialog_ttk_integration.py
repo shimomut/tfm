@@ -121,7 +121,7 @@ def test_handle_input_tab_switches_search_type(search_dialog):
     search_dialog.show('filename')
     
     # Create Tab event with modifiers
-    event = InputEvent(key_code=KeyCode.TAB, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.TAB, modifiers=set())
     result = search_dialog.handle_input(event)
     
     assert result == ('search', None)
@@ -136,7 +136,7 @@ def test_handle_input_escape_exits(search_dialog):
     """Test that ESC key exits the dialog"""
     search_dialog.show('filename')
     
-    event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=set())
     result = search_dialog.handle_input(event)
     
     assert result == True
@@ -152,7 +152,7 @@ def test_handle_input_enter_selects_result(search_dialog):
     ]
     search_dialog.selected = 1
     
-    event = InputEvent(key_code=KeyCode.ENTER, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.ENTER, modifiers=set())
     result = search_dialog.handle_input(event)
     
     assert result[0] == 'navigate'
@@ -169,32 +169,32 @@ def test_handle_input_navigation_keys(search_dialog):
     search_dialog.selected = 5
     
     # Test Down
-    event = InputEvent(key_code=KeyCode.DOWN, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.DOWN, modifiers=set())
     search_dialog.handle_input(event)
     assert search_dialog.selected == 6
     
     # Test Up
-    event = InputEvent(key_code=KeyCode.UP, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.UP, modifiers=set())
     search_dialog.handle_input(event)
     assert search_dialog.selected == 5
     
     # Test Page Down
-    event = InputEvent(key_code=KeyCode.PAGE_DOWN, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.PAGE_DOWN, modifiers=set())
     search_dialog.handle_input(event)
     assert search_dialog.selected == 15
     
     # Test Page Up
-    event = InputEvent(key_code=KeyCode.PAGE_UP, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.PAGE_UP, modifiers=set())
     search_dialog.handle_input(event)
     assert search_dialog.selected == 5
     
     # Test Home
-    event = InputEvent(key_code=KeyCode.HOME, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.HOME, modifiers=set())
     search_dialog.handle_input(event)
     assert search_dialog.selected == 0
     
     # Test End
-    event = InputEvent(key_code=KeyCode.END, modifiers=set())
+    event = KeyEvent(key_code=KeyCode.END, modifiers=set())
     search_dialog.handle_input(event)
     assert search_dialog.selected == 19
 

@@ -50,11 +50,11 @@ def windowDidResize_(self, notification):
 Modified `get_input()` to check the flag and generate a `KeyCode.RESIZE` event:
 
 ```python
-def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+def get_input(self, timeout_ms: int = -1) -> Optional[KeyEvent]:
     # Check if window was resized
     if self.resize_pending:
         self.resize_pending = False
-        return InputEvent(
+        return KeyEvent(
             key_code=KeyCode.RESIZE,
             modifiers=ModifierKey.NONE,
             char=None

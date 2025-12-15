@@ -6,7 +6,7 @@ This test systematically tests all possible keys on all dialogs to find
 any cases where a key returns True but doesn't set content_changed.
 """
 
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
 import sys
@@ -176,7 +176,7 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
         search_dialog = SearchDialog(self.config)
         search_dialog.show('filename')
         search_dialog.content_changed = False
-        result = search_dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
+        result = search_dialog.handle_input(KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "SearchDialog should handle LEFT key")
         self.assertTrue(search_dialog.content_changed, "SearchDialog LEFT key should set content_changed")
         
@@ -184,7 +184,7 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
         info_dialog = InfoDialog(self.config)
         info_dialog.show("Help", ["Line 1", "Line 2"])
         info_dialog.content_changed = False
-        result = info_dialog.handle_input(InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE))
+        result = info_dialog.handle_input(KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE))
         self.assertTrue(result, "InfoDialog should handle UP key")
         self.assertTrue(info_dialog.content_changed, "InfoDialog UP key should set content_changed")
         
@@ -192,7 +192,7 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
         batch_dialog = BatchRenameDialog(self.config)
         batch_dialog.show([Path('/tmp/file1.txt')])
         batch_dialog.content_changed = False
-        result = batch_dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
+        result = batch_dialog.handle_input(KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         if result and result is not False:  # If key was handled
             self.assertTrue(batch_dialog.content_changed, "BatchRenameDialog LEFT key should set content_changed")
             

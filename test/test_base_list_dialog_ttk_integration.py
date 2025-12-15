@@ -9,7 +9,7 @@ the TTK Renderer API instead of curses.
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 from ttk import TextAttribute, KeyCode
-from ttk.input_event import InputEvent
+from ttk import KeyEvent
 
 
 class TestBaseListDialogTTKIntegration(unittest.TestCase):
@@ -40,30 +40,30 @@ class TestBaseListDialogTTKIntegration(unittest.TestCase):
         self.assertEqual(dialog.renderer, self.mock_renderer)
         
     def test_handle_common_navigation_uses_input_event(self):
-        """Test that handle_common_navigation uses InputEvent instead of key codes"""
+        """Test that handle_common_navigation uses KeyEvent instead of key codes"""
         dialog = self.BaseListDialog(self.mock_config, renderer=self.mock_renderer)
         items = ['item1', 'item2', 'item3']
         
         # Test UP arrow
-        event = InputEvent(key_code=KeyCode.UP, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.UP, char=None, modifiers=0)
         dialog.selected = 1
         result = dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(dialog.selected, 0)
         
         # Test DOWN arrow
-        event = InputEvent(key_code=KeyCode.DOWN, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=0)
         result = dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(dialog.selected, 1)
         
         # Test ESCAPE
-        event = InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0)
         result = dialog.handle_common_navigation(event, items)
         self.assertEqual(result, 'cancel')
         
         # Test ENTER
-        event = InputEvent(key_code=KeyCode.ENTER, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.ENTER, char=None, modifiers=0)
         result = dialog.handle_common_navigation(event, items)
         self.assertEqual(result, 'select')
         
@@ -180,13 +180,13 @@ class TestBaseListDialogTTKIntegration(unittest.TestCase):
         
         # Test PAGE_DOWN
         dialog.selected = 0
-        event = InputEvent(key_code=KeyCode.PAGE_DOWN, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.PAGE_DOWN, char=None, modifiers=0)
         result = dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(dialog.selected, 10)
         
         # Test PAGE_UP
-        event = InputEvent(key_code=KeyCode.PAGE_UP, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.PAGE_UP, char=None, modifiers=0)
         result = dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(dialog.selected, 0)
@@ -198,13 +198,13 @@ class TestBaseListDialogTTKIntegration(unittest.TestCase):
         
         # Test END
         dialog.selected = 0
-        event = InputEvent(key_code=KeyCode.END, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.END, char=None, modifiers=0)
         result = dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(dialog.selected, 29)
         
         # Test HOME
-        event = InputEvent(key_code=KeyCode.HOME, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.HOME, char=None, modifiers=0)
         result = dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(dialog.selected, 0)

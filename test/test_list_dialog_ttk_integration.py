@@ -7,7 +7,7 @@ Tests the migration from curses to TTK Renderer API
 import unittest
 import sys
 from unittest.mock import Mock, MagicMock, patch, call
-from ttk import TextAttribute, KeyCode, InputEvent, ModifierKey
+from ttk import TextAttribute, KeyCode, KeyEvent, ModifierKey
 
 
 class TestListDialogTTKIntegration(unittest.TestCase):
@@ -71,7 +71,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         callback = Mock()
         self.dialog.show("Test", ["Item"], callback)
         
-        event = InputEvent(key_code=KeyCode.ESCAPE, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -85,7 +85,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         self.dialog.show("Test", items, callback)
         self.dialog.selected = 1
         
-        event = InputEvent(key_code=KeyCode.ENTER, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ENTER, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -98,7 +98,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         self.dialog.show("Test", items, Mock())
         self.dialog.selected = 2
         
-        event = InputEvent(key_code=KeyCode.UP, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.UP, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -111,7 +111,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         self.dialog.show("Test", items, Mock())
         self.dialog.selected = 0
         
-        event = InputEvent(key_code=KeyCode.DOWN, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.DOWN, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -124,7 +124,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         self.dialog.show("Test", items, Mock())
         
         # Type 'a' to filter (use 0 for no special key)
-        event = InputEvent(key_code=0, char='a', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=0, char='a', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -291,7 +291,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         custom_handler = Mock(return_value=True)
         self.dialog.show("Test", ["Item"], Mock(), custom_key_handler=custom_handler)
         
-        event = InputEvent(key_code=KeyCode.F1, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.F1, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -303,7 +303,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         self.dialog.show("Test", items, Mock())
         self.dialog.selected = 15
         
-        event = InputEvent(key_code=KeyCode.PAGE_UP, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.PAGE_UP, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -315,7 +315,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         self.dialog.show("Test", items, Mock())
         self.dialog.selected = 5
         
-        event = InputEvent(key_code=KeyCode.PAGE_DOWN, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.PAGE_DOWN, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -327,7 +327,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         self.dialog.show("Test", items, Mock())
         self.dialog.selected = 2
         
-        event = InputEvent(key_code=KeyCode.HOME, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.HOME, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -339,7 +339,7 @@ class TestListDialogTTKIntegration(unittest.TestCase):
         self.dialog.show("Test", items, Mock())
         self.dialog.selected = 0
         
-        event = InputEvent(key_code=KeyCode.END, char='', modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.END, char='', modifiers=ModifierKey.NONE)
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)

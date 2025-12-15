@@ -12,7 +12,7 @@ import pytest
 import threading
 import time
 from unittest.mock import Mock, MagicMock, patch
-from ttk import KeyCode, TextAttribute, InputEvent
+from ttk import KeyCode, TextAttribute, KeyEvent
 from tfm_drives_dialog import DrivesDialog, DriveEntry, DrivesDialogHelpers
 
 
@@ -72,11 +72,11 @@ class TestDrivesDialogInitialization:
 
 
 class TestDrivesDialogInputHandling:
-    """Test DrivesDialog input handling with InputEvent"""
+    """Test DrivesDialog input handling with KeyEvent"""
     
     def test_handle_input_accepts_input_event(self, drives_dialog):
-        """Test that handle_input accepts InputEvent"""
-        event = InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
+        """Test that handle_input accepts KeyEvent"""
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result is True
         assert not drives_dialog.is_active
@@ -84,7 +84,7 @@ class TestDrivesDialogInputHandling:
     def test_handle_input_escape_cancels(self, drives_dialog):
         """Test that ESC key cancels the dialog"""
         drives_dialog.show()
-        event = InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result is True
         assert not drives_dialog.is_active
@@ -98,7 +98,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.filtered_drives = [test_drive]
         drives_dialog.selected = 0
         
-        event = InputEvent(key_code=KeyCode.ENTER, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.ENTER, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result == ('navigate', test_drive)
     
@@ -112,7 +112,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.filtered_drives = drives_dialog.drives.copy()
         drives_dialog.selected = 1
         
-        event = InputEvent(key_code=KeyCode.UP, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.UP, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result is True
         assert drives_dialog.selected == 0
@@ -127,7 +127,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.filtered_drives = drives_dialog.drives.copy()
         drives_dialog.selected = 0
         
-        event = InputEvent(key_code=KeyCode.DOWN, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result is True
         assert drives_dialog.selected == 1
@@ -139,7 +139,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.filtered_drives = drives_dialog.drives.copy()
         drives_dialog.selected = 15
         
-        event = InputEvent(key_code=KeyCode.PAGE_UP, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.PAGE_UP, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result is True
         assert drives_dialog.selected < 15
@@ -151,7 +151,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.filtered_drives = drives_dialog.drives.copy()
         drives_dialog.selected = 0
         
-        event = InputEvent(key_code=KeyCode.PAGE_DOWN, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.PAGE_DOWN, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result is True
         assert drives_dialog.selected > 0
@@ -163,7 +163,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.filtered_drives = drives_dialog.drives.copy()
         drives_dialog.selected = 5
         
-        event = InputEvent(key_code=KeyCode.HOME, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.HOME, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result is True
         assert drives_dialog.selected == 0
@@ -175,7 +175,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.filtered_drives = drives_dialog.drives.copy()
         drives_dialog.selected = 0
         
-        event = InputEvent(key_code=KeyCode.END, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.END, char=None, modifiers=set())
         result = drives_dialog.handle_input(event)
         assert result is True
         assert drives_dialog.selected == 9
@@ -193,7 +193,7 @@ class TestDrivesDialogInputHandling:
         
         # Type 's3' to filter
         for char in "s3":
-            event = InputEvent(key_code=None, char=char, modifiers=set())
+            event = KeyEvent(key_code=None, char=char, modifiers=set())
             drives_dialog.handle_input(event)
         
         assert len(drives_dialog.filtered_drives) == 1

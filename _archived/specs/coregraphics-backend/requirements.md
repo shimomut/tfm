@@ -90,7 +90,7 @@ This document specifies the requirements for implementing a macOS CoreGraphics (
 
 #### Acceptance Criteria
 
-1. WHEN keyboard events occur THEN the system SHALL translate NSEvent key codes to TTK InputEvent objects
+1. WHEN keyboard events occur THEN the system SHALL translate NSEvent key codes to TTK KeyEvent objects
 2. WHEN modifier keys are pressed THEN the system SHALL detect and report Shift, Control, Alt, and Command states
 3. WHEN special keys are pressed THEN the system SHALL provide consistent codes for arrow keys, function keys, Enter, Escape, Backspace, and Delete
 4. WHEN input is requested with timeout THEN the system SHALL support blocking, non-blocking, and timed input modes

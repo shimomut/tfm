@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from ttk.renderer import Renderer
-from ttk.input_event import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 
 
 class TestTFMInitializationWithTTK(unittest.TestCase):

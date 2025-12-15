@@ -28,7 +28,7 @@ class TestProgressManagerNoRendering:
         """Verify ProgressManager does not import curses"""
         import tfm_progress_manager
         import sys
-        from ttk.input_event import InputEvent, KeyCode, ModifierKey
+        from ttk import KeyEvent, KeyCode, ModifierKey
         
         # Check module doesn't import curses
         assert 'curses' not in sys.modules or 'curses' not in dir(tfm_progress_manager)

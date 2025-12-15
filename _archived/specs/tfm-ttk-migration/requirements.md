@@ -30,7 +30,7 @@ This document specifies the requirements for migrating TFM (TUI File Manager) fr
 
 1. WHEN TFM is migrated THEN it SHALL use TTK's Renderer API directly without adapter layers
 2. WHEN drawing text THEN the system SHALL use renderer.draw_text() instead of stdscr.addstr()
-3. WHEN handling input THEN the system SHALL use TTK's InputEvent directly instead of curses key codes
+3. WHEN handling input THEN the system SHALL use TTK's KeyEvent directly instead of curses key codes
 4. WHEN managing colors THEN the system SHALL use TTK's RGB color pairs directly
 5. WHEN the migration is complete THEN no curses-like wrapper code SHALL exist in TFM
 
@@ -52,11 +52,11 @@ This document specifies the requirements for migrating TFM (TUI File Manager) fr
 
 #### Acceptance Criteria
 
-1. WHEN keyboard input is received THEN the system SHALL use TTK's InputEvent directly
+1. WHEN keyboard input is received THEN the system SHALL use TTK's KeyEvent directly
 2. WHEN special keys are pressed THEN the system SHALL use TTK's KeyCode enum instead of curses.KEY_* constants
 3. WHEN modifier keys are detected THEN the system SHALL use TTK's ModifierKey flags
 4. WHEN input timeout is needed THEN the system SHALL use renderer.get_input(timeout_ms) parameter
-5. WHEN key bindings are checked THEN the system SHALL map InputEvent to TFM's key binding system
+5. WHEN key bindings are checked THEN the system SHALL map KeyEvent to TFM's key binding system
 
 ### Requirement 4: Rendering Migration
 
@@ -177,7 +177,7 @@ This document specifies the requirements for migrating TFM (TUI File Manager) fr
 ### Phase 2: Core Components (Tasks 9-16)
 - Migrate tfm_main.py rendering to TTK API
 - Migrate tfm_pane_manager.py to TTK API
-- Migrate input handling to InputEvent
+- Migrate input handling to KeyEvent
 - Update key binding system
 
 ### Phase 3: UI Components (Tasks 17-30)

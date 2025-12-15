@@ -9,7 +9,7 @@ the TTK Renderer API instead of curses.
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 from ttk import TextAttribute, KeyCode
-from ttk.input_event import InputEvent
+from ttk import KeyEvent
 
 
 class TestInfoDialogTTKIntegration(unittest.TestCase):
@@ -42,14 +42,14 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         self.assertEqual(dialog.renderer, self.mock_renderer)
         
     def test_handle_input_uses_input_event(self):
-        """Test that handle_input uses InputEvent instead of key codes"""
+        """Test that handle_input uses KeyEvent instead of key codes"""
         dialog = self.InfoDialog(self.mock_config, renderer=self.mock_renderer)
         # Use many lines to ensure scrolling is possible
         many_lines = [f"Line {i}" for i in range(50)]
         dialog.show("Test", many_lines)
         
         # Test ESC key
-        event = InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0)
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertFalse(dialog.is_active)
@@ -58,7 +58,7 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         dialog.show("Test", many_lines)
         
         # Test Q key
-        event = InputEvent(key_code=None, char='q', modifiers=0)
+        event = KeyEvent(key_code=None, char='q', modifiers=0)
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertFalse(dialog.is_active)
@@ -67,40 +67,40 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         dialog.show("Test", many_lines)
         
         # Test UP arrow
-        event = InputEvent(key_code=KeyCode.UP, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.UP, char=None, modifiers=0)
         dialog.scroll = 1
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertEqual(dialog.scroll, 0)
         
         # Test DOWN arrow
-        event = InputEvent(key_code=KeyCode.DOWN, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=0)
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertEqual(dialog.scroll, 1)
         
         # Test PAGE_UP
-        event = InputEvent(key_code=KeyCode.PAGE_UP, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.PAGE_UP, char=None, modifiers=0)
         dialog.scroll = 5
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertEqual(dialog.scroll, 0)
         
         # Test PAGE_DOWN
-        event = InputEvent(key_code=KeyCode.PAGE_DOWN, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.PAGE_DOWN, char=None, modifiers=0)
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertGreater(dialog.scroll, 0)
         
         # Test HOME
-        event = InputEvent(key_code=KeyCode.HOME, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.HOME, char=None, modifiers=0)
         dialog.scroll = 5
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertEqual(dialog.scroll, 0)
         
         # Test END
-        event = InputEvent(key_code=KeyCode.END, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.END, char=None, modifiers=0)
         result = dialog.handle_input(event)
         self.assertTrue(result)
         # Scroll should be at or near max
@@ -164,7 +164,7 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         self.assertFalse(dialog.needs_redraw())
         
         # After input, should need redraw
-        event = InputEvent(key_code=KeyCode.DOWN, char=None, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=0)
         dialog.handle_input(event)
         self.assertTrue(dialog.needs_redraw())
         

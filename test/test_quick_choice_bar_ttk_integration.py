@@ -48,16 +48,16 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         self.assertEqual(self.quick_choice_bar.selected, 0)
     
     def test_handle_input_uses_input_event_escape(self):
-        """Test that handle_input uses InputEvent for ESC key"""
+        """Test that handle_input uses KeyEvent for ESC key"""
         self.quick_choice_bar.show("Test?", [], Mock())
         
-        event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         
         self.assertEqual(result, ('cancel', None))
     
     def test_handle_input_uses_input_event_left_right(self):
-        """Test that handle_input uses InputEvent for LEFT/RIGHT keys"""
+        """Test that handle_input uses KeyEvent for LEFT/RIGHT keys"""
         choices = [
             {"text": "Yes", "key": "y", "value": True},
             {"text": "No", "key": "n", "value": False},
@@ -67,19 +67,19 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         self.quick_choice_bar.selected = 1
         
         # Test LEFT key
-        event = InputEvent(key_code=KeyCode.LEFT, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.LEFT, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         self.assertEqual(result, ('selection_changed', None))
         self.assertEqual(self.quick_choice_bar.selected, 0)
         
         # Test RIGHT key
-        event = InputEvent(key_code=KeyCode.RIGHT, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.RIGHT, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         self.assertEqual(result, ('selection_changed', None))
         self.assertEqual(self.quick_choice_bar.selected, 1)
     
     def test_handle_input_uses_input_event_enter(self):
-        """Test that handle_input uses InputEvent for ENTER key"""
+        """Test that handle_input uses KeyEvent for ENTER key"""
         choices = [
             {"text": "Yes", "key": "y", "value": True},
             {"text": "No", "key": "n", "value": False}
@@ -87,7 +87,7 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         self.quick_choice_bar.show("Test?", choices, Mock())
         self.quick_choice_bar.selected = 0
         
-        event = InputEvent(key_code=KeyCode.ENTER, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.ENTER, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         
         self.assertEqual(result, ('execute', True))
@@ -102,17 +102,17 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         self.quick_choice_bar.show("Test?", choices, Mock())
         
         # Test 'y' key
-        event = InputEvent(char='y', key_code=None, modifiers=0)
+        event = KeyEvent(char='y', key_code=None, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         self.assertEqual(result, ('execute', True))
         
         # Test 'n' key
-        event = InputEvent(char='n', key_code=None, modifiers=0)
+        event = KeyEvent(char='n', key_code=None, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         self.assertEqual(result, ('execute', False))
         
         # Test 'c' key
-        event = InputEvent(char='c', key_code=None, modifiers=0)
+        event = KeyEvent(char='c', key_code=None, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         self.assertEqual(result, ('execute', None))
     
@@ -221,7 +221,7 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
     def test_no_curses_imports(self):
         """Test that QuickChoiceBar doesn't import curses"""
         import tfm_quick_choice_bar as qcb_module
-        from ttk.input_event import InputEvent, KeyCode, ModifierKey
+        from ttk import KeyEvent, KeyCode, ModifierKey
         
         # Check module doesn't import curses
         self.assertFalse(hasattr(qcb_module, 'curses'))

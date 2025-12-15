@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 from tfm_jump_dialog import JumpDialog, JumpDialogHelpers
 from tfm_config import DefaultConfig
 from tfm_pane_manager import PaneManager
-from ttk.input_event import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 
 
 class MockPaneManager:
@@ -247,9 +247,9 @@ class TestJumpDialog(unittest.TestCase):
         while self.jump_dialog.searching and (time.time() - start_time) < max_wait:
             time.sleep(0.1)
         
-        # Test navigation input using InputEvent
+        # Test navigation input using KeyEvent
         # Test Enter key - should return navigation result
-        enter_event = InputEvent(key_code=KeyCode.ENTER, modifiers=0)
+        enter_event = KeyEvent(key_code=KeyCode.ENTER, modifiers=0)
         result = self.jump_dialog.handle_input(enter_event)
         self.assertIsInstance(result, tuple)
         action, data = result
@@ -258,7 +258,7 @@ class TestJumpDialog(unittest.TestCase):
         
         # Test ESC key - should exit
         self.jump_dialog.show(test_path)  # Show again
-        esc_event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=0)
+        esc_event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=0)
         result = self.jump_dialog.handle_input(esc_event)
         self.assertTrue(result)
         self.assertFalse(self.jump_dialog.is_active)
@@ -279,7 +279,7 @@ class TestJumpDialog(unittest.TestCase):
         
         def concurrent_navigation():
             for i in range(10):
-                down_event = InputEvent(key_code=KeyCode.DOWN, modifiers=0)
+                down_event = KeyEvent(key_code=KeyCode.DOWN, modifiers=0)
                 self.jump_dialog.handle_input(down_event)
                 time.sleep(0.01)
         

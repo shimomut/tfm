@@ -15,7 +15,7 @@ from unittest.mock import Mock, MagicMock, patch
 # Add src directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 from ttk.renderer import TextAttribute
 from tfm_path import Path
 from tfm_text_viewer import TextViewer, is_text_file, view_text_file
@@ -116,11 +116,11 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         self.assertGreater(self.mock_renderer.draw_text.call_count, 0)
     
     def test_handle_key_accepts_input_event(self):
-        """Test that handle_key accepts InputEvent instead of key code"""
+        """Test that handle_key accepts KeyEvent instead of key code"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with UP arrow key
-        event = InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
         result = viewer.handle_key(event)
         
         # Should return True (continue viewing)
@@ -131,7 +131,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with 'q' character
-        event = InputEvent(key_code=0, modifiers=ModifierKey.NONE, char='q')
+        event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='q')
         result = viewer.handle_key(event)
         
         # Should return False (exit viewer)
@@ -142,7 +142,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with ESC key
-        event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
         result = viewer.handle_key(event)
         
         # Should return False (exit viewer)
@@ -154,7 +154,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         initial_offset = viewer.scroll_offset
         
         # Test with DOWN arrow key
-        event = InputEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE)
         viewer.handle_key(event)
         
         # Scroll offset should increase
@@ -166,7 +166,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer.scroll_offset = 5  # Start with some offset
         
         # Test with UP arrow key
-        event = InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
         viewer.handle_key(event)
         
         # Scroll offset should decrease
@@ -178,7 +178,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         initial_offset = viewer.scroll_offset
         
         # Test with PAGE_DOWN key
-        event = InputEvent(key_code=KeyCode.PAGE_DOWN, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.PAGE_DOWN, modifiers=ModifierKey.NONE)
         viewer.handle_key(event)
         
         # Scroll offset should increase by display height
@@ -190,7 +190,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer.scroll_offset = 10  # Start with some offset
         
         # Test with PAGE_UP key
-        event = InputEvent(key_code=KeyCode.PAGE_UP, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.PAGE_UP, modifiers=ModifierKey.NONE)
         viewer.handle_key(event)
         
         # Scroll offset should decrease
@@ -203,7 +203,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer.horizontal_offset = 5
         
         # Test with HOME key
-        event = InputEvent(key_code=KeyCode.HOME, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.HOME, modifiers=ModifierKey.NONE)
         viewer.handle_key(event)
         
         # Both offsets should be reset
@@ -215,7 +215,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with END key
-        event = InputEvent(key_code=KeyCode.END, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.END, modifiers=ModifierKey.NONE)
         viewer.handle_key(event)
         
         # Scroll offset should be at maximum
@@ -227,7 +227,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         initial_state = viewer.show_line_numbers
         
         # Test with 'n' character
-        event = InputEvent(key_code=0, modifiers=ModifierKey.NONE, char='n')
+        event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='n')
         viewer.handle_key(event)
         
         # Line numbers should be toggled
@@ -239,7 +239,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         initial_state = viewer.wrap_lines
         
         # Test with 'w' character
-        event = InputEvent(key_code=0, modifiers=ModifierKey.NONE, char='w')
+        event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='w')
         viewer.handle_key(event)
         
         # Wrap mode should be toggled
@@ -250,19 +250,19 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with 'f' character
-        event = InputEvent(key_code=0, modifiers=ModifierKey.NONE, char='f')
+        event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='f')
         viewer.handle_key(event)
         
         # Should enter isearch mode
         self.assertTrue(viewer.isearch_mode)
     
     def test_handle_isearch_input_accepts_input_event(self):
-        """Test that handle_isearch_input accepts InputEvent"""
+        """Test that handle_isearch_input accepts KeyEvent"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         viewer.enter_isearch_mode()
         
         # Test with character input
-        event = InputEvent(key_code=0, modifiers=ModifierKey.NONE, char='t')
+        event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='t')
         result = viewer.handle_isearch_input(event)
         
         # Should handle the input
@@ -276,7 +276,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer.isearch_pattern = "test"
         
         # Test with BACKSPACE key
-        event = InputEvent(key_code=KeyCode.BACKSPACE, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.BACKSPACE, modifiers=ModifierKey.NONE)
         viewer.handle_isearch_input(event)
         
         # Last character should be removed
@@ -288,7 +288,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer.enter_isearch_mode()
         
         # Test with ESC key
-        event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
         viewer.handle_isearch_input(event)
         
         # Should exit isearch mode
@@ -300,7 +300,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer.enter_isearch_mode()
         
         # Test with ENTER key
-        event = InputEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE)
         viewer.handle_isearch_input(event)
         
         # Should exit isearch mode
@@ -311,7 +311,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Mock get_input to return quit event
-        self.mock_renderer.get_input.return_value = InputEvent(key_code=0, modifiers=ModifierKey.NONE, char='q')
+        self.mock_renderer.get_input.return_value = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='q')
         
         viewer.run()
         

@@ -99,9 +99,9 @@ This document describes the integration of TTK (TUI Toolkit) into TFM, enabling 
 
 **Changes**:
 - Replaced `stdscr.getch()` with `renderer.get_input()`
-- Migrated from curses key codes to TTK's `InputEvent`
+- Migrated from curses key codes to TTK's `KeyEvent`
 - Created `tfm_input_utils.py` for input translation
-- Updated key binding system to work with `InputEvent`
+- Updated key binding system to work with `KeyEvent`
 
 **Benefits**:
 - Unified input handling across backends
@@ -199,7 +199,7 @@ renderer.draw_text(0, 0, "Text", color_pair=1, attributes=TextAttribute.BOLD)
 **Key Changes**:
 - Updated `tfm_main.py` to accept renderer
 - Replaced all curses rendering calls
-- Migrated input handling to InputEvent
+- Migrated input handling to KeyEvent
 - Created `tfm_input_utils.py` helper module
 
 
@@ -338,7 +338,7 @@ def test_both_backends():
 
 The `tfm_input_compat.py` module provides input event normalization:
 - Ensures consistent input event handling across backends
-- Converts various input formats to standardized InputEvent objects
+- Converts various input formats to standardized KeyEvent objects
 - Used by dialog components for reliable input processing
 
 ## Performance Considerations
@@ -431,7 +431,7 @@ def draw_border(self):
 - Ensure refresh() is called after drawing
 
 **Input not working**:
-- Check InputEvent handling
+- Check KeyEvent handling
 - Verify key code comparisons use KeyCode enum
 - Test with both backends
 
@@ -456,7 +456,7 @@ When migrating a new component to TTK:
 
 ### Input
 - [ ] Replace `stdscr.getch()` with `renderer.get_input()`
-- [ ] Replace curses key code checks with InputEvent
+- [ ] Replace curses key code checks with KeyEvent
 - [ ] Use `event.key_code` for special keys
 - [ ] Use `event.char` for printable characters
 - [ ] Handle `None` return from `get_input()`

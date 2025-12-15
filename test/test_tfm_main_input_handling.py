@@ -11,7 +11,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from unittest.mock import Mock, MagicMock, patch
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 from tfm_main import FileManager
 
 
@@ -39,24 +39,24 @@ def test_input_event_handling():
         fm = FileManager(mock_renderer)
         fm.log_height_ratio = 0.25  # Set required attribute
         
-        # Test that handle_key_input accepts InputEvent
+        # Test that handle_key_input accepts KeyEvent
         # Test UP arrow key
-        up_event = InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
+        up_event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
         result = fm.handle_key_input(up_event)
         assert result is True, "UP arrow should be handled"
         
         # Test DOWN arrow key
-        down_event = InputEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE)
+        down_event = KeyEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE)
         result = fm.handle_key_input(down_event)
         assert result is True, "DOWN arrow should be handled"
         
         # Test PAGE_UP key
-        page_up_event = InputEvent(key_code=KeyCode.PAGE_UP, modifiers=ModifierKey.NONE)
+        page_up_event = KeyEvent(key_code=KeyCode.PAGE_UP, modifiers=ModifierKey.NONE)
         result = fm.handle_key_input(page_up_event)
         assert result is True, "PAGE_UP should be handled"
         
         # Test PAGE_DOWN key
-        page_down_event = InputEvent(key_code=KeyCode.PAGE_DOWN, modifiers=ModifierKey.NONE)
+        page_down_event = KeyEvent(key_code=KeyCode.PAGE_DOWN, modifiers=ModifierKey.NONE)
         result = fm.handle_key_input(page_down_event)
         assert result is True, "PAGE_DOWN should be handled"
         
@@ -64,7 +64,7 @@ def test_input_event_handling():
 
 
 def test_is_key_for_action_with_input_event():
-    """Test that is_key_for_action works with InputEvent"""
+    """Test that is_key_for_action works with KeyEvent"""
     # Create mock renderer
     mock_renderer = Mock()
     mock_renderer.get_dimensions.return_value = (24, 80)
@@ -86,7 +86,7 @@ def test_is_key_for_action_with_input_event():
         
         # Test with printable character
         mock_is_bound.return_value = True
-        char_event = InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
+        char_event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
         result = fm.is_key_for_action(char_event, 'quit')
         assert result is True, "Printable character should be checked"
         mock_is_bound.assert_called()
@@ -96,7 +96,7 @@ def test_is_key_for_action_with_input_event():
         
         # Test with special key
         mock_is_bound.return_value = True
-        special_event = InputEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE)
+        special_event = KeyEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE)
         result = fm.is_key_for_action(special_event, 'help')
         assert result is True, "Special key should be checked"
         mock_is_bound.assert_called()
@@ -105,7 +105,7 @@ def test_is_key_for_action_with_input_event():
 
 
 def test_handle_isearch_input_with_input_event():
-    """Test that handle_isearch_input works with InputEvent"""
+    """Test that handle_isearch_input works with KeyEvent"""
     # Create mock renderer
     mock_renderer = Mock()
     mock_renderer.get_dimensions.return_value = (24, 80)
@@ -129,7 +129,7 @@ def test_handle_isearch_input_with_input_event():
         fm.isearch_matches = []
         
         # Test ESC key
-        esc_event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
+        esc_event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
         result = fm.handle_isearch_input(esc_event)
         assert result is True, "ESC should exit isearch mode"
         assert fm.isearch_mode is False, "Isearch mode should be disabled"
@@ -139,13 +139,13 @@ def test_handle_isearch_input_with_input_event():
         fm.isearch_pattern = ""
         
         # Test printable character
-        char_event = InputEvent(key_code=ord('t'), modifiers=ModifierKey.NONE, char='t')
+        char_event = KeyEvent(key_code=ord('t'), modifiers=ModifierKey.NONE, char='t')
         result = fm.handle_isearch_input(char_event)
         assert result is True, "Printable character should be handled"
         assert fm.isearch_pattern == "t", "Pattern should be updated"
         
         # Test BACKSPACE
-        backspace_event = InputEvent(key_code=KeyCode.BACKSPACE, modifiers=ModifierKey.NONE)
+        backspace_event = KeyEvent(key_code=KeyCode.BACKSPACE, modifiers=ModifierKey.NONE)
         result = fm.handle_isearch_input(backspace_event)
         assert result is True, "BACKSPACE should be handled"
         assert fm.isearch_pattern == "", "Pattern should be cleared"
@@ -166,7 +166,7 @@ def test_main_loop_uses_get_input():
     mock_renderer.set_cursor_visibility = Mock()
     
     # Mock get_input to return None (timeout) then quit event
-    quit_event = InputEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
+    quit_event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
     mock_renderer.get_input = Mock(side_effect=[None, quit_event])
     
     # Create FileManager with mock renderer
@@ -239,7 +239,7 @@ def test_special_keys_use_keycode_enum():
         ]
         
         for key_code, name, is_special in special_keys:
-            event = InputEvent(key_code=key_code, modifiers=ModifierKey.NONE)
+            event = KeyEvent(key_code=key_code, modifiers=ModifierKey.NONE)
             # Just verify the event can be created and has the right key_code
             assert event.key_code == key_code, f"{name} key_code should match"
             assert not event.is_printable(), f"{name} should not be printable"

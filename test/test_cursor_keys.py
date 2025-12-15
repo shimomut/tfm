@@ -9,7 +9,7 @@ import unittest.mock
 # Mock curses before importing anything else
 sys.modules['curses'] = unittest.mock.MagicMock()
 import curses
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 
 sys.path.insert(0, 'src')
 

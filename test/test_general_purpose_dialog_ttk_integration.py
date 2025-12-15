@@ -19,7 +19,7 @@ sys.path.insert(0, str(src_path))
 ttk_path = Path(__file__).parent.parent / 'ttk'
 sys.path.insert(0, str(ttk_path))
 
-from ttk import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogType, DialogHelpers
 
 
@@ -88,7 +88,7 @@ class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
         self.assertFalse(result)
         
         # Test with event when not active
-        event = InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=ModifierKey.NONE)
         result = dialog.handle_input(event)
         self.assertFalse(result)
     
@@ -132,7 +132,7 @@ class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
         self.assertEqual(dialog.get_text(), "initial")
         
         # Test ESC key
-        event = InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=ModifierKey.NONE)
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertFalse(dialog.is_active)
@@ -144,7 +144,7 @@ class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
         )
         dialog.set_text("test text")
         
-        event = InputEvent(key_code=KeyCode.ENTER, char=None, modifiers=ModifierKey.NONE)
+        event = KeyEvent(key_code=KeyCode.ENTER, char=None, modifiers=ModifierKey.NONE)
         result = dialog.handle_input(event)
         self.assertTrue(result)
         self.assertFalse(dialog.is_active)

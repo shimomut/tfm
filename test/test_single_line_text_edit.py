@@ -81,33 +81,33 @@ def test_key_handling():
     editor = SingleLineTextEdit("test")
     
     # Test printable characters
-    event = InputEvent(key_code=ord('X'), modifiers=0, char='X')
+    event = KeyEvent(key_code=ord('X'), modifiers=0, char='X')
     result = editor.handle_key(event)
     assert result
     assert editor.get_text() == "testX"
     
     # Test cursor keys
     editor.move_cursor_home()
-    event = InputEvent(key_code=KeyCode.RIGHT, modifiers=0)
+    event = KeyEvent(key_code=KeyCode.RIGHT, modifiers=0)
     result = editor.handle_key(event)
     print(f"Debug: KEY_RIGHT returned {result}, cursor at {editor.get_cursor_pos()}")
     assert result
     assert editor.get_cursor_pos() == 1
     
-    event = InputEvent(key_code=KeyCode.LEFT, modifiers=0)
+    event = KeyEvent(key_code=KeyCode.LEFT, modifiers=0)
     result = editor.handle_key(event)
     print(f"Debug: KEY_LEFT returned {result}, cursor at {editor.get_cursor_pos()}")
     assert result
     assert editor.get_cursor_pos() == 0
     
     # Test home/end keys
-    event = InputEvent(key_code=KeyCode.END, modifiers=0)
+    event = KeyEvent(key_code=KeyCode.END, modifiers=0)
     result = editor.handle_key(event)
     print(f"Debug: KEY_END returned {result}, cursor at {editor.get_cursor_pos()}")
     assert result
     assert editor.get_cursor_pos() == len(editor.get_text())
     
-    event = InputEvent(key_code=KeyCode.HOME, modifiers=0)
+    event = KeyEvent(key_code=KeyCode.HOME, modifiers=0)
     result = editor.handle_key(event)
     print(f"Debug: KEY_HOME returned {result}, cursor at {editor.get_cursor_pos()}")
     assert result
@@ -117,7 +117,7 @@ def test_key_handling():
     editor.move_cursor_right()
     original_text = editor.get_text()
     original_pos = editor.get_cursor_pos()
-    event = InputEvent(key_code=KeyCode.BACKSPACE, modifiers=0)
+    event = KeyEvent(key_code=KeyCode.BACKSPACE, modifiers=0)
     result = editor.handle_key(event)
     print(f"Debug: Before backspace: '{original_text}' at pos {original_pos}")
     print(f"Debug: After backspace: '{editor.get_text()}' at pos {editor.get_cursor_pos()}")

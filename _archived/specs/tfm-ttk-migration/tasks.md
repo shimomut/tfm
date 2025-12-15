@@ -75,27 +75,27 @@
 
 - [x] 10. Migrate tfm_main.py input handling to TTK API
   - Replace stdscr.getch() with renderer.get_input()
-  - Update input handling to use InputEvent
+  - Update input handling to use KeyEvent
   - Replace curses.KEY_* constants with KeyCode enum
-  - Handle InputEvent.char for printable characters
-  - Handle InputEvent.key_code for special keys
+  - Handle KeyEvent.char for printable characters
+  - Handle KeyEvent.key_code for special keys
   - Test keyboard input
   - Test special keys
   - _Requirements: 1.3, 3.1, 3.2, 3.3, 3.4_
 
 - [x] 11. Create input event helper utilities
   - Create `src/tfm_input_utils.py`
-  - Add function to convert InputEvent to TFM key binding format
-  - Add function to check if InputEvent matches key binding
+  - Add function to convert KeyEvent to TFM key binding format
+  - Add function to check if KeyEvent matches key binding
   - Add function to handle modifier keys
   - Test input utilities
   - _Requirements: 3.1, 3.2, 3.3, 3.5_
 
-- [x] 12. Update tfm_key_bindings.py for InputEvent
-  - Update key binding system to work with InputEvent
-  - Replace curses key code checks with InputEvent checks
-  - Update is_key_bound_to() to accept InputEvent
-  - Update is_special_key_bound_to_with_selection() for InputEvent
+- [x] 12. Update tfm_key_bindings.py for KeyEvent
+  - Update key binding system to work with KeyEvent
+  - Replace curses key code checks with KeyEvent checks
+  - Update is_key_bound_to() to accept KeyEvent
+  - Update is_special_key_bound_to_with_selection() for KeyEvent
   - Test key bindings
   - _Requirements: 3.1, 3.2, 3.5_
 
@@ -193,7 +193,7 @@
 - [x] 26. Migrate tfm_single_line_text_edit.py to TTK API
   - Update SingleLineTextEdit to use renderer
   - Replace rendering calls with TTK API
-  - Update input handling to use InputEvent
+  - Update input handling to use KeyEvent
   - Test text input
   - Test cursor movement
   - _Requirements: 4.1, 4.5_
@@ -201,7 +201,7 @@
 - [x] 27. Migrate tfm_text_viewer.py to TTK API
   - Update text viewer to use renderer
   - Replace rendering calls with TTK API
-  - Update input handling to use InputEvent
+  - Update input handling to use KeyEvent
   - Test file viewing
   - Test syntax highlighting
   - Test scrolling
@@ -248,7 +248,7 @@
   - _Requirements: 3.2_
 
 - [x] 34. Final input system cleanup
-  - Ensure all input handling uses InputEvent
+  - Ensure all input handling uses KeyEvent
   - Remove any remaining curses key code references
   - Test all key combinations
   - Test modifier keys

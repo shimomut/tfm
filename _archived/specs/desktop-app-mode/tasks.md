@@ -20,7 +20,7 @@
   - Create input_event.py module
   - Define KeyCode IntEnum with all special keys (arrows, function keys, etc.)
   - Define ModifierKey IntEnum with modifier flags
-  - Define InputEvent dataclass with key_code, modifiers, char, and mouse fields
+  - Define KeyEvent dataclass with key_code, modifiers, char, and mouse fields
   - Implement helper methods (is_printable, is_special_key, has_modifier)
   - _Requirements: 1.2, 5.1, 5.2, 5.3, 5.4, 10.1_
 
@@ -54,7 +54,7 @@
 
 - [x] 8. Implement curses input handling
   - Implement get_input() with timeout support
-  - Implement _translate_curses_key() to convert curses keys to InputEvent
+  - Implement _translate_curses_key() to convert curses keys to KeyEvent
   - Map all special keys (arrows, function keys, etc.)
   - Handle printable characters and special characters
   - _Requirements: 2.3, 5.1, 5.2, 5.5_
@@ -121,7 +121,7 @@
 - [x] 18. Implement Metal input handling
   - Implement get_input() to poll macOS event queue
   - Implement _poll_macos_event() using NSEvent
-  - Implement _translate_macos_event() to convert to InputEvent
+  - Implement _translate_macos_event() to convert to KeyEvent
   - Map keyboard events, mouse events, and window events
   - Handle modifier keys (Shift, Control, Alt, Command)
   - _Requirements: 3.4, 5.1, 5.2, 5.3, 5.4, 5.5_
@@ -220,11 +220,11 @@
   - Test that all abstract methods are defined
   - _Requirements: 1.5_
 
-- [ ]* 33. Write unit tests for InputEvent
+- [ ]* 33. Write unit tests for KeyEvent
   - Test is_printable() method
   - Test is_special_key() method
   - Test has_modifier() method
-  - Test InputEvent creation with various parameters
+  - Test KeyEvent creation with various parameters
   - _Requirements: 5.1, 5.2, 5.3_
 
 - [ ]* 34. Write unit tests for CursesBackend

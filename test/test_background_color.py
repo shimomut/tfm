@@ -6,7 +6,7 @@ Test for background color fix - verifying bkgd() replacement with addstr() appro
 import sys
 import os
 import curses
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 import time
 
 # Add src directory to path

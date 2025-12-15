@@ -4,7 +4,7 @@
   - Create `ttk/backends/coregraphics_backend.py` file
   - Add PyObjC import with availability check
   - Import required Cocoa, Quartz, and objc modules
-  - Import TTK base classes (Renderer, TextAttribute, InputEvent, KeyCode, ModifierKey)
+  - Import TTK base classes (Renderer, TextAttribute, KeyEvent, KeyCode, ModifierKey)
   - _Requirements: 1.1, 1.5_
 
 - [x] 2. Implement CoreGraphicsBackend class initialization
@@ -137,7 +137,7 @@
   - _Requirements: 6.4, 13.1, 13.2, 13.3, 13.5_
 
 - [x] 14. Implement input event translation
-  - Implement _translate_event() to convert NSEvent to InputEvent
+  - Implement _translate_event() to convert NSEvent to KeyEvent
   - Extract key code from NSEvent
   - Extract character from NSEvent
   - Translate modifier flags to ModifierKey mask
@@ -145,7 +145,7 @@
   - Map NSEventModifierFlagControl to ModifierKey.CONTROL
   - Map NSEventModifierFlagOption to ModifierKey.ALT
   - Map NSEventModifierFlagCommand to ModifierKey.COMMAND
-  - Return InputEvent with key_code, char, and modifiers
+  - Return KeyEvent with key_code, char, and modifiers
   - _Requirements: 6.1, 6.2, 6.3_
   - _Note: Implemented together with task 13 as they are tightly coupled_
 

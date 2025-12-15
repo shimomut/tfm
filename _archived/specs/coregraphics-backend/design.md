@@ -115,12 +115,12 @@ Receive NSEvent
     ↓
 Dispatch event with NSApp.sendEvent_
     ↓
-Translate NSEvent to InputEvent
+Translate NSEvent to KeyEvent
     - Extract key code
     - Extract character
     - Extract modifier flags
     ↓
-Return InputEvent to application
+Return KeyEvent to application
 ```
 
 ## Components and Interfaces
@@ -213,9 +213,9 @@ color_pairs[1] = ((255, 255, 255), (0, 0, 255))  # White on blue
 
 ## Data Models
 
-### InputEvent Translation
+### KeyEvent Translation
 
-NSEvent key codes must be translated to TTK InputEvent objects:
+NSEvent key codes must be translated to TTK KeyEvent objects:
 
 ```python
 # NSEvent provides:
@@ -223,8 +223,8 @@ NSEvent key codes must be translated to TTK InputEvent objects:
 - characters: str        # Character representation
 - modifierFlags: int     # Modifier key flags
 
-# Translate to InputEvent:
-InputEvent(
+# Translate to KeyEvent:
+KeyEvent(
     key_code=keyCode,
     char=characters if characters else None,
     modifiers=modifier_mask  # Translated from modifierFlags
@@ -338,7 +338,7 @@ Based on the requirements analysis, the following correctness properties must ho
 
 ### Property 6: Input Event Translation Completeness
 
-*For any* keyboard event received from macOS, the translation to InputEvent should produce a valid InputEvent object with appropriate key code, character, and modifier fields.
+*For any* keyboard event received from macOS, the translation to KeyEvent should produce a valid KeyEvent object with appropriate key code, character, and modifier fields.
 
 **Validates: Requirements 6.1**
 
@@ -533,7 +533,7 @@ Unit tests verify specific examples, edge cases, and integration points:
 **Input Tests:**
 - Verify get_input() with timeout=0 returns immediately
 - Verify get_input() with timeout=-1 blocks
-- Verify keyboard events are translated to InputEvent
+- Verify keyboard events are translated to KeyEvent
 - Verify modifier keys are detected correctly
 
 **Coordinate Tests:**
@@ -588,13 +588,13 @@ Property-based tests verify universal properties across many randomly generated 
 
 **Property Test 6: Input Event Translation Completeness**
 - Generate various keyboard events (simulated)
-- Translate to InputEvent
-- Verify InputEvent has valid key_code, char, and modifiers
+- Translate to KeyEvent
+- Verify KeyEvent has valid key_code, char, and modifiers
 - **Validates: Property 6**
 
 **Property Test 7: Modifier Key Detection**
 - Generate random combinations of modifier flags
-- Translate to InputEvent
+- Translate to KeyEvent
 - Verify all pressed modifiers are detected
 - **Validates: Property 7**
 

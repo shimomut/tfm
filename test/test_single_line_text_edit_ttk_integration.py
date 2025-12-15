@@ -87,43 +87,43 @@ class TestSingleLineTextEditTTKIntegration(unittest.TestCase):
         self.assertEqual(self.editor.get_text(), "ello")
     
     def test_handle_key_with_input_event(self):
-        """Test handle_key uses InputEvent instead of curses key codes"""
+        """Test handle_key uses KeyEvent instead of curses key codes"""
         self.editor.set_text("Test")
         self.editor.set_cursor_pos(4)
         
         # Test LEFT arrow
-        event = InputEvent(key_code=KeyCode.LEFT, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.LEFT, modifiers=0)
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_cursor_pos(), 3)
         
         # Test RIGHT arrow
-        event = InputEvent(key_code=KeyCode.RIGHT, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.RIGHT, modifiers=0)
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_cursor_pos(), 4)
         
         # Test HOME
-        event = InputEvent(key_code=KeyCode.HOME, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.HOME, modifiers=0)
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_cursor_pos(), 0)
         
         # Test END
-        event = InputEvent(key_code=KeyCode.END, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.END, modifiers=0)
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_cursor_pos(), 4)
         
         # Test BACKSPACE
-        event = InputEvent(key_code=KeyCode.BACKSPACE, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.BACKSPACE, modifiers=0)
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_text(), "Tes")
         
         # Test DELETE
         self.editor.set_cursor_pos(0)
-        event = InputEvent(key_code=KeyCode.DELETE, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.DELETE, modifiers=0)
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_text(), "es")
         
         # Test printable character
-        event = InputEvent(key_code=ord('X'), modifiers=0, char='X')
+        event = KeyEvent(key_code=ord('X'), modifiers=0, char='X')
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_text(), "Xes")
     
@@ -133,18 +133,18 @@ class TestSingleLineTextEditTTKIntegration(unittest.TestCase):
         self.editor.set_cursor_pos(2)
         
         # Test UP arrow moves to home when vertical nav enabled
-        event = InputEvent(key_code=KeyCode.UP, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.UP, modifiers=0)
         self.assertTrue(self.editor.handle_key(event, handle_vertical_nav=True))
         self.assertEqual(self.editor.get_cursor_pos(), 0)
         
         # Test DOWN arrow moves to end when vertical nav enabled
-        event = InputEvent(key_code=KeyCode.DOWN, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.DOWN, modifiers=0)
         self.assertTrue(self.editor.handle_key(event, handle_vertical_nav=True))
         self.assertEqual(self.editor.get_cursor_pos(), 4)
         
         # Test UP/DOWN don't work when vertical nav disabled
         self.editor.set_cursor_pos(2)
-        event = InputEvent(key_code=KeyCode.UP, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.UP, modifiers=0)
         self.assertFalse(self.editor.handle_key(event, handle_vertical_nav=False))
         self.assertEqual(self.editor.get_cursor_pos(), 2)
     
@@ -258,13 +258,13 @@ class TestSingleLineTextEditTTKIntegration(unittest.TestCase):
         
         # Should allow up to max_length
         for char in "Hello":
-            event = InputEvent(key_code=ord(char), modifiers=0, char=char)
+            event = KeyEvent(key_code=ord(char), modifiers=0, char=char)
             self.assertTrue(editor.handle_key(event))
         
         self.assertEqual(editor.get_text(), "Hello")
         
         # Should reject beyond max_length
-        event = InputEvent(key_code=ord('!'), modifiers=0, char='!')
+        event = KeyEvent(key_code=ord('!'), modifiers=0, char='!')
         self.assertFalse(editor.handle_key(event))
         self.assertEqual(editor.get_text(), "Hello")
     

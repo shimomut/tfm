@@ -20,7 +20,7 @@ Fix:
 - This ensures the dialog continues to be rendered after any key press
 """
 
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
 import sys
@@ -53,7 +53,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.search_dialog.content_changed = False  # Simulate after drawing
         
         # Press left key
-        result = self.search_dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
+        result = self.search_dialog.handle_input(KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         
         # Verify the fix
         self.assertTrue(result, "Left key should be handled")
@@ -69,7 +69,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.search_dialog.content_changed = False  # Simulate after drawing
         
         # Press right key
-        result = self.search_dialog.handle_input(InputEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE))
+        result = self.search_dialog.handle_input(KeyEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE))
         
         # Verify the fix
         self.assertTrue(result, "Right key should be handled")
@@ -148,7 +148,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.assertFalse(self.search_dialog.needs_redraw(), "Dialog should not need redraw after being drawn")
         
         # Step 3: Press left key immediately (the problematic scenario)
-        result = self.search_dialog.handle_input(InputEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
+        result = self.search_dialog.handle_input(KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         
         # Step 4: Verify dialog is still visible
         self.assertTrue(result, "Left key should be handled")

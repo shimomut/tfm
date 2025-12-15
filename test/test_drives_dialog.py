@@ -5,7 +5,7 @@ Test script for DrivesDialog functionality
 
 import sys
 import os
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 from unittest.mock import Mock
 
 # Add src directory to path

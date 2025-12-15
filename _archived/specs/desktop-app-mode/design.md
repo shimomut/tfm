@@ -20,7 +20,7 @@ TTK is designed as a standalone library independent of TFM, making it reusable f
                       │
 ┌─────────────────────▼───────────────────────────────────┐
 │                  TTK Abstract API                        │
-│  (Renderer, InputEvent, ColorPair, WindowInfo, etc.)   │
+│  (Renderer, KeyEvent, ColorPair, WindowInfo, etc.)   │
 └─────────────────────┬───────────────────────────────────┘
                       │
                       │ Implements
@@ -200,7 +200,7 @@ class Renderer(ABC):
         pass
     
     @abstractmethod
-    def get_input(self, timeout_ms: int = -1) -> Optional['InputEvent']:
+    def get_input(self, timeout_ms: int = -1) -> Optional['KeyEvent']:
         """
         Get the next input event.
         
@@ -208,7 +208,7 @@ class Renderer(ABC):
             timeout_ms: Timeout in milliseconds. -1 for blocking, 0 for non-blocking.
         
         Returns:
-            InputEvent if input is available, None if timeout expires.
+            KeyEvent if input is available, None if timeout expires.
         """
         pass
     
@@ -234,7 +234,7 @@ class Renderer(ABC):
         pass
 ```
 
-### 2. InputEvent
+### 2. KeyEvent
 
 Represents user input events with a unified interface across backends.
 
@@ -296,7 +296,7 @@ class ModifierKey(IntEnum):
     COMMAND = 8  # macOS Command key
 
 @dataclass
-class InputEvent:
+class KeyEvent:
     """Represents a user input event."""
     key_code: int  # KeyCode value or Unicode code point
     modifiers: int  # Bitwise OR of ModifierKey values
@@ -462,7 +462,7 @@ class CursesBackend(Renderer):
             return curses.COLOR_CYAN
         return curses.COLOR_WHITE
     
-    def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+    def get_input(self, timeout_ms: int = -1) -> Optional[KeyEvent]:
         """Get input from terminal."""
         if timeout_ms >= 0:
             self.stdscr.timeout(timeout_ms)
@@ -478,8 +478,8 @@ class CursesBackend(Renderer):
         except curses.error:
             return None
     
-    def _translate_curses_key(self, key: int) -> InputEvent:
-        """Translate curses key code to InputEvent."""
+    def _translate_curses_key(self, key: int) -> KeyEvent:
+        """Translate curses key code to KeyEvent."""
         modifiers = ModifierKey.NONE
         
         # Map curses keys to KeyCode
@@ -503,22 +503,22 @@ class CursesBackend(Renderer):
             key_map[curses.KEY_F1 + i] = KeyCode.F1 + i
         
         if key in key_map:
-            return InputEvent(key_code=key_map[key], modifiers=modifiers)
+            return KeyEvent(key_code=key_map[key], modifiers=modifiers)
         
         # Printable character
         if 32 <= key <= 126:
-            return InputEvent(key_code=key, modifiers=modifiers, char=chr(key))
+            return KeyEvent(key_code=key, modifiers=modifiers, char=chr(key))
         
         # Special characters
         if key == 10 or key == 13:
-            return InputEvent(key_code=KeyCode.ENTER, modifiers=modifiers)
+            return KeyEvent(key_code=KeyCode.ENTER, modifiers=modifiers)
         elif key == 27:
-            return InputEvent(key_code=KeyCode.ESCAPE, modifiers=modifiers)
+            return KeyEvent(key_code=KeyCode.ESCAPE, modifiers=modifiers)
         elif key == 9:
-            return InputEvent(key_code=KeyCode.TAB, modifiers=modifiers)
+            return KeyEvent(key_code=KeyCode.TAB, modifiers=modifiers)
         
         # Default
-        return InputEvent(key_code=key, modifiers=modifiers)
+        return KeyEvent(key_code=key, modifiers=modifiers)
     
     def set_cursor_visibility(self, visible: bool) -> None:
         """Set cursor visibility."""
@@ -734,7 +734,7 @@ class MetalBackend(Renderer):
         """Initialize color pair."""
         self.color_pairs[pair_id] = (fg_color, bg_color)
     
-    def get_input(self, timeout_ms: int = -1) -> Optional[InputEvent]:
+    def get_input(self, timeout_ms: int = -1) -> Optional[KeyEvent]:
         """Get input from macOS event system."""
         # Poll macOS event queue
         event = self._poll_macos_event(timeout_ms)
@@ -747,9 +747,9 @@ class MetalBackend(Renderer):
         # Use NSEvent polling
         pass
     
-    def _translate_macos_event(self, event) -> InputEvent:
-        """Translate macOS event to InputEvent."""
-        # Map NSEvent to InputEvent
+    def _translate_macos_event(self, event) -> KeyEvent:
+        """Translate macOS event to KeyEvent."""
+        # Map NSEvent to KeyEvent
         # Handle keyboard events, mouse events, window events
         pass
     
@@ -833,19 +833,19 @@ Property 4: Text attribute support
 **Validates: Requirements 2.2, 7.3, 9.1, 9.2, 9.3, 9.4**
 
 Property 5: Printable character input translation
-*For any* printable character input event, get_input should return an InputEvent with the correct character in the char field and a valid key_code.
+*For any* printable character input event, get_input should return an KeyEvent with the correct character in the char field and a valid key_code.
 **Validates: Requirements 5.1**
 
 Property 6: Special key input translation
-*For any* special key input (arrow keys, function keys, Enter, Escape, Backspace, Delete), get_input should return an InputEvent with the correct KeyCode value.
+*For any* special key input (arrow keys, function keys, Enter, Escape, Backspace, Delete), get_input should return an KeyEvent with the correct KeyCode value.
 **Validates: Requirements 5.2**
 
 Property 7: Modifier key detection
-*For any* key input with modifier keys pressed, get_input should return an InputEvent with the correct modifier flags set.
+*For any* key input with modifier keys pressed, get_input should return an KeyEvent with the correct modifier flags set.
 **Validates: Requirements 5.3**
 
 Property 8: Mouse input handling
-*For any* mouse event, get_input should return an InputEvent with valid mouse position (row, col) and button state.
+*For any* mouse event, get_input should return an KeyEvent with valid mouse position (row, col) and button state.
 **Validates: Requirements 5.4**
 
 Property 9: Dimension query consistency
@@ -865,7 +865,7 @@ Property 12: Backend color equivalence
 **Validates: Requirements 3.3**
 
 Property 13: Backend input equivalence
-*For any* input event type, both curses and Metal backends should translate platform-specific events to equivalent InputEvent objects with the same key_code and modifiers.
+*For any* input event type, both curses and Metal backends should translate platform-specific events to equivalent KeyEvent objects with the same key_code and modifiers.
 **Validates: Requirements 2.3, 3.4**
 
 ## Error Handling
@@ -947,25 +947,25 @@ Property-based tests will verify universal properties across many inputs:
 **Property Test 5: Printable character input translation**
 - Generate random printable characters
 - Simulate input events
-- Verify InputEvent has correct char and key_code
+- Verify KeyEvent has correct char and key_code
 - **Feature: desktop-app-mode, Property 5: Printable character input translation**
 - **Validates: Requirements 5.1**
 
 **Property Test 6: Special key input translation**
 - Generate random special key events
-- Verify InputEvent has correct KeyCode
+- Verify KeyEvent has correct KeyCode
 - **Feature: desktop-app-mode, Property 6: Special key input translation**
 - **Validates: Requirements 5.2**
 
 **Property Test 7: Modifier key detection**
 - Generate random key events with random modifier combinations
-- Verify InputEvent has correct modifier flags
+- Verify KeyEvent has correct modifier flags
 - **Feature: desktop-app-mode, Property 7: Modifier key detection**
 - **Validates: Requirements 5.3**
 
 **Property Test 8: Mouse input handling**
 - Generate random mouse events
-- Verify InputEvent has valid mouse data
+- Verify KeyEvent has valid mouse data
 - **Feature: desktop-app-mode, Property 8: Mouse input handling**
 - **Validates: Requirements 5.4**
 
@@ -998,7 +998,7 @@ Property-based tests will verify universal properties across many inputs:
 **Property Test 13: Backend input equivalence**
 - Generate random input events
 - Translate with both backends
-- Verify equivalent InputEvent objects
+- Verify equivalent KeyEvent objects
 - **Feature: desktop-app-mode, Property 13: Backend input equivalence**
 - **Validates: Requirements 2.3, 3.4**
 
@@ -1028,7 +1028,7 @@ The library will be named **TTK (TUI Toolkit / Traditional app Toolkit)** to ref
 ttk/
 ├── __init__.py
 ├── renderer.py          # Abstract Renderer class
-├── input_event.py       # InputEvent, KeyCode, ModifierKey
+├── input_event.py       # KeyEvent, KeyCode, ModifierKey
 ├── backends/
 │   ├── __init__.py
 │   ├── curses_backend.py

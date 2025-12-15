@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import Mock, MagicMock, patch, call
 import threading
 import time
-from ttk import KeyCode, InputEvent, TextAttribute
+from ttk import KeyCode, KeyEvent, TextAttribute
 from tfm_jump_dialog import JumpDialog, JumpDialogHelpers
 from tfm_path import Path
 
@@ -57,13 +57,13 @@ class TestJumpDialogTTKIntegration(unittest.TestCase):
         self.assertEqual(self.dialog.scroll, 0)
         
     def test_handle_input_with_input_event(self):
-        """Test that handle_input works with InputEvent"""
+        """Test that handle_input works with KeyEvent"""
         # Set up dialog state
         self.dialog.is_active = True
         self.dialog.filtered_directories = [Path('/dir1'), Path('/dir2')]
         
         # Test ESC key (cancel)
-        event = InputEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
         with patch.object(self.dialog, '_cancel_current_scan'):
             result = self.dialog.handle_input(event)
         
@@ -71,13 +71,13 @@ class TestJumpDialogTTKIntegration(unittest.TestCase):
         self.assertFalse(self.dialog.is_active)
         
     def test_handle_input_navigation_keys(self):
-        """Test that navigation keys work with InputEvent"""
+        """Test that navigation keys work with KeyEvent"""
         self.dialog.is_active = True
         self.dialog.filtered_directories = [Path('/dir1'), Path('/dir2'), Path('/dir3')]
         self.dialog.selected = 0
         
         # Test DOWN key
-        event = InputEvent(key_code=KeyCode.DOWN, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=set())
         result = self.dialog.handle_input(event)
         
         self.assertTrue(result)
@@ -90,7 +90,7 @@ class TestJumpDialogTTKIntegration(unittest.TestCase):
         self.dialog.selected = 1
         
         # Test ENTER key
-        event = InputEvent(key_code=KeyCode.ENTER, char=None, modifiers=set())
+        event = KeyEvent(key_code=KeyCode.ENTER, char=None, modifiers=set())
         with patch.object(self.dialog, '_cancel_current_scan'):
             result = self.dialog.handle_input(event)
         

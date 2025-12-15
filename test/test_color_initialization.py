@@ -11,7 +11,7 @@ import unittest
 import sys
 import os
 import curses
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 

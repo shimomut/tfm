@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from tfm_text_viewer import TextViewer
 from tfm_path import Path
 from ttk.mock_renderer import MockRenderer
-from ttk.input_event import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 
 
 def create_test_file_with_tabs(file_path: str):
@@ -61,7 +61,7 @@ def test_tab_width_change():
         assert line_with_tab.startswith("    "), "Single tab should expand to 4 spaces"
         
         # Simulate pressing 't' to change tab width to 8
-        event = InputEvent(char='t', key_code=None)
+        event = KeyEvent(char='t', key_code=None)
         viewer.handle_key(event)
         
         print(f"Tab width after first 't' press: {viewer.tab_width}")
@@ -73,7 +73,7 @@ def test_tab_width_change():
         assert line_with_tab.startswith("        "), "Single tab should expand to 8 spaces"
         
         # Simulate pressing 't' again to change tab width to 2
-        event = InputEvent(char='t', key_code=None)
+        event = KeyEvent(char='t', key_code=None)
         viewer.handle_key(event)
         
         print(f"Tab width after second 't' press: {viewer.tab_width}")
@@ -85,7 +85,7 @@ def test_tab_width_change():
         assert line_with_tab.startswith("  "), "Single tab should expand to 2 spaces"
         
         # Simulate pressing 't' once more to cycle back to 4
-        event = InputEvent(char='t', key_code=None)
+        event = KeyEvent(char='t', key_code=None)
         viewer.handle_key(event)
         
         print(f"Tab width after third 't' press: {viewer.tab_width}")
@@ -141,7 +141,7 @@ def test_tab_width_display():
         print("✓ Tab width is displayed in status bar")
         
         # Change tab width and check display
-        event = InputEvent(char='t', key_code=None)
+        event = KeyEvent(char='t', key_code=None)
         viewer.handle_key(event)
         
         renderer.clear_drawn_text()

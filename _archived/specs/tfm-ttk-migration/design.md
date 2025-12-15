@@ -60,7 +60,7 @@ TFM will use TTK's Renderer API directly without an adapter layer. This approach
 - Replace `stdscr.getch()` with `renderer.get_input()`
 - Replace `stdscr.getmaxyx()` with `renderer.get_dimensions()`
 - Replace curses color pairs with RGB tuples
-- Replace curses key codes with TTK's InputEvent and KeyCode
+- Replace curses key codes with TTK's KeyEvent and KeyCode
 
 **Example Migration:**
 
@@ -270,7 +270,7 @@ def main():
 1. Update `tfm_main.py` to accept renderer instead of stdscr
 2. Replace all `stdscr.addstr()` with `renderer.draw_text()`
 3. Replace all `stdscr.getch()` with `renderer.get_input()`
-4. Update input handling to use InputEvent
+4. Update input handling to use KeyEvent
 5. Test main functionality
 
 ### Phase 3: UI Components
@@ -306,8 +306,8 @@ def main():
 - **Trade-off**: Need to convert existing color definitions
 
 ### 4. Input Handling
-- **Decision**: Use TTK's InputEvent directly, update key binding system
-- **Rationale**: InputEvent is more powerful than curses key codes
+- **Decision**: Use TTK's KeyEvent directly, update key binding system
+- **Rationale**: KeyEvent is more powerful than curses key codes
 - **Trade-off**: Need to update key binding logic, but better long-term
 
 ### 5. Gradual Migration

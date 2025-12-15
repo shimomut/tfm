@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 from tfm_config import get_config
 from tfm_main import FileManager
 from tfm_jump_dialog import JumpDialog
-from ttk.input_event import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 
 
 class MockStdscr:
@@ -239,8 +239,8 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
         while jump_dialog.searching and (time.time() - start_time) < max_wait:
             time.sleep(0.1)
         
-        # Simulate Enter key press using InputEvent
-        enter_event = InputEvent(key_code=KeyCode.ENTER, modifiers=0)
+        # Simulate Enter key press using KeyEvent
+        enter_event = KeyEvent(key_code=KeyCode.ENTER, modifiers=0)
         result = jump_dialog.handle_input(enter_event)
         
         # Should return navigation tuple
@@ -272,8 +272,8 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
         
         def concurrent_navigation():
             for i in range(20):
-                down_event = InputEvent(key_code=KeyCode.DOWN, modifiers=0)
-                up_event = InputEvent(key_code=KeyCode.UP, modifiers=0)
+                down_event = KeyEvent(key_code=KeyCode.DOWN, modifiers=0)
+                up_event = KeyEvent(key_code=KeyCode.UP, modifiers=0)
                 jump_dialog.handle_input(down_event)
                 jump_dialog.handle_input(up_event)
                 time.sleep(0.01)

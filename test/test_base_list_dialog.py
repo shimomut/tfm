@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
 from unittest.mock import Mock, MagicMock
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 
 from tfm_base_list_dialog import BaseListDialog
 from tfm_list_dialog import ListDialog
@@ -52,13 +52,13 @@ class TestBaseListDialog(unittest.TestCase):
         
     def test_handle_common_navigation_cancel(self):
         """Test ESC key handling"""
-        event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=0)
         result = self.base_dialog.handle_common_navigation(event, ["item1", "item2"])
         self.assertEqual(result, 'cancel')
         
     def test_handle_common_navigation_select(self):
         """Test ENTER key handling"""
-        event = InputEvent(key_code=KeyCode.ENTER, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.ENTER, modifiers=0)
         result = self.base_dialog.handle_common_navigation(event, ["item1", "item2"])
         self.assertEqual(result, 'select')
         
@@ -67,13 +67,13 @@ class TestBaseListDialog(unittest.TestCase):
         items = ["item1", "item2", "item3"]
         
         # Test DOWN key
-        event = InputEvent(key_code=KeyCode.DOWN, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.DOWN, modifiers=0)
         result = self.base_dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(self.base_dialog.selected, 1)
         
         # Test UP key
-        event = InputEvent(key_code=KeyCode.UP, modifiers=0)
+        event = KeyEvent(key_code=KeyCode.UP, modifiers=0)
         result = self.base_dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(self.base_dialog.selected, 0)
@@ -139,7 +139,7 @@ class TestListDialog(unittest.TestCase):
         self.list_dialog.show("Test", items, callback)
         self.list_dialog.selected = 1
         
-        result = self.list_dialog.handle_input(InputEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE))
+        result = self.list_dialog.handle_input(KeyEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE))
         
         self.assertTrue(result)
         self.assertFalse(self.list_dialog.is_active)  # Should exit

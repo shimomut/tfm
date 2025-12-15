@@ -6,7 +6,7 @@ This test verifies that all dialogs properly handle keys without causing
 rendering issues (dialogs disappearing due to content_changed not being set).
 """
 
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
 import sys
@@ -184,7 +184,7 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
         self.assertFalse(dialog.needs_redraw(), "Dialog should not need redraw after being drawn")
         
         # Step 3: Press UP key immediately (the problematic scenario)
-        result = dialog.handle_input(InputEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE))
+        result = dialog.handle_input(KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE))
         
         # Step 4: Verify dialog is still visible
         self.assertTrue(result, "UP key should be handled")
