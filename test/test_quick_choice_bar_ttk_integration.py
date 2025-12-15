@@ -12,7 +12,7 @@ from unittest.mock import Mock, MagicMock, call
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from ttk import KeyCode, TextAttribute, InputEvent
+from ttk import KeyCode, TextAttribute, KeyEvent
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 
 
@@ -93,7 +93,7 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         self.assertEqual(result, ('execute', True))
     
     def test_handle_input_uses_input_event_char(self):
-        """Test that handle_input uses InputEvent.char for quick keys"""
+        """Test that handle_input uses KeyEvent.char for quick keys"""
         choices = [
             {"text": "Yes", "key": "y", "value": True},
             {"text": "No", "key": "n", "value": False},

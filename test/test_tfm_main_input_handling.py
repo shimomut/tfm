@@ -2,7 +2,7 @@
 """
 Test TFM main input handling migration to TTK API.
 
-This test verifies that tfm_main.py correctly uses TTK's InputEvent
+This test verifies that tfm_main.py correctly uses TTK's KeyEvent
 for input handling instead of curses key codes.
 """
 
@@ -16,7 +16,7 @@ from tfm_main import FileManager
 
 
 def test_input_event_handling():
-    """Test that FileManager handles InputEvent correctly"""
+    """Test that FileManager handles KeyEvent correctly"""
     # Create mock renderer
     mock_renderer = Mock()
     mock_renderer.get_dimensions.return_value = (24, 80)

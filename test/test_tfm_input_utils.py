@@ -2,7 +2,7 @@
 Tests for TFM Input Event Utilities
 
 This test suite verifies the input event helper functions that bridge
-TTK's InputEvent system with TFM's key binding system.
+TTK's KeyEvent system with TFM's key binding system.
 """
 
 import sys
@@ -11,7 +11,7 @@ from pathlib import Path
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from ttk import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 from tfm_input_utils import (
     input_event_to_key_char,
     is_input_event_for_key,

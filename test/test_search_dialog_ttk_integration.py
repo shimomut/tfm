@@ -12,7 +12,7 @@ import pytest
 import threading
 import time
 from unittest.mock import Mock, MagicMock, patch
-from ttk import TextAttribute, KeyCode, InputEvent
+from ttk import TextAttribute, KeyCode, KeyEvent
 from tfm_search_dialog import SearchDialog
 from tfm_path import Path
 

@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_single_line_text_edit import SingleLineTextEdit
-from ttk import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 
 
 def test_basic_functionality():
