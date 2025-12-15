@@ -89,9 +89,9 @@ class JumpDialog(BaseListDialog):
         """Handle input while in jump dialog mode
         
         Args:
-            event: InputEvent from TTK
+            event: KeyEvent from TTK
         """
-        # Backward compatibility: convert integer key codes to InputEvent
+        # Backward compatibility: convert integer key codes to KeyEvent
         event = ensure_input_event(event)
         
         if not event:

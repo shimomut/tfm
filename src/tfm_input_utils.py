@@ -1,19 +1,19 @@
 """
 TFM Input Event Utilities
 
-This module provides helper functions for working with TTK InputEvent objects
+This module provides helper functions for working with TTK KeyEvent objects
 in the context of TFM's key binding system.
 """
 
-from ttk import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey
 
 
 def input_event_to_key_char(event):
     """
-    Convert an InputEvent to a key character string for TFM key binding lookup.
+    Convert a KeyEvent to a key character string for TFM key binding lookup.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         
     Returns:
         str: Key character string, or None if event cannot be converted
@@ -91,17 +91,17 @@ def input_event_to_key_char(event):
 
 def is_input_event_for_key(event, key_char):
     """
-    Check if an InputEvent matches a specific key character.
+    Check if a KeyEvent matches a specific key character.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         key_char: Key character string to match against
         
     Returns:
         bool: True if event matches key_char
         
     Examples:
-        >>> event = InputEvent(char='a')
+        >>> event = KeyEvent(char='a', key_code=ord('a'), modifiers=ModifierKey.NONE)
         >>> is_input_event_for_key(event, 'a')
         True
         >>> is_input_event_for_key(event, 'A')
@@ -116,10 +116,10 @@ def is_input_event_for_key(event, key_char):
 
 def is_input_event_for_action(event, action, config_manager):
     """
-    Check if an InputEvent matches a configured action.
+    Check if a KeyEvent matches a configured action.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         action: Action name to check
         config_manager: ConfigManager instance for key binding lookup
         
@@ -127,7 +127,7 @@ def is_input_event_for_action(event, action, config_manager):
         bool: True if event is bound to the action
         
     Examples:
-        >>> event = InputEvent(char='q')
+        >>> event = KeyEvent(char='q', key_code=ord('q'), modifiers=ModifierKey.NONE)
         >>> is_input_event_for_action(event, 'quit', config_manager)
         True
     """
@@ -143,10 +143,10 @@ def is_input_event_for_action(event, action, config_manager):
 
 def is_input_event_for_action_with_selection(event, action, has_selection, config_manager):
     """
-    Check if an InputEvent matches a configured action and respects selection requirements.
+    Check if a KeyEvent matches a configured action and respects selection requirements.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         action: Action name to check
         has_selection: Whether files are currently selected
         config_manager: ConfigManager instance for key binding lookup
@@ -155,7 +155,7 @@ def is_input_event_for_action_with_selection(event, action, has_selection, confi
         bool: True if event is bound to the action and selection requirement is met
         
     Examples:
-        >>> event = InputEvent(char='c')
+        >>> event = KeyEvent(char='c', key_code=ord('c'), modifiers=ModifierKey.NONE)
         >>> is_input_event_for_action_with_selection(event, 'copy_files', True, config_manager)
         True
         >>> is_input_event_for_action_with_selection(event, 'copy_files', False, config_manager)
@@ -173,17 +173,17 @@ def is_input_event_for_action_with_selection(event, action, has_selection, confi
 
 def has_modifier(event, modifier):
     """
-    Check if an InputEvent has a specific modifier key pressed.
+    Check if a KeyEvent has a specific modifier key pressed.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         modifier: ModifierKey flag to check
         
     Returns:
         bool: True if modifier is pressed
         
     Examples:
-        >>> event = InputEvent(key_code=ord('a'), modifiers=ModifierKey.CONTROL, char='a')
+        >>> event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.CONTROL, char='a')
         >>> has_modifier(event, ModifierKey.CONTROL)
         True
         >>> has_modifier(event, ModifierKey.ALT)
@@ -197,10 +197,10 @@ def has_modifier(event, modifier):
 
 def is_ctrl_key(event):
     """
-    Check if an InputEvent has Ctrl modifier.
+    Check if a KeyEvent has Ctrl modifier.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         
     Returns:
         bool: True if Ctrl is pressed
@@ -210,10 +210,10 @@ def is_ctrl_key(event):
 
 def is_alt_key(event):
     """
-    Check if an InputEvent has Alt modifier.
+    Check if a KeyEvent has Alt modifier.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         
     Returns:
         bool: True if Alt is pressed
@@ -223,10 +223,10 @@ def is_alt_key(event):
 
 def is_shift_key(event):
     """
-    Check if an InputEvent has Shift modifier.
+    Check if a KeyEvent has Shift modifier.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         
     Returns:
         bool: True if Shift is pressed
@@ -236,10 +236,10 @@ def is_shift_key(event):
 
 def is_printable_char(event):
     """
-    Check if an InputEvent represents a printable character.
+    Check if a KeyEvent represents a printable character.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         
     Returns:
         bool: True if event has a printable character
@@ -251,10 +251,10 @@ def is_printable_char(event):
 
 def is_special_key(event):
     """
-    Check if an InputEvent represents a special key (non-printable).
+    Check if a KeyEvent represents a special key (non-printable).
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         
     Returns:
         bool: True if event has a special key code

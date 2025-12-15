@@ -453,10 +453,10 @@ class ConfigManager:
     
     def is_input_event_bound_to_action(self, event, action):
         """
-        Check if an InputEvent is bound to a specific action.
+        Check if a KeyEvent is bound to a specific action.
         
         Args:
-            event: InputEvent from TTK renderer
+            event: KeyEvent from TTK renderer
             action: Action name to check
             
         Returns:
@@ -476,10 +476,10 @@ class ConfigManager:
     
     def is_input_event_bound_to_action_with_selection(self, event, action, has_selection):
         """
-        Check if an InputEvent is bound to a specific action and respects selection requirements.
+        Check if a KeyEvent is bound to a specific action and respects selection requirements.
         
         Args:
-            event: InputEvent from TTK renderer
+            event: KeyEvent from TTK renderer
             action: Action name to check
             has_selection: Whether files are currently selected
             
@@ -578,10 +578,10 @@ def is_special_key_bound_to_with_selection(key_code, action, has_selection):
 
 def is_input_event_bound_to(event, action):
     """
-    Check if an InputEvent is bound to a specific action.
+    Check if a KeyEvent is bound to a specific action.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         action: Action name to check
         
     Returns:
@@ -592,10 +592,10 @@ def is_input_event_bound_to(event, action):
 
 def is_input_event_bound_to_with_selection(event, action, has_selection):
     """
-    Check if an InputEvent is bound to a specific action and respects selection requirements.
+    Check if a KeyEvent is bound to a specific action and respects selection requirements.
     
     Args:
-        event: InputEvent from TTK renderer
+        event: KeyEvent from TTK renderer
         action: Action name to check
         has_selection: Whether files are currently selected
         

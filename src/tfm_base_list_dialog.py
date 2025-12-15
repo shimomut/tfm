@@ -35,7 +35,7 @@ class BaseListDialog:
         """Handle common navigation keys for list dialogs
         
         Args:
-            event: The InputEvent
+            event: The KeyEvent
             items_list: List of items to navigate through
             
         Returns:

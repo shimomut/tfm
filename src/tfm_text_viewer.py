@@ -11,7 +11,7 @@ import traceback
 from tfm_path import Path
 from typing import List, Tuple, Optional, Dict, Any
 import re
-from ttk.input_event import InputEvent, KeyCode
+from ttk import KeyEvent, KeyCode
 from ttk.renderer import TextAttribute
 
 # Try to import pygments for syntax highlighting
@@ -436,7 +436,7 @@ class TextViewer:
         self.isearch_matches = []
         self.isearch_match_index = 0
     
-    def handle_isearch_input(self, event: InputEvent) -> bool:
+    def handle_isearch_input(self, event: KeyEvent) -> bool:
         """Handle input while in isearch mode. Returns True if key was handled."""
         # Handle None event
         if event is None:
@@ -825,7 +825,7 @@ class TextViewer:
         
         return min(estimated_line, len(self.lines))
     
-    def handle_key(self, event: InputEvent) -> bool:
+    def handle_key(self, event: KeyEvent) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
         # Handle None event
         if event is None:

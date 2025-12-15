@@ -48,12 +48,12 @@ class InfoDialog(BaseListDialog):
         """Handle input while in info dialog mode
         
         Args:
-            event: InputEvent from TTK
+            event: KeyEvent from TTK
             
         Returns:
             True if key was handled, False otherwise
         """
-        # Backward compatibility: convert integer key codes to InputEvent
+        # Backward compatibility: convert integer key codes to KeyEvent
         event = ensure_input_event(event)
         
         if not event:

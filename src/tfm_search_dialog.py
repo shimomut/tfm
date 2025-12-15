@@ -82,9 +82,9 @@ class SearchDialog(BaseListDialog):
         """Handle input while in search dialog mode
         
         Args:
-            event: InputEvent from TTK (or integer key code for backward compatibility)
+            event: KeyEvent from TTK (or integer key code for backward compatibility)
         """
-        # Backward compatibility: convert integer key codes to InputEvent
+        # Backward compatibility: convert integer key codes to KeyEvent
         event = ensure_input_event(event)
         
         if not event:

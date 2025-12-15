@@ -51,7 +51,7 @@ class QuickChoiceBar:
         """Handle input while in quick choice mode
         
         Args:
-            event: InputEvent from TTK renderer
+            event: KeyEvent from TTK renderer
         """
         if event.key_code == KeyCode.ESCAPE:
             return ('cancel', None)

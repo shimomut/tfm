@@ -72,12 +72,12 @@ class BatchRenameDialog(BaseListDialog):
         """Handle input while in batch rename mode
         
         Args:
-            event: InputEvent from TTK
+            event: KeyEvent from TTK
             
         Returns:
             Tuple of (action, data) or True/False
         """
-        # Backward compatibility: convert integer key codes to InputEvent
+        # Backward compatibility: convert integer key codes to KeyEvent
         event = ensure_input_event(event)
         
         if not event:
@@ -148,7 +148,7 @@ class BatchRenameDialog(BaseListDialog):
             # Let the active editor handle other keys
             active_editor = self.get_active_editor()
             
-            # Pass the InputEvent directly to SingleLineTextEdit
+            # Pass the KeyEvent directly to SingleLineTextEdit
             if active_editor.handle_key(event):
                 # Text changed, update preview
                 self.content_changed = True  # Mark content as changed when text changes

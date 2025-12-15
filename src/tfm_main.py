@@ -23,7 +23,7 @@ from collections import deque
 from tfm_single_line_text_edit import SingleLineTextEdit
 
 # Import TTK input event system
-from ttk.input_event import InputEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType
 from ttk.renderer import TextAttribute
 
 # Import constants and colors
@@ -151,7 +151,7 @@ class FileManager:
         
         # Configure renderer
         self.renderer.set_cursor_visibility(False)  # Hide cursor
-        # Note: TTK handles special keys automatically through InputEvent, no keypad() needed
+        # Note: TTK handles special keys automatically through KeyEvent, no keypad() needed
         
         # Track startup time for delayed redraw
         self.startup_time = time.time()
@@ -236,7 +236,7 @@ class FileManager:
         current_pane = self.get_current_pane()
         has_selection = len(current_pane['selected_files']) > 0
         
-        # Use the new InputEvent-aware function
+        # Use the new KeyEvent-aware function
         return is_input_event_bound_to_with_selection(event, action, has_selection)
         
     def count_files_and_dirs(self, pane_data):
@@ -3161,7 +3161,7 @@ class FileManager:
             # If no event was received (timeout), continue to next iteration
             if event is None:
                 pass  # Continue to drawing
-            elif event.key_code == KeyCode.RESIZE:  # Terminal window resized - handle at top level
+            elif isinstance(event, SystemEvent) and event.is_resize():  # Terminal window resized - handle at top level
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()
                 self.needs_full_redraw = True

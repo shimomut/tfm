@@ -64,9 +64,9 @@ class ListDialog(BaseListDialog):
         """Handle input while in list dialog mode
         
         Args:
-            event: InputEvent from TTK renderer (or integer key code for backward compatibility)
+            event: KeyEvent from TTK renderer (or integer key code for backward compatibility)
         """
-        # Backward compatibility: convert integer key codes to InputEvent
+        # Backward compatibility: convert integer key codes to KeyEvent
         event = ensure_input_event(event)
         
         # Check custom key handler first

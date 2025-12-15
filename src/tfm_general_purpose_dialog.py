@@ -95,12 +95,12 @@ class GeneralPurposeDialog:
         Handle input for the dialog
         
         Args:
-            event: InputEvent from TTK (or integer key code for backward compatibility)
+            event: KeyEvent from TTK (or integer key code for backward compatibility)
             
         Returns:
             bool: True if the event was handled, False otherwise
         """
-        # Backward compatibility: convert integer key codes to InputEvent
+        # Backward compatibility: convert integer key codes to KeyEvent
         event = ensure_input_event(event)
         
         if not self.is_active or not event:
@@ -136,8 +136,8 @@ class GeneralPurposeDialog:
         
         # Handle text editing
         else:
-            # Pass InputEvent directly to SingleLineTextEdit
-            # SingleLineTextEdit already handles InputEvent objects
+            # Pass KeyEvent directly to SingleLineTextEdit
+            # SingleLineTextEdit already handles KeyEvent objects
             handled = self.text_editor.handle_key(event)
             if handled:
                 self.content_changed = True  # Mark content as changed

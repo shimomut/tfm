@@ -133,7 +133,7 @@ class SingleLineTextEdit:
         Handle a key press and update the text/cursor accordingly
         
         Args:
-            event: InputEvent from TTK
+            event: KeyEvent from TTK
             handle_vertical_nav (bool): Whether to handle Up/Down keys for cursor movement
             
         Returns:
