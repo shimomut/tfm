@@ -2024,7 +2024,8 @@ class CoreGraphicsBackend(Renderer):
         
         # Check if window should close
         if self.should_close:
-            # Return a special quit event (Q key)
+            # Return a special quit event (Q key) only once
+            self.should_close = False
             return InputEvent(
                 key_code=ord('Q'),
                 modifiers=ModifierKey.NONE,
@@ -2351,16 +2352,19 @@ if COCOA_AVAILABLE:
                 
                 This method is called when the user clicks the window close button.
                 We set a flag to indicate the window should close, which will be
-                picked up by get_input().
+                picked up by get_input(). We return False to prevent the window
+                from closing immediately, allowing the application to handle the
+                close event gracefully through its normal event loop.
                 
                 Args:
                     sender: The window that is requesting to close
                 
                 Returns:
-                    bool: True to allow the window to close
+                    bool: False to prevent immediate window close, letting the
+                         application handle the close event through get_input()
                 """
                 self.backend.should_close = True
-                return True
+                return False
             
             def windowDidResize_(self, notification):
                 """
