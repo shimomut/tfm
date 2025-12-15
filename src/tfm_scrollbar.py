@@ -16,7 +16,7 @@ def draw_scrollbar(renderer, start_y, x_pos, display_height, total_items, scroll
     This function provides a consistent scroll bar implementation used across
     all TFM components. It draws a vertical scroll bar with:
     - Track: space character (background color shows through)
-    - Thumb: █ character in scroll bar color
+    - Thumb: ┃ character (HEAVY VERTICAL) in scroll bar color
     
     The thumb size represents the proportion of visible content, and its position
     indicates the current scroll offset.
@@ -71,9 +71,9 @@ def draw_scrollbar(renderer, start_y, x_pos, display_height, total_items, scroll
     for i in range(display_height):
         y = start_y + i
         if thumb_start <= i < thumb_end:
-            # Draw thumb (the movable part) - use vertical line instead of block
-            # The █ (FULL BLOCK) character can show gaps in some terminals/fonts
-            # Using ┃ (HEAVY VERTICAL) provides better continuity
+            # Draw thumb (the movable part) using vertical line character
+            # The ┃ (HEAVY VERTICAL) character provides better visual continuity
+            # than █ (FULL BLOCK) which can show gaps in some terminals/fonts
             renderer.draw_text(y, x_pos, "┃", scrollbar_color_pair, scrollbar_attrs)
         else:
             # Draw track (the background) - space character (background shows through)
