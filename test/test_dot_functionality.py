@@ -7,7 +7,7 @@ import sys
 import os
 import curses
 from ttk.input_event import InputEvent, KeyCode, ModifierKey
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_main import FileManager
 

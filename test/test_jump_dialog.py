@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 from tfm_jump_dialog import JumpDialog, JumpDialogHelpers
 from tfm_config import DefaultConfig
 from tfm_pane_manager import PaneManager
+from ttk.input_event import InputEvent, KeyCode
 
 
 class MockPaneManager:
@@ -47,7 +48,7 @@ class TestJumpDialog(unittest.TestCase):
         
     def tearDown(self):
         """Clean up test environment"""
-        if self.jump_dialog.mode:
+        if self.jump_dialog.is_active:
             self.jump_dialog.exit()
         
         # Clean up temp directory
@@ -55,8 +56,8 @@ class TestJumpDialog(unittest.TestCase):
             import shutil
             try:
                 shutil.rmtree(self.temp_dir)
-            except:
-                pass
+            except (OSError, PermissionError) as e:
+                print(f"Warning: Could not remove temp directory {self.temp_dir}: {e}")
     
     def create_test_directory_structure(self):
         """Create a temporary directory structure for testing"""
@@ -78,7 +79,7 @@ class TestJumpDialog(unittest.TestCase):
     
     def test_jump_dialog_initialization(self):
         """Test jump dialog initialization"""
-        self.assertFalse(self.jump_dialog.mode)
+        self.assertFalse(self.jump_dialog.is_active)
         self.assertEqual(len(self.jump_dialog.directories), 0)
         self.assertEqual(len(self.jump_dialog.filtered_directories), 0)
         self.assertEqual(self.jump_dialog.selected, 0)
@@ -91,7 +92,7 @@ class TestJumpDialog(unittest.TestCase):
         
         # Show dialog
         self.jump_dialog.show(test_path)
-        self.assertTrue(self.jump_dialog.mode)
+        self.assertTrue(self.jump_dialog.is_active)
         self.assertTrue(self.jump_dialog.searching)
         
         # Wait a moment for scanning to start
@@ -99,7 +100,7 @@ class TestJumpDialog(unittest.TestCase):
         
         # Exit dialog
         self.jump_dialog.exit()
-        self.assertFalse(self.jump_dialog.mode)
+        self.assertFalse(self.jump_dialog.is_active)
         self.assertFalse(self.jump_dialog.searching)
         self.assertEqual(len(self.jump_dialog.directories), 0)
         self.assertEqual(len(self.jump_dialog.filtered_directories), 0)
@@ -246,11 +247,10 @@ class TestJumpDialog(unittest.TestCase):
         while self.jump_dialog.searching and (time.time() - start_time) < max_wait:
             time.sleep(0.1)
         
-        # Test navigation input
-        import curses
-        
+        # Test navigation input using InputEvent
         # Test Enter key - should return navigation result
-        result = self.jump_dialog.handle_input(curses.KEY_ENTER)
+        enter_event = InputEvent(key_code=KeyCode.ENTER, modifiers=0)
+        result = self.jump_dialog.handle_input(enter_event)
         self.assertIsInstance(result, tuple)
         action, data = result
         self.assertEqual(action, 'navigate')
@@ -258,9 +258,10 @@ class TestJumpDialog(unittest.TestCase):
         
         # Test ESC key - should exit
         self.jump_dialog.show(test_path)  # Show again
-        result = self.jump_dialog.handle_input(27)  # ESC
+        esc_event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=0)
+        result = self.jump_dialog.handle_input(esc_event)
         self.assertTrue(result)
-        self.assertFalse(self.jump_dialog.mode)
+        self.assertFalse(self.jump_dialog.is_active)
     
     def test_thread_safety(self):
         """Test thread safety of jump dialog operations"""
@@ -277,9 +278,9 @@ class TestJumpDialog(unittest.TestCase):
                 time.sleep(0.01)
         
         def concurrent_navigation():
-            import curses
             for i in range(10):
-                self.jump_dialog.handle_input(curses.KEY_DOWN)
+                down_event = InputEvent(key_code=KeyCode.DOWN, modifiers=0)
+                self.jump_dialog.handle_input(down_event)
                 time.sleep(0.01)
         
         # Start concurrent threads
@@ -294,7 +295,7 @@ class TestJumpDialog(unittest.TestCase):
         nav_thread.join(timeout=2.0)
         
         # Dialog should still be functional
-        self.assertTrue(self.jump_dialog.mode)
+        self.assertTrue(self.jump_dialog.is_active)
     
     def test_jump_dialog_helpers(self):
         """Test JumpDialogHelpers functionality"""

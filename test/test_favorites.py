@@ -6,10 +6,11 @@ Test script for the favorite directories feature
 import curses
 from ttk.input_event import InputEvent, KeyCode, ModifierKey
 import sys
+import os
 from pathlib import Path
 
 # Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_main import FileManager
 from tfm_config import get_favorite_directories

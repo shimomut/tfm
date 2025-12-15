@@ -10,7 +10,7 @@ import unittest.mock
 # Mock curses before importing anything else
 sys.modules['curses'] = unittest.mock.MagicMock()
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_main import FileManager
 from tfm_single_line_text_edit import SingleLineTextEdit

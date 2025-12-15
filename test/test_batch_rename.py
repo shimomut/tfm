@@ -4,7 +4,11 @@ Test script for batch rename functionality
 """
 
 import re
-from pathlib import Path
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from tfm_path import Path
 
 def test_batch_rename_logic():
     """Test the batch rename logic without the UI"""

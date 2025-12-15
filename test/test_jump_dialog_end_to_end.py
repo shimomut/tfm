@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 from tfm_config import get_config
 from tfm_main import FileManager
 from tfm_jump_dialog import JumpDialog
+from ttk.input_event import InputEvent, KeyCode
 
 
 class MockStdscr:
@@ -66,8 +67,8 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
             import shutil
             try:
                 shutil.rmtree(self.temp_dir)
-            except:
-                pass
+            except (OSError, PermissionError) as e:
+                print(f"Warning: Could not remove temp directory {self.temp_dir}: {e}")
     
     def create_test_directory_structure(self):
         """Create a temporary directory structure for testing"""
@@ -120,7 +121,7 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
         
         # Test that jump dialog can be shown with a directory
         jump_dialog.show(test_path)
-        self.assertTrue(jump_dialog.mode)
+        self.assertTrue(jump_dialog.is_active)
         self.assertTrue(jump_dialog.searching)
         
         # Wait for scanning to start
@@ -128,7 +129,7 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
         
         # Test that dialog can be exited
         jump_dialog.exit()
-        self.assertFalse(jump_dialog.mode)
+        self.assertFalse(jump_dialog.is_active)
         self.assertFalse(jump_dialog.searching)
     
     def test_jump_dialog_directory_scanning_accuracy(self):
@@ -238,9 +239,9 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
         while jump_dialog.searching and (time.time() - start_time) < max_wait:
             time.sleep(0.1)
         
-        # Simulate Enter key press
-        import curses
-        result = jump_dialog.handle_input(curses.KEY_ENTER)
+        # Simulate Enter key press using InputEvent
+        enter_event = InputEvent(key_code=KeyCode.ENTER, modifiers=0)
+        result = jump_dialog.handle_input(enter_event)
         
         # Should return navigation tuple
         self.assertIsInstance(result, tuple)
@@ -261,7 +262,6 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
         jump_dialog.show(test_path)
         
         import threading
-        import curses
         
         # Perform concurrent operations
         def concurrent_filtering():
@@ -272,8 +272,10 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
         
         def concurrent_navigation():
             for i in range(20):
-                jump_dialog.handle_input(curses.KEY_DOWN)
-                jump_dialog.handle_input(curses.KEY_UP)
+                down_event = InputEvent(key_code=KeyCode.DOWN, modifiers=0)
+                up_event = InputEvent(key_code=KeyCode.UP, modifiers=0)
+                jump_dialog.handle_input(down_event)
+                jump_dialog.handle_input(up_event)
                 time.sleep(0.01)
         
         # Start concurrent threads
@@ -290,11 +292,11 @@ class TestJumpDialogEndToEnd(unittest.TestCase):
             thread.join(timeout=2.0)
         
         # Dialog should still be functional
-        self.assertTrue(jump_dialog.mode)
+        self.assertTrue(jump_dialog.is_active)
         
         # Should be able to exit cleanly
         jump_dialog.exit()
-        self.assertFalse(jump_dialog.mode)
+        self.assertFalse(jump_dialog.is_active)
 
 
 def run_end_to_end_tests():

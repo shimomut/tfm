@@ -8,10 +8,11 @@ Tests the integration of state management with the main TFM application.
 import sys
 import tempfile
 import os
-from pathlib import Path
 
 # Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from tfm_path import Path
 
 from tfm_state_manager import TFMStateManager
 

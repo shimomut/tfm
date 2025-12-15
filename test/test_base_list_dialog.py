@@ -52,12 +52,14 @@ class TestBaseListDialog(unittest.TestCase):
         
     def test_handle_common_navigation_cancel(self):
         """Test ESC key handling"""
-        result = self.base_dialog.handle_common_navigation(27, ["item1", "item2"])
+        event = InputEvent(key_code=KeyCode.ESCAPE, modifiers=0)
+        result = self.base_dialog.handle_common_navigation(event, ["item1", "item2"])
         self.assertEqual(result, 'cancel')
         
     def test_handle_common_navigation_select(self):
         """Test ENTER key handling"""
-        result = self.base_dialog.handle_common_navigation(KeyCode.ENTER, ["item1", "item2"])
+        event = InputEvent(key_code=KeyCode.ENTER, modifiers=0)
+        result = self.base_dialog.handle_common_navigation(event, ["item1", "item2"])
         self.assertEqual(result, 'select')
         
     def test_handle_common_navigation_up_down(self):
@@ -65,12 +67,14 @@ class TestBaseListDialog(unittest.TestCase):
         items = ["item1", "item2", "item3"]
         
         # Test DOWN key
-        result = self.base_dialog.handle_common_navigation(KeyCode.DOWN, items)
+        event = InputEvent(key_code=KeyCode.DOWN, modifiers=0)
+        result = self.base_dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(self.base_dialog.selected, 1)
         
         # Test UP key
-        result = self.base_dialog.handle_common_navigation(KeyCode.UP, items)
+        event = InputEvent(key_code=KeyCode.UP, modifiers=0)
+        result = self.base_dialog.handle_common_navigation(event, items)
         self.assertTrue(result)
         self.assertEqual(self.base_dialog.selected, 0)
         

@@ -5,7 +5,7 @@ Test script to verify that the 'h' key is no longer bound to help action
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_config import get_config, is_key_bound_to
 
