@@ -71,8 +71,10 @@ def draw_scrollbar(renderer, start_y, x_pos, display_height, total_items, scroll
     for i in range(display_height):
         y = start_y + i
         if thumb_start <= i < thumb_end:
-            # Draw thumb (the movable part) - solid block character
-            renderer.draw_text(y, x_pos, "█", scrollbar_color_pair, scrollbar_attrs)
+            # Draw thumb (the movable part) - use vertical line instead of block
+            # The █ (FULL BLOCK) character can show gaps in some terminals/fonts
+            # Using ┃ (HEAVY VERTICAL) provides better continuity
+            renderer.draw_text(y, x_pos, "┃", scrollbar_color_pair, scrollbar_attrs)
         else:
             # Draw track (the background) - space character (background shows through)
             renderer.draw_text(y, x_pos, " ", scrollbar_color_pair, scrollbar_attrs)
