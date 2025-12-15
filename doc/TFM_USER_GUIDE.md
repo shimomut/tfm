@@ -40,12 +40,13 @@ TFM (Terminal File Manager) is a powerful dual-pane file manager for the termina
 ### System Requirements
 
 #### Terminal Mode Requirements (All Platforms)
-- **Python 3.9+**: Core language requirement
+- **Python 3.9+**: Core language requirement (3.11+ recommended)
 - **Terminal**: Any terminal with curses support
-- **Operating System**: macOS, Linux, or Windows with compatible terminal
+- **Operating System**: macOS, Linux, or Windows
+- **Windows**: `windows-curses` package (automatically installed via setup.py)
 
 #### Desktop Mode Requirements (macOS Only)
-- **Python 3.9+**: Core language requirement
+- **Python 3.9+**: Core language requirement (3.11+ recommended)
 - **macOS**: 10.13 (High Sierra) or later
 - **PyObjC**: Install with `pip install pyobjc-framework-Cocoa`
 
@@ -62,8 +63,11 @@ TFM (Terminal File Manager) is a powerful dual-pane file manager for the termina
 git clone https://github.com/shimomut/tfm.git
 cd tfm
 
-# Run directly
+# Run directly in terminal mode
 python3 tfm.py
+
+# Run in desktop mode (macOS only)
+python3 tfm.py --desktop
 ```
 
 #### Method 2: Package Installation
@@ -73,17 +77,19 @@ cd tfm
 python3 setup.py install
 
 # Run installed version
-tfm
+tfm                # Terminal mode
+tfm --desktop      # Desktop mode (macOS only)
 ```
 
 #### Method 3: Development Installation
 ```bash
-# Install in development mode (changes reflected immediately)
+# Install in editable mode (changes reflected immediately)
 cd tfm
 pip install -e .
 
 # Run from anywhere
-tfm
+tfm                # Terminal mode
+tfm --desktop      # Desktop mode (macOS only)
 ```
 
 ### Optional Dependencies
@@ -160,12 +166,17 @@ python3 tfm.py
 
 #### Windows
 ```bash
-# Install dependencies (including windows-curses)
-pip install pygments boto3 windows-curses
+# Install windows-curses (required for Windows)
+pip install windows-curses
+
+# Install optional dependencies
+pip install pygments boto3
 
 # Run TFM
 python tfm.py
 ```
+
+**Note**: The `windows-curses` package is automatically installed when using `python setup.py install` on Windows systems.
 
 ### Verification
 
@@ -514,7 +525,7 @@ s3://my-bucket/path/to/files/
 ## Advanced Features
 
 ### Sub-shell Mode
-Press **z** to enter sub-shell mode with environment variables:
+Press **X** (Shift+x) to enter sub-shell mode with environment variables:
 - `TFM_LEFT_DIR`: Left pane directory
 - `TFM_RIGHT_DIR`: Right pane directory
 - `TFM_THIS_DIR`: Current pane directory
@@ -659,11 +670,40 @@ python3 tfm.py --desktop               # Shorthand for desktop mode
 ### Advanced Options
 ```bash
 --remote-log-port 8888            # Enable remote monitoring
---color-test info                 # Test color support
+--color-test MODE                 # Test color support (see modes below)
 --profile                         # Enable performance profiling
+--debug                           # Enable debug mode with full stack traces
 --version                         # Show version
---help                           # Show help
+--help                            # Show help
 ```
+
+#### Color Testing Modes
+```bash
+python3 tfm.py --color-test info           # Show current color configuration
+python3 tfm.py --color-test schemes        # List all available color schemes
+python3 tfm.py --color-test capabilities   # Test terminal color capabilities
+python3 tfm.py --color-test rgb-test       # Force RGB color mode
+python3 tfm.py --color-test fallback-test  # Force fallback color mode
+python3 tfm.py --color-test interactive    # Interactive color tester
+python3 tfm.py --color-test tfm-init       # Test TFM initialization sequence
+python3 tfm.py --color-test diagnose       # Diagnose color issues
+```
+
+**See detailed documentation**: [Color Debugging Feature](COLOR_DEBUGGING_FEATURE.md)
+
+#### Debug Mode
+Enable detailed error reporting for troubleshooting:
+
+```bash
+python3 tfm.py --debug
+```
+
+When debug mode is enabled:
+- Full stack traces are printed for uncaught exceptions
+- Detailed error information helps diagnose issues
+- Useful for reporting bugs or investigating problems
+
+Without debug mode, TFM shows simplified error messages and suggests using `--debug` for details.
 
 ### Combined Options
 ```bash
@@ -756,8 +796,7 @@ For detailed information about specific features, see these dedicated guides:
 - [Wide Character Support Feature](WIDE_CHARACTER_SUPPORT_FEATURE.md) - International character display
 
 ### Performance and Debugging
-- [Performance Profiling Feature](PERFORMANCE_PROFILING_FEATURE.md) - Performance analysis and optimization
-- [Performance Testing Guide](PERFORMANCE_TESTING_GUIDE.md) - Comprehensive performance testing
+- [Performance Profiling Feature](PERFORMANCE_PROFILING_FEATURE.md) - Performance analysis, optimization, and testing
 
 ### Integration and Extensions
 - [Beyond Compare Integration](BEYONDCOMPARE_INTEGRATION.md) - File comparison tool integration

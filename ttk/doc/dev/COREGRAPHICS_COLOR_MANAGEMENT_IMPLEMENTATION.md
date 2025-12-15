@@ -264,8 +264,8 @@ The verification script `test/verify_coregraphics_color_management.py` demonstra
 
 ## Related Documentation
 
-- [CoreGraphics Backend Design](../../.kiro/specs/coregraphics-backend/design.md)
-- [CoreGraphics Backend Requirements](../../.kiro/specs/coregraphics-backend/requirements.md)
+<!-- CoreGraphics backend spec files not included in repository -->
+<!-- CoreGraphics backend spec files not included in repository -->
 - [TTK API Reference](../API_REFERENCE.md)
 
 ## References

@@ -399,6 +399,191 @@ The profiling system uses intelligent triggering:
 - Avoids profiling when performance is good
 - Reduces overhead during normal operation
 
+## Performance Testing and Benchmarking
+
+### Establishing Performance Baseline
+
+Before making optimizations, establish a performance baseline to measure improvements against.
+
+#### Prerequisites
+
+- macOS operating system (for CoreGraphics backend testing)
+- TFM installed with CoreGraphics backend support
+- PyObjC installed (`pip install pyobjc-framework-Cocoa`)
+
+#### Running the Baseline Benchmark
+
+**Option 1: Manual Benchmark (Recommended)**
+
+The easiest way to establish a baseline:
+
+```bash
+# Run from the TFM project directory
+./tools/manual_baseline_benchmark.sh
+```
+
+**What happens**:
+1. TFM launches with profiling enabled
+2. You use TFM normally for 30 seconds
+3. Press 'q' to quit when done
+4. Script automatically analyzes performance and shows results
+
+**Tips for accurate measurements**:
+- Navigate through directories
+- Scroll through file lists
+- Switch between panes
+- Use TFM as you normally would
+- Don't just let it sit idle
+
+**Option 2: Automated Benchmark**
+
+For consistent, repeatable measurements:
+
+```bash
+python3 tools/benchmark_coregraphics_performance.py --duration 30
+```
+
+This runs TFM with simulated input for exactly 30 seconds.
+
+### Understanding Benchmark Results
+
+After the benchmark completes, you'll see:
+
+**FPS (Frames Per Second)**:
+- 60+ FPS = Excellent (smooth)
+- 30-60 FPS = Acceptable
+- 20-30 FPS = Poor (needs optimization)
+- <20 FPS = Critical (significant optimization needed)
+
+**drawRect_ Performance**:
+- Shows how much time is spent rendering
+- Lower time per call = better performance
+
+**API Call Counts**:
+- Shows how many CoreGraphics calls per frame
+- Current: ~3,000-4,000 calls per frame
+- Target: ~500-900 calls per frame (75-85% reduction)
+
+### Example Output
+
+```
+========================================================================
+CoreGraphics Performance Baseline Report
+========================================================================
+Generated: 2024-01-15 14:30:00
+Duration: 30.00 seconds
+
+FPS Measurements:
+----------------------------------------------------------------------
+Average FPS: 18.50
+Minimum FPS: 15.20
+Maximum FPS: 22.30
+Median FPS: 18.00
+Total samples: 6
+
+drawRect_ Method Performance:
+----------------------------------------------------------------------
+Total calls: 555
+Cumulative time: 29.4000 seconds
+Average time per call: 52.9730 ms
+Calls per second: 18.50
+
+CoreGraphics API Calls:
+----------------------------------------------------------------------
+Total API calls: 2109600
+API calls per second: 70320.00
+
+Performance Assessment:
+----------------------------------------------------------------------
+Overall: POOR - Below 30 FPS, optimization needed
+```
+
+### Viewing Detailed Profile Data
+
+For deeper analysis:
+
+```bash
+# Interactive command-line analysis
+python3 -m pstats profiling_output/baseline/loop_profile_*.prof
+
+# Visual analysis (requires snakeviz)
+pip install snakeviz
+snakeviz profiling_output/baseline/loop_profile_*.prof
+```
+
+### Comparing Before/After Optimization
+
+```bash
+# Before optimization
+./tools/manual_baseline_benchmark.sh 30
+mv profiling_output/baseline profiling_output/before
+
+# After optimization
+./tools/manual_baseline_benchmark.sh 30
+mv profiling_output/baseline profiling_output/after
+
+# Compare results
+diff profiling_output/before/baseline_report.txt \
+     profiling_output/after/baseline_report.txt
+```
+
+### Best Practices for Performance Testing
+
+#### For Accurate Measurements
+
+1. **Close other applications** - Reduce system load
+2. **Use consistent test scenarios** - Same navigation patterns
+3. **Run multiple times** - Average results for reliability
+4. **Document environment** - Note macOS version, hardware, etc.
+5. **Test realistic usage** - Don't just idle or spam keys
+
+#### For Optimization Work
+
+1. **Establish baseline first** - Always measure before optimizing
+2. **Change one thing at a time** - Isolate the impact of each change
+3. **Measure after each change** - Verify improvement
+4. **Document results** - Keep track of what worked
+5. **Compare profiles** - Use diff to see what changed
+
+#### For Reporting Issues
+
+If you encounter performance problems:
+
+1. **Run the baseline benchmark** - Capture current performance
+2. **Save the profile data** - Include in bug reports
+3. **Note your environment** - macOS version, hardware specs
+4. **Describe usage pattern** - What were you doing when slow?
+5. **Include FPS measurements** - From the benchmark output
+
+### Troubleshooting Performance Testing
+
+**No profile data generated?**
+- Make sure you ran TFM for at least 10 seconds
+- Check that profiling_output directory exists and is writable
+
+**FPS not showing during execution?**
+- Profiling should print FPS every 5 seconds
+- If not, check that TFM_PROFILING=1 is set
+
+**TFM won't launch?**
+- Verify PyObjC is installed: `python3 -c "import Cocoa"`
+- Make sure you're on macOS
+- Try running TFM directly: `python3 tfm.py --backend coregraphics`
+
+### Advanced Testing Usage
+
+**Custom benchmark duration**:
+```bash
+./tools/manual_baseline_benchmark.sh 60  # 60-second benchmark
+```
+
+**Custom output directory**:
+```bash
+python3 tools/benchmark_coregraphics_performance.py \
+  --duration 30 \
+  --output-dir profiling_output/my_baseline
+```
+
 ## Related Features
 
 - **Color Debugging**: Use `--color-test` to diagnose color performance issues
@@ -407,9 +592,10 @@ The profiling system uses intelligent triggering:
 
 ## See Also
 
-- [Performance Testing Guide](PERFORMANCE_TESTING_GUIDE.md) - Comprehensive performance testing
 - [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - High-performance desktop mode
 - Developer documentation: `doc/dev/PROFILING_SYSTEM_IMPLEMENTATION.md`
+- CoreGraphics baseline: `doc/dev/COREGRAPHICS_PERFORMANCE_BASELINE.md`
+- Performance measurement: `doc/dev/COREGRAPHICS_PERFORMANCE_MEASUREMENT.md`
 
 ---
 

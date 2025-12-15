@@ -675,7 +675,7 @@ backend.reset_window_geometry()
 ### Related TFM Documentation
 
 - [Window Geometry Persistence Feature](../WINDOW_GEOMETRY_PERSISTENCE_FEATURE.md) - End-user documentation
-- [CoreGraphics Backend](COREGRAPHICS_BACKEND.md) - Backend architecture
+- [CoreGraphics Backend](../../ttk/doc/COREGRAPHICS_BACKEND.md) - Backend architecture
 - [Desktop Mode Guide](../DESKTOP_MODE_GUIDE.md) - Desktop mode overview
 
 ## Conclusion

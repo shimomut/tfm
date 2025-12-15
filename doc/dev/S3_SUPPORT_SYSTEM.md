@@ -441,12 +441,14 @@ python test/test_s3_integration.py
 5. **Versioning** - Support for S3 object versioning
 6. **Progress indicators** - Show upload/download progress
 
-### Additional Storage Backends
-The modular architecture enables easy addition of new storage backends:
-- **tfm_scp.py**: SCP/SFTP support
-- **tfm_ftp.py**: FTP support
-- **tfm_azure.py**: Azure Blob Storage
-- **tfm_gcs.py**: Google Cloud Storage
+### Potential Future Storage Backends
+The modular architecture could enable addition of new storage backends in the future. These are architectural possibilities, not currently implemented or planned features:
+- **SCP/SFTP support**: Remote file access via SSH
+- **FTP support**: Traditional FTP protocol
+- **Azure Blob Storage**: Microsoft Azure cloud storage
+- **Google Cloud Storage**: Google Cloud Platform storage
+
+**Note**: These backends do not currently exist. The architecture's modularity means they could be added if needed, following the same patterns established by the S3 implementation.
 
 ## S3-Specific Features
 
@@ -752,7 +754,8 @@ def __init__(self, s3_uri: str, metadata: Optional[Dict[str, Any]] = None):
 - **Data Transfer**: Minimal impact (metadata is small)
 
 ## Related Documentation
-- [TFM Path Architecture](TFM_PATH_ARCHITECTURE.md)
-- [External Programs Policy](../external-programs-policy.md)
+<!-- TODO: Create TFM_PATH_ARCHITECTURE.md -->
+<!-- - [TFM Path Architecture](TFM_PATH_ARCHITECTURE.md) -->
+- [External Programs Policy](../../.kiro/steering/external-programs-policy.md)
 - [AWS S3 Documentation](https://docs.aws.amazon.com/s3/)
 - [boto3 Documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)

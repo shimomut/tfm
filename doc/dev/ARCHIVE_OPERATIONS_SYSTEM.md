@@ -525,5 +525,6 @@ The clean architectural separation between core functionality and UI integration
 ## Related Documentation
 
 - [S3 Support System](S3_SUPPORT_SYSTEM.md) - S3 integration for cross-storage operations
-- [TFM Path Architecture](TFM_PATH_ARCHITECTURE.md) - Path system used for cross-storage support
-- [External Programs Policy](../external-programs-policy.md) - External program integration
+<!-- TODO: Create TFM_PATH_ARCHITECTURE.md -->
+<!-- - [TFM Path Architecture](TFM_PATH_ARCHITECTURE.md) --> - Path system used for cross-storage support
+- [External Programs Policy](../../.kiro/steering/external-programs-policy.md) - External program integration

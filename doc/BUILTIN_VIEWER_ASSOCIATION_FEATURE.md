@@ -228,5 +228,5 @@ Extend the configuration with more file types:
 ## Related Documentation
 
 - File Associations: `doc/FILE_ASSOCIATIONS_FEATURE.md`
-- View Behavior: `doc/VIEW_FILE_BEHAVIOR.md`
+- View Behavior: `doc/VIEW_FILE_BEHAVIOR_FEATURE.md`
 - Text Viewer: `doc/dev/TEXT_VIEWER_SYSTEM.md`

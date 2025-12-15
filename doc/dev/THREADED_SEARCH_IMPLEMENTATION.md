@@ -98,7 +98,7 @@ class Config:
 - Configurable animation speed
 - Visual feedback during search operations
 - Thread-safe animation updates
-- See [SEARCH_ANIMATION_FEATURE.md](SEARCH_ANIMATION_FEATURE.md) for details
+- See [SEARCH_ANIMATION_FEATURE.md](../SEARCH_ANIMATION_FEATURE.md) for details
 
 ## Performance Benefits
 

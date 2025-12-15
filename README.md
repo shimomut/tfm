@@ -40,7 +40,11 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
 
 ### Installation
 1. Ensure you have Python 3.9+ installed
-2. Clone or download TFM
+2. Clone or download TFM:
+   ```bash
+   git clone https://github.com/shimomut/tfm.git
+   cd tfm
+   ```
 3. Run the file manager:
    
    **Terminal Mode** (all platforms):
@@ -183,6 +187,15 @@ python3 tfm.py --left /path/to/projects --right /path/to/documents
 # Enable remote log monitoring
 python3 tfm.py --remote-log-port 8888
 
+# Enable performance profiling
+python3 tfm.py --profile
+
+# Enable debug mode (full stack traces)
+python3 tfm.py --debug
+
+# Test color support
+python3 tfm.py --color-test info
+
 # Combined usage - desktop mode with custom directories
 python3 tfm.py --desktop --left ./src --right ./test
 
@@ -211,32 +224,52 @@ See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desk
 ### Requirements
 
 **Terminal Mode** (all platforms):
-- Python 3.9+ with curses library (built-in on Unix systems)
+- Python 3.9+ with curses library (built-in on macOS/Linux)
+- Windows: `pip install windows-curses` (automatically installed via setup.py)
 - Terminal with curses support
 
 **Desktop Mode** (macOS only):
 - Python 3.9+
+- macOS 10.13 (High Sierra) or later
 - PyObjC framework: `pip install pyobjc-framework-Cocoa`
 
 ### Optional Dependencies
 ```bash
-pip install pygments  # Enhanced syntax highlighting
-pip install boto3     # AWS S3 support
+pip install pygments  # Enhanced syntax highlighting (20+ file formats)
+pip install boto3     # AWS S3 support (cloud storage operations)
 pip install pyobjc-framework-Cocoa  # Desktop mode (macOS only)
 ```
 
 ### Installation Options
+
+#### Option 1: Run Directly (No Installation)
 ```bash
-# Run directly in terminal mode
+# Terminal mode (all platforms)
 python3 tfm.py
 
-# Run in desktop mode (macOS)
+# Desktop mode (macOS only)
 python3 tfm.py --desktop
+```
 
-# Install from source
+#### Option 2: Install as Package
+```bash
+# Install from source directory
+cd tfm
 python3 setup.py install
+
+# Run from anywhere
+tfm                # Terminal mode
+tfm --desktop      # Desktop mode (macOS only)
+```
+
+#### Option 3: Development Installation
+```bash
+# Install in editable mode (changes reflected immediately)
+cd tfm
+pip install -e .
+
+# Run from anywhere
 tfm
-tfm --desktop  # Desktop mode after installation
 ```
 
 ## Configuration

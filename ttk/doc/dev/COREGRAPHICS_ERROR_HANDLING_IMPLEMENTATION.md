@@ -294,7 +294,7 @@ Potential improvements for error handling:
 
 ## Related Documentation
 
-- [CoreGraphics Backend Implementation](COREGRAPHICS_BACKEND_IMPLEMENTATION.md)
-- [CoreGraphics Initialization](COREGRAPHICS_INITIALIZATION_IMPLEMENTATION.md)
+<!-- CoreGraphics Backend Implementation documentation not yet created -->
+<!-- CoreGraphics Initialization documentation not yet created -->
 - [CoreGraphics Drawing Operations](COREGRAPHICS_DRAWING_OPERATIONS_IMPLEMENTATION.md)
-- [Requirements Document](../../.kiro/specs/coregraphics-backend/requirements.md)
+<!-- CoreGraphics backend spec files not included in repository -->

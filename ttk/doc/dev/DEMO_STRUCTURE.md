@@ -105,4 +105,4 @@ Additional demo applications should follow the same pattern:
 
 - [Project File Placement Rules](../../../.kiro/steering/project-file-placement.md)
 - [TTK Library Structure](../../README.md)
-- [Demo Application Implementation](DEMO_APPLICATION_IMPLEMENTATION.md)
+<!-- Demo Application Implementation documentation not yet created -->

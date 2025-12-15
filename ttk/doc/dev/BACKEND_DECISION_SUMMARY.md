@@ -123,4 +123,4 @@ It's simpler, faster to implement, produces better text quality, and is proven b
 - [Detailed Comparison](MACOS_RENDERING_COMPARISON.md)
 - [Core Graphics Proof of Concept](CORE_GRAPHICS_POC.md)
 - [Full Recommendation](DESKTOP_BACKEND_RECOMMENDATION.md)
-- [Metal Backend Status](METAL_BACKEND_STATUS.md)
+<!-- Metal Backend Status documentation not yet created -->

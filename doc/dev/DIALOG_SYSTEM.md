@@ -485,4 +485,4 @@ The system successfully combines:
 
 - [TFM Application Overview](TFM_APPLICATION_OVERVIEW.md) - Overall application architecture
 - [Core Components](CORE_COMPONENTS.md) - Related UI components
-- [Exception Handling Policy](../exception-handling-policy.md) - Error handling guidelines
+- [Exception Handling Policy](../../.kiro/steering/exception-handling-policy.md) - Error handling guidelines

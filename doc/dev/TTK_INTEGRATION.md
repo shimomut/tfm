@@ -334,12 +334,12 @@ def test_both_backends():
         # Test functionality
 ```
 
-### Backward Compatibility
+### Input Event Compatibility
 
-Added `tfm_input_compat.py` to provide curses-like interface for tests:
-- Allows gradual test migration
-- Maintains test coverage during transition
-- Will be removed in future cleanup
+The `tfm_input_compat.py` module provides input event normalization:
+- Ensures consistent input event handling across backends
+- Converts various input formats to standardized InputEvent objects
+- Used by dialog components for reliable input processing
 
 ## Performance Considerations
 
@@ -499,7 +499,7 @@ When migrating a new component to TTK:
 - [TTK API Reference](../../ttk/doc/API_REFERENCE.md)
 - [Backend Implementation Guide](../../ttk/doc/BACKEND_IMPLEMENTATION_GUIDE.md)
 - [TFM User Guide](../TFM_USER_GUIDE.md)
-- [Performance Testing Guide](../PERFORMANCE_TESTING_GUIDE.md)
+- [Performance Profiling Feature](../PERFORMANCE_PROFILING_FEATURE.md)
 
 ### Key Files
 - `src/tfm_backend_selector.py` - Backend selection logic

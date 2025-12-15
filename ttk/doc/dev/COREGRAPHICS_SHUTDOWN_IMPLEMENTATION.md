@@ -230,7 +230,7 @@ Potential future enhancements to the shutdown implementation:
 ## Related Documentation
 
 - [CoreGraphics Window Creation Implementation](COREGRAPHICS_WINDOW_CREATION_IMPLEMENTATION.md)
-- [CoreGraphics Initialization Implementation](COREGRAPHICS_INITIALIZATION_IMPLEMENTATION.md)
-- [Metal Shutdown Implementation](METAL_SHUTDOWN_IMPLEMENTATION.md)
-- [Requirements Document](../../.kiro/specs/coregraphics-backend/requirements.md)
-- [Design Document](../../.kiro/specs/coregraphics-backend/design.md)
+<!-- CoreGraphics Initialization documentation not yet created -->
+<!-- Metal Shutdown Implementation documentation not yet created -->
+<!-- CoreGraphics backend spec files not included in repository -->
+<!-- CoreGraphics backend spec files not included in repository -->

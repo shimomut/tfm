@@ -207,7 +207,7 @@ The most transformative period in the project's history:
 - Threading for file operations
 - Byte-level progress tracking
 - Operation cancellation (move/delete)
-- **Qt backend exploration begins**
+- **Qt backend exploration begins** (later discontinued in favor of TTK)
 - Abstraction layer foundation
 - Business logic extraction
 

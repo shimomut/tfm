@@ -271,7 +271,7 @@ Potential improvements:
 ## Related Documentation
 
 - [Demo Structure](DEMO_STRUCTURE.md)
-- [Demo Application Implementation](DEMO_APPLICATION_IMPLEMENTATION.md)
+<!-- Demo Application Implementation documentation not yet created -->
 - [TTK User Guide](../USER_GUIDE.md)
 - [Renderer API Reference](../API_REFERENCE.md)
 
