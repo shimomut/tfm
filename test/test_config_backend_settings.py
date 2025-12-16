@@ -38,7 +38,7 @@ def test_default_backend_config():
     
     # Check default values
     assert config.DESKTOP_FONT_NAME == 'Menlo', "Default font should be Menlo"
-    assert config.DESKTOP_FONT_SIZE == 14, "Default font size should be 14"
+    assert config.DESKTOP_FONT_SIZE == 12, "Default font size should be 12"
     assert config.DESKTOP_WINDOW_WIDTH == 1200, "Default window width should be 1200"
     assert config.DESKTOP_WINDOW_HEIGHT == 800, "Default window height should be 800"
     

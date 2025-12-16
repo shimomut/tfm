@@ -22,7 +22,7 @@ class Config:
     
     # Desktop mode settings (for CoreGraphics backend)
     DESKTOP_FONT_NAME = 'Menlo'  # Font name for desktop mode
-    DESKTOP_FONT_SIZE = 14  # Font size for desktop mode
+    DESKTOP_FONT_SIZE = 12  # Font size for desktop mode
     DESKTOP_WINDOW_WIDTH = 1200  # Initial window width in pixels
     DESKTOP_WINDOW_HEIGHT = 800  # Initial window height in pixels
     

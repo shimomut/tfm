@@ -1102,7 +1102,7 @@ class CoreGraphicsBackend(Renderer):
         Args:
             window_title: Title for the window
             font_name: Name of the monospace font to use (default: "Menlo")
-            font_size: Font size in points (default: 14)
+            font_size: Font size in points (default: 12)
             rows: Initial grid height in characters (default: 24)
             cols: Initial grid width in characters (default: 80)
             frame_autosave_name: Optional name for NSWindow frame autosave.
