@@ -123,21 +123,6 @@ class SystemEvent(Event):
     """
     event_type: int  # SystemEventType value for system events (e.g., SystemEventType.RESIZE)
     
-    @property
-    def key_code(self) -> int:
-        """Backward compatibility: return event_type as key_code."""
-        return self.event_type
-    
-    @property
-    def modifiers(self) -> int:
-        """Backward compatibility: system events have no modifiers."""
-        return ModifierKey.NONE
-    
-    @property
-    def char(self) -> Optional[str]:
-        """Backward compatibility: system events have no character."""
-        return None
-    
     def is_resize(self) -> bool:
         """Check if this is a window resize event."""
         return self.event_type == SystemEventType.RESIZE
