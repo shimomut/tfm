@@ -646,7 +646,7 @@ class FileManager:
             max_left_path_width = max(1, left_pane_width - 4)
             # Use wide character aware truncation for path display
             if safe_get_display_width(left_path) > max_left_path_width:
-                left_path = truncate_to_width(left_path, max_left_path_width, "...")
+                left_path = truncate_to_width(left_path, max_left_path_width, "…")
             
             color_pair, attributes = get_header_color(self.pane_manager.active_pane == 'left')
             try:
@@ -668,7 +668,7 @@ class FileManager:
             max_right_path_width = max(1, right_pane_width - 4)
             # Use wide character aware truncation for path display
             if safe_get_display_width(right_path) > max_right_path_width:
-                right_path = truncate_to_width(right_path, max_right_path_width, "...")
+                right_path = truncate_to_width(right_path, max_right_path_width, "…")
                 
             right_color_pair, right_attributes = get_header_color(self.pane_manager.active_pane == 'right')
             try:
@@ -778,7 +778,7 @@ class FileManager:
             if pane_width < 20:  # Too narrow to display properly
                 # Use wide character aware truncation
                 max_name_width = max(1, pane_width - 5)
-                truncated_name = truncate_to_width(display_name, max_name_width, "...")
+                truncated_name = truncate_to_width(display_name, max_name_width, "…")
                 line = f"{selection_marker} {truncated_name}"
             else:
                 # Calculate precise filename width for column alignment
@@ -798,7 +798,7 @@ class FileManager:
                         
                         # Truncate basename using wide character aware truncation
                         if safe_get_display_width(basename) > name_width:
-                            basename = truncate_to_width(basename, name_width, "...")
+                            basename = truncate_to_width(basename, name_width, "…")
                         
                         # Pad basename to maintain column alignment using display width
                         padded_basename = pad_to_width(basename, name_width, align='left')
@@ -811,7 +811,7 @@ class FileManager:
                         
                         # Truncate filename using wide character aware truncation
                         if safe_get_display_width(display_name) > name_width:
-                            display_name = truncate_to_width(display_name, name_width, "...")
+                            display_name = truncate_to_width(display_name, name_width, "…")
                         
                         # Pad filename to maintain column alignment using display width
                         padded_name = pad_to_width(display_name, name_width, align='left')
@@ -829,7 +829,7 @@ class FileManager:
                         
                         # Truncate basename using wide character aware truncation
                         if safe_get_display_width(basename) > name_width:
-                            basename = truncate_to_width(basename, name_width, "...")
+                            basename = truncate_to_width(basename, name_width, "…")
                         
                         # Pad basename to maintain column alignment using display width
                         padded_basename = pad_to_width(basename, name_width, align='left')
@@ -842,7 +842,7 @@ class FileManager:
                         
                         # Truncate filename using wide character aware truncation
                         if safe_get_display_width(display_name) > name_width:
-                            display_name = truncate_to_width(display_name, name_width, "...")
+                            display_name = truncate_to_width(display_name, name_width, "…")
                         
                         # Pad filename to maintain column alignment using display width
                         padded_name = pad_to_width(display_name, name_width, align='left')

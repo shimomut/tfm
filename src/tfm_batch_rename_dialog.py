@@ -359,7 +359,7 @@ class BatchRenameDialog(BaseListDialog):
         
         # Truncate title if it's too wide for the dialog
         if title_width > dialog_width:
-            title_text = truncate_text(title_text, dialog_width - 2, "...")
+            title_text = truncate_text(title_text, dialog_width - 2, "…")
             title_width = get_width(title_text)
         
         title_x = start_x + (dialog_width - title_width) // 2
@@ -513,7 +513,7 @@ class BatchRenameDialog(BaseListDialog):
                 truncate_text = safe_funcs['truncate_to_width']
                 available_width = min(dialog_width - 4, width - start_x - 2)
                 if available_width > 0:
-                    truncated_help = truncate_text(help_text, available_width, "...")
+                    truncated_help = truncate_text(help_text, available_width, "…")
                     help_width = get_width(truncated_help)
                     help_x = start_x + (dialog_width - help_width) // 2
                     # Ensure truncated help text fits within terminal bounds

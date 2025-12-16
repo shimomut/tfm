@@ -231,7 +231,7 @@ def safe_get_display_width(text: str, warn_on_error: bool = None) -> int:
         return len(text)
 
 
-def safe_truncate_to_width(text: str, max_width: int, ellipsis: str = "...", warn_on_error: bool = None) -> str:
+def safe_truncate_to_width(text: str, max_width: int, ellipsis: str = "…", warn_on_error: bool = None) -> str:
     """
     Safely truncate text to fit within max_width display columns with error handling.
     
@@ -287,7 +287,7 @@ def safe_truncate_to_width(text: str, max_width: int, ellipsis: str = "...", war
             return ""
 
 
-def truncate_to_width(text: str, max_width: int, ellipsis: str = "...") -> str:
+def truncate_to_width(text: str, max_width: int, ellipsis: str = "…") -> str:
     """
     Truncate text to fit within max_width display columns, preserving character boundaries.
     
@@ -298,16 +298,16 @@ def truncate_to_width(text: str, max_width: int, ellipsis: str = "...") -> str:
     Args:
         text: The text string to truncate
         max_width: Maximum display width in terminal columns
-        ellipsis: String to append when text is truncated (default: "...")
+        ellipsis: String to append when text is truncated (default: "…")
         
     Returns:
         Truncated text that fits within max_width columns
         
     Examples:
         >>> truncate_to_width("hello world", 8)
-        'hello...'
+        'hello…'
         >>> truncate_to_width("こんにちは", 6)
-        'こん...'
+        'こん…'
         >>> truncate_to_width("short", 10)
         'short'
     """
@@ -736,7 +736,7 @@ def create_fallback_functions(mode: str = None):
             except Exception:
                 return 0
         
-        def basic_truncate_to_width(text: str, max_width: int, ellipsis: str = "...") -> str:
+        def basic_truncate_to_width(text: str, max_width: int, ellipsis: str = "…") -> str:
             try:
                 if not isinstance(text, str):
                     return ""
@@ -804,7 +804,7 @@ def create_fallback_functions(mode: str = None):
             except Exception:
                 return len(text) if isinstance(text, str) else 0
         
-        def ascii_truncate_to_width(text: str, max_width: int, ellipsis: str = "...") -> str:
+        def ascii_truncate_to_width(text: str, max_width: int, ellipsis: str = "…") -> str:
             try:
                 if not isinstance(text, str):
                     return ""
@@ -934,7 +934,7 @@ def get_safe_functions():
         # Return basic ASCII-safe functions as ultimate fallback
         return {
             'get_display_width': lambda text: len(text) if isinstance(text, str) else 0,
-            'truncate_to_width': lambda text, width, ellipsis="...": text[:width] if isinstance(text, str) and width > 0 else "",
+            'truncate_to_width': lambda text, width, ellipsis="…": text[:width] if isinstance(text, str) and width > 0 else "",
             'pad_to_width': lambda text, width, align='left', fill_char=' ': text + (' ' * max(0, width - len(text))) if isinstance(text, str) else "",
             'split_at_width': lambda text, width: (text[:width], text[width:]) if isinstance(text, str) and width > 0 else ("", text),
             'is_wide_character': lambda char: False

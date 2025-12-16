@@ -233,7 +233,7 @@ class BaseListDialog:
             
             # Truncate title if it's too wide for the dialog
             if title_width > dialog_width:
-                title_text = truncate_text(title_text, dialog_width - 2, "...")
+                title_text = truncate_text(title_text, dialog_width - 2, "…")
                 title_width = get_width(title_text)
             
             title_x = start_x + (dialog_width - title_width) // 2
@@ -317,7 +317,7 @@ class BaseListDialog:
                 # Truncate item text if too wide, accounting for selection indicator
                 available_width = content_width - 2  # Account for selection indicator
                 if get_width(item_text) > available_width:
-                    item_text = truncate_text(item_text, available_width, "...")
+                    item_text = truncate_text(item_text, available_width, "…")
                 
                 # Add selection indicator
                 status_color_pair, _ = get_status_color()
@@ -375,7 +375,7 @@ class BaseListDialog:
                     self.renderer.draw_text(y, help_x, help_text, color_pair=status_color_pair, attributes=help_attributes)
             else:
                 # Truncate help text if too wide
-                truncated_help = truncate_text(help_text, content_width, "...")
+                truncated_help = truncate_text(help_text, content_width, "…")
                 help_width = get_width(truncated_help)
                 help_x = start_x + (dialog_width - help_width) // 2
                 if help_x >= start_x:

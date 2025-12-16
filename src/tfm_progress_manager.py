@@ -282,8 +282,8 @@ class ProgressManager:
             if available_space > 10:  # Only show filename if we have reasonable space
                 # Truncate filename if too long
                 if len(current_item) > available_space:
-                    truncate_at = max(1, available_space - 3)
-                    current_item = "..." + current_item[-truncate_at:]
+                    truncate_at = max(1, available_space - 1)
+                    current_item = "…" + current_item[-truncate_at:]
                 
                 progress_text += separator + current_item + byte_progress_text
         

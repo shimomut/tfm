@@ -237,7 +237,7 @@ class InfoDialog(BaseListDialog):
                                            color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
             else:
                 # Truncate help text if too wide
-                truncated_help = truncate_text(help_text, content_width, "...")
+                truncated_help = truncate_text(help_text, content_width, "…")
                 help_width = get_width(truncated_help)
                 help_x = start_x + (dialog_width - help_width) // 2
                 if help_x >= start_x:
