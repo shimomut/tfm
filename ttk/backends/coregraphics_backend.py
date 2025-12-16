@@ -1463,6 +1463,26 @@ class CoreGraphicsBackend(Renderer):
         self.cursor_row = 0
         self.cursor_col = 0
     
+    def suspend(self) -> None:
+        """
+        Suspend rendering to allow external programs to run.
+        
+        For the CoreGraphics backend (GUI application), this is a no-op since
+        external programs run in separate windows and don't need the terminal.
+        This method exists for interface compatibility with the curses backend.
+        """
+        pass
+    
+    def resume(self) -> None:
+        """
+        Resume rendering after external program execution.
+        
+        For the CoreGraphics backend (GUI application), this is a no-op since
+        external programs run in separate windows and don't affect the GUI state.
+        This method exists for interface compatibility with the curses backend.
+        """
+        pass
+    
     def reset_window_geometry(self) -> bool:
         """
         Reset window geometry to default size and position.
