@@ -21,23 +21,8 @@ DEFAULT_LOG_HEIGHT_RATIO = 0.25  # Log pane takes 1/4 of screen
 MIN_LOG_HEIGHT = 5
 MAX_LOG_MESSAGES = 1000
 
-# Color constants moved to tfm_colors.py
-
-# Terminal-specific key codes
-# These are terminal-dependent codes that may vary across different terminal emulators.
-# For standard keys (ENTER, TAB, arrows, etc.), use TTK's KeyCode enum instead.
-
-# Shift+Arrow key combinations for log scrolling (terminal-dependent)
-# Note: These codes vary by terminal emulator and may not work in all environments.
-# Some terminals send regular arrow codes (258/259) for Shift+Arrow.
-KEY_SHIFT_UP_1 = 337      # Shift+Up in some terminals
-KEY_SHIFT_DOWN_1 = 336    # Shift+Down in some terminals  
-KEY_SHIFT_UP_2 = 393      # Alternative Shift+Up code
-KEY_SHIFT_DOWN_2 = 402    # Alternative Shift+Down code
-KEY_SHIFT_LEFT_1 = 545    # Shift+Left in some terminals
-KEY_SHIFT_RIGHT_1 = 560   # Shift+Right in some terminals
-KEY_SHIFT_LEFT_2 = 393    # Alternative Shift+Left code
-KEY_SHIFT_RIGHT_2 = 402   # Alternative Shift+Right code
+# Terminal-specific key codes have been moved to TTK's curses backend
+# Use KeyCode with ModifierKey.SHIFT for Shift+Arrow combinations instead
 
 # File size formatting thresholds
 SIZE_KB = 1024

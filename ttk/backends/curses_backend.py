@@ -13,6 +13,19 @@ from ttk.renderer import Renderer, TextAttribute
 from ttk.input_event import Event, KeyEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
 
 
+# Terminal-specific key codes for Shift+Arrow combinations
+# These codes vary by terminal emulator and may not work in all environments
+# The backend translates these to standard KeyEvent with SHIFT modifier
+_KEY_SHIFT_UP_1 = 337      # Shift+Up in some terminals
+_KEY_SHIFT_DOWN_1 = 336    # Shift+Down in some terminals  
+_KEY_SHIFT_UP_2 = 393      # Alternative Shift+Up code
+_KEY_SHIFT_DOWN_2 = 402    # Alternative Shift+Down code
+_KEY_SHIFT_LEFT_1 = 545    # Shift+Left in some terminals
+_KEY_SHIFT_RIGHT_1 = 560   # Shift+Right in some terminals
+_KEY_SHIFT_LEFT_2 = 393    # Alternative Shift+Left code
+_KEY_SHIFT_RIGHT_2 = 402   # Alternative Shift+Right code
+
+
 class CursesBackend(Renderer):
     """
     Curses-based rendering backend for terminal applications.
@@ -620,6 +633,8 @@ class CursesBackend(Renderer):
         
         This method maps curses key codes to the abstract Event format,
         handling special keys, printable characters, and modifier keys.
+        Terminal-specific Shift+Arrow combinations are translated to
+        standard KeyEvent with SHIFT modifier.
         
         Args:
             key: Curses key code
@@ -632,6 +647,17 @@ class CursesBackend(Renderer):
         # Handle resize event separately (it's a system event, not a key event)
         if key == curses.KEY_RESIZE:
             return SystemEvent(event_type=SystemEventType.RESIZE)
+        
+        # Handle terminal-specific Shift+Arrow combinations
+        # These vary by terminal emulator, so we check multiple codes
+        if key in (_KEY_SHIFT_UP_1, _KEY_SHIFT_UP_2):
+            return KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.SHIFT)
+        elif key in (_KEY_SHIFT_DOWN_1, _KEY_SHIFT_DOWN_2):
+            return KeyEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.SHIFT)
+        elif key in (_KEY_SHIFT_LEFT_1, _KEY_SHIFT_LEFT_2):
+            return KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.SHIFT)
+        elif key in (_KEY_SHIFT_RIGHT_1, _KEY_SHIFT_RIGHT_2):
+            return KeyEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.SHIFT)
         
         # Map curses keys to KeyCode
         key_map = {

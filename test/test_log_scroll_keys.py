@@ -10,34 +10,36 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 def test_log_scroll_constants():
-    """Test that log scrolling key constants are defined"""
-    print("Testing log scrolling key constants...")
+    """Test that terminal-specific key constants have been moved to TTK backend"""
+    print("Testing that terminal-specific key constants are no longer in tfm_const...")
     
     try:
-        from tfm_const import (
-            KEY_SHIFT_UP_1, KEY_SHIFT_DOWN_1,
-            KEY_SHIFT_UP_2, KEY_SHIFT_DOWN_2,
-            KEY_SHIFT_LEFT_1, KEY_SHIFT_RIGHT_1,
-            KEY_SHIFT_LEFT_2, KEY_SHIFT_RIGHT_2
-        )
+        # These constants should no longer be in tfm_const
+        try:
+            from tfm_const import KEY_SHIFT_UP_1
+            print("✗ KEY_SHIFT_UP_1 should not be in tfm_const (moved to TTK backend)")
+            return False
+        except (ImportError, AttributeError):
+            pass  # Expected - constants moved to TTK
         
-        # Test that Shift key constants are defined and have expected values
-        assert KEY_SHIFT_UP_1 == 337, f"KEY_SHIFT_UP_1 should be 337, got {KEY_SHIFT_UP_1}"
-        assert KEY_SHIFT_DOWN_1 == 336, f"KEY_SHIFT_DOWN_1 should be 336, got {KEY_SHIFT_DOWN_1}"
+        # Verify TFM now uses standard KeyCode with SHIFT modifier
+        from tfm_main import FileManager
+        import inspect
+        source = inspect.getsource(FileManager.handle_key_input)
         
-        # Test new Shift+Left/Right constants
-        assert KEY_SHIFT_LEFT_1 == 545, f"KEY_SHIFT_LEFT_1 should be 545, got {KEY_SHIFT_LEFT_1}"
-        assert KEY_SHIFT_RIGHT_1 == 560, f"KEY_SHIFT_RIGHT_1 should be 560, got {KEY_SHIFT_RIGHT_1}"
-        
-        # Test alternative shift key constants
-        assert KEY_SHIFT_UP_2 == 393, f"KEY_SHIFT_UP_2 should be 393, got {KEY_SHIFT_UP_2}"
-        assert KEY_SHIFT_DOWN_2 == 402, f"KEY_SHIFT_DOWN_2 should be 402, got {KEY_SHIFT_DOWN_2}"
-        
-        print("✓ All log scrolling key constants defined correctly")
-        return True
+        # Check that new pattern is used
+        if 'KeyCode.UP and event.modifiers & ModifierKey.SHIFT' in source:
+            print("✓ Terminal-specific key constants moved to TTK curses backend")
+            print("✓ TFM now uses standard KeyCode with ModifierKey.SHIFT")
+            return True
+        else:
+            print("✗ Expected pattern not found in TFM")
+            return False
         
     except Exception as e:
         print(f"✗ Error testing key constants: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def test_log_pane_height_method():

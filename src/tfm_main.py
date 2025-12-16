@@ -2523,7 +2523,7 @@ class FileManager:
                 self.update_isearch_matches()
                 self.needs_full_redraw = True
             return True
-        elif event.key_code == KeyCode.UP:
+        elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
             # Up arrow - go to previous match
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
@@ -2531,7 +2531,7 @@ class FileManager:
                 current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
-        elif event.key_code == KeyCode.DOWN:
+        elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
             # Down arrow - go to next match
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
@@ -2756,7 +2756,27 @@ class FileManager:
         """Handle input event and return True if the event was processed"""
         current_pane = self.get_current_pane()
         
-        # Handle isearch mode input first
+        # Handle Shift+Arrow keys for log scrolling FIRST (works in all modes)
+        if event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
+            if self.log_manager.scroll_log_up(1):
+                self.needs_full_redraw = True
+            return True
+        elif event.key_code == KeyCode.DOWN and event.modifiers & ModifierKey.SHIFT:  # Shift+Down
+            if self.log_manager.scroll_log_down(1):
+                self.needs_full_redraw = True
+            return True
+        elif event.key_code == KeyCode.LEFT and event.modifiers & ModifierKey.SHIFT:  # Shift+Left - fast scroll to older messages
+            log_height = self._get_log_pane_height()
+            if self.log_manager.scroll_log_up(max(1, log_height)):
+                self.needs_full_redraw = True
+            return True
+        elif event.key_code == KeyCode.RIGHT and event.modifiers & ModifierKey.SHIFT:  # Shift+Right - fast scroll to newer messages
+            log_height = self._get_log_pane_height()
+            if self.log_manager.scroll_log_down(max(1, log_height)):
+                self.needs_full_redraw = True
+            return True
+        
+        # Handle isearch mode input
         if self.isearch_mode:
             if self.handle_isearch_input(event):
                 return True  # Isearch mode handled the event
@@ -2825,11 +2845,11 @@ class FileManager:
         elif event.key_code == KeyCode.TAB:  # Tab key - switch panes
             self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
             self.needs_full_redraw = True
-        elif event.key_code == KeyCode.UP:
+        elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['selected_index'] > 0:
                 current_pane['selected_index'] -= 1
                 self.needs_full_redraw = True
-        elif event.key_code == KeyCode.DOWN:
+        elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['selected_index'] < len(current_pane['files']) - 1:
                 current_pane['selected_index'] += 1
                 self.needs_full_redraw = True
@@ -2985,26 +3005,12 @@ class FileManager:
                     self.needs_full_redraw = True
                 except PermissionError:
                     self.show_error("Permission denied")
-        elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left':  # Right arrow in left pane - switch to right pane
+        elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left' and not (event.modifiers & ModifierKey.SHIFT):  # Right arrow in left pane - switch to right pane
             self.pane_manager.active_pane = 'right'
             self.needs_full_redraw = True
-        elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'right':  # Left arrow in right pane - switch to left pane
+        elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'right' and not (event.modifiers & ModifierKey.SHIFT):  # Left arrow in right pane - switch to left pane
             self.pane_manager.active_pane = 'left'
             self.needs_full_redraw = True
-        elif event.key_code in (KEY_SHIFT_UP_1, KEY_SHIFT_UP_2):  # Shift+Up
-            if self.log_manager.scroll_log_up(1):
-                self.needs_full_redraw = True
-        elif event.key_code in (KEY_SHIFT_DOWN_1, KEY_SHIFT_DOWN_2):  # Shift+Down
-            if self.log_manager.scroll_log_down(1):
-                self.needs_full_redraw = True
-        elif event.key_code in (KEY_SHIFT_LEFT_1, KEY_SHIFT_LEFT_2):  # Shift+Left - fast scroll to older messages
-            log_height = self._get_log_pane_height()
-            if self.log_manager.scroll_log_up(max(1, log_height)):
-                self.needs_full_redraw = True
-        elif event.key_code in (KEY_SHIFT_RIGHT_1, KEY_SHIFT_RIGHT_2):  # Shift+Right - fast scroll to newer messages
-            log_height = self._get_log_pane_height()
-            if self.log_manager.scroll_log_down(max(1, log_height)):
-                self.needs_full_redraw = True
         elif self.is_key_for_action(event, 'select_file'):  # Toggle file selection
             self.toggle_selection()
             self.needs_full_redraw = True
