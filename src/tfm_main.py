@@ -3171,6 +3171,14 @@ class FileManager:
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()
                 self.needs_full_redraw = True
+            elif isinstance(event, SystemEvent) and event.is_close():  # Window close requested
+                # Check if file/archive operations are in progress
+                if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
+                    # Ignore close event during operations
+                    print("Cannot close: file operation in progress")
+                else:
+                    # No operations in progress, exit immediately
+                    self.should_quit = True
             else:
                 # Check if operation is in progress
                 if hasattr(self, 'operation_in_progress') and self.operation_in_progress:

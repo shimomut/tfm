@@ -141,3 +141,7 @@ class SystemEvent(Event):
     def is_resize(self) -> bool:
         """Check if this is a window resize event."""
         return self.event_type == SystemEventType.RESIZE
+    
+    def is_close(self) -> bool:
+        """Check if this is a window close event."""
+        return self.event_type == SystemEventType.CLOSE
