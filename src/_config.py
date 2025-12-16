@@ -12,6 +12,9 @@ import sys
 # Import tfm_tool function for tool search functionality
 from tfm_external_programs import tfm_tool
 
+# Import backend detector for runtime backend detection
+from tfm_backend_detector import is_desktop_mode
+
 class Config:
     """User configuration for TFM"""
     
@@ -147,7 +150,10 @@ class Config:
     MAX_EXTENSION_LENGTH = 5    # Maximum extension length to show separately
     
     # Text editor settings
-    TEXT_EDITOR = 'vim'  # Text editor command (vim, nano, emacs, code, etc.)
+    # Automatically set based on actual running backend mode:
+    # - Terminal mode (curses): vim
+    # - Desktop mode (coregraphics): code (VS Code)
+    TEXT_EDITOR = 'code' if is_desktop_mode() else 'vim'
     
     # S3 settings
     S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)

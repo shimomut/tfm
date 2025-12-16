@@ -38,11 +38,16 @@ def select_backend(args):
         >>> backend_name, options = select_backend(args)
         >>> # backend_name == 'coregraphics', options == {'window_title': ..., 'font_name': ..., ...}
     """
+    import os
+    
     # Determine requested backend from arguments or configuration
     backend_name = _get_requested_backend(args)
     
     # Validate backend availability and fall back if necessary
     backend_name = _validate_backend_availability(backend_name)
+    
+    # Set environment variable so other modules can detect the actual backend
+    os.environ['TFM_BACKEND'] = backend_name
     
     # Prepare backend-specific options
     backend_options = _get_backend_options(backend_name, args)
