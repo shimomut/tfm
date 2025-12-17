@@ -623,24 +623,47 @@ class DiffViewer:
         current_x = start_x
         remaining_width = max_width
         
+        # Track cumulative width for horizontal scrolling
+        cumulative_width = 0
+        offset_applied = False
+        
         for text, syntax_color in highlighted_line:
             if remaining_width <= 0:
                 break
             
-            # Apply horizontal scrolling
-            if self.horizontal_offset > 0:
-                skip_width = 0
-                skip_chars = 0
-                for char in text:
-                    char_width = get_display_width(char)
-                    if skip_width + char_width > self.horizontal_offset:
-                        break
-                    skip_width += char_width
-                    skip_chars += 1
-                
-                text = text[skip_chars:]
-                if not text:
+            # Calculate width of this segment
+            segment_width = sum(get_display_width(char) for char in text)
+            
+            # Apply horizontal scrolling only once at the beginning
+            if not offset_applied and self.horizontal_offset > 0:
+                # Check if we need to skip this entire segment
+                if cumulative_width + segment_width <= self.horizontal_offset:
+                    cumulative_width += segment_width
                     continue
+                
+                # Partially skip this segment
+                if cumulative_width < self.horizontal_offset:
+                    skip_amount = self.horizontal_offset - cumulative_width
+                    skip_chars = 0
+                    skip_width = 0
+                    
+                    for char in text:
+                        char_width = get_display_width(char)
+                        if skip_width + char_width > skip_amount:
+                            break
+                        skip_width += char_width
+                        skip_chars += 1
+                    
+                    text = text[skip_chars:]
+                    cumulative_width = self.horizontal_offset
+                    offset_applied = True
+                else:
+                    offset_applied = True
+            
+            cumulative_width += sum(get_display_width(char) for char in text)
+            
+            if not text:
+                continue
             
             # Truncate to fit remaining width
             visible_text = truncate_to_width(text, remaining_width, "")
@@ -681,25 +704,47 @@ class DiffViewer:
         current_x = start_x
         remaining_width = max_width
         
+        # Track cumulative width for horizontal scrolling
+        cumulative_width = 0
+        offset_applied = False
+        
         for text, is_different in char_diff:
             if remaining_width <= 0:
                 break
             
-            # Apply horizontal scrolling
-            if self.horizontal_offset > 0:
-                # Skip characters based on horizontal offset
-                skip_width = 0
-                skip_chars = 0
-                for char in text:
-                    char_width = get_display_width(char)
-                    if skip_width + char_width > self.horizontal_offset:
-                        break
-                    skip_width += char_width
-                    skip_chars += 1
-                
-                text = text[skip_chars:]
-                if not text:
+            # Calculate width of this segment
+            segment_width = sum(get_display_width(char) for char in text)
+            
+            # Apply horizontal scrolling only once at the beginning
+            if not offset_applied and self.horizontal_offset > 0:
+                # Check if we need to skip this entire segment
+                if cumulative_width + segment_width <= self.horizontal_offset:
+                    cumulative_width += segment_width
                     continue
+                
+                # Partially skip this segment
+                if cumulative_width < self.horizontal_offset:
+                    skip_amount = self.horizontal_offset - cumulative_width
+                    skip_chars = 0
+                    skip_width = 0
+                    
+                    for char in text:
+                        char_width = get_display_width(char)
+                        if skip_width + char_width > skip_amount:
+                            break
+                        skip_width += char_width
+                        skip_chars += 1
+                    
+                    text = text[skip_chars:]
+                    cumulative_width = self.horizontal_offset
+                    offset_applied = True
+                else:
+                    offset_applied = True
+            
+            cumulative_width += sum(get_display_width(char) for char in text)
+            
+            if not text:
+                continue
             
             # Truncate to fit remaining width
             visible_text = truncate_to_width(text, remaining_width, "")
