@@ -63,7 +63,7 @@ class TestDiffViewer(unittest.TestCase):
         self.assertGreater(len(viewer.diff_lines), 0)
         
         # Verify diff contains expected changes
-        statuses = [status for _, _, status in viewer.diff_lines]
+        statuses = [status for _, _, status, _, _, _, _ in viewer.diff_lines]
         self.assertIn('equal', statuses)  # Some lines should be equal
         self.assertTrue(any(s in statuses for s in ['replace', 'delete', 'insert']))  # Some changes
     
@@ -179,7 +179,7 @@ def farewell():
         self.assertGreater(len(viewer.diff_lines), 0)
         
         # Check for different types of changes
-        statuses = [status for _, _, status in viewer.diff_lines]
+        statuses = [status for _, _, status, _, _, _, _ in viewer.diff_lines]
         self.assertIn('equal', statuses)
         self.assertTrue(any(s in ['replace', 'delete', 'insert'] for s in statuses))
     
@@ -191,7 +191,7 @@ def farewell():
         viewer = DiffViewer(self.mock_renderer, Path(self.file1_path), Path(identical_file))
         
         # All lines should be equal
-        statuses = [status for _, _, status in viewer.diff_lines]
+        statuses = [status for _, _, status, _, _, _, _ in viewer.diff_lines]
         self.assertTrue(all(s == 'equal' for s in statuses))
     
     def test_completely_different_files(self):
@@ -202,8 +202,71 @@ def farewell():
         viewer = DiffViewer(self.mock_renderer, Path(self.file1_path), Path(different_file))
         
         # Should have changes
-        statuses = [status for _, _, status in viewer.diff_lines]
+        statuses = [status for _, _, status, _, _, _, _ in viewer.diff_lines]
         self.assertTrue(any(s != 'equal' for s in statuses))
+    
+    def test_whitespace_ignore_mode(self):
+        """Test whitespace ignore mode"""
+        # Create files with whitespace differences
+        ws_file1 = self.test_dir / 'whitespace1.txt'
+        ws_file2 = self.test_dir / 'whitespace2.txt'
+        
+        ws_file1.write_text("Line 1\nLine 2\nLine 3\n")
+        ws_file2.write_text("Line 1\n  Line 2  \n\tLine 3\n")
+        
+        viewer = DiffViewer(self.mock_renderer, Path(ws_file1), Path(ws_file2))
+        
+        # Without whitespace ignore, should show differences
+        statuses_normal = [status for _, _, status, _, _, _, _ in viewer.diff_lines]
+        has_changes_normal = any(s != 'equal' for s in statuses_normal)
+        
+        # Enable whitespace ignore mode
+        viewer.ignore_whitespace = True
+        viewer.compute_diff()
+        
+        # With whitespace ignore, should be equal
+        statuses_ignore = [status for _, _, status, _, _, _, _ in viewer.diff_lines]
+        has_changes_ignore = any(s != 'equal' for s in statuses_ignore)
+        
+        # Verify that whitespace ignore mode reduces differences
+        self.assertTrue(has_changes_normal)
+        self.assertFalse(has_changes_ignore)
+    
+    def test_whitespace_ignore_toggle(self):
+        """Test toggling whitespace ignore mode with 'w' key"""
+        viewer = DiffViewer(self.mock_renderer, Path(self.file1_path), Path(self.file2_path))
+        
+        # Initially disabled
+        self.assertFalse(viewer.ignore_whitespace)
+        
+        # Toggle on
+        event = KeyEvent(key_code=None, modifiers=0, char='w')
+        viewer.handle_key(event)
+        self.assertTrue(viewer.ignore_whitespace)
+        
+        # Toggle off
+        viewer.handle_key(event)
+        self.assertFalse(viewer.ignore_whitespace)
+    
+    def test_whitespace_ignore_with_real_differences(self):
+        """Test that whitespace ignore doesn't hide real differences"""
+        # Create files with both whitespace and content differences
+        ws_file1 = self.test_dir / 'mixed1.txt'
+        ws_file2 = self.test_dir / 'mixed2.txt'
+        
+        ws_file1.write_text("Line 1\nLine 2\nLine 3\n")
+        ws_file2.write_text("Line 1\n  Line 2 modified  \nLine 3\n")
+        
+        viewer = DiffViewer(self.mock_renderer, Path(ws_file1), Path(ws_file2))
+        
+        # Enable whitespace ignore mode
+        viewer.ignore_whitespace = True
+        viewer.compute_diff()
+        
+        # Should still show the content difference
+        statuses = [status for _, _, status, _, _, _, _ in viewer.diff_lines]
+        has_changes = any(s != 'equal' for s in statuses)
+        self.assertTrue(has_changes)
 
 
 if __name__ == '__main__':

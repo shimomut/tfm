@@ -90,6 +90,7 @@ The currently focused difference is highlighted with a distinct blue background 
 - `#`: Toggle line numbers on/off
 - `s`: Toggle syntax highlighting on/off (if pygments is available)
 - `t`: Cycle through tab widths (2, 4, 8 spaces)
+- `w`: Toggle whitespace ignore mode (ignore spaces and tabs when comparing)
 
 #### Exit
 - `q`: Quit the diff viewer
@@ -105,7 +106,7 @@ The status bar at the bottom shows:
 - **Diff position**: Current difference number and total (e.g., "Diff 3/16")
 - **Equal lines**: Number of identical lines
 - **Changed lines**: Number of lines with differences
-- **Active options**: Shows which features are enabled (NUM for line numbers, SYNTAX for syntax highlighting, TAB:4 for tab width)
+- **Active options**: Shows which features are enabled (NUM for line numbers, SYNTAX for syntax highlighting, TAB:4 for tab width, IGNORE-WS for whitespace ignore mode)
 
 ## Use Cases
 
@@ -185,6 +186,52 @@ The diff viewer automatically tracks all differences in the files. Use `n` and `
 
 This makes it easy to review changes one at a time without manually scrolling through the entire file.
 
+### Ignoring Whitespace Differences
+
+The diff viewer includes a whitespace ignore mode that's useful when comparing files with formatting differences:
+
+**What it does:**
+- Ignores all space and tab characters when comparing lines
+- Focuses on actual content changes, not formatting
+- Useful for comparing code with different indentation styles
+- **Important**: Original text with all whitespace is always displayed - only the comparison logic changes
+
+**How to use:**
+1. Press `w` to toggle whitespace ignore mode
+2. The status bar shows "IGNORE-WS" when enabled
+3. The diff is automatically recomputed
+4. Press `w` again to disable
+
+**How it works:**
+- Lines are compared after stripping all spaces and tabs
+- If lines match after stripping, they're shown as equal (white/regular background)
+- If lines differ after stripping, they're shown as different (yellow background)
+- The original text with all whitespace is always displayed
+- Character-level highlighting still works, but compares non-whitespace characters only
+- Whitespace characters are shown but not highlighted as differences
+
+**Common use cases:**
+- Comparing code formatted with different tab widths
+- Reviewing changes where only spacing was modified
+- Comparing files with trailing whitespace differences
+- Checking if two files are functionally identical despite formatting
+
+**Example:**
+```python
+# File 1
+def hello():
+    print("Hello")
+
+# File 2 (extra spaces and tabs)
+def hello():
+	print("Hello")  
+```
+
+Without whitespace ignore: Shows as different (yellow background)
+With whitespace ignore: Shows as identical (white/regular background)
+
+Note: The actual text displayed always includes all spaces and tabs - only the background color changes to indicate whether the lines are considered different.
+
 ### Keyboard Shortcuts Summary
 
 | Key | Action |
@@ -199,6 +246,7 @@ This makes it easy to review changes one at a time without manually scrolling th
 | `#` | Toggle line numbers |
 | `s` | Toggle syntax highlighting |
 | `t` | Cycle tab width (2/4/8) |
+| `w` | Toggle whitespace ignore mode |
 | `q`/`Enter`/`Esc` | Exit viewer |
 
 ## Technical Details

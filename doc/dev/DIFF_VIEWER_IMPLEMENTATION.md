@@ -85,14 +85,77 @@ for tag, i1, i2, j1, j2 in matcher.get_opcodes():
 
 Each diff line is stored as a tuple:
 ```python
-(line1: str, line2: str, status: str)
+(line1: str, line2: str, status: str, line_num1: int, line_num2: int, char_diff1: list, char_diff2: list)
 ```
 
-Where status is one of:
-- `'equal'`: Lines are identical
-- `'replace'`: Lines are different
-- `'delete'`: Line only in left file
-- `'insert'`: Line only in right file
+Where:
+- `line1`, `line2`: Text content from each file
+- `status`: One of `'equal'`, `'replace'`, `'delete'`, `'insert'`
+- `line_num1`, `line_num2`: Line numbers in original files (None if no corresponding line)
+- `char_diff1`, `char_diff2`: Character-level diff data for replace operations (None otherwise)
+
+### Whitespace Ignore Mode
+
+The diff viewer includes a whitespace ignore mode that strips all space and tab characters before comparison:
+
+**Implementation:**
+
+```python
+def _strip_whitespace(self, line: str) -> str:
+    """Remove all whitespace characters (spaces and tabs) from a line"""
+    return line.replace(' ', '').replace('\t', '')
+
+def compute_diff(self):
+    """Compute side-by-side diff using difflib"""
+    # Prepare lines for comparison (strip whitespace if mode is enabled)
+    compare_lines1 = [self._strip_whitespace(line) for line in self.file1_lines] if self.ignore_whitespace else self.file1_lines
+    compare_lines2 = [self._strip_whitespace(line) for line in self.file2_lines] if self.ignore_whitespace else self.file2_lines
+    
+    # Use difflib's SequenceMatcher for line-by-line comparison
+    matcher = difflib.SequenceMatcher(None, compare_lines1, compare_lines2)
+```
+
+**Character-Level Diff with Whitespace Ignore:**
+
+When whitespace ignore is enabled, character-level diffs compare stripped versions but display original text:
+
+```python
+def _compute_char_diff(self, line1: str, line2: str):
+    # Compare stripped versions
+    compare_line1 = self._strip_whitespace(line1) if self.ignore_whitespace else line1
+    compare_line2 = self._strip_whitespace(line2) if self.ignore_whitespace else line2
+    
+    matcher = difflib.SequenceMatcher(None, compare_line1, compare_line2)
+    
+    if self.ignore_whitespace:
+        # Build mappings from stripped position to original position
+        map1 = [i for i, char in enumerate(line1) if char not in (' ', '\t')]
+        map2 = [i for i, char in enumerate(line2) if char not in (' ', '\t')]
+        
+        # Map opcodes back to original positions
+        # Include whitespace segments as non-highlighted
+        # Highlight only non-whitespace differences
+```
+
+This ensures that when whitespace ignore is enabled:
+- Lines are compared without whitespace for determining differences
+- Original text with all whitespace is always displayed
+- Character-level highlighting works on non-whitespace characters only
+- Whitespace characters are shown but never highlighted as differences
+- The mapping preserves the original text structure while comparing content
+
+**Key Features:**
+- Strips all spaces and tabs before comparison
+- Preserves original text for display (only comparison is affected)
+- Recomputes diff automatically when toggled
+- Works with both line-level and character-level diffs
+- Status bar shows "IGNORE-WS" when enabled
+
+**Use Cases:**
+- Comparing files with different indentation styles
+- Ignoring trailing whitespace
+- Focusing on content changes rather than formatting
+- Comparing code formatted with different tab widths
 
 ## Rendering
 

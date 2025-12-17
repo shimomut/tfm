@@ -47,6 +47,7 @@ class DiffViewer:
         self.tab_width = 4  # Number of spaces per tab
         self.diff_indices = []  # List of line indices where differences occur
         self.current_diff_index = -1  # Index into diff_indices (-1 means no focus)
+        self.ignore_whitespace = False  # Whether to ignore whitespace when comparing
         
         # Load files and compute diff
         self.load_files()
@@ -259,6 +260,18 @@ class DiffViewer:
         
         return highlighted_lines
     
+    def _strip_whitespace(self, line: str) -> str:
+        """
+        Remove all whitespace characters (spaces and tabs) from a line.
+        
+        Args:
+            line: Line of text
+            
+        Returns:
+            Line with all spaces and tabs removed
+        """
+        return line.replace(' ', '').replace('\t', '')
+    
     def _compute_char_diff(self, line1: str, line2: str) -> Tuple[List[Tuple[str, bool]], List[Tuple[str, bool]]]:
         """
         Compute character-level differences between two lines.
@@ -269,34 +282,98 @@ class DiffViewer:
         if not line1 or not line2:
             return [(line1, False)], [(line2, False)]
         
+        # Prepare lines for comparison
+        compare_line1 = self._strip_whitespace(line1) if self.ignore_whitespace else line1
+        compare_line2 = self._strip_whitespace(line2) if self.ignore_whitespace else line2
+        
         # Use SequenceMatcher for character-level comparison
-        matcher = difflib.SequenceMatcher(None, line1, line2)
+        matcher = difflib.SequenceMatcher(None, compare_line1, compare_line2)
         
         result1 = []
         result2 = []
         
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            if tag == 'equal':
-                # Characters are the same
-                result1.append((line1[i1:i2], False))
-                result2.append((line2[j1:j2], False))
-            elif tag == 'replace':
-                # Characters are different
-                result1.append((line1[i1:i2], True))
-                result2.append((line2[j1:j2], True))
-            elif tag == 'delete':
-                # Characters only in line1
-                result1.append((line1[i1:i2], True))
-            elif tag == 'insert':
-                # Characters only in line2
-                result2.append((line2[j1:j2], True))
+        if self.ignore_whitespace:
+            # When ignoring whitespace, we need to map back to original positions
+            # Build mappings from stripped position to original position
+            map1 = []  # List of original indices for non-whitespace chars in line1
+            map2 = []  # List of original indices for non-whitespace chars in line2
+            
+            for i, char in enumerate(line1):
+                if char not in (' ', '\t'):
+                    map1.append(i)
+            
+            for i, char in enumerate(line2):
+                if char not in (' ', '\t'):
+                    map2.append(i)
+            
+            # Track position in original lines
+            pos1 = 0
+            pos2 = 0
+            
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                # Get original positions
+                orig_start1 = map1[i1] if i1 < len(map1) else len(line1)
+                orig_end1 = map1[i2 - 1] + 1 if i2 > 0 and i2 - 1 < len(map1) else len(line1)
+                orig_start2 = map2[j1] if j1 < len(map2) else len(line2)
+                orig_end2 = map2[j2 - 1] + 1 if j2 > 0 and j2 - 1 < len(map2) else len(line2)
+                
+                # Add any whitespace before this segment
+                if pos1 < orig_start1:
+                    result1.append((line1[pos1:orig_start1], False))
+                if pos2 < orig_start2:
+                    result2.append((line2[pos2:orig_start2], False))
+                
+                if tag == 'equal':
+                    # Characters are the same
+                    result1.append((line1[orig_start1:orig_end1], False))
+                    result2.append((line2[orig_start2:orig_end2], False))
+                elif tag == 'replace':
+                    # Characters are different
+                    result1.append((line1[orig_start1:orig_end1], True))
+                    result2.append((line2[orig_start2:orig_end2], True))
+                elif tag == 'delete':
+                    # Characters only in line1
+                    result1.append((line1[orig_start1:orig_end1], True))
+                elif tag == 'insert':
+                    # Characters only in line2
+                    result2.append((line2[orig_start2:orig_end2], True))
+                
+                pos1 = orig_end1
+                pos2 = orig_end2
+            
+            # Add any trailing whitespace
+            if pos1 < len(line1):
+                result1.append((line1[pos1:], False))
+            if pos2 < len(line2):
+                result2.append((line2[pos2:], False))
+        else:
+            # Normal comparison without whitespace stripping
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                if tag == 'equal':
+                    # Characters are the same
+                    result1.append((line1[i1:i2], False))
+                    result2.append((line2[j1:j2], False))
+                elif tag == 'replace':
+                    # Characters are different
+                    result1.append((line1[i1:i2], True))
+                    result2.append((line2[j1:j2], True))
+                elif tag == 'delete':
+                    # Characters only in line1
+                    result1.append((line1[i1:i2], True))
+                elif tag == 'insert':
+                    # Characters only in line2
+                    result2.append((line2[j1:j2], True))
         
         return result1, result2
     
     def compute_diff(self):
         """Compute side-by-side diff using difflib"""
+        # Prepare lines for comparison (strip whitespace if mode is enabled)
+        compare_lines1 = [self._strip_whitespace(line) for line in self.file1_lines] if self.ignore_whitespace else self.file1_lines
+        compare_lines2 = [self._strip_whitespace(line) for line in self.file2_lines] if self.ignore_whitespace else self.file2_lines
+        
         # Use difflib's SequenceMatcher for line-by-line comparison
-        matcher = difflib.SequenceMatcher(None, self.file1_lines, self.file2_lines)
+        matcher = difflib.SequenceMatcher(None, compare_lines1, compare_lines2)
         
         self.diff_lines = []
         self.diff_indices = []
@@ -406,7 +483,7 @@ class DiffViewer:
             self.renderer.draw_text(y, separator_x, "│", header_color_pair, header_attrs)
         
         # Controls
-        controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll n/p:next/prev diff PgUp/PgDn:page #:line# s:syntax t:tab"
+        controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll n/p:next/prev diff PgUp/PgDn:page #:line# s:syntax t:tab w:whitespace"
         status_color_pair, status_attrs = get_status_color()
         
         if len(controls) + 4 < width:
@@ -453,6 +530,8 @@ class DiffViewer:
         if PYGMENTS_AVAILABLE and self.syntax_highlighting:
             options.append("SYNTAX")
         options.append(f"TAB:{self.tab_width}")
+        if self.ignore_whitespace:
+            options.append("IGNORE-WS")
         
         if options:
             right_parts.extend(options)
@@ -514,23 +593,25 @@ class DiffViewer:
                 is_focused = focused_start <= line_index < focused_end
             
             # Determine colors based on status (with background colors)
+            # Dummy lines (blank alignment lines) always get gray background, even when focused
             if is_focused:
                 # Use focused color for lines with real content
                 color_pair, attrs = get_color_with_attrs(COLOR_DIFF_FOCUSED)
-                blank_color_pair, _ = get_color_with_attrs(COLOR_DIFF_BLANK)
+                # Blank lines (dummy lines) always get gray background, even when focused
+                blank_color_pair, blank_attrs = get_color_with_attrs(COLOR_DIFF_BLANK)
             elif status == 'equal':
                 color_pair, attrs = get_color_with_attrs(COLOR_REGULAR_FILE)
-                blank_color_pair = color_pair
-            elif status == 'delete':
-                color_pair, attrs = get_color_with_attrs(COLOR_DIFF_DELETE)
-                blank_color_pair, _ = get_color_with_attrs(COLOR_DIFF_BLANK)
-            elif status == 'insert':
-                # Real inserted lines use the same color as other changes
-                color_pair, attrs = get_color_with_attrs(COLOR_DIFF_CHANGE)
-                blank_color_pair, _ = get_color_with_attrs(COLOR_DIFF_BLANK)
+                blank_color_pair, blank_attrs = color_pair, attrs
+            elif status == 'delete' or status == 'insert':
+                # Lines only in one side (delete/insert) - brown background
+                color_pair, attrs = get_color_with_attrs(COLOR_DIFF_ONLY_ONE_SIDE)
+                # Blank lines (dummy lines) get gray background
+                blank_color_pair, blank_attrs = get_color_with_attrs(COLOR_DIFF_BLANK)
             else:  # replace
+                # Different lines (both sides have content but different) - yellow/brown background
                 color_pair, attrs = get_color_with_attrs(COLOR_DIFF_CHANGE)
-                blank_color_pair, _ = get_color_with_attrs(COLOR_DIFF_BLANK)
+                # Blank lines (dummy lines) get gray background
+                blank_color_pair, blank_attrs = get_color_with_attrs(COLOR_DIFF_BLANK)
             
             # Get character-level change color
             char_change_color_pair, char_change_attrs = get_color_with_attrs(COLOR_DIFF_CHAR_CHANGE)
@@ -556,15 +637,16 @@ class DiffViewer:
                                                    highlighted_line1)
                 elif highlighted_line1 and self.syntax_highlighting:
                     # Draw with syntax highlighting
+                    # Use syntax colors only for equal lines, diff background for others
                     self._draw_highlighted_line(y_pos, content_start_x, highlighted_line1, content_width,
-                                               color_pair, attrs)
+                                               color_pair, attrs, use_syntax_colors=(status == 'equal'))
                 else:
                     visible_line1 = self._apply_horizontal_scroll(line1)
                     visible_line1 = truncate_to_width(visible_line1, content_width, "")
                     self.renderer.draw_text(y_pos, content_start_x, visible_line1, color_pair, attrs)
             else:
-                # Draw blank line with background color for alignment
-                self.renderer.draw_text(y_pos, content_start_x, ' ' * content_width, blank_color_pair, attrs)
+                # Draw blank line with gray background for alignment (dummy line)
+                self.renderer.draw_text(y_pos, content_start_x, ' ' * content_width, blank_color_pair, blank_attrs)
             
             # Draw separator
             header_color_pair, header_attrs = get_header_color()
@@ -591,22 +673,23 @@ class DiffViewer:
                                                    highlighted_line2)
                 elif highlighted_line2 and self.syntax_highlighting:
                     # Draw with syntax highlighting
+                    # Use syntax colors only for equal lines, diff background for others
                     self._draw_highlighted_line(y_pos, content_start_x2, highlighted_line2, content_width,
-                                               color_pair, attrs)
+                                               color_pair, attrs, use_syntax_colors=(status == 'equal'))
                 else:
                     visible_line2 = self._apply_horizontal_scroll(line2)
                     visible_line2 = truncate_to_width(visible_line2, content_width, "")
                     self.renderer.draw_text(y_pos, content_start_x2, visible_line2, color_pair, attrs)
             else:
-                # Draw blank line with background color for alignment
-                self.renderer.draw_text(y_pos, content_start_x2, ' ' * content_width, blank_color_pair, attrs)
+                # Draw blank line with gray background for alignment (dummy line)
+                self.renderer.draw_text(y_pos, content_start_x2, ' ' * content_width, blank_color_pair, blank_attrs)
         
         # Draw scroll bar
         draw_scrollbar(self.renderer, start_y, display_width - 1, display_height,
                       len(self.diff_lines), self.scroll_offset)
     
     def _draw_highlighted_line(self, y_pos: int, start_x: int, highlighted_line: List[Tuple[str, int]],
-                              max_width: int, bg_color: int, bg_attrs: int):
+                              max_width: int, bg_color: int, bg_attrs: int, use_syntax_colors: bool = False):
         """
         Draw a syntax-highlighted line with diff background color.
         
@@ -617,9 +700,8 @@ class DiffViewer:
             max_width: Maximum width to draw
             bg_color: Background color pair for the diff status
             bg_attrs: Background attributes for the diff status
+            use_syntax_colors: If True, use syntax colors (for equal lines); if False, use bg_color (for diff lines)
         """
-        # Note: For now, we use the syntax colors with the diff background
-        # This is a simplified approach - ideally we'd blend colors
         current_x = start_x
         remaining_width = max_width
         
@@ -670,9 +752,16 @@ class DiffViewer:
             if not visible_text:
                 break
             
-            # Use syntax color for foreground, but keep diff background
-            # For simplicity, we use the syntax color directly
-            self.renderer.draw_text(y_pos, current_x, visible_text, syntax_color, bg_attrs)
+            # Choose color based on whether this is an equal line or a diff line
+            if use_syntax_colors:
+                # For equal lines, use syntax highlighting colors
+                draw_color = syntax_color
+            else:
+                # For diff lines (delete/insert/change/focused), use diff background color
+                # to preserve diff highlighting (syntax color would override the background)
+                draw_color = bg_color
+            
+            self.renderer.draw_text(y_pos, current_x, visible_text, draw_color, bg_attrs)
             
             # Update position
             text_width = get_display_width(visible_text)
@@ -831,6 +920,11 @@ class DiffViewer:
                 
                 # Re-expand tabs with new tab width
                 self.refresh_tab_expansion()
+            elif char_lower == 'w':
+                # Toggle whitespace ignore mode
+                self.ignore_whitespace = not self.ignore_whitespace
+                # Recompute diff with new whitespace mode
+                self.compute_diff()
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
