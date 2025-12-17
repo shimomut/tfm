@@ -9,6 +9,7 @@ import sys
 import shlex
 import time
 from tfm_path import Path
+from tfm_backend_detector import is_desktop_mode
 
 
 def tfm_tool(tool_name):
@@ -99,8 +100,13 @@ class ExternalProgramManager:
     
     def execute_external_program(self, pane_manager, program):
         """Execute an external program with environment variables set"""
-        # Restore stdout/stderr temporarily
-        self.log_manager.restore_stdio()
+        # Detect if running in desktop mode
+        desktop_mode = is_desktop_mode()
+        
+        # In terminal mode, restore stdout/stderr to allow subprocess to use terminal
+        # In desktop mode, keep LogCapture active so subprocess output goes to log pane
+        if not desktop_mode:
+            self.log_manager.restore_stdio()
         
         # Clear the screen and reset cursor
         self.renderer.clear()
@@ -167,7 +173,22 @@ class ExternalProgramManager:
             os.chdir(working_dir)
             
             # Execute the program with the modified environment
-            result = subprocess.run(command, env=env)
+            # In desktop mode, capture output to redirect to log pane
+            if desktop_mode:
+                result = subprocess.run(command, env=env, capture_output=True, text=True)
+                
+                # Redirect stdout to log pane (LogCapture is still active)
+                if result.stdout:
+                    for line in result.stdout.splitlines():
+                        print(line)
+                
+                # Redirect stderr to log pane (LogCapture is still active)
+                if result.stderr:
+                    for line in result.stderr.splitlines():
+                        print(line, file=sys.stderr)
+            else:
+                # Terminal mode - let subprocess use terminal directly
+                result = subprocess.run(command, env=env)
             
             # Check if auto_return option is enabled
             auto_return = program.get('options', {}).get('auto_return', False)
@@ -178,27 +199,47 @@ class ExternalProgramManager:
             if result.returncode == 0:
                 print(f"Program '{program['name']}' completed successfully")
                 
-                if auto_return:
-                    print("Auto-returning to TFM...")
-                    time.sleep(1)  # Brief pause to show the message
+                if auto_return or desktop_mode:
+                    # In desktop mode, no sleep needed - just return immediately
+                    if not desktop_mode:
+                        time.sleep(1)  # Brief pause in terminal mode only
                 else:
                     print("Press Enter to return to TFM...")
                     input()
             else:
                 print(f"Program '{program['name']}' exited with code {result.returncode}")
-                # Always wait for user input when there's an error, regardless of auto_return setting
-                print("Press Enter to return to TFM...")
-                input()
+                # In desktop mode, auto-return even on error (user can check log pane)
+                # In terminal mode, wait for user input when there's an error
+                if desktop_mode:
+                    print("Check log pane for error details.")
+                    # No sleep in desktop mode - return immediately
+                else:
+                    print("Press Enter to return to TFM...")
+                    input()
             
         except FileNotFoundError:
             print(f"Error: Command not found: {program['command'][0]}")
             print("Tip: Use tfm_tool() function for TFM tools in your configuration")
-            print("Press Enter to continue...")
-            input()
+            
+            # In desktop mode, auto-return (user can check log pane)
+            # In terminal mode, wait for user input
+            if desktop_mode:
+                print("Check log pane for error details.")
+                # No sleep in desktop mode - return immediately
+            else:
+                print("Press Enter to continue...")
+                input()
         except Exception as e:
             print(f"Error executing program '{program['name']}': {e}")
-            print("Press Enter to continue...")
-            input()
+            
+            # In desktop mode, auto-return (user can check log pane)
+            # In terminal mode, wait for user input
+            if desktop_mode:
+                print("Check log pane for error details.")
+                # No sleep in desktop mode - return immediately
+            else:
+                print("Press Enter to continue...")
+                input()
         
         finally:
             # Resume the renderer
@@ -209,10 +250,12 @@ class ExternalProgramManager:
             color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
             init_colors(self.renderer, color_scheme)
             
-            # Restore stdout/stderr capture
-            from tfm_log_manager import LogCapture
-            sys.stdout = LogCapture(self.log_manager.log_messages, "STDOUT")
-            sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
+            # Restore stdout/stderr capture (only needed in terminal mode)
+            # In desktop mode, LogCapture was never disconnected
+            if not desktop_mode:
+                from tfm_log_manager import LogCapture
+                sys.stdout = LogCapture(self.log_manager.log_messages, "STDOUT")
+                sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
             
             # Log return from program execution
             print(f"Returned from external program: {program['name']}")
