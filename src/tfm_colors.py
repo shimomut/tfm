@@ -188,11 +188,11 @@ COLOR_SCHEMES = {
         # Diff viewer colors
         'DIFF_ONLY_ONE_SIDE_BG': {
             'color_num': 152,
-            'rgb': (80, 50, 30)     # Brown background for lines only in one side (delete/insert)
+            'rgb': (30, 80, 50)     # Green-based background for lines only in one side (delete/insert)
         },
         'DIFF_CHANGE_BG': {
             'color_num': 154,
-            'rgb': (100, 80, 30)     # Yellow/brown background for different lines (replace)
+            'rgb': (70, 40, 40)     # Red-based background for different lines (less prominent than CHAR_CHANGE)
         },
         'DIFF_BLANK_BG': {
             'color_num': 155,
@@ -200,11 +200,11 @@ COLOR_SCHEMES = {
         },
         'DIFF_CHAR_CHANGE_BG': {
             'color_num': 156,
-            'rgb': (180, 80, 30)    # Bright orange background for different characters (more prominent)
+            'rgb': (140, 40, 40)    # Red-based background for different characters (more prominent)
         },
         'DIFF_FOCUSED_BG': {
             'color_num': 157,
-            'rgb': (70, 70, 160)    # Blue background for focused lines
+            'rgb': (60, 70, 140)    # Blue-based background for focused lines (more prominent than CHANGE)
         }
     },
     'light': {
@@ -314,11 +314,11 @@ COLOR_SCHEMES = {
         # Diff viewer colors
         'DIFF_ONLY_ONE_SIDE_BG': {
             'color_num': 152,
-            'rgb': (240, 220, 200)  # Light brown background for lines only in one side (delete/insert)
+            'rgb': (200, 240, 220)  # Light green-based background for lines only in one side (delete/insert)
         },
         'DIFF_CHANGE_BG': {
             'color_num': 154,
-            'rgb': (255, 255, 200)  # Light yellow background for changed lines
+            'rgb': (240, 220, 220)  # Light red-based background for different lines (less prominent than CHAR_CHANGE)
         },
         'DIFF_BLANK_BG': {
             'color_num': 155,
@@ -326,11 +326,11 @@ COLOR_SCHEMES = {
         },
         'DIFF_CHAR_CHANGE_BG': {
             'color_num': 156,
-            'rgb': (255, 180, 100)  # Bright orange background for character-level changes
+            'rgb': (255, 180, 180)  # Light red-based background for different characters (more prominent)
         },
         'DIFF_FOCUSED_BG': {
             'color_num': 157,
-            'rgb': (180, 180, 255)  # Bright blue background for focused difference
+            'rgb': (200, 210, 255)  # Light blue-based background for focused lines (more prominent than CHANGE)
         }
     }
 }
