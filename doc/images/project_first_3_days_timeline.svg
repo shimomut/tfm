@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .timeline-line { stroke: #4a90e2; stroke-width: 4; fill: none; }
+      .hour-box { fill: #f8f9fa; stroke: #4a90e2; stroke-width: 2; }
+      .hour-title { font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; fill: #2c3e50; }
+      .hour-time { font-family: Arial, sans-serif; font-size: 10px; fill: #7f8c8d; }
+      .hour-features { font-family: Arial, sans-serif; font-size: 9px; fill: #34495e; }
+      .milestone { fill: #e74c3c; stroke: #c0392b; stroke-width: 2; }
+      .milestone-text { font-family: Arial, sans-serif; font-size: 9px; font-weight: bold; fill: #7f8c8d; }
+      .hour-marker { font-family: Arial, sans-serif; font-size: 9px; fill: #7f8c8d; }
+      .title { font-family: Arial, sans-serif; font-size: 26px; font-weight: bold; fill: #2c3e50; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 13px; fill: #7f8c8d; }
+      .day-label { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #2c3e50; }
+      .phase1 { fill: #e8f5e9; stroke: #4caf50; }
+      .phase2 { fill: #fff3e0; stroke: #ff9800; }
+      .phase3 { fill: #e3f2fd; stroke: #2196f3; }
+      .phase4 { fill: #f3e5f5; stroke: #9c27b0; }
+      .phase5 { fill: #fce4ec; stroke: #e91e63; }
+      .arrow { fill: none; stroke: #4a90e2; stroke-width: 2; marker-end: url(#arrowhead); }
+      .day-divider { stroke: #95a5a6; stroke-width: 2; stroke-dasharray: 5,5; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#4a90e2" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="800" y="40" text-anchor="middle" class="title">TFM: The First 72 Hours</text>
+  <text x="800" y="65" text-anchor="middle" class="subtitle">From Concept to Complete File Manager - September 2025</text>
+  
+  <!-- Timeline axis (0H to 72H) -->
+  <line x1="80" y1="450" x2="1520" y2="450" class="timeline-line"/>
+  
+  <!-- Hour markers (every 6 hours) -->
+  <circle cx="80" cy="450" r="4" fill="#4a90e2"/>
+  <text x="80" y="470" text-anchor="middle" class="hour-marker">0H</text>
+  
+  <circle cx="200" cy="450" r="3" fill="#95a5a6"/>
+  <text x="200" y="470" text-anchor="middle" class="hour-marker">6H</text>
+  
+  <circle cx="320" cy="450" r="3" fill="#95a5a6"/>
+  <text x="320" y="470" text-anchor="middle" class="hour-marker">12H</text>
+  
+  <circle cx="440" cy="450" r="3" fill="#95a5a6"/>
+  <text x="440" y="470" text-anchor="middle" class="hour-marker">18H</text>
+  
+  <circle cx="560" cy="450" r="4" fill="#4a90e2"/>
+  <text x="560" y="470" text-anchor="middle" class="hour-marker">24H</text>
+  <text x="560" y="490" text-anchor="middle" class="day-label">Day 2</text>
+  
+  <circle cx="680" cy="450" r="3" fill="#95a5a6"/>
+  <text x="680" y="470" text-anchor="middle" class="hour-marker">30H</text>
+  
+  <circle cx="800" cy="450" r="3" fill="#95a5a6"/>
+  <text x="800" y="470" text-anchor="middle" class="hour-marker">36H</text>
+  
+  <circle cx="920" cy="450" r="3" fill="#95a5a6"/>
+  <text x="920" y="470" text-anchor="middle" class="hour-marker">42H</text>
+  
+  <circle cx="1040" cy="450" r="4" fill="#4a90e2"/>
+  <text x="1040" y="470" text-anchor="middle" class="hour-marker">48H</text>
+  <text x="1040" y="490" text-anchor="middle" class="day-label">Day 3</text>
+  
+  <circle cx="1160" cy="450" r="3" fill="#95a5a6"/>
+  <text x="1160" y="470" text-anchor="middle" class="hour-marker">54H</text>
+  
+  <circle cx="1280" cy="450" r="3" fill="#95a5a6"/>
+  <text x="1280" y="470" text-anchor="middle" class="hour-marker">60H</text>
+  
+  <circle cx="1400" cy="450" r="3" fill="#95a5a6"/>
+  <text x="1400" y="470" text-anchor="middle" class="hour-marker">66H</text>
+  
+  <circle cx="1520" cy="450" r="4" fill="#e74c3c"/>
+  <text x="1520" y="470" text-anchor="middle" class="hour-marker">72H</text>
+  
+  <!-- Day dividers -->
+  <line x1="560" y1="100" x2="560" y2="850" class="day-divider"/>
+  <line x1="1040" y1="100" x2="1040" y2="850" class="day-divider"/>
+  
+  <!-- 0-3H: Initial Concept -->
+  <rect x="80" y="120" width="90" height="170" class="hour-box phase1" rx="6"/>
+  <text x="125" y="140" text-anchor="middle" class="hour-title">Initial Setup</text>
+  <text x="125" y="155" text-anchor="middle" class="hour-time">0-3H</text>
+  <text x="90" y="175" class="hour-features">• Project init</text>
+  <text x="90" y="188" class="hour-features">• Curses setup</text>
+  <text x="90" y="201" class="hour-features">• Dual-pane</text>
+  <text x="90" y="214" class="hour-features">• Dir listing</text>
+  <text x="90" y="227" class="hour-features">• Keyboard</text>
+  <text x="90" y="240" class="hour-features">• Colors</text>
+  <circle cx="125" cy="450" r="6" class="milestone"/>
+  <line x1="125" y1="290" x2="125" y2="444" class="arrow"/>
+  
+  <!-- 3-6H: Navigation -->
+  <rect x="180" y="120" width="90" height="170" class="hour-box phase2" rx="6"/>
+  <text x="225" y="140" text-anchor="middle" class="hour-title">Navigation</text>
+  <text x="225" y="155" text-anchor="middle" class="hour-time">3-6H</text>
+  <text x="190" y="175" class="hour-features">• Arrow keys</text>
+  <text x="190" y="188" class="hour-features">• Selection</text>
+  <text x="190" y="201" class="hour-features">• Traversal</text>
+  <text x="190" y="214" class="hour-features">• Parent dir</text>
+  <text x="190" y="227" class="hour-features">• Cursor pos</text>
+  <text x="190" y="240" class="hour-features">• Status bar</text>
+  <circle cx="225" cy="450" r="6" class="milestone"/>
+  <line x1="225" y1="290" x2="225" y2="444" class="arrow"/>
+  
+  <!-- 6-12H: File Operations -->
+  <rect x="280" y="120" width="110" height="170" class="hour-box phase3" rx="6"/>
+  <text x="335" y="140" text-anchor="middle" class="hour-title">File Ops</text>
+  <text x="335" y="155" text-anchor="middle" class="hour-time">6-12H</text>
+  <text x="290" y="175" class="hour-features">• Copy (F5)</text>
+  <text x="290" y="188" class="hour-features">• Move (F6)</text>
+  <text x="290" y="201" class="hour-features">• Delete (F8)</text>
+  <text x="290" y="214" class="hour-features">• Mkdir (F7)</text>
+  <text x="290" y="227" class="hour-features">• Rename</text>
+  <text x="290" y="240" class="hour-features">• Progress</text>
+  <text x="290" y="253" class="hour-features">• Errors</text>
+  <circle cx="335" cy="450" r="6" class="milestone"/>
+  <line x1="335" y1="290" x2="335" y2="444" class="arrow"/>
+  
+  <!-- 12-18H: Text Viewer -->
+  <rect x="400" y="120" width="110" height="170" class="hour-box phase4" rx="6"/>
+  <text x="455" y="140" text-anchor="middle" class="hour-title">Text Viewer</text>
+  <text x="455" y="155" text-anchor="middle" class="hour-time">12-18H</text>
+  <text x="410" y="175" class="hour-features">• View (F3)</text>
+  <text x="410" y="188" class="hour-features">• Scrolling</text>
+  <text x="410" y="201" class="hour-features">• Wrapping</text>
+  <text x="410" y="214" class="hour-features">• Search</text>
+  <text x="410" y="227" class="hour-features">• Syntax</text>
+  <text x="410" y="240" class="hour-features">• Binary</text>
+  <text x="410" y="253" class="hour-features">• Large files</text>
+  <circle cx="455" cy="450" r="6" class="milestone"/>
+  <line x1="455" y1="290" x2="455" y2="444" class="arrow"/>
+  
+  <!-- 18-24H: Polish -->
+  <rect x="520" y="120" width="110" height="170" class="hour-box phase5" rx="6"/>
+  <text x="575" y="140" text-anchor="middle" class="hour-title">v0.90 Release</text>
+  <text x="575" y="155" text-anchor="middle" class="hour-time">18-24H</text>
+  <text x="530" y="175" class="hour-features">• Config system</text>
+  <text x="530" y="188" class="hour-features">• Key bindings</text>
+  <text x="530" y="201" class="hour-features">• Help (F1)</text>
+  <text x="530" y="214" class="hour-features">• Bug fixes</text>
+  <text x="530" y="227" class="hour-features">• Docs</text>
+  <text x="530" y="240" class="hour-features">• Testing</text>
+  <text x="530" y="253" class="hour-features">• RELEASE!</text>
+  <circle cx="575" cy="450" r="8" class="milestone"/>
+  <line x1="575" y1="290" x2="575" y2="442" class="arrow"/>
+  <text x="575" y="510" text-anchor="middle" class="milestone-text">v0.90</text>
+  
+  <!-- 24-36H: Search -->
+  <rect x="640" y="120" width="110" height="170" class="hour-box phase1" rx="6"/>
+  <text x="695" y="140" text-anchor="middle" class="hour-title">Search</text>
+  <text x="695" y="155" text-anchor="middle" class="hour-time">24-36H</text>
+  <text x="650" y="175" class="hour-features">• Search dialog</text>
+  <text x="650" y="188" class="hour-features">• Patterns</text>
+  <text x="650" y="201" class="hour-features">• Recursive</text>
+  <text x="650" y="214" class="hour-features">• Results nav</text>
+  <text x="650" y="227" class="hour-features">• Case toggle</text>
+  <text x="650" y="240" class="hour-features">• Hidden files</text>
+  <text x="650" y="253" class="hour-features">• Performance</text>
+  <circle cx="695" cy="450" r="6" class="milestone"/>
+  <line x1="695" y1="290" x2="695" y2="444" class="arrow"/>
+  
+  <!-- 36-48H: UI Polish -->
+  <rect x="760" y="120" width="110" height="170" class="hour-box phase2" rx="6"/>
+  <text x="815" y="140" text-anchor="middle" class="hour-title">UI Polish</text>
+  <text x="815" y="155" text-anchor="middle" class="hour-time">36-48H</text>
+  <text x="770" y="175" class="hour-features">• Dialog system</text>
+  <text x="770" y="188" class="hour-features">• Confirmations</text>
+  <text x="770" y="201" class="hour-features">• Progress bars</text>
+  <text x="770" y="214" class="hour-features">• Colors</text>
+  <text x="770" y="227" class="hour-features">• History</text>
+  <text x="770" y="240" class="hour-features">• Tab switch</text>
+  <text x="770" y="253" class="hour-features">• Resize</text>
+  <circle cx="815" cy="450" r="6" class="milestone"/>
+  <line x1="815" y1="290" x2="815" y2="444" class="arrow"/>
+  
+  <!-- 48-54H: Archives -->
+  <rect x="1050" y="120" width="100" height="170" class="hour-box phase3" rx="6"/>
+  <text x="1100" y="140" text-anchor="middle" class="hour-title">Archives</text>
+  <text x="1100" y="155" text-anchor="middle" class="hour-time">48-54H</text>
+  <text x="1060" y="175" class="hour-features">• ZIP browse</text>
+  <text x="1060" y="188" class="hour-features">• TAR support</text>
+  <text x="1060" y="201" class="hour-features">• Virtual dirs</text>
+  <text x="1060" y="214" class="hour-features">• Extract</text>
+  <text x="1060" y="227" class="hour-features">• Metadata</text>
+  <text x="1060" y="240" class="hour-features">• Nested</text>
+  <text x="1060" y="253" class="hour-features">• Detection</text>
+  <circle cx="1100" cy="450" r="6" class="milestone"/>
+  <line x1="1100" y1="290" x2="1100" y2="444" class="arrow"/>
+  
+  <!-- 54-60H: External Programs -->
+  <rect x="1160" y="120" width="110" height="170" class="hour-box phase4" rx="6"/>
+  <text x="1215" y="140" text-anchor="middle" class="hour-title">External</text>
+  <text x="1215" y="155" text-anchor="middle" class="hour-time">54-60H</text>
+  <text x="1170" y="175" class="hour-features">• Launcher</text>
+  <text x="1170" y="188" class="hour-features">• Env vars</text>
+  <text x="1170" y="201" class="hour-features">• Shell</text>
+  <text x="1170" y="214" class="hour-features">• Editors</text>
+  <text x="1170" y="227" class="hour-features">• Commands</text>
+  <text x="1170" y="240" class="hour-features">• Auto-return</text>
+  <text x="1170" y="253" class="hour-features">• Config</text>
+  <circle cx="1215" cy="450" r="6" class="milestone"/>
+  <line x1="1215" y1="290" x2="1215" y2="444" class="arrow"/>
+  
+  <!-- 60-66H: Threading -->
+  <rect x="1280" y="120" width="100" height="170" class="hour-box phase5" rx="6"/>
+  <text x="1330" y="140" text-anchor="middle" class="hour-title">Threading</text>
+  <text x="1330" y="155" text-anchor="middle" class="hour-time">60-66H</text>
+  <text x="1290" y="175" class="hour-features">• Async ops</text>
+  <text x="1290" y="188" class="hour-features">• Copy thread</text>
+  <text x="1290" y="201" class="hour-features">• Search bg</text>
+  <text x="1290" y="214" class="hour-features">• Cancel</text>
+  <text x="1290" y="227" class="hour-features">• Progress</text>
+  <text x="1290" y="240" class="hour-features">• UI update</text>
+  <text x="1290" y="253" class="hour-features">• Safety</text>
+  <circle cx="1330" cy="450" r="6" class="milestone"/>
+  <line x1="1330" y1="290" x2="1330" y2="444" class="arrow"/>
+  
+  <!-- 66-72H: State -->
+  <rect x="1390" y="120" width="130" height="170" class="hour-box phase1" rx="6"/>
+  <text x="1455" y="140" text-anchor="middle" class="hour-title">State Mgmt</text>
+  <text x="1455" y="155" text-anchor="middle" class="hour-time">66-72H</text>
+  <text x="1400" y="175" class="hour-features">• Persistence</text>
+  <text x="1400" y="188" class="hour-features">• Cursor save</text>
+  <text x="1400" y="201" class="hour-features">• Dir history</text>
+  <text x="1400" y="214" class="hour-features">• Geometry</text>
+  <text x="1400" y="227" class="hour-features">• Config files</text>
+  <text x="1400" y="240" class="hour-features">• Restoration</text>
+  <text x="1400" y="253" class="hour-features">• Optimization</text>
+  <circle cx="1455" cy="450" r="8" class="milestone"/>
+  <line x1="1455" y1="290" x2="1455" y2="442" class="arrow"/>
+  
+  <!-- Lower section features -->
+  <rect x="80" y="530" width="230" height="140" class="hour-box phase3" rx="6"/>
+  <text x="195" y="555" text-anchor="middle" class="hour-title">Day 1 Achievements</text>
+  <text x="95" y="580" class="hour-features">✓ Complete dual-pane file manager</text>
+  <text x="95" y="595" class="hour-features">✓ All file operations (copy/move/delete)</text>
+  <text x="95" y="610" class="hour-features">✓ Text viewer with search</text>
+  <text x="95" y="625" class="hour-features">✓ Configuration system</text>
+  <text x="95" y="640" class="hour-features">✓ Help system</text>
+  <text x="95" y="655" class="hour-features">✓ Version 0.90 released</text>
+  
+  <rect x="330" y="530" width="230" height="140" class="hour-box phase2" rx="6"/>
+  <text x="445" y="555" text-anchor="middle" class="hour-title">Day 2 Achievements</text>
+  <text x="345" y="580" class="hour-features">✓ File search with patterns</text>
+  <text x="345" y="595" class="hour-features">✓ Enhanced dialog system</text>
+  <text x="345" y="610" class="hour-features">✓ Progress indicators</text>
+  <text x="345" y="625" class="hour-features">✓ Cursor history</text>
+  <text x="345" y="640" class="hour-features">✓ Tab switching</text>
+  <text x="345" y="655" class="hour-features">✓ UI refinements</text>
+  
+  <rect x="580" y="530" width="230" height="140" class="hour-box phase4" rx="6"/>
+  <text x="695" y="555" text-anchor="middle" class="hour-title">Day 3 Achievements</text>
+  <text x="595" y="580" class="hour-features">✓ Archive browsing (ZIP/TAR/GZ)</text>
+  <text x="595" y="595" class="hour-features">✓ Virtual directory system</text>
+  <text x="595" y="610" class="hour-features">✓ External program integration</text>
+  <text x="595" y="625" class="hour-features">✓ Threaded operations</text>
+  <text x="595" y="640" class="hour-features">✓ State management</text>
+  <text x="595" y="655" class="hour-features">✓ Session persistence</text>
+  
+  <rect x="830" y="530" width="690" height="140" class="hour-box phase5" rx="6"/>
+  <text x="1175" y="555" text-anchor="middle" class="hour-title">72-Hour Summary</text>
+  <text x="850" y="580" class="hour-features">Complete TUI file manager built from scratch • Dual-pane navigation • Full file operations • Text viewer</text>
+  <text x="850" y="600" class="hour-features">Archive support • External programs • Search • Threading • State persistence • Configuration system</text>
+  <text x="850" y="620" class="hour-features">~50 commits • Version 0.90 released • Fully functional application • Ready for production use</text>
+  <text x="850" y="640" class="hour-features">Foundation established for S3, internationalization, and TTK framework evolution</text>
+  
+  <!-- Footer -->
+  <text x="800" y="710" text-anchor="middle" class="subtitle">Hourly Timeline: 0H to 72H</text>
+  <text x="800" y="730" text-anchor="middle" class="subtitle">From Zero to Complete File Manager in Three Days</text>
+</svg>

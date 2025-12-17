@@ -4,13 +4,13 @@
     <style>
       .timeline-line { stroke: #4a90e2; stroke-width: 6; fill: none; }
       .phase-box { fill: #f0f4f8; stroke: #4a90e2; stroke-width: 3; }
-      .phase-title { font-family: Arial, sans-serif; font-size: 22px; font-weight: bold; fill: #2c3e50; }
-      .phase-time { font-family: Arial, sans-serif; font-size: 18px; fill: #7f8c8d; }
-      .phase-features { font-family: Arial, sans-serif; font-size: 16px; fill: #34495e; }
+      .phase-title { font-family: Arial, sans-serif; font-size: 16.5px; font-weight: bold; fill: #2c3e50; }
+      .phase-time { font-family: Arial, sans-serif; font-size: 13.5px; fill: #7f8c8d; }
+      .phase-features { font-family: Arial, sans-serif; font-size: 12px; fill: #34495e; }
       .milestone { fill: #e74c3c; stroke: #c0392b; stroke-width: 3; }
-      .milestone-text { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; fill: #e74c3c; }
-      .title { font-family: Arial, sans-serif; font-size: 32px; font-weight: bold; fill: #2c3e50; }
-      .subtitle { font-family: Arial, sans-serif; font-size: 18px; fill: #7f8c8d; }
+      .milestone-text { font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; fill: #e74c3c; }
+      .title { font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; fill: #2c3e50; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 13.5px; fill: #7f8c8d; }
       .phase1 { fill: #e8f5e9; stroke: #4caf50; }
       .phase2 { fill: #fff3e0; stroke: #ff9800; }
       .phase3 { fill: #e3f2fd; stroke: #2196f3; }
@@ -30,44 +30,60 @@
   <line x1="100" y1="400" x2="1300" y2="400" class="timeline-line"/>
   
   <!-- Phase 1: First 24 Hours -->
-  <rect x="100" y="120" width="280" height="160" class="phase-box phase1" rx="10"/>
-  <text x="240" y="155" text-anchor="middle" class="phase-title">Core Foundation</text>
-  <text x="240" y="185" text-anchor="middle" class="phase-time">First 24 Hours</text>
-  <text x="120" y="220" class="phase-features">• Complete file manager</text>
-  <text x="120" y="245" class="phase-features">• Text editor/viewer</text>
-  <text x="120" y="270" class="phase-features">• Version 0.90</text>
+  <rect x="100" y="100" width="280" height="200" class="phase-box phase1" rx="10"/>
+  <text x="240" y="125" text-anchor="middle" class="phase-title">Core Foundation</text>
+  <text x="240" y="145" text-anchor="middle" class="phase-time">First 24 Hours (Sep 2025)</text>
+  <text x="120" y="170" class="phase-features">• Dual-pane file manager</text>
+  <text x="120" y="188" class="phase-features">• Text editor/viewer</text>
+  <text x="120" y="206" class="phase-features">• File operations (copy/move/delete)</text>
+  <text x="120" y="224" class="phase-features">• Directory navigation</text>
+  <text x="120" y="242" class="phase-features">• Search functionality</text>
+  <text x="120" y="260" class="phase-features">• Curses-based UI</text>
+  <text x="120" y="278" class="phase-features">• Version 0.90 released</text>
   <circle cx="240" cy="400" r="10" class="milestone"/>
-  <line x1="240" y1="280" x2="240" y2="390" class="arrow"/>
+  <line x1="240" y1="300" x2="240" y2="390" class="arrow"/>
   
   <!-- Phase 2: Weeks 2-4 -->
-  <rect x="420" y="120" width="280" height="160" class="phase-box phase2" rx="10"/>
-  <text x="560" y="155" text-anchor="middle" class="phase-title">Enhancement</text>
-  <text x="560" y="185" text-anchor="middle" class="phase-time">Weeks 2-4</text>
-  <text x="440" y="220" class="phase-features">• S3 integration</text>
-  <text x="440" y="245" class="phase-features">• Archive browsing</text>
-  <text x="440" y="270" class="phase-features">• Threading</text>
+  <rect x="420" y="100" width="280" height="200" class="phase-box phase2" rx="10"/>
+  <text x="560" y="125" text-anchor="middle" class="phase-title">Enhancement Phase</text>
+  <text x="560" y="145" text-anchor="middle" class="phase-time">Weeks 2-4 (Oct 2025)</text>
+  <text x="440" y="170" class="phase-features">• AWS S3 integration</text>
+  <text x="440" y="188" class="phase-features">• Archive browsing (zip/tar/gz)</text>
+  <text x="440" y="206" class="phase-features">• Virtual directory system</text>
+  <text x="440" y="224" class="phase-features">• Threaded operations</text>
+  <text x="440" y="242" class="phase-features">• Progress indicators</text>
+  <text x="440" y="260" class="phase-features">• Remote log monitoring</text>
+  <text x="440" y="278" class="phase-features">• External program support</text>
   <circle cx="560" cy="400" r="10" class="milestone"/>
-  <line x1="560" y1="280" x2="560" y2="390" class="arrow"/>
+  <line x1="560" y1="300" x2="560" y2="390" class="arrow"/>
   
   <!-- Phase 3: Month 2 -->
-  <rect x="740" y="120" width="280" height="160" class="phase-box phase3" rx="10"/>
-  <text x="880" y="155" text-anchor="middle" class="phase-title">Internationalization</text>
-  <text x="880" y="185" text-anchor="middle" class="phase-time">Month 2</text>
-  <text x="760" y="220" class="phase-features">• Wide character support</text>
-  <text x="760" y="245" class="phase-features">• CJK languages</text>
-  <text x="760" y="270" class="phase-features">• Stability</text>
+  <rect x="740" y="100" width="280" height="200" class="phase-box phase3" rx="10"/>
+  <text x="880" y="125" text-anchor="middle" class="phase-title">Internationalization</text>
+  <text x="880" y="145" text-anchor="middle" class="phase-time">Month 2 (Nov 2025)</text>
+  <text x="760" y="170" class="phase-features">• Wide character support</text>
+  <text x="760" y="188" class="phase-features">• CJK language rendering</text>
+  <text x="760" y="206" class="phase-features">• Unicode normalization</text>
+  <text x="760" y="224" class="phase-features">• Character width detection</text>
+  <text x="760" y="242" class="phase-features">• Emoji support</text>
+  <text x="760" y="260" class="phase-features">• Performance optimization</text>
+  <text x="760" y="278" class="phase-features">• Stability improvements</text>
   <circle cx="880" cy="400" r="10" class="milestone"/>
-  <line x1="880" y1="280" x2="880" y2="390" class="arrow"/>
+  <line x1="880" y1="300" x2="880" y2="390" class="arrow"/>
   
   <!-- Phase 4: Month 3 -->
-  <rect x="1060" y="120" width="280" height="160" class="phase-box phase4" rx="10"/>
-  <text x="1200" y="155" text-anchor="middle" class="phase-title">TTK Revolution</text>
-  <text x="1200" y="185" text-anchor="middle" class="phase-time">Month 3</text>
-  <text x="1080" y="220" class="phase-features">• Backend abstraction</text>
-  <text x="1080" y="245" class="phase-features">• Cross-platform</text>
-  <text x="1080" y="270" class="phase-features">• Version 0.98</text>
+  <rect x="1060" y="100" width="280" height="200" class="phase-box phase4" rx="10"/>
+  <text x="1200" y="125" text-anchor="middle" class="phase-title">TTK Revolution</text>
+  <text x="1200" y="145" text-anchor="middle" class="phase-time">Month 3 (Dec 2025)</text>
+  <text x="1080" y="170" class="phase-features">• TTK library extraction</text>
+  <text x="1080" y="188" class="phase-features">• Backend abstraction layer</text>
+  <text x="1080" y="206" class="phase-features">• CoreGraphics backend (macOS)</text>
+  <text x="1080" y="224" class="phase-features">• Cross-platform support</text>
+  <text x="1080" y="242" class="phase-features">• Renderer architecture</text>
+  <text x="1080" y="260" class="phase-features">• Input event system</text>
+  <text x="1080" y="278" class="phase-features">• Version 0.98 released</text>
   <circle cx="1200" cy="400" r="10" class="milestone"/>
-  <line x1="1200" y1="280" x2="1200" y2="390" class="arrow"/>
+  <line x1="1200" y1="300" x2="1200" y2="390" class="arrow"/>
   
   <!-- Key Milestones on timeline -->
   <circle cx="180" cy="400" r="8" fill="#27ae60"/>
@@ -86,26 +102,43 @@
   <text x="1020" y="440" text-anchor="middle" class="milestone-text">Dec 10</text>
   
   <!-- Architecture Evolution -->
-  <text x="100" y="520" class="phase-title">Architecture Evolution</text>
+  <text x="100" y="500" class="phase-title">Architecture Evolution</text>
   
   <!-- Storage Layer -->
-  <rect x="100" y="550" width="360" height="120" class="phase-box" rx="8"/>
-  <text x="120" y="580" class="phase-title" font-size="20">Storage</text>
-  <text x="130" y="610" class="phase-features">Local → Archives → S3</text>
-  <text x="130" y="640" class="phase-features">Virtual directories</text>
+  <rect x="100" y="520" width="400" height="150" class="phase-box" rx="8"/>
+  <text x="120" y="545" class="phase-title" font-size="15">Storage Abstraction</text>
+  <text x="130" y="568" class="phase-features">• Local filesystem (pathlib)</text>
+  <text x="130" y="586" class="phase-features">• Archive support (zip/tar/gz/bz2)</text>
+  <text x="130" y="604" class="phase-features">• AWS S3 integration (boto3)</text>
+  <text x="130" y="622" class="phase-features">• Virtual directory system</text>
+  <text x="130" y="640" class="phase-features">• Unified path interface</text>
+  <text x="130" y="658" class="phase-features">• Caching &amp; optimization</text>
   
   <!-- UI Architecture -->
-  <rect x="520" y="550" width="360" height="120" class="phase-box" rx="8"/>
-  <text x="540" y="580" class="phase-title" font-size="20">UI Framework</text>
-  <text x="550" y="610" class="phase-features">Curses → TTK abstraction</text>
-  <text x="550" y="640" class="phase-features">Multi-backend support</text>
+  <rect x="540" y="520" width="400" height="150" class="phase-box" rx="8"/>
+  <text x="560" y="545" class="phase-title" font-size="15">UI Framework Evolution</text>
+  <text x="570" y="568" class="phase-features">• Curses-only → TTK abstraction</text>
+  <text x="570" y="586" class="phase-features">• Backend interface (ABC)</text>
+  <text x="570" y="604" class="phase-features">• CoreGraphics backend (macOS)</text>
+  <text x="570" y="622" class="phase-features">• Input event system</text>
+  <text x="570" y="640" class="phase-features">• Renderer architecture</text>
+  <text x="570" y="658" class="phase-features">• Cross-platform support</text>
   
   <!-- Statistics -->
-  <rect x="940" y="550" width="360" height="120" class="phase-box" rx="8"/>
-  <text x="960" y="580" class="phase-title" font-size="20">Project Stats</text>
-  <text x="970" y="610" class="phase-features">402+ commits in 3 months</text>
-  <text x="970" y="640" class="phase-features">2 major versions released</text>
+  <rect x="980" y="520" width="360" height="150" class="phase-box" rx="8"/>
+  <text x="1000" y="545" class="phase-title" font-size="15">Project Metrics</text>
+  <text x="1010" y="568" class="phase-features">• 402+ commits in 3 months</text>
+  <text x="1010" y="586" class="phase-features">• 2 major versions (0.90, 0.98)</text>
+  <text x="1010" y="604" class="phase-features">• 50+ demo/test files</text>
+  <text x="1010" y="622" class="phase-features">• Comprehensive documentation</text>
+  <text x="1010" y="640" class="phase-features">• Active development cycle</text>
+  <text x="1010" y="658" class="phase-features">• Modular architecture</text>
+  
+  <!-- Key Technologies -->
+  <text x="100" y="710" class="phase-title">Key Technologies &amp; Innovations</text>
+  <rect x="100" y="725" width="1240" height="50" class="phase-box" rx="8"/>
+  <text x="120" y="748" class="phase-features">Python 3 • Curses/CoreGraphics • AWS S3 (boto3) • Archive handling • Threading • Virtual filesystems • Unicode/CJK • State management • External programs • Remote monitoring</text>
   
   <!-- Footer -->
-  <text x="700" y="740" text-anchor="middle" class="subtitle" font-size="20">Terminal App → Cross-Platform Framework</text>
+  <text x="700" y="790" text-anchor="middle" class="subtitle" font-size="15">From Terminal File Manager to Cross-Platform TUI Framework</text>
 </svg>
