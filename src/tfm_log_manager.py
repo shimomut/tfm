@@ -389,7 +389,7 @@ class LogManager:
                     
                     # Truncate if too long (account for scrollbar)
                     if len(log_line) > content_width - 1:
-                        log_line = log_line[:content_width - 4] + "..."
+                        log_line = log_line[:content_width - 2] + "…"
                     
                     # Get color based on source
                     color_pair, attributes = get_log_color(source)
