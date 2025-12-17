@@ -115,6 +115,7 @@ class Config:
         'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
         'adjust_log_down': ['}'],             # Make log pane smaller (Shift+])
         'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)
+        'diff_files': {'keys': ['='], 'selection': 'required'}, # View diff between two selected text files
     }
     
     # Favorite directories - customize your frequently used directories

@@ -62,6 +62,13 @@ COLOR_BACKGROUND = 27        # Background color for filling areas
 # Scroll bar colors
 COLOR_SCROLLBAR = 29         # Scroll bar (uses different characters for track and thumb)
 
+# Diff viewer colors
+COLOR_DIFF_ONLY_ONE_SIDE = 30  # Lines only in one side (delete/insert)
+COLOR_DIFF_CHANGE = 32         # Changed lines in diff viewer (yellow background)
+COLOR_DIFF_BLANK = 33          # Blank lines in diff viewer (for alignment)
+COLOR_DIFF_CHAR_CHANGE = 34    # Character-level changes within lines (bright highlight)
+COLOR_DIFF_FOCUSED = 35        # Focused difference (highlighted background)
+
 # Current color scheme
 current_color_scheme = 'dark'
 
@@ -177,6 +184,27 @@ COLOR_SCHEMES = {
         'DEFAULT_BG': {
             'color_num': 147,
             'rgb': (0, 0, 0)        # Black for default background
+        },
+        # Diff viewer colors
+        'DIFF_ONLY_ONE_SIDE_BG': {
+            'color_num': 152,
+            'rgb': (30, 80, 50)     # Green-based background for lines only in one side (delete/insert)
+        },
+        'DIFF_CHANGE_BG': {
+            'color_num': 154,
+            'rgb': (70, 40, 40)     # Red-based background for different lines (less prominent than CHAR_CHANGE)
+        },
+        'DIFF_BLANK_BG': {
+            'color_num': 155,
+            'rgb': (50, 50, 50)     # Gray background for dummy lines (alignment)
+        },
+        'DIFF_CHAR_CHANGE_BG': {
+            'color_num': 156,
+            'rgb': (140, 40, 40)    # Red-based background for different characters (more prominent)
+        },
+        'DIFF_FOCUSED_BG': {
+            'color_num': 157,
+            'rgb': (60, 70, 140)    # Blue-based background for focused lines (more prominent than CHANGE)
         }
     },
     'light': {
@@ -282,6 +310,27 @@ COLOR_SCHEMES = {
         'DEFAULT_BG': {
             'color_num': 149,
             'rgb': (255, 255, 255)  # White for default background
+        },
+        # Diff viewer colors
+        'DIFF_ONLY_ONE_SIDE_BG': {
+            'color_num': 152,
+            'rgb': (200, 240, 220)  # Light green-based background for lines only in one side (delete/insert)
+        },
+        'DIFF_CHANGE_BG': {
+            'color_num': 154,
+            'rgb': (240, 220, 220)  # Light red-based background for different lines (less prominent than CHAR_CHANGE)
+        },
+        'DIFF_BLANK_BG': {
+            'color_num': 155,
+            'rgb': (230, 230, 230)  # Light gray background for blank lines (alignment)
+        },
+        'DIFF_CHAR_CHANGE_BG': {
+            'color_num': 156,
+            'rgb': (255, 180, 180)  # Light red-based background for different characters (more prominent)
+        },
+        'DIFF_FOCUSED_BG': {
+            'color_num': 157,
+            'rgb': (200, 210, 255)  # Light blue-based background for focused lines (more prominent than CHANGE)
         }
     }
 }
@@ -412,6 +461,18 @@ def init_colors(renderer, color_scheme=None):
     
     # Background color pair for filling areas
     renderer.init_color_pair(COLOR_BACKGROUND, default_fg, default_bg)
+    
+    # Diff viewer colors
+    diff_only_one_side_bg = rgb_colors['DIFF_ONLY_ONE_SIDE_BG']['rgb']
+    diff_change_bg = rgb_colors['DIFF_CHANGE_BG']['rgb']
+    diff_blank_bg = rgb_colors['DIFF_BLANK_BG']['rgb']
+    diff_char_change_bg = rgb_colors['DIFF_CHAR_CHANGE_BG']['rgb']
+    diff_focused_bg = rgb_colors['DIFF_FOCUSED_BG']['rgb']
+    renderer.init_color_pair(COLOR_DIFF_ONLY_ONE_SIDE, default_fg, diff_only_one_side_bg)
+    renderer.init_color_pair(COLOR_DIFF_CHANGE, default_fg, diff_change_bg)
+    renderer.init_color_pair(COLOR_DIFF_BLANK, default_fg, diff_blank_bg)
+    renderer.init_color_pair(COLOR_DIFF_CHAR_CHANGE, default_fg, diff_char_change_bg)
+    renderer.init_color_pair(COLOR_DIFF_FOCUSED, default_fg, diff_focused_bg)
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """

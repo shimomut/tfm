@@ -31,6 +31,7 @@ from tfm_const import *
 from tfm_colors import *
 from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, is_special_key_bound_to_with_selection, is_input_event_bound_to, is_input_event_bound_to_with_selection, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
 from tfm_text_viewer import view_text_file, is_text_file
+from tfm_diff_viewer import view_diff
 
 # Import new modular components
 from tfm_log_manager import LogManager
@@ -2299,6 +2300,56 @@ class FileManager:
                 # Not a text file and no viewer configured
                 print(f"No viewer configured for '{selected_file.name}' (not a text file)")
     
+    def diff_selected_files(self):
+        """View diff between two selected text files"""
+        # Collect selected files from both panes
+        left_selected = [Path(f) for f in self.pane_manager.left_pane['selected_files']]
+        right_selected = [Path(f) for f in self.pane_manager.right_pane['selected_files']]
+        
+        # Combine all selected files
+        all_selected = left_selected + right_selected
+        
+        # Filter to only files (not directories)
+        selected_files = [f for f in all_selected if f.exists() and f.is_file()]
+        
+        # Check if exactly 2 files are selected
+        if len(selected_files) != 2:
+            if len(all_selected) == 0:
+                print("No files selected. Select exactly 2 text files to compare.")
+            elif len(all_selected) == 1:
+                print("Only 1 file selected. Select exactly 2 text files to compare.")
+            elif len(selected_files) < len(all_selected):
+                print(f"Selected items include directories. Select exactly 2 text files to compare.")
+            else:
+                print(f"Selected {len(selected_files)} files. Select exactly 2 text files to compare.")
+            return
+        
+        file1, file2 = selected_files[0], selected_files[1]
+        
+        # Check if both are text files
+        if not is_text_file(file1):
+            print(f"'{file1.name}' is not a text file")
+            return
+        
+        if not is_text_file(file2):
+            print(f"'{file2.name}' is not a text file")
+            return
+        
+        # Launch diff viewer
+        try:
+            self.renderer.set_cursor_visibility(False)
+            
+            if view_diff(self.renderer, file1, file2):
+                print(f"Compared: {file1.name} <-> {file2.name}")
+            else:
+                print(f"Failed to compare files")
+            
+            self.needs_full_redraw = True
+            
+        except Exception as e:
+            print(f"Error viewing diff: {e}")
+            self.needs_full_redraw = True
+    
     def edit_selected_file(self):
         """Edit the selected file using configured editor from file associations"""
         current_pane = self.get_current_pane()
@@ -3068,6 +3119,8 @@ class FileManager:
             self.show_file_details()
         elif self.is_key_for_action(event, 'view_file'):  # View file
             self.view_selected_file()
+        elif self.is_key_for_action(event, 'diff_files'):  # Diff two selected files
+            self.diff_selected_files()
         elif self.is_key_for_action(event, 'copy_files'):  # Copy selected files
             self.copy_selected_files()
         elif self.is_key_for_action(event, 'move_files'):  # Move selected files
