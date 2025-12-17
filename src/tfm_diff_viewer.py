@@ -635,12 +635,14 @@ class DiffViewer:
                     self._draw_line_with_char_diff(y_pos, content_start_x, char_diff1, content_width, 
                                                    color_pair, attrs, char_change_color_pair, char_change_attrs,
                                                    highlighted_line1)
-                elif highlighted_line1 and self.syntax_highlighting:
-                    # Draw with syntax highlighting
+                elif self.syntax_highlighting and highlighted_line1:
+                    # Draw with syntax highlighting (only when enabled)
                     # Use syntax colors only for equal lines, diff background for others
                     self._draw_highlighted_line(y_pos, content_start_x, highlighted_line1, content_width,
                                                color_pair, attrs, use_syntax_colors=(status == 'equal'))
                 else:
+                    # No syntax highlighting or no highlighted line available
+                    # Apply horizontal scrolling manually
                     visible_line1 = self._apply_horizontal_scroll(line1)
                     visible_line1 = truncate_to_width(visible_line1, content_width, "")
                     self.renderer.draw_text(y_pos, content_start_x, visible_line1, color_pair, attrs)
@@ -671,12 +673,14 @@ class DiffViewer:
                     self._draw_line_with_char_diff(y_pos, content_start_x2, char_diff2, content_width,
                                                    color_pair, attrs, char_change_color_pair, char_change_attrs,
                                                    highlighted_line2)
-                elif highlighted_line2 and self.syntax_highlighting:
-                    # Draw with syntax highlighting
+                elif self.syntax_highlighting and highlighted_line2:
+                    # Draw with syntax highlighting (only when enabled)
                     # Use syntax colors only for equal lines, diff background for others
                     self._draw_highlighted_line(y_pos, content_start_x2, highlighted_line2, content_width,
                                                color_pair, attrs, use_syntax_colors=(status == 'equal'))
                 else:
+                    # No syntax highlighting or no highlighted line available
+                    # Apply horizontal scrolling manually
                     visible_line2 = self._apply_horizontal_scroll(line2)
                     visible_line2 = truncate_to_width(visible_line2, content_width, "")
                     self.renderer.draw_text(y_pos, content_start_x2, visible_line2, color_pair, attrs)
@@ -859,7 +863,7 @@ class DiffViewer:
         
         # Skip characters based on horizontal offset
         current_width = 0
-        start_index = 0
+        start_index = len(line)  # Default to end of line if we scroll past everything
         
         for i, char in enumerate(line):
             char_width = get_display_width(char)
