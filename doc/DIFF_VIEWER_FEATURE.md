@@ -60,8 +60,11 @@ The diff viewer uses colors to indicate the type of change:
 
 - **White/Regular**: Lines that are identical in both files
 - **Red**: Lines that were deleted (only in left file)
-- **Blue/Cyan**: Lines that were inserted (only in right file)
-- **Green/Yellow**: Lines that were modified (different in both files)
+- **Yellow**: Lines that were changed (modified, inserted, or replaced)
+- **Gray**: Dummy/blank lines inserted for alignment (when one side has no content)
+- **Bright Blue**: Currently focused difference (when using n/p navigation)
+
+When navigating between differences using `n` (next) and `p` (previous), the focused difference block is highlighted with a bright blue background, making it stand out from other changes. Note that dummy alignment lines (gray) are not highlighted when focused - only real content lines receive the focus highlight.
 
 ### Navigation Controls
 
@@ -77,6 +80,17 @@ The diff viewer uses colors to indicate the type of change:
 - `←` (Left Arrow): Scroll left one column
 - `→` (Right Arrow): Scroll right one column
 
+#### Difference Navigation
+- `n`: Jump to next difference
+- `p`: Jump to previous difference
+
+The currently focused difference is highlighted with a distinct blue background color, making it easy to see which change you're reviewing. The status bar shows your position (e.g., "Diff 3/16") indicating you're viewing the 3rd difference out of 16 total differences.
+
+#### Display Options
+- `#`: Toggle line numbers on/off
+- `s`: Toggle syntax highlighting on/off (if pygments is available)
+- `t`: Cycle through tab widths (2, 4, 8 spaces)
+
 #### Exit
 - `q`: Quit the diff viewer
 - `Enter`: Quit the diff viewer
@@ -88,8 +102,10 @@ The status bar at the bottom shows:
 
 - **Current line / Total lines**: Your position in the diff
 - **Scroll percentage**: How far through the diff you are
+- **Diff position**: Current difference number and total (e.g., "Diff 3/16")
 - **Equal lines**: Number of identical lines
 - **Changed lines**: Number of lines with differences
+- **Active options**: Shows which features are enabled (NUM for line numbers, SYNTAX for syntax highlighting, TAB:4 for tab width)
 
 ## Use Cases
 
@@ -151,9 +167,23 @@ Compare log files:
 ### Understanding Changes
 
 - **Red lines (left only)**: Content was removed
-- **Green lines (right only)**: Content was added
-- **Yellow lines (both sides)**: Content was modified
+- **Yellow lines**: Content was changed (modified, inserted, or replaced)
+- **Gray lines**: Dummy/blank lines for alignment (no actual content)
 - **White lines**: Content is identical
+- **Bright blue lines**: Currently focused difference (use n/p to navigate)
+
+Note: Dummy alignment lines (shown in gray) appear when one side of the diff has no corresponding content. These are not highlighted when focused - only lines with actual content receive the focus highlight.
+
+### Navigating Between Differences
+
+The diff viewer automatically tracks all differences in the files. Use `n` and `p` to jump between them:
+
+1. Press `n` to jump to the next difference
+2. Press `p` to jump to the previous difference
+3. The focused difference is highlighted with a bright blue background
+4. The status bar shows your position (e.g., "Diff 3/16")
+
+This makes it easy to review changes one at a time without manually scrolling through the entire file.
 
 ### Keyboard Shortcuts Summary
 
@@ -162,8 +192,13 @@ Compare log files:
 | `=` | Launch diff viewer (from file manager) |
 | `↑`/`↓` | Scroll vertically |
 | `←`/`→` | Scroll horizontally |
+| `n` | Jump to next difference |
+| `p` | Jump to previous difference |
 | `PgUp`/`PgDn` | Page up/down |
 | `Home`/`End` | Jump to start/end |
+| `#` | Toggle line numbers |
+| `s` | Toggle syntax highlighting |
+| `t` | Cycle tab width (2/4/8) |
 | `q`/`Enter`/`Esc` | Exit viewer |
 
 ## Technical Details

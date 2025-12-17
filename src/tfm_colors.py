@@ -62,6 +62,14 @@ COLOR_BACKGROUND = 27        # Background color for filling areas
 # Scroll bar colors
 COLOR_SCROLLBAR = 29         # Scroll bar (uses different characters for track and thumb)
 
+# Diff viewer colors
+COLOR_DIFF_DELETE = 30       # Deleted lines in diff viewer (red background)
+COLOR_DIFF_INSERT = 31       # Inserted lines in diff viewer (green background)
+COLOR_DIFF_CHANGE = 32       # Changed lines in diff viewer (yellow background)
+COLOR_DIFF_BLANK = 33        # Blank lines in diff viewer (for alignment)
+COLOR_DIFF_CHAR_CHANGE = 34  # Character-level changes within lines (bright highlight)
+COLOR_DIFF_FOCUSED = 35      # Focused difference (highlighted background)
+
 # Current color scheme
 current_color_scheme = 'dark'
 
@@ -177,6 +185,31 @@ COLOR_SCHEMES = {
         'DEFAULT_BG': {
             'color_num': 147,
             'rgb': (0, 0, 0)        # Black for default background
+        },
+        # Diff viewer colors
+        'DIFF_DELETE_BG': {
+            'color_num': 152,
+            'rgb': (80, 20, 20)     # Dark red background for deleted lines
+        },
+        'DIFF_INSERT_BG': {
+            'color_num': 153,
+            'rgb': (20, 80, 20)     # Dark green background for inserted lines
+        },
+        'DIFF_CHANGE_BG': {
+            'color_num': 154,
+            'rgb': (80, 80, 20)     # Dark yellow background for changed lines
+        },
+        'DIFF_BLANK_BG': {
+            'color_num': 155,
+            'rgb': (40, 40, 40)     # Dark gray background for blank lines (alignment)
+        },
+        'DIFF_CHAR_CHANGE_BG': {
+            'color_num': 156,
+            'rgb': (140, 60, 20)    # Bright orange background for character-level changes
+        },
+        'DIFF_FOCUSED_BG': {
+            'color_num': 157,
+            'rgb': (60, 60, 140)    # Bright blue background for focused difference
         }
     },
     'light': {
@@ -282,6 +315,31 @@ COLOR_SCHEMES = {
         'DEFAULT_BG': {
             'color_num': 149,
             'rgb': (255, 255, 255)  # White for default background
+        },
+        # Diff viewer colors
+        'DIFF_DELETE_BG': {
+            'color_num': 152,
+            'rgb': (255, 200, 200)  # Light red background for deleted lines
+        },
+        'DIFF_INSERT_BG': {
+            'color_num': 153,
+            'rgb': (200, 255, 200)  # Light green background for inserted lines
+        },
+        'DIFF_CHANGE_BG': {
+            'color_num': 154,
+            'rgb': (255, 255, 200)  # Light yellow background for changed lines
+        },
+        'DIFF_BLANK_BG': {
+            'color_num': 155,
+            'rgb': (230, 230, 230)  # Light gray background for blank lines (alignment)
+        },
+        'DIFF_CHAR_CHANGE_BG': {
+            'color_num': 156,
+            'rgb': (255, 180, 100)  # Bright orange background for character-level changes
+        },
+        'DIFF_FOCUSED_BG': {
+            'color_num': 157,
+            'rgb': (180, 180, 255)  # Bright blue background for focused difference
         }
     }
 }
@@ -412,6 +470,20 @@ def init_colors(renderer, color_scheme=None):
     
     # Background color pair for filling areas
     renderer.init_color_pair(COLOR_BACKGROUND, default_fg, default_bg)
+    
+    # Diff viewer colors
+    diff_delete_bg = rgb_colors['DIFF_DELETE_BG']['rgb']
+    diff_insert_bg = rgb_colors['DIFF_INSERT_BG']['rgb']
+    diff_change_bg = rgb_colors['DIFF_CHANGE_BG']['rgb']
+    diff_blank_bg = rgb_colors['DIFF_BLANK_BG']['rgb']
+    diff_char_change_bg = rgb_colors['DIFF_CHAR_CHANGE_BG']['rgb']
+    diff_focused_bg = rgb_colors['DIFF_FOCUSED_BG']['rgb']
+    renderer.init_color_pair(COLOR_DIFF_DELETE, default_fg, diff_delete_bg)
+    renderer.init_color_pair(COLOR_DIFF_INSERT, default_fg, diff_insert_bg)
+    renderer.init_color_pair(COLOR_DIFF_CHANGE, default_fg, diff_change_bg)
+    renderer.init_color_pair(COLOR_DIFF_BLANK, default_fg, diff_blank_bg)
+    renderer.init_color_pair(COLOR_DIFF_CHAR_CHANGE, default_fg, diff_char_change_bg)
+    renderer.init_color_pair(COLOR_DIFF_FOCUSED, default_fg, diff_focused_bg)
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """
