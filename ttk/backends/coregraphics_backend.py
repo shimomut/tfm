@@ -2428,9 +2428,10 @@ class CoreGraphicsBackend(Renderer):
         key_equivalent, modifier_mask = self._parse_shortcut(item_def.get('shortcut', ''))
         
         # Create menu item with title, action, and key equivalent
+        # Use selector name as string - PyObjC will handle the bridging
         item = Cocoa.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
             item_def['label'],
-            objc.selector(self._menu_item_selected_, signature=b'v@:@'),
+            '_menu_item_selected:',  # Selector as string with trailing colon for one argument
             key_equivalent
         )
         

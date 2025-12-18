@@ -3502,7 +3502,9 @@ class FileManager:
                 pass  # Continue to drawing
             elif isinstance(event, MenuEvent):  # Menu item selected
                 # Handle menu events
-                self._handle_menu_event(event)
+                handled = self._handle_menu_event(event)
+                if handled:
+                    self.needs_full_redraw = True
             elif isinstance(event, SystemEvent) and event.is_resize():  # Terminal window resized - handle at top level
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()
