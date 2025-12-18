@@ -12,8 +12,34 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_text_viewer import TextViewer
 from tfm_path import Path
-from ttk.mock_renderer import MockRenderer
 from ttk import KeyEvent, KeyCode
+from ttk.renderer import TextAttribute
+
+
+class MockRenderer:
+    """Mock renderer for testing"""
+    def __init__(self, height=24, width=80):
+        self.height = height
+        self.width = width
+        self.drawn_text = []
+        
+    def get_dimensions(self):
+        return self.height, self.width
+        
+    def draw_text(self, y, x, text, color_pair=0, attributes=TextAttribute.NORMAL):
+        self.drawn_text.append({
+            'y': y,
+            'x': x,
+            'text': text,
+            'color_pair': color_pair,
+            'attributes': attributes
+        })
+        
+    def clear(self):
+        self.drawn_text = []
+        
+    def refresh(self):
+        pass
 
 
 def create_test_file_with_tabs(file_path: str):

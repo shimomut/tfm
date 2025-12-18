@@ -340,12 +340,12 @@ class Renderer(ABC):
     @abstractmethod
     def get_event(self, timeout_ms: int = -1) -> Optional['Event']:
         """
-        Get the next event (keyboard, mouse, or system event).
+        Get the next event (keyboard, mouse, system, or menu event).
         
         This method retrieves the next event from the event queue. Events can be
-        keyboard input, mouse actions, or system events (like window resize).
-        It can operate in blocking mode (wait indefinitely), non-blocking mode
-        (return immediately), or with a timeout.
+        keyboard input, mouse actions, system events (like window resize), or
+        menu selection events (in desktop mode). It can operate in blocking mode
+        (wait indefinitely), non-blocking mode (return immediately), or with a timeout.
         
         Args:
             timeout_ms: Timeout in milliseconds.
@@ -354,10 +354,13 @@ class Renderer(ABC):
                        >0: Wait up to timeout_ms milliseconds for an event
         
         Returns:
-            Optional[Event]: An Event object if an event is available,
-                            or None if the timeout expires with no event.
+            Optional[Event]: An Event object (KeyEvent, MouseEvent, SystemEvent,
+                            or MenuEvent) if an event is available, or None if
+                            the timeout expires with no event.
                                  
-        Note: The Event type is defined in the ttk.event module.
+        Note: The Event types are defined in the ttk.input_event module.
+              MenuEvent objects are only generated in desktop mode when a user
+              selects a menu item from the native menu bar.
         
         Example:
             # Blocking wait for event
@@ -371,6 +374,14 @@ class Renderer(ABC):
             
             # Wait up to 100ms for event
             event = renderer.get_event(timeout_ms=100)
+            
+            # Handle different event types
+            from ttk.input_event import KeyEvent, MenuEvent
+            event = renderer.get_event()
+            if isinstance(event, MenuEvent):
+                print(f"Menu item selected: {event.item_id}")
+            elif isinstance(event, KeyEvent):
+                print(f"Key pressed: {event.key_code}")
         """
         pass
     
@@ -423,3 +434,105 @@ class Renderer(ABC):
         get_event(). New code should use get_event() directly.
         """
         return self.get_event(timeout_ms)
+    
+    @abstractmethod
+    def set_menu_bar(self, menu_structure: dict) -> None:
+        """
+        Set the menu bar structure for desktop mode.
+        
+        This method configures the native menu bar with the specified menu
+        structure. It is only applicable in desktop mode (e.g., macOS CoreGraphics
+        backend). Terminal-based backends should implement this as a no-op.
+        
+        The menu structure defines a hierarchical organization of menus and menu
+        items, including labels, keyboard shortcuts, and initial enabled states.
+        
+        Args:
+            menu_structure: Dictionary defining the menu hierarchy with the format:
+                {
+                    'menus': [
+                        {
+                            'id': str,           # Unique menu identifier
+                            'label': str,        # Display label for the menu
+                            'items': [
+                                {
+                                    'id': str,              # Unique item identifier
+                                    'label': str,           # Display label
+                                    'shortcut': Optional[str],  # Keyboard shortcut (e.g., 'Cmd+N')
+                                    'enabled': bool         # Initial enabled state
+                                },
+                                {'separator': True},  # Menu separator
+                                ...
+                            ]
+                        },
+                        ...
+                    ]
+                }
+        
+        Note: This method should be called during application initialization
+        after the renderer has been initialized. Changes to the menu structure
+        require calling this method again with the updated structure.
+        
+        Example:
+            menu_structure = {
+                'menus': [
+                    {
+                        'id': 'file',
+                        'label': 'File',
+                        'items': [
+                            {
+                                'id': 'file.new',
+                                'label': 'New File',
+                                'shortcut': 'Cmd+N',
+                                'enabled': True
+                            },
+                            {'separator': True},
+                            {
+                                'id': 'file.quit',
+                                'label': 'Quit',
+                                'shortcut': 'Cmd+Q',
+                                'enabled': True
+                            }
+                        ]
+                    }
+                ]
+            }
+            renderer.set_menu_bar(menu_structure)
+        """
+        pass
+    
+    @abstractmethod
+    def update_menu_item_state(self, item_id: str, enabled: bool) -> None:
+        """
+        Update the enabled/disabled state of a menu item.
+        
+        This method dynamically updates whether a menu item is enabled (selectable)
+        or disabled (grayed out). It allows the application to reflect the current
+        application state in the menu bar without reconstructing the entire menu.
+        
+        This is only applicable in desktop mode. Terminal-based backends should
+        implement this as a no-op.
+        
+        Args:
+            item_id: Unique identifier for the menu item to update.
+                    This must match an 'id' field from the menu structure
+                    passed to set_menu_bar().
+            enabled: True to enable the menu item (make it selectable),
+                    False to disable it (gray it out and prevent selection).
+        
+        Raises:
+            ValueError: If item_id does not correspond to a known menu item.
+                       Backends may choose to log a warning instead of raising.
+        
+        Note: State updates are typically applied immediately and do not require
+        a refresh operation. The menu bar will reflect the change the next time
+        the user opens the menu.
+        
+        Example:
+            # Disable the "Paste" menu item when clipboard is empty
+            renderer.update_menu_item_state('edit.paste', False)
+            
+            # Enable the "Delete" menu item when files are selected
+            renderer.update_menu_item_state('file.delete', True)
+        """
+        pass

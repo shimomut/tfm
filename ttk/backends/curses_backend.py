@@ -724,3 +724,30 @@ class CursesBackend(Renderer):
         except curses.error:
             # Ignore out-of-bounds errors
             pass
+    
+    def set_menu_bar(self, menu_structure: dict) -> None:
+        """
+        Set menu bar structure (no-op for terminal backend).
+        
+        Menu bars are only supported in desktop mode. This method is a no-op
+        for the curses backend.
+        
+        Args:
+            menu_structure: Menu structure dictionary (ignored)
+        """
+        # No-op: Terminal backend does not support native menu bars
+        pass
+    
+    def update_menu_item_state(self, item_id: str, enabled: bool) -> None:
+        """
+        Update menu item state (no-op for terminal backend).
+        
+        Menu bars are only supported in desktop mode. This method is a no-op
+        for the curses backend.
+        
+        Args:
+            item_id: Menu item identifier (ignored)
+            enabled: Enabled state (ignored)
+        """
+        # No-op: Terminal backend does not support native menu bars
+        pass

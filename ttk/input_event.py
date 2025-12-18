@@ -130,3 +130,18 @@ class SystemEvent(Event):
     def is_close(self) -> bool:
         """Check if this is a window close event."""
         return self.event_type == SystemEventType.CLOSE
+
+
+@dataclass
+class MenuEvent(Event):
+    """
+    Represents a menu selection event.
+    
+    This class captures menu item selection events from the native menu bar
+    in desktop mode. Menu events are generated when a user selects a menu item
+    from the application's menu bar.
+    """
+    item_id: str  # Unique identifier for the selected menu item
+    
+    def __repr__(self):
+        return f"MenuEvent(item_id='{self.item_id}')"
