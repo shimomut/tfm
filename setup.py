@@ -30,18 +30,18 @@ setup(
     url="https://github.com/shimomut/tfm",
     packages=["tfm"],
     package_dir={
-        "tfm": ".",
+        "tfm": "src",
     },
     package_data={
         "tfm": [
-            "src/*.py",
-            "tools/*",
+            "*.py",
+            "../tools/*",
         ],
     },
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "tfm=tfm.tfm:main",
+            "tfm=tfm.tfm_main:cli_main",
         ],
     },
     install_requires=requirements,
