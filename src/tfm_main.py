@@ -25,7 +25,7 @@ from collections import deque
 from tfm_single_line_text_edit import SingleLineTextEdit
 
 # Import TTK input event system
-from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType
+from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, MenuEvent
 from ttk.renderer import TextAttribute
 
 # Import constants and colors
@@ -54,6 +54,7 @@ from tfm_state_manager import get_state_manager, cleanup_state_manager
 from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_cache_manager import CacheManager
 from tfm_profiling import ProfilingManager
+from tfm_menu_manager import MenuManager
 
 class FileManager:
     def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_enabled=False):
@@ -124,6 +125,12 @@ class FileManager:
         self.archive_ui = ArchiveUI(self, self.archive_operations)
         self.file_operations_ui = FileOperationsUI(self, self.file_operations)
         
+        # Initialize menu system for desktop mode
+        self.menu_manager = None
+        if self.is_desktop_mode():
+            self.menu_manager = MenuManager(self)
+            self._setup_menu_bar()
+        
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
         self.needs_full_redraw = True  # Flag to control when to redraw everything
@@ -181,6 +188,222 @@ class FileManager:
             # If we can't create the directories, log a warning but don't fail
             # TFM should still work without user directories
             print(f"Warning: Could not create TFM user directories: {e}", file=sys.stderr)
+    
+    def is_desktop_mode(self):
+        """Check if running in desktop mode.
+        
+        Returns:
+            bool: True if renderer supports menu bar (desktop mode)
+        """
+        return hasattr(self.renderer, 'set_menu_bar')
+    
+    def _setup_menu_bar(self):
+        """Initialize menu bar for desktop mode."""
+        if not self.menu_manager:
+            return
+        
+        try:
+            menu_structure = self.menu_manager.get_menu_structure()
+            self.renderer.set_menu_bar(menu_structure)
+            self.log_manager.add_message("INFO", "Menu bar initialized for desktop mode")
+        except Exception as e:
+            self.log_manager.add_message("ERROR", f"Failed to initialize menu bar: {e}")
+    
+    def _update_menu_states(self):
+        """Update menu item states based on current application state."""
+        if not self.is_desktop_mode() or not self.menu_manager:
+            return
+        
+        try:
+            states = self.menu_manager.update_menu_states()
+            for item_id, enabled in states.items():
+                self.renderer.update_menu_item_state(item_id, enabled)
+        except Exception as e:
+            self.log_manager.add_message("ERROR", f"Failed to update menu states: {e}")
+    
+    def _handle_menu_event(self, event):
+        """Handle menu selection events.
+        
+        Args:
+            event: MenuEvent with item_id
+        
+        Returns:
+            bool: True if event was handled
+        """
+        if not isinstance(event, MenuEvent):
+            return False
+        
+        item_id = event.item_id
+        
+        # File menu
+        if item_id == MenuManager.FILE_NEW_FILE:
+            return self._action_create_file()
+        elif item_id == MenuManager.FILE_NEW_FOLDER:
+            return self._action_create_directory()
+        elif item_id == MenuManager.FILE_OPEN:
+            return self._action_open_file()
+        elif item_id == MenuManager.FILE_DELETE:
+            return self._action_delete()
+        elif item_id == MenuManager.FILE_RENAME:
+            return self._action_rename()
+        elif item_id == MenuManager.FILE_QUIT:
+            return self._action_quit()
+        
+        # Edit menu
+        elif item_id == MenuManager.EDIT_COPY:
+            return self._action_copy()
+        elif item_id == MenuManager.EDIT_CUT:
+            return self._action_cut()
+        elif item_id == MenuManager.EDIT_PASTE:
+            return self._action_paste()
+        elif item_id == MenuManager.EDIT_SELECT_ALL:
+            return self._action_select_all()
+        
+        # View menu
+        elif item_id == MenuManager.VIEW_SHOW_HIDDEN:
+            return self._action_toggle_hidden()
+        elif item_id == MenuManager.VIEW_SORT_BY_NAME:
+            return self._action_sort_by('name')
+        elif item_id == MenuManager.VIEW_SORT_BY_SIZE:
+            return self._action_sort_by('size')
+        elif item_id == MenuManager.VIEW_SORT_BY_DATE:
+            return self._action_sort_by('date')
+        elif item_id == MenuManager.VIEW_SORT_BY_EXTENSION:
+            return self._action_sort_by('extension')
+        elif item_id == MenuManager.VIEW_REFRESH:
+            return self._action_refresh()
+        
+        # Go menu
+        elif item_id == MenuManager.GO_PARENT:
+            return self._action_go_parent()
+        elif item_id == MenuManager.GO_HOME:
+            return self._action_go_home()
+        elif item_id == MenuManager.GO_FAVORITES:
+            return self._action_show_favorites()
+        elif item_id == MenuManager.GO_RECENT:
+            return self._action_show_recent()
+        
+        return False
+    
+    # Menu action methods
+    def _action_create_file(self):
+        """Create a new file."""
+        self.enter_create_file_mode()
+        return True
+    
+    def _action_create_directory(self):
+        """Create a new directory."""
+        self.enter_create_directory_mode()
+        return True
+    
+    def _action_open_file(self):
+        """Open the selected file or directory."""
+        self.handle_enter()
+        return True
+    
+    def _action_delete(self):
+        """Delete selected files."""
+        self.file_operations_ui.delete_files()
+        return True
+    
+    def _action_rename(self):
+        """Rename selected file."""
+        self.enter_rename_mode()
+        return True
+    
+    def _action_quit(self):
+        """Quit the application."""
+        self.should_quit = True
+        return True
+    
+    def _action_copy(self):
+        """Copy selected files."""
+        self.file_operations_ui.copy_files()
+        return True
+    
+    def _action_cut(self):
+        """Cut selected files."""
+        self.file_operations_ui.cut_files()
+        return True
+    
+    def _action_paste(self):
+        """Paste files from clipboard."""
+        self.file_operations_ui.paste_files()
+        return True
+    
+    def _action_select_all(self):
+        """Select all items."""
+        self.select_all()
+        return True
+    
+    def _action_toggle_hidden(self):
+        """Toggle showing hidden files."""
+        self.file_operations.show_hidden = not self.file_operations.show_hidden
+        self.refresh_files()
+        self.needs_full_redraw = True
+        status = "showing" if self.file_operations.show_hidden else "hiding"
+        print(f"Now {status} hidden files")
+        return True
+    
+    def _action_sort_by(self, sort_type):
+        """Sort files by specified type.
+        
+        Args:
+            sort_type: Sort type ('name', 'size', 'date', 'extension')
+        """
+        current_pane = self.get_current_pane()
+        current_pane['sort_mode'] = sort_type
+        self.refresh_files(current_pane)
+        self.needs_full_redraw = True
+        print(f"Sorted by {sort_type}")
+        return True
+    
+    def _action_refresh(self):
+        """Refresh file list."""
+        self.refresh_files()
+        self.needs_full_redraw = True
+        print("Refreshed file list")
+        return True
+    
+    def _action_go_parent(self):
+        """Navigate to parent directory."""
+        current_pane = self.get_current_pane()
+        parent = current_pane['path'].parent
+        if parent != current_pane['path']:  # Not at root
+            self.save_cursor_position(current_pane)
+            current_pane['path'] = parent
+            current_pane['selected_index'] = 0
+            current_pane['scroll_offset'] = 0
+            current_pane['selected_files'].clear()
+            self.refresh_files(current_pane)
+            self.restore_cursor_position(current_pane)
+            self.needs_full_redraw = True
+        return True
+    
+    def _action_go_home(self):
+        """Navigate to home directory."""
+        current_pane = self.get_current_pane()
+        home_path = Path.home()
+        if current_pane['path'] != home_path:
+            self.save_cursor_position(current_pane)
+            current_pane['path'] = home_path
+            current_pane['selected_index'] = 0
+            current_pane['scroll_offset'] = 0
+            current_pane['selected_files'].clear()
+            self.refresh_files(current_pane)
+            self.restore_cursor_position(current_pane)
+            self.needs_full_redraw = True
+        return True
+    
+    def _action_show_favorites(self):
+        """Show favorites dialog."""
+        self.show_favorites_dialog()
+        return True
+    
+    def _action_show_recent(self):
+        """Show recent locations dialog."""
+        self.show_recent_directories_dialog()
+        return True
         
     def safe_addstr(self, y, x, text, attr=None):
         """Safely add string to screen, handling boundary conditions
@@ -3252,12 +3475,19 @@ class FileManager:
             if self.log_manager.has_log_updates():
                 self.needs_full_redraw = True
             
+            # Update menu states for desktop mode
+            if self.is_desktop_mode():
+                self._update_menu_states()
+            
             # Get user input with timeout to allow timer checks
             event = self.renderer.get_input(timeout_ms=16)  # 16ms timeout
             
             # If no event was received (timeout), continue to next iteration
             if event is None:
                 pass  # Continue to drawing
+            elif isinstance(event, MenuEvent):  # Menu item selected
+                # Handle menu events
+                self._handle_menu_event(event)
             elif isinstance(event, SystemEvent) and event.is_resize():  # Terminal window resized - handle at top level
                 # Clear screen and trigger full redraw to handle new dimensions
                 self.clear_screen_with_background()

@@ -113,6 +113,9 @@ def test_complete_implementation_can_be_instantiated():
         def init_color_pair(self, pair_id, fg_color, bg_color):
             pass
         
+        def get_event(self, timeout_ms=-1):
+            return None
+        
         def get_input(self, timeout_ms=-1):
             return None
         
@@ -120,6 +123,12 @@ def test_complete_implementation_can_be_instantiated():
             pass
         
         def move_cursor(self, row, col):
+            pass
+        
+        def set_menu_bar(self, menu_structure):
+            pass
+        
+        def update_menu_item_state(self, item_id, enabled):
             pass
     
     # Should be able to instantiate

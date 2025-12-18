@@ -2008,7 +2008,7 @@ class CoreGraphicsBackend(Renderer):
         """
         Get the next event from the macOS event system.
         
-        This method polls the macOS event queue for keyboard, mouse, and system events
+        This method polls the macOS event queue for keyboard, mouse, menu, and system events
         and translates them into TTK's unified Event format. It supports
         blocking, non-blocking, and timed event modes.
         
@@ -2032,6 +2032,10 @@ class CoreGraphicsBackend(Renderer):
             event = backend.get_event(timeout_ms=-1)
             print(f"User pressed: {event.char}")
         """
+        # Check menu event queue first (highest priority)
+        if hasattr(self, 'menu_event_queue') and self.menu_event_queue:
+            return self.menu_event_queue.pop(0)
+        
         # Check if window was resized
         if self.resize_pending:
             self.resize_pending = False
@@ -2327,6 +2331,211 @@ class CoreGraphicsBackend(Renderer):
         # Trigger a redraw if cursor is visible
         if self.cursor_visible and self.view:
             self.view.setNeedsDisplay_(True)
+    
+    def set_menu_bar(self, menu_structure: dict) -> None:
+        """
+        Set menu bar structure for desktop mode.
+        
+        Creates a native macOS menu bar using NSMenu and NSMenuItem APIs.
+        The menu structure is stored and menu items are cached for efficient
+        state updates.
+        
+        Args:
+            menu_structure: Menu structure dictionary with format:
+                {
+                    'menus': [
+                        {
+                            'id': str,
+                            'label': str,
+                            'items': [
+                                {
+                                    'id': str,
+                                    'label': str,
+                                    'shortcut': Optional[str],
+                                    'enabled': bool
+                                },
+                                {'separator': True},
+                                ...
+                            ]
+                        },
+                        ...
+                    ]
+                }
+        """
+        if not menu_structure or 'menus' not in menu_structure:
+            return
+        
+        # Initialize menu event queue if not already done
+        if not hasattr(self, 'menu_event_queue'):
+            self.menu_event_queue = []
+        
+        # Initialize menu items cache if not already done
+        if not hasattr(self, 'menu_items'):
+            self.menu_items = {}
+        
+        # Create main menu bar
+        main_menu = Cocoa.NSMenu.alloc().init()
+        
+        # Process each top-level menu
+        for menu_def in menu_structure.get('menus', []):
+            # Create submenu for this top-level menu
+            submenu = Cocoa.NSMenu.alloc().initWithTitle_(menu_def['label'])
+            
+            # Create menu item to hold the submenu
+            menu_item = Cocoa.NSMenuItem.alloc().init()
+            menu_item.setSubmenu_(submenu)
+            
+            # Add menu items to the submenu
+            for item_def in menu_def.get('items', []):
+                if item_def.get('separator'):
+                    # Add separator
+                    submenu.addItem_(Cocoa.NSMenuItem.separatorItem())
+                else:
+                    # Create regular menu item
+                    item = self._create_menu_item(item_def)
+                    submenu.addItem_(item)
+                    
+                    # Cache the menu item for state updates
+                    self.menu_items[item_def['id']] = item
+            
+            # Add the menu to the main menu bar
+            main_menu.addItem_(menu_item)
+        
+        # Set the main menu for the application
+        app = Cocoa.NSApplication.sharedApplication()
+        app.setMainMenu_(main_menu)
+        
+        # Store reference to menu bar
+        self.menu_bar = main_menu
+    
+    def _create_menu_item(self, item_def: dict):
+        """
+        Create a single NSMenuItem from definition.
+        
+        Args:
+            item_def: Menu item definition dictionary with keys:
+                - id: Unique identifier
+                - label: Display label
+                - shortcut: Optional keyboard shortcut (e.g., 'Cmd+N')
+                - enabled: Initial enabled state
+        
+        Returns:
+            NSMenuItem configured with the specified properties
+        """
+        # Parse keyboard shortcut
+        key_equivalent, modifier_mask = self._parse_shortcut(item_def.get('shortcut', ''))
+        
+        # Create menu item with title, action, and key equivalent
+        item = Cocoa.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            item_def['label'],
+            objc.selector(self._menu_item_selected_, signature=b'v@:@'),
+            key_equivalent
+        )
+        
+        # Set modifier mask for the shortcut
+        if modifier_mask is not None:
+            item.setKeyEquivalentModifierMask_(modifier_mask)
+        
+        # Set enabled state
+        item.setEnabled_(item_def.get('enabled', True))
+        
+        # Store the item ID as represented object for callback identification
+        item.setRepresentedObject_(item_def['id'])
+        
+        # Set target to self for the action callback
+        item.setTarget_(self)
+        
+        return item
+    
+    def _parse_shortcut(self, shortcut: str):
+        """
+        Parse keyboard shortcut string into macOS key equivalent and modifier mask.
+        
+        Converts shortcut strings like 'Cmd+N', 'Cmd+Shift+S', 'Ctrl+C' into
+        the format required by NSMenuItem.
+        
+        Args:
+            shortcut: Shortcut string (e.g., 'Cmd+N', 'Cmd+Shift+S', 'Ctrl+C')
+        
+        Returns:
+            Tuple of (key_equivalent: str, modifier_mask: int or None)
+            - key_equivalent: The key character (e.g., 'n', 's', 'c')
+            - modifier_mask: Bitwise OR of NSEventModifierFlag values, or None if no modifiers
+        
+        Examples:
+            'Cmd+N' -> ('n', NSEventModifierFlagCommand)
+            'Cmd+Shift+S' -> ('S', NSEventModifierFlagCommand | NSEventModifierFlagShift)
+            'Ctrl+C' -> ('c', NSEventModifierFlagControl)
+            '' -> ('', None)
+        """
+        if not shortcut:
+            return ('', None)
+        
+        # Split shortcut into parts
+        parts = shortcut.split('+')
+        if not parts:
+            return ('', None)
+        
+        # Last part is the key, everything else is modifiers
+        key = parts[-1]
+        modifiers = parts[:-1]
+        
+        # Build modifier mask
+        modifier_mask = 0
+        for mod in modifiers:
+            mod_lower = mod.lower()
+            if mod_lower == 'cmd' or mod_lower == 'command':
+                modifier_mask |= Cocoa.NSEventModifierFlagCommand
+            elif mod_lower == 'shift':
+                modifier_mask |= Cocoa.NSEventModifierFlagShift
+            elif mod_lower == 'ctrl' or mod_lower == 'control':
+                modifier_mask |= Cocoa.NSEventModifierFlagControl
+            elif mod_lower == 'alt' or mod_lower == 'option':
+                modifier_mask |= Cocoa.NSEventModifierFlagOption
+        
+        # Convert key to lowercase unless Shift is in modifiers
+        # (Shift modifier makes the key uppercase automatically)
+        if 'shift' not in [m.lower() for m in modifiers]:
+            key = key.lower()
+        
+        return (key, modifier_mask if modifier_mask > 0 else None)
+    
+    def _menu_item_selected_(self, sender):
+        """
+        Callback when a menu item is selected.
+        
+        This method is called by the macOS menu system when a user selects
+        a menu item. It creates a MenuEvent and adds it to the event queue
+        for retrieval by get_event().
+        
+        Args:
+            sender: The NSMenuItem that was selected
+        """
+        # Get the item ID from the represented object
+        item_id = sender.representedObject()
+        
+        if item_id:
+            # Create MenuEvent and add to queue
+            from ttk.input_event import MenuEvent
+            event = MenuEvent(item_id=item_id)
+            self.menu_event_queue.append(event)
+    
+    def update_menu_item_state(self, item_id: str, enabled: bool) -> None:
+        """
+        Update menu item enabled/disabled state.
+        
+        Dynamically updates whether a menu item is enabled (selectable) or
+        disabled (grayed out) based on application state.
+        
+        Args:
+            item_id: Menu item identifier (must match an ID from set_menu_bar)
+            enabled: True to enable, False to disable
+        """
+        if not hasattr(self, 'menu_items'):
+            return
+        
+        if item_id in self.menu_items:
+            self.menu_items[item_id].setEnabled_(enabled)
 
 
 # Define TTKWindowDelegate class for handling window events

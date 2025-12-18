@@ -13,9 +13,8 @@ from pathlib import Path
 # Add src directory to Python path for testing
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-# Import the create_parser function from tfm.py
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from tfm import create_parser
+# Import the create_parser function from tfm_main
+from tfm_main import create_parser
 
 class TestCommandLineArguments(unittest.TestCase):
     """Test command line argument parsing for --left and --right options"""
