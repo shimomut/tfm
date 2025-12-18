@@ -374,6 +374,43 @@ class TextViewer:
         
         return wrapped_lines
     
+    def get_wrapped_lines_with_mapping(self) -> Tuple[List[List[Tuple[str, int]]], List[int]]:
+        """
+        Get all lines with wrapping applied and a mapping to original line numbers.
+        
+        Returns:
+            Tuple of (display_lines, line_mapping) where:
+            - display_lines: List of display lines, each being a list of (text, color) tuples
+            - line_mapping: List mapping each display line index to its original line number (1-based)
+        """
+        if not self.wrap_lines:
+            # No wrapping - simple 1:1 mapping
+            return self.highlighted_lines, list(range(1, len(self.highlighted_lines) + 1))
+        
+        # Calculate available width for content
+        start_y, start_x, display_height, display_width = self.get_display_dimensions()
+        
+        # Account for line numbers if enabled
+        line_num_width = 0
+        if self.show_line_numbers and self.lines:
+            line_num_width = len(str(len(self.lines))) + 2
+        
+        content_width = display_width - line_num_width
+        
+        if content_width <= 0:
+            return self.highlighted_lines, list(range(1, len(self.highlighted_lines) + 1))
+        
+        wrapped_lines = []
+        line_mapping = []
+        
+        for original_line_num, highlighted_line in enumerate(self.highlighted_lines, start=1):
+            wrapped_segments = self.wrap_highlighted_line(highlighted_line, content_width)
+            wrapped_lines.extend(wrapped_segments)
+            # Map all wrapped segments to the same original line number
+            line_mapping.extend([original_line_num] * len(wrapped_segments))
+        
+        return wrapped_lines, line_mapping
+    
     def find_matches(self, pattern: str) -> List[int]:
         """Find all lines that match the search pattern (case-insensitive)"""
         if not pattern:
@@ -577,10 +614,10 @@ class TextViewer:
         # Calculate current position info
         if self.wrap_lines:
             # When wrapping is enabled, show display line position
-            display_lines = self.get_wrapped_lines()
+            display_lines, line_mapping = self.get_wrapped_lines_with_mapping()
             current_line = self.scroll_offset + 1  # 1-based display line number
             total_lines = len(display_lines)
-            original_line = self.get_original_line_number(self.scroll_offset)
+            original_line = line_mapping[self.scroll_offset] if self.scroll_offset < len(line_mapping) else 1
         else:
             # Normal mode - show original line numbers
             current_line = self.scroll_offset + 1  # 1-based line number
@@ -670,8 +707,8 @@ class TextViewer:
         """Draw the file content with syntax highlighting and wide character support"""
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
-        # Get the lines to display (wrapped or unwrapped)
-        display_lines = self.get_wrapped_lines()
+        # Get the lines to display with mapping to original line numbers
+        display_lines, line_mapping = self.get_wrapped_lines_with_mapping()
         
         # Calculate line number width if showing line numbers
         line_num_width = 0
@@ -702,10 +739,23 @@ class TextViewer:
             # Draw line number if enabled
             x_pos = start_x
             if self.show_line_numbers:
-                # For wrapped lines, we need to map back to original line numbers
-                # For now, show the display line index + 1 (this could be improved)
-                original_line_num = self.get_original_line_number(line_index) if self.wrap_lines else line_index + 1
-                line_num = f"{original_line_num:>{line_num_width-1}} "
+                # Get the original line number for this display line
+                original_line_num = line_mapping[line_index] if line_index < len(line_mapping) else line_index + 1
+                
+                # Only show line number for the first wrapped segment of each original line
+                # Check if this is the first occurrence of this line number in the visible range
+                is_first_segment = True
+                if self.wrap_lines and line_index > 0:
+                    prev_line_num = line_mapping[line_index - 1] if line_index - 1 < len(line_mapping) else 0
+                    if prev_line_num == original_line_num:
+                        is_first_segment = False
+                
+                if is_first_segment:
+                    line_num = f"{original_line_num:>{line_num_width-1}} "
+                else:
+                    # Show blank space for continuation lines
+                    line_num = " " * line_num_width
+                
                 line_num_color_pair, line_num_attrs = get_line_number_color()
                 self.renderer.draw_text(y_pos, x_pos, line_num, line_num_color_pair, line_num_attrs)
                 x_pos += line_num_width
@@ -713,8 +763,8 @@ class TextViewer:
             # Get the highlighted line (list of (text, color) tuples)
             highlighted_line = display_lines[line_index]
             
-            # Check if this line is an isearch match (for unwrapped mode)
-            original_line_index = self.get_original_line_number(line_index) - 1 if self.wrap_lines else line_index
+            # Check if this line is an isearch match
+            original_line_index = line_mapping[line_index] - 1 if line_index < len(line_mapping) else line_index
             is_search_match = (self.isearch_mode and 
                              self.isearch_matches and 
                              original_line_index in self.isearch_matches)
@@ -809,21 +859,14 @@ class TextViewer:
         if not self.wrap_lines:
             return display_line_index + 1
         
-        # This is a simplified implementation - for a more accurate mapping,
-        # we would need to track which original line each wrapped line came from
-        # For now, estimate based on average wrapping
-        if not self.lines:
-            return 1
+        # Use the mapping from get_wrapped_lines_with_mapping
+        _, line_mapping = self.get_wrapped_lines_with_mapping()
         
-        # Calculate approximate original line
-        total_display_lines = len(self.get_wrapped_lines())
-        if total_display_lines == 0:
-            return 1
+        if display_line_index < len(line_mapping):
+            return line_mapping[display_line_index]
         
-        ratio = len(self.lines) / total_display_lines
-        estimated_line = int(display_line_index * ratio) + 1
-        
-        return min(estimated_line, len(self.lines))
+        # Fallback if index is out of range
+        return len(self.lines) if self.lines else 1
     
     def handle_key(self, event: KeyEvent) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
@@ -858,7 +901,7 @@ class TextViewer:
                 if self.wrap_lines:
                     # When enabling wrap, we might need to adjust scroll position
                     # since wrapped lines will be longer
-                    display_lines = self.get_wrapped_lines()
+                    display_lines, _ = self.get_wrapped_lines_with_mapping()
                     max_scroll = max(0, len(display_lines) - display_height)
                     self.scroll_offset = min(old_scroll, max_scroll)
             elif char_lower == 's':
@@ -896,7 +939,7 @@ class TextViewer:
                 self.scroll_offset -= 1
         elif event.key_code == KeyCode.DOWN:
             # Use display lines for scrolling when wrapping is enabled
-            display_lines = self.get_wrapped_lines()
+            display_lines, _ = self.get_wrapped_lines_with_mapping()
             max_scroll = max(0, len(display_lines) - display_height)
             if self.scroll_offset < max_scroll:
                 self.scroll_offset += 1
@@ -911,7 +954,7 @@ class TextViewer:
             self.scroll_offset = max(0, self.scroll_offset - display_height)
         elif event.key_code == KeyCode.PAGE_DOWN:
             # Use display lines for page scrolling when wrapping is enabled
-            display_lines = self.get_wrapped_lines()
+            display_lines, _ = self.get_wrapped_lines_with_mapping()
             max_scroll = max(0, len(display_lines) - display_height)
             self.scroll_offset = min(max_scroll, self.scroll_offset + display_height)
         elif event.key_code == KeyCode.HOME:
@@ -919,7 +962,7 @@ class TextViewer:
             self.horizontal_offset = 0
         elif event.key_code == KeyCode.END:
             # Use display lines for end positioning when wrapping is enabled
-            display_lines = self.get_wrapped_lines()
+            display_lines, _ = self.get_wrapped_lines_with_mapping()
             max_scroll = max(0, len(display_lines) - display_height)
             self.scroll_offset = max_scroll
             
