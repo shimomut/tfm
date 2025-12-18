@@ -66,12 +66,50 @@ class MenuManager:
         """
         modifier = self._get_shortcut_modifier()
         
+        menus = []
+        
+        # On macOS, add application menu as first menu
+        # This will show "TFM" instead of "python"
+        if platform.system() == 'Darwin':
+            menus.append(self._build_app_menu(modifier))
+        
+        # Add standard menus
+        menus.extend([
+            self._build_file_menu(modifier),
+            self._build_edit_menu(modifier),
+            self._build_view_menu(modifier),
+            self._build_go_menu(modifier)
+        ])
+        
         return {
-            'menus': [
-                self._build_file_menu(modifier),
-                self._build_edit_menu(modifier),
-                self._build_view_menu(modifier),
-                self._build_go_menu(modifier)
+            'menus': menus
+        }
+    
+    def _build_app_menu(self, modifier):
+        """Build the Application menu structure (macOS only).
+        
+        Args:
+            modifier: Keyboard modifier key (Cmd or Ctrl)
+        
+        Returns:
+            dict: Application menu structure
+        """
+        return {
+            'id': 'app',
+            'label': 'TFM',  # This will show as the app name in the menu bar
+            'items': [
+                {
+                    'id': 'app.about',
+                    'label': 'About TFM',
+                    'enabled': False  # Not implemented yet
+                },
+                {'separator': True},
+                {
+                    'id': self.FILE_QUIT,
+                    'label': 'Quit TFM',
+                    'shortcut': f'{modifier}+Q',
+                    'enabled': True
+                }
             ]
         }
     
@@ -118,13 +156,6 @@ class MenuManager:
                     'label': 'Rename',
                     'shortcut': f'{modifier}+R',
                     'enabled': False  # Disabled when no selection
-                },
-                {'separator': True},
-                {
-                    'id': self.FILE_QUIT,
-                    'label': 'Quit',
-                    'shortcut': f'{modifier}+Q',
-                    'enabled': True
                 }
             ]
         }
