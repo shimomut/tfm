@@ -38,12 +38,12 @@ def tfm_tool(tool_name):
     user_tools_dir = home_dir / '.tfm' / 'tools'
     candidates.append(user_tools_dir / tool_name)
     
-    # 2. System tools directory: {parent of src}/tools/
+    # 2. System tools directory
     # This works for both development and installed package:
-    # - Development: project_root/src/tfm_external_programs.py -> project_root/tools/
-    # - Installed: site-packages/tfm/src/tfm_external_programs.py -> site-packages/tfm/tools/
-    current_file = Path(__file__)  # This is tfm_external_programs.py in src/
-    tools_dir = current_file.parent.parent / 'tools'  # Go up from src/ to parent, then to tools/
+    # - Development: project_root/src/tfm_external_programs.py -> project_root/src/tools/
+    # - Installed: site-packages/tfm/tfm_external_programs.py -> site-packages/tfm/tools/
+    current_file = Path(__file__)  # This is tfm_external_programs.py
+    tools_dir = current_file.parent / 'tools'  # tools/ is in the same directory as this file
     candidates.append(tools_dir / tool_name)
     
     # Check each candidate
