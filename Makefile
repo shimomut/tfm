@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-debug run-profile monitor-log test test-quick clean install dev-install lint format demo
+.PHONY: help run run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo
 
 # Backend selection (default: curses)
 # Usage: make run BACKEND=coregraphics
@@ -19,6 +19,7 @@ help:
 	@echo "  test-quick   - Run quick verification tests"
 	@echo "  clean        - Clean up temporary files"
 	@echo "  install      - Install TFM"
+	@echo "  uninstall    - Uninstall TFM"
 	@echo "  dev-install  - Install in development mode"
 	@echo "  lint         - Run code linting"
 	@echo "  format       - Format code"
@@ -67,9 +68,21 @@ clean:
 	@rm -rf build/ dist/ 2>/dev/null || true
 
 install:
+	@echo "Installing TTK..."
+	@cd ttk && pip3 install .
+	@echo "Installing TFM..."
 	@pip3 install .
 
+uninstall:
+	@echo "Uninstalling TFM..."
+	@pip3 uninstall -y tfm
+	@echo "Uninstalling TTK..."
+	@pip3 uninstall -y ttk
+
 dev-install:
+	@echo "Installing TTK in development mode..."
+	@cd ttk && pip3 install -e .
+	@echo "Installing TFM in development mode..."
 	@pip3 install -e .
 
 lint:
