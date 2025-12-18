@@ -9,7 +9,7 @@ between two text files with syntax highlighting support.
 import difflib
 from tfm_path import Path
 from typing import List, Tuple, Optional
-from ttk import KeyEvent, KeyCode
+from ttk import KeyEvent, KeyCode, ModifierKey
 from tfm_colors import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
@@ -48,6 +48,7 @@ class DiffViewer:
         self.diff_indices = []  # List of line indices where differences occur
         self.current_diff_index = -1  # Index into diff_indices (-1 means no focus)
         self.ignore_whitespace = False  # Whether to ignore whitespace when comparing
+        self.wrap_lines = False  # Whether to wrap long lines
         
         # Load files and compute diff
         self.load_files()
@@ -483,7 +484,7 @@ class DiffViewer:
             self.renderer.draw_text(y, separator_x, "│", header_color_pair, header_attrs)
         
         # Controls
-        controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll n/p:next/prev diff PgUp/PgDn:page #:line# s:syntax t:tab w:whitespace"
+        controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll Shift-↑↓:prev/next diff PgUp/PgDn:page #:line# s:syntax t:tab i:ignore-ws w:wrap"
         status_color_pair, status_attrs = get_status_color()
         
         if len(controls) + 4 < width:
@@ -504,7 +505,17 @@ class DiffViewer:
         self.renderer.draw_text(status_y, 0, " " * width, status_color_pair, status_attrs)
         
         # Calculate statistics
-        total_lines = len(self.diff_lines)
+        if self.wrap_lines:
+            # Get wrapped lines for accurate count
+            pane_width = (width - 1) // 2
+            line_num_width = self.line_number_width if self.show_line_numbers else 0
+            scroll_bar_width = calculate_scrollbar_width(len(self.diff_lines), height - 3)
+            content_width = pane_width - scroll_bar_width - line_num_width
+            display_lines = self._get_wrapped_diff_lines(content_width)
+            total_lines = len(display_lines)
+        else:
+            total_lines = len(self.diff_lines)
+        
         equal_lines = sum(1 for item in self.diff_lines if item[2] == 'equal')
         changed_lines = sum(1 for item in self.diff_lines if item[2] in ('replace', 'delete', 'insert'))
         
@@ -527,6 +538,8 @@ class DiffViewer:
         options = []
         if self.show_line_numbers:
             options.append("NUM")
+        if self.wrap_lines:
+            options.append("WRAP")
         if PYGMENTS_AVAILABLE and self.syntax_highlighting:
             options.append("SYNTAX")
         options.append(f"TAB:{self.tab_width}")
@@ -559,6 +572,12 @@ class DiffViewer:
         scroll_bar_width = calculate_scrollbar_width(len(self.diff_lines), display_height)
         content_width = pane_width - scroll_bar_width - line_num_width
         
+        # If wrapping is enabled, we need to expand diff_lines to include wrapped segments
+        if self.wrap_lines:
+            display_lines = self._get_wrapped_diff_lines(content_width)
+        else:
+            display_lines = self.diff_lines
+        
         # Get background color
         bg_color_pair, bg_attrs = get_background_color_pair()
         
@@ -573,12 +592,13 @@ class DiffViewer:
             # Fill entire line with background
             self.renderer.draw_text(y_pos, start_x, ' ' * display_width, bg_color_pair, bg_attrs)
             
-            if line_index >= len(self.diff_lines):
+            if line_index >= len(display_lines):
                 continue
             
-            diff_item = self.diff_lines[line_index]
+            diff_item = display_lines[line_index]
             line1, line2, status, line_num1, line_num2 = diff_item[0], diff_item[1], diff_item[2], diff_item[3], diff_item[4]
             char_diff1, char_diff2 = diff_item[5] if len(diff_item) > 5 else None, diff_item[6] if len(diff_item) > 6 else None
+            is_first_segment = diff_item[7] if len(diff_item) > 7 else True
             
             # Check if this line is part of the focused difference
             # Only focus lines with actual content (not dummy alignment lines)
@@ -588,7 +608,7 @@ class DiffViewer:
                 focused_start = self.diff_indices[self.current_diff_index]
                 # Find the end of this difference block
                 focused_end = focused_start
-                while focused_end < len(self.diff_lines) and self.diff_lines[focused_end][2] != 'equal':
+                while focused_end < len(display_lines) and display_lines[focused_end][2] != 'equal':
                     focused_end += 1
                 is_focused = focused_start <= line_index < focused_end
             
@@ -619,7 +639,11 @@ class DiffViewer:
             # Draw left pane line number if enabled
             content_start_x = start_x
             if self.show_line_numbers:
-                line_num_str1 = f"{line_num1:4d} " if line_num1 is not None else "     "
+                # Only show line number for first segment when wrapping
+                if is_first_segment and line_num1 is not None:
+                    line_num_str1 = f"{line_num1:4d} "
+                else:
+                    line_num_str1 = "     "
                 self.renderer.draw_text(y_pos, start_x, line_num_str1, line_num_color_pair, line_num_attrs)
                 content_start_x = start_x + line_num_width
             
@@ -657,7 +681,11 @@ class DiffViewer:
             # Draw right pane line number if enabled
             content_start_x2 = separator_x + 1
             if self.show_line_numbers:
-                line_num_str2 = f"{line_num2:4d} " if line_num2 is not None else "     "
+                # Only show line number for first segment when wrapping
+                if is_first_segment and line_num2 is not None:
+                    line_num_str2 = f"{line_num2:4d} "
+                else:
+                    line_num_str2 = "     "
                 self.renderer.draw_text(y_pos, separator_x + 1, line_num_str2, line_num_color_pair, line_num_attrs)
                 content_start_x2 = separator_x + 1 + line_num_width
             
@@ -690,7 +718,7 @@ class DiffViewer:
         
         # Draw scroll bar
         draw_scrollbar(self.renderer, start_y, display_width - 1, display_height,
-                      len(self.diff_lines), self.scroll_offset)
+                      len(display_lines), self.scroll_offset)
     
     def _draw_highlighted_line(self, y_pos: int, start_x: int, highlighted_line: List[Tuple[str, int]],
                               max_width: int, bg_color: int, bg_attrs: int, use_syntax_colors: bool = False):
@@ -874,6 +902,95 @@ class DiffViewer:
         
         return line[start_index:]
     
+    def _wrap_line(self, line: str, max_width: int) -> List[str]:
+        """
+        Wrap a line to fit within max_width display columns.
+        
+        Args:
+            line: Line of text to wrap
+            max_width: Maximum display width for wrapped lines
+            
+        Returns:
+            List of wrapped line segments
+        """
+        if not line or max_width <= 0:
+            return [line] if line else [""]
+        
+        # Check if line fits without wrapping
+        line_width = get_display_width(line)
+        if line_width <= max_width:
+            return [line]
+        
+        wrapped_lines = []
+        current_line = ""
+        current_width = 0
+        
+        for char in line:
+            char_width = get_display_width(char)
+            
+            if current_width + char_width > max_width:
+                # Current line is full, start a new line
+                if current_line:
+                    wrapped_lines.append(current_line)
+                current_line = char
+                current_width = char_width
+            else:
+                current_line += char
+                current_width += char_width
+        
+        # Add the final line
+        if current_line:
+            wrapped_lines.append(current_line)
+        
+        # Ensure we return at least one line (even if empty)
+        if not wrapped_lines:
+            wrapped_lines = [""]
+        
+        return wrapped_lines
+    
+    def _get_wrapped_diff_lines(self, content_width: int) -> List[Tuple]:
+        """
+        Get diff lines with wrapping applied.
+        
+        Returns:
+            List of tuples similar to diff_lines but with wrapped segments
+            Each tuple: (line1_segment, line2_segment, status, line_num1, line_num2, char_diff1, char_diff2, is_first_segment)
+        """
+        wrapped_diff_lines = []
+        
+        for diff_item in self.diff_lines:
+            line1, line2, status, line_num1, line_num2 = diff_item[0], diff_item[1], diff_item[2], diff_item[3], diff_item[4]
+            char_diff1, char_diff2 = diff_item[5] if len(diff_item) > 5 else None, diff_item[6] if len(diff_item) > 6 else None
+            
+            # Wrap both lines
+            wrapped1 = self._wrap_line(line1, content_width) if line1 else [""]
+            wrapped2 = self._wrap_line(line2, content_width) if line2 else [""]
+            
+            # Take the maximum number of wrapped segments
+            max_segments = max(len(wrapped1), len(wrapped2))
+            
+            # Create wrapped diff items
+            for i in range(max_segments):
+                segment1 = wrapped1[i] if i < len(wrapped1) else ""
+                segment2 = wrapped2[i] if i < len(wrapped2) else ""
+                
+                # Only show line number for the first segment
+                seg_line_num1 = line_num1 if i == 0 else None
+                seg_line_num2 = line_num2 if i == 0 else None
+                
+                # Mark if this is the first segment (for line number display)
+                is_first_segment = (i == 0)
+                
+                # For now, we don't split char_diff across wrapped segments
+                # This is a simplification - full implementation would need to split char_diff too
+                seg_char_diff1 = char_diff1 if i == 0 else None
+                seg_char_diff2 = char_diff2 if i == 0 else None
+                
+                wrapped_diff_lines.append((segment1, segment2, status, seg_line_num1, seg_line_num2, 
+                                          seg_char_diff1, seg_char_diff2, is_first_segment))
+        
+        return wrapped_diff_lines
+    
     def handle_key(self, event: KeyEvent) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
         if event is None:
@@ -886,18 +1003,6 @@ class DiffViewer:
             char_lower = event.char.lower()
             if char_lower == 'q':
                 return False
-            elif char_lower == 'n':
-                # Jump to next difference
-                if self.diff_indices:
-                    if self.current_diff_index < len(self.diff_indices) - 1:
-                        self.current_diff_index += 1
-                        self.scroll_offset = self.diff_indices[self.current_diff_index]
-            elif char_lower == 'p':
-                # Jump to previous difference
-                if self.diff_indices:
-                    if self.current_diff_index > 0:
-                        self.current_diff_index -= 1
-                        self.scroll_offset = self.diff_indices[self.current_diff_index]
             elif char_lower == '#':
                 # Toggle line numbers
                 self.show_line_numbers = not self.show_line_numbers
@@ -924,11 +1029,17 @@ class DiffViewer:
                 
                 # Re-expand tabs with new tab width
                 self.refresh_tab_expansion()
-            elif char_lower == 'w':
+            elif char_lower == 'i':
                 # Toggle whitespace ignore mode
                 self.ignore_whitespace = not self.ignore_whitespace
                 # Recompute diff with new whitespace mode
                 self.compute_diff()
+            elif char_lower == 'w':
+                # Toggle wrap mode
+                self.wrap_lines = not self.wrap_lines
+                # Reset horizontal offset when enabling wrap mode
+                if self.wrap_lines:
+                    self.horizontal_offset = 0
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
@@ -936,12 +1047,41 @@ class DiffViewer:
         elif event.key_code == KeyCode.ENTER:
             return False
         elif event.key_code == KeyCode.UP:
-            if self.scroll_offset > 0:
-                self.scroll_offset -= 1
+            # Check for Shift modifier to jump to previous diff
+            if event.has_modifier(ModifierKey.SHIFT):
+                # Jump to previous difference
+                if self.diff_indices:
+                    if self.current_diff_index > 0:
+                        self.current_diff_index -= 1
+                        self.scroll_offset = self.diff_indices[self.current_diff_index]
+            else:
+                # Normal scroll up
+                if self.scroll_offset > 0:
+                    self.scroll_offset -= 1
         elif event.key_code == KeyCode.DOWN:
-            max_scroll = max(0, len(self.diff_lines) - display_height)
-            if self.scroll_offset < max_scroll:
-                self.scroll_offset += 1
+            # Check for Shift modifier to jump to next diff
+            if event.has_modifier(ModifierKey.SHIFT):
+                # Jump to next difference
+                if self.diff_indices:
+                    if self.current_diff_index < len(self.diff_indices) - 1:
+                        self.current_diff_index += 1
+                        self.scroll_offset = self.diff_indices[self.current_diff_index]
+            else:
+                # Normal scroll down
+                # Calculate max scroll based on whether wrapping is enabled
+                if self.wrap_lines:
+                    # Need to calculate wrapped lines to get correct count
+                    _, _, _, display_width = self.get_display_dimensions()
+                    pane_width = (display_width - 1) // 2
+                    line_num_width = self.line_number_width if self.show_line_numbers else 0
+                    scroll_bar_width = calculate_scrollbar_width(len(self.diff_lines), display_height)
+                    content_width = pane_width - scroll_bar_width - line_num_width
+                    display_lines = self._get_wrapped_diff_lines(content_width)
+                    max_scroll = max(0, len(display_lines) - display_height)
+                else:
+                    max_scroll = max(0, len(self.diff_lines) - display_height)
+                if self.scroll_offset < max_scroll:
+                    self.scroll_offset += 1
         elif event.key_code == KeyCode.LEFT:
             if self.horizontal_offset > 0:
                 self.horizontal_offset = max(0, self.horizontal_offset - 1)
@@ -950,13 +1090,33 @@ class DiffViewer:
         elif event.key_code == KeyCode.PAGE_UP:
             self.scroll_offset = max(0, self.scroll_offset - display_height)
         elif event.key_code == KeyCode.PAGE_DOWN:
-            max_scroll = max(0, len(self.diff_lines) - display_height)
+            # Calculate max scroll based on whether wrapping is enabled
+            if self.wrap_lines:
+                _, _, _, display_width = self.get_display_dimensions()
+                pane_width = (display_width - 1) // 2
+                line_num_width = self.line_number_width if self.show_line_numbers else 0
+                scroll_bar_width = calculate_scrollbar_width(len(self.diff_lines), display_height)
+                content_width = pane_width - scroll_bar_width - line_num_width
+                display_lines = self._get_wrapped_diff_lines(content_width)
+                max_scroll = max(0, len(display_lines) - display_height)
+            else:
+                max_scroll = max(0, len(self.diff_lines) - display_height)
             self.scroll_offset = min(max_scroll, self.scroll_offset + display_height)
         elif event.key_code == KeyCode.HOME:
             self.scroll_offset = 0
             self.horizontal_offset = 0
         elif event.key_code == KeyCode.END:
-            max_scroll = max(0, len(self.diff_lines) - display_height)
+            # Calculate max scroll based on whether wrapping is enabled
+            if self.wrap_lines:
+                _, _, _, display_width = self.get_display_dimensions()
+                pane_width = (display_width - 1) // 2
+                line_num_width = self.line_number_width if self.show_line_numbers else 0
+                scroll_bar_width = calculate_scrollbar_width(len(self.diff_lines), display_height)
+                content_width = pane_width - scroll_bar_width - line_num_width
+                display_lines = self._get_wrapped_diff_lines(content_width)
+                max_scroll = max(0, len(display_lines) - display_height)
+            else:
+                max_scroll = max(0, len(self.diff_lines) - display_height)
             self.scroll_offset = max_scroll
         
         return True
