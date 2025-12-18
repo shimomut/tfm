@@ -33,6 +33,10 @@ SIZE_GB = 1024 * 1024 * 1024
 DATETIME_FORMAT = "%Y-%m-%d %H:%M"
 LOG_TIME_FORMAT = "%H:%M:%S"
 
+# File list date format options
+DATE_FORMAT_FULL = 'full'        # YYYY-MM-DD HH:mm:ss
+DATE_FORMAT_SHORT = 'short'      # YY-MM-DD HH:mm (default)
+
 # Pane layout constants
 MIN_PANE_RATIO = 0.1  # Minimum left pane width (10%)
 MAX_PANE_RATIO = 0.9  # Maximum left pane width (90%)

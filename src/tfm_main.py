@@ -515,6 +515,24 @@ class FileManager:
                     max_width = max(max_width, ext_display_width)
         
         return max_width
+    
+    def get_date_column_width(self):
+        """
+        Calculate the date column width based on current date format setting.
+        
+        Returns:
+            int: Width in characters for the date column
+        """
+        from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
+        
+        date_format = getattr(self.config, 'DATE_FORMAT', 'short')
+        
+        if date_format == DATE_FORMAT_FULL:
+            # YYYY-MM-DD HH:mm:ss = 19 characters
+            return 19
+        else:  # DATE_FORMAT_SHORT (default)
+            # YY-MM-DD HH:mm = 14 characters
+            return 14
 
     def apply_filter(self):
         """Apply filter - wrapper for file_operations method"""
@@ -773,7 +791,7 @@ class FileManager:
             basename, extension = self.separate_filename_extension(display_name, is_dir)
             
             # Format line to fit pane - with safety checks for narrow panes
-            datetime_width = 16  # "YYYY-MM-DD HH:MM" = 16 characters
+            datetime_width = self.get_date_column_width()
             size_width = 8
             marker_width = 2  # Space for selection marker
             
@@ -1982,12 +2000,30 @@ class FileManager:
                 # Clear screen to apply new background color immediately
                 self.clear_screen_with_background()
                 self.needs_full_redraw = True
+                
+            elif option == "Cycle date format":
+                from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
+                current_format = getattr(self.config, 'DATE_FORMAT', 'short')
+                
+                # Toggle between formats: short <-> full
+                if current_format == DATE_FORMAT_FULL:
+                    new_format = DATE_FORMAT_SHORT
+                    format_name = "Short (YY-MM-DD HH:mm)"
+                else:  # DATE_FORMAT_SHORT (default)
+                    new_format = DATE_FORMAT_FULL
+                    format_name = "Full (YYYY-MM-DD HH:mm:ss)"
+                
+                # Update config
+                self.config.DATE_FORMAT = new_format
+                print(f"Date format: {format_name}")
+                self.needs_full_redraw = True
         
         # Define the view options
         options = [
             "Toggle hidden files",
             "Toggle color scheme (dark/light)", 
-            "Toggle fallback color scheme"
+            "Toggle fallback color scheme",
+            "Cycle date format"
         ]
         
         self.show_list_dialog("View Options", options, handle_view_option)

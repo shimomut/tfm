@@ -61,6 +61,7 @@ class DefaultConfig:
     SHOW_HIDDEN_FILES = False
     DEFAULT_LEFT_PANE_RATIO = 0.5
     DEFAULT_LOG_HEIGHT_RATIO = 0.25
+    DATE_FORMAT = 'short'  # 'full' or 'short'
     
     # Sorting settings
     DEFAULT_SORT_MODE = 'name'  # 'name', 'size', 'date'

@@ -197,6 +197,26 @@ class FileOperations:
             description += ' ↑'
         
         return description
+    def _format_date(self, timestamp):
+        """Format date/time based on configured format.
+        
+        Args:
+            timestamp: Unix timestamp
+            
+        Returns:
+            str: Formatted date/time string
+        """
+        from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
+        
+        dt = datetime.fromtimestamp(timestamp)
+        date_format = getattr(self.config, 'DATE_FORMAT', 'short')
+        
+        if date_format == DATE_FORMAT_FULL:
+            # YYYY-MM-DD HH:mm:ss
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        else:  # DATE_FORMAT_SHORT (default)
+            # YY-MM-DD HH:mm
+            return dt.strftime("%y-%m-%d %H:%M")
     
     def get_file_info(self, path):
         """Get file information for display"""
@@ -217,8 +237,8 @@ class FileOperations:
                 else:
                     size_str = f"{size/(1024*1024*1024):.1f}G"
             
-            # Format date
-            date_str = datetime.fromtimestamp(stat_info.st_mtime).strftime("%Y-%m-%d %H:%M")
+            # Format date based on configured format
+            date_str = self._format_date(stat_info.st_mtime)
             
             return size_str, date_str
         except (OSError, PermissionError):
