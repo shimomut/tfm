@@ -1034,7 +1034,11 @@ class FileManager:
                 # Account for the fact that line will be truncated to pane_width-2
                 usable_width = pane_width - 2
                 
-                if pane_width < 60:
+                # Calculate minimum width needed to show datetime
+                # marker(2) + space(1) + min_name(16) + space(1) + ext(4) + space(1) + size(8) + space(1) + datetime
+                min_width_for_datetime = 2 + 1 + 16 + 1 + 4 + 1 + 8 + 1 + datetime_width  # = 38 + datetime_width
+                
+                if pane_width < min_width_for_datetime:
                     # For narrow panes: "● basename ext size" (no datetime)
                     if extension:
                         # Calculate actual maximum extension width for this pane
