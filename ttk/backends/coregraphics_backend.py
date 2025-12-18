@@ -2337,8 +2337,7 @@ class CoreGraphicsBackend(Renderer):
         Set menu bar structure for desktop mode.
         
         Creates a native macOS menu bar using NSMenu and NSMenuItem APIs.
-        The menu structure is stored and menu items are cached for efficient
-        state updates.
+        Menu items are cached for efficient state updates via update_menu_item_state().
         
         Args:
             menu_structure: Menu structure dictionary with format:
@@ -2380,6 +2379,9 @@ class CoreGraphicsBackend(Renderer):
         for menu_def in menu_structure.get('menus', []):
             # Create submenu for this top-level menu
             submenu = Cocoa.NSMenu.alloc().initWithTitle_(menu_def['label'])
+            
+            # Disable auto-enabling - we'll manage states manually
+            submenu.setAutoenablesItems_(False)
             
             # Create menu item to hold the submenu
             menu_item = Cocoa.NSMenuItem.alloc().init()
@@ -2436,7 +2438,7 @@ class CoreGraphicsBackend(Renderer):
         if modifier_mask is not None:
             item.setKeyEquivalentModifierMask_(modifier_mask)
         
-        # Set enabled state
+        # Set initial enabled state
         item.setEnabled_(item_def.get('enabled', True))
         
         # Store the item ID as represented object for callback identification

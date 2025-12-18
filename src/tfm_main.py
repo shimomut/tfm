@@ -210,7 +210,12 @@ class FileManager:
             self.log_manager.add_message("ERROR", f"Failed to initialize menu bar: {e}")
     
     def _update_menu_states(self):
-        """Update menu item states based on current application state."""
+        """
+        Update menu item states based on current application state.
+        
+        This is called when application state changes that affect menu items
+        (e.g., file selection changes, clipboard changes).
+        """
         if not self.is_desktop_mode() or not self.menu_manager:
             return
         
@@ -3475,9 +3480,19 @@ class FileManager:
             if self.log_manager.has_log_updates():
                 self.needs_full_redraw = True
             
-            # Update menu states for desktop mode
+            # Update menu states when selection or clipboard changes
+            # This is more efficient than polling every frame
             if self.is_desktop_mode():
-                self._update_menu_states()
+                current_pane = self.get_current_pane()
+                current_selection_count = len(current_pane['selected_files'])
+                
+                # Track state changes
+                if not hasattr(self, '_last_selection_count'):
+                    self._last_selection_count = current_selection_count
+                    self._update_menu_states()
+                elif self._last_selection_count != current_selection_count:
+                    self._last_selection_count = current_selection_count
+                    self._update_menu_states()
             
             # Get user input with timeout to allow timer checks
             event = self.renderer.get_input(timeout_ms=16)  # 16ms timeout
