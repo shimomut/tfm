@@ -426,10 +426,7 @@ class DiffViewer:
                 # Record the first line of this difference block
                 self.diff_indices.append(start_index)
         
-        # Initialize current diff index if we have differences
-        if self.diff_indices and self.current_diff_index == -1:
-            self.current_diff_index = 0
-            self.scroll_offset = self.diff_indices[0]
+        # Don't initialize current diff index - let user navigate to first/last diff with Shift-Up/Down
     
     def get_display_dimensions(self) -> Tuple[int, int, int, int]:
         """Get the dimensions for the diff display area"""
@@ -991,6 +988,53 @@ class DiffViewer:
         
         return wrapped_diff_lines
     
+    def _get_diff_block_size(self, diff_index: int) -> int:
+        """
+        Get the number of lines in a difference block.
+        
+        Args:
+            diff_index: Index into diff_indices
+            
+        Returns:
+            Number of lines in the difference block
+        """
+        if diff_index < 0 or diff_index >= len(self.diff_indices):
+            return 0
+        
+        start_line = self.diff_indices[diff_index]
+        
+        # Find the end of this difference block (next equal line or end of file)
+        end_line = start_line
+        while end_line < len(self.diff_lines) and self.diff_lines[end_line][2] != 'equal':
+            end_line += 1
+        
+        return end_line - start_line
+    
+    def _scroll_to_diff(self, diff_index: int, display_height: int):
+        """
+        Scroll to show a difference block, trying to center it if possible.
+        The first line of the difference must always be visible.
+        
+        Args:
+            diff_index: Index into diff_indices
+            display_height: Height of the display area
+        """
+        if diff_index < 0 or diff_index >= len(self.diff_indices):
+            return
+        
+        diff_start = self.diff_indices[diff_index]
+        diff_size = self._get_diff_block_size(diff_index)
+        
+        # If the difference is shorter than the screen, try to center it
+        if diff_size < display_height:
+            # Calculate centered position
+            center_offset = diff_start - (display_height - diff_size) // 2
+            # Ensure we don't scroll before the beginning
+            self.scroll_offset = max(0, center_offset)
+        else:
+            # Difference is larger than screen, just show from the start
+            self.scroll_offset = diff_start
+    
     def handle_key(self, event: KeyEvent) -> bool:
         """Handle key input. Returns True if viewer should continue, False to exit"""
         if event is None:
@@ -1051,9 +1095,14 @@ class DiffViewer:
             if event.has_modifier(ModifierKey.SHIFT):
                 # Jump to previous difference
                 if self.diff_indices:
-                    if self.current_diff_index > 0:
+                    if self.current_diff_index == -1:
+                        # First time using Shift-Up: jump to last difference
+                        self.current_diff_index = len(self.diff_indices) - 1
+                        self._scroll_to_diff(self.current_diff_index, display_height)
+                    elif self.current_diff_index > 0:
+                        # Jump to previous difference
                         self.current_diff_index -= 1
-                        self.scroll_offset = self.diff_indices[self.current_diff_index]
+                        self._scroll_to_diff(self.current_diff_index, display_height)
             else:
                 # Normal scroll up
                 if self.scroll_offset > 0:
@@ -1063,9 +1112,14 @@ class DiffViewer:
             if event.has_modifier(ModifierKey.SHIFT):
                 # Jump to next difference
                 if self.diff_indices:
-                    if self.current_diff_index < len(self.diff_indices) - 1:
+                    if self.current_diff_index == -1:
+                        # First time using Shift-Down: jump to first difference
+                        self.current_diff_index = 0
+                        self._scroll_to_diff(self.current_diff_index, display_height)
+                    elif self.current_diff_index < len(self.diff_indices) - 1:
+                        # Jump to next difference
                         self.current_diff_index += 1
-                        self.scroll_offset = self.diff_indices[self.current_diff_index]
+                        self._scroll_to_diff(self.current_diff_index, display_height)
             else:
                 # Normal scroll down
                 # Calculate max scroll based on whether wrapping is enabled
