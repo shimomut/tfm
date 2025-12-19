@@ -3297,27 +3297,6 @@ class FileManager:
         
         current_pane = self.get_current_pane()
         
-        # Handle Shift+Arrow keys for log scrolling FIRST (works in all modes)
-        # Only process for KeyEvent (CharEvent doesn't have key_code)
-        if isinstance(event, KeyEvent) and event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
-            if self.log_manager.scroll_log_up(1):
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(event, KeyEvent) and event.key_code == KeyCode.DOWN and event.modifiers & ModifierKey.SHIFT:  # Shift+Down
-            if self.log_manager.scroll_log_down(1):
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(event, KeyEvent) and event.key_code == KeyCode.LEFT and event.modifiers & ModifierKey.SHIFT:  # Shift+Left - fast scroll to older messages
-            log_height = self._get_log_pane_height()
-            if self.log_manager.scroll_log_up(max(1, log_height)):
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(event, KeyEvent) and event.key_code == KeyCode.RIGHT and event.modifiers & ModifierKey.SHIFT:  # Shift+Right - fast scroll to newer messages
-            log_height = self._get_log_pane_height()
-            if self.log_manager.scroll_log_down(max(1, log_height)):
-                self.needs_full_redraw = True
-            return True
-        
         # Handle isearch mode input
         if self.isearch_mode:
             return self.handle_isearch_input(event)
@@ -3365,6 +3344,26 @@ class FileManager:
         # CharEvents are not processed here as they don't have key_code
         if not isinstance(event, KeyEvent):
             return False
+        
+        # Handle Shift+Arrow keys for log scrolling (only when no dialogs are active)
+        if event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
+            if self.log_manager.scroll_log_up(1):
+                self.needs_full_redraw = True
+            return True
+        elif event.key_code == KeyCode.DOWN and event.modifiers & ModifierKey.SHIFT:  # Shift+Down
+            if self.log_manager.scroll_log_down(1):
+                self.needs_full_redraw = True
+            return True
+        elif event.key_code == KeyCode.LEFT and event.modifiers & ModifierKey.SHIFT:  # Shift+Left - fast scroll to older messages
+            log_height = self._get_log_pane_height()
+            if self.log_manager.scroll_log_up(max(1, log_height)):
+                self.needs_full_redraw = True
+            return True
+        elif event.key_code == KeyCode.RIGHT and event.modifiers & ModifierKey.SHIFT:  # Shift+Right - fast scroll to newer messages
+            log_height = self._get_log_pane_height()
+            if self.log_manager.scroll_log_down(max(1, log_height)):
+                self.needs_full_redraw = True
+            return True
         
         if self.is_key_for_action(event, 'quit'):
             def quit_callback(confirmed):
