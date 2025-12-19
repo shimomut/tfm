@@ -82,6 +82,10 @@ class GeneralPurposeDialog:
         self.help_text = ""
         self.callback = None
         self.cancel_callback = None
+        
+        # Hide the caret when dialog closes
+        if self.renderer:
+            self.renderer.hide_caret()
     
     def get_text(self):
         """Get the current text from the input field"""
