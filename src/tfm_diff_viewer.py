@@ -482,7 +482,7 @@ class DiffViewer:
             self.renderer.draw_text(y, separator_x, "│", header_color_pair, header_attrs)
         
         # Controls
-        controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll Shift-↑↓:prev/next diff PgUp/PgDn:page #:line# s:syntax t:tab i:ignore-ws w:wrap"
+        controls = "Enter/ESC:quit ↑↓:scroll ←→:h-scroll Shift-↑↓:prev/next diff PgUp/PgDn:page n:line-num s:syntax t:tab i:ignore-ws w:wrap"
         status_color_pair, status_attrs = get_status_color()
         
         if len(controls) + 4 < width:
@@ -1061,10 +1061,7 @@ class DiffViewer:
         # Check for character-based commands (only from KeyEvent)
         if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
-            if char_lower == 'q':
-                self.should_close = True
-                return True
-            elif char_lower == '#':
+            if char_lower == 'n':
                 # Toggle line numbers
                 self.show_line_numbers = not self.show_line_numbers
             elif char_lower == 's':
@@ -1104,9 +1101,11 @@ class DiffViewer:
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
-            return False
+            self.should_close = True
+            return True
         elif event.key_code == KeyCode.ENTER:
-            return False
+            self.should_close = True
+            return True
         elif event.key_code == KeyCode.UP:
             # Check for Shift modifier to jump to previous diff
             if event.has_modifier(ModifierKey.SHIFT):

@@ -593,7 +593,7 @@ class TextViewer:
             self.renderer.draw_text(1, 2, isearch_prompt[:width-4], search_color_pair, search_attrs)
         else:
             # Show normal controls
-            controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:numbers w:wrap s:syntax t:tab-width"
+            controls = "Enter/ESC:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:line-num w:wrap s:syntax t:tab-width"
             
             # Center the controls or left-align if too long
             if len(controls) + 4 < width:
@@ -903,10 +903,7 @@ class TextViewer:
         # Check for character-based commands (only from KeyEvent)
         if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
-            if char_lower == 'q':
-                self.should_close = True
-                return True
-            elif char_lower == 'n':
+            if char_lower == 'n':
                 self.show_line_numbers = not self.show_line_numbers
             elif char_lower == 'w':
                 # When toggling wrap mode, adjust scroll position to maintain context
@@ -951,9 +948,11 @@ class TextViewer:
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
-            return False
+            self.should_close = True
+            return True
         elif event.key_code == KeyCode.ENTER:
-            return False
+            self.should_close = True
+            return True
         elif event.key_code == KeyCode.UP:
             if self.scroll_offset > 0:
                 self.scroll_offset -= 1
