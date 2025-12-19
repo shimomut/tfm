@@ -1040,6 +1040,10 @@ class DiffViewer:
         if event is None:
             return True
         
+        # DiffViewer doesn't handle CharEvents - return False so backend generates them
+        if isinstance(event, CharEvent):
+            return False
+        
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
         # Check for character-based commands (only from KeyEvent)

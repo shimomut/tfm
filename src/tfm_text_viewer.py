@@ -881,8 +881,12 @@ class TextViewer:
         
         # Handle isearch mode input first
         if self.isearch_mode:
-            if self.handle_isearch_input(event):
-                return True  # Isearch mode handled the key
+            return self.handle_isearch_input(event)
+        
+        # CharEvents should only be handled in isearch mode
+        # Return False for unhandled CharEvents so backend generates them
+        if isinstance(event, CharEvent):
+            return False
         
         # Check for character-based commands (only from KeyEvent)
         if isinstance(event, KeyEvent) and event.char:
