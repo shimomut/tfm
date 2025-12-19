@@ -76,7 +76,7 @@ class TFMEventCallback(EventCallback):
     
     def on_key_event(self, event: KeyEvent) -> bool:
         """
-        Handle a key event by routing to command handlers.
+        Handle a key event by routing to FileManager.handle_input().
         
         Args:
             event: KeyEvent to handle
@@ -84,12 +84,12 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed (command executed), False otherwise
         """
-        # Route to the file manager's command handler
-        return self.file_manager.handle_command(event)
+        # Route to the file manager's unified input handler
+        return self.file_manager.handle_input(event)
     
     def on_char_event(self, event: CharEvent) -> bool:
         """
-        Handle a character event by passing to active dialog or text widget.
+        Handle a character event by routing to FileManager.handle_input().
         
         Args:
             event: CharEvent to handle
@@ -97,32 +97,9 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed (character inserted), False otherwise
         """
-        # Route through general_dialog if it's active
-        # This ensures content_changed flag is set correctly
-        if self.file_manager.general_dialog.is_active:
-            return self.file_manager.general_dialog.handle_input(event)
-        
-        # Route through search_dialog if it's active
-        if self.file_manager.search_dialog.is_active:
-            return self.file_manager.search_dialog.handle_input(event)
-        
-        # Route through jump_dialog if it's active
-        if self.file_manager.jump_dialog.is_active:
-            return self.file_manager.jump_dialog.handle_input(event)
-        
-        # Route through batch_rename_dialog if it's active
-        if self.file_manager.batch_rename_dialog.is_active:
-            return self.file_manager.batch_rename_dialog.handle_input(event)
-        
-        # Route through list_dialog if it's active
-        if self.file_manager.list_dialog.is_active:
-            return self.file_manager.list_dialog.handle_input(event)
-        
-        # Otherwise pass to active text widget if one exists
-        active_widget = self.file_manager.get_active_text_widget()
-        if active_widget:
-            return active_widget.handle_key(event)
-        return False
+        # Route to the file manager's unified input handler
+        # handle_input() will route CharEvents to active dialogs
+        return self.file_manager.handle_input(event)
     
     def on_system_event(self, event: SystemEvent) -> bool:
         """
@@ -904,22 +881,6 @@ class FileManager:
     def get_inactive_pane(self):
         """Get the inactive pane"""
         return self.pane_manager.get_inactive_pane()
-    
-    def handle_command(self, event: KeyEvent) -> bool:
-        """
-        Handle a command key event.
-        
-        This method routes KeyEvents to the appropriate command handlers
-        and returns whether the event was consumed.
-        
-        Args:
-            event: KeyEvent to handle
-        
-        Returns:
-            True if the event was consumed (command executed), False otherwise
-        """
-        # Route to handle_key_input which already returns True/False
-        return self.handle_key_input(event)
     
     def get_active_text_widget(self):
         """
@@ -3320,32 +3281,45 @@ class FileManager:
         
         return False
 
-    def handle_key_input(self, event):
-        """Handle input event and return True if the event was processed"""
+    def handle_input(self, event):
+        """
+        Handle input event (KeyEvent or CharEvent) and return True if the event was processed.
+        
+        Args:
+            event: KeyEvent or CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        # Type check: only handle KeyEvent and CharEvent
+        if not isinstance(event, (KeyEvent, CharEvent)):
+            return False
+        
         current_pane = self.get_current_pane()
         
         # Handle Shift+Arrow keys for log scrolling FIRST (works in all modes)
-        if event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
+        # Only process for KeyEvent (CharEvent doesn't have key_code)
+        if isinstance(event, KeyEvent) and event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
             if self.log_manager.scroll_log_up(1):
                 self.needs_full_redraw = True
             return True
-        elif event.key_code == KeyCode.DOWN and event.modifiers & ModifierKey.SHIFT:  # Shift+Down
+        elif isinstance(event, KeyEvent) and event.key_code == KeyCode.DOWN and event.modifiers & ModifierKey.SHIFT:  # Shift+Down
             if self.log_manager.scroll_log_down(1):
                 self.needs_full_redraw = True
             return True
-        elif event.key_code == KeyCode.LEFT and event.modifiers & ModifierKey.SHIFT:  # Shift+Left - fast scroll to older messages
+        elif isinstance(event, KeyEvent) and event.key_code == KeyCode.LEFT and event.modifiers & ModifierKey.SHIFT:  # Shift+Left - fast scroll to older messages
             log_height = self._get_log_pane_height()
             if self.log_manager.scroll_log_up(max(1, log_height)):
                 self.needs_full_redraw = True
             return True
-        elif event.key_code == KeyCode.RIGHT and event.modifiers & ModifierKey.SHIFT:  # Shift+Right - fast scroll to newer messages
+        elif isinstance(event, KeyEvent) and event.key_code == KeyCode.RIGHT and event.modifiers & ModifierKey.SHIFT:  # Shift+Right - fast scroll to newer messages
             log_height = self._get_log_pane_height()
             if self.log_manager.scroll_log_down(max(1, log_height)):
                 self.needs_full_redraw = True
             return True
         
-        # Handle isearch mode input
-        if self.isearch_mode:
+        # Handle isearch mode input (KeyEvent only)
+        if isinstance(event, KeyEvent) and self.isearch_mode:
             if self.handle_isearch_input(event):
                 return True  # Isearch mode handled the event
             # Isearch didn't handle the event - return False to allow CharEvent generation
@@ -3355,15 +3329,15 @@ class FileManager:
         if self.general_dialog.is_active:
             return self.general_dialog.handle_input(event)
         
-        # Handle quick choice mode input
-        if self.quick_choice_bar.is_active:
+        # Handle quick choice mode input (KeyEvent only)
+        if isinstance(event, KeyEvent) and self.quick_choice_bar.is_active:
             if self.handle_quick_choice_input(event):
                 return True  # Quick choice mode handled the event
             # Dialog didn't handle the event - return False to allow CharEvent generation
             return False
         
-        # Handle info dialog mode input
-        if self.info_dialog.is_active:
+        # Handle info dialog mode input (KeyEvent only)
+        if isinstance(event, KeyEvent) and self.info_dialog.is_active:
             if self.handle_info_dialog_input(event):
                 return True  # Info dialog mode handled the event
             # Dialog didn't handle the event - return False to allow CharEvent generation
@@ -3371,27 +3345,42 @@ class FileManager:
         
         # Handle list dialog mode input
         if self.list_dialog.is_active:
-            if self.handle_list_dialog_input(event):
-                return True  # List dialog mode handled the event
-            # Dialog didn't handle the event - return False to allow CharEvent generation
-            return False
+            # CharEvents go directly to dialog's handle_input
+            if isinstance(event, CharEvent):
+                return self.list_dialog.handle_input(event)
+            # KeyEvents go through handle_list_dialog_input
+            if isinstance(event, KeyEvent):
+                if self.handle_list_dialog_input(event):
+                    return True  # List dialog mode handled the event
+                # Dialog didn't handle the event - return False to allow CharEvent generation
+                return False
         
         # Handle search dialog mode input
         if self.search_dialog.is_active:
-            if self.handle_search_dialog_input(event):
-                return True  # Search dialog mode handled the event
-            # Dialog didn't handle the event - return False to allow CharEvent generation
-            return False
+            # CharEvents go directly to dialog's handle_input
+            if isinstance(event, CharEvent):
+                return self.search_dialog.handle_input(event)
+            # KeyEvents go through handle_search_dialog_input
+            if isinstance(event, KeyEvent):
+                if self.handle_search_dialog_input(event):
+                    return True  # Search dialog mode handled the event
+                # Dialog didn't handle the event - return False to allow CharEvent generation
+                return False
         
         # Handle jump dialog mode input
         if self.jump_dialog.is_active:
-            if self.handle_jump_dialog_input(event):
-                return True  # Jump dialog mode handled the event
-            # Dialog didn't handle the event - return False to allow CharEvent generation
-            return False
+            # CharEvents go directly to dialog's handle_input
+            if isinstance(event, CharEvent):
+                return self.jump_dialog.handle_input(event)
+            # KeyEvents go through handle_jump_dialog_input
+            if isinstance(event, KeyEvent):
+                if self.handle_jump_dialog_input(event):
+                    return True  # Jump dialog mode handled the event
+                # Dialog didn't handle the event - return False to allow CharEvent generation
+                return False
         
-        # Handle drives dialog mode input
-        if self.drives_dialog.is_active:
+        # Handle drives dialog mode input (KeyEvent only)
+        if isinstance(event, KeyEvent) and self.drives_dialog.is_active:
             if self.handle_drives_dialog_input(event):
                 return True  # Drives dialog mode handled the event
             # Dialog didn't handle the event - return False to allow CharEvent generation
@@ -3399,12 +3388,28 @@ class FileManager:
         
         # Handle batch rename dialog mode input
         if self.batch_rename_dialog.is_active:
-            if self.handle_batch_rename_input(event):
-                return True  # Batch rename mode handled the event
-            # Dialog didn't handle the event - return False to allow CharEvent generation
+            # CharEvents go directly to dialog's handle_input
+            if isinstance(event, CharEvent):
+                return self.batch_rename_dialog.handle_input(event)
+            # KeyEvents go through handle_batch_rename_input
+            if isinstance(event, KeyEvent):
+                if self.handle_batch_rename_input(event):
+                    return True  # Batch rename mode handled the event
+                # Dialog didn't handle the event - return False to allow CharEvent generation
+                return False
+        
+        # Handle CharEvents for active text widgets
+        if isinstance(event, CharEvent):
+            active_widget = self.get_active_text_widget()
+            if active_widget:
+                return active_widget.handle_key(event)
             return False
         
-        # Handle main application keys
+        # Handle main application keys (KeyEvent only)
+        # CharEvents are not processed here as they don't have key_code
+        if not isinstance(event, KeyEvent):
+            return False
+        
         if self.is_key_for_action(event, 'quit'):
             def quit_callback(confirmed):
                 if confirmed:
@@ -3786,7 +3791,7 @@ class FileManager:
                     # Ignore all other keys during operation
                 else:
                     # Handle normal key input
-                    self.handle_key_input(event)
+                    self.handle_input(event)
             
             # Draw interface after handling input
             self.draw_interface()

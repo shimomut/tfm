@@ -39,25 +39,25 @@ def test_input_event_handling():
         fm = FileManager(mock_renderer)
         fm.log_height_ratio = 0.25  # Set required attribute
         
-        # Test that handle_key_input accepts KeyEvent
+        # Test that handle_input accepts KeyEvent
         # Test UP arrow key
         up_event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
-        result = fm.handle_key_input(up_event)
+        result = fm.handle_input(up_event)
         assert result is True, "UP arrow should be handled"
         
         # Test DOWN arrow key
         down_event = KeyEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE)
-        result = fm.handle_key_input(down_event)
+        result = fm.handle_input(down_event)
         assert result is True, "DOWN arrow should be handled"
         
         # Test PAGE_UP key
         page_up_event = KeyEvent(key_code=KeyCode.PAGE_UP, modifiers=ModifierKey.NONE)
-        result = fm.handle_key_input(page_up_event)
+        result = fm.handle_input(page_up_event)
         assert result is True, "PAGE_UP should be handled"
         
         # Test PAGE_DOWN key
         page_down_event = KeyEvent(key_code=KeyCode.PAGE_DOWN, modifiers=ModifierKey.NONE)
-        result = fm.handle_key_input(page_down_event)
+        result = fm.handle_input(page_down_event)
         assert result is True, "PAGE_DOWN should be handled"
         
         print("✓ Input event handling test passed")
@@ -199,7 +199,7 @@ def test_main_loop_uses_get_input():
         assert event.key_code == ord('q'), "Event should be 'q' key"
         
         # Handle the quit event
-        fm.handle_key_input(event)
+        fm.handle_input(event)
         assert fm.should_quit is True, "should_quit should be set to True"
         
         print("✓ Main loop get_input test passed")

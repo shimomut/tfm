@@ -25,7 +25,7 @@ def test_log_scroll_constants():
         # Verify TFM now uses standard KeyCode with SHIFT modifier
         from tfm_main import FileManager
         import inspect
-        source = inspect.getsource(FileManager.handle_key_input)
+        source = inspect.getsource(FileManager.handle_input)
         
         # Check that new pattern is used
         if 'KeyCode.UP and event.modifiers & ModifierKey.SHIFT' in source:
