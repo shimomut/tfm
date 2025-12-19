@@ -319,9 +319,13 @@ class SingleLineTextEdit:
                     caret_x = last_char_x
         
         # Set caret position and visibility after rendering
+        # Note: Caret position is set here, but actual visibility should be
+        # controlled by the caller after all rendering is complete to avoid
+        # IME composition text appearing in wrong locations
         if is_active:
             renderer.set_caret_position(caret_x, y)
-            renderer.show_caret()
+            # Don't show caret here - let the caller control visibility
+            # after all rendering is complete
         else:
             renderer.hide_caret()
     

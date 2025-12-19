@@ -204,6 +204,8 @@ class GeneralPurposeDialog:
             show_help = False  # Disable help if no space
         
         # Draw input field using SingleLineTextEdit
+        # Note: SingleLineTextEdit.draw() sets caret position internally
+        # but we need to set it again after drawing help text
         self.text_editor.draw(
             self.renderer, status_y, 2, max_field_width,
             self.prompt_text,
@@ -221,6 +223,22 @@ class GeneralPurposeDialog:
                 self.renderer.draw_text(status_y, help_x, self.help_text, 
                                        color_pair=status_color, 
                                        attributes=TextAttribute.NORMAL)
+        
+        # CRITICAL: Set caret position AFTER all text drawing is complete
+        # Drawing text moves the cursor, so we must restore the caret position
+        # Calculate the correct caret position based on the text editor state
+        prompt_width = get_width(self.prompt_text)
+        text_before_cursor = self.text_editor.text[:self.text_editor.cursor_pos]
+        cursor_display_offset = get_width(text_before_cursor)
+        caret_x = 2 + prompt_width + cursor_display_offset
+        
+        # Set caret position and show it
+        self.renderer.set_caret_position(caret_x, status_y)
+        self.renderer.show_caret()
+        
+        # CRITICAL: Refresh to apply the cursor position change
+        # Without refresh, the cursor position is staged but not visible
+        self.renderer.refresh()
 
 
 # Helper functions for common dialog patterns

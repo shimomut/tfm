@@ -845,8 +845,7 @@ class CursesBackend(Renderer):
         Set the terminal caret position.
         
         This method positions the terminal cursor at the specified screen
-        coordinates using curses.setsyx(). The caret will only be visible
-        if show_caret() has been called.
+        coordinates. The caret will only be visible if show_caret() has been called.
         
         Args:
             x: Column position (0-based, 0 is left)
@@ -856,9 +855,9 @@ class CursesBackend(Renderer):
         by catching curses.error exceptions.
         """
         try:
-            # curses.setsyx() takes (row, col) not (x, y)
-            curses.setsyx(y, x)
-            self.stdscr.refresh()
+            # Use move() to set the cursor position
+            # This sets the position for the next refresh
+            self.stdscr.move(y, x)
         except curses.error:
             # Position out of bounds or other curses error - ignore
             pass
