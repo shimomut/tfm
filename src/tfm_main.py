@@ -3125,7 +3125,8 @@ class FileManager:
                 self.needs_full_redraw = True
                 return True
         
-        return True  # Capture most keys in batch rename mode
+        # Return False if event not handled to allow CharEvent generation
+        return False
 
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
