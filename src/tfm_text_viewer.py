@@ -45,6 +45,7 @@ class TextViewer:
         self.wrap_lines = False
         self.syntax_highlighting = PYGMENTS_AVAILABLE
         self.tab_width = 4  # Number of spaces per tab
+        self.should_close = False  # Flag to indicate viewer wants to close
         
         # Isearch mode state
         self.isearch_mode = False
@@ -872,10 +873,13 @@ class TextViewer:
         return len(self.lines) if self.lines else 1
     
     def handle_key(self, event: KeyEvent) -> bool:
-        """Handle key input. Returns True if viewer should continue, False to exit"""
+        """
+        Handle key input. Returns True if event was consumed, False otherwise.
+        Sets self.should_close = True when viewer wants to close.
+        """
         # Handle None event
         if event is None:
-            return True
+            return False
         
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
@@ -892,7 +896,8 @@ class TextViewer:
         if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
             if char_lower == 'q':
-                return False
+                self.should_close = True
+                return True
             elif char_lower == 'n':
                 self.show_line_numbers = not self.show_line_numbers
             elif char_lower == 'w':
@@ -986,7 +991,7 @@ class TextViewer:
         Handle input event (called by FileManager's main loop)
         
         Returns:
-            bool: True to keep viewer open, False to close
+            bool: True if event was consumed, False otherwise
         """
         return self.handle_key(event)
 

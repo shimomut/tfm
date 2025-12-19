@@ -3303,16 +3303,18 @@ class FileManager:
         
         # Handle active viewer input (TextViewer or DiffViewer)
         if self.active_viewer:
-            keep_open = self.active_viewer.handle_input(event)
-            if not keep_open:
-                # Viewer wants to close
+            consumed = self.active_viewer.handle_input(event)
+            
+            # Check if viewer wants to close
+            if self.active_viewer.should_close:
                 self.active_viewer = None
                 self.renderer.set_cursor_visibility(False)
                 self.needs_full_redraw = True
-            else:
-                # Viewer handled the event, needs redraw
+            elif consumed:
+                # Viewer consumed the event, needs redraw
                 self.needs_full_redraw = True
-            return True
+            
+            return consumed
         
         current_pane = self.get_current_pane()
         

@@ -49,6 +49,7 @@ class DiffViewer:
         self.current_diff_index = -1  # Index into diff_indices (-1 means no focus)
         self.ignore_whitespace = False  # Whether to ignore whitespace when comparing
         self.wrap_lines = False  # Whether to wrap long lines
+        self.should_close = False  # Flag to indicate viewer wants to close
         
         # Load files and compute diff
         self.load_files()
@@ -1036,9 +1037,12 @@ class DiffViewer:
             self.scroll_offset = diff_start
     
     def handle_key(self, event: KeyEvent) -> bool:
-        """Handle key input. Returns True if viewer should continue, False to exit"""
+        """
+        Handle key input. Returns True if event was consumed, False otherwise.
+        Sets self.should_close = True when viewer wants to close.
+        """
         if event is None:
-            return True
+            return False
         
         # DiffViewer doesn't handle CharEvents - return False so backend generates them
         if isinstance(event, CharEvent):
@@ -1050,7 +1054,8 @@ class DiffViewer:
         if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
             if char_lower == 'q':
-                return False
+                self.should_close = True
+                return True
             elif char_lower == '#':
                 # Toggle line numbers
                 self.show_line_numbers = not self.show_line_numbers
@@ -1190,7 +1195,7 @@ class DiffViewer:
         Handle input event (called by FileManager's main loop)
         
         Returns:
-            bool: True to keep viewer open, False to close
+            bool: True if event was consumed, False otherwise
         """
         return self.handle_key(event)
 
