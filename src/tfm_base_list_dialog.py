@@ -111,7 +111,7 @@ class BaseListDialog:
         # Left/Right arrows - let editor handle
         elif event.key_code in (KeyCode.LEFT, KeyCode.RIGHT):
             if self.text_editor.handle_key(event):
-                return 'text_changed'
+                return True  # Cursor moved, but text not changed
             return True
         # Backspace - let editor handle
         elif event.key_code == KeyCode.BACKSPACE:
