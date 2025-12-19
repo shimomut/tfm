@@ -69,6 +69,10 @@ COLOR_DIFF_BLANK = 33          # Blank lines in diff viewer (for alignment)
 COLOR_DIFF_CHAR_CHANGE = 34    # Character-level changes within lines (bright highlight)
 COLOR_DIFF_FOCUSED = 35        # Focused difference (highlighted background)
 
+# Focus indicator colors
+COLOR_FOCUS_BRACKET = 36       # Red brackets for focused item in active pane
+COLOR_FOCUS_BRACKET_INACTIVE = 37  # Dimmed brackets for focused item in inactive pane
+
 # Current color scheme
 current_color_scheme = 'dark'
 
@@ -205,6 +209,14 @@ COLOR_SCHEMES = {
         'DIFF_FOCUSED_BG': {
             'color_num': 157,
             'rgb': (60, 70, 140)    # Blue-based background for focused lines (more prominent than CHANGE)
+        },
+        'FOCUS_BRACKET_FG': {
+            'color_num': 158,
+            'rgb': (255, 80, 80)    # Bright red for focus brackets
+        },
+        'FOCUS_BRACKET_INACTIVE_FG': {
+            'color_num': 159,
+            'rgb': (150, 150, 150)  # Gray for inactive focus brackets
         }
     },
     'light': {
@@ -331,6 +343,14 @@ COLOR_SCHEMES = {
         'DIFF_FOCUSED_BG': {
             'color_num': 157,
             'rgb': (200, 210, 255)  # Light blue-based background for focused lines (more prominent than CHANGE)
+        },
+        'FOCUS_BRACKET_FG': {
+            'color_num': 158,
+            'rgb': (200, 0, 0)      # Dark red for focus brackets
+        },
+        'FOCUS_BRACKET_INACTIVE_FG': {
+            'color_num': 159,
+            'rgb': (100, 100, 100)  # Dark gray for inactive focus brackets
         }
     }
 }
@@ -473,33 +493,24 @@ def init_colors(renderer, color_scheme=None):
     renderer.init_color_pair(COLOR_DIFF_BLANK, default_fg, diff_blank_bg)
     renderer.init_color_pair(COLOR_DIFF_CHAR_CHANGE, default_fg, diff_char_change_bg)
     renderer.init_color_pair(COLOR_DIFF_FOCUSED, default_fg, diff_focused_bg)
+    
+    # Focus bracket color
+    focus_bracket_fg = rgb_colors['FOCUS_BRACKET_FG']['rgb']
+    renderer.init_color_pair(COLOR_FOCUS_BRACKET, focus_bracket_fg, default_bg)
+    focus_bracket_inactive_fg = rgb_colors['FOCUS_BRACKET_INACTIVE_FG']['rgb']
+    renderer.init_color_pair(COLOR_FOCUS_BRACKET_INACTIVE, focus_bracket_inactive_fg, default_bg)
 
 def get_file_color(is_dir, is_executable, is_selected, is_active):
     """
     Get the appropriate color pair and attributes for a file based on its properties.
     
+    Note: is_selected refers to the focused/cursor item, which now uses brackets instead
+    of background color highlighting. This function returns normal colors for all items.
+    
     Returns:
         Tuple[int, int]: (color_pair, attributes)
     """
-    # Handle selected files with common background color
-    if is_selected and is_active:
-        if is_dir:
-            return COLOR_DIRECTORIES_SELECTED, TextAttribute.NORMAL
-        elif is_executable:
-            return COLOR_EXECUTABLES_SELECTED, TextAttribute.NORMAL
-        else:
-            return COLOR_REGULAR_FILE_SELECTED, TextAttribute.NORMAL
-    
-    # Handle inactive selection with dedicated colors
-    if is_selected:
-        if is_dir:
-            return COLOR_DIRECTORIES_SELECTED_INACTIVE, TextAttribute.NORMAL
-        elif is_executable:
-            return COLOR_EXECUTABLES_SELECTED_INACTIVE, TextAttribute.NORMAL
-        else:
-            return COLOR_REGULAR_FILE_SELECTED_INACTIVE, TextAttribute.NORMAL
-    
-    # Normal (unselected) files
+    # All files use normal colors (focused item is indicated by brackets, not background)
     if is_dir:
         return COLOR_DIRECTORIES, TextAttribute.NORMAL
     elif is_executable:
@@ -887,3 +898,18 @@ def get_scrollbar_color():
         Tuple[int, int]: (color_pair, attributes)
     """
     return COLOR_SCROLLBAR, TextAttribute.NORMAL
+
+def get_focus_bracket_color(is_active=True):
+    """
+    Get focus bracket color pair and attributes.
+    
+    Args:
+        is_active: Whether the pane is active (default: True)
+    
+    Returns:
+        Tuple[int, int]: (color_pair, attributes)
+    """
+    if is_active:
+        return COLOR_FOCUS_BRACKET, TextAttribute.NORMAL
+    else:
+        return COLOR_FOCUS_BRACKET_INACTIVE, TextAttribute.NORMAL
