@@ -88,7 +88,7 @@ def test_tab_width_change():
         
         # Simulate pressing 't' to change tab width to 8
         event = KeyEvent(char='t', key_code=None)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         print(f"Tab width after first 't' press: {viewer.tab_width}")
         assert viewer.tab_width == 8, f"Expected tab width 8, got {viewer.tab_width}"
@@ -100,7 +100,7 @@ def test_tab_width_change():
         
         # Simulate pressing 't' again to change tab width to 2
         event = KeyEvent(char='t', key_code=None)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         print(f"Tab width after second 't' press: {viewer.tab_width}")
         assert viewer.tab_width == 2, f"Expected tab width 2, got {viewer.tab_width}"
@@ -112,7 +112,7 @@ def test_tab_width_change():
         
         # Simulate pressing 't' once more to cycle back to 4
         event = KeyEvent(char='t', key_code=None)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         print(f"Tab width after third 't' press: {viewer.tab_width}")
         assert viewer.tab_width == 4, f"Expected tab width 4, got {viewer.tab_width}"
@@ -168,7 +168,7 @@ def test_tab_width_display():
         
         # Change tab width and check display
         event = KeyEvent(char='t', key_code=None)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         renderer.clear_drawn_text()
         viewer.draw_status_bar()

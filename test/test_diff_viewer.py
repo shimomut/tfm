@@ -75,34 +75,34 @@ class TestDiffViewer(unittest.TestCase):
         # Should handle error gracefully
         self.assertIn("File not found", viewer.file1_lines[0])
     
-    def test_handle_key_navigation(self):
+    def test_handle_input_navigation(self):
         """Test keyboard navigation"""
         viewer = DiffViewer(self.mock_renderer, Path(self.file1_path), Path(self.file2_path))
         
         # Test scroll down
         initial_offset = viewer.scroll_offset
         event = KeyEvent(key_code=KeyCode.DOWN, modifiers=0, char='')
-        result = viewer.handle_key(event)
+        result = viewer.handle_input(event)
         self.assertTrue(result)
         self.assertGreaterEqual(viewer.scroll_offset, initial_offset)
         
         # Test quit
         event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=0, char='')
-        result = viewer.handle_key(event)
+        result = viewer.handle_input(event)
         self.assertFalse(result)
     
-    def test_handle_key_horizontal_scroll(self):
+    def test_handle_input_horizontal_scroll(self):
         """Test horizontal scrolling"""
         viewer = DiffViewer(self.mock_renderer, Path(self.file1_path), Path(self.file2_path))
         
         # Test scroll right
         event = KeyEvent(key_code=KeyCode.RIGHT, modifiers=0, char='')
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         self.assertGreater(viewer.horizontal_offset, 0)
         
         # Test scroll left
         event = KeyEvent(key_code=KeyCode.LEFT, modifiers=0, char='')
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         self.assertEqual(viewer.horizontal_offset, 0)
     
     def test_view_diff_function(self):
@@ -241,11 +241,11 @@ def farewell():
         
         # Toggle on
         event = KeyEvent(key_code=None, modifiers=0, char='w')
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         self.assertTrue(viewer.ignore_whitespace)
         
         # Toggle off
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         self.assertFalse(viewer.ignore_whitespace)
     
     def test_whitespace_ignore_with_real_differences(self):

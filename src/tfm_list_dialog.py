@@ -4,7 +4,7 @@ TUI File Manager - List Dialog Component
 Provides searchable list dialog functionality
 """
 
-from ttk import TextAttribute
+from ttk import TextAttribute, KeyEvent, CharEvent
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
 from tfm_colors import get_status_color
@@ -64,48 +64,60 @@ class ListDialog(BaseListDialog):
         """Handle input while in list dialog mode
         
         Args:
-            event: KeyEvent from TTK renderer (or integer key code for backward compatibility)
+            event: KeyEvent or CharEvent from TTK renderer (or integer key code for backward compatibility)
         """
         # Backward compatibility: convert integer key codes to KeyEvent
         event = ensure_input_event(event)
         
-        # Check custom key handler first
-        if self.custom_key_handler and self.custom_key_handler(event):
-            return True
-            
-        # Use base class navigation handling
-        result = self.handle_common_navigation(event, self.filtered_items)
+        if not event:
+            return False
         
-        if result == 'cancel':
-            # Store callback before exiting
-            callback = self.callback
-            self.exit()
-            # Call callback after exiting to allow new dialogs
-            if callback:
-                callback(None)
+        # Check custom key handler first (only for KeyEvents)
+        if isinstance(event, KeyEvent) and self.custom_key_handler and self.custom_key_handler(event):
             return True
-        elif result == 'select':
-            # Select current item
-            callback = self.callback
-            if self.filtered_items and 0 <= self.selected < len(self.filtered_items):
-                selected_item = self.filtered_items[self.selected]
-                self.exit()
-                # Call callback after exiting to allow new dialogs
-                if callback:
-                    callback(selected_item)
-            else:
+        
+        # Only pass KeyEvents to navigation handler (CharEvents go to text editor)
+        if isinstance(event, KeyEvent):
+            # Use base class navigation handling
+            result = self.handle_common_navigation(event, self.filtered_items)
+            
+            if result == 'cancel':
+                # Store callback before exiting
+                callback = self.callback
                 self.exit()
                 # Call callback after exiting to allow new dialogs
                 if callback:
                     callback(None)
-            return True
-        elif result == 'text_changed':
-            self._filter_items()
-            self.content_changed = True  # Mark content as changed when filtering
-            return True
-        elif result:
-            self.content_changed = True  # Mark content as changed for navigation
-            return True
+                return True
+            elif result == 'select':
+                # Select current item
+                callback = self.callback
+                if self.filtered_items and 0 <= self.selected < len(self.filtered_items):
+                    selected_item = self.filtered_items[self.selected]
+                    self.exit()
+                    # Call callback after exiting to allow new dialogs
+                    if callback:
+                        callback(selected_item)
+                else:
+                    self.exit()
+                    # Call callback after exiting to allow new dialogs
+                    if callback:
+                        callback(None)
+                return True
+            elif result == 'text_changed':
+                self._filter_items()
+                self.content_changed = True  # Mark content as changed when filtering
+                return True
+            elif result:
+                self.content_changed = True  # Mark content as changed for navigation
+                return True
+        
+        # CharEvent - pass to text editor
+        if isinstance(event, CharEvent):
+            if self.text_editor.handle_key(event):
+                self._filter_items()
+                self.content_changed = True
+                return True
             
         return False
         

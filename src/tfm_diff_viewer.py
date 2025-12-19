@@ -9,7 +9,7 @@ between two text files with syntax highlighting support.
 import difflib
 from tfm_path import Path
 from typing import List, Tuple, Optional
-from ttk import KeyEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent
 from tfm_colors import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
@@ -49,6 +49,7 @@ class DiffViewer:
         self.current_diff_index = -1  # Index into diff_indices (-1 means no focus)
         self.ignore_whitespace = False  # Whether to ignore whitespace when comparing
         self.wrap_lines = False  # Whether to wrap long lines
+        self.should_close = False  # Flag to indicate viewer wants to close
         
         # Load files and compute diff
         self.load_files()
@@ -481,7 +482,7 @@ class DiffViewer:
             self.renderer.draw_text(y, separator_x, "│", header_color_pair, header_attrs)
         
         # Controls
-        controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll Shift-↑↓:prev/next diff PgUp/PgDn:page #:line# s:syntax t:tab i:ignore-ws w:wrap"
+        controls = "Enter/ESC:quit ↑↓:scroll ←→:h-scroll Shift-↑↓:prev/next diff PgUp/PgDn:page n:line-num s:syntax t:tab i:ignore-ws w:wrap"
         status_color_pair, status_attrs = get_status_color()
         
         if len(controls) + 4 < width:
@@ -1035,19 +1036,32 @@ class DiffViewer:
             # Difference is larger than screen, just show from the start
             self.scroll_offset = diff_start
     
-    def handle_key(self, event: KeyEvent) -> bool:
-        """Handle key input. Returns True if viewer should continue, False to exit"""
+    def draw(self):
+        """Draw the viewer (called by FileManager's main loop)"""
+        self.draw_header()
+        self.draw_content()
+        self.draw_status_bar()
+    
+    def handle_input(self, event):
+        """
+        Handle input event (called by FileManager's main loop)
+        
+        Returns:
+            bool: True if event was consumed, False otherwise
+        """
         if event is None:
-            return True
+            return False
+        
+        # DiffViewer doesn't handle CharEvents - return False so backend generates them
+        if isinstance(event, CharEvent):
+            return False
         
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
-        # Check for character-based commands
-        if event.char:
+        # Check for character-based commands (only from KeyEvent)
+        if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
-            if char_lower == 'q':
-                return False
-            elif char_lower == '#':
+            if char_lower == 'n':
                 # Toggle line numbers
                 self.show_line_numbers = not self.show_line_numbers
             elif char_lower == 's':
@@ -1087,9 +1101,11 @@ class DiffViewer:
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
-            return False
+            self.should_close = True
+            return True
         elif event.key_code == KeyCode.ENTER:
-            return False
+            self.should_close = True
+            return True
         elif event.key_code == KeyCode.UP:
             # Check for Shift modifier to jump to previous diff
             if event.has_modifier(ModifierKey.SHIFT):
@@ -1174,36 +1190,11 @@ class DiffViewer:
             self.scroll_offset = max_scroll
         
         return True
-    
-    def run(self):
-        """Main viewer loop"""
-        self.renderer.set_cursor_visibility(False)
-        
-        # Initial draw
-        self.renderer.clear()
-        self.draw_header()
-        self.draw_content()
-        self.draw_status_bar()
-        self.renderer.refresh()
-        
-        while True:
-            try:
-                event = self.renderer.get_input()
-                if not self.handle_key(event):
-                    break
-                
-                self.draw_header()
-                self.draw_content()
-                self.draw_status_bar()
-                self.renderer.refresh()
-                
-            except KeyboardInterrupt:
-                break
 
 
-def view_diff(renderer, file1_path: Path, file2_path: Path) -> bool:
+def create_diff_viewer(renderer, file1_path: Path, file2_path: Path):
     """
-    View differences between two text files
+    Create a diff viewer instance
     
     Args:
         renderer: TTK renderer object
@@ -1211,25 +1202,21 @@ def view_diff(renderer, file1_path: Path, file2_path: Path) -> bool:
         file2_path: Path to the second file
         
     Returns:
-        True if diff was viewed successfully, False otherwise
+        DiffViewer instance or None if files cannot be viewed
     """
     if not file1_path.exists() or not file1_path.is_file():
         print(f"Error: First file does not exist or is not a file: {file1_path}")
-        return False
+        return None
     
     if not file2_path.exists() or not file2_path.is_file():
         print(f"Error: Second file does not exist or is not a file: {file2_path}")
-        return False
+        return None
     
     try:
-        viewer = DiffViewer(renderer, file1_path, file2_path)
-        viewer.run()
-        return True
+        return DiffViewer(renderer, file1_path, file2_path)
     except (OSError, IOError) as e:
         print(f"Error: Could not open files for diff: {e}")
-        return False
-    except KeyboardInterrupt:
-        return True
+        return None
     except Exception as e:
-        print(f"Error: Unexpected error viewing diff: {e}")
-        return False
+        print(f"Error: Unexpected error creating diff viewer: {e}")
+        return None

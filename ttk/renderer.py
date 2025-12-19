@@ -8,7 +8,10 @@ handling, and window management.
 
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Tuple, Optional
+from typing import Tuple, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ttk.input_event import KeyEvent, CharEvent, SystemEvent
 
 
 class TextAttribute(IntEnum):
@@ -22,6 +25,51 @@ class TextAttribute(IntEnum):
     BOLD = 1        # Bold/emphasized text
     UNDERLINE = 2   # Underlined text
     REVERSE = 4     # Reverse video (swap foreground and background colors)
+
+
+class EventCallback:
+    """
+    Callback interface for event delivery.
+    
+    Backends call these methods to deliver events to the application.
+    The application implements these methods to handle events.
+    """
+    
+    def on_key_event(self, event: 'KeyEvent') -> bool:
+        """
+        Handle a key event.
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed (handled), False otherwise
+        """
+        return False
+    
+    def on_char_event(self, event: 'CharEvent') -> bool:
+        """
+        Handle a character event.
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed (handled), False otherwise
+        """
+        return False
+    
+    def on_system_event(self, event: 'SystemEvent') -> bool:
+        """
+        Handle a system event (resize, close, etc.).
+        
+        Args:
+            event: SystemEvent to handle
+        
+        Returns:
+            True if the event was consumed (handled), False otherwise
+        """
+        return False
 
 
 class Renderer(ABC):
@@ -434,6 +482,28 @@ class Renderer(ABC):
         get_event(). New code should use get_event() directly.
         """
         return self.get_event(timeout_ms)
+    
+    def set_event_callback(self, callback: Optional[EventCallback]) -> None:
+        """
+        Set the event callback for event delivery.
+        
+        This method enables callback-based event delivery instead of polling.
+        When a callback is set, events are delivered via the callback methods
+        (on_key_event, on_char_event, on_system_event) instead of being
+        returned by get_event().
+        
+        Args:
+            callback: EventCallback instance or None to disable callbacks
+        
+        Example:
+            class MyCallback(EventCallback):
+                def on_key_event(self, event):
+                    print(f"Key pressed: {event.key_code}")
+                    return True  # Event consumed
+            
+            renderer.set_event_callback(MyCallback())
+        """
+        self.event_callback = callback
     
     @abstractmethod
     def set_menu_bar(self, menu_structure: dict) -> None:

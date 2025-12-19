@@ -11,7 +11,7 @@ import traceback
 from tfm_path import Path
 from typing import List, Tuple, Optional, Dict, Any
 import re
-from ttk import KeyEvent, KeyCode
+from ttk import KeyEvent, KeyCode, CharEvent
 from ttk.renderer import TextAttribute
 
 # Try to import pygments for syntax highlighting
@@ -45,6 +45,7 @@ class TextViewer:
         self.wrap_lines = False
         self.syntax_highlighting = PYGMENTS_AVAILABLE
         self.tab_width = 4  # Number of spaces per tab
+        self.should_close = False  # Flag to indicate viewer wants to close
         
         # Isearch mode state
         self.isearch_mode = False
@@ -479,36 +480,39 @@ class TextViewer:
         if event is None:
             return False
         
-        if event.key_code == KeyCode.ESCAPE:
-            self.exit_isearch_mode()
-            return True
-        elif event.key_code == KeyCode.ENTER:
-            # Enter - exit isearch mode and keep current position
-            self.exit_isearch_mode()
-            return True
-        elif event.key_code == KeyCode.BACKSPACE:
-            # Backspace - remove last character
-            if self.isearch_pattern:
-                self.isearch_pattern = self.isearch_pattern[:-1]
-                self.update_isearch_matches()
-            return True
-        elif event.key_code == KeyCode.UP:
-            # Up arrow - go to previous match
-            if self.isearch_matches:
-                self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
-                self.jump_to_match()
-            return True
-        elif event.key_code == KeyCode.DOWN:
-            # Down arrow - go to next match
-            if self.isearch_matches:
-                self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
-                self.jump_to_match()
-            return True
-        elif event.char and len(event.char) == 1 and 32 <= ord(event.char) <= 126:
-            # Printable characters
+        # Handle CharEvent - text input for search pattern
+        if isinstance(event, CharEvent):
             self.isearch_pattern += event.char
             self.update_isearch_matches()
             return True
+        
+        # Handle KeyEvent - navigation and control commands
+        if isinstance(event, KeyEvent):
+            if event.key_code == KeyCode.ESCAPE:
+                self.exit_isearch_mode()
+                return True
+            elif event.key_code == KeyCode.ENTER:
+                # Enter - exit isearch mode and keep current position
+                self.exit_isearch_mode()
+                return True
+            elif event.key_code == KeyCode.BACKSPACE:
+                # Backspace - remove last character
+                if self.isearch_pattern:
+                    self.isearch_pattern = self.isearch_pattern[:-1]
+                    self.update_isearch_matches()
+                return True
+            elif event.key_code == KeyCode.UP:
+                # Up arrow - go to previous match
+                if self.isearch_matches:
+                    self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
+                    self.jump_to_match()
+                return True
+            elif event.key_code == KeyCode.DOWN:
+                # Down arrow - go to next match
+                if self.isearch_matches:
+                    self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
+                    self.jump_to_match()
+                return True
         
         return False
     
@@ -589,7 +593,7 @@ class TextViewer:
             self.renderer.draw_text(1, 2, isearch_prompt[:width-4], search_color_pair, search_attrs)
         else:
             # Show normal controls
-            controls = "q/Enter:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:numbers w:wrap s:syntax t:tab-width"
+            controls = "Enter/ESC:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:line-num w:wrap s:syntax t:tab-width"
             
             # Center the controls or left-align if too long
             if len(controls) + 4 < width:
@@ -868,25 +872,38 @@ class TextViewer:
         # Fallback if index is out of range
         return len(self.lines) if self.lines else 1
     
-    def handle_key(self, event: KeyEvent) -> bool:
-        """Handle key input. Returns True if viewer should continue, False to exit"""
+    def draw(self):
+        """Draw the viewer (called by FileManager's main loop)"""
+        self.draw_header()
+        self.draw_content()
+        self.draw_status_bar()
+    
+    def handle_input(self, event):
+        """
+        Handle input event (called by FileManager's main loop)
+        
+        Returns:
+            bool: True if event was consumed, False otherwise
+        """
         # Handle None event
         if event is None:
-            return True
+            return False
         
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
         # Handle isearch mode input first
         if self.isearch_mode:
-            if self.handle_isearch_input(event):
-                return True  # Isearch mode handled the key
+            return self.handle_isearch_input(event)
         
-        # Check for character-based commands
-        if event.char:
+        # CharEvents should only be handled in isearch mode
+        # Return False for unhandled CharEvents so backend generates them
+        if isinstance(event, CharEvent):
+            return False
+        
+        # Check for character-based commands (only from KeyEvent)
+        if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
-            if char_lower == 'q':
-                return False
-            elif char_lower == 'n':
+            if char_lower == 'n':
                 self.show_line_numbers = not self.show_line_numbers
             elif char_lower == 'w':
                 # When toggling wrap mode, adjust scroll position to maintain context
@@ -931,9 +948,11 @@ class TextViewer:
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
-            return False
+            self.should_close = True
+            return True
         elif event.key_code == KeyCode.ENTER:
-            return False
+            self.should_close = True
+            return True
         elif event.key_code == KeyCode.UP:
             if self.scroll_offset > 0:
                 self.scroll_offset -= 1
@@ -967,33 +986,6 @@ class TextViewer:
             self.scroll_offset = max_scroll
             
         return True
-    
-    def run(self):
-        """Main viewer loop"""
-        self.renderer.set_cursor_visibility(False)
-        
-        # Initial draw
-        self.renderer.clear()
-        self.draw_header()
-        self.draw_content()
-        self.draw_status_bar()
-        self.renderer.refresh()
-        
-        while True:
-            # Handle input - this will block until a key is pressed
-            try:
-                event = self.renderer.get_input()
-                if not self.handle_key(event):
-                    break
-                    
-                # Only redraw after handling input - no full clear to avoid flicker
-                self.draw_header()
-                self.draw_content()
-                self.draw_status_bar()
-                self.renderer.refresh()
-                
-            except KeyboardInterrupt:
-                break
 
 
 def is_text_file(file_path: Path) -> bool:
@@ -1061,34 +1053,29 @@ def is_text_file(file_path: Path) -> bool:
         return False
 
 
-def view_text_file(renderer, file_path: Path) -> bool:
+def create_text_viewer(renderer, file_path: Path):
     """
-    View a text file with syntax highlighting
+    Create a text viewer instance
     
     Args:
         renderer: TTK renderer object
         file_path: Path to the file to view
         
     Returns:
-        True if file was viewed successfully, False otherwise
+        TextViewer instance or None if file cannot be viewed
     """
     if not file_path.exists() or not file_path.is_file():
-        return False
+        return None
         
     if not is_text_file(file_path):
-        return False
+        return None
     
     try:
-        viewer = TextViewer(renderer, file_path)
-        viewer.run()
-        return True
+        return TextViewer(renderer, file_path)
     except (OSError, IOError) as e:
         print(f"Error: Could not open text file {file_path}: {e}")
-        return False
-    except KeyboardInterrupt:
-        # User interrupted - this is normal
-        return True
+        return None
     except Exception as e:
-        print(f"Error: Unexpected error viewing text file {file_path}: {e}")
+        print(f"Error: Unexpected error creating text viewer for {file_path}: {e}")
         traceback.print_exc()
-        return False
+        return None

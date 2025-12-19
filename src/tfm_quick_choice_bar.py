@@ -4,7 +4,7 @@ TUI File Manager - Quick Choice Bar Component
 Provides quick choice dialog functionality displayed in the status bar
 """
 
-from ttk import KeyCode, TextAttribute
+from ttk import KeyCode, TextAttribute, KeyEvent, CharEvent
 from tfm_colors import get_status_color
 
 
@@ -78,8 +78,8 @@ class QuickChoiceBar:
             return ('execute', None)
             
         else:
-            # Check for quick key matches with character input
-            if event.char:
+            # Check for quick key matches with character input (only from KeyEvent)
+            if isinstance(event, KeyEvent) and event.char:
                 key_char = event.char.lower()
                 for choice in self.choices:
                     if "key" in choice and choice["key"] and choice["key"].lower() == key_char:

@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ttk import KeyEvent, KeyCode, ModifierKey
 from ttk.renderer import TextAttribute
+from ttk.input_event import CharEvent
 from tfm_path import Path
 from tfm_text_viewer import TextViewer, is_text_file, view_text_file
 from tfm_colors import COLOR_REGULAR_FILE, COLOR_ERROR
@@ -115,88 +116,88 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         self.assertTrue(self.mock_renderer.draw_text.called)
         self.assertGreater(self.mock_renderer.draw_text.call_count, 0)
     
-    def test_handle_key_accepts_input_event(self):
+    def test_handle_input_accepts_input_event(self):
         """Test that handle_key accepts KeyEvent instead of key code"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with UP arrow key
         event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
-        result = viewer.handle_key(event)
+        result = viewer.handle_input(event)
         
         # Should return True (continue viewing)
         self.assertTrue(result)
     
-    def test_handle_key_quit_with_q(self):
+    def test_handle_input_quit_with_q(self):
         """Test that 'q' key quits the viewer"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with 'q' character
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='q')
-        result = viewer.handle_key(event)
+        result = viewer.handle_input(event)
         
         # Should return False (exit viewer)
         self.assertFalse(result)
     
-    def test_handle_key_quit_with_escape(self):
+    def test_handle_input_quit_with_escape(self):
         """Test that ESC key quits the viewer"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with ESC key
         event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
-        result = viewer.handle_key(event)
+        result = viewer.handle_input(event)
         
         # Should return False (exit viewer)
         self.assertFalse(result)
     
-    def test_handle_key_scroll_down(self):
+    def test_handle_input_scroll_down(self):
         """Test that DOWN arrow scrolls down"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         initial_offset = viewer.scroll_offset
         
         # Test with DOWN arrow key
         event = KeyEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Scroll offset should increase
         self.assertGreaterEqual(viewer.scroll_offset, initial_offset)
     
-    def test_handle_key_scroll_up(self):
+    def test_handle_input_scroll_up(self):
         """Test that UP arrow scrolls up"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         viewer.scroll_offset = 5  # Start with some offset
         
         # Test with UP arrow key
         event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Scroll offset should decrease
         self.assertEqual(viewer.scroll_offset, 4)
     
-    def test_handle_key_page_down(self):
+    def test_handle_input_page_down(self):
         """Test that PAGE_DOWN scrolls by page"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         initial_offset = viewer.scroll_offset
         
         # Test with PAGE_DOWN key
         event = KeyEvent(key_code=KeyCode.PAGE_DOWN, modifiers=ModifierKey.NONE)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Scroll offset should increase by display height
         self.assertGreater(viewer.scroll_offset, initial_offset)
     
-    def test_handle_key_page_up(self):
+    def test_handle_input_page_up(self):
         """Test that PAGE_UP scrolls by page"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         viewer.scroll_offset = 10  # Start with some offset
         
         # Test with PAGE_UP key
         event = KeyEvent(key_code=KeyCode.PAGE_UP, modifiers=ModifierKey.NONE)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Scroll offset should decrease
         self.assertLess(viewer.scroll_offset, 10)
     
-    def test_handle_key_home(self):
+    def test_handle_input_home(self):
         """Test that HOME key goes to beginning"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         viewer.scroll_offset = 10
@@ -204,65 +205,65 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with HOME key
         event = KeyEvent(key_code=KeyCode.HOME, modifiers=ModifierKey.NONE)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Both offsets should be reset
         self.assertEqual(viewer.scroll_offset, 0)
         self.assertEqual(viewer.horizontal_offset, 0)
     
-    def test_handle_key_end(self):
+    def test_handle_input_end(self):
         """Test that END key goes to end"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with END key
         event = KeyEvent(key_code=KeyCode.END, modifiers=ModifierKey.NONE)
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Scroll offset should be at maximum
         self.assertGreater(viewer.scroll_offset, 0)
     
-    def test_handle_key_toggle_line_numbers(self):
+    def test_handle_input_toggle_line_numbers(self):
         """Test that 'n' key toggles line numbers"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         initial_state = viewer.show_line_numbers
         
         # Test with 'n' character
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='n')
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Line numbers should be toggled
         self.assertEqual(viewer.show_line_numbers, not initial_state)
     
-    def test_handle_key_toggle_wrap(self):
+    def test_handle_input_toggle_wrap(self):
         """Test that 'w' key toggles line wrapping"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         initial_state = viewer.wrap_lines
         
         # Test with 'w' character
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='w')
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Wrap mode should be toggled
         self.assertEqual(viewer.wrap_lines, not initial_state)
     
-    def test_handle_key_enter_isearch(self):
+    def test_handle_input_enter_isearch(self):
         """Test that 'f' key enters isearch mode"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         
         # Test with 'f' character
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='f')
-        viewer.handle_key(event)
+        viewer.handle_input(event)
         
         # Should enter isearch mode
         self.assertTrue(viewer.isearch_mode)
     
     def test_handle_isearch_input_accepts_input_event(self):
-        """Test that handle_isearch_input accepts KeyEvent"""
+        """Test that handle_isearch_input accepts CharEvent"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         viewer.enter_isearch_mode()
         
-        # Test with character input
-        event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='t')
+        # Test with character input using CharEvent
+        event = CharEvent(char='t')
         result = viewer.handle_isearch_input(event)
         
         # Should handle the input

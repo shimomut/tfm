@@ -25,15 +25,14 @@ from collections import deque
 from tfm_single_line_text_edit import SingleLineTextEdit
 
 # Import TTK input event system
-from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, MenuEvent
-from ttk.renderer import TextAttribute
+from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, MenuEvent, CharEvent, EventCallback, TextAttribute
 
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
 from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, is_special_key_bound_to_with_selection, is_input_event_bound_to, is_input_event_bound_to_with_selection, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
-from tfm_text_viewer import view_text_file, is_text_file
-from tfm_diff_viewer import view_diff
+from tfm_text_viewer import create_text_viewer, is_text_file
+from tfm_diff_viewer import create_diff_viewer
 
 # Import new modular components
 from tfm_log_manager import LogManager
@@ -55,6 +54,80 @@ from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_cache_manager import CacheManager
 from tfm_profiling import ProfilingManager
 from tfm_menu_manager import MenuManager
+
+
+class TFMEventCallback(EventCallback):
+    """
+    Event callback implementation for TFM application layer.
+    
+    This class implements the EventCallback interface to handle events
+    delivered by the TTK backend. It routes KeyEvents to command handlers,
+    CharEvents to active text widgets, and SystemEvents to appropriate handlers.
+    """
+    
+    def __init__(self, file_manager):
+        """
+        Initialize the TFMEventCallback.
+        
+        Args:
+            file_manager: FileManager instance to route events to
+        """
+        self.file_manager = file_manager
+    
+    def on_key_event(self, event: KeyEvent) -> bool:
+        """
+        Handle a key event by routing to FileManager.handle_input().
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed (command executed), False otherwise
+        """
+        # Route to the file manager's unified input handler
+        return self.file_manager.handle_input(event)
+    
+    def on_char_event(self, event: CharEvent) -> bool:
+        """
+        Handle a character event by routing to FileManager.handle_input().
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed (character inserted), False otherwise
+        """
+        # Route to the file manager's unified input handler
+        # handle_input() will route CharEvents to active dialogs
+        return self.file_manager.handle_input(event)
+    
+    def on_system_event(self, event: SystemEvent) -> bool:
+        """
+        Handle a system event (resize, close, etc.).
+        
+        Args:
+            event: SystemEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        if event.is_resize():
+            # Handle window resize
+            self.file_manager.clear_screen_with_background()
+            self.file_manager.needs_full_redraw = True
+            return True
+        elif event.is_close():
+            # Handle window close request
+            if hasattr(self.file_manager, 'operation_in_progress') and self.file_manager.operation_in_progress:
+                # Ignore close event during operations
+                print("Cannot close: file operation in progress")
+                return True
+            else:
+                # No operations in progress, exit immediately
+                self.file_manager.should_quit = True
+                return True
+        return False
+
 
 class FileManager:
     def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_enabled=False):
@@ -147,11 +220,18 @@ class FileManager:
         # Dialog state (now handled by general_dialog)
         self.rename_file_path = None  # Still needed for rename operations
         
+        # Viewer state (TextViewer and DiffViewer)
+        self.active_viewer = None  # Current active viewer instance
+        
         # Operation state flags
         self.operation_in_progress = False  # Flag to block input during operations
         self.operation_cancelled = False  # Flag to signal operation cancellation
 
         self.should_quit = False  # Flag to control main loop exit
+        
+        # Event callback system (for future migration to callback-based event handling)
+        self.event_callback = None  # Will be set when enabling callback mode
+        self.callback_mode_enabled = False  # Flag to track if callback mode is active
 
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
@@ -804,6 +884,128 @@ class FileManager:
     def get_inactive_pane(self):
         """Get the inactive pane"""
         return self.pane_manager.get_inactive_pane()
+    
+    def get_active_text_widget(self):
+        """
+        Get the currently active text input widget, if any.
+        
+        Returns:
+            The active text widget (SingleLineTextEdit) or None
+        """
+        # Check if general dialog is active and has a text widget
+        if self.general_dialog.is_active and hasattr(self.general_dialog, 'text_editor'):
+            return self.general_dialog.text_editor
+        
+        # Check if search dialog is active and has a text widget
+        if self.search_dialog.is_active and hasattr(self.search_dialog, 'text_edit'):
+            return self.search_dialog.text_edit
+        
+        # Check if jump dialog is active and has a text widget
+        if self.jump_dialog.is_active and hasattr(self.jump_dialog, 'text_edit'):
+            return self.jump_dialog.text_edit
+        
+        # Check if batch rename dialog is active and has a text widget
+        if self.batch_rename_dialog.is_active and hasattr(self.batch_rename_dialog, 'text_edit'):
+            return self.batch_rename_dialog.text_edit
+        
+        # No active text widget
+        return None
+    
+    def enable_callback_mode(self):
+        """
+        Enable callback-based event handling.
+        
+        This method sets up the TFMEventCallback and registers it with the backend.
+        Once enabled, events will be delivered via callbacks instead of polling.
+        
+        Note: This is for future migration. Current implementation uses polling.
+        """
+        if not self.callback_mode_enabled:
+            # Create and register the event callback
+            self.event_callback = TFMEventCallback(self)
+            self.renderer.set_event_callback(self.event_callback)
+            self.callback_mode_enabled = True
+            self.log_manager.add_message("INFO", "Callback-based event handling enabled")
+    
+    def disable_callback_mode(self):
+        """
+        Disable callback-based event handling and return to polling mode.
+        
+        This method unregisters the event callback and returns to traditional
+        polling-based event handling.
+        """
+        if self.callback_mode_enabled:
+            # Unregister the event callback
+            self.renderer.set_event_callback(None)
+            self.event_callback = None
+            self.callback_mode_enabled = False
+            self.log_manager.add_message("INFO", "Callback-based event handling disabled")
+    
+    def run_with_callbacks(self):
+        """
+        Run the main application loop using callback-based event handling.
+        
+        This is an alternative to the traditional run() method that uses
+        callbacks instead of polling. It enables callback mode and then
+        runs the backend's event loop with integrated drawing.
+        
+        Note: The backend's run_event_loop() only handles events, so we need
+        to integrate drawing into the event handling callbacks.
+        """
+        # Enable callback mode
+        self.enable_callback_mode()
+        
+        # Draw initial interface
+        self.draw_interface()
+        
+        # Run event loop with drawing
+        while True:
+            # Start loop iteration timing
+            if self.profiling_manager:
+                self.profiling_manager.start_loop_iteration()
+            
+            # Check if we should quit
+            if self.should_quit:
+                break
+            
+            # Check for startup redraw trigger
+            if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.033:
+                self.needs_full_redraw = True
+                delattr(self, 'startup_time')
+            
+            # Check for log updates
+            if self.log_manager.has_log_updates():
+                self.needs_full_redraw = True
+            
+            # Update menu states if needed
+            if self.is_desktop_mode():
+                current_pane = self.get_current_pane()
+                current_selection_count = len(current_pane['selected_files'])
+                
+                if not hasattr(self, '_last_selection_count'):
+                    self._last_selection_count = current_selection_count
+                    self._update_menu_states()
+                elif self._last_selection_count != current_selection_count:
+                    self._last_selection_count = current_selection_count
+                    self._update_menu_states()
+            
+            # Process one event with timeout
+            self.renderer.get_event(timeout_ms=16)  # This will trigger callbacks
+            
+            # Draw interface after event processing
+            self.draw_interface()
+            
+            # End loop iteration
+            if self.profiling_manager:
+                self.profiling_manager.end_loop_iteration()
+                if self.profiling_manager.should_print_fps():
+                    self.profiling_manager.print_fps()
+        
+        # Restore stdout/stderr before exiting
+        self.restore_stdio()
+        
+        # Save application state before exiting
+        self.save_application_state()
 
     def get_log_scroll_percentage(self):
         """Calculate the current log scroll position as a percentage"""
@@ -1410,14 +1612,14 @@ class FileManager:
                     self.needs_full_redraw = True
             elif is_text_file(selected_file):
                 # Fallback to text viewer for text files without association
-                self.renderer.set_cursor_visibility(False)
-                
-                if view_text_file(self.renderer, selected_file):
-                    print(f"Viewed file: {selected_file.name}")
+                viewer = create_text_viewer(self.renderer, selected_file)
+                if viewer:
+                    self.active_viewer = viewer
+                    self.renderer.set_cursor_visibility(False)
+                    self.needs_full_redraw = True
+                    print(f"Viewing file: {selected_file.name}")
                 else:
                     self.show_info(f"File: {selected_file.name}")
-                
-                self.needs_full_redraw = True
             else:
                 # For files without association, show file info
                 self.show_info(f"File: {selected_file.name}")
@@ -2554,14 +2756,14 @@ class FileManager:
             if is_text_file(selected_file):
                 # Fallback to built-in text viewer for text files
                 try:
-                    self.renderer.set_cursor_visibility(False)
-                    
-                    if view_text_file(self.renderer, selected_file):
-                        print(f"Viewed text file: {selected_file.name}")
+                    viewer = create_text_viewer(self.renderer, selected_file)
+                    if viewer:
+                        self.active_viewer = viewer
+                        self.renderer.set_cursor_visibility(False)
+                        self.needs_full_redraw = True
+                        print(f"Viewing text file: {selected_file.name}")
                     else:
                         print(f"Failed to view file: {selected_file.name}")
-                    
-                    self.needs_full_redraw = True
                     
                 except Exception as e:
                     print(f"Error viewing file: {str(e)}")
@@ -2607,13 +2809,16 @@ class FileManager:
         
         # Launch diff viewer
         try:
-            self.renderer.set_cursor_visibility(False)
-            
-            if view_diff(self.renderer, file1, file2):
-                print(f"Compared: {file1.name} <-> {file2.name}")
+            viewer = create_diff_viewer(self.renderer, file1, file2)
+            if viewer:
+                self.active_viewer = viewer
+                self.renderer.set_cursor_visibility(False)
+                self.needs_full_redraw = True
+                print(f"Comparing: {file1.name} <-> {file2.name}")
             else:
                 print(f"Failed to compare files")
-            
+        except Exception as e:
+            print(f"Error creating diff viewer: {e}")
             self.needs_full_redraw = True
             
         except Exception as e:
@@ -2860,7 +3065,16 @@ class FileManager:
                 current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
-        elif event.is_printable():
+        
+        # Handle CharEvent - text input for search pattern
+        if isinstance(event, CharEvent):
+            self.isearch_pattern += event.char
+            self.update_isearch_matches()
+            self.needs_full_redraw = True
+            return True
+        
+        # Handle KeyEvent with printable character (for backward compatibility)
+        if isinstance(event, KeyEvent) and event.is_printable():
             # Add character to isearch pattern
             self.isearch_pattern += event.char
             self.update_isearch_matches()
@@ -2911,7 +3125,8 @@ class FileManager:
                 self.needs_full_redraw = True
                 return True
         
-        return True  # Capture most keys in batch rename mode
+        # Return False if event not handled to allow CharEvent generation
+        return False
 
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
@@ -3052,10 +3267,10 @@ class FileManager:
         
         return False
     
-    def handle_drives_dialog_input(self, key):
+    def handle_drives_dialog_input(self, event):
         """Handle input while in drives dialog mode - wrapper for drives dialog component"""
         was_active = self.drives_dialog.is_active
-        result = self.drives_dialog.handle_input(key)
+        result = self.drives_dialog.handle_input(event)
         
         if result == True:
             # If dialog was active but is no longer active, it exited - need full redraw
@@ -3073,11 +3288,86 @@ class FileManager:
         
         return False
 
-    def handle_key_input(self, event):
-        """Handle input event and return True if the event was processed"""
+    def handle_input(self, event):
+        """
+        Handle input event (KeyEvent or CharEvent) and return True if the event was processed.
+        
+        Args:
+            event: KeyEvent or CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        # Type check: only handle KeyEvent and CharEvent
+        if not isinstance(event, (KeyEvent, CharEvent)):
+            return False
+        
+        # Handle active viewer input (TextViewer or DiffViewer)
+        if self.active_viewer:
+            consumed = self.active_viewer.handle_input(event)
+            
+            # Check if viewer wants to close
+            if self.active_viewer.should_close:
+                self.active_viewer = None
+                self.renderer.set_cursor_visibility(False)
+                self.needs_full_redraw = True
+            elif consumed:
+                # Viewer consumed the event, needs redraw
+                self.needs_full_redraw = True
+            
+            return consumed
+        
         current_pane = self.get_current_pane()
         
-        # Handle Shift+Arrow keys for log scrolling FIRST (works in all modes)
+        # Handle isearch mode input
+        if self.isearch_mode:
+            return self.handle_isearch_input(event)
+        
+        # Handle general dialog input
+        if self.general_dialog.is_active:
+            return self.general_dialog.handle_input(event)
+        
+        # Handle quick choice mode input (KeyEvent only)
+        if isinstance(event, KeyEvent) and self.quick_choice_bar.is_active:
+            return self.handle_quick_choice_input(event)
+        
+        # Handle info dialog mode input
+        if self.info_dialog.is_active:
+            return self.handle_info_dialog_input(event)
+        
+        # Handle list dialog mode input
+        if self.list_dialog.is_active:
+            return self.handle_list_dialog_input(event)
+        
+        # Handle search dialog mode input
+        if self.search_dialog.is_active:
+            return self.handle_search_dialog_input(event)
+        
+        # Handle jump dialog mode input
+        if self.jump_dialog.is_active:
+            return self.handle_jump_dialog_input(event)
+        
+        # Handle drives dialog mode input
+        if self.drives_dialog.is_active:
+            return self.handle_drives_dialog_input(event)
+        
+        # Handle batch rename dialog mode input
+        if self.batch_rename_dialog.is_active:
+            return self.handle_batch_rename_input(event)
+        
+        # Handle CharEvents for active text widgets
+        if isinstance(event, CharEvent):
+            active_widget = self.get_active_text_widget()
+            if active_widget:
+                return active_widget.handle_key(event)
+            return False
+        
+        # Handle main application keys (KeyEvent only)
+        # CharEvents are not processed here as they don't have key_code
+        if not isinstance(event, KeyEvent):
+            return False
+        
+        # Handle Shift+Arrow keys for log scrolling (only when no dialogs are active)
         if event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
             if self.log_manager.scroll_log_up(1):
                 self.needs_full_redraw = True
@@ -3097,59 +3387,6 @@ class FileManager:
                 self.needs_full_redraw = True
             return True
         
-        # Handle isearch mode input
-        if self.isearch_mode:
-            if self.handle_isearch_input(event):
-                return True  # Isearch mode handled the event
-        
-        # Handle general dialog input
-        if self.general_dialog.is_active:
-            if self.general_dialog.handle_input(event):
-                return True  # General dialog handled the event
-        
-        # Handle quick choice mode input
-        if self.quick_choice_bar.is_active:
-            if self.handle_quick_choice_input(event):
-                return True  # Quick choice mode handled the event
-        
-        # Handle info dialog mode input
-        if self.info_dialog.is_active:
-            if self.handle_info_dialog_input(event):
-                return True  # Info dialog mode handled the event
-        
-        # Handle list dialog mode input
-        if self.list_dialog.is_active:
-            if self.handle_list_dialog_input(event):
-                return True  # List dialog mode handled the event
-        
-        # Handle search dialog mode input
-        if self.search_dialog.is_active:
-            if self.handle_search_dialog_input(event):
-                return True  # Search dialog mode handled the event
-        
-        # Handle jump dialog mode input
-        if self.jump_dialog.is_active:
-            if self.handle_jump_dialog_input(event):
-                return True  # Jump dialog mode handled the event
-        
-        # Handle drives dialog mode input
-        if self.drives_dialog.is_active:
-            if self.handle_drives_dialog_input(event):
-                return True  # Drives dialog mode handled the event
-        
-        # Handle batch rename dialog mode input
-        if self.batch_rename_dialog.is_active:
-            if self.handle_batch_rename_input(event):
-                return True  # Batch rename mode handled the event
-        
-        # Skip regular key processing if any dialog is open
-        # This prevents conflicts like starting isearch mode while help dialog is open
-        if (self.quick_choice_bar.is_active or self.info_dialog.is_active or self.list_dialog.is_active or 
-            self.search_dialog.is_active or self.jump_dialog.is_active or self.drives_dialog.is_active or 
-            self.batch_rename_dialog.is_active or self.isearch_mode or self.general_dialog.is_active):
-            return True
-        
-        # Handle main application keys
         if self.is_key_for_action(event, 'quit'):
             def quit_callback(confirmed):
                 if confirmed:
@@ -3441,6 +3678,16 @@ class FileManager:
 
     def draw_interface(self):
         """Draw the complete interface"""
+        # Check if a viewer is active
+        if self.active_viewer:
+            # Draw viewer instead of normal interface
+            if self.needs_full_redraw:
+                self.renderer.clear()
+                self.active_viewer.draw()
+                self.renderer.refresh()
+                self.needs_full_redraw = False
+            return
+        
         # Only do full redraw when needed
         if self.needs_full_redraw:
             self.refresh_files()
@@ -3464,90 +3711,7 @@ class FileManager:
         if self.needs_full_redraw:
             self.needs_full_redraw = False
 
-    def run(self):
-        """Main application loop"""
-        while True:
-            # Start loop iteration timing and check if profiling should be triggered
-            if self.profiling_manager:
-                self.profiling_manager.start_loop_iteration()
-            
-            # Check if we should quit
-            if self.should_quit:
-                break
-            
-            # Check for startup redraw trigger (0.1 seconds after startup)
-            if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.033:
-                self.needs_full_redraw = True
-                delattr(self, 'startup_time')  # Remove the attribute to avoid repeated triggers
-            
-            # Check for log updates and trigger redraw if needed
-            if self.log_manager.has_log_updates():
-                self.needs_full_redraw = True
-            
-            # Update menu states when selection or clipboard changes
-            # This is more efficient than polling every frame
-            if self.is_desktop_mode():
-                current_pane = self.get_current_pane()
-                current_selection_count = len(current_pane['selected_files'])
-                
-                # Track state changes
-                if not hasattr(self, '_last_selection_count'):
-                    self._last_selection_count = current_selection_count
-                    self._update_menu_states()
-                elif self._last_selection_count != current_selection_count:
-                    self._last_selection_count = current_selection_count
-                    self._update_menu_states()
-            
-            # Get user input with timeout to allow timer checks
-            event = self.renderer.get_input(timeout_ms=16)  # 16ms timeout
-            
-            # If no event was received (timeout), continue to next iteration
-            if event is None:
-                pass  # Continue to drawing
-            elif isinstance(event, MenuEvent):  # Menu item selected
-                # Handle menu events
-                handled = self._handle_menu_event(event)
-                if handled:
-                    self.needs_full_redraw = True
-            elif isinstance(event, SystemEvent) and event.is_resize():  # Terminal window resized - handle at top level
-                # Clear screen and trigger full redraw to handle new dimensions
-                self.clear_screen_with_background()
-                self.needs_full_redraw = True
-            elif isinstance(event, SystemEvent) and event.is_close():  # Window close requested
-                # Check if file/archive operations are in progress
-                if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
-                    # Ignore close event during operations
-                    print("Cannot close: file operation in progress")
-                else:
-                    # No operations in progress, exit immediately
-                    self.should_quit = True
-            else:
-                # Check if operation is in progress
-                if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
-                    # Only allow ESC key to cancel operation
-                    if event.key_code == KeyCode.ESCAPE:
-                        self.operation_cancelled = True
-                        print("Cancelling operation...")
-                    # Ignore all other keys during operation
-                else:
-                    # Handle normal key input
-                    self.handle_key_input(event)
-            
-            # Draw interface after handling input
-            self.draw_interface()
-            
-            # End loop iteration and print FPS if needed
-            if self.profiling_manager:
-                self.profiling_manager.end_loop_iteration()
-                if self.profiling_manager.should_print_fps():
-                    self.profiling_manager.print_fps()
-        
-        # Restore stdout/stderr before exiting
-        self.restore_stdio()
-        
-        # Save application state before exiting
-        self.save_application_state()
-    
+
     def load_application_state(self):
         """Load saved application state from persistent storage."""
         try:
@@ -3724,7 +3888,7 @@ def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profilin
     fm = None
     try:
         fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, profiling_enabled=profiling_enabled)
-        fm.run()
+        fm.run_with_callbacks()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
         pass

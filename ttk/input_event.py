@@ -79,14 +79,19 @@ class Event:
 @dataclass
 class KeyEvent(Event):
     """
-    Represents a keyboard input event.
+    Represents a keyboard command event.
+    
+    KeyEvent is generated for:
+    - Special keys (arrows, function keys, etc.)
+    - Printable keys with command modifiers (Ctrl, Alt, Cmd)
+    - Command shortcuts (Q to quit, A to select all, etc.)
     
     This class captures keyboard events including regular key presses,
     special keys (arrows, function keys, etc.), and modifier key states.
     """
     key_code: int  # KeyCode value or Unicode code point
     modifiers: int  # Bitwise OR of ModifierKey values
-    char: Optional[str] = None  # Character for printable keys
+    char: Optional[str] = None  # Character for printable keys (legacy)
     
     def is_printable(self) -> bool:
         """Check if this is a printable character."""
@@ -99,6 +104,22 @@ class KeyEvent(Event):
     def has_modifier(self, modifier: ModifierKey) -> bool:
         """Check if a specific modifier key is pressed."""
         return (self.modifiers & modifier) != 0
+
+
+@dataclass
+class CharEvent(Event):
+    """
+    Represents a character input event for text entry.
+    
+    CharEvent is generated when the user types a printable character
+    without command modifiers (Ctrl, Alt, Cmd). It is used by text
+    input widgets to insert characters into text fields.
+    """
+    char: str  # The character to insert (single Unicode character)
+    
+    def __repr__(self) -> str:
+        """Return string representation for debugging."""
+        return f"CharEvent(char={repr(self.char)})"
 
 
 @dataclass

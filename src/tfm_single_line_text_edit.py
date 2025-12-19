@@ -12,6 +12,7 @@ This module provides a reusable SingleLineTextEdit class that handles:
 """
 
 from ttk import TextAttribute, KeyCode
+from ttk.input_event import CharEvent, KeyEvent
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, truncate_to_width, get_safe_functions
 
@@ -133,7 +134,7 @@ class SingleLineTextEdit:
         Handle a key press and update the text/cursor accordingly
         
         Args:
-            event: KeyEvent from TTK
+            event: KeyEvent or CharEvent from TTK
             handle_vertical_nav (bool): Whether to handle Up/Down keys for cursor movement
             
         Returns:
@@ -141,29 +142,31 @@ class SingleLineTextEdit:
         """
         if not event:
             return False
-            
-        # Handle cursor movement keys
-        if event.key_code == KeyCode.LEFT:
-            return self.move_cursor_left()
-        elif event.key_code == KeyCode.RIGHT:
-            return self.move_cursor_right()
-        elif event.key_code == KeyCode.HOME:
-            return self.move_cursor_home()
-        elif event.key_code == KeyCode.END:
-            return self.move_cursor_end()
-        elif handle_vertical_nav and event.key_code == KeyCode.UP:
-            # Up arrow - move to beginning of line when vertical nav is enabled
-            return self.move_cursor_home()
-        elif handle_vertical_nav and event.key_code == KeyCode.DOWN:
-            # Down arrow - move to end of line when vertical nav is enabled
-            return self.move_cursor_end()
-        elif event.key_code == KeyCode.BACKSPACE:
-            return self.backspace()
-        elif event.key_code == KeyCode.DELETE:
-            return self.delete_char_at_cursor()
-        elif event.is_printable() and event.char:
-            # Handle printable characters
+        
+        # Handle CharEvent - text input
+        if isinstance(event, CharEvent):
             return self.insert_char(event.char)
+        
+        # Handle KeyEvent - navigation and editing commands
+        if isinstance(event, KeyEvent):
+            if event.key_code == KeyCode.LEFT:
+                return self.move_cursor_left()
+            elif event.key_code == KeyCode.RIGHT:
+                return self.move_cursor_right()
+            elif event.key_code == KeyCode.HOME:
+                return self.move_cursor_home()
+            elif event.key_code == KeyCode.END:
+                return self.move_cursor_end()
+            elif handle_vertical_nav and event.key_code == KeyCode.UP:
+                # Up arrow - move to beginning of line when vertical nav is enabled
+                return self.move_cursor_home()
+            elif handle_vertical_nav and event.key_code == KeyCode.DOWN:
+                # Down arrow - move to end of line when vertical nav is enabled
+                return self.move_cursor_end()
+            elif event.key_code == KeyCode.BACKSPACE:
+                return self.backspace()
+            elif event.key_code == KeyCode.DELETE:
+                return self.delete_char_at_cursor()
         
         return False
         
