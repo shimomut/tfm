@@ -4,6 +4,8 @@
 
 This document establishes the standards and guidelines for creating external programs that integrate with TFM (TUI File Manager). External programs are shell scripts or executables that can be launched from within TFM and have access to TFM's context through environment variables.
 
+For implementation details, see [EXTERNAL_PROGRAMS_IMPLEMENTATION.md](EXTERNAL_PROGRAMS_IMPLEMENTATION.md).
+
 ## Core Principles
 
 ### 1. Use TFM Environment Variables, Not Arguments
