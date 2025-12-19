@@ -88,6 +88,8 @@ Example Usage:
 """
 
 import time
+import unicodedata
+from functools import lru_cache
 
 # Check PyObjC availability
 try:
@@ -103,6 +105,36 @@ from ttk.renderer import Renderer, TextAttribute
 from ttk.input_event import Event, KeyEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
 from typing import Tuple, Optional, List, Dict, Any
 from dataclasses import dataclass
+
+
+@lru_cache(maxsize=1024)
+def _is_wide_character(char: str) -> bool:
+    """
+    Check if a character is a wide (double-width) character.
+    
+    Wide characters (zenkaku) take up 2 display columns in terminal output,
+    including most East Asian characters (Chinese, Japanese, Korean).
+    
+    Args:
+        char: A single Unicode character
+        
+    Returns:
+        True if the character is wide (double-width), False otherwise
+    """
+    if len(char) != 1:
+        return False
+    
+    # Fast path for ASCII characters (most common case)
+    if ord(char) < 128:
+        return False
+    
+    try:
+        # Use East Asian Width property from Unicode database
+        width = unicodedata.east_asian_width(char)
+        # 'F' = Fullwidth, 'W' = Wide
+        return width in ('F', 'W')
+    except (UnicodeError, ValueError):
+        return False
 
 
 @dataclass
@@ -1716,16 +1748,26 @@ class CoreGraphicsBackend(Renderer):
             if row < 0 or row >= self.rows or col < 0 or col >= self.cols:
                 return
             
-            # Draw each character in the text
-            for i, char in enumerate(text):
-                current_col = col + i
-                
+            # Draw each character in the text, accounting for wide characters
+            current_col = col
+            for char in text:
                 # Stop if we've reached the right edge of the grid
                 if current_col >= self.cols:
                     break
                 
                 # Update the grid cell with the character, color pair, and attributes
                 self.grid[row][current_col] = (char, color_pair, attributes)
+                
+                # Check if this is a wide character (occupies 2 cells)
+                if _is_wide_character(char):
+                    # Move to next column and store empty placeholder
+                    current_col += 1
+                    if current_col < self.cols:
+                        # Store empty string as placeholder for the second cell of wide char
+                        self.grid[row][current_col] = ('', color_pair, attributes)
+                
+                # Move to next column
+                current_col += 1
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: draw_text failed at ({row}, {col}): {e}")
@@ -2933,9 +2975,10 @@ if COCOA_AVAILABLE:
                     col = start_col
                     
                     while col < end_col:
-                        # Skip leading spaces efficiently
+                        # Skip leading spaces and empty placeholders efficiently
                         # Spaces don't need to be drawn (background is already rendered)
-                        while col < end_col and grid[row][col][0] == ' ':
+                        # Empty strings are placeholders for the second cell of wide characters
+                        while col < end_col and grid[row][col][0] in (' ', ''):
                             col += 1
                         
                         # Check if we've reached the end of the row
@@ -2967,8 +3010,8 @@ if COCOA_AVAILABLE:
                         while col < end_col:
                             char, color_pair, attributes = grid[row][col]
                             
-                            # Stop batch at space
-                            if char == ' ':
+                            # Stop batch at space or empty placeholder
+                            if char in (' ', ''):
                                 break
                             
                             # Stop batch if attributes changed
@@ -2985,6 +3028,11 @@ if COCOA_AVAILABLE:
                         # we must draw each character at its exact grid position to maintain alignment.
                         # Drawing multiple characters as a single string would cause misalignment because
                         # NSAttributedString uses proportional spacing even with monospace fonts.
+                        #
+                        # Wide Character Handling:
+                        # Wide characters (zenkaku) like Japanese, Chinese, Korean characters occupy
+                        # 2 grid cells. The draw_text() method stores them with an empty placeholder
+                        # in the next cell, so we just need to draw them with double width.
                         if batch_chars:
                             # Determine if underline attribute is present
                             has_underline = bool(start_attributes & TextAttribute.UNDERLINE)
