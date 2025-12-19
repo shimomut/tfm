@@ -3318,12 +3318,9 @@ class FileManager:
                 self.needs_full_redraw = True
             return True
         
-        # Handle isearch mode input (KeyEvent only)
-        if isinstance(event, KeyEvent) and self.isearch_mode:
-            if self.handle_isearch_input(event):
-                return True  # Isearch mode handled the event
-            # Isearch didn't handle the event - return False to allow CharEvent generation
-            return False
+        # Handle isearch mode input
+        if self.isearch_mode:
+            return self.handle_isearch_input(event)
         
         # Handle general dialog input
         if self.general_dialog.is_active:
@@ -3331,72 +3328,31 @@ class FileManager:
         
         # Handle quick choice mode input (KeyEvent only)
         if isinstance(event, KeyEvent) and self.quick_choice_bar.is_active:
-            if self.handle_quick_choice_input(event):
-                return True  # Quick choice mode handled the event
-            # Dialog didn't handle the event - return False to allow CharEvent generation
-            return False
+            return self.handle_quick_choice_input(event)
         
-        # Handle info dialog mode input (KeyEvent only)
-        if isinstance(event, KeyEvent) and self.info_dialog.is_active:
-            if self.handle_info_dialog_input(event):
-                return True  # Info dialog mode handled the event
-            # Dialog didn't handle the event - return False to allow CharEvent generation
-            return False
+        # Handle info dialog mode input
+        if self.info_dialog.is_active:
+            return self.handle_info_dialog_input(event)
         
         # Handle list dialog mode input
         if self.list_dialog.is_active:
-            # CharEvents go directly to dialog's handle_input
-            if isinstance(event, CharEvent):
-                return self.list_dialog.handle_input(event)
-            # KeyEvents go through handle_list_dialog_input
-            if isinstance(event, KeyEvent):
-                if self.handle_list_dialog_input(event):
-                    return True  # List dialog mode handled the event
-                # Dialog didn't handle the event - return False to allow CharEvent generation
-                return False
+            return self.handle_list_dialog_input(event)
         
         # Handle search dialog mode input
         if self.search_dialog.is_active:
-            # CharEvents go directly to dialog's handle_input
-            if isinstance(event, CharEvent):
-                return self.search_dialog.handle_input(event)
-            # KeyEvents go through handle_search_dialog_input
-            if isinstance(event, KeyEvent):
-                if self.handle_search_dialog_input(event):
-                    return True  # Search dialog mode handled the event
-                # Dialog didn't handle the event - return False to allow CharEvent generation
-                return False
+            return self.handle_search_dialog_input(event)
         
         # Handle jump dialog mode input
         if self.jump_dialog.is_active:
-            # CharEvents go directly to dialog's handle_input
-            if isinstance(event, CharEvent):
-                return self.jump_dialog.handle_input(event)
-            # KeyEvents go through handle_jump_dialog_input
-            if isinstance(event, KeyEvent):
-                if self.handle_jump_dialog_input(event):
-                    return True  # Jump dialog mode handled the event
-                # Dialog didn't handle the event - return False to allow CharEvent generation
-                return False
+            return self.handle_jump_dialog_input(event)
         
         # Handle drives dialog mode input
         if self.drives_dialog.is_active:
-            if self.handle_drives_dialog_input(event):
-                return True  # Drives dialog mode handled the event
-            # Dialog didn't handle the event - return False to allow CharEvent generation
-            return False
+            return self.handle_drives_dialog_input(event)
         
         # Handle batch rename dialog mode input
         if self.batch_rename_dialog.is_active:
-            # CharEvents go directly to dialog's handle_input
-            if isinstance(event, CharEvent):
-                return self.batch_rename_dialog.handle_input(event)
-            # KeyEvents go through handle_batch_rename_input
-            if isinstance(event, KeyEvent):
-                if self.handle_batch_rename_input(event):
-                    return True  # Batch rename mode handled the event
-                # Dialog didn't handle the event - return False to allow CharEvent generation
-                return False
+            return self.handle_batch_rename_input(event)
         
         # Handle CharEvents for active text widgets
         if isinstance(event, CharEvent):
