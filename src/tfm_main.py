@@ -1201,21 +1201,21 @@ class FileManager:
             is_executable = file_path.is_file() and os.access(file_path, os.X_OK)
             is_selected = file_index == pane_data['selected_index']
             
-            # Get base color for the file
-            color_pair, _ = get_file_color(is_dir, is_executable, is_selected, is_active)
+            color = get_file_color(is_dir, is_executable, is_selected, is_active)
             
-            # Build attributes by combining states (they are not mutually exclusive)
-            attributes = TextAttribute.NORMAL
-            
-            # Add underline for search matches
-            if is_search_match:
-                attributes |= TextAttribute.UNDERLINE
-            
-            # Add reverse video for multi-selected items
-            if is_multi_selected:
-                attributes |= TextAttribute.REVERSE
-            
-            color = (color_pair, attributes)
+            # Handle search match highlighting (takes precedence over multi-selection)
+            if is_search_match and not is_selected:
+                # Highlight search matches with underline
+                color_pair, _ = get_file_color(is_dir, is_executable, False, False)
+                color = (color_pair, TextAttribute.UNDERLINE)
+            # Handle multi-selection highlighting
+            elif is_multi_selected and not is_selected:
+                # Get base color and add reverse video for multi-selected files
+                color_pair, _ = get_file_color(is_dir, is_executable, False, False)
+                color = (color_pair, TextAttribute.REVERSE)
+                
+            # Add selection marker for multi-selected files
+            selection_marker = "●" if is_multi_selected else " "
             
             # Separate filename into basename and extension
             basename, extension = self.separate_filename_extension(display_name, is_dir)
@@ -1223,33 +1223,33 @@ class FileManager:
             # Format line to fit pane - with safety checks for narrow panes
             datetime_width = self.get_date_column_width()
             size_width = 8
-            
-            # All items need the same content width for alignment
-            # Layout: border(1) + marker/bracket(1) + content + space(1) + bracket/nothing(1) = pane_width
-            # So content width = pane_width - 4
-            content_width = pane_width - 4
+            marker_width = 2  # Space for selection marker
             
             # Safety check: ensure we have minimum space for formatting
-            if content_width < 16:  # Too narrow to display properly
+            if pane_width < 20:  # Too narrow to display properly
                 # Use wide character aware truncation
-                max_name_width = max(1, content_width)
+                max_name_width = max(1, pane_width - 5)
                 truncated_name = truncate_to_width(display_name, max_name_width, "…")
-                line = f"{truncated_name}"
+                line = f"{selection_marker} {truncated_name}"
             else:
-                # Calculate minimum width needed to show datetime
-                # min_name(16) + space(1) + ext(4) + space(1) + size(8) + space(1) + datetime
-                min_width_for_datetime = 16 + 1 + 4 + 1 + 8 + 1 + datetime_width  # = 31 + datetime_width
+                # Calculate precise filename width for column alignment
+                # Account for the fact that line will be truncated to pane_width-2
+                usable_width = pane_width - 2
                 
-                if content_width < min_width_for_datetime:
-                    # For narrow panes: "basename ext size" (no datetime)
+                # Calculate minimum width needed to show datetime
+                # marker(2) + space(1) + min_name(16) + space(1) + ext(4) + space(1) + size(8) + space(1) + datetime
+                min_width_for_datetime = 2 + 1 + 16 + 1 + 4 + 1 + 8 + 1 + datetime_width  # = 38 + datetime_width
+                
+                if pane_width < min_width_for_datetime:
+                    # For narrow panes: "● basename ext size" (no datetime)
                     if extension:
                         # Calculate actual maximum extension width for this pane
                         ext_width = self.calculate_max_extension_width(pane_data)
                         if ext_width == 0:  # No extensions in this pane
                             ext_width = safe_get_display_width(extension)
                         
-                        # Reserve space for: ext_width + space(1) + size(8) = 9 + ext_width
-                        name_width = content_width - (9 + ext_width)
+                        # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) = 12 + ext_width
+                        name_width = usable_width - (12 + ext_width)
                         
                         # Truncate basename using wide character aware truncation
                         if safe_get_display_width(basename) > name_width:
@@ -1258,11 +1258,11 @@ class FileManager:
                         # Pad basename to maintain column alignment using display width
                         padded_basename = pad_to_width(basename, name_width, align='left')
                         padded_extension = pad_to_width(extension, ext_width, align='left')
-                        line = f"{padded_basename} {padded_extension}{size_str:>8}"
+                        line = f"{selection_marker} {padded_basename} {padded_extension}{size_str:>8}"
                     else:
                         # No extension separation - use full width for filename
-                        # Reserve space for: size(8) = 8
-                        name_width = content_width - 8
+                        # Reserve space for: marker(2) + space(1) + size(8) = 11
+                        name_width = usable_width - 11
                         
                         # Truncate filename using wide character aware truncation
                         if safe_get_display_width(display_name) > name_width:
@@ -1270,17 +1270,17 @@ class FileManager:
                         
                         # Pad filename to maintain column alignment using display width
                         padded_name = pad_to_width(display_name, name_width, align='left')
-                        line = f"{padded_name}{size_str:>8}"
+                        line = f"{selection_marker} {padded_name}{size_str:>8}"
                 else:
-                    # For wider panes: "basename ext size datetime"
+                    # For wider panes: "● basename ext size datetime"
                     if extension:
                         # Calculate actual maximum extension width for this pane
                         ext_width = self.calculate_max_extension_width(pane_data)
                         if ext_width == 0:  # No extensions in this pane
                             ext_width = safe_get_display_width(extension)
                         
-                        # Reserve space for: ext_width + space(1) + size(8) + space(1) + datetime(len) = 10 + ext_width + datetime_width
-                        name_width = content_width - (10 + ext_width + datetime_width)
+                        # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) + space(1) + datetime(len) = 13 + ext_width + datetime_width
+                        name_width = usable_width - (13 + ext_width + datetime_width)
                         
                         # Truncate basename using wide character aware truncation
                         if safe_get_display_width(basename) > name_width:
@@ -1289,11 +1289,11 @@ class FileManager:
                         # Pad basename to maintain column alignment using display width
                         padded_basename = pad_to_width(basename, name_width, align='left')
                         padded_extension = pad_to_width(extension, ext_width, align='left')
-                        line = f"{padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
+                        line = f"{selection_marker} {padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
                     else:
                         # No extension separation - use full width for filename
-                        # Reserve space for: size(8) + space(1) + datetime(len) = 9 + datetime_width
-                        name_width = content_width - (9 + datetime_width)
+                        # Reserve space for: marker(2) + space(1) + size(8) + space(1) + datetime(len) = 12 + datetime_width
+                        name_width = usable_width - (12 + datetime_width)
                         
                         # Truncate filename using wide character aware truncation
                         if safe_get_display_width(display_name) > name_width:
@@ -1301,32 +1301,17 @@ class FileManager:
                         
                         # Pad filename to maintain column alignment using display width
                         padded_name = pad_to_width(display_name, name_width, align='left')
-                        line = f"{padded_name} {size_str:>8} {mtime_str}"
+                        line = f"{selection_marker} {padded_name} {size_str:>8} {mtime_str}"
             
             try:
-                # Draw the line with focus brackets if selected
-                if is_selected:
-                    # For focused items: "[" + line + "]"
-                    # Line is already sized to content_width (pane_width - 4)
-                    
-                    # Draw opening bracket (red for active, gray for inactive)
-                    bracket_color_pair, bracket_attributes = get_focus_bracket_color(is_active)
-                    self.renderer.draw_text(y, start_x + 1, "[", color_pair=bracket_color_pair, attributes=bracket_attributes)
-                    
-                    # Draw the main content
-                    color_pair, attributes = color
-                    self.renderer.draw_text(y, start_x + 2, line, color_pair=color_pair, attributes=attributes)
-                    
-                    # Draw closing bracket at fixed position
-                    bracket_x = start_x + pane_width - 1
-                    self.renderer.draw_text(y, bracket_x, "]", color_pair=bracket_color_pair, attributes=bracket_attributes)
-                else:
-                    # For non-focused items: " " + line
-                    # Line is already sized to content_width (pane_width - 4)
-                    
-                    # Draw with space prefix
-                    color_pair, attributes = color
-                    self.renderer.draw_text(y, start_x + 1, " " + line, color_pair=color_pair, attributes=attributes)
+                # Use wide character aware truncation for final line display
+                max_line_width = pane_width - 2
+                if safe_get_display_width(line) > max_line_width:
+                    line = truncate_to_width(line, max_line_width, "")
+                
+                # Color is already a tuple of (color_pair, attributes)
+                color_pair, attributes = color
+                self.renderer.draw_text(y, start_x + 1, line, color_pair=color_pair, attributes=attributes)
             except Exception:
                 pass  # Ignore if we can't write to screen edge
                 
