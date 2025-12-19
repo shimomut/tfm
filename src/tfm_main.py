@@ -25,8 +25,7 @@ from collections import deque
 from tfm_single_line_text_edit import SingleLineTextEdit
 
 # Import TTK input event system
-from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, MenuEvent
-from ttk.renderer import TextAttribute
+from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, MenuEvent, CharEvent, EventCallback, TextAttribute
 
 # Import constants and colors
 from tfm_const import *
@@ -55,6 +54,82 @@ from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_cache_manager import CacheManager
 from tfm_profiling import ProfilingManager
 from tfm_menu_manager import MenuManager
+
+
+class TFMEventCallback(EventCallback):
+    """
+    Event callback implementation for TFM application layer.
+    
+    This class implements the EventCallback interface to handle events
+    delivered by the TTK backend. It routes KeyEvents to command handlers,
+    CharEvents to active text widgets, and SystemEvents to appropriate handlers.
+    """
+    
+    def __init__(self, file_manager):
+        """
+        Initialize the TFMEventCallback.
+        
+        Args:
+            file_manager: FileManager instance to route events to
+        """
+        self.file_manager = file_manager
+    
+    def on_key_event(self, event: KeyEvent) -> bool:
+        """
+        Handle a key event by routing to command handlers.
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed (command executed), False otherwise
+        """
+        # Route to the file manager's command handler
+        return self.file_manager.handle_command(event)
+    
+    def on_char_event(self, event: CharEvent) -> bool:
+        """
+        Handle a character event by passing to active text widget.
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed (character inserted), False otherwise
+        """
+        # Pass to active text widget if one exists
+        active_widget = self.file_manager.get_active_text_widget()
+        if active_widget:
+            return active_widget.handle_key(event)
+        return False
+    
+    def on_system_event(self, event: SystemEvent) -> bool:
+        """
+        Handle a system event (resize, close, etc.).
+        
+        Args:
+            event: SystemEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        if event.is_resize():
+            # Handle window resize
+            self.file_manager.clear_screen_with_background()
+            self.file_manager.needs_full_redraw = True
+            return True
+        elif event.is_close():
+            # Handle window close request
+            if hasattr(self.file_manager, 'operation_in_progress') and self.file_manager.operation_in_progress:
+                # Ignore close event during operations
+                print("Cannot close: file operation in progress")
+                return True
+            else:
+                # No operations in progress, exit immediately
+                self.file_manager.should_quit = True
+                return True
+        return False
+
 
 class FileManager:
     def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_enabled=False):
@@ -152,6 +227,10 @@ class FileManager:
         self.operation_cancelled = False  # Flag to signal operation cancellation
 
         self.should_quit = False  # Flag to control main loop exit
+        
+        # Event callback system (for future migration to callback-based event handling)
+        self.event_callback = None  # Will be set when enabling callback mode
+        self.callback_mode_enabled = False  # Flag to track if callback mode is active
 
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
@@ -804,6 +883,102 @@ class FileManager:
     def get_inactive_pane(self):
         """Get the inactive pane"""
         return self.pane_manager.get_inactive_pane()
+    
+    def handle_command(self, event: KeyEvent) -> bool:
+        """
+        Handle a command key event.
+        
+        This method routes KeyEvents to the appropriate command handlers
+        and returns whether the event was consumed.
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed (command executed), False otherwise
+        """
+        # Route to handle_key_input which already returns True/False
+        return self.handle_key_input(event)
+    
+    def get_active_text_widget(self):
+        """
+        Get the currently active text input widget, if any.
+        
+        Returns:
+            The active text widget (SingleLineTextEdit) or None
+        """
+        # Check if general dialog is active and has a text widget
+        if self.general_dialog.is_active and hasattr(self.general_dialog, 'text_edit'):
+            return self.general_dialog.text_edit
+        
+        # Check if search dialog is active and has a text widget
+        if self.search_dialog.is_active and hasattr(self.search_dialog, 'text_edit'):
+            return self.search_dialog.text_edit
+        
+        # Check if jump dialog is active and has a text widget
+        if self.jump_dialog.is_active and hasattr(self.jump_dialog, 'text_edit'):
+            return self.jump_dialog.text_edit
+        
+        # Check if batch rename dialog is active and has a text widget
+        if self.batch_rename_dialog.is_active and hasattr(self.batch_rename_dialog, 'text_edit'):
+            return self.batch_rename_dialog.text_edit
+        
+        # No active text widget
+        return None
+    
+    def enable_callback_mode(self):
+        """
+        Enable callback-based event handling.
+        
+        This method sets up the TFMEventCallback and registers it with the backend.
+        Once enabled, events will be delivered via callbacks instead of polling.
+        
+        Note: This is for future migration. Current implementation uses polling.
+        """
+        if not self.callback_mode_enabled:
+            # Create and register the event callback
+            self.event_callback = TFMEventCallback(self)
+            self.renderer.set_event_callback(self.event_callback)
+            self.callback_mode_enabled = True
+            self.log_manager.add_message("INFO", "Callback-based event handling enabled")
+    
+    def disable_callback_mode(self):
+        """
+        Disable callback-based event handling and return to polling mode.
+        
+        This method unregisters the event callback and returns to traditional
+        polling-based event handling.
+        """
+        if self.callback_mode_enabled:
+            # Unregister the event callback
+            self.renderer.set_event_callback(None)
+            self.event_callback = None
+            self.callback_mode_enabled = False
+            self.log_manager.add_message("INFO", "Callback-based event handling disabled")
+    
+    def run_with_callbacks(self):
+        """
+        Run the main application loop using callback-based event handling.
+        
+        This is an alternative to the traditional run() method that uses
+        callbacks instead of polling. It enables callback mode and then
+        runs the backend's event loop.
+        
+        Note: This is for future migration. Current implementation uses run().
+        """
+        # Enable callback mode
+        self.enable_callback_mode()
+        
+        try:
+            # Run the backend event loop
+            # The backend will call our callbacks for each event
+            self.renderer.run_event_loop()
+        finally:
+            # Restore stdout/stderr before exiting
+            self.restore_stdio()
+            
+            # Save application state before exiting
+            self.save_application_state()
 
     def get_log_scroll_percentage(self):
         """Calculate the current log scroll position as a percentage"""
@@ -2860,7 +3035,16 @@ class FileManager:
                 current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
-        elif event.is_printable():
+        
+        # Handle CharEvent - text input for search pattern
+        if isinstance(event, CharEvent):
+            self.isearch_pattern += event.char
+            self.update_isearch_matches()
+            self.needs_full_redraw = True
+            return True
+        
+        # Handle KeyEvent with printable character (for backward compatibility)
+        if isinstance(event, KeyEvent) and event.is_printable():
             # Add character to isearch pattern
             self.isearch_pattern += event.char
             self.update_isearch_matches()

@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ttk import KeyEvent, KeyCode, ModifierKey
 from ttk.renderer import TextAttribute
+from ttk.input_event import CharEvent
 from tfm_path import Path
 from tfm_text_viewer import TextViewer, is_text_file, view_text_file
 from tfm_colors import COLOR_REGULAR_FILE, COLOR_ERROR
@@ -257,12 +258,12 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         self.assertTrue(viewer.isearch_mode)
     
     def test_handle_isearch_input_accepts_input_event(self):
-        """Test that handle_isearch_input accepts KeyEvent"""
+        """Test that handle_isearch_input accepts CharEvent"""
         viewer = TextViewer(self.mock_renderer, self.test_path)
         viewer.enter_isearch_mode()
         
-        # Test with character input
-        event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='t')
+        # Test with character input using CharEvent
+        event = CharEvent(char='t')
         result = viewer.handle_isearch_input(event)
         
         # Should handle the input

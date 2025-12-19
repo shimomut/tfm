@@ -4,7 +4,7 @@ TUI File Manager - Info Dialog Component
 Provides scrollable information dialog functionality
 """
 
-from ttk import TextAttribute, KeyCode
+from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
 from tfm_base_list_dialog import BaseListDialog
 from tfm_colors import get_status_color
 from tfm_config import config_manager
@@ -59,10 +59,11 @@ class InfoDialog(BaseListDialog):
         if not event:
             return False
             
-        # ESC or Q - close
-        if event.key_code == KeyCode.ESCAPE or (event.char and event.char.lower() == 'q'):
-            self.exit()
-            return True
+        # ESC or Q - close (only from KeyEvent)
+        if isinstance(event, KeyEvent):
+            if event.key_code == KeyCode.ESCAPE or (event.char and event.char.lower() == 'q'):
+                self.exit()
+                return True
         # Up arrow - scroll up
         elif event.key_code == KeyCode.UP:
             if self.scroll > 0:

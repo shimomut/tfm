@@ -10,7 +10,7 @@ import curses
 from typing import Tuple, Optional
 
 from ttk.renderer import Renderer, TextAttribute
-from ttk.input_event import Event, KeyEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
+from ttk.input_event import Event, KeyEvent, CharEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
 
 
 # Terminal-specific key codes for Shift+Arrow combinations
@@ -51,6 +51,7 @@ class CursesBackend(Renderer):
         self.fullcolor_mode = False
         self.next_color_index = 16  # Start after basic 16 colors
         self.rgb_to_color_cache = {}  # Cache RGB -> color index mappings
+        self.event_callback = None  # EventCallback instance for callback-based event delivery
     
     def initialize(self) -> None:
         """
@@ -598,10 +599,14 @@ class CursesBackend(Renderer):
     
     def get_event(self, timeout_ms: int = -1) -> Optional[Event]:
         """
-        Get event from terminal.
+        Get event from terminal (polling mode - for backward compatibility).
         
-        This method retrieves the next event from the terminal.
+        This method retrieves the next event from the terminal using polling.
         It supports blocking, non-blocking, and timeout modes.
+        
+        When callbacks are enabled via set_event_callback(), this method processes
+        events and delivers them via callbacks, then returns None. This allows
+        existing code to continue using get_event() while new code can use callbacks.
         
         Args:
             timeout_ms: Timeout in milliseconds
@@ -610,22 +615,29 @@ class CursesBackend(Renderer):
                        >0: Wait up to timeout_ms milliseconds
         
         Returns:
-            Optional[Event]: Event if input is available, None if timeout
+            Optional[Event]: Event if input is available and callbacks are disabled,
+                            None if timeout or if callbacks are enabled
         """
-        if timeout_ms >= 0:
-            self.stdscr.timeout(timeout_ms)
-        else:
-            self.stdscr.timeout(-1)
-        
-        try:
-            key = self.stdscr.getch()
-            if key == -1:
-                return None
-            
-            return self._translate_curses_key(key)
-        except curses.error as e:
-            # Timeout or input error
+        if self.event_callback:
+            # Callbacks enabled - process events but deliver via callbacks
+            self._process_events(timeout_ms)
             return None
+        else:
+            # Callbacks disabled - use traditional polling
+            if timeout_ms >= 0:
+                self.stdscr.timeout(timeout_ms)
+            else:
+                self.stdscr.timeout(-1)
+            
+            try:
+                key = self.stdscr.getch()
+                if key == -1:
+                    return None
+                
+                return self._translate_curses_key(key)
+            except curses.error as e:
+                # Timeout or input error
+                return None
     
     def _translate_curses_key(self, key: int) -> Event:
         """
@@ -751,3 +763,147 @@ class CursesBackend(Renderer):
         """
         # No-op: Terminal backend does not support native menu bars
         pass
+    
+    def run_event_loop(self) -> None:
+        """
+        Run the event loop with callback-based event delivery.
+        
+        This method runs an event loop that continuously polls for keyboard input
+        and delivers events via the registered callback. The loop continues until
+        the callback returns False for a system event or an exception occurs.
+        
+        This method requires that set_event_callback() has been called to register
+        a callback. If no callback is registered, this method does nothing.
+        
+        The event loop:
+        1. Polls for keyboard input using getch()
+        2. Translates input to KeyEvent
+        3. Delivers KeyEvent via on_key_event() callback
+        4. If not consumed, translates to CharEvent (if applicable)
+        5. Delivers CharEvent via on_char_event() callback
+        
+        Note: This is the callback-based event system. For polling-based event
+        handling, use get_event() instead.
+        """
+        if not self.event_callback:
+            # No callback registered - nothing to do
+            return
+        
+        # Run event loop until interrupted
+        while True:
+            try:
+                # Poll for keyboard input (blocking)
+                event = self.get_event(timeout_ms=-1)
+                
+                if event is None:
+                    continue
+                
+                # Handle system events
+                if isinstance(event, SystemEvent):
+                    consumed = self.event_callback.on_system_event(event)
+                    if not consumed:
+                        # System event not consumed - continue loop
+                        continue
+                    # System event consumed - continue loop
+                    continue
+                
+                # Handle key events
+                if isinstance(event, KeyEvent):
+                    consumed = self.event_callback.on_key_event(event)
+                    
+                    if not consumed:
+                        # KeyEvent not consumed - try to translate to CharEvent
+                        char_event = self._translate_key_to_char(event)
+                        if char_event:
+                            self.event_callback.on_char_event(char_event)
+                
+            except KeyboardInterrupt:
+                # Allow Ctrl+C to break the loop
+                break
+            except Exception as e:
+                # Log error but continue loop
+                print(f"Error in event loop: {e}")
+                continue
+    
+    def _process_events(self, timeout_ms: int = -1) -> None:
+        """
+        Process one event cycle and deliver via callbacks.
+        
+        This method is used by get_event() when callbacks are enabled. It polls
+        for one event, translates it, and delivers it via the registered callback.
+        If the KeyEvent is not consumed, it translates it to CharEvent and delivers
+        that as well.
+        
+        This allows get_event() to maintain backward compatibility while supporting
+        the callback-based event system.
+        
+        Args:
+            timeout_ms: Timeout in milliseconds
+                       -1: Block indefinitely
+                        0: Non-blocking
+                       >0: Wait up to timeout_ms milliseconds
+        """
+        if not self.event_callback:
+            return
+        
+        # Set timeout for getch()
+        if timeout_ms >= 0:
+            self.stdscr.timeout(timeout_ms)
+        else:
+            self.stdscr.timeout(-1)
+        
+        try:
+            # Poll for keyboard input
+            key = self.stdscr.getch()
+            if key == -1:
+                return
+            
+            # Translate to event
+            event = self._translate_curses_key(key)
+            if event is None:
+                return
+            
+            # Handle system events
+            if isinstance(event, SystemEvent):
+                self.event_callback.on_system_event(event)
+                return
+            
+            # Handle key events
+            if isinstance(event, KeyEvent):
+                consumed = self.event_callback.on_key_event(event)
+                
+                if not consumed:
+                    # KeyEvent not consumed - try to translate to CharEvent
+                    char_event = self._translate_key_to_char(event)
+                    if char_event:
+                        self.event_callback.on_char_event(char_event)
+        
+        except curses.error:
+            # Timeout or input error - ignore
+            pass
+    
+    def _translate_key_to_char(self, event: KeyEvent) -> Optional['CharEvent']:
+        """
+        Translate a KeyEvent to CharEvent if it represents a printable character.
+        
+        This method checks if a KeyEvent represents a printable character without
+        command modifiers (Ctrl, Alt, Cmd). If so, it creates a CharEvent for
+        text input. Shift modifier is allowed for uppercase letters.
+        
+        Args:
+            event: KeyEvent that was not consumed by the application
+        
+        Returns:
+            CharEvent if the KeyEvent represents a printable character,
+            None otherwise
+        """
+        # Only translate if no command modifiers (Ctrl, Alt, Cmd)
+        # Shift is allowed for uppercase letters
+        if event.modifiers & (ModifierKey.CONTROL | ModifierKey.ALT | ModifierKey.COMMAND):
+            return None
+        
+        # Only translate if has printable character in char field
+        if event.char and len(event.char) == 1 and event.char.isprintable():
+            return CharEvent(char=event.char)
+        
+        return None

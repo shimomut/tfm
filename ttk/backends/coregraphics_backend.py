@@ -1183,6 +1183,9 @@ class CoreGraphicsBackend(Renderer):
         # Window state
         self.should_close = False
         self.resize_pending = False
+        
+        # Event callback for callback-based event delivery
+        self.event_callback: Optional['EventCallback'] = None
     
     def initialize(self) -> None:
         """
@@ -1612,6 +1615,68 @@ class CoreGraphicsBackend(Renderer):
             Tuple[int, int]: (rows, cols) - Current grid dimensions
         """
         return (self.rows, self.cols)
+    
+    def set_event_callback(self, callback: Optional['EventCallback']) -> None:
+        """
+        Set the event callback for event delivery.
+        
+        When a callback is set, events are delivered via the callback methods
+        (on_key_event, on_char_event, on_system_event) instead of being returned
+        by get_event(). This enables the callback-based event system required for
+        proper CharEvent generation.
+        
+        Args:
+            callback: EventCallback instance or None to disable callbacks
+        
+        Example:
+            # Enable callback-based event delivery
+            callback = TFMEventCallback(app)
+            backend.set_event_callback(callback)
+            
+            # Disable callbacks (return to polling mode)
+            backend.set_event_callback(None)
+        """
+        self.event_callback = callback
+    
+    def run_event_loop(self) -> None:
+        """
+        Run the NSApplication event loop.
+        
+        This method starts the macOS NSApplication event loop, which processes
+        events and delivers them via the callback system. This is the main event
+        loop for desktop mode when using callbacks.
+        
+        The event loop runs until the application quits (window is closed or
+        quit command is issued). Events are delivered via the EventCallback
+        methods (on_key_event, on_char_event, on_system_event) set with
+        set_event_callback().
+        
+        This method integrates with the existing window management and event
+        handling infrastructure:
+        - Window resize events are delivered via on_system_event
+        - Window close events are delivered via on_system_event
+        - Keyboard events are delivered via keyDown: → on_key_event
+        - Character events are delivered via insertText: → on_char_event
+        
+        Example:
+            # Set up event callback
+            callback = TFMEventCallback(app)
+            backend.set_event_callback(callback)
+            
+            # Run event loop (blocks until application quits)
+            backend.run_event_loop()
+        
+        Note:
+            This method blocks until the application quits. It should be called
+            after all initialization is complete and the window is ready to
+            receive events.
+        """
+        # Get the shared application instance
+        app = Cocoa.NSApplication.sharedApplication()
+        
+        # Run the application event loop
+        # This blocks until the application quits
+        app.run()
     
     def get_character_drawing_metrics(self) -> CharacterDrawingMetrics:
         """
@@ -2048,11 +2113,15 @@ class CoreGraphicsBackend(Renderer):
     
     def get_event(self, timeout_ms: int = -1) -> Optional[Event]:
         """
-        Get the next event from the macOS event system.
+        Get the next event from the macOS event system (polling mode - for backward compatibility).
         
         This method polls the macOS event queue for keyboard, mouse, menu, and system events
         and translates them into TTK's unified Event format. It supports
         blocking, non-blocking, and timed event modes.
+        
+        When callbacks are enabled via set_event_callback(), this method processes
+        events and delivers them via callbacks, then returns None. This allows
+        existing code to continue using get_event() while new code can use callbacks.
         
         Args:
             timeout_ms: Timeout in milliseconds.
@@ -2061,8 +2130,8 @@ class CoreGraphicsBackend(Renderer):
                        >0: Wait up to timeout_ms milliseconds for an event
         
         Returns:
-            Optional[Event]: An Event object if an event is available,
-                            or None if the timeout expires with no event.
+            Optional[Event]: An Event object if an event is available and callbacks are disabled,
+                            or None if the timeout expires or if callbacks are enabled.
         
         Example:
             # Non-blocking check for event
@@ -2074,6 +2143,12 @@ class CoreGraphicsBackend(Renderer):
             event = backend.get_event(timeout_ms=-1)
             print(f"User pressed: {event.char}")
         """
+        if self.event_callback:
+            # Callbacks enabled - process events but deliver via callbacks
+            self._process_events(timeout_ms)
+            return None
+        
+        # Callbacks disabled - use traditional polling
         # Check menu event queue first (highest priority)
         if hasattr(self, 'menu_event_queue') and self.menu_event_queue:
             return self.menu_event_queue.pop(0)
@@ -2162,6 +2237,110 @@ class CoreGraphicsBackend(Renderer):
         app.updateWindows()
         
         return input_event
+    
+    def _process_events(self, timeout_ms: int = -1) -> None:
+        """
+        Process one event cycle and deliver via callbacks.
+        
+        This method is used by get_event() when callbacks are enabled. It polls
+        the macOS event queue for one event, translates it, and delivers it via
+        the registered callback.
+        
+        This allows get_event() to maintain backward compatibility while supporting
+        the callback-based event system. In desktop mode, events are delivered via
+        the NSTextInputClient protocol (keyDown: → insertText:), so this method
+        primarily handles system events and menu events.
+        
+        Args:
+            timeout_ms: Timeout in milliseconds
+                       -1: Block indefinitely
+                        0: Non-blocking
+                       >0: Wait up to timeout_ms milliseconds
+        """
+        if not self.event_callback:
+            return
+        
+        # Check menu event queue first (highest priority)
+        if hasattr(self, 'menu_event_queue') and self.menu_event_queue:
+            menu_event = self.menu_event_queue.pop(0)
+            # Menu events are not part of the callback system yet
+            # They would need to be handled separately
+            return
+        
+        # Check if window was resized
+        if self.resize_pending:
+            self.resize_pending = False
+            self.event_callback.on_system_event(
+                SystemEvent(event_type=SystemEventType.RESIZE)
+            )
+            return
+        
+        # Check if window should close
+        if self.should_close:
+            self.should_close = False
+            self.event_callback.on_system_event(
+                SystemEvent(event_type=SystemEventType.CLOSE)
+            )
+            return
+        
+        # Get the shared application instance
+        app = Cocoa.NSApplication.sharedApplication()
+        
+        # Calculate timeout date based on timeout_ms
+        if timeout_ms < 0:
+            until_date = Cocoa.NSDate.distantFuture()
+        elif timeout_ms == 0:
+            until_date = None
+        else:
+            timeout_seconds = timeout_ms / 1000.0
+            until_date = Cocoa.NSDate.dateWithTimeIntervalSinceNow_(timeout_seconds)
+        
+        # Define event mask
+        event_mask = (
+            Cocoa.NSEventMaskKeyDown |
+            Cocoa.NSEventMaskKeyUp |
+            Cocoa.NSEventMaskFlagsChanged |
+            Cocoa.NSEventMaskLeftMouseDown |
+            Cocoa.NSEventMaskLeftMouseUp |
+            Cocoa.NSEventMaskRightMouseDown |
+            Cocoa.NSEventMaskRightMouseUp |
+            Cocoa.NSEventMaskMouseMoved |
+            Cocoa.NSEventMaskLeftMouseDragged |
+            Cocoa.NSEventMaskRightMouseDragged |
+            Cocoa.NSEventMaskMouseEntered |
+            Cocoa.NSEventMaskMouseExited |
+            Cocoa.NSEventMaskScrollWheel |
+            Cocoa.NSEventMaskAppKitDefined |
+            Cocoa.NSEventMaskSystemDefined |
+            Cocoa.NSEventMaskApplicationDefined |
+            Cocoa.NSEventMaskPeriodic |
+            Cocoa.NSEventMaskCursorUpdate
+        )
+        
+        # Poll for next event
+        event = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
+            event_mask,
+            until_date,
+            Cocoa.NSDefaultRunLoopMode,
+            True
+        )
+        
+        if event is None:
+            return
+        
+        # Translate the NSEvent to TTK's Event
+        input_event = self._translate_event(event)
+        
+        # Deliver via callback if we handled it
+        if input_event is not None:
+            if isinstance(input_event, KeyEvent):
+                self.event_callback.on_key_event(input_event)
+        else:
+            # We didn't handle this event, let the system process it
+            app.sendEvent_(event)
+        
+        # Update the display after processing events
+        app.updateWindows()
     
     def _translate_event(self, event) -> Optional[KeyEvent]:
         """
@@ -3091,6 +3270,133 @@ if COCOA_AVAILABLE:
                     bool: True to receive keyboard input
                 """
                 return True
+            
+            # NSTextInputClient protocol methods
+            # These methods are required for proper text input handling on macOS
+            # and enable the callback-based event system with CharEvent generation
+            
+            def hasMarkedText(self) -> bool:
+                """
+                Check if there is marked text (IME composition in progress).
+                
+                This is part of the NSTextInputClient protocol. For now, we return
+                False as we don't support IME composition yet. This will be
+                implemented in a future phase when full IME support is added.
+                
+                Returns:
+                    bool: False (no IME composition support yet)
+                """
+                return False
+            
+            def markedRange(self):
+                """
+                Get the range of marked text (IME composition).
+                
+                This is part of the NSTextInputClient protocol. For now, we return
+                NSNotFound to indicate no marked text, as we don't support IME
+                composition yet. This will be implemented in a future phase.
+                
+                Returns:
+                    NSRange: NSMakeRange(NSNotFound, 0) indicating no marked text
+                """
+                return Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
+            
+            def selectedRange(self):
+                """
+                Get the range of selected text.
+                
+                This is part of the NSTextInputClient protocol. For now, we return
+                NSNotFound to indicate no selection, as we don't track text selection
+                in the view. This will be implemented in a future phase if needed.
+                
+                Returns:
+                    NSRange: NSMakeRange(NSNotFound, 0) indicating no selection
+                """
+                return Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
+            
+            def validAttributesForMarkedText(self):
+                """
+                Get valid attributes for marked text (IME composition).
+                
+                This is part of the NSTextInputClient protocol. For now, we return
+                an empty array as we don't support IME composition attributes yet.
+                This will be implemented in a future phase when full IME support
+                is added.
+                
+                Returns:
+                    NSArray: Empty array (no IME attributes supported yet)
+                """
+                return []
+            
+            def keyDown_(self, event):
+                """
+                Handle key down event from macOS.
+                
+                This method is called by macOS when a key is pressed. It translates
+                the NSEvent to a KeyEvent and delivers it via the callback. If the
+                event is not consumed by the application, it passes the event to
+                interpretKeyEvents: which will call insertText: if the key produces
+                a character.
+                
+                This is the entry point for the callback-based event system in
+                desktop mode. The flow is:
+                1. keyDown: receives NSEvent
+                2. Translate to KeyEvent
+                3. Deliver via on_key_event callback
+                4. If consumed (returns True), done
+                5. If not consumed, call interpretKeyEvents:
+                6. macOS calls insertText: with the character
+                7. insertText: generates CharEvent and delivers via on_char_event
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                # Translate NSEvent to KeyEvent
+                key_event = self.backend._translate_event(event)
+                
+                if key_event and self.backend.event_callback:
+                    # Deliver KeyEvent via callback
+                    consumed = self.backend.event_callback.on_key_event(key_event)
+                    
+                    if consumed:
+                        # Application consumed the event - don't pass to input system
+                        return
+                
+                # Not consumed - pass to input system for character translation
+                # macOS will call insertText: if this produces a character
+                self.interpretKeyEvents_([event])
+            
+            def insertText_(self, string):
+                """
+                Handle character input from macOS text input system.
+                
+                This method is called by macOS when a key event produces a character
+                (after keyDown: was not consumed). It extracts the character from
+                the NSString and generates a CharEvent for each character, delivering
+                them via the on_char_event callback.
+                
+                This is the second part of the callback-based event system flow:
+                1. keyDown: delivers KeyEvent
+                2. If not consumed, interpretKeyEvents: is called
+                3. macOS translates the key to a character
+                4. insertText: is called with the character
+                5. Generate CharEvent and deliver via on_char_event
+                
+                Args:
+                    string: NSString containing the character(s) to insert
+                """
+                if not string or len(string) == 0:
+                    return
+                
+                # Import CharEvent here to avoid circular import
+                from ttk.input_event import CharEvent
+                
+                # Create CharEvent for each character
+                for char in string:
+                    char_event = CharEvent(char=char)
+                    
+                    if self.backend.event_callback:
+                        self.backend.event_callback.on_char_event(char_event)
 else:
     # Provide a dummy class when PyObjC is not available
     class TTKView:

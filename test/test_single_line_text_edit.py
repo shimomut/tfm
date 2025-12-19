@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_single_line_text_edit import SingleLineTextEdit
 from ttk import KeyEvent, KeyCode
+from ttk.input_event import CharEvent
 
 
 def test_basic_functionality():
@@ -80,8 +81,8 @@ def test_key_handling():
     
     editor = SingleLineTextEdit("test")
     
-    # Test printable characters
-    event = KeyEvent(key_code=ord('X'), modifiers=0, char='X')
+    # Test printable characters using CharEvent (not KeyEvent)
+    event = CharEvent(char='X')
     result = editor.handle_key(event)
     assert result
     assert editor.get_text() == "testX"

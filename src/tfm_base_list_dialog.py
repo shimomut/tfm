@@ -4,7 +4,7 @@ TUI File Manager - Base List Dialog Component
 Provides common functionality for list-based dialogs
 """
 
-from ttk import TextAttribute, KeyCode
+from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, get_safe_functions
@@ -108,11 +108,13 @@ class BaseListDialog:
             if self.text_editor.handle_key(event):
                 return 'text_changed'
             return True
-        # Printable characters - let editor handle
-        elif event.char and len(event.char) == 1 and 32 <= ord(event.char) <= 126:
+        
+        # CharEvent - let editor handle text input
+        if isinstance(event, CharEvent):
             if self.text_editor.handle_key(event):
                 return 'text_changed'
             return True
+        
         return False
         
     def _adjust_scroll(self, total_items, content_height=None):

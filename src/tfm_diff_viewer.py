@@ -9,7 +9,7 @@ between two text files with syntax highlighting support.
 import difflib
 from tfm_path import Path
 from typing import List, Tuple, Optional
-from ttk import KeyEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent
 from tfm_colors import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
@@ -1042,8 +1042,8 @@ class DiffViewer:
         
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
-        # Check for character-based commands
-        if event.char:
+        # Check for character-based commands (only from KeyEvent)
+        if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
             if char_lower == 'q':
                 return False

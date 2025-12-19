@@ -11,7 +11,7 @@ import traceback
 from tfm_path import Path
 from typing import List, Tuple, Optional, Dict, Any
 import re
-from ttk import KeyEvent, KeyCode
+from ttk import KeyEvent, KeyCode, CharEvent
 from ttk.renderer import TextAttribute
 
 # Try to import pygments for syntax highlighting
@@ -479,36 +479,39 @@ class TextViewer:
         if event is None:
             return False
         
-        if event.key_code == KeyCode.ESCAPE:
-            self.exit_isearch_mode()
-            return True
-        elif event.key_code == KeyCode.ENTER:
-            # Enter - exit isearch mode and keep current position
-            self.exit_isearch_mode()
-            return True
-        elif event.key_code == KeyCode.BACKSPACE:
-            # Backspace - remove last character
-            if self.isearch_pattern:
-                self.isearch_pattern = self.isearch_pattern[:-1]
-                self.update_isearch_matches()
-            return True
-        elif event.key_code == KeyCode.UP:
-            # Up arrow - go to previous match
-            if self.isearch_matches:
-                self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
-                self.jump_to_match()
-            return True
-        elif event.key_code == KeyCode.DOWN:
-            # Down arrow - go to next match
-            if self.isearch_matches:
-                self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
-                self.jump_to_match()
-            return True
-        elif event.char and len(event.char) == 1 and 32 <= ord(event.char) <= 126:
-            # Printable characters
+        # Handle CharEvent - text input for search pattern
+        if isinstance(event, CharEvent):
             self.isearch_pattern += event.char
             self.update_isearch_matches()
             return True
+        
+        # Handle KeyEvent - navigation and control commands
+        if isinstance(event, KeyEvent):
+            if event.key_code == KeyCode.ESCAPE:
+                self.exit_isearch_mode()
+                return True
+            elif event.key_code == KeyCode.ENTER:
+                # Enter - exit isearch mode and keep current position
+                self.exit_isearch_mode()
+                return True
+            elif event.key_code == KeyCode.BACKSPACE:
+                # Backspace - remove last character
+                if self.isearch_pattern:
+                    self.isearch_pattern = self.isearch_pattern[:-1]
+                    self.update_isearch_matches()
+                return True
+            elif event.key_code == KeyCode.UP:
+                # Up arrow - go to previous match
+                if self.isearch_matches:
+                    self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
+                    self.jump_to_match()
+                return True
+            elif event.key_code == KeyCode.DOWN:
+                # Down arrow - go to next match
+                if self.isearch_matches:
+                    self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
+                    self.jump_to_match()
+                return True
         
         return False
     
@@ -881,8 +884,8 @@ class TextViewer:
             if self.handle_isearch_input(event):
                 return True  # Isearch mode handled the key
         
-        # Check for character-based commands
-        if event.char:
+        # Check for character-based commands (only from KeyEvent)
+        if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
             if char_lower == 'q':
                 return False

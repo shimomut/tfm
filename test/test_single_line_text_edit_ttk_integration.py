@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_single_line_text_edit import SingleLineTextEdit
 from ttk import KeyEvent, KeyCode, TextAttribute
+from ttk.input_event import CharEvent
 
 
 class TestSingleLineTextEditTTKIntegration(unittest.TestCase):
@@ -122,8 +123,8 @@ class TestSingleLineTextEditTTKIntegration(unittest.TestCase):
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_text(), "es")
         
-        # Test printable character
-        event = KeyEvent(key_code=ord('X'), modifiers=0, char='X')
+        # Test printable character using CharEvent
+        event = CharEvent(char='X')
         self.assertTrue(self.editor.handle_key(event))
         self.assertEqual(self.editor.get_text(), "Xes")
     
@@ -256,15 +257,15 @@ class TestSingleLineTextEditTTKIntegration(unittest.TestCase):
         """Test maximum length constraint"""
         editor = SingleLineTextEdit("", max_length=5)
         
-        # Should allow up to max_length
+        # Should allow up to max_length using CharEvent
         for char in "Hello":
-            event = KeyEvent(key_code=ord(char), modifiers=0, char=char)
+            event = CharEvent(char=char)
             self.assertTrue(editor.handle_key(event))
         
         self.assertEqual(editor.get_text(), "Hello")
         
         # Should reject beyond max_length
-        event = KeyEvent(key_code=ord('!'), modifiers=0, char='!')
+        event = CharEvent(char='!')
         self.assertFalse(editor.handle_key(event))
         self.assertEqual(editor.get_text(), "Hello")
     

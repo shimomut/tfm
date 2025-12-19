@@ -5,7 +5,7 @@ This module provides helper functions for working with TTK KeyEvent objects
 in the context of TFM's key binding system.
 """
 
-from ttk import KeyEvent, KeyCode, ModifierKey
+from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent
 
 
 def input_event_to_key_char(event):
@@ -24,6 +24,14 @@ def input_event_to_key_char(event):
         - Modified keys: 'CTRL_A', 'ALT_X'
     """
     if not event:
+        return None
+    
+    # CharEvent should not be used for key bindings (it's for text input only)
+    if isinstance(event, CharEvent):
+        return None
+    
+    # Only handle KeyEvent for key bindings
+    if not isinstance(event, KeyEvent):
         return None
     
     # Handle printable characters
@@ -245,6 +253,9 @@ def is_printable_char(event):
         bool: True if event has a printable character
     """
     if not event:
+        return False
+    # Only KeyEvent has is_printable() method
+    if not isinstance(event, KeyEvent):
         return False
     return event.is_printable()
 

@@ -14,12 +14,13 @@ __version__ = "0.1.0"
 __author__ = "TFM Development Team"
 
 # Import main abstract classes for convenience
-from .renderer import Renderer, TextAttribute
-from .input_event import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, MouseEvent, MenuEvent
+from .renderer import Renderer, TextAttribute, EventCallback
+from .input_event import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, MouseEvent, MenuEvent, CharEvent
 
 __all__ = [
     'Renderer',
     'TextAttribute',
+    'EventCallback',
     'KeyEvent',
     'KeyCode',
     'ModifierKey',
@@ -27,4 +28,5 @@ __all__ = [
     'SystemEventType',
     'MouseEvent',
     'MenuEvent',
+    'CharEvent',
 ]
