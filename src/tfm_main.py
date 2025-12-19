@@ -102,6 +102,22 @@ class TFMEventCallback(EventCallback):
         if self.file_manager.general_dialog.is_active:
             return self.file_manager.general_dialog.handle_input(event)
         
+        # Route through search_dialog if it's active
+        if self.file_manager.search_dialog.is_active:
+            return self.file_manager.search_dialog.handle_input(event)
+        
+        # Route through jump_dialog if it's active
+        if self.file_manager.jump_dialog.is_active:
+            return self.file_manager.jump_dialog.handle_input(event)
+        
+        # Route through batch_rename_dialog if it's active
+        if self.file_manager.batch_rename_dialog.is_active:
+            return self.file_manager.batch_rename_dialog.handle_input(event)
+        
+        # Route through list_dialog if it's active
+        if self.file_manager.list_dialog.is_active:
+            return self.file_manager.list_dialog.handle_input(event)
+        
         # Otherwise pass to active text widget if one exists
         active_widget = self.file_manager.get_active_text_widget()
         if active_widget:
@@ -3332,6 +3348,8 @@ class FileManager:
         if self.isearch_mode:
             if self.handle_isearch_input(event):
                 return True  # Isearch mode handled the event
+            # Isearch didn't handle the event - return False to allow CharEvent generation
+            return False
         
         # Handle general dialog input
         if self.general_dialog.is_active:
@@ -3341,43 +3359,50 @@ class FileManager:
         if self.quick_choice_bar.is_active:
             if self.handle_quick_choice_input(event):
                 return True  # Quick choice mode handled the event
+            # Dialog didn't handle the event - return False to allow CharEvent generation
+            return False
         
         # Handle info dialog mode input
         if self.info_dialog.is_active:
             if self.handle_info_dialog_input(event):
                 return True  # Info dialog mode handled the event
+            # Dialog didn't handle the event - return False to allow CharEvent generation
+            return False
         
         # Handle list dialog mode input
         if self.list_dialog.is_active:
             if self.handle_list_dialog_input(event):
                 return True  # List dialog mode handled the event
+            # Dialog didn't handle the event - return False to allow CharEvent generation
+            return False
         
         # Handle search dialog mode input
         if self.search_dialog.is_active:
             if self.handle_search_dialog_input(event):
                 return True  # Search dialog mode handled the event
+            # Dialog didn't handle the event - return False to allow CharEvent generation
+            return False
         
         # Handle jump dialog mode input
         if self.jump_dialog.is_active:
             if self.handle_jump_dialog_input(event):
                 return True  # Jump dialog mode handled the event
+            # Dialog didn't handle the event - return False to allow CharEvent generation
+            return False
         
         # Handle drives dialog mode input
         if self.drives_dialog.is_active:
             if self.handle_drives_dialog_input(event):
                 return True  # Drives dialog mode handled the event
+            # Dialog didn't handle the event - return False to allow CharEvent generation
+            return False
         
         # Handle batch rename dialog mode input
         if self.batch_rename_dialog.is_active:
             if self.handle_batch_rename_input(event):
                 return True  # Batch rename mode handled the event
-        
-        # Skip regular key processing if any dialog is open
-        # This prevents conflicts like starting isearch mode while help dialog is open
-        if (self.quick_choice_bar.is_active or self.info_dialog.is_active or self.list_dialog.is_active or 
-            self.search_dialog.is_active or self.jump_dialog.is_active or self.drives_dialog.is_active or 
-            self.batch_rename_dialog.is_active or self.isearch_mode):
-            return True
+            # Dialog didn't handle the event - return False to allow CharEvent generation
+            return False
         
         # Handle main application keys
         if self.is_key_for_action(event, 'quit'):

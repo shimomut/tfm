@@ -8,7 +8,7 @@ import fnmatch
 import re
 import threading
 import time
-from ttk import TextAttribute, KeyCode
+from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
 from tfm_colors import get_status_color
@@ -82,54 +82,62 @@ class SearchDialog(BaseListDialog):
         """Handle input while in search dialog mode
         
         Args:
-            event: KeyEvent from TTK (or integer key code for backward compatibility)
+            event: KeyEvent or CharEvent from TTK (or integer key code for backward compatibility)
         """
         # Backward compatibility: convert integer key codes to KeyEvent
         event = ensure_input_event(event)
         
         if not event:
             return False
-            
-        # Handle Tab key for search type switching first
-        if event.key_code == KeyCode.TAB:
+        
+        # Handle Tab key for search type switching first (KeyEvent only)
+        if isinstance(event, KeyEvent) and event.key_code == KeyCode.TAB:
             self.search_type = 'content' if self.search_type == 'filename' else 'filename'
             self.content_changed = True  # Mark content as changed when switching search type
             return ('search', None)
             
-        # Use base class navigation handling with thread safety
-        with self.search_lock:
-            current_results = self.results.copy()
-        
-        result = self.handle_common_navigation(event, current_results)
-        
-        if result == 'cancel':
-            # Cancel search before exiting
-            self._cancel_current_search()
-            self.exit()
-            return True
-        elif result == 'select':
-            # Cancel search before navigating
-            self._cancel_current_search()
-            
-            # Return the selected result for navigation (thread-safe)
+        # Only pass KeyEvents to navigation handler (CharEvents go to text editor)
+        if isinstance(event, KeyEvent):
+            # Use base class navigation handling with thread safety
             with self.search_lock:
-                if self.results and 0 <= self.selected < len(self.results):
-                    selected_result = self.results[self.selected]
-                    return ('navigate', selected_result)
-            return ('navigate', None)
-        elif result == 'text_changed':
-            self.content_changed = True  # Mark content as changed when text changes
-            return ('search', None)
-        elif result:
-            # Update selection in thread-safe manner for navigation keys
-            if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
-                with self.search_lock:
-                    # The base class already updated self.selected, just need to adjust scroll
-                    self._adjust_scroll(len(self.results))
+                current_results = self.results.copy()
             
-            # Mark content as changed for ANY handled key to ensure continued rendering
-            self.content_changed = True
-            return True
+            result = self.handle_common_navigation(event, current_results)
+            
+            if result == 'cancel':
+                # Cancel search before exiting
+                self._cancel_current_search()
+                self.exit()
+                return True
+            elif result == 'select':
+                # Cancel search before navigating
+                self._cancel_current_search()
+                
+                # Return the selected result for navigation (thread-safe)
+                with self.search_lock:
+                    if self.results and 0 <= self.selected < len(self.results):
+                        selected_result = self.results[self.selected]
+                        return ('navigate', selected_result)
+                return ('navigate', None)
+            elif result == 'text_changed':
+                self.content_changed = True  # Mark content as changed when text changes
+                return ('search', None)
+            elif result:
+                # Update selection in thread-safe manner for navigation keys
+                if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
+                    with self.search_lock:
+                        # The base class already updated self.selected, just need to adjust scroll
+                        self._adjust_scroll(len(self.results))
+                
+                # Mark content as changed for ANY handled key to ensure continued rendering
+                self.content_changed = True
+                return True
+        
+        # CharEvent - pass to text editor
+        if isinstance(event, CharEvent):
+            if self.text_editor.handle_key(event):
+                self.content_changed = True
+                return ('search', None)
             
         return False
         
