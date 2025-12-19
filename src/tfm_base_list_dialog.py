@@ -35,13 +35,23 @@ class BaseListDialog:
         """Handle common navigation keys for list dialogs
         
         Args:
-            event: The KeyEvent
+            event: The KeyEvent or CharEvent
             items_list: List of items to navigate through
             
         Returns:
             True if key was handled, False otherwise
         """
         if not event:
+            return False
+        
+        # CharEvent - let editor handle text input
+        if isinstance(event, CharEvent):
+            if self.text_editor.handle_key(event):
+                return 'text_changed'
+            return True
+        
+        # Only handle KeyEvent for navigation below this point
+        if not isinstance(event, KeyEvent):
             return False
             
         # ESC - cancel
@@ -105,12 +115,6 @@ class BaseListDialog:
             return True
         # Backspace - let editor handle
         elif event.key_code == KeyCode.BACKSPACE:
-            if self.text_editor.handle_key(event):
-                return 'text_changed'
-            return True
-        
-        # CharEvent - let editor handle text input
-        if isinstance(event, CharEvent):
             if self.text_editor.handle_key(event):
                 return 'text_changed'
             return True

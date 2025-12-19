@@ -3260,10 +3260,10 @@ class FileManager:
         
         return False
     
-    def handle_drives_dialog_input(self, key):
+    def handle_drives_dialog_input(self, event):
         """Handle input while in drives dialog mode - wrapper for drives dialog component"""
         was_active = self.drives_dialog.is_active
-        result = self.drives_dialog.handle_input(key)
+        result = self.drives_dialog.handle_input(event)
         
         if result == True:
             # If dialog was active but is no longer active, it exited - need full redraw
@@ -3379,8 +3379,8 @@ class FileManager:
                 # Dialog didn't handle the event - return False to allow CharEvent generation
                 return False
         
-        # Handle drives dialog mode input (KeyEvent only)
-        if isinstance(event, KeyEvent) and self.drives_dialog.is_active:
+        # Handle drives dialog mode input
+        if self.drives_dialog.is_active:
             if self.handle_drives_dialog_input(event):
                 return True  # Drives dialog mode handled the event
             # Dialog didn't handle the event - return False to allow CharEvent generation
