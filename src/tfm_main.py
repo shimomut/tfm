@@ -89,7 +89,7 @@ class TFMEventCallback(EventCallback):
     
     def on_char_event(self, event: CharEvent) -> bool:
         """
-        Handle a character event by passing to active text widget.
+        Handle a character event by passing to active dialog or text widget.
         
         Args:
             event: CharEvent to handle
@@ -97,7 +97,12 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed (character inserted), False otherwise
         """
-        # Pass to active text widget if one exists
+        # Route through general_dialog if it's active
+        # This ensures content_changed flag is set correctly
+        if self.file_manager.general_dialog.is_active:
+            return self.file_manager.general_dialog.handle_input(event)
+        
+        # Otherwise pass to active text widget if one exists
         active_widget = self.file_manager.get_active_text_widget()
         if active_widget:
             return active_widget.handle_key(event)
@@ -908,8 +913,8 @@ class FileManager:
             The active text widget (SingleLineTextEdit) or None
         """
         # Check if general dialog is active and has a text widget
-        if self.general_dialog.is_active and hasattr(self.general_dialog, 'text_edit'):
-            return self.general_dialog.text_edit
+        if self.general_dialog.is_active and hasattr(self.general_dialog, 'text_editor'):
+            return self.general_dialog.text_editor
         
         # Check if search dialog is active and has a text widget
         if self.search_dialog.is_active and hasattr(self.search_dialog, 'text_edit'):
@@ -962,23 +967,65 @@ class FileManager:
         
         This is an alternative to the traditional run() method that uses
         callbacks instead of polling. It enables callback mode and then
-        runs the backend's event loop.
+        runs the backend's event loop with integrated drawing.
         
-        Note: This is for future migration. Current implementation uses run().
+        Note: The backend's run_event_loop() only handles events, so we need
+        to integrate drawing into the event handling callbacks.
         """
         # Enable callback mode
         self.enable_callback_mode()
         
-        try:
-            # Run the backend event loop
-            # The backend will call our callbacks for each event
-            self.renderer.run_event_loop()
-        finally:
-            # Restore stdout/stderr before exiting
-            self.restore_stdio()
+        # Draw initial interface
+        self.draw_interface()
+        
+        # Run event loop with drawing
+        while True:
+            # Start loop iteration timing
+            if self.profiling_manager:
+                self.profiling_manager.start_loop_iteration()
             
-            # Save application state before exiting
-            self.save_application_state()
+            # Check if we should quit
+            if self.should_quit:
+                break
+            
+            # Check for startup redraw trigger
+            if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.033:
+                self.needs_full_redraw = True
+                delattr(self, 'startup_time')
+            
+            # Check for log updates
+            if self.log_manager.has_log_updates():
+                self.needs_full_redraw = True
+            
+            # Update menu states if needed
+            if self.is_desktop_mode():
+                current_pane = self.get_current_pane()
+                current_selection_count = len(current_pane['selected_files'])
+                
+                if not hasattr(self, '_last_selection_count'):
+                    self._last_selection_count = current_selection_count
+                    self._update_menu_states()
+                elif self._last_selection_count != current_selection_count:
+                    self._last_selection_count = current_selection_count
+                    self._update_menu_states()
+            
+            # Process one event with timeout
+            self.renderer.get_event(timeout_ms=16)  # This will trigger callbacks
+            
+            # Draw interface after event processing
+            self.draw_interface()
+            
+            # End loop iteration
+            if self.profiling_manager:
+                self.profiling_manager.end_loop_iteration()
+                if self.profiling_manager.should_print_fps():
+                    self.profiling_manager.print_fps()
+        
+        # Restore stdout/stderr before exiting
+        self.restore_stdio()
+        
+        # Save application state before exiting
+        self.save_application_state()
 
     def get_log_scroll_percentage(self):
         """Calculate the current log scroll position as a percentage"""
@@ -3288,8 +3335,7 @@ class FileManager:
         
         # Handle general dialog input
         if self.general_dialog.is_active:
-            if self.general_dialog.handle_input(event):
-                return True  # General dialog handled the event
+            return self.general_dialog.handle_input(event)
         
         # Handle quick choice mode input
         if self.quick_choice_bar.is_active:
@@ -3330,7 +3376,7 @@ class FileManager:
         # This prevents conflicts like starting isearch mode while help dialog is open
         if (self.quick_choice_bar.is_active or self.info_dialog.is_active or self.list_dialog.is_active or 
             self.search_dialog.is_active or self.jump_dialog.is_active or self.drives_dialog.is_active or 
-            self.batch_rename_dialog.is_active or self.isearch_mode or self.general_dialog.is_active):
+            self.batch_rename_dialog.is_active or self.isearch_mode):
             return True
         
         # Handle main application keys
@@ -3908,7 +3954,7 @@ def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profilin
     fm = None
     try:
         fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, profiling_enabled=profiling_enabled)
-        fm.run()
+        fm.run_with_callbacks()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
         pass

@@ -10,6 +10,7 @@ various overlay dialog types including:
 """
 
 from ttk import TextAttribute, KeyCode
+from ttk.input_event import KeyEvent
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, get_safe_functions
@@ -113,35 +114,36 @@ class GeneralPurposeDialog:
     
     def _handle_status_line_input(self, event):
         """Handle input for status line input dialog"""
-        # Handle ESC - cancel
-        if event.key_code == KeyCode.ESCAPE:
-            # Store callback before hiding
-            cancel_callback = self.cancel_callback
-            self.hide()
-            # Call callback after hiding to allow new dialogs
-            if cancel_callback:
-                cancel_callback()
-            return True
+        # Check if it's a KeyEvent first
+        if isinstance(event, KeyEvent):
+            # Handle ESC - cancel
+            if event.key_code == KeyCode.ESCAPE:
+                # Store callback before hiding
+                cancel_callback = self.cancel_callback
+                self.hide()
+                # Call callback after hiding to allow new dialogs
+                if cancel_callback:
+                    cancel_callback()
+                return True
+            
+            # Handle Enter - confirm
+            elif event.key_code == KeyCode.ENTER:
+                # Store callback and text before hiding
+                callback = self.callback
+                text = self.text_editor.get_text()
+                self.hide()
+                # Call callback after hiding to allow new dialogs
+                if callback:
+                    callback(text)
+                return True
         
-        # Handle Enter - confirm
-        elif event.key_code == KeyCode.ENTER:
-            # Store callback and text before hiding
-            callback = self.callback
-            text = self.text_editor.get_text()
-            self.hide()
-            # Call callback after hiding to allow new dialogs
-            if callback:
-                callback(text)
-            return True
-        
-        # Handle text editing
-        else:
-            # Pass KeyEvent directly to SingleLineTextEdit
-            # SingleLineTextEdit already handles KeyEvent objects
-            handled = self.text_editor.handle_key(event)
-            if handled:
-                self.content_changed = True  # Mark content as changed
-            return handled
+        # Handle text editing (both KeyEvent and CharEvent)
+        # Pass event directly to SingleLineTextEdit
+        # SingleLineTextEdit handles both KeyEvent and CharEvent
+        handled = self.text_editor.handle_key(event)
+        if handled:
+            self.content_changed = True  # Mark content as changed
+        return handled
     
     def needs_redraw(self):
         """Check if this dialog needs to be redrawn"""
