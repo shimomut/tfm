@@ -2328,16 +2328,10 @@ class CoreGraphicsBackend(Renderer):
         if event is None:
             return
         
-        # Translate the NSEvent to TTK's Event
-        input_event = self._translate_event(event)
-        
-        # Deliver via callback if we handled it
-        if input_event is not None:
-            if isinstance(input_event, KeyEvent):
-                self.event_callback.on_key_event(input_event)
-        else:
-            # We didn't handle this event, let the system process it
-            app.sendEvent_(event)
+        # Send event to the system for processing
+        # This allows keyDown: → interpretKeyEvents: → insertText: flow
+        # which generates CharEvent when KeyEvent is not consumed
+        app.sendEvent_(event)
         
         # Update the display after processing events
         app.updateWindows()
