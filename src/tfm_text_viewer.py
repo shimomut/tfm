@@ -872,10 +872,18 @@ class TextViewer:
         # Fallback if index is out of range
         return len(self.lines) if self.lines else 1
     
-    def handle_key(self, event: KeyEvent) -> bool:
+    def draw(self):
+        """Draw the viewer (called by FileManager's main loop)"""
+        self.draw_header()
+        self.draw_content()
+        self.draw_status_bar()
+    
+    def handle_input(self, event):
         """
-        Handle key input. Returns True if event was consumed, False otherwise.
-        Sets self.should_close = True when viewer wants to close.
+        Handle input event (called by FileManager's main loop)
+        
+        Returns:
+            bool: True if event was consumed, False otherwise
         """
         # Handle None event
         if event is None:
@@ -979,21 +987,6 @@ class TextViewer:
             self.scroll_offset = max_scroll
             
         return True
-    
-    def draw(self):
-        """Draw the viewer (called by FileManager's main loop)"""
-        self.draw_header()
-        self.draw_content()
-        self.draw_status_bar()
-    
-    def handle_input(self, event):
-        """
-        Handle input event (called by FileManager's main loop)
-        
-        Returns:
-            bool: True if event was consumed, False otherwise
-        """
-        return self.handle_key(event)
 
 
 def is_text_file(file_path: Path) -> bool:

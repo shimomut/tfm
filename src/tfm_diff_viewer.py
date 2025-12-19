@@ -1036,10 +1036,18 @@ class DiffViewer:
             # Difference is larger than screen, just show from the start
             self.scroll_offset = diff_start
     
-    def handle_key(self, event: KeyEvent) -> bool:
+    def draw(self):
+        """Draw the viewer (called by FileManager's main loop)"""
+        self.draw_header()
+        self.draw_content()
+        self.draw_status_bar()
+    
+    def handle_input(self, event):
         """
-        Handle key input. Returns True if event was consumed, False otherwise.
-        Sets self.should_close = True when viewer wants to close.
+        Handle input event (called by FileManager's main loop)
+        
+        Returns:
+            bool: True if event was consumed, False otherwise
         """
         if event is None:
             return False
@@ -1183,21 +1191,6 @@ class DiffViewer:
             self.scroll_offset = max_scroll
         
         return True
-    
-    def draw(self):
-        """Draw the viewer (called by FileManager's main loop)"""
-        self.draw_header()
-        self.draw_content()
-        self.draw_status_bar()
-    
-    def handle_input(self, event):
-        """
-        Handle input event (called by FileManager's main loop)
-        
-        Returns:
-            bool: True if event was consumed, False otherwise
-        """
-        return self.handle_key(event)
 
 
 def create_diff_viewer(renderer, file1_path: Path, file2_path: Path):
