@@ -1324,13 +1324,9 @@ class FileManager:
                     # For non-focused items: " " + line
                     # Line is already sized to content_width (pane_width - 4)
                     
-                    # Draw space prefix without attributes (to avoid reverse video on the space)
-                    color_pair, _ = get_file_color(is_dir, is_executable, False, False)
-                    self.renderer.draw_text(y, start_x + 1, " ", color_pair=color_pair, attributes=TextAttribute.NORMAL)
-                    
-                    # Draw the line content with its attributes
+                    # Draw with space prefix
                     color_pair, attributes = color
-                    self.renderer.draw_text(y, start_x + 2, line, color_pair=color_pair, attributes=attributes)
+                    self.renderer.draw_text(y, start_x + 1, " " + line, color_pair=color_pair, attributes=attributes)
             except Exception:
                 pass  # Ignore if we can't write to screen edge
                 
