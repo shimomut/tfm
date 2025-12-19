@@ -200,3 +200,110 @@
 
 - [x] 11. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 12. Implement UTF-8 byte accumulation in curses backend
+- [ ] 12.1 Add UTF8Accumulator class to curses backend
+  - Create UTF8Accumulator class with buffer and expected_bytes tracking
+  - Implement add_byte method with UTF-8 validation logic
+  - Implement reset method to clear accumulator state
+  - Implement is_accumulating method to check buffer status
+  - _Requirements: 8.1, 8.3_
+
+- [ ] 12.2 Integrate UTF8Accumulator into curses event loop
+  - Add utf8_accumulator instance to CursesBackend
+  - Call add_byte for each getch() result
+  - Generate CharEvent only when complete character is formed
+  - Skip KeyEvent generation for multi-byte characters
+  - _Requirements: 8.2, 8.5_
+
+- [ ] 12.3 Handle invalid UTF-8 sequences
+  - Catch UnicodeDecodeError in UTF8Accumulator
+  - Reset accumulator on invalid sequences
+  - Continue processing without generating events
+  - _Requirements: 8.4_
+
+- [ ]* 12.4 Write property test for UTF-8 accumulation
+  - **Property 11: Multi-byte UTF-8 sequences form single CharEvent**
+  - **Validates: Requirements 8.1, 8.2**
+
+- [ ]* 12.5 Write property test for UTF-8 buffering
+  - **Property 12: Incomplete UTF-8 sequences are buffered**
+  - **Validates: Requirements 8.3**
+
+- [ ]* 12.6 Write property test for invalid UTF-8 handling
+  - **Property 13: Invalid UTF-8 sequences are discarded**
+  - **Validates: Requirements 8.4**
+
+- [ ]* 12.7 Write property test for no KeyEvents during accumulation
+  - **Property 14: No KeyEvents for UTF-8 continuation bytes**
+  - **Validates: Requirements 8.5**
+
+- [ ] 13. Implement caret position management
+- [ ] 13.1 Add caret position methods to Renderer base class
+  - Add set_caret_position(x, y) method signature
+  - Add hide_caret() method signature
+  - Add show_caret() method signature
+  - _Requirements: 9.1_
+
+- [ ] 13.2 Implement caret position methods in CursesBackend
+  - Implement set_caret_position using curses.setsyx()
+  - Implement hide_caret using curses.curs_set(0)
+  - Implement show_caret using curses.curs_set(1)
+  - Handle curses.error exceptions gracefully
+  - _Requirements: 9.1, 9.2_
+
+- [ ] 13.3 Implement caret position methods in CoreGraphicsBackend
+  - Implement set_caret_position as no-op (OS handles caret)
+  - Implement hide_caret as no-op
+  - Implement show_caret as no-op
+  - _Requirements: 9.1_
+
+- [ ] 13.4 Integrate caret positioning into SingleLineTextEdit
+  - Update draw() method to call set_caret_position after rendering
+  - Calculate caret position from widget coordinates and cursor offset
+  - Call show_caret() when widget has focus
+  - Call hide_caret() when widget loses focus
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+
+- [ ]* 13.5 Write property test for caret position matching
+  - **Property 15: Caret position matches cursor position**
+  - **Validates: Requirements 9.1, 9.3**
+
+- [ ]* 13.6 Write property test for caret updates
+  - **Property 16: Caret updates on cursor movement**
+  - **Validates: Requirements 9.2**
+
+- [ ]* 13.7 Write property test for caret hiding on focus loss
+  - **Property 17: Caret hidden when widget loses focus**
+  - **Validates: Requirements 9.4**
+
+- [ ]* 13.8 Write property test for caret rendering order
+  - **Property 18: Caret set after widget rendering**
+  - **Validates: Requirements 9.5**
+
+- [ ] 14. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 15. Integration testing for Unicode input
+- [ ]* 15.1 Test Japanese character input (hiragana, katakana, kanji)
+  - Test typing あ, い, う, え, お
+  - Test typing カ, タ, ナ, ハ, マ
+  - Test typing 日, 本, 語
+  - Verify single CharEvent per character
+  - _Requirements: 8.1, 8.2_
+
+- [ ]* 15.2 Test other multi-byte Unicode characters
+  - Test emoji input (😀, 🎉, etc.)
+  - Test accented characters (é, ñ, ü, etc.)
+  - Test Chinese characters
+  - Test Korean characters
+  - _Requirements: 8.1, 8.2_
+
+- [ ]* 15.3 Test caret position with Unicode characters
+  - Test caret positioning with mixed ASCII and Unicode
+  - Test caret movement through Unicode text
+  - Verify caret position accounts for character width
+  - _Requirements: 9.1, 9.2, 9.3_
+
+- [ ] 16. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

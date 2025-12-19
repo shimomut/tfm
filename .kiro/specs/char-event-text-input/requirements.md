@@ -12,6 +12,10 @@ This feature introduces a distinction between character input events (CharEvent)
 - **Backend**: The platform-specific implementation layer (curses or CoreGraphics) that interfaces with the operating system
 - **TFM**: Terminal File Manager - the main application
 - **Event Handler**: Code that processes keyboard input events and determines appropriate actions
+- **UTF-8**: A variable-length character encoding for Unicode, where characters can be 1-4 bytes
+- **Multi-byte Character**: A Unicode character that requires more than one byte in UTF-8 encoding (e.g., Japanese characters)
+- **Caret**: The visible cursor indicator in the terminal that shows where text input will appear
+- **Cursor Position**: The logical position within a text widget where the next character will be inserted
 
 ## Requirements
 
@@ -95,3 +99,27 @@ This feature introduces a distinction between character input events (CharEvent)
 3. WHEN a user presses Cmd+key on macOS in a text field THEN the system SHALL generate a KeyEvent not a CharEvent
 4. WHEN a user presses a character without modifiers in a text field THEN the system SHALL generate a CharEvent
 5. WHEN a user presses Shift+character for uppercase in a text field THEN the system SHALL generate a CharEvent with the uppercase character
+
+### Requirement 8
+
+**User Story:** As a user typing Unicode characters in curses backend mode, I want multi-byte UTF-8 characters to be handled correctly, so that I can input characters like Japanese hiragana without generating multiple events.
+
+#### Acceptance Criteria
+
+1. WHEN a user types a multi-byte UTF-8 character in curses mode THEN the system SHALL accumulate the bytes until a complete character is formed
+2. WHEN a complete UTF-8 character is formed THEN the system SHALL generate a single CharEvent with the complete Unicode character
+3. WHEN the system receives incomplete UTF-8 byte sequences THEN the system SHALL buffer them until the sequence is complete
+4. WHEN the system receives an invalid UTF-8 byte sequence THEN the system SHALL discard the invalid bytes and continue processing
+5. WHEN a multi-byte character is being accumulated THEN the system SHALL NOT generate KeyEvent instances for the individual bytes
+
+### Requirement 9
+
+**User Story:** As a user typing in text input fields, I want the terminal caret position to match the logical cursor position in the text widget, so that I can see where my input will appear.
+
+#### Acceptance Criteria
+
+1. WHEN a text input widget has focus THEN the system SHALL position the terminal caret at the widget's cursor position
+2. WHEN the cursor position changes within a text widget THEN the system SHALL update the terminal caret position immediately
+3. WHEN calculating caret position THEN the system SHALL account for the widget's screen coordinates and internal cursor offset
+4. WHEN a text widget loses focus THEN the system SHALL hide the terminal caret or move it to an appropriate location
+5. WHEN rendering a text widget THEN the system SHALL ensure the caret position is set after drawing the widget content
