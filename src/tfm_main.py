@@ -1203,16 +1203,12 @@ class FileManager:
             
             color = get_file_color(is_dir, is_executable, is_selected, is_active)
             
-            # Handle search match highlighting (takes precedence over multi-selection)
-            if is_search_match and not is_selected:
-                # Highlight search matches with underline
-                color_pair, _ = get_file_color(is_dir, is_executable, False, False)
-                color = (color_pair, TextAttribute.UNDERLINE)
-            # Handle multi-selection highlighting
-            elif is_multi_selected and not is_selected:
-                # Get base color and add reverse video for multi-selected files
-                color_pair, _ = get_file_color(is_dir, is_executable, False, False)
-                color = (color_pair, TextAttribute.REVERSE)
+            # Add underline attribute for search matches (can combine with selection)
+            if is_search_match:
+                color_pair, base_attrs = color
+                color = (color_pair, base_attrs | TextAttribute.UNDERLINE)
+            # Multi-selected files use normal colors with ● marker (no color reversal needed)
+            # The ● marker provides sufficient visual distinction
                 
             # Add selection marker for multi-selected files
             selection_marker = "●" if is_multi_selected else " "
