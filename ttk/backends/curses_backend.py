@@ -934,13 +934,25 @@ class CursesBackend(Renderer):
                     self.event_callback.on_system_event(event)
                     continue
                 
-                # Try to accumulate as UTF-8 byte
+                # Special keys (> 255) are not UTF-8 bytes - handle them directly
+                if key > 255:
+                    # This is a special key (arrow, function key, etc.)
+                    key_event = self._translate_curses_key(key)
+                    if isinstance(key_event, KeyEvent):
+                        self.event_callback.on_key_event(key_event)
+                    elif isinstance(key_event, SystemEvent):
+                        self.event_callback.on_system_event(key_event)
+                    continue
+                
+                # Try to accumulate as UTF-8 byte (only for 0-255 range)
                 char = self.utf8_accumulator.add_byte(key)
                 
                 if char is not None:
                     # Complete character formed
                     if len(char) == 1 and ord(char) < 128:
                         # ASCII - generate KeyEvent (for command matching)
+                        # Use the original key byte for translation (not the char)
+                        # because _translate_curses_key expects raw curses key codes
                         key_event = self._translate_curses_key(key)
                         consumed = False
                         if isinstance(key_event, KeyEvent):
@@ -953,6 +965,7 @@ class CursesBackend(Renderer):
                                 self.event_callback.on_char_event(char_event)
                     else:
                         # Multi-byte Unicode - generate CharEvent directly
+                        # Skip KeyEvent generation for multi-byte characters
                         char_event = CharEvent(char=char)
                         self.event_callback.on_char_event(char_event)
                 # else: still accumulating, wait for more bytes
@@ -971,8 +984,7 @@ class CursesBackend(Renderer):
         
         This method is used by get_event() when callbacks are enabled. It polls
         for one event, translates it, and delivers it via the registered callback.
-        If the KeyEvent is not consumed, it translates it to CharEvent and delivers
-        that as well.
+        It properly handles UTF-8 multi-byte characters by accumulating bytes.
         
         This allows get_event() to maintain backward compatibility while supporting
         the callback-based event system.
@@ -998,25 +1010,46 @@ class CursesBackend(Renderer):
             if key == -1:
                 return
             
-            # Translate to event
-            event = self._translate_curses_key(key)
-            if event is None:
-                return
-            
-            # Handle system events
-            if isinstance(event, SystemEvent):
+            # Handle resize event separately (it's a system event, not a key event)
+            if key == curses.KEY_RESIZE:
+                event = SystemEvent(event_type=SystemEventType.RESIZE)
                 self.event_callback.on_system_event(event)
                 return
             
-            # Handle key events
-            if isinstance(event, KeyEvent):
-                consumed = self.event_callback.on_key_event(event)
-                
-                if not consumed:
-                    # KeyEvent not consumed - try to translate to CharEvent
-                    char_event = self._translate_key_to_char(event)
-                    if char_event:
-                        self.event_callback.on_char_event(char_event)
+            # Special keys (> 255) are not UTF-8 bytes - handle them directly
+            if key > 255:
+                # This is a special key (arrow, function key, etc.)
+                key_event = self._translate_curses_key(key)
+                if isinstance(key_event, KeyEvent):
+                    self.event_callback.on_key_event(key_event)
+                elif isinstance(key_event, SystemEvent):
+                    self.event_callback.on_system_event(key_event)
+                return
+            
+            # Try to accumulate as UTF-8 byte (only for 0-255 range)
+            char = self.utf8_accumulator.add_byte(key)
+            
+            if char is not None:
+                # Complete character formed
+                if len(char) == 1 and ord(char) < 128:
+                    # ASCII - generate KeyEvent (for command matching)
+                    # Use the original key byte for translation
+                    key_event = self._translate_curses_key(key)
+                    consumed = False
+                    if isinstance(key_event, KeyEvent):
+                        consumed = self.event_callback.on_key_event(key_event)
+                    
+                    # If not consumed, translate to CharEvent
+                    if not consumed and isinstance(key_event, KeyEvent):
+                        char_event = self._translate_key_to_char(key_event)
+                        if char_event:
+                            self.event_callback.on_char_event(char_event)
+                else:
+                    # Multi-byte Unicode - generate CharEvent directly
+                    # Skip KeyEvent generation for multi-byte characters
+                    char_event = CharEvent(char=char)
+                    self.event_callback.on_char_event(char_event)
+            # else: still accumulating, wait for more bytes
         
         except curses.error:
             # Timeout or input error - ignore
