@@ -13,7 +13,7 @@ from pathlib import Path as StdPath
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
-from tfm_diff_viewer import DiffViewer, view_diff
+from tfm_diff_viewer import DiffViewer, create_diff_viewer
 from ttk import KeyEvent, KeyCode
 
 

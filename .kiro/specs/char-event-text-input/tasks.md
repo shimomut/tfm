@@ -201,22 +201,22 @@
 - [x] 11. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 12. Implement UTF-8 byte accumulation in curses backend
-- [ ] 12.1 Add UTF8Accumulator class to curses backend
+- [x] 12. Implement UTF-8 byte accumulation in curses backend
+- [x] 12.1 Add UTF8Accumulator class to curses backend
   - Create UTF8Accumulator class with buffer and expected_bytes tracking
   - Implement add_byte method with UTF-8 validation logic
   - Implement reset method to clear accumulator state
   - Implement is_accumulating method to check buffer status
   - _Requirements: 8.1, 8.3_
 
-- [ ] 12.2 Integrate UTF8Accumulator into curses event loop
+- [x] 12.2 Integrate UTF8Accumulator into curses event loop
   - Add utf8_accumulator instance to CursesBackend
   - Call add_byte for each getch() result
   - Generate CharEvent only when complete character is formed
   - Skip KeyEvent generation for multi-byte characters
   - _Requirements: 8.2, 8.5_
 
-- [ ] 12.3 Handle invalid UTF-8 sequences
+- [x] 12.3 Handle invalid UTF-8 sequences
   - Catch UnicodeDecodeError in UTF8Accumulator
   - Reset accumulator on invalid sequences
   - Continue processing without generating events
@@ -238,27 +238,27 @@
   - **Property 14: No KeyEvents for UTF-8 continuation bytes**
   - **Validates: Requirements 8.5**
 
-- [ ] 13. Implement caret position management
-- [ ] 13.1 Add caret position methods to Renderer base class
+- [x] 13. Implement caret position management
+- [x] 13.1 Add caret position methods to Renderer base class
   - Add set_caret_position(x, y) method signature
   - Add hide_caret() method signature
   - Add show_caret() method signature
   - _Requirements: 9.1_
 
-- [ ] 13.2 Implement caret position methods in CursesBackend
+- [x] 13.2 Implement caret position methods in CursesBackend
   - Implement set_caret_position using curses.setsyx()
   - Implement hide_caret using curses.curs_set(0)
   - Implement show_caret using curses.curs_set(1)
   - Handle curses.error exceptions gracefully
   - _Requirements: 9.1, 9.2_
 
-- [ ] 13.3 Implement caret position methods in CoreGraphicsBackend
+- [x] 13.3 Implement caret position methods in CoreGraphicsBackend
   - Implement set_caret_position as no-op (OS handles caret)
   - Implement hide_caret as no-op
   - Implement show_caret as no-op
   - _Requirements: 9.1_
 
-- [ ] 13.4 Integrate caret positioning into SingleLineTextEdit
+- [x] 13.4 Integrate caret positioning into SingleLineTextEdit
   - Update draw() method to call set_caret_position after rendering
   - Calculate caret position from widget coordinates and cursor offset
   - Call show_caret() when widget has focus
@@ -281,10 +281,10 @@
   - **Property 18: Caret set after widget rendering**
   - **Validates: Requirements 9.5**
 
-- [ ] 14. Checkpoint - Ensure all tests pass
+- [x] 14. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 15. Integration testing for Unicode input
+- [x] 15. Integration testing for Unicode input
 - [ ]* 15.1 Test Japanese character input (hiragana, katakana, kanji)
   - Test typing あ, い, う, え, お
   - Test typing カ, タ, ナ, ハ, マ
@@ -305,5 +305,5 @@
   - Verify caret position accounts for character width
   - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 16. Final Checkpoint - Ensure all tests pass
+- [x] 16. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

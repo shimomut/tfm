@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.modules['curses'] = MagicMock()
 
 from tfm_path import Path
-from tfm_text_viewer import TextViewer, view_text_file, is_text_file
+from tfm_text_viewer import TextViewer, is_text_file, create_text_viewer
 
 
 class TestArchiveViewerIntegration(unittest.TestCase):

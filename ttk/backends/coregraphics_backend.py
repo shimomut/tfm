@@ -2754,6 +2754,43 @@ class CoreGraphicsBackend(Renderer):
         
         if item_id in self.menu_items:
             self.menu_items[item_id].setEnabled_(enabled)
+    
+    def set_caret_position(self, x: int, y: int) -> None:
+        """
+        Set the terminal caret position (no-op for desktop mode).
+        
+        In desktop mode, the OS manages the caret position through the
+        NSTextInputClient protocol. This method is a no-op as the caret
+        is automatically positioned by macOS based on text input context.
+        
+        Args:
+            x: Column position (ignored)
+            y: Row position (ignored)
+        """
+        # No-op: Desktop mode uses OS-managed caret via NSTextInputClient
+        pass
+    
+    def hide_caret(self) -> None:
+        """
+        Hide the terminal caret (no-op for desktop mode).
+        
+        In desktop mode, the OS manages caret visibility through the
+        NSTextInputClient protocol. This method is a no-op as the caret
+        visibility is automatically controlled by macOS.
+        """
+        # No-op: Desktop mode uses OS-managed caret visibility
+        pass
+    
+    def show_caret(self) -> None:
+        """
+        Show the terminal caret (no-op for desktop mode).
+        
+        In desktop mode, the OS manages caret visibility through the
+        NSTextInputClient protocol. This method is a no-op as the caret
+        visibility is automatically controlled by macOS.
+        """
+        # No-op: Desktop mode uses OS-managed caret visibility
+        pass
 
 
 # Define TTKWindowDelegate class for handling window events

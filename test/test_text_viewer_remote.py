@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch, MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
-from tfm_text_viewer import TextViewer, is_text_file, view_text_file
+from tfm_text_viewer import TextViewer, is_text_file, create_text_viewer
 
 
 class TestTextViewerRemote(unittest.TestCase):

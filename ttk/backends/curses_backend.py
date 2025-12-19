@@ -13,6 +13,81 @@ from ttk.renderer import Renderer, TextAttribute
 from ttk.input_event import Event, KeyEvent, CharEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
 
 
+class UTF8Accumulator:
+    """
+    Accumulates UTF-8 byte sequences to form complete Unicode characters.
+    
+    UTF-8 encoding uses 1-4 bytes per character:
+    - 0xxxxxxx: 1-byte character (ASCII)
+    - 110xxxxx 10xxxxxx: 2-byte character
+    - 1110xxxx 10xxxxxx 10xxxxxx: 3-byte character
+    - 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx: 4-byte character
+    """
+    
+    def __init__(self):
+        """Initialize the UTF-8 accumulator."""
+        self.buffer: bytearray = bytearray()
+        self.expected_bytes: int = 0
+    
+    def add_byte(self, byte: int) -> Optional[str]:
+        """
+        Add a byte to the accumulator.
+        
+        Args:
+            byte: Integer value of the byte (0-255)
+        
+        Returns:
+            Complete Unicode character if sequence is complete, None otherwise
+        """
+        # First byte - determine expected length
+        if self.expected_bytes == 0:
+            if byte < 0x80:  # ASCII (1 byte)
+                return chr(byte)
+            elif (byte & 0xE0) == 0xC0:  # 2-byte sequence
+                self.expected_bytes = 2
+                self.buffer.append(byte)
+            elif (byte & 0xF0) == 0xE0:  # 3-byte sequence
+                self.expected_bytes = 3
+                self.buffer.append(byte)
+            elif (byte & 0xF8) == 0xF0:  # 4-byte sequence
+                self.expected_bytes = 4
+                self.buffer.append(byte)
+            else:
+                # Invalid start byte - discard
+                self.reset()
+                return None
+        else:
+            # Continuation byte - should start with 10xxxxxx
+            if (byte & 0xC0) != 0x80:
+                # Invalid continuation byte - discard buffer
+                self.reset()
+                return None
+            
+            self.buffer.append(byte)
+            
+            # Check if sequence is complete
+            if len(self.buffer) == self.expected_bytes:
+                try:
+                    char = self.buffer.decode('utf-8')
+                    self.reset()
+                    return char
+                except UnicodeDecodeError:
+                    # Invalid sequence - discard
+                    self.reset()
+                    return None
+        
+        return None
+    
+    def reset(self):
+        """Reset the accumulator state."""
+        self.buffer.clear()
+        self.expected_bytes = 0
+    
+    def is_accumulating(self) -> bool:
+        """Check if currently accumulating a multi-byte sequence."""
+        return len(self.buffer) > 0
+
+
 # Terminal-specific key codes for Shift+Arrow combinations
 # These codes vary by terminal emulator and may not work in all environments
 # The backend translates these to standard KeyEvent with SHIFT modifier
@@ -52,6 +127,7 @@ class CursesBackend(Renderer):
         self.next_color_index = 16  # Start after basic 16 colors
         self.rgb_to_color_cache = {}  # Cache RGB -> color index mappings
         self.event_callback = None  # EventCallback instance for callback-based event delivery
+        self.utf8_accumulator = UTF8Accumulator()  # UTF-8 byte accumulator for multi-byte characters
     
     def initialize(self) -> None:
         """
@@ -764,6 +840,57 @@ class CursesBackend(Renderer):
         # No-op: Terminal backend does not support native menu bars
         pass
     
+    def set_caret_position(self, x: int, y: int) -> None:
+        """
+        Set the terminal caret position.
+        
+        This method positions the terminal cursor at the specified screen
+        coordinates using curses.setsyx(). The caret will only be visible
+        if show_caret() has been called.
+        
+        Args:
+            x: Column position (0-based, 0 is left)
+            y: Row position (0-based, 0 is top)
+        
+        Note: Coordinates outside the window bounds are handled gracefully
+        by catching curses.error exceptions.
+        """
+        try:
+            # curses.setsyx() takes (row, col) not (x, y)
+            curses.setsyx(y, x)
+            self.stdscr.refresh()
+        except curses.error:
+            # Position out of bounds or other curses error - ignore
+            pass
+    
+    def hide_caret(self) -> None:
+        """
+        Hide the terminal caret.
+        
+        This method makes the terminal cursor invisible by calling
+        curses.curs_set(0). This is useful when a text input widget
+        loses focus.
+        """
+        try:
+            curses.curs_set(0)
+        except curses.error:
+            # Terminal doesn't support cursor visibility control - ignore
+            pass
+    
+    def show_caret(self) -> None:
+        """
+        Show the terminal caret.
+        
+        This method makes the terminal cursor visible by calling
+        curses.curs_set(1). This is useful when a text input widget
+        gains focus.
+        """
+        try:
+            curses.curs_set(1)
+        except curses.error:
+            # Terminal doesn't support cursor visibility control - ignore
+            pass
+    
     def run_event_loop(self) -> None:
         """
         Run the event loop with callback-based event delivery.
@@ -777,10 +904,12 @@ class CursesBackend(Renderer):
         
         The event loop:
         1. Polls for keyboard input using getch()
-        2. Translates input to KeyEvent
-        3. Delivers KeyEvent via on_key_event() callback
-        4. If not consumed, translates to CharEvent (if applicable)
-        5. Delivers CharEvent via on_char_event() callback
+        2. Accumulates UTF-8 bytes for multi-byte characters
+        3. Generates KeyEvent for ASCII characters
+        4. Delivers KeyEvent via on_key_event() callback
+        5. If not consumed, translates to CharEvent (if applicable)
+        6. Delivers CharEvent via on_char_event() callback
+        7. Generates CharEvent directly for multi-byte Unicode characters
         
         Note: This is the callback-based event system. For polling-based event
         handling, use get_event() instead.
@@ -793,29 +922,40 @@ class CursesBackend(Renderer):
         while True:
             try:
                 # Poll for keyboard input (blocking)
-                event = self.get_event(timeout_ms=-1)
+                self.stdscr.timeout(-1)
+                key = self.stdscr.getch()
                 
-                if event is None:
+                if key == -1:
                     continue
                 
-                # Handle system events
-                if isinstance(event, SystemEvent):
-                    consumed = self.event_callback.on_system_event(event)
-                    if not consumed:
-                        # System event not consumed - continue loop
-                        continue
-                    # System event consumed - continue loop
+                # Handle resize event separately (it's a system event, not a key event)
+                if key == curses.KEY_RESIZE:
+                    event = SystemEvent(event_type=SystemEventType.RESIZE)
+                    self.event_callback.on_system_event(event)
                     continue
                 
-                # Handle key events
-                if isinstance(event, KeyEvent):
-                    consumed = self.event_callback.on_key_event(event)
-                    
-                    if not consumed:
-                        # KeyEvent not consumed - try to translate to CharEvent
-                        char_event = self._translate_key_to_char(event)
-                        if char_event:
-                            self.event_callback.on_char_event(char_event)
+                # Try to accumulate as UTF-8 byte
+                char = self.utf8_accumulator.add_byte(key)
+                
+                if char is not None:
+                    # Complete character formed
+                    if len(char) == 1 and ord(char) < 128:
+                        # ASCII - generate KeyEvent (for command matching)
+                        key_event = self._translate_curses_key(key)
+                        consumed = False
+                        if isinstance(key_event, KeyEvent):
+                            consumed = self.event_callback.on_key_event(key_event)
+                        
+                        # If not consumed, translate to CharEvent
+                        if not consumed and isinstance(key_event, KeyEvent):
+                            char_event = self._translate_key_to_char(key_event)
+                            if char_event:
+                                self.event_callback.on_char_event(char_event)
+                    else:
+                        # Multi-byte Unicode - generate CharEvent directly
+                        char_event = CharEvent(char=char)
+                        self.event_callback.on_char_event(char_event)
+                # else: still accumulating, wait for more bytes
                 
             except KeyboardInterrupt:
                 # Allow Ctrl+C to break the loop

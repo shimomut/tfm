@@ -606,3 +606,71 @@ class Renderer(ABC):
             renderer.update_menu_item_state('file.delete', True)
         """
         pass
+    
+    @abstractmethod
+    def set_caret_position(self, x: int, y: int) -> None:
+        """
+        Set the terminal caret position.
+        
+        This method positions the terminal caret (the blinking cursor indicator)
+        at the specified screen coordinates. The caret position should match the
+        logical cursor position in text input widgets to provide visual feedback
+        about where text input will appear.
+        
+        In terminal mode (curses), this controls the actual terminal cursor.
+        In desktop mode (CoreGraphics), this is typically a no-op as the OS
+        manages the caret through the NSTextInputClient protocol.
+        
+        Args:
+            x: Column position (0-based, 0 is left)
+            y: Row position (0-based, 0 is top)
+        
+        Note: The caret will only be visible if show_caret() has been called.
+        Coordinates outside the window bounds are handled gracefully (typically
+        ignored or clamped).
+        
+        Example:
+            # Position caret at column 10, row 5
+            renderer.set_caret_position(10, 5)
+            renderer.show_caret()
+        """
+        pass
+    
+    @abstractmethod
+    def hide_caret(self) -> None:
+        """
+        Hide the terminal caret.
+        
+        This method makes the terminal caret invisible. This is useful when
+        a text input widget loses focus or when the application wants to
+        draw its own cursor representation.
+        
+        In terminal mode (curses), this sets the cursor to invisible.
+        In desktop mode (CoreGraphics), this is typically a no-op as the OS
+        manages caret visibility.
+        
+        Example:
+            # Hide caret when widget loses focus
+            renderer.hide_caret()
+        """
+        pass
+    
+    @abstractmethod
+    def show_caret(self) -> None:
+        """
+        Show the terminal caret.
+        
+        This method makes the terminal caret visible at its current position.
+        This is useful when a text input widget gains focus and wants to
+        show the user where text input will appear.
+        
+        In terminal mode (curses), this sets the cursor to visible.
+        In desktop mode (CoreGraphics), this is typically a no-op as the OS
+        manages caret visibility.
+        
+        Example:
+            # Show caret when widget gains focus
+            renderer.set_caret_position(10, 5)
+            renderer.show_caret()
+        """
+        pass

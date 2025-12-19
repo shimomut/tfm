@@ -19,7 +19,7 @@ from ttk import KeyEvent, KeyCode, ModifierKey
 from ttk.renderer import TextAttribute
 from ttk.input_event import CharEvent
 from tfm_path import Path
-from tfm_text_viewer import TextViewer, is_text_file, view_text_file
+from tfm_text_viewer import TextViewer, is_text_file, create_text_viewer
 from tfm_colors import COLOR_REGULAR_FILE, COLOR_ERROR
 
 
