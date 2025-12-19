@@ -307,3 +307,54 @@
 
 - [x] 16. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 17. Fix IME composition text positioning
+- [x] 17.1 Identify caret positioning issues with IME
+  - Investigate why IME composition text appears after help text
+  - Identify that addstr() moves cursor to end of drawn text
+  - Identify that caret position must be set after all drawing
+  - _Requirements: 10.1, 10.2_
+
+- [x] 17.2 Fix dialog drawing order
+  - Modify GeneralPurposeDialog._draw_status_line_input()
+  - Draw all text first (input field + help text)
+  - Calculate caret position after all drawing
+  - Set caret position and show caret as final steps
+  - Add refresh() call to apply cursor position immediately
+  - _Requirements: 10.1, 10.2, 10.3, 10.4_
+
+- [x] 17.3 Improve set_caret_position implementation
+  - Change CursesBackend.set_caret_position() to use move() instead of setsyx()
+  - More reliable cursor positioning
+  - _Requirements: 10.3_
+
+- [x] 17.4 Update text editor caret behavior
+  - Remove premature show_caret() call from SingleLineTextEdit.draw()
+  - Let caller control caret visibility after all rendering
+  - _Requirements: 10.4_
+
+- [x] 17.5 Document IME positioning fix
+  - Create documentation explaining the root cause
+  - Document the importance of refresh() call
+  - Document the drawing order requirements
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+
+- [x] 18. Remove help text during editing to prevent IME instability
+- [x] 18.1 Identify help text positioning issues
+  - Observe that help text position shifts when IME composition text appears
+  - Identify that IME composition text width varies by terminal application
+  - Determine that help text causes visual instability during editing
+  - _Requirements: 10.2_
+
+- [x] 18.2 Remove help text from status bar during editing
+  - Modify GeneralPurposeDialog._draw_status_line_input()
+  - Remove all help text rendering logic
+  - Simplify max_field_width calculation
+  - Keep critical caret positioning and refresh() call
+  - _Requirements: 10.2_
+
+- [x] 18.3 Verify stable editing experience
+  - Test that editing is stable without help text
+  - Verify IME composition text appears correctly
+  - Confirm no visual instability during typing
+  - _Requirements: 10.1, 10.2_

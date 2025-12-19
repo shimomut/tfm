@@ -180,49 +180,24 @@ class GeneralPurposeDialog:
                                color_pair=status_color, 
                                attributes=status_attrs)
         
-        # Calculate help text space and position first using display width
-        help_text_width = get_width(self.help_text) if self.help_text else 0
-        help_margin = 3  # Space around help text
-        help_total_space = help_text_width + help_margin if self.help_text else 0
-        
-        # Reserve space for help text if it can fit
-        reserved_help_space = 0
-        show_help = False
-        if self.help_text and width > help_total_space + 20:  # Need at least 20 chars for input
-            reserved_help_space = help_total_space
-            show_help = True
-        
+        # Don't show help text during editing to avoid position shifts
+        # caused by IME composition text width variations
         # Calculate available space for the input field (prompt + text)
-        # Leave some margin (4 chars) and space for help text if showing
-        max_field_width = width - reserved_help_space - 4
+        # Leave some margin (4 chars)
+        max_field_width = width - 4
         
         # Ensure minimum width for the input field using display width
         prompt_width = get_width(self.prompt_text)
         min_field_width = prompt_width + 5  # At least 5 chars for input
         if max_field_width < min_field_width:
             max_field_width = min_field_width
-            show_help = False  # Disable help if no space
         
         # Draw input field using SingleLineTextEdit
-        # Note: SingleLineTextEdit.draw() sets caret position internally
-        # but we need to set it again after drawing help text
         self.text_editor.draw(
             self.renderer, status_y, 2, max_field_width,
             self.prompt_text,
             is_active=True
         )
-        
-        # Show help text on the right if we determined it should be shown
-        if show_help and self.help_text:
-            help_x = width - help_text_width - 2
-            # Make sure help text doesn't overlap with input field
-            # Calculate input field end position using display widths
-            input_text_width = get_width(self.text_editor.text)
-            input_end_x = 2 + min(max_field_width, prompt_width + input_text_width + 1)
-            if help_x > input_end_x + 2:  # At least 2 chars gap
-                self.renderer.draw_text(status_y, help_x, self.help_text, 
-                                       color_pair=status_color, 
-                                       attributes=TextAttribute.NORMAL)
         
         # CRITICAL: Set caret position AFTER all text drawing is complete
         # Drawing text moves the cursor, so we must restore the caret position

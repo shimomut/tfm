@@ -123,3 +123,15 @@ This feature introduces a distinction between character input events (CharEvent)
 3. WHEN calculating caret position THEN the system SHALL account for the widget's screen coordinates and internal cursor offset
 4. WHEN a text widget loses focus THEN the system SHALL hide the terminal caret or move it to an appropriate location
 5. WHEN rendering a text widget THEN the system SHALL ensure the caret position is set after drawing the widget content
+
+### Requirement 10
+
+**User Story:** As a user typing with an IME (Input Method Editor) for languages like Japanese, I want the IME composition text to appear at the correct cursor position, so that I can see what I'm typing in the right location.
+
+#### Acceptance Criteria
+
+1. WHEN using IME to compose multi-byte characters THEN the IME composition text SHALL appear at the cursor position in the input field
+2. WHEN the dialog contains help text THEN the IME composition text SHALL NOT appear after the help text
+3. WHEN setting caret position for IME THEN the system SHALL call refresh() to apply the cursor position immediately
+4. WHEN drawing dialog components THEN the system SHALL set caret position AFTER all text drawing is complete
+5. WHEN calculating caret position THEN the system SHALL account for wide characters in the text before the cursor
