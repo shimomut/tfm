@@ -971,32 +971,20 @@ class TextViewer:
             
         return True
     
-    def run(self):
-        """Main viewer loop"""
-        self.renderer.set_cursor_visibility(False)
-        
-        # Initial draw
-        self.renderer.clear()
+    def draw(self):
+        """Draw the viewer (called by FileManager's main loop)"""
         self.draw_header()
         self.draw_content()
         self.draw_status_bar()
-        self.renderer.refresh()
+    
+    def handle_input(self, event):
+        """
+        Handle input event (called by FileManager's main loop)
         
-        while True:
-            # Handle input - this will block until a key is pressed
-            try:
-                event = self.renderer.get_input()
-                if not self.handle_key(event):
-                    break
-                    
-                # Only redraw after handling input - no full clear to avoid flicker
-                self.draw_header()
-                self.draw_content()
-                self.draw_status_bar()
-                self.renderer.refresh()
-                
-            except KeyboardInterrupt:
-                break
+        Returns:
+            bool: True to keep viewer open, False to close
+        """
+        return self.handle_key(event)
 
 
 def is_text_file(file_path: Path) -> bool:
@@ -1064,34 +1052,29 @@ def is_text_file(file_path: Path) -> bool:
         return False
 
 
-def view_text_file(renderer, file_path: Path) -> bool:
+def create_text_viewer(renderer, file_path: Path):
     """
-    View a text file with syntax highlighting
+    Create a text viewer instance
     
     Args:
         renderer: TTK renderer object
         file_path: Path to the file to view
         
     Returns:
-        True if file was viewed successfully, False otherwise
+        TextViewer instance or None if file cannot be viewed
     """
     if not file_path.exists() or not file_path.is_file():
-        return False
+        return None
         
     if not is_text_file(file_path):
-        return False
+        return None
     
     try:
-        viewer = TextViewer(renderer, file_path)
-        viewer.run()
-        return True
+        return TextViewer(renderer, file_path)
     except (OSError, IOError) as e:
         print(f"Error: Could not open text file {file_path}: {e}")
-        return False
-    except KeyboardInterrupt:
-        # User interrupted - this is normal
-        return True
+        return None
     except Exception as e:
-        print(f"Error: Unexpected error viewing text file {file_path}: {e}")
+        print(f"Error: Unexpected error creating text viewer for {file_path}: {e}")
         traceback.print_exc()
-        return False
+        return None

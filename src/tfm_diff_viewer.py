@@ -1175,35 +1175,25 @@ class DiffViewer:
         
         return True
     
-    def run(self):
-        """Main viewer loop"""
-        self.renderer.set_cursor_visibility(False)
-        
-        # Initial draw
-        self.renderer.clear()
+    def draw(self):
+        """Draw the viewer (called by FileManager's main loop)"""
         self.draw_header()
         self.draw_content()
         self.draw_status_bar()
-        self.renderer.refresh()
+    
+    def handle_input(self, event):
+        """
+        Handle input event (called by FileManager's main loop)
         
-        while True:
-            try:
-                event = self.renderer.get_input()
-                if not self.handle_key(event):
-                    break
-                
-                self.draw_header()
-                self.draw_content()
-                self.draw_status_bar()
-                self.renderer.refresh()
-                
-            except KeyboardInterrupt:
-                break
+        Returns:
+            bool: True to keep viewer open, False to close
+        """
+        return self.handle_key(event)
 
 
-def view_diff(renderer, file1_path: Path, file2_path: Path) -> bool:
+def create_diff_viewer(renderer, file1_path: Path, file2_path: Path):
     """
-    View differences between two text files
+    Create a diff viewer instance
     
     Args:
         renderer: TTK renderer object
@@ -1211,25 +1201,21 @@ def view_diff(renderer, file1_path: Path, file2_path: Path) -> bool:
         file2_path: Path to the second file
         
     Returns:
-        True if diff was viewed successfully, False otherwise
+        DiffViewer instance or None if files cannot be viewed
     """
     if not file1_path.exists() or not file1_path.is_file():
         print(f"Error: First file does not exist or is not a file: {file1_path}")
-        return False
+        return None
     
     if not file2_path.exists() or not file2_path.is_file():
         print(f"Error: Second file does not exist or is not a file: {file2_path}")
-        return False
+        return None
     
     try:
-        viewer = DiffViewer(renderer, file1_path, file2_path)
-        viewer.run()
-        return True
+        return DiffViewer(renderer, file1_path, file2_path)
     except (OSError, IOError) as e:
         print(f"Error: Could not open files for diff: {e}")
-        return False
-    except KeyboardInterrupt:
-        return True
+        return None
     except Exception as e:
-        print(f"Error: Unexpected error viewing diff: {e}")
-        return False
+        print(f"Error: Unexpected error creating diff viewer: {e}")
+        return None
