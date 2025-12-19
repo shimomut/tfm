@@ -82,10 +82,6 @@ class GeneralPurposeDialog:
         self.help_text = ""
         self.callback = None
         self.cancel_callback = None
-        
-        # Hide the caret when dialog closes
-        if self.renderer:
-            self.renderer.hide_caret()
     
     def get_text(self):
         """Get the current text from the input field"""
@@ -211,9 +207,9 @@ class GeneralPurposeDialog:
         cursor_display_offset = get_width(text_before_cursor)
         caret_x = 2 + prompt_width + cursor_display_offset
         
-        # Set caret position and show it
+        # Set caret position (keep caret hidden - TFM renders its own cursor)
+        # IME will use this position for composition text
         self.renderer.set_caret_position(caret_x, status_y)
-        self.renderer.show_caret()
         
         # CRITICAL: Refresh to apply the cursor position change
         # Without refresh, the cursor position is staged but not visible

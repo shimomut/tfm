@@ -193,8 +193,7 @@ class SingleLineTextEdit:
         text_max_width = max_width - label_width
         
         if text_max_width <= 0:
-            # Not enough space - hide caret and return
-            renderer.hide_caret()
+            # Not enough space - return early
             return
         
         # Get color and attributes
@@ -212,10 +211,6 @@ class SingleLineTextEdit:
                                    base_attributes | TextAttribute.REVERSE)
                 # Set caret position at the beginning of the text field
                 renderer.set_caret_position(text_start_x, y)
-                renderer.show_caret()
-            else:
-                # Hide caret when not active
-                renderer.hide_caret()
             return
         
         # Ensure cursor is within bounds
@@ -322,12 +317,11 @@ class SingleLineTextEdit:
         # Note: Caret position is set here, but actual visibility should be
         # controlled by the caller after all rendering is complete to avoid
         # IME composition text appearing in wrong locations
+        # Set caret position after rendering
+        # Note: Caret position is set here for IME composition text positioning
+        # The caret remains hidden - TFM renders its own cursor
         if is_active:
             renderer.set_caret_position(caret_x, y)
-            # Don't show caret here - let the caller control visibility
-            # after all rendering is complete
-        else:
-            renderer.hide_caret()
     
     def _safe_draw_text(self, renderer, y, x, text, color_pair, attributes):
         """Safely draw text to screen, handling boundary conditions and wide characters"""

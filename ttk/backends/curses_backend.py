@@ -845,7 +845,8 @@ class CursesBackend(Renderer):
         Set the terminal caret position.
         
         This method positions the terminal cursor at the specified screen
-        coordinates. The caret will only be visible if show_caret() has been called.
+        coordinates. The caret position can be set even when hidden, which
+        is useful for IME (Input Method Editor) composition text positioning.
         
         Args:
             x: Column position (0-based, 0 is left)
@@ -860,34 +861,6 @@ class CursesBackend(Renderer):
             self.stdscr.move(y, x)
         except curses.error:
             # Position out of bounds or other curses error - ignore
-            pass
-    
-    def hide_caret(self) -> None:
-        """
-        Hide the terminal caret.
-        
-        This method makes the terminal cursor invisible by calling
-        curses.curs_set(0). This is useful when a text input widget
-        loses focus.
-        """
-        try:
-            curses.curs_set(0)
-        except curses.error:
-            # Terminal doesn't support cursor visibility control - ignore
-            pass
-    
-    def show_caret(self) -> None:
-        """
-        Show the terminal caret.
-        
-        This method makes the terminal cursor visible by calling
-        curses.curs_set(1). This is useful when a text input widget
-        gains focus.
-        """
-        try:
-            curses.curs_set(1)
-        except curses.error:
-            # Terminal doesn't support cursor visibility control - ignore
             pass
     
     def run_event_loop(self) -> None:
