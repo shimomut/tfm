@@ -23,6 +23,7 @@ class InfoDialog(BaseListDialog):
         self.title = ""
         self.lines = []
         self.content_changed = True  # Track if content needs redraw
+        self.cached_content_height = 10  # Cached content height from last draw
         
     def show(self, title, info_lines):
         """Show an information dialog with scrollable content
@@ -59,11 +60,14 @@ class InfoDialog(BaseListDialog):
         if not event:
             return False
             
-        # ESC or Q - close (only from KeyEvent)
-        if isinstance(event, KeyEvent):
-            if event.key_code == KeyCode.ESCAPE or (event.char and event.char.lower() == 'q'):
-                self.exit()
-                return True
+        # Only handle KeyEvent (not CharEvent)
+        if not isinstance(event, KeyEvent):
+            return False
+            
+        # ESC or Q - close
+        if event.key_code == KeyCode.ESCAPE or (event.char and event.char.lower() == 'q'):
+            self.exit()
+            return True
         # Up arrow - scroll up
         elif event.key_code == KeyCode.UP:
             if self.scroll > 0:
@@ -73,10 +77,8 @@ class InfoDialog(BaseListDialog):
             return True
         # Down arrow - scroll down
         elif event.key_code == KeyCode.DOWN:
-            # Scroll down - calculate max scroll based on current content
-            # We'll use a default content height for now, this will be refined in draw()
-            content_height = 10  # Default, will be calculated properly in draw()
-            max_scroll = max(0, len(self.lines) - content_height)
+            # Scroll down - calculate max scroll based on cached content height
+            max_scroll = max(0, len(self.lines) - self.cached_content_height)
             if self.scroll < max_scroll:
                 self.scroll += 1
             # Always mark content as changed for any handled key to ensure continued rendering
@@ -91,8 +93,7 @@ class InfoDialog(BaseListDialog):
             return True
         # Page Down
         elif event.key_code == KeyCode.PAGE_DOWN:
-            content_height = 10  # Default, will be calculated properly in draw()
-            max_scroll = max(0, len(self.lines) - content_height)
+            max_scroll = max(0, len(self.lines) - self.cached_content_height)
             old_scroll = self.scroll
             self.scroll = min(max_scroll, self.scroll + 10)
             # Always mark content as changed for any handled key to ensure continued rendering
@@ -107,8 +108,7 @@ class InfoDialog(BaseListDialog):
             return True
         # End - go to bottom
         elif event.key_code == KeyCode.END:
-            content_height = 10  # Default, will be calculated properly in draw()
-            max_scroll = max(0, len(self.lines) - content_height)
+            max_scroll = max(0, len(self.lines) - self.cached_content_height)
             if self.scroll != max_scroll:
                 self.scroll = max_scroll
             # Always mark content as changed for any handled key to ensure continued rendering
@@ -190,6 +190,9 @@ class InfoDialog(BaseListDialog):
         content_start_x = start_x + 2
         content_width = dialog_width - 4
         content_height = content_end_y - content_start_y + 1
+        
+        # Cache content height for scroll calculations in handle_input
+        self.cached_content_height = content_height
         
         # Update scroll bounds based on actual content height
         max_scroll = max(0, len(self.lines) - content_height)
