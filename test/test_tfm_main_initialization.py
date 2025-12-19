@@ -49,7 +49,7 @@ def test_file_manager_accepts_renderer():
                             assert args[0] is mock_renderer
                             assert args[1] == 'dark'
                             
-                            # Verify cursor was hidden
+                            # Verify focus was hidden
                             mock_renderer.set_cursor_visibility.assert_called_once_with(False)
     
     print("✓ FileManager accepts renderer parameter")

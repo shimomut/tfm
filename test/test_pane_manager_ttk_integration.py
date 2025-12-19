@@ -111,7 +111,7 @@ class TestPaneManagerTTKIntegration(unittest.TestCase):
     def test_adjust_scroll_for_selection(self):
         """Test scroll adjustment for selection"""
         pane = self.pane_manager.left_pane
-        pane['selected_index'] = 10
+        pane['focused_index'] = 10
         pane['scroll_offset'] = 0
         
         # Adjust scroll for display height of 5
@@ -185,14 +185,14 @@ class TestPaneManagerTTKIntegration(unittest.TestCase):
         ]
         
         # Set right pane cursor to common file
-        self.pane_manager.right_pane['selected_index'] = 0
+        self.pane_manager.right_pane['focused_index'] = 0
         self.pane_manager.active_pane = 'left'
         
         # Sync left cursor to right's selection
         result = self.pane_manager.sync_cursor_to_other_pane()
         
         self.assertTrue(result)
-        self.assertEqual(self.pane_manager.left_pane['selected_index'], 1)
+        self.assertEqual(self.pane_manager.left_pane['focused_index'], 1)
     
     def test_sync_cursor_from_current_pane(self):
         """Test syncing cursor from current pane to other pane"""
@@ -211,14 +211,14 @@ class TestPaneManagerTTKIntegration(unittest.TestCase):
         ]
         
         # Set left pane cursor to common file
-        self.pane_manager.left_pane['selected_index'] = 1
+        self.pane_manager.left_pane['focused_index'] = 1
         self.pane_manager.active_pane = 'left'
         
         # Sync right cursor to left's selection
         result = self.pane_manager.sync_cursor_from_current_pane()
         
         self.assertTrue(result)
-        self.assertEqual(self.pane_manager.right_pane['selected_index'], 0)
+        self.assertEqual(self.pane_manager.right_pane['focused_index'], 0)
     
     def test_pane_ratio(self):
         """Test pane width ratio"""
@@ -301,7 +301,7 @@ class TestPaneManagerWithoutStateManager(unittest.TestCase):
         """Test that save_cursor_position doesn't crash without state manager"""
         pane = self.pane_manager.left_pane
         pane['files'] = [TFMPath(str(self.left_dir / "file1.txt"))]
-        pane['selected_index'] = 0
+        pane['focused_index'] = 0
         
         # Should not crash
         self.pane_manager.save_cursor_position(pane)

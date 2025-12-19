@@ -229,7 +229,7 @@ class TestJumpDialogHelpers(unittest.TestCase):
         
         # Verify pane was updated
         self.assertEqual(current_pane['path'], target_dir)
-        self.assertEqual(current_pane['selected_index'], 0)
+        self.assertEqual(current_pane['focused_index'], 0)
         self.assertEqual(current_pane['scroll_offset'], 0)
         self.assertEqual(len(current_pane['selected_files']), 0)
         

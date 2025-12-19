@@ -312,7 +312,7 @@ class TestJumpDialog(unittest.TestCase):
         # Check that pane was updated
         current_pane = mock_pane_manager.get_current_pane()
         self.assertEqual(current_pane['path'], test_path)
-        self.assertEqual(current_pane['selected_index'], 0)
+        self.assertEqual(current_pane['focused_index'], 0)
         self.assertEqual(current_pane['scroll_offset'], 0)
         self.assertEqual(len(current_pane['selected_files']), 0)
         

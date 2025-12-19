@@ -467,7 +467,7 @@ class DrivesDialogHelpers:
             # Update the current pane
             old_path = current_pane['path']
             current_pane['path'] = drive_path
-            current_pane['selected_index'] = 0
+            current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()
             

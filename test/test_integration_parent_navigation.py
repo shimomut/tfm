@@ -96,7 +96,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         
         # 3. Navigate to parent
         left_pane['path'] = left_pane['path'].parent
-        left_pane['selected_index'] = 0
+        left_pane['focused_index'] = 0
         left_pane['scroll_offset'] = 0
         left_pane['selected_files'].clear()
         
@@ -107,7 +107,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         cursor_set = False
         for i, file_path in enumerate(left_pane['files']):
             if file_path.name == child_directory_name and file_path.is_dir():
-                left_pane['selected_index'] = i
+                left_pane['focused_index'] = i
                 cursor_set = True
                 break
         
@@ -116,7 +116,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         self.assertEqual(str(left_pane['path']), str(self.temp_dir))
         
         # Verify the selected file is the beta directory
-        selected_file = left_pane['files'][left_pane['selected_index']]
+        selected_file = left_pane['files'][left_pane['focused_index']]
         self.assertEqual(selected_file.name, "beta")
         self.assertTrue(selected_file.is_dir())
         
@@ -124,7 +124,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         # (Simulate entering the selected directory)
         if selected_file.is_dir():
             left_pane['path'] = selected_file
-            left_pane['selected_index'] = 0
+            left_pane['focused_index'] = 0
             left_pane['scroll_offset'] = 0
             left_pane['selected_files'].clear()
             self.file_operations.refresh_files(left_pane)
@@ -146,7 +146,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         # Simulate parent navigation
         child_name = left_pane['path'].name
         left_pane['path'] = left_pane['path'].parent
-        left_pane['selected_index'] = 0
+        left_pane['focused_index'] = 0
         left_pane['scroll_offset'] = 0
         left_pane['selected_files'].clear()
         
@@ -156,11 +156,11 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         # Find and select the child directory
         for i, file_path in enumerate(left_pane['files']):
             if file_path.name == child_name and file_path.is_dir():
-                left_pane['selected_index'] = i
+                left_pane['focused_index'] = i
                 break
         
         # Verify correct positioning
-        selected_file = left_pane['files'][left_pane['selected_index']]
+        selected_file = left_pane['files'][left_pane['focused_index']]
         self.assertEqual(selected_file.name, "alpha")
         self.assertTrue(selected_file.is_dir())
     
@@ -180,7 +180,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         # Navigate up one level (deeper -> deep)
         child_name = left_pane['path'].name  # "deeper"
         left_pane['path'] = left_pane['path'].parent
-        left_pane['selected_index'] = 0
+        left_pane['focused_index'] = 0
         left_pane['scroll_offset'] = 0
         left_pane['selected_files'].clear()
         self.file_operations.refresh_files(left_pane)
@@ -188,17 +188,17 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         # Find the child directory
         for i, file_path in enumerate(left_pane['files']):
             if file_path.name == child_name and file_path.is_dir():
-                left_pane['selected_index'] = i
+                left_pane['focused_index'] = i
                 break
         
         # Verify we're positioned on "deeper" directory
-        selected_file = left_pane['files'][left_pane['selected_index']]
+        selected_file = left_pane['files'][left_pane['focused_index']]
         self.assertEqual(selected_file.name, "deeper")
         
         # Navigate up another level (deep -> alpha)
         child_name = left_pane['path'].name  # "deep"
         left_pane['path'] = left_pane['path'].parent
-        left_pane['selected_index'] = 0
+        left_pane['focused_index'] = 0
         left_pane['scroll_offset'] = 0
         left_pane['selected_files'].clear()
         self.file_operations.refresh_files(left_pane)
@@ -206,11 +206,11 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         # Find the child directory
         for i, file_path in enumerate(left_pane['files']):
             if file_path.name == child_name and file_path.is_dir():
-                left_pane['selected_index'] = i
+                left_pane['focused_index'] = i
                 break
         
         # Verify we're positioned on "deep" directory
-        selected_file = left_pane['files'][left_pane['selected_index']]
+        selected_file = left_pane['files'][left_pane['focused_index']]
         self.assertEqual(selected_file.name, "deep")
 
 

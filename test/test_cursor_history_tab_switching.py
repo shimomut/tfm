@@ -49,7 +49,7 @@ def test_cursor_history_tab_switching():
         for i, test_dir in enumerate(test_dirs):
             pane_manager.left_pane['path'] = test_dir
             pane_manager.left_pane['files'] = [test_dir / f"file_{i}.txt"]
-            pane_manager.left_pane['selected_index'] = 0
+            pane_manager.left_pane['focused_index'] = 0
             pane_manager.save_cursor_position(pane_manager.left_pane)
             print(f"  {i+1}. {test_dir} -> file_{i}.txt")
             time.sleep(0.01)
@@ -58,7 +58,7 @@ def test_cursor_history_tab_switching():
         for i, test_dir in enumerate(reversed(test_dirs)):
             pane_manager.right_pane['path'] = test_dir
             pane_manager.right_pane['files'] = [test_dir / f"file_{i}.txt"]
-            pane_manager.right_pane['selected_index'] = 0
+            pane_manager.right_pane['focused_index'] = 0
             pane_manager.save_cursor_position(pane_manager.right_pane)
             print(f"  {i+1}. {test_dir} -> file_{i}.txt")
             time.sleep(0.01)

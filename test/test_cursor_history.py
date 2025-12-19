@@ -60,11 +60,11 @@ def test_cursor_history():
     print(f"Files in directory: {[f.name for f in pane_data['files']]}")
     
     # Test saving cursor position
-    pane_data['selected_index'] = 2  # Select file3.txt
-    print(f"Selected file: {pane_data['files'][pane_data['selected_index']].name}")
+    pane_data['focused_index'] = 2  # Select file3.txt
+    print(f"Selected file: {pane_data['files'][pane_data['focused_index']].name}")
     
     # Simulate save_cursor_position
-    current_file = pane_data['files'][pane_data['selected_index']]
+    current_file = pane_data['files'][pane_data['focused_index']]
     current_dir = pane_data['path']
     cursor_entry = (current_file.name, str(current_dir))
     pane_data['cursor_history'].append(cursor_entry)
@@ -74,14 +74,14 @@ def test_cursor_history():
     # Simulate changing to subdirectory
     pane_data['path'] = test_dir / "dir1"
     pane_data['files'] = sorted(list(pane_data['path'].iterdir()), key=lambda x: x.name)
-    pane_data['selected_index'] = 0
+    pane_data['focused_index'] = 0
     
     print(f"Changed to: {pane_data['path']}")
     print(f"Files in new directory: {[f.name for f in pane_data['files']]}")
     
     # Save position in subdirectory
-    pane_data['selected_index'] = 1  # Select subfile2.txt
-    current_file = pane_data['files'][pane_data['selected_index']]
+    pane_data['focused_index'] = 1  # Select subfile2.txt
+    current_file = pane_data['files'][pane_data['focused_index']]
     current_dir = pane_data['path']
     cursor_entry = (current_file.name, str(current_dir))
     pane_data['cursor_history'].append(cursor_entry)
@@ -91,7 +91,7 @@ def test_cursor_history():
     # Simulate going back to parent directory
     pane_data['path'] = test_dir
     pane_data['files'] = sorted(list(pane_data['path'].iterdir()), key=lambda x: x.name)
-    pane_data['selected_index'] = 0
+    pane_data['focused_index'] = 0
     
     print(f"Returned to: {pane_data['path']}")
     
@@ -104,7 +104,7 @@ def test_cursor_history():
             # Try to find this filename in current files
             for i, file_path in enumerate(pane_data['files']):
                 if file_path.name == filename:
-                    pane_data['selected_index'] = i
+                    pane_data['focused_index'] = i
                     restored = True
                     print(f"Restored cursor to: {filename} (index {i})")
                     break
@@ -114,7 +114,7 @@ def test_cursor_history():
     if not restored:
         print("No cursor position found in history")
     
-    print(f"Final selected file: {pane_data['files'][pane_data['selected_index']].name}")
+    print(f"Final selected file: {pane_data['files'][pane_data['focused_index']].name}")
     print(f"Cursor history: {list(pane_data['cursor_history'])}")
     
     # Cleanup

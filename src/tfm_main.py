@@ -457,7 +457,7 @@ class FileManager:
         if parent != current_pane['path']:  # Not at root
             self.save_cursor_position(current_pane)
             current_pane['path'] = parent
-            current_pane['selected_index'] = 0
+            current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()
             self.refresh_files(current_pane)
@@ -472,7 +472,7 @@ class FileManager:
         if current_pane['path'] != home_path:
             self.save_cursor_position(current_pane)
             current_pane['path'] = home_path
-            current_pane['selected_index'] = 0
+            current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()
             self.refresh_files(current_pane)
@@ -668,7 +668,7 @@ class FileManager:
                 log_height = calculated_height if self.log_height_ratio > 0 else 0
                 display_height = height - log_height - 3
                 
-                self.pane_manager.adjust_scroll_for_selection(current_pane, display_height)
+                self.pane_manager.adjust_scroll_for_focus(current_pane, display_height)
                 self.needs_full_redraw = True
         else:
             # Different directories, sync directory
@@ -683,7 +683,7 @@ class FileManager:
                 
                 if not self.pane_manager.restore_cursor_position(current_pane, display_height):
                     # If no history found, default to first item
-                    current_pane['selected_index'] = 0
+                    current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                 
                 self.needs_full_redraw = True
@@ -703,7 +703,7 @@ class FileManager:
                 log_height = calculated_height if self.log_height_ratio > 0 else 0
                 display_height = height - log_height - 3
                 
-                self.pane_manager.adjust_scroll_for_selection(other_pane, display_height)
+                self.pane_manager.adjust_scroll_for_focus(other_pane, display_height)
                 self.needs_full_redraw = True
         else:
             # Different directories, sync directory
@@ -718,7 +718,7 @@ class FileManager:
                 
                 if not self.pane_manager.restore_cursor_position(other_pane, display_height):
                     # If no history found, default to first item
-                    other_pane['selected_index'] = 0
+                    other_pane['focused_index'] = 0
                     other_pane['scroll_offset'] = 0
                 
                 self.needs_full_redraw = True
@@ -733,7 +733,7 @@ class FileManager:
             log_height = calculated_height if self.log_height_ratio > 0 else 0
             display_height = height - log_height - 3
             
-            self.pane_manager.adjust_scroll_for_selection(current_pane, display_height)
+            self.pane_manager.adjust_scroll_for_focus(current_pane, display_height)
             self.needs_full_redraw = True
     
     def sync_cursor_from_current_pane(self):
@@ -746,7 +746,7 @@ class FileManager:
             log_height = calculated_height if self.log_height_ratio > 0 else 0
             display_height = height - log_height - 3
             
-            self.pane_manager.adjust_scroll_for_selection(other_pane, display_height)
+            self.pane_manager.adjust_scroll_for_focus(other_pane, display_height)
             self.needs_full_redraw = True
         
     def restore_cursor_position(self, pane_data):
@@ -761,13 +761,13 @@ class FileManager:
         """Save cursor position to history - wrapper for pane_manager method"""
         return self.pane_manager.save_cursor_position(pane_data)
     
-    def adjust_scroll_for_selection(self, pane_data):
+    def adjust_scroll_for_focus(self, pane_data):
         """Adjust scroll for selection - wrapper for pane_manager method"""
         height, width = self.renderer.get_dimensions()
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         display_height = height - log_height - 3
-        return self.pane_manager.adjust_scroll_for_selection(pane_data, display_height)
+        return self.pane_manager.adjust_scroll_for_focus(pane_data, display_height)
     
     def separate_filename_extension(self, filename, is_dir=False):
         """
@@ -1167,10 +1167,10 @@ class FileManager:
             return
         
         # Calculate scroll offset
-        if pane_data['selected_index'] < pane_data['scroll_offset']:
-            pane_data['scroll_offset'] = pane_data['selected_index']
-        elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
-            pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
+        if pane_data['focused_index'] < pane_data['scroll_offset']:
+            pane_data['scroll_offset'] = pane_data['focused_index']
+        elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
+            pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
             
         # Draw files
         for i in range(display_height):
@@ -1190,28 +1190,28 @@ class FileManager:
             # Get file info
             size_str, mtime_str = self.get_file_info(file_path)
             
-            # Check if this file is multi-selected
-            is_multi_selected = str(file_path) in pane_data['selected_files']
+            # Check if this file is selected (marked for batch operations)
+            is_selected = str(file_path) in pane_data['selected_files']
             
             # Check if this file is an isearch match
             is_search_match = (self.isearch_mode and is_active and 
                              file_index in self.isearch_matches)
             
-            # Choose color based on file properties and selection
+            # Choose color based on file properties and focus (cursor position)
             is_executable = file_path.is_file() and os.access(file_path, os.X_OK)
-            is_selected = file_index == pane_data['selected_index']
+            is_focused = file_index == pane_data['focused_index']
             
-            color = get_file_color(is_dir, is_executable, is_selected, is_active)
+            color = get_file_color(is_dir, is_executable, is_focused, is_active)
             
-            # Add underline attribute for search matches (can combine with selection)
+            # Add underline attribute for search matches (can combine with focus)
             if is_search_match:
                 color_pair, base_attrs = color
                 color = (color_pair, base_attrs | TextAttribute.UNDERLINE)
-            # Multi-selected files use normal colors with ● marker (no color reversal needed)
+            # Selected files use normal colors with ● marker (no color reversal needed)
             # The ● marker provides sufficient visual distinction
                 
-            # Add selection marker for multi-selected files
-            selection_marker = "●" if is_multi_selected else " "
+            # Add selection marker for selected files
+            selection_marker = "●" if is_selected else " "
             
             # Separate filename into basename and extension
             basename, extension = self.separate_filename_extension(display_name, is_dir)
@@ -1490,16 +1490,16 @@ class FileManager:
         if not current_pane['files']:
             return
             
-        selected_file = current_pane['files'][current_pane['selected_index']]
+        focused_file = current_pane['files'][current_pane['focused_index']]
         
         # Parent directory (..) is no longer shown
-        if selected_file.is_dir():
+        if focused_file.is_dir():
             try:
                 # Save current cursor position before changing directory
                 self.save_cursor_position(current_pane)
                 
-                current_pane['path'] = selected_file
-                current_pane['selected_index'] = 0
+                current_pane['path'] = focused_file
+                current_pane['focused_index'] = 0
                 current_pane['scroll_offset'] = 0
                 current_pane['selected_files'].clear()  # Clear selections when changing directory
                 self.refresh_files(current_pane)
@@ -1507,13 +1507,13 @@ class FileManager:
                 # Try to restore cursor position for this directory
                 if not self.restore_cursor_position(current_pane):
                     # If no history found, default to first item
-                    current_pane['selected_index'] = 0
+                    current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                 
                 self.needs_full_redraw = True
             except PermissionError:
                 self.show_error("Permission denied")
-        elif self.archive_operations.is_archive(selected_file):
+        elif self.archive_operations.is_archive(focused_file):
             # Navigate into archive as virtual directory
             try:
                 # Import archive exceptions for specific error handling
@@ -1526,42 +1526,42 @@ class FileManager:
                 self.save_cursor_position(current_pane)
                 
                 # Create archive URI for the root of the archive
-                archive_uri = f"archive://{selected_file.absolute()}#"
+                archive_uri = f"archive://{focused_file.absolute()}#"
                 archive_path = Path(archive_uri)
                 
                 # Navigate into the archive
                 current_pane['path'] = archive_path
-                current_pane['selected_index'] = 0
+                current_pane['focused_index'] = 0
                 current_pane['scroll_offset'] = 0
                 current_pane['selected_files'].clear()  # Clear selections when entering archive
                 self.refresh_files(current_pane)
                 
                 # Default to first item
-                current_pane['selected_index'] = 0
+                current_pane['focused_index'] = 0
                 current_pane['scroll_offset'] = 0
                 
                 self.needs_full_redraw = True
-                self.log_manager.add_message("INFO", f"Entered archive: {selected_file.name}")
+                self.log_manager.add_message("INFO", f"Entered archive: {focused_file.name}")
             except FileNotFoundError as e:
                 # Archive file doesn't exist
                 user_msg = getattr(e, 'args', ['Archive file not found'])[1] if len(getattr(e, 'args', [])) > 1 else "Archive file not found"
                 self.show_error(user_msg)
-                self.log_manager.add_message("ERROR", f"Archive not found: {selected_file}: {e}")
+                self.log_manager.add_message("ERROR", f"Archive not found: {focused_file}: {e}")
             except ArchiveCorruptedError as e:
                 # Archive is corrupted
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message("ERROR", f"Corrupted archive: {selected_file}: {e}")
+                self.log_manager.add_message("ERROR", f"Corrupted archive: {focused_file}: {e}")
             except ArchiveFormatError as e:
                 # Unsupported or invalid format
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message("ERROR", f"Invalid archive format: {selected_file}: {e}")
+                self.log_manager.add_message("ERROR", f"Invalid archive format: {focused_file}: {e}")
             except ArchivePermissionError as e:
                 # Permission denied
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message("ERROR", f"Permission denied: {selected_file}: {e}")
+                self.log_manager.add_message("ERROR", f"Permission denied: {focused_file}: {e}")
             except ArchiveDiskSpaceError as e:
                 # Insufficient disk space
                 user_msg = getattr(e, 'user_message', str(e))
@@ -1571,14 +1571,14 @@ class FileManager:
                 # Generic archive error
                 user_msg = getattr(e, 'user_message', str(e))
                 self.show_error(user_msg)
-                self.log_manager.add_message("ERROR", f"Archive error: {selected_file}: {e}")
+                self.log_manager.add_message("ERROR", f"Archive error: {focused_file}: {e}")
             except Exception as e:
                 # Unexpected error
                 self.show_error(f"Cannot open archive: {e}")
-                self.log_manager.add_message("ERROR", f"Unexpected error opening archive: {selected_file}: {e}")
+                self.log_manager.add_message("ERROR", f"Unexpected error opening archive: {focused_file}: {e}")
         else:
             # For files, try to use file association for 'open' action
-            filename = selected_file.name
+            filename = focused_file.name
             command = get_program_for_file(filename, 'open')
             
             if command:
@@ -1588,14 +1588,14 @@ class FileManager:
                     self.external_program_manager.suspend_curses()
                     
                     # Launch the program
-                    result = subprocess.run(command + [str(selected_file)], 
+                    result = subprocess.run(command + [str(focused_file)], 
                                           cwd=str(current_pane['path']))
                     
                     # Resume curses
                     self.external_program_manager.resume_curses()
                     
                     if result.returncode == 0:
-                        print(f"Opened file: {selected_file.name}")
+                        print(f"Opened file: {focused_file.name}")
                     else:
                         print(f"Program exited with code {result.returncode}")
                     
@@ -1606,19 +1606,19 @@ class FileManager:
                     self.external_program_manager.resume_curses()
                     print(f"Error opening file: {e}")
                     self.needs_full_redraw = True
-            elif is_text_file(selected_file):
+            elif is_text_file(focused_file):
                 # Fallback to text viewer for text files without association
-                viewer = create_text_viewer(self.renderer, selected_file)
+                viewer = create_text_viewer(self.renderer, focused_file)
                 if viewer:
                     self.active_viewer = viewer
                     self.renderer.set_cursor_visibility(False)
                     self.needs_full_redraw = True
-                    print(f"Viewing file: {selected_file.name}")
+                    print(f"Viewing file: {focused_file.name}")
                 else:
-                    self.show_info(f"File: {selected_file.name}")
+                    self.show_info(f"File: {focused_file.name}")
             else:
                 # For files without association, show file info
-                self.show_info(f"File: {selected_file.name}")
+                self.show_info(f"File: {focused_file.name}")
             
     def show_error(self, message):
         """Show error message"""
@@ -1652,7 +1652,7 @@ class FileManager:
         
         if self.isearch_matches:
             current_pane = self.get_current_pane()
-            current_index = current_pane['selected_index']
+            current_index = current_pane['focused_index']
             
             # Find the next match at or after current position
             next_match = None
@@ -1666,15 +1666,15 @@ class FileManager:
                 next_match = self.isearch_matches[0]
                 
             # Update cursor position
-            current_pane['selected_index'] = next_match
+            current_pane['focused_index'] = next_match
             self.isearch_match_index = self.isearch_matches.index(next_match)
             
             # Ensure the selected item is visible (adjust scroll if needed)
-            self.adjust_scroll_for_selection(current_pane)
+            self.adjust_scroll_for_focus(current_pane)
         else:
             self.isearch_match_index = 0
             
-    def adjust_scroll_for_selection(self, pane_data):
+    def adjust_scroll_for_focus(self, pane_data):
         """Ensure the selected item is visible by adjusting scroll offset"""
         height, width = self.renderer.get_dimensions()
         calculated_height = int(height * self.log_height_ratio)
@@ -1682,10 +1682,10 @@ class FileManager:
         display_height = height - log_height - 3  # Reserve space for header, footer, and status
         
         # Adjust scroll offset to keep selection visible
-        if pane_data['selected_index'] < pane_data['scroll_offset']:
-            pane_data['scroll_offset'] = pane_data['selected_index']
-        elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
-            pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
+        if pane_data['focused_index'] < pane_data['scroll_offset']:
+            pane_data['scroll_offset'] = pane_data['focused_index']
+        elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
+            pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
             
     def enter_isearch_mode(self):
         """Enter isearch mode"""
@@ -1736,7 +1736,7 @@ class FileManager:
         current_pane = self.get_current_pane()
         filter_pattern = self.filter_editor.text
         current_pane['filter_pattern'] = filter_pattern
-        current_pane['selected_index'] = 0  # Reset selection to top
+        current_pane['focused_index'] = 0  # Reset selection to top
         current_pane['scroll_offset'] = 0
         self.refresh_files(current_pane)
         
@@ -1753,7 +1753,7 @@ class FileManager:
         """Clear the filter from the active pane"""
         current_pane = self.get_current_pane()
         current_pane['filter_pattern'] = ""
-        current_pane['selected_index'] = 0  # Reset selection to top
+        current_pane['focused_index'] = 0  # Reset selection to top
         current_pane['scroll_offset'] = 0
         self.refresh_files(current_pane)
         
@@ -1778,13 +1778,13 @@ class FileManager:
             print("No files to rename")
             return
             
-        selected_file = current_pane['files'][current_pane['selected_index']]
+        focused_file = current_pane['files'][current_pane['focused_index']]
         
         # Parent directory (..) is no longer shown, so no need to check for it
         
         # Check if this storage implementation supports directory renaming
         try:
-            if selected_file.is_dir() and not selected_file.supports_directory_rename():
+            if focused_file.is_dir() and not focused_file.supports_directory_rename():
                 print("Directory renaming is not supported on this storage type due to performance and cost considerations")
                 return
         except Exception as e:
@@ -1792,12 +1792,12 @@ class FileManager:
             print(f"Warning: Could not check directory rename capability: {e}")
         
         # Enter rename mode using general dialog
-        self.rename_file_path = selected_file
-        DialogHelpers.create_rename_dialog(self.general_dialog, selected_file.name, selected_file.name)
+        self.rename_file_path = focused_file
+        DialogHelpers.create_rename_dialog(self.general_dialog, focused_file.name, focused_file.name)
         self.general_dialog.callback = self.on_rename_confirm
         self.general_dialog.cancel_callback = self.on_rename_cancel
         self.needs_full_redraw = True
-        print(f"Renaming: {selected_file.name}")
+        print(f"Renaming: {focused_file.name}")
     
     def on_rename_confirm(self, new_name):
         """Handle rename confirmation"""
@@ -1840,8 +1840,8 @@ class FileManager:
             # Try to select the renamed file
             for i, file_path in enumerate(current_pane['files']):
                 if file_path.name == new_name:
-                    current_pane['selected_index'] = i
-                    self.adjust_scroll_for_selection(current_pane)
+                    current_pane['focused_index'] = i
+                    self.adjust_scroll_for_focus(current_pane)
                     break
             
             self.general_dialog.hide()
@@ -1915,8 +1915,8 @@ class FileManager:
             # Try to select the new directory
             for i, file_path in enumerate(current_pane['files']):
                 if file_path.name == new_dir_name:
-                    current_pane['selected_index'] = i
-                    self.adjust_scroll_for_selection(current_pane)
+                    current_pane['focused_index'] = i
+                    self.adjust_scroll_for_focus(current_pane)
                     break
             
             self.general_dialog.hide()
@@ -1982,8 +1982,8 @@ class FileManager:
             # Try to select the new file
             for i, file_path in enumerate(current_pane['files']):
                 if file_path.name == new_file_name:
-                    current_pane['selected_index'] = i
-                    self.adjust_scroll_for_selection(current_pane)
+                    current_pane['focused_index'] = i
+                    self.adjust_scroll_for_focus(current_pane)
                     break
             
             # Open the file for editing if it's a text file
@@ -2334,7 +2334,7 @@ class FileManager:
             # Navigate to the selected path
             old_path = current_pane['path']
             current_pane['path'] = target_path
-            current_pane['selected_index'] = 0
+            current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()  # Clear selections when changing directory
             
@@ -2352,8 +2352,8 @@ class FileManager:
             # Log the navigation
             pane_name = "left" if current_pane is self.pane_manager.left_pane else "right"
             if restored and current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']].name
-                print(f"Navigated {pane_name} pane: {old_path} → {target_path} (cursor: {selected_file})")
+                focused_file = current_pane['files'][current_pane['focused_index']].name
+                print(f"Navigated {pane_name} pane: {old_path} → {target_path} (cursor: {focused_file})")
             else:
                 print(f"Navigated {pane_name} pane: {old_path} → {target_path}")
             
@@ -2402,9 +2402,9 @@ class FileManager:
                 old_state = self.file_operations.show_hidden
                 new_state = self.file_operations.toggle_hidden_files()
                 # Reset both panes
-                self.pane_manager.left_pane['selected_index'] = 0
+                self.pane_manager.left_pane['focused_index'] = 0
                 self.pane_manager.left_pane['scroll_offset'] = 0
-                self.pane_manager.right_pane['selected_index'] = 0
+                self.pane_manager.right_pane['focused_index'] = 0
                 self.pane_manager.right_pane['scroll_offset'] = 0
                 print(f"Hidden files: {'shown' if new_state else 'hidden'}")
                 self.needs_full_redraw = True
@@ -2644,7 +2644,7 @@ class FileManager:
                     continue
         else:
             # Show details for current cursor position
-            current_file = current_pane['files'][current_pane['selected_index']]
+            current_file = current_pane['files'][current_pane['focused_index']]
             files_to_show.append(current_file)
         
         if not files_to_show:
@@ -2712,14 +2712,14 @@ class FileManager:
             print("No files to view")
             return
         
-        selected_file = current_pane['files'][current_pane['selected_index']]
+        focused_file = current_pane['files'][current_pane['focused_index']]
         
-        if selected_file.is_dir():
+        if focused_file.is_dir():
             print("Cannot view directory")
             return
         
         # Try to use file association for 'view' action
-        filename = selected_file.name
+        filename = focused_file.name
         command = get_program_for_file(filename, 'view')
         
         if command:
@@ -2729,14 +2729,14 @@ class FileManager:
                 self.external_program_manager.suspend_curses()
                 
                 # Launch the viewer
-                result = subprocess.run(command + [str(selected_file)], 
+                result = subprocess.run(command + [str(focused_file)], 
                                       cwd=str(current_pane['path']))
                 
                 # Resume curses
                 self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
-                    print(f"Viewed file: {selected_file.name}")
+                    print(f"Viewed file: {focused_file.name}")
                 else:
                     print(f"Viewer exited with code {result.returncode}")
                 
@@ -2749,24 +2749,24 @@ class FileManager:
                 self.needs_full_redraw = True
         else:
             # No file association found - check if it's a text file
-            if is_text_file(selected_file):
+            if is_text_file(focused_file):
                 # Fallback to built-in text viewer for text files
                 try:
-                    viewer = create_text_viewer(self.renderer, selected_file)
+                    viewer = create_text_viewer(self.renderer, focused_file)
                     if viewer:
                         self.active_viewer = viewer
                         self.renderer.set_cursor_visibility(False)
                         self.needs_full_redraw = True
-                        print(f"Viewing text file: {selected_file.name}")
+                        print(f"Viewing text file: {focused_file.name}")
                     else:
-                        print(f"Failed to view file: {selected_file.name}")
+                        print(f"Failed to view file: {focused_file.name}")
                     
                 except Exception as e:
                     print(f"Error viewing file: {str(e)}")
                     self.needs_full_redraw = True
             else:
                 # Not a text file and no viewer configured
-                print(f"No viewer configured for '{selected_file.name}' (not a text file)")
+                print(f"No viewer configured for '{focused_file.name}' (not a text file)")
     
     def diff_selected_files(self):
         """View diff between two selected text files"""
@@ -2829,19 +2829,19 @@ class FileManager:
             print("No files in current directory")
             return
             
-        selected_file = current_pane['files'][current_pane['selected_index']]
+        focused_file = current_pane['files'][current_pane['focused_index']]
         
         # Check if file editing is supported for this storage type
-        if not selected_file.supports_file_editing():
+        if not focused_file.supports_file_editing():
             print("Editing S3 files is not supported for now")
             return
         
         # Allow editing directories (some editors can handle them)
-        if selected_file.is_dir():
-            print(f"Warning: '{selected_file.name}' is a directory")
+        if focused_file.is_dir():
+            print(f"Warning: '{focused_file.name}' is a directory")
         
         # Try to use file association for 'edit' action
-        filename = selected_file.name
+        filename = focused_file.name
         command = get_program_for_file(filename, 'edit')
         
         if command:
@@ -2851,14 +2851,14 @@ class FileManager:
                 self.external_program_manager.suspend_curses()
                 
                 # Launch the editor
-                result = subprocess.run(command + [str(selected_file)], 
+                result = subprocess.run(command + [str(focused_file)], 
                                       cwd=str(current_pane['path']))
                 
                 # Resume curses
                 self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
-                    print(f"Edited file: {selected_file.name}")
+                    print(f"Edited file: {focused_file.name}")
                 else:
                     print(f"Editor exited with code {result.returncode}")
                     
@@ -2879,14 +2879,14 @@ class FileManager:
                 self.external_program_manager.suspend_curses()
                 
                 # Launch the text editor
-                result = subprocess.run([editor, str(selected_file)], 
+                result = subprocess.run([editor, str(focused_file)], 
                                       cwd=str(current_pane['path']))
                 
                 # Resume curses
                 self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
-                    print(f"Edited file: {selected_file.name}")
+                    print(f"Edited file: {focused_file.name}")
                 else:
                     print(f"Editor exited with code {result.returncode}")
                     
@@ -3050,7 +3050,7 @@ class FileManager:
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
-                current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
+                current_pane['focused_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
@@ -3058,7 +3058,7 @@ class FileManager:
             if self.isearch_matches:
                 self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
-                current_pane['selected_index'] = self.isearch_matches[self.isearch_match_index]
+                current_pane['focused_index'] = self.isearch_matches[self.isearch_match_index]
                 self.needs_full_redraw = True
             return True
         
@@ -3400,12 +3400,12 @@ class FileManager:
             self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
             self.needs_full_redraw = True
         elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
-            if current_pane['selected_index'] > 0:
-                current_pane['selected_index'] -= 1
+            if current_pane['focused_index'] > 0:
+                current_pane['focused_index'] -= 1
                 self.needs_full_redraw = True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
-            if current_pane['selected_index'] < len(current_pane['files']) - 1:
-                current_pane['selected_index'] += 1
+            if current_pane['focused_index'] < len(current_pane['files']) - 1:
+                current_pane['focused_index'] += 1
                 self.needs_full_redraw = True
         elif event.key_code == KeyCode.ENTER:
             self.handle_enter()
@@ -3413,9 +3413,9 @@ class FileManager:
         elif self.is_key_for_action(event, 'toggle_hidden'):
             self.file_operations.toggle_hidden_files()
             # Reset both panes
-            self.pane_manager.left_pane['selected_index'] = 0
+            self.pane_manager.left_pane['focused_index'] = 0
             self.pane_manager.left_pane['scroll_offset'] = 0
-            self.pane_manager.right_pane['selected_index'] = 0
+            self.pane_manager.right_pane['focused_index'] = 0
             self.pane_manager.right_pane['scroll_offset'] = 0
             self.needs_full_redraw = True
         elif self.is_key_for_action(event, 'toggle_color_scheme'):
@@ -3434,10 +3434,10 @@ class FileManager:
         elif self.is_key_for_action(event, 'unselect_all'):
             self.unselect_all()
         elif event.key_code == KeyCode.PAGE_UP:  # Page Up - file navigation only
-            current_pane['selected_index'] = max(0, current_pane['selected_index'] - 10)
+            current_pane['focused_index'] = max(0, current_pane['focused_index'] - 10)
             self.needs_full_redraw = True
         elif event.key_code == KeyCode.PAGE_DOWN:  # Page Down - file navigation only
-            current_pane['selected_index'] = min(len(current_pane['files']) - 1, current_pane['selected_index'] + 10)
+            current_pane['focused_index'] = min(len(current_pane['files']) - 1, current_pane['focused_index'] + 10)
             self.needs_full_redraw = True
         elif event.key_code == KeyCode.BACKSPACE:  # Backspace - go to parent directory
             # Check if we're at the root of an archive
@@ -3459,7 +3459,7 @@ class FileManager:
                     
                     # Navigate to the parent directory
                     current_pane['path'] = parent_dir
-                    current_pane['selected_index'] = 0
+                    current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                     current_pane['selected_files'].clear()
                     self.refresh_files(current_pane)
@@ -3468,13 +3468,13 @@ class FileManager:
                     cursor_set = False
                     for i, file_path in enumerate(current_pane['files']):
                         if file_path.name == archive_filename:
-                            current_pane['selected_index'] = i
-                            self.adjust_scroll_for_selection(current_pane)
+                            current_pane['focused_index'] = i
+                            self.adjust_scroll_for_focus(current_pane)
                             cursor_set = True
                             break
                     
                     if not cursor_set:
-                        current_pane['selected_index'] = 0
+                        current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
                     self.needs_full_redraw = True
@@ -3492,7 +3492,7 @@ class FileManager:
                     child_directory_name = current_pane['path'].name
                     
                     current_pane['path'] = current_pane['path'].parent
-                    current_pane['selected_index'] = 0
+                    current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                     current_pane['selected_files'].clear()  # Clear selections when changing directory
                     self.refresh_files(current_pane)
@@ -3501,16 +3501,16 @@ class FileManager:
                     cursor_set = False
                     for i, file_path in enumerate(current_pane['files']):
                         if file_path.name == child_directory_name and file_path.is_dir():
-                            current_pane['selected_index'] = i
+                            current_pane['focused_index'] = i
                             # Adjust scroll offset to keep selection visible
-                            self.adjust_scroll_for_selection(current_pane)
+                            self.adjust_scroll_for_focus(current_pane)
                             cursor_set = True
                             break
                     
                     # If we couldn't find the child directory, try to restore cursor position from history
                     if not cursor_set and not self.restore_cursor_position(current_pane):
                         # If no history found, default to first item
-                        current_pane['selected_index'] = 0
+                        current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
                     self.needs_full_redraw = True
@@ -3524,7 +3524,7 @@ class FileManager:
                     self.save_cursor_position(current_pane)
                     
                     current_pane['path'] = current_pane['path'].parent
-                    current_pane['selected_index'] = 0
+                    current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                     current_pane['selected_files'].clear()  # Clear selections when changing directory
                     self.refresh_files(current_pane)
@@ -3532,7 +3532,7 @@ class FileManager:
                     # Try to restore cursor position for this directory
                     if not self.restore_cursor_position(current_pane):
                         # If no history found, default to first item
-                        current_pane['selected_index'] = 0
+                        current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
                     self.needs_full_redraw = True
@@ -3545,7 +3545,7 @@ class FileManager:
                     self.save_cursor_position(current_pane)
                     
                     current_pane['path'] = current_pane['path'].parent
-                    current_pane['selected_index'] = 0
+                    current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                     current_pane['selected_files'].clear()  # Clear selections when changing directory
                     self.refresh_files(current_pane)
@@ -3553,7 +3553,7 @@ class FileManager:
                     # Try to restore cursor position for this directory
                     if not self.restore_cursor_position(current_pane):
                         # If no history found, default to first item
-                        current_pane['selected_index'] = 0
+                        current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
                     self.needs_full_redraw = True
@@ -3780,7 +3780,7 @@ class FileManager:
             if left_restored:
                 left_path = self.pane_manager.left_pane['path']
                 if self.pane_manager.left_pane['files']:
-                    selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['selected_index']].name
+                    selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['focused_index']].name
                     print(f"Restored left pane cursor: {left_path} -> {selected_file}")
             
             # Restore right pane cursor position
@@ -3788,7 +3788,7 @@ class FileManager:
             if right_restored:
                 right_path = self.pane_manager.right_pane['path']
                 if self.pane_manager.right_pane['files']:
-                    selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['selected_index']].name
+                    selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['focused_index']].name
                     print(f"Restored right pane cursor: {right_path} -> {selected_file}")
             
             # If either cursor was restored, trigger a redraw
@@ -3835,22 +3835,22 @@ class FileManager:
         try:
             # Save left pane cursor position
             if (self.pane_manager.left_pane['files'] and 
-                self.pane_manager.left_pane['selected_index'] < len(self.pane_manager.left_pane['files'])):
+                self.pane_manager.left_pane['focused_index'] < len(self.pane_manager.left_pane['files'])):
                 
                 self.pane_manager.save_cursor_position(self.pane_manager.left_pane)
                 
                 left_path = self.pane_manager.left_pane['path']
-                selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['selected_index']].name
+                selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['focused_index']].name
                 print(f"Saved left pane cursor position: {left_path} -> {selected_file}")
             
             # Save right pane cursor position
             if (self.pane_manager.right_pane['files'] and 
-                self.pane_manager.right_pane['selected_index'] < len(self.pane_manager.right_pane['files'])):
+                self.pane_manager.right_pane['focused_index'] < len(self.pane_manager.right_pane['files'])):
                 
                 self.pane_manager.save_cursor_position(self.pane_manager.right_pane)
                 
                 right_path = self.pane_manager.right_pane['path']
-                selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['selected_index']].name
+                selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['focused_index']].name
                 print(f"Saved right pane cursor position: {right_path} -> {selected_file}")
                 
         except Exception as e:

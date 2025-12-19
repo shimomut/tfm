@@ -41,7 +41,7 @@ def test_tfm_can_initialize_with_curses_backend():
                             assert fm.renderer is mock_backend
                             assert fm.stdscr is mock_backend
                             
-                            # Verify cursor was hidden
+                            # Verify focus was hidden
                             mock_backend.set_cursor_visibility.assert_called_once_with(False)
     
     print("✓ TFM can initialize with CursesBackend")

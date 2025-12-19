@@ -451,7 +451,7 @@ class TFMStateManager(StateManager):
         # Extract serializable state
         state = {
             'path': str(pane_data.get('path', '')),
-            'selected_index': pane_data.get('selected_index', 0),
+            'selected_index': pane_data.get('focused_index', 0),
             'scroll_offset': pane_data.get('scroll_offset', 0),
             'sort_mode': pane_data.get('sort_mode', 'name'),
             'sort_reverse': pane_data.get('sort_reverse', False),

@@ -74,7 +74,7 @@ def test_drives_dialog_integration():
     
     # Verify pane was updated
     assert current_pane['path'] == Path.home()
-    assert current_pane['selected_index'] == 0
+    assert current_pane['focused_index'] == 0
     assert current_pane['scroll_offset'] == 0
     assert len(messages) > 0
     assert "Home" in messages[0]

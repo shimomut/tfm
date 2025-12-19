@@ -53,11 +53,11 @@ class FileOperations:
                 pane_data['sort_reverse']
             )
             
-            # Ensure selected index is valid
+            # Ensure focused index is valid
             if pane_data['files']:
-                pane_data['selected_index'] = min(pane_data['selected_index'], len(pane_data['files']) - 1)
+                pane_data['focused_index'] = min(pane_data['focused_index'], len(pane_data['files']) - 1)
             else:
-                pane_data['selected_index'] = 0
+                pane_data['focused_index'] = 0
             
             # Clean up selected files - remove any that no longer exist
             current_file_paths = {str(f) for f in pane_data['files']}
@@ -70,7 +70,7 @@ class FileOperations:
             if self.log_manager:
                 self.log_manager.add_message("ERROR", f"Archive navigation error: {pane_data['path']}: {e}")
             pane_data['files'] = []
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
         except ArchiveCorruptedError as e:
             # Archive is corrupted
             user_msg = getattr(e, 'user_message', str(e))
@@ -78,7 +78,7 @@ class FileOperations:
             if self.log_manager:
                 self.log_manager.add_message("ERROR", f"Corrupted archive: {pane_data['path']}: {e}")
             pane_data['files'] = []
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
         except ArchivePermissionError as e:
             # Permission denied for archive
             user_msg = getattr(e, 'user_message', str(e))
@@ -86,7 +86,7 @@ class FileOperations:
             if self.log_manager:
                 self.log_manager.add_message("ERROR", f"Archive permission denied: {pane_data['path']}: {e}")
             pane_data['files'] = []
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
         except ArchiveError as e:
             # Generic archive error
             user_msg = getattr(e, 'user_message', str(e))
@@ -94,31 +94,31 @@ class FileOperations:
             if self.log_manager:
                 self.log_manager.add_message("ERROR", f"Archive error: {pane_data['path']}: {e}")
             pane_data['files'] = []
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
         except PermissionError as e:
             print(f"Permission denied accessing directory {pane_data['path']}: {e}")
             if self.log_manager:
                 self.log_manager.add_message("ERROR", f"Permission denied: {pane_data['path']}: {e}")
             pane_data['files'] = []
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
         except FileNotFoundError as e:
             print(f"Directory not found: {pane_data['path']}: {e}")
             if self.log_manager:
                 self.log_manager.add_message("ERROR", f"Directory not found: {pane_data['path']}: {e}")
             pane_data['files'] = []
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
         except OSError as e:
             print(f"System error reading directory {pane_data['path']}: {e}")
             if self.log_manager:
                 self.log_manager.add_message("ERROR", f"System error: {pane_data['path']}: {e}")
             pane_data['files'] = []
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
         except Exception as e:
             print(f"Unexpected error reading directory {pane_data['path']}: {e}")
             if self.log_manager:
                 self.log_manager.add_message("ERROR", f"Unexpected error: {pane_data['path']}: {e}")
             pane_data['files'] = []
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
     
     def sort_entries(self, entries, sort_mode, reverse=False):
         """Sort file entries based on the specified mode
@@ -249,22 +249,22 @@ class FileOperations:
         if not pane_data['files']:
             return False, "No files to select"
             
-        selected_file = pane_data['files'][pane_data['selected_index']]
-        file_path_str = str(selected_file)
+        focused_file = pane_data['files'][pane_data['focused_index']]
+        file_path_str = str(focused_file)
         
         if file_path_str in pane_data['selected_files']:
             pane_data['selected_files'].remove(file_path_str)
-            message = f"Deselected: {selected_file.name}"
+            message = f"Deselected: {focused_file.name}"
         else:
             pane_data['selected_files'].add(file_path_str)
-            message = f"Selected: {selected_file.name}"
+            message = f"Selected: {focused_file.name}"
         
         # Move cursor if requested
         if move_cursor:
-            if direction > 0 and pane_data['selected_index'] < len(pane_data['files']) - 1:
-                pane_data['selected_index'] += 1
-            elif direction < 0 and pane_data['selected_index'] > 0:
-                pane_data['selected_index'] -= 1
+            if direction > 0 and pane_data['focused_index'] < len(pane_data['files']) - 1:
+                pane_data['focused_index'] += 1
+            elif direction < 0 and pane_data['focused_index'] > 0:
+                pane_data['focused_index'] -= 1
         
         return True, message
     
@@ -401,7 +401,7 @@ class FileOperations:
         pane_data['filter_pattern'] = pattern
         
         # Reset selection and scroll when filter changes
-        pane_data['selected_index'] = 0
+        pane_data['focused_index'] = 0
         pane_data['scroll_offset'] = 0
         pane_data['selected_files'].clear()  # Clear selections when filter changes
         
@@ -414,7 +414,7 @@ class FileOperations:
         """Clear the filter for the specified pane"""
         if pane_data['filter_pattern']:
             pane_data['filter_pattern'] = ""
-            pane_data['selected_index'] = 0
+            pane_data['focused_index'] = 0
             pane_data['scroll_offset'] = 0
             self.refresh_files(pane_data)
             return True
@@ -498,8 +498,8 @@ class FileOperationsUI:
         else:
             # Copy current file if no files are selected
             if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_copy.append(selected_file)
+                focused_file = current_pane['files'][current_pane['focused_index']]
+                files_to_copy.append(focused_file)
         
         if not files_to_copy:
             print("No files to copy")
@@ -754,8 +754,8 @@ class FileOperationsUI:
         else:
             # Move current file if no files are selected
             if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_move.append(selected_file)
+                focused_file = current_pane['files'][current_pane['focused_index']]
+                files_to_move.append(focused_file)
         
         if not files_to_move:
             print("No files to move")
@@ -1053,8 +1053,8 @@ class FileOperationsUI:
         else:
             # Delete current file if no files are selected
             if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_delete.append(selected_file)
+                focused_file = current_pane['files'][current_pane['focused_index']]
+                files_to_delete.append(focused_file)
         
         if not files_to_delete:
             print("No files to delete")
@@ -1222,8 +1222,8 @@ class FileOperationsUI:
                 current_pane['selected_files'].clear()
                 
                 # Adjust cursor position if it's now out of bounds
-                if current_pane['selected_index'] >= len(current_pane['files']):
-                    current_pane['selected_index'] = max(0, len(current_pane['files']) - 1)
+                if current_pane['focused_index'] >= len(current_pane['files']):
+                    current_pane['focused_index'] = max(0, len(current_pane['files']) - 1)
                 
                 # Print completion message
                 if self.file_manager.operation_cancelled:

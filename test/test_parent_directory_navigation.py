@@ -83,7 +83,7 @@ class TestParentDirectoryNavigation(unittest.TestCase):
         
         # Simulate file refresh (normally done by file_operations.refresh_files)
         left_pane['files'] = [TFMPath(self.child2_path / "subfile.txt")]
-        left_pane['selected_index'] = 0
+        left_pane['focused_index'] = 0
         
         # Simulate the parent directory navigation logic
         # Remember the child directory name we're leaving
@@ -91,7 +91,7 @@ class TestParentDirectoryNavigation(unittest.TestCase):
         
         # Navigate to parent
         left_pane['path'] = left_pane['path'].parent
-        left_pane['selected_index'] = 0
+        left_pane['focused_index'] = 0
         left_pane['scroll_offset'] = 0
         left_pane['selected_files'].clear()
         
@@ -105,15 +105,15 @@ class TestParentDirectoryNavigation(unittest.TestCase):
         cursor_set = False
         for i, file_path in enumerate(left_pane['files']):
             if file_path.name == child_directory_name and file_path.is_dir():
-                left_pane['selected_index'] = i
+                left_pane['focused_index'] = i
                 cursor_set = True
                 break
         
-        # Verify cursor was set correctly
+        # Verify focus was set correctly
         self.assertTrue(cursor_set, "Cursor should be set to child directory")
         
         # Verify the selected file is the child2 directory
-        selected_file = left_pane['files'][left_pane['selected_index']]
+        selected_file = left_pane['files'][left_pane['focused_index']]
         self.assertEqual(selected_file.name, "child2")
         self.assertTrue(selected_file.is_dir())
     
@@ -125,7 +125,7 @@ class TestParentDirectoryNavigation(unittest.TestCase):
         
         # Simulate file refresh
         left_pane['files'] = [TFMPath(self.child2_path / "subfile.txt")]
-        left_pane['selected_index'] = 0
+        left_pane['focused_index'] = 0
         
         # Remember child directory name
         child_directory_name = left_pane['path'].name
@@ -136,7 +136,7 @@ class TestParentDirectoryNavigation(unittest.TestCase):
         
         # Navigate to parent
         left_pane['path'] = left_pane['path'].parent
-        left_pane['selected_index'] = 0
+        left_pane['focused_index'] = 0
         left_pane['scroll_offset'] = 0
         left_pane['selected_files'].clear()
         
@@ -150,15 +150,15 @@ class TestParentDirectoryNavigation(unittest.TestCase):
         cursor_set = False
         for i, file_path in enumerate(left_pane['files']):
             if file_path.name == child_directory_name and file_path.is_dir():
-                left_pane['selected_index'] = i
+                left_pane['focused_index'] = i
                 cursor_set = True
                 break
         
-        # Verify cursor was not set (child directory doesn't exist)
+        # Verify focus was not set (child directory doesn't exist)
         self.assertFalse(cursor_set, "Cursor should not be set when child directory doesn't exist")
         
         # Verify we fall back to first item (index 0)
-        self.assertEqual(left_pane['selected_index'], 0)
+        self.assertEqual(left_pane['focused_index'], 0)
     
     def test_parent_navigation_from_root(self):
         """Test parent navigation when already at root directory"""

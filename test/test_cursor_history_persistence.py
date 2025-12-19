@@ -45,8 +45,8 @@ def test_cursor_history_persistence():
         # Simulate file list for the pane
         pane_manager.left_pane['files'] = [test_dir / f for f in test_files]
         
-        # Set cursor to file2.py (index 1)
-        pane_manager.left_pane['selected_index'] = 1
+        # Set focus to file2.py (index 1)
+        pane_manager.left_pane['focused_index'] = 1
         
         # Save cursor position
         pane_manager.save_cursor_position(pane_manager.left_pane)
@@ -60,14 +60,14 @@ def test_cursor_history_persistence():
         # Create a new pane manager instance (simulating restart)
         pane_manager2 = PaneManager(config, test_dir, test_dir, state_manager)
         pane_manager2.left_pane['files'] = [test_dir / f for f in test_files]
-        pane_manager2.left_pane['selected_index'] = 0  # Start at first file
+        pane_manager2.left_pane['focused_index'] = 0  # Start at first file
         
         # Restore cursor position
         display_height = 20
         restored = pane_manager2.restore_cursor_position(pane_manager2.left_pane, display_height)
         
         assert restored is True
-        assert pane_manager2.left_pane['selected_index'] == 1
+        assert pane_manager2.left_pane['focused_index'] == 1
         print("✓ Cursor position correctly restored from state manager")
         
         # Test with different directory
@@ -81,7 +81,7 @@ def test_cursor_history_persistence():
         # Set up second directory
         pane_manager.right_pane['path'] = test_dir2
         pane_manager.right_pane['files'] = [test_dir2 / f for f in test_files2]
-        pane_manager.right_pane['selected_index'] = 2  # gamma.log
+        pane_manager.right_pane['focused_index'] = 2  # gamma.log
         
         # Save cursor position for second directory
         pane_manager.save_cursor_position(pane_manager.right_pane)
@@ -125,7 +125,7 @@ def test_cursor_history_without_state_manager():
         
         # Simulate file list
         pane_manager.left_pane['files'] = [test_dir / f for f in test_files]
-        pane_manager.left_pane['selected_index'] = 1
+        pane_manager.left_pane['focused_index'] = 1
         
         # These operations should not fail even without state manager
         pane_manager.save_cursor_position(pane_manager.left_pane)
@@ -168,14 +168,14 @@ def test_cursor_history_with_missing_files():
         pane_manager = PaneManager(config, test_dir, test_dir, state_manager)
         remaining_files = ["file1.txt", "file3.log"]
         pane_manager.left_pane['files'] = [test_dir / f for f in remaining_files]
-        pane_manager.left_pane['selected_index'] = 0
+        pane_manager.left_pane['focused_index'] = 0
         
         # Try to restore cursor position
         restored = pane_manager.restore_cursor_position(pane_manager.left_pane, 20)
         
         # Should return False since the saved file doesn't exist
         assert restored is False
-        assert pane_manager.left_pane['selected_index'] == 0  # Should remain unchanged
+        assert pane_manager.left_pane['focused_index'] == 0  # Should remain unchanged
         print("✓ Cursor history handles missing files correctly")
         
         # Clean up

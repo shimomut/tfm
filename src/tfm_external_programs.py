@@ -80,9 +80,9 @@ def quote_filenames_with_double_quotes(filenames):
 def get_selected_or_cursor_files(pane_data):
     """Get selected files, or current cursor position if no files selected"""
     selected = [Path(f).name for f in pane_data['selected_files']]
-    if not selected and pane_data['files'] and pane_data['selected_index'] < len(pane_data['files']):
-        # No files selected, use cursor position
-        cursor_file = pane_data['files'][pane_data['selected_index']]
+    if not selected and pane_data['files'] and pane_data['focused_index'] < len(pane_data['files']):
+        # No files selected, use focused file
+        focused_file = pane_data['files'][pane_data['focused_index']]
         selected = [cursor_file.name]
     return selected
 

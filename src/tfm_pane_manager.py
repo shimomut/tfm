@@ -18,20 +18,20 @@ class PaneManager:
         # Dual pane setup with configuration
         self.left_pane = {
             'path': left_startup_path,
-            'selected_index': 0,
+            'focused_index': 0,
             'scroll_offset': 0,
             'files': [],
-            'selected_files': set(),  # Track multi-selected files
+            'selected_files': set(),  # Track selected files for batch operations
             'sort_mode': getattr(config, 'DEFAULT_SORT_MODE', 'name'),
             'sort_reverse': getattr(config, 'DEFAULT_SORT_REVERSE', False),
             'filter_pattern': "",  # Filename filter pattern for this pane
         }
         self.right_pane = {
             'path': right_startup_path,
-            'selected_index': 0,
+            'focused_index': 0,
             'scroll_offset': 0,
             'files': [],
-            'selected_files': set(),  # Track multi-selected files
+            'selected_files': set(),  # Track selected files for batch operations
             'sort_mode': getattr(config, 'DEFAULT_SORT_MODE', 'name'),
             'sort_reverse': getattr(config, 'DEFAULT_SORT_REVERSE', False),
             'filter_pattern': "",  # Filename filter pattern for this pane
@@ -56,10 +56,10 @@ class PaneManager:
     
     def save_cursor_position(self, pane_data):
         """Save current cursor position to persistent history"""
-        if not pane_data['files'] or pane_data['selected_index'] >= len(pane_data['files']):
+        if not pane_data['files'] or pane_data['focused_index'] >= len(pane_data['files']):
             return
             
-        current_file = pane_data['files'][pane_data['selected_index']]
+        current_file = pane_data['files'][pane_data['focused_index']]
         current_dir = str(pane_data['path'])
         
         # If no state manager available, skip saving
@@ -93,13 +93,13 @@ class PaneManager:
             # Try to find this filename in current files
             for i, file_path in enumerate(pane_data['files']):
                 if file_path.name == target_filename:
-                    pane_data['selected_index'] = i
+                    pane_data['focused_index'] = i
                     
-                    # Adjust scroll offset to keep selection visible
-                    if pane_data['selected_index'] < pane_data['scroll_offset']:
-                        pane_data['scroll_offset'] = pane_data['selected_index']
-                    elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
-                        pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
+                    # Adjust scroll offset to keep focused item visible
+                    if pane_data['focused_index'] < pane_data['scroll_offset']:
+                        pane_data['scroll_offset'] = pane_data['focused_index']
+                    elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
+                        pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
                     
                     return True
         
@@ -149,7 +149,7 @@ class PaneManager:
         # Change current pane to the other pane's directory
         old_directory = current_pane['path']
         current_pane['path'] = target_directory
-        current_pane['selected_index'] = 0
+        current_pane['focused_index'] = 0
         current_pane['scroll_offset'] = 0
         current_pane['selected_files'].clear()  # Clear selections when changing directory
         
@@ -204,7 +204,7 @@ class PaneManager:
         # Change other pane to the current pane's directory
         old_directory = other_pane['path']
         other_pane['path'] = target_directory
-        other_pane['selected_index'] = 0
+        other_pane['focused_index'] = 0
         other_pane['scroll_offset'] = 0
         other_pane['selected_files'].clear()  # Clear selections when changing directory
         
@@ -221,14 +221,14 @@ class PaneManager:
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
         
-        # Get the currently selected file in the other pane
-        if not other_pane['files'] or other_pane['selected_index'] >= len(other_pane['files']):
+        # Get the currently focused file in the other pane
+        if not other_pane['files'] or other_pane['focused_index'] >= len(other_pane['files']):
             if log_callback:
-                log_callback("No file selected in other pane")
+                log_callback("No file focused in other pane")
             return False
             
-        other_selected_file = other_pane['files'][other_pane['selected_index']]
-        target_filename = other_selected_file.name
+        other_focused_file = other_pane['files'][other_pane['focused_index']]
+        target_filename = other_focused_file.name
         
         # Find the same filename in current pane
         target_index = None
@@ -239,7 +239,7 @@ class PaneManager:
         
         if target_index is not None:
             # Move cursor to the matching file
-            current_pane['selected_index'] = target_index
+            current_pane['focused_index'] = target_index
             
             if log_callback:
                 pane_name = "left" if self.active_pane == 'left' else "right"
@@ -255,14 +255,14 @@ class PaneManager:
         current_pane = self.get_current_pane()
         other_pane = self.get_inactive_pane()
         
-        # Get the currently selected file in the current pane
-        if not current_pane['files'] or current_pane['selected_index'] >= len(current_pane['files']):
+        # Get the currently focused file in the current pane
+        if not current_pane['files'] or current_pane['focused_index'] >= len(current_pane['files']):
             if log_callback:
-                log_callback("No file selected in current pane")
+                log_callback("No file focused in current pane")
             return False
             
-        current_selected_file = current_pane['files'][current_pane['selected_index']]
-        target_filename = current_selected_file.name
+        current_focused_file = current_pane['files'][current_pane['focused_index']]
+        target_filename = current_focused_file.name
         
         # Find the same filename in other pane
         target_index = None
@@ -273,7 +273,7 @@ class PaneManager:
         
         if target_index is not None:
             # Move cursor to the matching file in other pane
-            other_pane['selected_index'] = target_index
+            other_pane['focused_index'] = target_index
             
             if log_callback:
                 other_pane_name = "right" if self.active_pane == 'left' else "left"
@@ -285,12 +285,12 @@ class PaneManager:
                 log_callback(f"File '{target_filename}' not found in {other_pane_name} pane")
             return False
     
-    def adjust_scroll_for_selection(self, pane_data, display_height):
-        """Ensure the selected item is visible by adjusting scroll offset"""
-        if pane_data['selected_index'] < pane_data['scroll_offset']:
-            pane_data['scroll_offset'] = pane_data['selected_index']
-        elif pane_data['selected_index'] >= pane_data['scroll_offset'] + display_height:
-            pane_data['scroll_offset'] = pane_data['selected_index'] - display_height + 1
+    def adjust_scroll_for_focus(self, pane_data, display_height):
+        """Ensure the focused item is visible by adjusting scroll offset"""
+        if pane_data['focused_index'] < pane_data['scroll_offset']:
+            pane_data['scroll_offset'] = pane_data['focused_index']
+        elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
+            pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
     
     def count_files_and_dirs(self, pane_data):
         """Count directories and files in a pane"""

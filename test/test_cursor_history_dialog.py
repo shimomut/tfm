@@ -110,7 +110,7 @@ class MockFileManager:
             # Navigate to the selected path
             old_path = current_pane['path']
             current_pane['path'] = target_path
-            current_pane['selected_index'] = 0
+            current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()  # Clear selections when changing directory
             
@@ -128,7 +128,7 @@ class MockFileManager:
             # Log the navigation
             pane_name = "left" if current_pane is self.pane_manager.left_pane else "right"
             if restored and current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']].name
+                selected_file = current_pane['files'][current_pane['focused_index']].name
                 self.navigation_log.append(f"Navigated {pane_name} pane: {old_path} → {target_path} (cursor: {selected_file})")
             else:
                 self.navigation_log.append(f"Navigated {pane_name} pane: {old_path} → {target_path}")
@@ -182,7 +182,7 @@ def test_cursor_history_dialog_basic():
             # Set up left pane (current pane)
             fm.pane_manager.left_pane['path'] = directory
             fm.refresh_files(fm.pane_manager.left_pane)
-            fm.pane_manager.left_pane['selected_index'] = file_index
+            fm.pane_manager.left_pane['focused_index'] = file_index
             
             # Save cursor position
             fm.pane_manager.save_cursor_position(fm.pane_manager.left_pane)
@@ -249,7 +249,7 @@ def test_cursor_history_navigation():
         # Set up cursor position in target directory first
         fm.pane_manager.left_pane['path'] = target_dir
         fm.refresh_files(fm.pane_manager.left_pane)
-        fm.pane_manager.left_pane['selected_index'] = 1  # target_y.py
+        fm.pane_manager.left_pane['focused_index'] = 1  # target_y.py
         fm.pane_manager.save_cursor_position(fm.pane_manager.left_pane)
         
         target_file = fm.pane_manager.left_pane['files'][1].name
@@ -258,7 +258,7 @@ def test_cursor_history_navigation():
         # Navigate back to source directory
         fm.pane_manager.left_pane['path'] = source_dir
         fm.refresh_files(fm.pane_manager.left_pane)
-        fm.pane_manager.left_pane['selected_index'] = 0
+        fm.pane_manager.left_pane['focused_index'] = 0
         
         print(f"Current directory: {source_dir}")
         
@@ -271,7 +271,7 @@ def test_cursor_history_navigation():
         
         # Check if cursor was restored
         if fm.pane_manager.left_pane['files']:
-            restored_file = fm.pane_manager.left_pane['files'][fm.pane_manager.left_pane['selected_index']].name
+            restored_file = fm.pane_manager.left_pane['files'][fm.pane_manager.left_pane['focused_index']].name
             print(f"Cursor restored to: {restored_file}")
             assert restored_file == target_file
         
@@ -324,7 +324,7 @@ def test_cursor_history_separate_panes():
         for i, directory in enumerate(left_dirs):
             fm.pane_manager.left_pane['path'] = directory
             fm.refresh_files(fm.pane_manager.left_pane)
-            fm.pane_manager.left_pane['selected_index'] = 0
+            fm.pane_manager.left_pane['focused_index'] = 0
             fm.pane_manager.save_cursor_position(fm.pane_manager.left_pane)
             print(f"  {i+1}. {directory}")
             time.sleep(0.01)
@@ -334,7 +334,7 @@ def test_cursor_history_separate_panes():
         for i, directory in enumerate(right_dirs):
             fm.pane_manager.right_pane['path'] = directory
             fm.refresh_files(fm.pane_manager.right_pane)
-            fm.pane_manager.right_pane['selected_index'] = 0
+            fm.pane_manager.right_pane['focused_index'] = 0
             fm.pane_manager.save_cursor_position(fm.pane_manager.right_pane)
             print(f"  {i+1}. {directory}")
             time.sleep(0.01)
@@ -430,7 +430,7 @@ def test_cursor_history_missing_directory():
         config = DefaultConfig()
         fm = MockFileManager(config, test_dir, test_dir, state_manager)
         fm.refresh_files()
-        fm.pane_manager.left_pane['selected_index'] = 0
+        fm.pane_manager.left_pane['focused_index'] = 0
         fm.pane_manager.save_cursor_position(fm.pane_manager.left_pane)
         
         print(f"Saved history for: {test_dir}")

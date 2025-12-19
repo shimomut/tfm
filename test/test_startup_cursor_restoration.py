@@ -69,7 +69,7 @@ class MockFileManager:
             if left_restored:
                 left_path = self.pane_manager.left_pane['path']
                 if self.pane_manager.left_pane['files']:
-                    selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['selected_index']].name
+                    selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['focused_index']].name
                     print(f"Restored left pane cursor: {left_path} -> {selected_file}")
             
             # Restore right pane cursor position
@@ -77,7 +77,7 @@ class MockFileManager:
             if right_restored:
                 right_path = self.pane_manager.right_pane['path']
                 if self.pane_manager.right_pane['files']:
-                    selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['selected_index']].name
+                    selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['focused_index']].name
                     print(f"Restored right pane cursor: {right_path} -> {selected_file}")
             
             # If either cursor was restored, trigger a redraw
@@ -139,9 +139,9 @@ def test_startup_cursor_restoration_basic():
         fm1 = MockFileManager(config, left_dir, right_dir, state_manager)
         fm1.refresh_files()
         
-        # Set cursor positions
-        fm1.pane_manager.left_pane['selected_index'] = 2  # file3.log
-        fm1.pane_manager.right_pane['selected_index'] = 1  # doc2.py
+        # Set focus positions
+        fm1.pane_manager.left_pane['focused_index'] = 2  # file3.log
+        fm1.pane_manager.right_pane['focused_index'] = 1  # doc2.py
         
         # Save cursor positions
         fm1.pane_manager.save_cursor_position(fm1.pane_manager.left_pane)
@@ -166,18 +166,18 @@ def test_startup_cursor_restoration_basic():
         fm2 = MockFileManager(config, left_dir, right_dir, state_manager2)
         
         # Initially, cursors should be at index 0
-        assert fm2.pane_manager.left_pane['selected_index'] == 0
-        assert fm2.pane_manager.right_pane['selected_index'] == 0
+        assert fm2.pane_manager.left_pane['focused_index'] == 0
+        assert fm2.pane_manager.right_pane['focused_index'] == 0
         
         # Simulate startup - load application state (which includes cursor restoration)
         left_restored, right_restored = fm2.load_application_state()
         
-        # Verify cursor positions were restored
+        # Verify focus positions were restored
         assert left_restored is True
         assert right_restored is True
         
-        assert fm2.pane_manager.left_pane['selected_index'] == 2
-        assert fm2.pane_manager.right_pane['selected_index'] == 1
+        assert fm2.pane_manager.left_pane['focused_index'] == 2
+        assert fm2.pane_manager.right_pane['focused_index'] == 1
         
         # Verify correct files are selected
         restored_left_file = fm2.pane_manager.left_pane['files'][2].name
@@ -224,8 +224,8 @@ def test_startup_restoration_with_missing_files():
         fm1 = MockFileManager(config, test_dir, test_dir, state_manager)
         fm1.refresh_files()
         
-        # Set cursor to file2.py (index 1)
-        fm1.pane_manager.left_pane['selected_index'] = 1
+        # Set focus to file2.py (index 1)
+        fm1.pane_manager.left_pane['focused_index'] = 1
         fm1.pane_manager.save_cursor_position(fm1.pane_manager.left_pane)
         
         print(f"Saved cursor position at: file2.py")
@@ -251,8 +251,8 @@ def test_startup_restoration_with_missing_files():
         assert right_restored is False
         
         # Cursor should remain at default position (index 0)
-        assert fm2.pane_manager.left_pane['selected_index'] == 0
-        assert fm2.pane_manager.right_pane['selected_index'] == 0
+        assert fm2.pane_manager.left_pane['focused_index'] == 0
+        assert fm2.pane_manager.right_pane['focused_index'] == 0
         
         print("✓ Cursor restoration correctly failed for missing file")
         
@@ -290,9 +290,9 @@ def test_startup_restoration_with_empty_directories():
         assert left_restored is False
         assert right_restored is False
         
-        # Cursors should remain at default position
-        assert fm.pane_manager.left_pane['selected_index'] == 0
-        assert fm.pane_manager.right_pane['selected_index'] == 0
+        # Focus should remain at default position
+        assert fm.pane_manager.left_pane['focused_index'] == 0
+        assert fm.pane_manager.right_pane['focused_index'] == 0
         
         # No redraw should be triggered
         assert fm.needs_full_redraw is False
@@ -339,8 +339,8 @@ def test_startup_restoration_separate_panes():
         fm1.refresh_files()
         
         # Set different cursor positions
-        fm1.pane_manager.left_pane['selected_index'] = 1   # left_b.py
-        fm1.pane_manager.right_pane['selected_index'] = 3  # right_w.md
+        fm1.pane_manager.left_pane['focused_index'] = 1   # left_b.py
+        fm1.pane_manager.right_pane['focused_index'] = 3  # right_w.md
         
         # Save cursor positions
         fm1.pane_manager.save_cursor_position(fm1.pane_manager.left_pane)
@@ -369,8 +369,8 @@ def test_startup_restoration_separate_panes():
         assert right_restored is True
         
         # Verify correct positions
-        assert fm2.pane_manager.left_pane['selected_index'] == 1
-        assert fm2.pane_manager.right_pane['selected_index'] == 3
+        assert fm2.pane_manager.left_pane['focused_index'] == 1
+        assert fm2.pane_manager.right_pane['focused_index'] == 3
         
         # Verify correct files
         restored_left = fm2.pane_manager.left_pane['files'][1].name
@@ -412,8 +412,8 @@ def test_startup_restoration_scroll_adjustment():
         fm1 = MockFileManager(config, test_dir, test_dir, state_manager)
         fm1.refresh_files()
         
-        # Set cursor to a file near the end (index 15)
-        fm1.pane_manager.left_pane['selected_index'] = 15
+        # Set focus to a file near the end (index 15)
+        fm1.pane_manager.left_pane['focused_index'] = 15
         fm1.pane_manager.save_cursor_position(fm1.pane_manager.left_pane)
         
         selected_file = fm1.pane_manager.left_pane['files'][15].name
@@ -434,8 +434,8 @@ def test_startup_restoration_scroll_adjustment():
         # Should be restored
         assert left_restored is True
         
-        # Verify cursor position
-        assert fm2.pane_manager.left_pane['selected_index'] == 15
+        # Verify focus position
+        assert fm2.pane_manager.left_pane['focused_index'] == 15
         
         # Verify scroll position was adjusted (should not be 0 for index 15)
         # With a typical display height, scroll should be adjusted to show the selected item

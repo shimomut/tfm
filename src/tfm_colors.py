@@ -21,15 +21,15 @@ COLOR_REGULAR_FILE = 28      # Regular files (changed from 1 to avoid conflict w
 COLOR_DIRECTORIES = 2        # Directories
 COLOR_EXECUTABLES = 3        # Executable files
 
-# File type colors (selected)
-COLOR_REGULAR_FILE_SELECTED = 4    # Selected regular files
-COLOR_DIRECTORIES_SELECTED = 5     # Selected directories
-COLOR_EXECUTABLES_SELECTED = 6     # Selected executables
+# File type colors (focused)
+COLOR_REGULAR_FILE_FOCUSED = 4    # Focused regular files
+COLOR_DIRECTORIES_FOCUSED = 5     # Focused directories
+COLOR_EXECUTABLES_FOCUSED = 6     # Focused executables
 
-# File type colors (selected inactive)
-COLOR_REGULAR_FILE_SELECTED_INACTIVE = 24    # Selected regular files in inactive pane
-COLOR_DIRECTORIES_SELECTED_INACTIVE = 25     # Selected directories in inactive pane
-COLOR_EXECUTABLES_SELECTED_INACTIVE = 26     # Selected executables in inactive pane
+# File type colors (focused inactive)
+COLOR_REGULAR_FILE_FOCUSED_INACTIVE = 24    # Focused regular files in inactive pane
+COLOR_DIRECTORIES_FOCUSED_INACTIVE = 25     # Focused directories in inactive pane
+COLOR_EXECUTABLES_FOCUSED_INACTIVE = 26     # Focused executables in inactive pane
 
 # Interface colors
 COLOR_HEADER = 7        # File list headers (directory paths)
@@ -106,13 +106,13 @@ COLOR_SCHEMES = {
             'color_num': 102,
             'rgb': (51, 229, 51)    # Bright green for executables
         },
-        'SELECTED_BG': {
+        'FOCUSED_BG': {
             'color_num': 103,
-            'rgb': (40, 80, 160)    # Dark blue-purple background for selected items
+            'rgb': (40, 80, 160)    # Dark blue-purple background for focused items
         },
-        'SELECTED_INACTIVE_BG': {
+        'FOCUSED_INACTIVE_BG': {
             'color_num': 150,
-            'rgb': (80, 80, 80)    # Darker blue background for selected items in inactive pane
+            'rgb': (80, 80, 80)    # Darker blue background for focused items in inactive pane
         },
         'REGULAR_FILE_FG': {
             'color_num': 107,
@@ -232,13 +232,13 @@ COLOR_SCHEMES = {
             'color_num': 122,
             'rgb': (0, 160, 0)    # Dark green for executables
         },
-        'SELECTED_BG': {
+        'FOCUSED_BG': {
             'color_num': 123,
-            'rgb': (120, 160, 255)    # Light blue background for selected items
+            'rgb': (120, 160, 255)    # Light blue background for focused items
         },
-        'SELECTED_INACTIVE_BG': {
+        'FOCUSED_INACTIVE_BG': {
             'color_num': 151,
-            'rgb': (160, 160, 160)    # Lighter blue background for selected items in inactive pane
+            'rgb': (160, 160, 160)    # Lighter blue background for focused items in inactive pane
         },
         'REGULAR_FILE_FG': {
             'color_num': 127,
@@ -386,8 +386,8 @@ def init_colors(renderer, color_scheme=None):
     boundary_bg = rgb_colors['BOUNDARY_BG']['rgb']
     directory_fg = rgb_colors['DIRECTORY_FG']['rgb']
     executable_fg = rgb_colors['EXECUTABLE_FG']['rgb']
-    selected_bg = rgb_colors['SELECTED_BG']['rgb']
-    selected_inactive_bg = rgb_colors['SELECTED_INACTIVE_BG']['rgb']
+    focused_bg = rgb_colors['FOCUSED_BG']['rgb']
+    focused_inactive_bg = rgb_colors['FOCUSED_INACTIVE_BG']['rgb']
     regular_file_fg = rgb_colors['REGULAR_FILE_FG']['rgb']
     log_stdout_fg = rgb_colors['LOG_STDOUT_FG']['rgb']
     log_system_fg = rgb_colors['LOG_SYSTEM_FG']['rgb']
@@ -419,15 +419,15 @@ def init_colors(renderer, color_scheme=None):
     renderer.init_color_pair(COLOR_DIRECTORIES, directory_fg, default_bg)
     renderer.init_color_pair(COLOR_EXECUTABLES, executable_fg, default_bg)
     
-    # File type colors (selected)
-    renderer.init_color_pair(COLOR_REGULAR_FILE_SELECTED, regular_file_fg, selected_bg)
-    renderer.init_color_pair(COLOR_DIRECTORIES_SELECTED, directory_fg, selected_bg)
-    renderer.init_color_pair(COLOR_EXECUTABLES_SELECTED, executable_fg, selected_bg)
+    # File type colors (focused)
+    renderer.init_color_pair(COLOR_REGULAR_FILE_FOCUSED, regular_file_fg, focused_bg)
+    renderer.init_color_pair(COLOR_DIRECTORIES_FOCUSED, directory_fg, focused_bg)
+    renderer.init_color_pair(COLOR_EXECUTABLES_FOCUSED, executable_fg, focused_bg)
     
-    # File type colors (selected inactive)
-    renderer.init_color_pair(COLOR_REGULAR_FILE_SELECTED_INACTIVE, regular_file_fg, selected_inactive_bg)
-    renderer.init_color_pair(COLOR_DIRECTORIES_SELECTED_INACTIVE, directory_fg, selected_inactive_bg)
-    renderer.init_color_pair(COLOR_EXECUTABLES_SELECTED_INACTIVE, executable_fg, selected_inactive_bg)
+    # File type colors (focused inactive)
+    renderer.init_color_pair(COLOR_REGULAR_FILE_FOCUSED_INACTIVE, regular_file_fg, focused_inactive_bg)
+    renderer.init_color_pair(COLOR_DIRECTORIES_FOCUSED_INACTIVE, directory_fg, focused_inactive_bg)
+    renderer.init_color_pair(COLOR_EXECUTABLES_FOCUSED_INACTIVE, executable_fg, focused_inactive_bg)
     
     # Interface colors
     renderer.init_color_pair(COLOR_HEADER, default_fg, header_bg)
@@ -474,32 +474,32 @@ def init_colors(renderer, color_scheme=None):
     renderer.init_color_pair(COLOR_DIFF_CHAR_CHANGE, default_fg, diff_char_change_bg)
     renderer.init_color_pair(COLOR_DIFF_FOCUSED, default_fg, diff_focused_bg)
 
-def get_file_color(is_dir, is_executable, is_selected, is_active):
+def get_file_color(is_dir, is_executable, is_focused, is_active):
     """
     Get the appropriate color pair and attributes for a file based on its properties.
     
     Returns:
         Tuple[int, int]: (color_pair, attributes)
     """
-    # Handle selected files with common background color
-    if is_selected and is_active:
+    # Handle focused files with common background color
+    if is_focused and is_active:
         if is_dir:
-            return COLOR_DIRECTORIES_SELECTED, TextAttribute.NORMAL
+            return COLOR_DIRECTORIES_FOCUSED, TextAttribute.NORMAL
         elif is_executable:
-            return COLOR_EXECUTABLES_SELECTED, TextAttribute.NORMAL
+            return COLOR_EXECUTABLES_FOCUSED, TextAttribute.NORMAL
         else:
-            return COLOR_REGULAR_FILE_SELECTED, TextAttribute.NORMAL
+            return COLOR_REGULAR_FILE_FOCUSED, TextAttribute.NORMAL
     
-    # Handle inactive selection with dedicated colors
-    if is_selected:
+    # Handle inactive focus with dedicated colors
+    if is_focused:
         if is_dir:
-            return COLOR_DIRECTORIES_SELECTED_INACTIVE, TextAttribute.NORMAL
+            return COLOR_DIRECTORIES_FOCUSED_INACTIVE, TextAttribute.NORMAL
         elif is_executable:
-            return COLOR_EXECUTABLES_SELECTED_INACTIVE, TextAttribute.NORMAL
+            return COLOR_EXECUTABLES_FOCUSED_INACTIVE, TextAttribute.NORMAL
         else:
-            return COLOR_REGULAR_FILE_SELECTED_INACTIVE, TextAttribute.NORMAL
+            return COLOR_REGULAR_FILE_FOCUSED_INACTIVE, TextAttribute.NORMAL
     
-    # Normal (unselected) files
+    # Normal (unfocused) files
     if is_dir:
         return COLOR_DIRECTORIES, TextAttribute.NORMAL
     elif is_executable:

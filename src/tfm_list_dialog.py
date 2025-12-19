@@ -269,7 +269,7 @@ class ListDialogHelpers:
                         if target_path.exists() and target_path.is_dir():
                             old_path = current_pane['path']
                             current_pane['path'] = target_path
-                            current_pane['selected_index'] = 0
+                            current_pane['focused_index'] = 0
                             current_pane['scroll_offset'] = 0
                             current_pane['selected_files'].clear()  # Clear selections
                             

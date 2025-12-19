@@ -162,7 +162,7 @@ def test_tfm_specific_operations():
         
         assert loaded_state is not None
         assert loaded_state['path'] == '/test/path'
-        assert loaded_state['selected_index'] == 5
+        assert loaded_state['focused_index'] == 5
         assert loaded_state['sort_mode'] == 'size'
         assert set(loaded_state['selected_files']) == {'/test/file1.txt', '/test/file2.txt'}
         

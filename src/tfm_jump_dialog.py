@@ -458,7 +458,7 @@ class JumpDialogHelpers:
         if directory and directory.exists() and directory.is_dir():
             old_path = current_pane['path']
             current_pane['path'] = directory
-            current_pane['selected_index'] = 0
+            current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()
             

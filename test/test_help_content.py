@@ -92,7 +92,7 @@ def generate_help_content():
     
     # Tips section
     help_lines.append("=== TIPS ===")
-    help_lines.append("• Use multi-selection with Space to operate on multiple files")
+    help_lines.append("• Use Space to select/deselect files for batch operations")
     help_lines.append("• Search supports multiple patterns separated by spaces")
     help_lines.append("• Log pane shows operation results and system messages")
     help_lines.append("• File details (i) shows comprehensive file information")

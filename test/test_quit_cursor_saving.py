@@ -61,22 +61,22 @@ class MockFileManager:
         try:
             # Save left pane cursor position
             if (self.pane_manager.left_pane['files'] and 
-                self.pane_manager.left_pane['selected_index'] < len(self.pane_manager.left_pane['files'])):
+                self.pane_manager.left_pane['focused_index'] < len(self.pane_manager.left_pane['files'])):
                 
                 self.pane_manager.save_cursor_position(self.pane_manager.left_pane)
                 
                 left_path = self.pane_manager.left_pane['path']
-                selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['selected_index']].name
+                selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['focused_index']].name
                 saved_positions.append(f"Left pane: {left_path} -> {selected_file}")
             
             # Save right pane cursor position
             if (self.pane_manager.right_pane['files'] and 
-                self.pane_manager.right_pane['selected_index'] < len(self.pane_manager.right_pane['files'])):
+                self.pane_manager.right_pane['focused_index'] < len(self.pane_manager.right_pane['files'])):
                 
                 self.pane_manager.save_cursor_position(self.pane_manager.right_pane)
                 
                 right_path = self.pane_manager.right_pane['path']
-                selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['selected_index']].name
+                selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['focused_index']].name
                 saved_positions.append(f"Right pane: {right_path} -> {selected_file}")
         
         except Exception as e:
@@ -151,9 +151,9 @@ def test_quit_cursor_saving_basic():
         fm = MockFileManager(config, left_dir, right_dir, state_manager)
         fm.refresh_files()
         
-        # Set cursor positions
-        fm.pane_manager.left_pane['selected_index'] = 2   # gamma.log
-        fm.pane_manager.right_pane['selected_index'] = 1  # two.py
+        # Set focus positions
+        fm.pane_manager.left_pane['focused_index'] = 2   # gamma.log
+        fm.pane_manager.right_pane['focused_index'] = 1  # two.py
         
         left_file = fm.pane_manager.left_pane['files'][2].name
         right_file = fm.pane_manager.right_pane['files'][1].name
@@ -251,8 +251,8 @@ def test_quit_saving_with_invalid_cursor():
         fm.refresh_files()
         
         # Set invalid cursor positions (beyond file list)
-        fm.pane_manager.left_pane['selected_index'] = 10   # Invalid (only 2 files)
-        fm.pane_manager.right_pane['selected_index'] = 5   # Invalid (only 2 files)
+        fm.pane_manager.left_pane['focused_index'] = 10   # Invalid (only 2 files)
+        fm.pane_manager.right_pane['focused_index'] = 5   # Invalid (only 2 files)
         
         print(f"Set invalid cursor positions:")
         print(f"  Left pane: index 10 (only {len(fm.pane_manager.left_pane['files'])} files)")
@@ -303,9 +303,9 @@ def test_quit_saving_integration_with_startup():
         fm1 = MockFileManager(DefaultConfig(), work_dir, docs_dir, state_manager1)
         fm1.refresh_files()
         
-        # Set cursor positions during work
-        fm1.pane_manager.left_pane['selected_index'] = 1   # utils.py
-        fm1.pane_manager.right_pane['selected_index'] = 2  # GUIDE.md
+        # Set focus positions during work
+        fm1.pane_manager.left_pane['focused_index'] = 1   # utils.py
+        fm1.pane_manager.right_pane['focused_index'] = 2  # GUIDE.md
         
         work_file = fm1.pane_manager.left_pane['files'][1].name
         doc_file = fm1.pane_manager.right_pane['files'][2].name
@@ -331,8 +331,8 @@ def test_quit_saving_integration_with_startup():
         fm2.refresh_files()
         
         # Initially cursors should be at default positions
-        assert fm2.pane_manager.left_pane['selected_index'] == 0
-        assert fm2.pane_manager.right_pane['selected_index'] == 0
+        assert fm2.pane_manager.left_pane['focused_index'] == 0
+        assert fm2.pane_manager.right_pane['focused_index'] == 0
         
         # Restore cursor positions (simulate startup)
         height, width = fm2.stdscr.getmaxyx()
@@ -345,8 +345,8 @@ def test_quit_saving_integration_with_startup():
         assert left_restored is True
         assert right_restored is True
         
-        assert fm2.pane_manager.left_pane['selected_index'] == 1
-        assert fm2.pane_manager.right_pane['selected_index'] == 2
+        assert fm2.pane_manager.left_pane['focused_index'] == 1
+        assert fm2.pane_manager.right_pane['focused_index'] == 2
         
         restored_work_file = fm2.pane_manager.left_pane['files'][1].name
         restored_doc_file = fm2.pane_manager.right_pane['files'][2].name
@@ -400,8 +400,8 @@ def test_quit_saving_separate_pane_histories():
         fm.refresh_files()
         
         # Set different cursor positions
-        fm.pane_manager.left_pane['selected_index'] = 1   # left_b.py
-        fm.pane_manager.right_pane['selected_index'] = 3  # right_w.md
+        fm.pane_manager.left_pane['focused_index'] = 1   # left_b.py
+        fm.pane_manager.right_pane['focused_index'] = 3  # right_w.md
         
         left_file = fm.pane_manager.left_pane['files'][1].name
         right_file = fm.pane_manager.right_pane['files'][3].name

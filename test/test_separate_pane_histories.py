@@ -145,7 +145,7 @@ def test_pane_manager_integration_separate():
         for i, (directory, file_index) in enumerate(left_navigation):
             pane_manager.left_pane['path'] = directory
             pane_manager.left_pane['files'] = [directory / f"left_file_{j}.txt" for j in range(3)]
-            pane_manager.left_pane['selected_index'] = file_index
+            pane_manager.left_pane['focused_index'] = file_index
             
             pane_manager.save_cursor_position(pane_manager.left_pane)
             
@@ -164,7 +164,7 @@ def test_pane_manager_integration_separate():
         for i, (directory, file_index) in enumerate(right_navigation):
             pane_manager.right_pane['path'] = directory
             pane_manager.right_pane['files'] = [directory / f"right_file_{j}.txt" for j in range(3)]
-            pane_manager.right_pane['selected_index'] = file_index
+            pane_manager.right_pane['focused_index'] = file_index
             
             pane_manager.save_cursor_position(pane_manager.right_pane)
             
@@ -177,12 +177,12 @@ def test_pane_manager_integration_separate():
         for directory, expected_file_index in left_navigation:
             pane_manager.left_pane['path'] = directory
             pane_manager.left_pane['files'] = [directory / f"left_file_{j}.txt" for j in range(3)]
-            pane_manager.left_pane['selected_index'] = 0  # Start at first file
+            pane_manager.left_pane['focused_index'] = 0  # Start at first file
             
             restored = pane_manager.restore_cursor_position(pane_manager.left_pane, 20)
             
             assert restored is True
-            assert pane_manager.left_pane['selected_index'] == expected_file_index
+            assert pane_manager.left_pane['focused_index'] == expected_file_index
             
             restored_file = pane_manager.left_pane['files'][expected_file_index].name
             print(f"  ✓ {directory} -> {restored_file} (index {expected_file_index})")
@@ -192,12 +192,12 @@ def test_pane_manager_integration_separate():
         for directory, expected_file_index in right_navigation:
             pane_manager.right_pane['path'] = directory
             pane_manager.right_pane['files'] = [directory / f"right_file_{j}.txt" for j in range(3)]
-            pane_manager.right_pane['selected_index'] = 0  # Start at first file
+            pane_manager.right_pane['focused_index'] = 0  # Start at first file
             
             restored = pane_manager.restore_cursor_position(pane_manager.right_pane, 20)
             
             assert restored is True
-            assert pane_manager.right_pane['selected_index'] == expected_file_index
+            assert pane_manager.right_pane['focused_index'] == expected_file_index
             
             restored_file = pane_manager.right_pane['files'][expected_file_index].name
             print(f"  ✓ {directory} -> {restored_file} (index {expected_file_index})")

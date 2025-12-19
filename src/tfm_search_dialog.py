@@ -525,7 +525,7 @@ class SearchDialogHelpers:
         if result['type'] == 'dir':
             # Navigate to directory
             current_pane['path'] = target_path
-            current_pane['selected_index'] = 0
+            current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()
             print_func(f"Navigated to directory: {result['relative_path']}")
@@ -541,13 +541,13 @@ class SearchDialogHelpers:
             # Find and select the target file
             for i, file_path in enumerate(current_pane['files']):
                 if file_path == target_path:
-                    current_pane['selected_index'] = i
+                    current_pane['focused_index'] = i
                     # Adjust scroll to make selection visible - this would need display_height
                     # For now, just set basic scroll
-                    if current_pane['selected_index'] < current_pane['scroll_offset']:
-                        current_pane['scroll_offset'] = current_pane['selected_index']
-                    elif current_pane['selected_index'] >= current_pane['scroll_offset'] + 10:  # Default height
-                        current_pane['scroll_offset'] = current_pane['selected_index'] - 10 + 1
+                    if current_pane['focused_index'] < current_pane['scroll_offset']:
+                        current_pane['scroll_offset'] = current_pane['focused_index']
+                    elif current_pane['focused_index'] >= current_pane['scroll_offset'] + 10:  # Default height
+                        current_pane['scroll_offset'] = current_pane['focused_index'] - 10 + 1
                     break
             
             if result['type'] == 'content':
@@ -563,7 +563,7 @@ class SearchDialogHelpers:
             current_pane: Current pane data
             display_height: Actual display height available
         """
-        if current_pane['selected_index'] < current_pane['scroll_offset']:
-            current_pane['scroll_offset'] = current_pane['selected_index']
-        elif current_pane['selected_index'] >= current_pane['scroll_offset'] + display_height:
-            current_pane['scroll_offset'] = current_pane['selected_index'] - display_height + 1
+        if current_pane['focused_index'] < current_pane['scroll_offset']:
+            current_pane['scroll_offset'] = current_pane['focused_index']
+        elif current_pane['focused_index'] >= current_pane['scroll_offset'] + display_height:
+            current_pane['scroll_offset'] = current_pane['focused_index'] - display_height + 1

@@ -2524,8 +2524,8 @@ class ArchiveUI:
         else:
             # Archive current file if no files are selected
             if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_archive.append(selected_file)
+                focused_file = current_pane['files'][current_pane['focused_index']]
+                files_to_archive.append(focused_file)
         
         if not files_to_archive:
             print("No files to archive")
@@ -2578,8 +2578,8 @@ class ArchiveUI:
         else:
             # Archive current file if no files are selected
             if current_pane['files']:
-                selected_file = current_pane['files'][current_pane['selected_index']]
-                files_to_archive.append(selected_file)
+                focused_file = current_pane['files'][current_pane['focused_index']]
+                files_to_archive.append(focused_file)
         
         if not files_to_archive:
             print("No files to archive")
@@ -2629,8 +2629,8 @@ class ArchiveUI:
                     # Try to select the new archive in the other pane
                     for i, file_path in enumerate(other_pane['files']):
                         if file_path.name == archive_filename:
-                            other_pane['selected_index'] = i
-                            self.file_manager.adjust_scroll_for_selection(other_pane)
+                            other_pane['focused_index'] = i
+                            self.file_manager.adjust_scroll_for_focus(other_pane)
                             break
                 else:
                     print(f"Failed to create archive: {archive_filename}")
@@ -2663,10 +2663,10 @@ class ArchiveUI:
             return
         
         # Get the selected file
-        selected_file = current_pane['files'][current_pane['selected_index']]
+        focused_file = current_pane['files'][current_pane['focused_index']]
         
-        if not selected_file.is_file():
-            print("Selected item is not a file")
+        if not focused_file.is_file():
+            print("Focused item is not a file")
             return
         
         # Check if it's an archive file using the archive operations

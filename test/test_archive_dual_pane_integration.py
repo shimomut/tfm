@@ -394,28 +394,28 @@ def test_cursor_sync_with_archives():
         pane_manager.right_pane['files'] = sorted(list(pane_manager.right_pane['path'].iterdir()), 
                                                     key=lambda x: x.name)
         
-        # Set cursor in left pane to beta.txt (index 1)
-        pane_manager.left_pane['selected_index'] = 1
+        # Set focus in left pane to beta.txt (index 1)
+        pane_manager.left_pane['focused_index'] = 1
         pane_manager.active_pane = 'left'
         
         # Sync cursor from left to right
         result = pane_manager.sync_cursor_from_current_pane(log_callback=log_manager.add_message)
         
         if result:
-            # Right pane cursor should now be on beta.txt
-            right_selected = pane_manager.right_pane['files'][pane_manager.right_pane['selected_index']]
+            # Right pane focus should now be on beta.txt
+            right_selected = pane_manager.right_pane['files'][pane_manager.right_pane['focused_index']]
             assert right_selected.name == "beta.txt", "Right pane should be on beta.txt"
             print("  ✓ Synced cursor from archive to filesystem")
         
         # Test reverse sync
-        pane_manager.right_pane['selected_index'] = 2  # gamma.txt
+        pane_manager.right_pane['focused_index'] = 2  # gamma.txt
         pane_manager.active_pane = 'right'
         
         result = pane_manager.sync_cursor_from_current_pane(log_callback=log_manager.add_message)
         
         if result:
-            # Left pane cursor should now be on gamma.txt
-            left_selected = pane_manager.left_pane['files'][pane_manager.left_pane['selected_index']]
+            # Left pane focus should now be on gamma.txt
+            left_selected = pane_manager.left_pane['files'][pane_manager.left_pane['focused_index']]
             assert left_selected.name == "gamma.txt", "Left pane should be on gamma.txt"
             print("  ✓ Synced cursor from filesystem to archive")
 

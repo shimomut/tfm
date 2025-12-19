@@ -48,7 +48,7 @@ def test_state_manager_integration():
         loaded_state = state_manager.load_pane_state('left')
         assert loaded_state is not None
         assert loaded_state['path'] == str(test_pane_data['path'])
-        assert loaded_state['selected_index'] == test_pane_data['selected_index']
+        assert loaded_state['focused_index'] == test_pane_data['focused_index']
         assert loaded_state['sort_mode'] == test_pane_data['sort_mode']
         print("✓ Pane state loaded successfully")
         
@@ -152,7 +152,7 @@ def test_state_persistence():
         loaded_pane = state_manager2.load_pane_state('right')
         assert loaded_pane is not None
         assert loaded_pane['path'] == test_data['path']
-        assert loaded_pane['selected_index'] == test_data['selected_index']
+        assert loaded_pane['focused_index'] == test_data['focused_index']
         assert loaded_pane['sort_mode'] == test_data['sort_mode']
         
         loaded_layout = state_manager2.load_window_layout()
