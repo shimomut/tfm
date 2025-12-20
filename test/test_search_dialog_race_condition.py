@@ -103,14 +103,14 @@ def test_thread_safe_access_methods():
         
         def _check_dialog_content_changed(self):
             """Simulate the fixed method with thread-safe access"""
-            if self.search_dialog.mode:
+            if self.search_dialog.is_active:
                 with self.search_dialog.search_lock:
                     return self.search_dialog.content_changed
             return False
         
         def _mark_dialog_content_unchanged(self):
             """Simulate the fixed method with thread-safe access"""
-            if self.search_dialog.mode:
+            if self.search_dialog.is_active:
                 with self.search_dialog.search_lock:
                     self.search_dialog.content_changed = False
     

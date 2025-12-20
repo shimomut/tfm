@@ -2166,6 +2166,8 @@ class FileManager:
         ListDialogHelpers.show_favorite_directories(
             self.list_dialog, self.pane_manager, print_with_redraw
         )
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2221,6 +2223,8 @@ class FileManager:
         other_pane_name = 'Right' if pane_name == 'left' else 'Left'
         help_text = f"↑↓:select  Enter:choose  TAB:switch to {other_pane_name}  Type:search  ESC:cancel"
         self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys, help_text)
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2284,6 +2288,8 @@ class FileManager:
         ListDialogHelpers.show_programs_dialog(
             self.list_dialog, execute_program_wrapper, print
         )
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2300,6 +2306,8 @@ class FileManager:
         ListDialogHelpers.show_compare_selection(
             self.list_dialog, current_pane, other_pane, print_with_redraw
         )
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2564,6 +2572,8 @@ class FileManager:
         
         # Use the helper method to show file details
         InfoDialogHelpers.show_file_details(self.info_dialog, files_to_show, current_pane)
+        # Push dialog onto layer stack
+        self.push_layer(self.info_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -3073,7 +3083,9 @@ class FileManager:
     
     def show_search_dialog(self, search_type='filename'):
         """Show the search dialog for filename or content search - wrapper for search dialog component"""
-        self.search_dialog.show(search_type)
+        current_pane = self.get_current_pane()
+        search_root = current_pane['path']
+        self.search_dialog.show(search_type, search_root)
         # Push dialog onto layer stack
         self.push_layer(self.search_dialog)
         
@@ -3639,6 +3651,16 @@ class FileManager:
         
         # Check if top layer wants to close and pop it if so
         if self.ui_layer_stack.check_and_close_top_layer():
+            # Check if search dialog just closed with a selected result
+            if hasattr(self, 'search_dialog'):
+                selected_result = self.search_dialog.get_selected_result()
+                if selected_result:
+                    self._navigate_to_search_result(selected_result)
+                    # Save search term to history if it's not empty
+                    search_term = self.search_dialog.text_editor.text.strip()
+                    if search_term:
+                        self.add_search_to_history(search_term)
+            
             self.needs_full_redraw = True
         
         # Mark for redraw if event was consumed

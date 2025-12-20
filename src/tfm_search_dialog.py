@@ -29,6 +29,8 @@ class SearchDialog(UILayer, BaseListDialog):
         self.results = []  # List of search results
         self.searching = False  # Whether search is in progress
         self.content_changed = True  # Track if content needs redraw
+        self.search_root = None  # Root directory for search
+        self._selected_result = None  # Selected result when dialog closes
         
         # Threading support
         self.search_thread = None
@@ -42,11 +44,12 @@ class SearchDialog(UILayer, BaseListDialog):
         # Get configurable search result limit
         self.max_search_results = getattr(config, 'MAX_SEARCH_RESULTS', 10000)
         
-    def show(self, search_type='filename'):
+    def show(self, search_type='filename', search_root=None):
         """Show the search dialog for filename or content search
         
         Args:
             search_type: 'filename' or 'content' search mode
+            search_root: Path object representing the root directory to search from
         """
         # Cancel any existing search first
         self._cancel_current_search()
@@ -54,12 +57,14 @@ class SearchDialog(UILayer, BaseListDialog):
         
         self.is_active = True
         self.search_type = search_type
+        self.search_root = search_root
         self.text_editor.clear()
         self.results = []
         self.selected = 0
         self.scroll = 0
         self.searching = False
         self.last_search_pattern = ""
+        self._selected_result = None  # Clear any previous selection
         
         # Reset animation
         self.progress_animator.reset()
@@ -74,10 +79,20 @@ class SearchDialog(UILayer, BaseListDialog):
         self.results = []
         self.searching = False
         self.last_search_pattern = ""
+        self.search_root = None
+        # Don't clear _selected_result here - it needs to persist for retrieval
         self.content_changed = True  # Mark content as changed when exiting
         
         # Reset animation
         self.progress_animator.reset()
+    
+    def get_selected_result(self):
+        """Get the selected result after dialog exits
+        
+        Returns:
+            The selected search result, or None if no result was selected
+        """
+        return getattr(self, '_selected_result', None)
         
     def handle_input(self, event):
         """Handle input while in search dialog mode
@@ -95,7 +110,10 @@ class SearchDialog(UILayer, BaseListDialog):
         if isinstance(event, KeyEvent) and event.key_code == KeyCode.TAB:
             self.search_type = 'content' if self.search_type == 'filename' else 'filename'
             self.content_changed = True  # Mark content as changed when switching search type
-            return ('search', None)
+            # Trigger search with new search type if we have a pattern
+            if self.search_root and self.text_editor.text.strip():
+                self.perform_search(self.search_root)
+            return True
             
         # Only pass KeyEvents to navigation handler (CharEvents go to text editor)
         if isinstance(event, KeyEvent):
@@ -118,11 +136,18 @@ class SearchDialog(UILayer, BaseListDialog):
                 with self.search_lock:
                     if self.results and 0 <= self.selected < len(self.results):
                         selected_result = self.results[self.selected]
-                        return ('navigate', selected_result)
-                return ('navigate', None)
+                        # Store result for retrieval by main application
+                        self._selected_result = selected_result
+                        self.exit()
+                        return True
+                self.exit()
+                return True
             elif result == 'text_changed':
                 self.content_changed = True  # Mark content as changed when text changes
-                return ('search', None)
+                # Automatically trigger search when text changes
+                if self.search_root:
+                    self.perform_search(self.search_root)
+                return True
             elif result:
                 # Update selection in thread-safe manner for navigation keys
                 if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
@@ -138,7 +163,10 @@ class SearchDialog(UILayer, BaseListDialog):
         if isinstance(event, CharEvent):
             if self.text_editor.handle_key(event):
                 self.content_changed = True
-                return ('search', None)
+                # Automatically trigger search when text changes
+                if self.search_root:
+                    self.perform_search(self.search_root)
+                return True
             
         return False
         
@@ -528,6 +556,9 @@ class SearchDialog(UILayer, BaseListDialog):
         if event.key_code == KeyCode.TAB:
             self.search_type = 'content' if self.search_type == 'filename' else 'filename'
             self.content_changed = True
+            # Trigger search with new search type if we have a pattern
+            if self.search_root and self.text_editor.text.strip():
+                self.perform_search(self.search_root)
             return True
         
         # Use base class navigation handling with thread safety
@@ -545,12 +576,18 @@ class SearchDialog(UILayer, BaseListDialog):
             # Cancel search before navigating
             self._cancel_current_search()
             
-            # Return value is handled by the caller through should_close()
-            # The actual navigation happens in the main loop
+            # Store selected result for retrieval
+            with self.search_lock:
+                if self.results and 0 <= self.selected < len(self.results):
+                    self._selected_result = self.results[self.selected]
+            
             self.exit()
             return True
         elif result == 'text_changed':
             self.content_changed = True
+            # Automatically trigger search when text changes
+            if self.search_root:
+                self.perform_search(self.search_root)
             return True
         elif result:
             # Update selection in thread-safe manner for navigation keys
@@ -584,6 +621,9 @@ class SearchDialog(UILayer, BaseListDialog):
         # Pass to text editor
         if self.text_editor.handle_key(event):
             self.content_changed = True
+            # Automatically trigger search when text changes
+            if self.search_root:
+                self.perform_search(self.search_root)
             return True
         
         return False

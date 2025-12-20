@@ -124,7 +124,7 @@ def test_handle_input_tab_switches_search_type(search_dialog):
     event = KeyEvent(key_code=KeyCode.TAB, modifiers=set())
     result = search_dialog.handle_input(event)
     
-    assert result == ('search', None)
+    assert result == True  # Now returns boolean
     assert search_dialog.search_type == 'content'
     
     # Tab again to switch back
@@ -155,8 +155,10 @@ def test_handle_input_enter_selects_result(search_dialog):
     event = KeyEvent(key_code=KeyCode.ENTER, modifiers=set())
     result = search_dialog.handle_input(event)
     
-    assert result[0] == 'navigate'
-    assert result[1]['path'] == Path('/test/file2.txt')
+    # Now returns True and stores result internally
+    assert result == True
+    assert search_dialog.get_selected_result()['path'] == Path('/test/file2.txt')
+    assert not search_dialog.is_active  # Dialog should be closed
 
 
 def test_handle_input_navigation_keys(search_dialog):
