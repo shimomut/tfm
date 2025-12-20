@@ -71,6 +71,24 @@ Example Usage:
     )
     backend.initialize()
     
+    # Set up event callback
+    class MyEventCallback:
+        def on_key_event(self, event):
+            print(f"Key pressed: {event.char}")
+            return True
+        
+        def on_char_event(self, event):
+            return True
+        
+        def on_system_event(self, event):
+            pass
+        
+        def should_close(self):
+            return False
+    
+    callback = MyEventCallback()
+    backend.set_event_callback(callback)
+    
     # Initialize a color pair (white on blue)
     backend.init_color_pair(1, (255, 255, 255), (0, 0, 255))
     
@@ -78,10 +96,8 @@ Example Usage:
     backend.draw_text(0, 0, "Hello, World!", color_pair=1)
     backend.refresh()
     
-    # Get keyboard input
-    event = backend.get_event(timeout_ms=-1)  # Block until event
-    if event:
-        print(f"Key pressed: {event.char}")
+    # Run event loop
+    backend.run_event_loop()
     
     # Clean up
     backend.shutdown()
@@ -104,7 +120,11 @@ try:
     # These warnings are informational and occur during normal NSTextInputClient
     # protocol implementation when handling output parameters (like actual_range).
     # The pointer creation is correct and expected behavior.
-    warnings.filterwarnings('ignore', category=objc.ObjCPointerWarning)
+    try:
+        if hasattr(objc, 'ObjCPointerWarning') and isinstance(objc.ObjCPointerWarning, type):
+            warnings.filterwarnings('ignore', category=objc.ObjCPointerWarning)
+    except (AttributeError, TypeError):
+        pass  # ObjCPointerWarning not available or not a proper warning class
 except ImportError:
     COCOA_AVAILABLE = False
 
@@ -1375,7 +1395,7 @@ class CoreGraphicsBackend(Renderer):
                 self.cols = new_cols
                 self.rows = new_rows
                 # Grid will be initialized with new dimensions in _initialize_grid()
-                # Set flag to generate resize event in get_input()
+                # Set flag to generate resize event in run_event_loop_iteration()
                 self.resize_pending = True
         
         # Create window delegate to handle window events
@@ -1626,24 +1646,28 @@ class CoreGraphicsBackend(Renderer):
     
     def set_event_callback(self, callback: Optional['EventCallback']) -> None:
         """
-        Set the event callback for event delivery.
+        Set the event callback for event delivery (REQUIRED).
         
-        When a callback is set, events are delivered via the callback methods
-        (on_key_event, on_char_event, on_system_event) instead of being returned
-        by get_event(). This enables the callback-based event system required for
+        Events are delivered via the callback methods (on_key_event, on_char_event,
+        on_system_event). This enables the callback-based event system required for
         proper CharEvent generation.
         
+        The callback is required and cannot be None. All events are delivered via
+        the callback methods.
+        
         Args:
-            callback: EventCallback instance or None to disable callbacks
+            callback: EventCallback instance (required, not optional)
+        
+        Raises:
+            ValueError: If callback is None
         
         Example:
             # Enable callback-based event delivery
             callback = TFMEventCallback(app)
             backend.set_event_callback(callback)
-            
-            # Disable callbacks (return to polling mode)
-            backend.set_event_callback(None)
         """
+        if callback is None:
+            raise ValueError("Event callback cannot be None")
         self.event_callback = callback
     
     def run_event_loop(self) -> None:
@@ -1666,6 +1690,9 @@ class CoreGraphicsBackend(Renderer):
         - Keyboard events are delivered via keyDown: → on_key_event
         - Character events are delivered via insertText: → on_char_event
         
+        Raises:
+            RuntimeError: If event callback not set
+        
         Example:
             # Set up event callback
             callback = TFMEventCallback(app)
@@ -1679,12 +1706,83 @@ class CoreGraphicsBackend(Renderer):
             after all initialization is complete and the window is ready to
             receive events.
         """
+        if self.event_callback is None:
+            raise RuntimeError("Event callback not set. Call set_event_callback() first.")
+        
         # Get the shared application instance
         app = Cocoa.NSApplication.sharedApplication()
         
         # Run the application event loop
         # This blocks until the application quits
         app.run()
+    
+    def run_event_loop_iteration(self, timeout_ms: int = -1) -> None:
+        """
+        Process one iteration of the event loop.
+        
+        This method processes pending OS events and delivers them via the
+        EventCallback methods (on_key_event, on_char_event, on_system_event).
+        It returns after processing events or when the timeout expires.
+        
+        Events are NOT returned directly from this method. Instead, they are
+        delivered asynchronously via the callback methods set with
+        set_event_callback().
+        
+        The event callback MUST be set before calling this method.
+        
+        Args:
+            timeout_ms: Maximum time to wait for events in milliseconds.
+                       -1 (default): Wait indefinitely for events
+                        0: Non-blocking, process pending events and return immediately
+                       >0: Wait up to timeout_ms milliseconds for events
+        
+        Raises:
+            RuntimeError: If event callback not set
+        
+        Example:
+            renderer.set_event_callback(MyCallback())
+            
+            # Main application loop
+            while not should_quit:
+                # Process events (delivered via callbacks)
+                renderer.run_event_loop_iteration(timeout_ms=16)
+                
+                # Update application state
+                update_application()
+                
+                # Draw interface
+                renderer.refresh()
+        """
+        if self.event_callback is None:
+            raise RuntimeError("Event callback not set. Call set_event_callback() first.")
+        
+        # Get the shared application instance
+        app = Cocoa.NSApplication.sharedApplication()
+        
+        # Calculate timeout date
+        if timeout_ms < 0:
+            # Wait indefinitely
+            date = Cocoa.NSDate.distantFuture()
+        elif timeout_ms == 0:
+            # Non-blocking
+            date = Cocoa.NSDate.distantPast()
+        else:
+            # Wait for specified timeout
+            date = Cocoa.NSDate.dateWithTimeIntervalSinceNow_(timeout_ms / 1000.0)
+        
+        # Process one event
+        event = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
+            Cocoa.NSAnyEventMask,
+            date,
+            Cocoa.NSDefaultRunLoopMode,
+            True
+        )
+        
+        if event:
+            # Send event to the application for processing
+            app.sendEvent_(event)
+            # Update the application (process any pending operations)
+            app.updateWindows()
     
     def get_character_drawing_metrics(self) -> CharacterDrawingMetrics:
         """
@@ -2119,231 +2217,7 @@ class CoreGraphicsBackend(Renderer):
         if hasattr(self, '_attr_string_cache') and self._attr_string_cache is not None:
             self._attr_string_cache.clear()
     
-    def get_event(self, timeout_ms: int = -1) -> Optional[Event]:
-        """
-        Get the next event from the macOS event system (polling mode - for backward compatibility).
-        
-        This method polls the macOS event queue for keyboard, mouse, menu, and system events
-        and translates them into TTK's unified Event format. It supports
-        blocking, non-blocking, and timed event modes.
-        
-        When callbacks are enabled via set_event_callback(), this method processes
-        events and delivers them via callbacks, then returns None. This allows
-        existing code to continue using get_event() while new code can use callbacks.
-        
-        Args:
-            timeout_ms: Timeout in milliseconds.
-                       -1: Block indefinitely until an event is available
-                        0: Non-blocking, return immediately if no event
-                       >0: Wait up to timeout_ms milliseconds for an event
-        
-        Returns:
-            Optional[Event]: An Event object if an event is available and callbacks are disabled,
-                            or None if the timeout expires or if callbacks are enabled.
-        
-        Example:
-            # Non-blocking check for event
-            event = backend.get_event(timeout_ms=0)
-            if event:
-                print(f"Got key: {event.key_code}")
-            
-            # Blocking wait for event
-            event = backend.get_event(timeout_ms=-1)
-            print(f"User pressed: {event.char}")
-        """
-        if self.event_callback:
-            # Callbacks enabled - process events but deliver via callbacks
-            self._process_events(timeout_ms)
-            return None
-        
-        # Callbacks disabled - use traditional polling
-        # Check menu event queue first (highest priority)
-        if hasattr(self, 'menu_event_queue') and self.menu_event_queue:
-            return self.menu_event_queue.pop(0)
-        
-        # Check if window was resized
-        if self.resize_pending:
-            self.resize_pending = False
-            return SystemEvent(
-                event_type=SystemEventType.RESIZE
-            )
-        
-        # Check if window should close
-        if self.should_close:
-            # Return a system close event only once
-            self.should_close = False
-            return SystemEvent(
-                event_type=SystemEventType.CLOSE
-            )
-        
-        # Get the shared application instance
-        app = Cocoa.NSApplication.sharedApplication()
-        
-        # Calculate timeout date based on timeout_ms
-        if timeout_ms < 0:
-            # Blocking mode - use distant future (wait indefinitely)
-            until_date = Cocoa.NSDate.distantFuture()
-        elif timeout_ms == 0:
-            # Non-blocking mode - use None to return immediately
-            until_date = None
-        else:
-            # Timed mode - calculate date from now + timeout
-            timeout_seconds = timeout_ms / 1000.0
-            # PyObjC method: dateWithTimeIntervalSinceNow_()
-            # Corresponds to Objective-C: dateWithTimeIntervalSinceNow:
-            until_date = Cocoa.NSDate.dateWithTimeIntervalSinceNow_(timeout_seconds)
-        
-        # Define event mask for all events we care about
-        event_mask = (
-            Cocoa.NSEventMaskKeyDown |
-            Cocoa.NSEventMaskKeyUp |
-            Cocoa.NSEventMaskFlagsChanged |
-            Cocoa.NSEventMaskLeftMouseDown |
-            Cocoa.NSEventMaskLeftMouseUp |
-            Cocoa.NSEventMaskRightMouseDown |
-            Cocoa.NSEventMaskRightMouseUp |
-            Cocoa.NSEventMaskMouseMoved |
-            Cocoa.NSEventMaskLeftMouseDragged |
-            Cocoa.NSEventMaskRightMouseDragged |
-            Cocoa.NSEventMaskMouseEntered |
-            Cocoa.NSEventMaskMouseExited |
-            Cocoa.NSEventMaskScrollWheel |
-            Cocoa.NSEventMaskAppKitDefined |
-            Cocoa.NSEventMaskSystemDefined |
-            Cocoa.NSEventMaskApplicationDefined |
-            Cocoa.NSEventMaskPeriodic |
-            Cocoa.NSEventMaskCursorUpdate
-        )
-        
-        # Poll for next event using PyObjC method name translation
-        # Objective-C: nextEventMatchingMask:untilDate:inMode:dequeue:
-        # PyObjC: nextEventMatchingMask_untilDate_inMode_dequeue_()
-        # Each colon becomes an underscore followed by the parameter
-        # Use NSDefaultRunLoopMode for normal event processing
-        event = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
-            event_mask,
-            until_date,
-            Cocoa.NSDefaultRunLoopMode,
-            True  # dequeue the event (remove it from the queue)
-        )
-        
-        # If no event available, return None
-        if event is None:
-            return None
-        
-        # Translate the NSEvent to TTK's Event first
-        input_event = self._translate_event(event)
-        
-        # Only dispatch the event to the system if we didn't handle it
-        # This prevents the beep sound that occurs when unhandled key events
-        # are sent through the Cocoa event chain
-        if input_event is None:
-            # We didn't handle this event, let the system process it
-            app.sendEvent_(event)
-        
-        # Update the display after processing events
-        app.updateWindows()
-        
-        return input_event
-    
-    def _process_events(self, timeout_ms: int = -1) -> None:
-        """
-        Process one event cycle and deliver via callbacks.
-        
-        This method is used by get_event() when callbacks are enabled. It polls
-        the macOS event queue for one event, translates it, and delivers it via
-        the registered callback.
-        
-        This allows get_event() to maintain backward compatibility while supporting
-        the callback-based event system. In desktop mode, events are delivered via
-        the NSTextInputClient protocol (keyDown: → insertText:), so this method
-        primarily handles system events and menu events.
-        
-        Args:
-            timeout_ms: Timeout in milliseconds
-                       -1: Block indefinitely
-                        0: Non-blocking
-                       >0: Wait up to timeout_ms milliseconds
-        """
-        if not self.event_callback:
-            return
-        
-        # Check menu event queue first (highest priority)
-        if hasattr(self, 'menu_event_queue') and self.menu_event_queue:
-            menu_event = self.menu_event_queue.pop(0)
-            # Menu events are not part of the callback system yet
-            # They would need to be handled separately
-            return
-        
-        # Check if window was resized
-        if self.resize_pending:
-            self.resize_pending = False
-            self.event_callback.on_system_event(
-                SystemEvent(event_type=SystemEventType.RESIZE)
-            )
-            return
-        
-        # Check if window should close
-        if self.should_close:
-            self.should_close = False
-            self.event_callback.on_system_event(
-                SystemEvent(event_type=SystemEventType.CLOSE)
-            )
-            return
-        
-        # Get the shared application instance
-        app = Cocoa.NSApplication.sharedApplication()
-        
-        # Calculate timeout date based on timeout_ms
-        if timeout_ms < 0:
-            until_date = Cocoa.NSDate.distantFuture()
-        elif timeout_ms == 0:
-            until_date = None
-        else:
-            timeout_seconds = timeout_ms / 1000.0
-            until_date = Cocoa.NSDate.dateWithTimeIntervalSinceNow_(timeout_seconds)
-        
-        # Define event mask
-        event_mask = (
-            Cocoa.NSEventMaskKeyDown |
-            Cocoa.NSEventMaskKeyUp |
-            Cocoa.NSEventMaskFlagsChanged |
-            Cocoa.NSEventMaskLeftMouseDown |
-            Cocoa.NSEventMaskLeftMouseUp |
-            Cocoa.NSEventMaskRightMouseDown |
-            Cocoa.NSEventMaskRightMouseUp |
-            Cocoa.NSEventMaskMouseMoved |
-            Cocoa.NSEventMaskLeftMouseDragged |
-            Cocoa.NSEventMaskRightMouseDragged |
-            Cocoa.NSEventMaskMouseEntered |
-            Cocoa.NSEventMaskMouseExited |
-            Cocoa.NSEventMaskScrollWheel |
-            Cocoa.NSEventMaskAppKitDefined |
-            Cocoa.NSEventMaskSystemDefined |
-            Cocoa.NSEventMaskApplicationDefined |
-            Cocoa.NSEventMaskPeriodic |
-            Cocoa.NSEventMaskCursorUpdate
-        )
-        
-        # Poll for next event
-        event = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
-            event_mask,
-            until_date,
-            Cocoa.NSDefaultRunLoopMode,
-            True
-        )
-        
-        if event is None:
-            return
-        
-        # Send event to the system for processing
-        # This allows keyDown: → interpretKeyEvents: → insertText: flow
-        # which generates CharEvent when KeyEvent is not consumed
-        app.sendEvent_(event)
-        
-        # Update the display after processing events
-        app.updateWindows()
-    
+
     def _translate_event(self, event) -> Optional[KeyEvent]:
         """
         Translate a macOS NSEvent to a TTK KeyEvent.
@@ -2763,8 +2637,7 @@ class CoreGraphicsBackend(Renderer):
         Callback when a menu item is selected.
         
         This method is called by the macOS menu system when a user selects
-        a menu item. It creates a MenuEvent and adds it to the event queue
-        for retrieval by get_event().
+        a menu item. It creates a MenuEvent and adds it to the event queue.
         
         Args:
             sender: The NSMenuItem that was selected
@@ -2848,7 +2721,7 @@ if COCOA_AVAILABLE:
                 
                 This method is called when the user clicks the window close button.
                 We set a flag to indicate the window should close, which will be
-                picked up by get_input(). We return False to prevent the window
+                picked up by the event loop. We return False to prevent the window
                 from closing immediately, allowing the application to handle the
                 close event gracefully through its normal event loop.
                 
@@ -2857,7 +2730,7 @@ if COCOA_AVAILABLE:
                 
                 Returns:
                     bool: False to prevent immediate window close, letting the
-                         application handle the close event through get_input()
+                         application handle the close event through the event loop
                 """
                 self.backend.should_close = True
                 return False
@@ -2952,7 +2825,7 @@ if COCOA_AVAILABLE:
                     if hasattr(self.backend, '_attr_string_cache') and self.backend._attr_string_cache is not None:
                         self.backend._attr_string_cache.clear()
                     
-                    # Set flag to generate resize event in get_input()
+                    # Set flag to generate resize event in run_event_loop_iteration()
                     self.backend.resize_pending = True
                     
                     # Trigger redraw
@@ -3385,8 +3258,8 @@ if COCOA_AVAILABLE:
                 # First, translate to KeyEvent and deliver to application
                 key_event = self.backend._translate_event(event)
                 
-                if key_event and self.backend.event_callback:
-                    # Deliver KeyEvent to application
+                if key_event:
+                    # Deliver KeyEvent to application (callback always set)
                     try:
                         consumed = self.backend.event_callback.on_key_event(key_event)
                     except Exception as e:
@@ -3655,8 +3528,8 @@ if COCOA_AVAILABLE:
                 for char in text:
                     char_event = CharEvent(char=char)
                     
-                    if self.backend.event_callback:
-                        self.backend.event_callback.on_char_event(char_event)
+                    # Deliver CharEvent to application (callback always set)
+                    self.backend.event_callback.on_char_event(char_event)
             
             def firstRectForCharacterRange_actualRange_(self, char_range, actual_range):
                 """
@@ -3828,8 +3701,8 @@ if COCOA_AVAILABLE:
                     # Translate to KeyEvent
                     key_event = self.backend._translate_event(event)
                     
-                    if key_event and self.backend.event_callback:
-                        # Deliver KeyEvent to application
+                    if key_event:
+                        # Deliver KeyEvent to application (callback always set)
                         self.backend.event_callback.on_key_event(key_event)
             
             def characterIndexForPoint_(self, point):

@@ -11,6 +11,7 @@ parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from ttk.backends.curses_backend import CursesBackend
+from ttk.test.test_utils import EventCapture
 
 
 def main():
@@ -19,6 +20,10 @@ def main():
     
     try:
         backend.initialize()
+        
+        # Set up event capture
+        capture = EventCapture()
+        backend.set_event_callback(capture)
         
         # Initialize color pairs
         backend.init_color_pair(1, (255, 255, 255), (0, 0, 0))  # White on black
@@ -51,10 +56,10 @@ def main():
         # Refresh
         backend.refresh()
         
-        # Wait for input
+        # Wait for input using callback mode
         while True:
-            event = backend.get_input(timeout_ms=-1)
-            if event and event.char and event.char.lower() == 'q':
+            event = capture.get_next_event(backend, timeout_ms=100)
+            if event and event[0] == 'char' and event[1].char and event[1].char.lower() == 'q':
                 break
         
     finally:

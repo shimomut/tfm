@@ -6,7 +6,7 @@ This plan breaks down the callback mode migration into discrete implementation t
 
 ## Tasks
 
-- [ ] 1. Create test infrastructure for callback mode
+- [x] 1. Create test infrastructure for callback mode
   - Create `ttk/test/test_utils.py` with EventCapture helper class
   - Implement `get_next_event()` helper method
   - Implement `wait_for_event()` helper method
@@ -20,7 +20,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Test wait_for_event() with specific event types
   - _Requirements: 6.2_
 
-- [ ] 2. Update Renderer interface
+- [x] 2. Update Renderer interface
   - Remove `get_event()` method from abstract interface
   - Remove `get_input()` method from abstract interface
   - Make `callback` parameter non-optional in `set_event_callback()` signature
@@ -34,7 +34,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Test that `set_event_callback()` signature requires callback
   - _Requirements: 1.1, 1.2_
 
-- [ ] 3. Update CoreGraphics backend - remove polling mode
+- [x] 3. Update CoreGraphics backend - remove polling mode
   - Remove `get_event()` method implementation
   - Remove `_process_events()` method
   - Remove `event_queue` instance variable
@@ -46,7 +46,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Test that `event_queue` attribute doesn't exist
   - _Requirements: 1.3, 1.4_
 
-- [ ] 4. Update CoreGraphics backend - add validation
+- [x] 4. Update CoreGraphics backend - add validation
   - Add validation to `set_event_callback()` to reject None
   - Add validation to `run_event_loop_iteration()` to check callback is set
   - Raise `ValueError` if callback is None in `set_event_callback()`
@@ -60,7 +60,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Test that calling set_event_callback(None) raises ValueError
   - _Requirements: 2.1, 2.2_
 
-- [ ] 5. Simplify CoreGraphics backend event delivery
+- [x] 5. Simplify CoreGraphics backend event delivery
   - Remove conditional `if self.event_callback:` checks from `keyDown_()`
   - Remove conditional checks from other event handler methods
   - Ensure all events are delivered directly via callback methods
@@ -77,10 +77,10 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Use hypothesis to generate various event types
   - _Requirements: 2.3, 4.1, 4.3_
 
-- [ ] 6. Checkpoint - Verify core TTK changes
+- [x] 6. Checkpoint - Verify core TTK changes
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Update TFM application initialization
+- [x] 7. Update TFM application initialization
   - Remove `enable_callback_mode()` method from TFM class
   - Remove `disable_callback_mode()` method from TFM class
   - Remove `callback_mode_enabled` instance variable
@@ -96,7 +96,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Test that `callback_mode_enabled` attribute doesn't exist
   - _Requirements: 5.2, 5.3, 5.4_
 
-- [ ] 8. Simplify TFM main loop
+- [x] 8. Simplify TFM main loop
   - Remove unnecessary `get_event()` call from main loop
   - Keep only `run_event_loop_iteration()` call
   - Remove `run_with_callbacks()` method if it exists
@@ -109,7 +109,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Test that TFM responds to events correctly
   - _Requirements: 5.1, 10.1_
 
-- [ ] 9. Update TTK test files to use callback mode
+- [x] 9. Update TTK test files to use callback mode
   - Update `ttk/test/test_coregraphics_keyboard_input.py`
   - Update `ttk/test/test_coregraphics_menu.py`
   - Update `ttk/test/test_lines_simple.py`
@@ -124,7 +124,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Replace `get_input()` calls with EventCapture pattern
   - _Requirements: 6.1, 6.3_
 
-- [ ] 10. Update TFM test files to use callback mode
+- [x] 10. Update TFM test files to use callback mode
   - Update `test/test_tfm_main_input_handling.py`
   - Update `test/test_coregraphics_resize_event.py`
   - Update `test/test_coregraphics_resize_on_restore.py`
@@ -132,7 +132,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Replace `get_input()` calls with EventCapture pattern
   - _Requirements: 6.1, 6.3_
 
-- [ ] 11. Update TTK demo scripts to use callback mode
+- [x] 11. Update TTK demo scripts to use callback mode
   - Update `ttk/demo/standalone_app.py`
   - Update `ttk/demo/backend_switching.py`
   - Update `ttk/demo/demo_unicode_emoji.py`
@@ -140,7 +140,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Replace `get_input()` calls with callback pattern
   - _Requirements: 7.1, 7.2, 7.4_
 
-- [ ] 12. Update TFM demo scripts to use callback mode
+- [x] 12. Update TFM demo scripts to use callback mode
   - Update `demo/demo_menu_keyboard_shortcuts.py`
   - Update `demo/demo_character_drawing_optimization.py`
   - Update `demo/demo_menu_bar.py`
@@ -150,7 +150,7 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Replace `get_input()` calls with callback pattern
   - _Requirements: 7.1, 7.2, 7.4_
 
-- [ ] 13. Checkpoint - Verify all code migrated
+- [x] 13. Checkpoint - Verify all code migrated
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ]* 13.1 Write property test for IME unconsumed events
@@ -177,14 +177,14 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Use hypothesis to generate various composition sequences
   - _Requirements: 9.1_
 
-- [ ] 14. Update TTK documentation
+- [x] 14. Update TTK documentation
   - Update `ttk/README.md` to remove polling mode examples
   - Add callback mode examples to `ttk/README.md`
   - Update any other TTK documentation files
   - Remove references to `get_event()` and `get_input()`
   - _Requirements: 8.1, 8.2_
 
-- [ ] 15. Update developer documentation
+- [x] 15. Update developer documentation
   - Update `doc/dev/EVENT_HANDLING_IMPLEMENTATION.md`
   - Update `doc/dev/IME_SUPPORT_IMPLEMENTATION.md`
   - Update `doc/dev/CALLBACK_MODE_VS_POLLING_MODE.md`
@@ -192,20 +192,20 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Add callback-only architecture explanation
   - _Requirements: 8.3, 8.4_
 
-- [ ] 16. Create migration guide (if needed)
+- [x] 16. Create migration guide (if needed)
   - Check if external TTK users exist
   - If yes, create migration guide document
   - Document breaking changes
   - Provide code examples for migration
   - _Requirements: 12.1, 12.3_
 
-- [ ] 17. Update version number
+- [x] 17. Update version number
   - Increment major version number (breaking change)
   - Update version in setup.py or equivalent
   - Update CHANGELOG with breaking changes
   - _Requirements: 12.4_
 
-- [ ] 18. Final validation and testing
+- [x] 18. Final validation and testing
   - Run complete test suite
   - Verify all tests pass
   - Manual IME testing (Japanese, Chinese, Korean)
@@ -213,14 +213,14 @@ This plan breaks down the callback mode migration into discrete implementation t
   - Performance validation
   - _Requirements: 9.1, 9.2, 9.3, 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 19. Verify code simplification goals
+- [x] 19. Verify code simplification goals
   - Count lines of code removed (should be 400+)
   - Verify no conditional logic for callback mode in CoreGraphics backend
   - Verify Renderer interface is simpler
   - Verify no dead code paths remain
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 20. Final checkpoint - Migration complete
+- [x] 20. Final checkpoint - Migration complete
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

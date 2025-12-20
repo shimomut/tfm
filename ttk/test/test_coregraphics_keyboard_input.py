@@ -2,7 +2,7 @@
 Test CoreGraphics backend keyboard input handling.
 
 This test verifies that the CoreGraphics backend correctly implements
-keyboard input handling with timeout support and event translation.
+keyboard input handling with callback mode and event translation.
 """
 
 import sys
@@ -31,6 +31,7 @@ class TestCoreGraphicsKeyboardInput(unittest.TestCase):
         """Set up test fixtures."""
         from ttk.backends.coregraphics_backend import CoreGraphicsBackend
         from ttk.input_event import KeyCode, ModifierKey
+        from ttk.test.test_utils import EventCapture
         
         self.KeyCode = KeyCode
         self.ModifierKey = ModifierKey
@@ -46,24 +47,25 @@ class TestCoreGraphicsKeyboardInput(unittest.TestCase):
         
         # Initialize the backend
         self.backend.initialize()
+        
+        # Set up event capture
+        self.capture = EventCapture()
+        self.backend.set_event_callback(self.capture)
     
     def tearDown(self):
         """Clean up after tests."""
         if hasattr(self, 'backend') and self.backend:
             self.backend.shutdown()
     
-    def test_get_input_method_exists(self):
-        """Test that get_input method exists and is callable."""
-        self.assertTrue(hasattr(self.backend, 'get_input'))
-        self.assertTrue(callable(self.backend.get_input))
+    def test_set_event_callback_method_exists(self):
+        """Test that set_event_callback method exists and is callable."""
+        self.assertTrue(hasattr(self.backend, 'set_event_callback'))
+        self.assertTrue(callable(self.backend.set_event_callback))
     
-    def test_get_input_non_blocking_returns_none(self):
-        """Test that non-blocking get_input returns None when no input available."""
-        # Non-blocking mode should return immediately with None if no input
-        result = self.backend.get_input(timeout_ms=0)
-        
-        # Should return None (no input available)
-        self.assertIsNone(result)
+    def test_run_event_loop_iteration_method_exists(self):
+        """Test that run_event_loop_iteration method exists and is callable."""
+        self.assertTrue(hasattr(self.backend, 'run_event_loop_iteration'))
+        self.assertTrue(callable(self.backend.run_event_loop_iteration))
     
     def test_translate_event_method_exists(self):
         """Test that _translate_event helper method exists."""

@@ -390,53 +390,7 @@ class Renderer(ABC):
         """
         pass
     
-    @abstractmethod
-    def get_event(self, timeout_ms: int = -1) -> Optional['Event']:
-        """
-        Get the next event (keyboard, mouse, system, or menu event).
-        
-        This method retrieves the next event from the event queue. Events can be
-        keyboard input, mouse actions, system events (like window resize), or
-        menu selection events (in desktop mode). It can operate in blocking mode
-        (wait indefinitely), non-blocking mode (return immediately), or with a timeout.
-        
-        Args:
-            timeout_ms: Timeout in milliseconds.
-                       -1 (default): Block indefinitely until an event is available
-                        0: Non-blocking, return immediately if no event
-                       >0: Wait up to timeout_ms milliseconds for an event
-        
-        Returns:
-            Optional[Event]: An Event object (KeyEvent, MouseEvent, SystemEvent,
-                            or MenuEvent) if an event is available, or None if
-                            the timeout expires with no event.
-                                 
-        Note: The Event types are defined in the ttk.input_event module.
-              MenuEvent objects are only generated in desktop mode when a user
-              selects a menu item from the native menu bar.
-        
-        Example:
-            # Blocking wait for event
-            event = renderer.get_event()
-            
-            # Non-blocking check for event
-            event = renderer.get_event(timeout_ms=0)
-            if event is not None:
-                # Process event
-                pass
-            
-            # Wait up to 100ms for event
-            event = renderer.get_event(timeout_ms=100)
-            
-            # Handle different event types
-            from ttk.input_event import KeyEvent, MenuEvent
-            event = renderer.get_event()
-            if isinstance(event, MenuEvent):
-                print(f"Menu item selected: {event.item_id}")
-            elif isinstance(event, KeyEvent):
-                print(f"Key pressed: {event.key_code}")
-        """
-        pass
+
     
     @abstractmethod
     def set_cursor_visibility(self, visible: bool) -> None:
@@ -479,26 +433,25 @@ class Renderer(ABC):
         """
         pass
     
-    def get_input(self, timeout_ms: int = -1) -> Optional['Event']:
-        """
-        Deprecated: Use get_event() instead.
-        
-        This method is provided for backward compatibility and simply calls
-        get_event(). New code should use get_event() directly.
-        """
-        return self.get_event(timeout_ms)
+
     
-    def set_event_callback(self, callback: Optional[EventCallback]) -> None:
+    @abstractmethod
+    def set_event_callback(self, callback: EventCallback) -> None:
         """
-        Set the event callback for event delivery.
+        Set the event callback for event delivery (REQUIRED).
         
-        This method enables callback-based event delivery instead of polling.
-        When a callback is set, events are delivered via the callback methods
-        (on_key_event, on_char_event, on_system_event) instead of being
-        returned by get_event().
+        This method enables callback-based event delivery. All events are delivered
+        via the callback methods (on_key_event, on_char_event, on_system_event)
+        instead of being returned by polling methods.
+        
+        This method MUST be called before run_event_loop() or run_event_loop_iteration().
+        The callback parameter is required and cannot be None.
         
         Args:
-            callback: EventCallback instance or None to disable callbacks
+            callback: EventCallback instance (required, not optional)
+        
+        Raises:
+            ValueError: If callback is None
         
         Example:
             class MyCallback(EventCallback):
@@ -508,7 +461,66 @@ class Renderer(ABC):
             
             renderer.set_event_callback(MyCallback())
         """
-        self.event_callback = callback
+        pass
+    
+    @abstractmethod
+    def run_event_loop(self) -> None:
+        """
+        Run the main event loop until application quits.
+        
+        This method blocks until the application terminates. Events are delivered
+        via the EventCallback set with set_event_callback().
+        
+        The event callback MUST be set before calling this method.
+        
+        Raises:
+            RuntimeError: If event callback not set
+        
+        Example:
+            renderer.set_event_callback(MyCallback())
+            renderer.run_event_loop()  # Blocks until application quits
+        """
+        pass
+    
+    @abstractmethod
+    def run_event_loop_iteration(self, timeout_ms: int = -1) -> None:
+        """
+        Process one iteration of the event loop.
+        
+        This method processes pending OS events and delivers them via the
+        EventCallback methods (on_key_event, on_char_event, on_system_event).
+        It returns after processing events or when the timeout expires.
+        
+        Events are NOT returned directly from this method. Instead, they are
+        delivered asynchronously via the callback methods set with
+        set_event_callback().
+        
+        The event callback MUST be set before calling this method.
+        
+        Args:
+            timeout_ms: Maximum time to wait for events in milliseconds.
+                       -1 (default): Wait indefinitely for events
+                        0: Non-blocking, process pending events and return immediately
+                       >0: Wait up to timeout_ms milliseconds for events
+        
+        Raises:
+            RuntimeError: If event callback not set
+        
+        Example:
+            renderer.set_event_callback(MyCallback())
+            
+            # Main application loop
+            while not should_quit:
+                # Process events (delivered via callbacks)
+                renderer.run_event_loop_iteration(timeout_ms=16)
+                
+                # Update application state
+                update_application()
+                
+                # Draw interface
+                renderer.refresh()
+        """
+        pass
     
     @abstractmethod
     def set_menu_bar(self, menu_structure: dict) -> None:

@@ -34,7 +34,50 @@ except ImportError:
     sys.exit(1)
 
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-from ttk.renderer import TextAttribute
+from ttk.renderer import TextAttribute, EventCallback
+from ttk.input_event import KeyCode
+
+
+class UnicodeEmojiDemoCallback(EventCallback):
+    """Event callback handler for Unicode/Emoji demo."""
+    
+    def __init__(self, demo_state):
+        """
+        Initialize the callback handler.
+        
+        Args:
+            demo_state: Dictionary containing demo state (running flag)
+        """
+        self.demo_state = demo_state
+    
+    def on_key_event(self, event) -> bool:
+        """
+        Handle key events.
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if event was consumed
+        """
+        # Exit on Escape key
+        if event.key_code == KeyCode.ESCAPE:
+            self.demo_state['running'] = False
+            return True
+        
+        return False
+    
+    def on_char_event(self, event) -> bool:
+        """Handle character events."""
+        return False
+    
+    def on_system_event(self, event) -> bool:
+        """Handle system events."""
+        return False
+    
+    def should_close(self) -> bool:
+        """Check if application should quit."""
+        return not self.demo_state['running']
 
 
 def main():
@@ -161,17 +204,17 @@ def main():
         # Refresh to show everything
         backend.refresh()
         
+        # Set up event callback
+        demo_state = {'running': True}
+        event_callback = UnicodeEmojiDemoCallback(demo_state)
+        backend.set_event_callback(event_callback)
+        
         # Keep window open
-        print("Demo running. Press Ctrl+C to exit.")
+        print("Demo running. Press Escape or Ctrl+C to exit.")
         try:
-            while True:
-                # Process events to keep window responsive
-                event = backend.get_input(timeout_ms=100)
-                if event:
-                    # Exit on Escape key
-                    from ttk.input_event import KeyCode
-                    if event.key_code == KeyCode.ESCAPE:
-                        break
+            while demo_state['running']:
+                # Process events (delivered via callbacks)
+                backend.run_event_loop_iteration(timeout_ms=100)
         except KeyboardInterrupt:
             print("\nExiting demo...")
         

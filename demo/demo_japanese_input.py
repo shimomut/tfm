@@ -123,7 +123,7 @@ class JapaneseInputDemo(EventCallback):
         # Event loop
         while self.running:
             # Process events (this will call our callbacks)
-            self.renderer.get_event(timeout_ms=16)
+            self.renderer.run_event_loop_iteration(timeout_ms=16)
             
             # Redraw
             self.draw()

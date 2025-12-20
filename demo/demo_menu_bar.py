@@ -59,9 +59,51 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from ttk import KeyEvent, KeyCode, ModifierKey, MenuEvent, SystemEvent, SystemEventType
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+from ttk.renderer import EventCallback
 from src.tfm_menu_manager import MenuManager
 from unittest.mock import Mock
 import time
+
+
+class MenuBarDemoCallback(EventCallback):
+    """Event callback handler for menu bar demo."""
+    
+    def __init__(self, backend):
+        """Initialize the callback handler."""
+        self.backend = backend
+        self.running = True
+        self.current_event = None
+    
+    def on_key_event(self, event: KeyEvent) -> bool:
+        """Handle key events."""
+        self.current_event = event
+        return False
+    
+    def on_char_event(self, event) -> bool:
+        """Handle character events."""
+        return False
+    
+    def on_menu_event(self, event: MenuEvent) -> bool:
+        """Handle menu events."""
+        self.current_event = event
+        return True
+    
+    def on_system_event(self, event: SystemEvent) -> bool:
+        """Handle system events."""
+        if event.is_close():
+            self.running = False
+            return True
+        return False
+    
+    def should_close(self) -> bool:
+        """Check if application should quit."""
+        return not self.running
+    
+    def get_event(self, timeout_ms=-1):
+        """Get next event (for compatibility with demo code)."""
+        self.current_event = None
+        self.backend.run_event_loop_iteration(timeout_ms)
+        return self.current_event
 
 
 def create_mock_file_manager():
@@ -105,14 +147,14 @@ def print_instructions(backend, instructions, start_row=4):
     backend.refresh()
 
 
-def wait_for_key(backend, prompt="Press any key to continue..."):
+def wait_for_key(backend, callback, prompt="Press any key to continue..."):
     """Wait for user to press a key"""
     rows, cols = backend.get_size()
     backend.draw_text(rows - 2, 2, prompt, color_pair=2)
     backend.refresh()
     
     while True:
-        event = backend.get_event(timeout_ms=-1)
+        event = callback.get_event(timeout_ms=-1)
         if isinstance(event, KeyEvent):
             break
         elif isinstance(event, SystemEvent) and event.is_close():
@@ -121,7 +163,7 @@ def wait_for_key(backend, prompt="Press any key to continue..."):
     return True
 
 
-def demo_menu_structure(backend, menu_manager):
+def demo_menu_structure(backend, menu_manager, callback):
     """Demo 1: Show menu structure"""
     print_header(backend, "Demo 1: Menu Structure")
     
@@ -158,10 +200,10 @@ def demo_menu_structure(backend, menu_manager):
     ]
     
     print_instructions(backend, instructions)
-    return wait_for_key(backend)
+    return wait_for_key(backend, callback)
 
 
-def demo_menu_selection(backend, menu_manager, mock_fm):
+def demo_menu_selection(backend, menu_manager, mock_fm, callback):
     """Demo 2: Menu selection and action execution"""
     print_header(backend, "Demo 2: Menu Selection and Action Execution")
     
@@ -191,7 +233,7 @@ def demo_menu_selection(backend, menu_manager, mock_fm):
     max_actions = 4
     
     while action_count < max_actions:
-        event = backend.get_event(timeout_ms=-1)
+        event = callback.get_event(timeout_ms=-1)
         
         if event is None:
             continue
@@ -236,10 +278,10 @@ def demo_menu_selection(backend, menu_manager, mock_fm):
             if action_count > 0:
                 break
     
-    return wait_for_key(backend, "Press any key to continue to next demo...")
+    return wait_for_key(backend, callback, "Press any key to continue to next demo...")
 
 
-def demo_menu_state_updates(backend, menu_manager, mock_fm):
+def demo_menu_state_updates(backend, menu_manager, mock_fm, callback):
     """Demo 3: Menu state updates based on selection"""
     print_header(backend, "Demo 3: Menu State Updates")
     
@@ -261,7 +303,7 @@ def demo_menu_state_updates(backend, menu_manager, mock_fm):
     
     print_instructions(backend, instructions)
     
-    if not wait_for_key(backend, "Press any key to select files..."):
+    if not wait_for_key(backend, callback, "Press any key to select files..."):
         return False
     
     # Simulate selecting files
@@ -294,7 +336,7 @@ def demo_menu_state_updates(backend, menu_manager, mock_fm):
     
     print_instructions(backend, instructions)
     
-    if not wait_for_key(backend, "Press any key to copy files..."):
+    if not wait_for_key(backend, callback, "Press any key to copy files..."):
         return False
     
     # Simulate copying files
@@ -323,7 +365,7 @@ def demo_menu_state_updates(backend, menu_manager, mock_fm):
     
     print_instructions(backend, instructions)
     
-    if not wait_for_key(backend, "Press any key to navigate to root..."):
+    if not wait_for_key(backend, callback, "Press any key to navigate to root..."):
         return False
     
     # Simulate navigating to root
@@ -353,10 +395,10 @@ def demo_menu_state_updates(backend, menu_manager, mock_fm):
     
     print_instructions(backend, instructions)
     
-    return wait_for_key(backend)
+    return wait_for_key(backend, callback)
 
 
-def demo_keyboard_shortcuts(backend, menu_manager, mock_fm):
+def demo_keyboard_shortcuts(backend, menu_manager, mock_fm, callback):
     """Demo 4: Keyboard shortcuts"""
     print_header(backend, "Demo 4: Keyboard Shortcuts")
     
@@ -382,7 +424,7 @@ def demo_keyboard_shortcuts(backend, menu_manager, mock_fm):
     event_row = 16
     
     while True:
-        event = backend.get_event(timeout_ms=-1)
+        event = callback.get_event(timeout_ms=-1)
         
         if event is None:
             continue
@@ -472,17 +514,21 @@ def main():
         backend.init_color_pair(1, (255, 255, 255), (0, 100, 200))  # White on blue
         backend.init_color_pair(2, (255, 255, 0), (0, 0, 0))        # Yellow on black
         
+        # Set up event callback
+        callback = MenuBarDemoCallback(backend)
+        backend.set_event_callback(callback)
+        
         # Run demos
-        if not demo_menu_structure(backend, menu_manager):
+        if not demo_menu_structure(backend, menu_manager, callback):
             return
         
-        if not demo_menu_selection(backend, menu_manager, mock_fm):
+        if not demo_menu_selection(backend, menu_manager, mock_fm, callback):
             return
         
-        if not demo_menu_state_updates(backend, menu_manager, mock_fm):
+        if not demo_menu_state_updates(backend, menu_manager, mock_fm, callback):
             return
         
-        if not demo_keyboard_shortcuts(backend, menu_manager, mock_fm):
+        if not demo_keyboard_shortcuts(backend, menu_manager, mock_fm, callback):
             return
         
         # Show completion message
@@ -506,7 +552,7 @@ def main():
         ]
         
         print_instructions(backend, instructions)
-        wait_for_key(backend, "Press any key to exit...")
+        wait_for_key(backend, callback, "Press any key to exit...")
     
     except KeyboardInterrupt:
         print("\nDemo interrupted by user")

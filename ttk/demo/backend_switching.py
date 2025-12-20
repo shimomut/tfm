@@ -32,8 +32,59 @@ if __name__ == '__main__':
 
 from ttk.backends.curses_backend import CursesBackend
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-from ttk.renderer import Renderer, TextAttribute
+from ttk.renderer import Renderer, TextAttribute, EventCallback
 from ttk import KeyEvent, KeyCode
+
+
+class BackendSwitchingDemoCallback(EventCallback):
+    """Event callback handler for BackendSwitchingDemo."""
+    
+    def __init__(self, demo):
+        """
+        Initialize the callback handler.
+        
+        Args:
+            demo: BackendSwitchingDemo instance to handle events for
+        """
+        self.demo = demo
+    
+    def on_key_event(self, event: KeyEvent) -> bool:
+        """
+        Handle key events.
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if event was consumed
+        """
+        # Check for quit command
+        if event.char and event.char.lower() == 'q':
+            self.demo.running = False
+            return True
+        
+        # Check for ESC key
+        if event.key_code == KeyCode.ESCAPE:
+            self.demo.running = False
+            return True
+        
+        # Redraw on any other key
+        self.demo.draw_screen()
+        return True
+    
+    def on_char_event(self, event) -> bool:
+        """Handle character events."""
+        return False
+    
+    def on_system_event(self, event) -> bool:
+        """Handle system events (resize)."""
+        # Redraw on resize
+        self.demo.draw_screen()
+        return True
+    
+    def should_close(self) -> bool:
+        """Check if application should quit."""
+        return not self.demo.running
 
 
 class BackendSwitchingDemo:
@@ -55,6 +106,7 @@ class BackendSwitchingDemo:
         self.renderer = renderer
         self.running = False
         self.frame_count = 0
+        self.event_callback = None
         
     def initialize_colors(self):
         """Initialize color pairs used by the demo."""
@@ -172,30 +224,6 @@ class BackendSwitchingDemo:
         
         self.frame_count += 1
     
-    def handle_input(self, event: KeyEvent) -> bool:
-        """
-        Handle input events.
-        
-        Args:
-            event: The input event to handle
-            
-        Returns:
-            True to continue running, False to quit
-        """
-        # Handle resize events
-        if event.key_code == KeyCode.RESIZE:
-            return True
-        
-        # Check for quit command
-        if event.char and event.char.lower() == 'q':
-            return False
-        
-        # Check for ESC key
-        if event.key_code == KeyCode.ESCAPE:
-            return False
-        
-        return True
-    
     def run(self):
         """Run the demo main loop."""
         self.running = True
@@ -204,30 +232,17 @@ class BackendSwitchingDemo:
             # Initialize colors
             self.initialize_colors()
             
+            # Set up event callback
+            self.event_callback = BackendSwitchingDemoCallback(self)
+            self.renderer.set_event_callback(self.event_callback)
+            
             # Draw initial screen
             self.draw_screen()
             
             # Main event loop
             while self.running:
-                # Get input with timeout
-                event = self.renderer.get_input(timeout_ms=100)
-                
-                if event is None:
-                    # No input - just continue
-                    continue
-                
-                # Handle resize event
-                if event.key_code == KeyCode.RESIZE:
-                    self.draw_screen()
-                    continue
-                
-                # Handle the input
-                if not self.handle_input(event):
-                    self.running = False
-                    break
-                
-                # Redraw screen
-                self.draw_screen()
+                # Process events (delivered via callbacks)
+                self.renderer.run_event_loop_iteration(timeout_ms=100)
                 
         except KeyboardInterrupt:
             self.running = False

@@ -20,6 +20,26 @@ The simplest TTK application:
 ```python
 from ttk.backends.curses_backend import CursesBackend
 from ttk import KeyCode
+from ttk.renderer import EventCallback
+
+class HelloCallback(EventCallback):
+    """Simple event callback."""
+    
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event):
+        """Handle any key press to quit."""
+        self.should_quit = True
+        return True
+    
+    def on_char_event(self, event):
+        """Handle character events."""
+        return False
+    
+    def should_close(self):
+        """Check if application should quit."""
+        return self.should_quit
 
 renderer = CursesBackend()
 renderer.initialize()
@@ -28,7 +48,13 @@ try:
     renderer.draw_text(0, 0, "Hello, World!")
     renderer.draw_text(1, 0, "Press any key to exit")
     renderer.refresh()
-    renderer.get_input()
+    
+    # Set up callback and wait for input
+    callback = HelloCallback()
+    renderer.set_event_callback(callback)
+    
+    while not callback.should_quit:
+        renderer.run_event_loop_iteration()
 finally:
     renderer.shutdown()
 ```
@@ -40,16 +66,40 @@ A reusable application structure:
 ```python
 from ttk.backends.curses_backend import CursesBackend
 from ttk import KeyCode
+from ttk.renderer import EventCallback
+
+class ApplicationCallback(EventCallback):
+    """Event callback for application."""
+    
+    def __init__(self, app):
+        self.app = app
+    
+    def on_key_event(self, event):
+        """Handle key events."""
+        return self.app.handle_input(event)
+    
+    def on_char_event(self, event):
+        """Handle character events."""
+        return False
+    
+    def should_close(self):
+        """Check if application should quit."""
+        return not self.app.running
 
 class Application:
     def __init__(self):
         self.renderer = CursesBackend()
         self.running = False
+        self.callback = None
     
     def initialize(self):
         """Initialize the application."""
         self.renderer.initialize()
         self.renderer.init_color_pair(1, (255, 255, 255), (0, 0, 128))
+        
+        # Set up event callback
+        self.callback = ApplicationCallback(self)
+        self.renderer.set_event_callback(self.callback)
     
     def shutdown(self):
         """Clean up resources."""
@@ -65,6 +115,8 @@ class Application:
         """Handle input events."""
         if event.key_code == KeyCode.ESCAPE:
             self.running = False
+            return True
+        return False
     
     def run(self):
         """Main application loop."""
@@ -73,8 +125,7 @@ class Application:
             self.running = True
             while self.running:
                 self.draw()
-                event = self.renderer.get_input()
-                self.handle_input(event)
+                self.renderer.run_event_loop_iteration(timeout_ms=16)
         finally:
             self.shutdown()
 

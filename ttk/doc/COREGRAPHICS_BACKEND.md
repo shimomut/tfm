@@ -41,15 +41,33 @@ renderer = CoreGraphicsBackend()
 renderer.initialize()
 
 try:
+    # Set up event callback
+    class SimpleCallback(EventCallback):
+        def __init__(self):
+            self.should_quit = False
+        
+        def on_key_event(self, event):
+            if event.key_code == KeyCode.ESCAPE:
+                self.should_quit = True
+                return True
+            return False
+        
+        def on_char_event(self, event):
+            return False
+        
+        def should_close(self):
+            return self.should_quit
+    
+    callback = SimpleCallback()
+    renderer.set_event_callback(callback)
+    
     # Draw text
     renderer.draw_text(0, 0, "Hello, macOS!")
     renderer.refresh()
     
-    # Wait for ESC key
-    while True:
-        event = renderer.get_input()
-        if event and event.key_code == KeyCode.ESCAPE:
-            break
+    # Event loop
+    while not callback.should_quit:
+        renderer.run_event_loop_iteration(timeout_ms=16)
 
 finally:
     renderer.shutdown()

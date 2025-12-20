@@ -104,28 +104,28 @@ class TestCoreGraphicsMenuSupport(unittest.TestCase):
         # Verify no event was added
         self.assertEqual(len(self.backend.menu_event_queue), 0)
     
-    def test_get_event_returns_menu_event_first(self):
-        """Test that get_event returns menu events before other events."""
+    def test_callback_receives_menu_event(self):
+        """Test that menu events are delivered via callback."""
+        from ttk.test.test_utils import EventCapture
+        
+        # Set up event capture
+        capture = EventCapture()
+        self.backend.event_callback = capture
+        
         # Add a menu event to the queue
         menu_event = MenuEvent(item_id='file.quit')
         self.backend.menu_event_queue.append(menu_event)
         
-        # Set up other pending events
-        self.backend.resize_pending = True
-        self.backend.should_close = True
+        # Process events via callback
+        self.backend.run_event_loop_iteration(timeout_ms=0)
         
-        # Get event should return menu event first
-        event = self.backend.get_event(timeout_ms=0)
-        
-        self.assertIsInstance(event, MenuEvent)
-        self.assertEqual(event.item_id, 'file.quit')
-        
-        # Menu event queue should be empty now
-        self.assertEqual(len(self.backend.menu_event_queue), 0)
-        
-        # Other events should still be pending
-        self.assertTrue(self.backend.resize_pending)
-        self.assertTrue(self.backend.should_close)
+        # Verify event was delivered via callback
+        self.assertTrue(capture.has_event_type('system'))
+        events = capture.get_all_events()
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0][0], 'system')
+        self.assertIsInstance(events[0][1], MenuEvent)
+        self.assertEqual(events[0][1].item_id, 'file.quit')
     
     def test_update_menu_item_state_enables_item(self):
         """Test updating menu item state to enabled."""

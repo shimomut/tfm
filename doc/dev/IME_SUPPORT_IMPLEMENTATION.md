@@ -394,17 +394,25 @@ class TTKView(Cocoa.NSView, protocols=[objc.protocolNamed('NSTextInputClient')])
 
 **Problem**: Application key bindings interfere with IME composition.
 
-**Solution**: Check `hasMarkedText()` in `keyDown_()` and pass directly to `interpretKeyEvents_()` during composition.
+**Solution**: Check `hasMarkedText()` in `keyDown_()` and pass directly to `interpretKeyEvents_()` during composition. This ensures IME gets priority during composition while still delivering KeyEvents to the application when composition is not active.
+
+### 6. Callback Requirement
+
+**Problem**: IME doesn't work without event callback set.
+
+**Solution**: TTK requires event callback to be set via `set_event_callback()` before running the event loop. IME events are delivered via `on_key_event()` and `on_char_event()` callback methods.
 
 ## Integration with TTK Event System
 
-The IME implementation integrates seamlessly with TTK's event system:
+The IME implementation integrates seamlessly with TTK's callback-only event system:
 
-1. **KeyEvent**: Delivered for keys that don't start composition
-2. **CharEvent**: Generated when composition is committed via `insertText_()`
-3. **Event Callback**: Uses existing `backend.event_callback` interface
+1. **KeyEvent**: Delivered via `on_key_event()` for keys that don't start composition
+2. **CharEvent**: Generated when composition is committed via `insertText_()` and delivered via `on_char_event()`
+3. **Event Callback**: Uses the required `backend.event_callback` interface
 
-This allows TFM and other TTK applications to handle IME input without any changes to their event handling code.
+**Callback Requirement**: The event callback must be set via `set_event_callback()` before running the event loop. IME functionality requires callback mode - there is no polling mode support.
+
+This allows TFM and other TTK applications to handle IME input without any changes to their event handling code, as long as they implement the EventCallback interface.
 
 ## Future Enhancements
 
