@@ -1,44 +1,44 @@
 # Implementation Plan
 
-- [ ] 1. Add IME state tracking to TTKView
+- [x] 1. Add IME state tracking to TTKView
   - Add instance variables for marked_text, marked_range, and selected_range in initWithFrame_backend_
   - Initialize marked_range with NSNotFound location
   - Initialize selected_range as zero-length range
   - _Requirements: 3.2, 3.3, 5.1_
 
-- [ ] 2. Implement basic NSTextInputClient protocol methods
-- [ ] 2.1 Implement hasMarkedText method
+- [x] 2. Implement basic NSTextInputClient protocol methods
+- [x] 2.1 Implement hasMarkedText method
   - Return True if marked_range.location != NSNotFound
   - _Requirements: 3.2_
 
-- [ ] 2.2 Implement markedRange method
+- [x] 2.2 Implement markedRange method
   - Return the current marked_range
   - _Requirements: 3.2_
 
-- [ ] 2.3 Implement selectedRange method
+- [x] 2.3 Implement selectedRange method
   - Return the current selected_range
   - _Requirements: 3.3_
 
-- [ ] 2.4 Implement validAttributesForMarkedText method
+- [x] 2.4 Implement validAttributesForMarkedText method
   - Return empty array for basic support
   - _Requirements: 3.1_
 
-- [ ] 3. Implement composition text handling
-- [ ] 3.1 Implement setMarkedText_selectedRange_replacementRange_ method
+- [x] 3. Implement composition text handling
+- [x] 3.1 Implement setMarkedText_selectedRange_replacementRange_ method
   - Extract plain text from NSString or NSAttributedString
   - Update marked_text instance variable
   - Update marked_range based on text length
   - Store selected_range parameter
   - _Requirements: 3.4, 5.1_
 
-- [ ] 3.2 Implement unmarkText method
+- [x] 3.2 Implement unmarkText method
   - Clear marked_text to empty string
   - Reset marked_range to NSNotFound location
   - Reset selected_range to zero-length
   - _Requirements: 5.4, 5.5, 7.3_
 
-- [ ] 4. Implement text commit handling
-- [ ] 4.1 Implement insertText_ method
+- [x] 4. Implement text commit handling
+- [x] 4.1 Implement insertText_ method
   - Clear marked text state by calling unmarkText
   - Extract plain text from NSString or NSAttributedString
   - Generate CharEvent for each character in the text
@@ -49,12 +49,12 @@
   - **Property 1: IME committed text generates CharEvent**
   - **Validates: Requirements 1.5, 6.1, 6.2**
 
-- [ ] 5. Add cursor position tracking to CoreGraphicsBackend
-- [ ] 5.1 Add cursor_row and cursor_col instance variables
+- [x] 5. Add cursor position tracking to CoreGraphicsBackend
+- [x] 5.1 Add cursor_row and cursor_col instance variables
   - Initialize to 0 in __init__
   - _Requirements: 2.4, 4.1_
 
-- [ ] 5.2 Implement set_cursor_position method
+- [x] 5.2 Implement set_cursor_position method
   - Accept row and col parameters
   - Clamp row to [0, rows-1]
   - Clamp col to [0, cols-1]
@@ -65,8 +65,8 @@
   - **Property 2: Cursor position determines IME overlay position**
   - **Validates: Requirements 2.4, 2.5, 4.1, 4.2**
 
-- [ ] 6. Implement IME positioning
-- [ ] 6.1 Implement firstRectForCharacterRange_actualRange_ method
+- [x] 6. Implement IME positioning
+- [x] 6.1 Implement firstRectForCharacterRange_actualRange_ method
   - Get cursor position from backend.cursor_row and backend.cursor_col
   - Convert to pixel coordinates using char_width and char_height
   - Apply coordinate system transformation (TTK to CoreGraphics)
@@ -82,8 +82,8 @@
   - Test with various cursor positions
   - _Requirements: 4.1, 4.2_
 
-- [ ] 7. Implement font information for IME
-- [ ] 7.1 Implement attributedSubstringForProposedRange_actualRange_ method
+- [x] 7. Implement font information for IME
+- [x] 7.1 Implement attributedSubstringForProposedRange_actualRange_ method
   - Create attributes dictionary with NSFontAttributeName set to backend.font
   - Create NSAttributedString with single space character and attributes
   - Fill actual_range parameter if not None
@@ -94,8 +94,8 @@
   - **Property 3: Font size matches application font**
   - **Validates: Requirements 2.1, 2.2, 2.3**
 
-- [ ] 8. Update keyDown_ method for IME integration
-- [ ] 8.1 Modify keyDown_ to call interpretKeyEvents_
+- [x] 8. Update keyDown_ method for IME integration
+- [x] 8.1 Modify keyDown_ to call interpretKeyEvents_
   - Generate KeyEvent from NSEvent (existing code)
   - Deliver KeyEvent to application via callback
   - If consumed, return early without IME processing
@@ -108,30 +108,30 @@
   - Test Escape during composition cancels composition
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 9. Add error handling
-- [ ] 9.1 Add bounds checking in set_cursor_position
+- [x] 9. Add error handling
+- [x] 9.1 Add bounds checking in set_cursor_position
   - Log warning if position is significantly out of bounds
   - Clamp to valid range
   - _Requirements: 2.4_
 
-- [ ] 9.2 Add null checks in insertText_
+- [x] 9.2 Add null checks in insertText_
   - Check if event_callback exists before generating CharEvent
   - Log warning in debug mode if callback is None
   - _Requirements: 6.1_
 
-- [ ] 9.3 Add null checks in firstRectForCharacterRange_actualRange_
+- [x] 9.3 Add null checks in firstRectForCharacterRange_actualRange_
   - Check if window exists before coordinate conversion
   - Return zero rect at origin if window is None
   - Log warning about missing window
   - _Requirements: 4.1_
 
-- [ ] 9.4 Add null checks in attributedSubstringForProposedRange_actualRange_
+- [x] 9.4 Add null checks in attributedSubstringForProposedRange_actualRange_
   - Check if backend.font exists
   - Return None if font is None
   - Log warning about missing font
   - _Requirements: 2.1_
 
-- [ ] 10. Checkpoint - Ensure all tests pass
+- [x] 10. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ]* 11. Create integration test for Japanese IME
@@ -165,5 +165,5 @@
   - Show composition text and committed text
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 16. Final Checkpoint - Ensure all tests pass
+- [x] 16. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

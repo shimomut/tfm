@@ -2547,6 +2547,38 @@ class CoreGraphicsBackend(Renderer):
         if self.cursor_visible and self.view:
             self.view.setNeedsDisplay_(True)
     
+    def set_cursor_position(self, row: int, col: int) -> None:
+        """
+        Update cursor position for IME positioning.
+        
+        This method should be called by text widgets when the cursor moves
+        to ensure IME composition appears at the correct location. Unlike
+        move_cursor(), this method does not trigger a redraw and is specifically
+        designed for IME support.
+        
+        Coordinates are clamped to valid grid bounds to prevent out-of-bounds
+        errors. If the position is significantly out of bounds (more than 10
+        rows/cols beyond the grid), a warning is logged.
+        
+        Args:
+            row: Cursor row (0-based, 0 is top)
+            col: Cursor column (0-based, 0 is left)
+        
+        Example:
+            # Update cursor position for IME
+            backend.set_cursor_position(5, 10)
+            
+            # IME will now position composition text at row 5, column 10
+        """
+        # Log warning if position is significantly out of bounds
+        if row < -10 or row >= self.rows + 10 or col < -10 or col >= self.cols + 10:
+            print(f"Warning: Cursor position ({row}, {col}) is significantly out of bounds "
+                  f"for grid size ({self.rows}, {self.cols})")
+        
+        # Clamp to valid range
+        self.cursor_row = max(0, min(row, self.rows - 1))
+        self.cursor_col = max(0, min(col, self.cols - 1))
+    
     def set_menu_bar(self, menu_structure: dict) -> None:
         """
         Set menu bar structure for desktop mode.
@@ -2984,6 +3016,13 @@ if COCOA_AVAILABLE:
                 # during rendering in drawRect_()
                 self.backend = backend
                 
+                # IME state tracking for NSTextInputClient protocol support
+                # These instance variables track the current composition state
+                # for Input Method Editor (IME) support on macOS
+                self.marked_text = ""  # Current composition text
+                self.marked_range = Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)  # Composition range
+                self.selected_range = Cocoa.NSMakeRange(0, 0)  # Selection within composition
+                
                 return self
             
             def drawRect_(self, rect):
@@ -3288,54 +3327,114 @@ if COCOA_AVAILABLE:
                 """
                 Check if there is marked text (IME composition in progress).
                 
-                This is part of the NSTextInputClient protocol. For now, we return
-                False as we don't support IME composition yet. This will be
-                implemented in a future phase when full IME support is added.
+                This is part of the NSTextInputClient protocol. Returns True if
+                there is active composition text (marked text) from the IME.
+                
+                The marked_range.location is set to NSNotFound when there is no
+                composition, and to a valid location (typically 0) when composition
+                is active.
                 
                 Returns:
-                    bool: False (no IME composition support yet)
+                    bool: True if there is active composition text, False otherwise
                 """
-                return False
+                return self.marked_range.location != Cocoa.NSNotFound
             
             def markedRange(self):
                 """
                 Get the range of marked text (IME composition).
                 
-                This is part of the NSTextInputClient protocol. For now, we return
-                NSNotFound to indicate no marked text, as we don't support IME
-                composition yet. This will be implemented in a future phase.
+                This is part of the NSTextInputClient protocol. Returns the current
+                marked_range which indicates the range of composition text.
+                
+                When there is no composition, marked_range.location is NSNotFound.
+                When composition is active, marked_range contains the location and
+                length of the composition text.
                 
                 Returns:
-                    NSRange: NSMakeRange(NSNotFound, 0) indicating no marked text
+                    NSRange: The current marked text range
                 """
-                return Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
+                return self.marked_range
             
             def selectedRange(self):
                 """
                 Get the range of selected text.
                 
-                This is part of the NSTextInputClient protocol. For now, we return
-                NSNotFound to indicate no selection, as we don't track text selection
-                in the view. This will be implemented in a future phase if needed.
+                This is part of the NSTextInputClient protocol. Returns the current
+                selected_range which indicates the selection within the composition
+                text or document.
+                
+                For TFM, we track the selection within the composition text during
+                IME input. When there is no composition, this typically returns a
+                zero-length range at the cursor position.
                 
                 Returns:
-                    NSRange: NSMakeRange(NSNotFound, 0) indicating no selection
+                    NSRange: The current selected text range
                 """
-                return Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
+                return self.selected_range
             
             def validAttributesForMarkedText(self):
                 """
                 Get valid attributes for marked text (IME composition).
                 
-                This is part of the NSTextInputClient protocol. For now, we return
-                an empty array as we don't support IME composition attributes yet.
-                This will be implemented in a future phase when full IME support
-                is added.
+                This is part of the NSTextInputClient protocol. Returns an array
+                of attribute names that the application supports for marked text.
+                
+                For basic IME support, we return an empty array to indicate that
+                we don't require any special attributes for marked text. macOS
+                will use default attributes (underline, highlighting) for the
+                composition text.
                 
                 Returns:
-                    NSArray: Empty array (no IME attributes supported yet)
+                    NSArray: Empty array (basic support without custom attributes)
                 """
                 return []
+            
+            def setMarkedText_selectedRange_replacementRange_(self, string, selected_range, replacement_range):
+                """
+                Handle composition text updates from IME.
+                
+                This method is called repeatedly as the user types with IME active.
+                macOS handles all visual rendering - we just track the state for
+                position queries.
+                
+                This is part of the NSTextInputClient protocol and is called by
+                macOS during IME composition to update the marked (composition) text.
+                
+                Args:
+                    string: NSString or NSAttributedString containing composition text
+                    selected_range: NSRange indicating selected portion within composition
+                    replacement_range: NSRange indicating text to replace (usually NSNotFound)
+                """
+                # Extract plain text if NSAttributedString
+                if hasattr(string, 'string'):
+                    self.marked_text = str(string.string())
+                else:
+                    self.marked_text = str(string)
+                
+                # Update marked range
+                if len(self.marked_text) > 0:
+                    self.marked_range = Cocoa.NSMakeRange(0, len(self.marked_text))
+                else:
+                    self.marked_range = Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
+                
+                # Store selected range within composition
+                self.selected_range = selected_range
+            
+            def unmarkText(self):
+                """
+                Cancel composition without committing.
+                
+                This method is called when:
+                1. User presses Escape during composition
+                2. Focus changes while composition is active
+                3. Dialog closes with active composition
+                
+                This is part of the NSTextInputClient protocol and clears all
+                composition state without generating any CharEvent.
+                """
+                self.marked_text = ""
+                self.marked_range = Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
+                self.selected_range = Cocoa.NSMakeRange(0, 0)
             
             def keyDown_(self, event):
                 """
@@ -3384,28 +3483,179 @@ if COCOA_AVAILABLE:
                 the NSString and generates a CharEvent for each character, delivering
                 them via the on_char_event callback.
                 
+                This method is also called when IME composition is committed. In that
+                case, we clear the marked text state before generating CharEvent.
+                
                 This is the second part of the callback-based event system flow:
                 1. keyDown: delivers KeyEvent
                 2. If not consumed, interpretKeyEvents: is called
-                3. macOS translates the key to a character
-                4. insertText: is called with the character
-                5. Generate CharEvent and deliver via on_char_event
+                3. macOS translates the key to a character (or commits IME composition)
+                4. insertText: is called with the character(s)
+                5. Clear marked text state (if IME was active)
+                6. Generate CharEvent and deliver via on_char_event
                 
                 Args:
-                    string: NSString containing the character(s) to insert
+                    string: NSString or NSAttributedString containing the character(s) to insert
                 """
-                if not string or len(string) == 0:
+                # Clear marked text state (IME composition is being committed)
+                self.marked_text = ""
+                self.marked_range = Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
+                self.selected_range = Cocoa.NSMakeRange(0, 0)
+                
+                # Extract plain text if NSAttributedString
+                if hasattr(string, 'string'):
+                    text = str(string.string())
+                else:
+                    text = str(string)
+                
+                if not text or len(text) == 0:
                     return
                 
                 # Import CharEvent here to avoid circular import
                 from ttk.input_event import CharEvent
                 
                 # Create CharEvent for each character
-                for char in string:
+                for char in text:
                     char_event = CharEvent(char=char)
                     
                     if self.backend.event_callback:
                         self.backend.event_callback.on_char_event(char_event)
+            
+            def firstRectForCharacterRange_actualRange_(self, char_range, actual_range):
+                """
+                Provide screen rectangle for composition text positioning.
+                
+                This method tells macOS where to display the composition text and
+                candidate window. We return the screen coordinates of the current
+                cursor position.
+                
+                This is part of the NSTextInputClient protocol and is called by
+                macOS to determine where to position the IME composition overlay
+                and candidate selection window.
+                
+                The method performs the following steps:
+                1. Get cursor position from backend (cursor_row, cursor_col)
+                2. Convert to pixel coordinates using char_width and char_height
+                3. Apply coordinate system transformation (TTK to CoreGraphics)
+                4. Create NSRect at cursor position with character dimensions
+                5. Convert from view coordinates to screen coordinates
+                6. Fill actual_range parameter if provided
+                7. Return screen rectangle
+                
+                Coordinate System Transformation:
+                    TTK uses top-left origin where (0, 0) is at the top-left corner
+                    and row increases downward. CoreGraphics uses bottom-left origin
+                    where (0, 0) is at the bottom-left corner and y increases upward.
+                    
+                    Transformation formula:
+                        x_pixel = col * char_width
+                        y_pixel = (rows - row - 1) * char_height
+                
+                Args:
+                    char_range: NSRange indicating requested character range
+                    actual_range: Pointer to NSRange to fill with actual range (can be NULL/None)
+                
+                Returns:
+                    NSRect in screen coordinates where composition should appear
+                """
+                # Get cursor position from backend
+                # The backend tracks the current text widget's cursor position
+                cursor_row = self.backend.cursor_row
+                cursor_col = self.backend.cursor_col
+                
+                # Convert to pixel coordinates (TTK to CoreGraphics)
+                # TTK: (0, 0) is top-left, row increases downward
+                # CoreGraphics: (0, 0) is bottom-left, y increases upward
+                x_pixel = cursor_col * self.backend.char_width
+                y_pixel = (self.backend.rows - cursor_row - 1) * self.backend.char_height
+                
+                # Create rect at cursor position with character dimensions
+                # This rect represents where the first character of composition will appear
+                rect = Cocoa.NSMakeRect(
+                    x_pixel,
+                    y_pixel,
+                    self.backend.char_width,
+                    self.backend.char_height
+                )
+                
+                # Convert from view coordinates to screen coordinates
+                # Step 1: Convert from view coordinates to window coordinates
+                # Pass None as the second argument to convert to window coordinates
+                window_rect = self.convertRect_toView_(rect, None)
+                
+                # Step 2: Convert from window coordinates to screen coordinates
+                # Check if window exists before conversion
+                window = self.window()
+                if window is not None:
+                    screen_rect = window.convertRectToScreen_(window_rect)
+                else:
+                    # No window - return zero rect at origin
+                    # This shouldn't happen in normal operation, but provides a fallback
+                    print("Warning: IME positioning requested but view has no window")
+                    screen_rect = Cocoa.NSMakeRect(0, 0, 0, 0)
+                
+                # Fill actual_range if provided
+                # actual_range is a pointer that macOS may provide to receive the
+                # actual range we're returning information for
+                if actual_range is not None:
+                    # We're returning information for the requested range
+                    actual_range[0] = char_range
+                
+                return screen_rect
+            
+            def attributedSubstringForProposedRange_actualRange_(self, proposed_range, actual_range):
+                """
+                Provide attributed string for font information.
+                
+                This method tells macOS what font to use for composition text.
+                We return an attributed string with our application font so the
+                IME composition matches our text size.
+                
+                This is part of the NSTextInputClient protocol and is called by
+                macOS to determine what font and text attributes to use when
+                rendering the IME composition overlay.
+                
+                The method performs the following steps:
+                1. Check if backend.font exists
+                2. Create attributes dictionary with NSFontAttributeName set to backend.font
+                3. Create NSAttributedString with single space character and attributes
+                4. Fill actual_range parameter if provided
+                5. Return attributed string (or None if font is not available)
+                
+                Args:
+                    proposed_range: NSRange indicating requested range
+                    actual_range: Pointer to NSRange to fill with actual range (can be NULL/None)
+                
+                Returns:
+                    NSAttributedString with font information, or None if font is not available
+                """
+                # Check if backend.font exists
+                if not hasattr(self.backend, 'font') or self.backend.font is None:
+                    # No font available - return None
+                    # macOS will use default system font for composition
+                    print("Warning: IME font information requested but backend.font is not available")
+                    return None
+                
+                # Create attributes dictionary with our font
+                # Use a single space character as placeholder
+                attrs = {
+                    Cocoa.NSFontAttributeName: self.backend.font
+                }
+                
+                # Create NSAttributedString with font information
+                attr_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
+                    " ",
+                    attrs
+                )
+                
+                # Fill actual_range if provided
+                # actual_range is a pointer that macOS may provide to receive the
+                # actual range we're returning information for
+                if actual_range is not None:
+                    # We're returning information for a single character (the space)
+                    actual_range[0] = Cocoa.NSMakeRange(0, 1)
+                
+                return attr_string
 else:
     # Provide a dummy class when PyObjC is not available
     class TTKView:
