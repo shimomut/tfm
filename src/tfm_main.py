@@ -2136,26 +2136,6 @@ class FileManager:
         self.list_dialog.exit()
         self.needs_full_redraw = True
     
-    def handle_info_dialog_input(self, key):
-        """Handle input while in info dialog mode - wrapper for info dialog component"""
-        was_active = self.info_dialog.is_active
-        if self.info_dialog.handle_input(key):
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.info_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        return False
-    
-    def handle_list_dialog_input(self, key):
-        """Handle input while in list dialog mode - wrapper for list dialog component"""
-        was_active = self.list_dialog.is_active
-        if self.list_dialog.handle_input(key):
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.list_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        return False
-
     def show_favorite_directories(self):
         """Show favorite directories using the searchable list dialog"""
         # Create a wrapper print function that also triggers redraw
@@ -3103,35 +3083,6 @@ class FileManager:
         search_root = current_pane['path']
         self.search_dialog.perform_search(search_root)
     
-    def handle_search_dialog_input(self, key):
-        """Handle input while in search dialog mode - wrapper for search dialog component"""
-        was_active = self.search_dialog.is_active
-        result = self.search_dialog.handle_input(key)
-        
-        if result == True:
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.search_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(result, tuple):
-            action, data = result
-            if action == 'search':
-                self.perform_search()
-                return True
-            elif action == 'navigate':
-                if data:
-                    self._navigate_to_search_result(data)
-                    
-                # Save search term to history if it's not empty
-                search_term = self.search_dialog.text_editor.text.strip()
-                if search_term:
-                    self.add_search_to_history(search_term)
-                    
-                self.exit_search_dialog_mode()
-                return True
-        
-        return False
-
     def _navigate_to_search_result(self, result):
         """Navigate to the selected search result - wrapper for search dialog helper"""
         SearchDialogHelpers.navigate_to_result(result, self.pane_manager, self.file_operations, print)
@@ -3174,48 +3125,6 @@ class FileManager:
         self.drives_dialog.exit()
         self.needs_full_redraw = True
     
-    def handle_jump_dialog_input(self, key):
-        """Handle input while in jump dialog mode - wrapper for jump dialog component"""
-        was_active = self.jump_dialog.is_active
-        result = self.jump_dialog.handle_input(key)
-        
-        if result == True:
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.jump_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(result, tuple):
-            action, data = result
-            if action == 'navigate':
-                if data:
-                    JumpDialogHelpers.navigate_to_directory(data, self.pane_manager, print)
-                    
-                self.exit_jump_dialog_mode()
-                return True
-        
-        return False
-    
-    def handle_drives_dialog_input(self, event):
-        """Handle input while in drives dialog mode - wrapper for drives dialog component"""
-        was_active = self.drives_dialog.is_active
-        result = self.drives_dialog.handle_input(event)
-        
-        if result == True:
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.drives_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(result, tuple):
-            action, data = result
-            if action == 'navigate':
-                if data:
-                    DrivesDialogHelpers.navigate_to_drive(data, self.pane_manager, print)
-                    
-                self.exit_drives_dialog_mode()
-                return True
-        
-        return False
-
     def handle_main_screen_key_event(self, event):
         """
         Handle key events for the main FileManager screen.
