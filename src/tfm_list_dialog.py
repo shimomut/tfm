@@ -7,12 +7,13 @@ Provides searchable list dialog functionality
 from ttk import TextAttribute, KeyEvent, CharEvent
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
+from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_config import get_favorite_directories, get_programs
 from tfm_input_compat import ensure_input_event
 
 
-class ListDialog(BaseListDialog):
+class ListDialog(UILayer, BaseListDialog):
     """Searchable list dialog component"""
     
     def __init__(self, config, renderer=None):
@@ -70,6 +71,16 @@ class ListDialog(BaseListDialog):
         event = ensure_input_event(event)
         
         if not event:
+            return False
+        
+        # Check if this is a KeyEvent with a char field (text input)
+        # If so, treat it as character input for the text editor
+        if isinstance(event, KeyEvent) and hasattr(event, 'char') and event.char and event.key_code == 0:
+            # This is text input, pass to text editor
+            if self.text_editor.handle_key(CharEvent(char=event.char)):
+                self._filter_items()
+                self.content_changed = True
+                return True
             return False
         
         # Check custom key handler first (only for KeyEvents)
@@ -212,6 +223,139 @@ class ListDialog(BaseListDialog):
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False
+    
+    # UILayer interface implementation
+    
+    def handle_key_event(self, event) -> bool:
+        """
+        Handle a key event (UILayer interface).
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to KeyEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, KeyEvent):
+            return False
+        
+        # Check custom key handler first
+        if self.custom_key_handler and self.custom_key_handler(event):
+            return True
+        
+        # Use base class navigation handling
+        result = self.handle_common_navigation(event, self.filtered_items)
+        
+        if result == 'cancel':
+            # Store callback before exiting
+            callback = self.callback
+            self.exit()
+            # Call callback after exiting to allow new dialogs
+            if callback:
+                callback(None)
+            return True
+        elif result == 'select':
+            # Select current item
+            callback = self.callback
+            if self.filtered_items and 0 <= self.selected < len(self.filtered_items):
+                selected_item = self.filtered_items[self.selected]
+                self.exit()
+                # Call callback after exiting to allow new dialogs
+                if callback:
+                    callback(selected_item)
+            else:
+                self.exit()
+                # Call callback after exiting to allow new dialogs
+                if callback:
+                    callback(None)
+            return True
+        elif result == 'text_changed':
+            self._filter_items()
+            self.content_changed = True
+            return True
+        elif result:
+            self.content_changed = True
+            return True
+        
+        return False
+    
+    def handle_char_event(self, event) -> bool:
+        """
+        Handle a character event (UILayer interface).
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to CharEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, CharEvent):
+            return False
+        
+        # Pass to text editor
+        if self.text_editor.handle_key(event):
+            self._filter_items()
+            self.content_changed = True
+            return True
+        
+        return False
+    
+    def render(self, renderer) -> None:
+        """
+        Render the layer's content (UILayer interface).
+        
+        Args:
+            renderer: TTK renderer instance for drawing
+        """
+        self.draw()
+    
+    def is_full_screen(self) -> bool:
+        """
+        Query if this layer occupies the full screen (UILayer interface).
+        
+        Returns:
+            False - dialogs are overlays, not full-screen
+        """
+        return False
+    
+    def mark_dirty(self) -> None:
+        """
+        Mark this layer as needing a redraw (UILayer interface).
+        """
+        self.content_changed = True
+    
+    def clear_dirty(self) -> None:
+        """
+        Clear the dirty flag after rendering (UILayer interface).
+        """
+        self.content_changed = False
+    
+    def should_close(self) -> bool:
+        """
+        Query if this layer wants to close (UILayer interface).
+        
+        Returns:
+            True if the layer should be closed, False otherwise
+        """
+        return not self.is_active
+    
+    def on_activate(self) -> None:
+        """
+        Called when this layer becomes the top layer (UILayer interface).
+        """
+        self.content_changed = True  # Ensure dialog is drawn when activated
+    
+    def on_deactivate(self) -> None:
+        """
+        Called when this layer is no longer the top layer (UILayer interface).
+        """
+        pass
 
 
 class ListDialogHelpers:

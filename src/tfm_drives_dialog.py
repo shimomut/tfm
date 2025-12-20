@@ -6,9 +6,10 @@ Provides storage/drive selection functionality including local filesystem and S3
 
 import threading
 import time
-from ttk import KeyCode, TextAttribute
+from ttk import KeyCode, KeyEvent, CharEvent, TextAttribute
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
+from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_input_compat import ensure_input_event
@@ -59,7 +60,7 @@ class DriveEntry:
             return f"{icon} {display_name}"
 
 
-class DrivesDialog(BaseListDialog):
+class DrivesDialog(UILayer, BaseListDialog):
     """Drives dialog component for storage/drive selection"""
     
     def __init__(self, config, renderer=None):
@@ -70,6 +71,7 @@ class DrivesDialog(BaseListDialog):
         self.filtered_drives = []  # Filtered drives based on search
         self.loading_s3 = False  # Whether S3 bucket scan is in progress
         self.content_changed = True  # Track if content needs redraw
+        self._selected_drive = None  # Store selected drive for retrieval
         
         # Threading support for S3 bucket loading
         self.s3_thread = None
@@ -431,6 +433,153 @@ class DrivesDialog(BaseListDialog):
         # Automatically mark as not needing redraw after drawing (unless still loading)
         if not self.loading_s3:
             self.content_changed = False
+    
+    # UILayer interface implementation
+    
+    def handle_key_event(self, event) -> bool:
+        """
+        Handle a key event (UILayer interface).
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to KeyEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, KeyEvent):
+            return False
+        
+        # Use base class navigation handling with thread safety
+        with self.s3_lock:
+            current_filtered = self.filtered_drives.copy()
+        
+        result = self.handle_common_navigation(event, current_filtered)
+        
+        if result == 'cancel':
+            # Cancel S3 scan before exiting
+            self._cancel_current_s3_scan()
+            self.exit()
+            return True
+        elif result == 'select':
+            # Cancel S3 scan before navigating
+            self._cancel_current_s3_scan()
+            
+            # Return the selected drive for navigation (thread-safe)
+            with self.s3_lock:
+                if self.filtered_drives and 0 <= self.selected < len(self.filtered_drives):
+                    selected_drive = self.filtered_drives[self.selected]
+                    # Store the selected drive for retrieval
+                    self._selected_drive = selected_drive
+                    self.exit()
+                    return True
+            self.exit()
+            return True
+        elif result == 'text_changed':
+            self._filter_drives()
+            self.content_changed = True
+            return True
+        elif result:
+            # Update selection in thread-safe manner for navigation keys
+            if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
+                with self.s3_lock:
+                    # The base class already updated self.selected, just need to adjust scroll
+                    self._adjust_scroll(len(self.filtered_drives))
+            
+            # Mark content as changed for ANY handled key to ensure continued rendering
+            self.content_changed = True
+            return True
+        
+        return False
+    
+    def handle_char_event(self, event) -> bool:
+        """
+        Handle a character event (UILayer interface).
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to CharEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, CharEvent):
+            return False
+        
+        # Pass to text editor
+        if self.text_editor.handle_key(event):
+            self._filter_drives()
+            self.content_changed = True
+            return True
+        
+        return False
+    
+    def render(self, renderer) -> None:
+        """
+        Render the layer's content (UILayer interface).
+        
+        Args:
+            renderer: TTK renderer instance for drawing
+        """
+        self.draw()
+    
+    def is_full_screen(self) -> bool:
+        """
+        Query if this layer occupies the full screen (UILayer interface).
+        
+        Returns:
+            False - dialogs are overlays, not full-screen
+        """
+        return False
+    
+    def mark_dirty(self) -> None:
+        """
+        Mark this layer as needing a redraw (UILayer interface).
+        """
+        self.content_changed = True
+    
+    def clear_dirty(self) -> None:
+        """
+        Clear the dirty flag after rendering (UILayer interface).
+        """
+        # Only clear if not loading S3 (to keep animation running)
+        if not self.loading_s3:
+            self.content_changed = False
+    
+    def should_close(self) -> bool:
+        """
+        Query if this layer wants to close (UILayer interface).
+        
+        Returns:
+            True if the layer should be closed, False otherwise
+        """
+        return not self.is_active
+    
+    def on_activate(self) -> None:
+        """
+        Called when this layer becomes the top layer (UILayer interface).
+        """
+        self.content_changed = True  # Ensure dialog is drawn when activated
+    
+    def on_deactivate(self) -> None:
+        """
+        Called when this layer is no longer the top layer (UILayer interface).
+        """
+        # Cancel any running S3 scan when deactivated
+        self._cancel_current_s3_scan()
+    
+    def get_selected_drive(self):
+        """
+        Get the selected drive entry.
+        
+        Returns:
+            DriveEntry object of the selected drive, or None if no selection
+        """
+        return self._selected_drive
 
 
 class DrivesDialogHelpers:

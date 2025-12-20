@@ -13,6 +13,7 @@ from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent
 from tfm_colors import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
+from tfm_ui_layer import UILayer
 
 # Try to import pygments for syntax highlighting
 try:
@@ -25,8 +26,8 @@ except ImportError:
     PYGMENTS_AVAILABLE = False
 
 
-class DiffViewer:
-    """Side-by-side text diff viewer"""
+class DiffViewer(UILayer):
+    """Side-by-side text diff viewer that implements UILayer interface"""
     
     def __init__(self, renderer, file1_path: Path, file2_path: Path):
         self.renderer = renderer
@@ -49,7 +50,8 @@ class DiffViewer:
         self.current_diff_index = -1  # Index into diff_indices (-1 means no focus)
         self.ignore_whitespace = False  # Whether to ignore whitespace when comparing
         self.wrap_lines = False  # Whether to wrap long lines
-        self.should_close = False  # Flag to indicate viewer wants to close
+        self._should_close = False  # Flag to indicate viewer wants to close (UILayer interface)
+        self._dirty = True  # Flag to indicate layer needs redraw (UILayer interface)
         
         # Load files and compute diff
         self.load_files()
@@ -1064,6 +1066,7 @@ class DiffViewer:
             if char_lower == 'n':
                 # Toggle line numbers
                 self.show_line_numbers = not self.show_line_numbers
+                self._dirty = True
             elif char_lower == 's':
                 # Toggle syntax highlighting
                 if PYGMENTS_AVAILABLE:
@@ -1076,6 +1079,7 @@ class DiffViewer:
                         # Create plain highlighted lines (no colors)
                         self.file1_highlighted = [[(line, COLOR_REGULAR_FILE)] for line in self.file1_lines]
                         self.file2_highlighted = [[(line, COLOR_REGULAR_FILE)] for line in self.file2_lines]
+                    self._dirty = True
             elif char_lower == 't':
                 # Cycle through tab widths: 2, 4, 8
                 if self.tab_width == 2:
@@ -1087,24 +1091,27 @@ class DiffViewer:
                 
                 # Re-expand tabs with new tab width
                 self.refresh_tab_expansion()
+                self._dirty = True
             elif char_lower == 'i':
                 # Toggle whitespace ignore mode
                 self.ignore_whitespace = not self.ignore_whitespace
                 # Recompute diff with new whitespace mode
                 self.compute_diff()
+                self._dirty = True
             elif char_lower == 'w':
                 # Toggle wrap mode
                 self.wrap_lines = not self.wrap_lines
                 # Reset horizontal offset when enabling wrap mode
                 if self.wrap_lines:
                     self.horizontal_offset = 0
+                self._dirty = True
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
-            self.should_close = True
+            self._should_close = True
             return True
         elif event.key_code == KeyCode.ENTER:
-            self.should_close = True
+            self._should_close = True
             return True
         elif event.key_code == KeyCode.UP:
             # Check for Shift modifier to jump to previous diff
@@ -1115,14 +1122,17 @@ class DiffViewer:
                         # First time using Shift-Up: jump to last difference
                         self.current_diff_index = len(self.diff_indices) - 1
                         self._scroll_to_diff(self.current_diff_index, display_height)
+                        self._dirty = True
                     elif self.current_diff_index > 0:
                         # Jump to previous difference
                         self.current_diff_index -= 1
                         self._scroll_to_diff(self.current_diff_index, display_height)
+                        self._dirty = True
             else:
                 # Normal scroll up
                 if self.scroll_offset > 0:
                     self.scroll_offset -= 1
+                    self._dirty = True
         elif event.key_code == KeyCode.DOWN:
             # Check for Shift modifier to jump to next diff
             if event.has_modifier(ModifierKey.SHIFT):
@@ -1132,10 +1142,12 @@ class DiffViewer:
                         # First time using Shift-Down: jump to first difference
                         self.current_diff_index = 0
                         self._scroll_to_diff(self.current_diff_index, display_height)
+                        self._dirty = True
                     elif self.current_diff_index < len(self.diff_indices) - 1:
                         # Jump to next difference
                         self.current_diff_index += 1
                         self._scroll_to_diff(self.current_diff_index, display_height)
+                        self._dirty = True
             else:
                 # Normal scroll down
                 # Calculate max scroll based on whether wrapping is enabled
@@ -1152,13 +1164,17 @@ class DiffViewer:
                     max_scroll = max(0, len(self.diff_lines) - display_height)
                 if self.scroll_offset < max_scroll:
                     self.scroll_offset += 1
+                    self._dirty = True
         elif event.key_code == KeyCode.LEFT:
             if self.horizontal_offset > 0:
                 self.horizontal_offset = max(0, self.horizontal_offset - 1)
+                self._dirty = True
         elif event.key_code == KeyCode.RIGHT:
             self.horizontal_offset += 1
+            self._dirty = True
         elif event.key_code == KeyCode.PAGE_UP:
             self.scroll_offset = max(0, self.scroll_offset - display_height)
+            self._dirty = True
         elif event.key_code == KeyCode.PAGE_DOWN:
             # Calculate max scroll based on whether wrapping is enabled
             if self.wrap_lines:
@@ -1172,9 +1188,11 @@ class DiffViewer:
             else:
                 max_scroll = max(0, len(self.diff_lines) - display_height)
             self.scroll_offset = min(max_scroll, self.scroll_offset + display_height)
+            self._dirty = True
         elif event.key_code == KeyCode.HOME:
             self.scroll_offset = 0
             self.horizontal_offset = 0
+            self._dirty = True
         elif event.key_code == KeyCode.END:
             # Calculate max scroll based on whether wrapping is enabled
             if self.wrap_lines:
@@ -1188,8 +1206,122 @@ class DiffViewer:
             else:
                 max_scroll = max(0, len(self.diff_lines) - display_height)
             self.scroll_offset = max_scroll
+            self._dirty = True
         
         return True
+
+
+    # UILayer interface methods
+    
+    def handle_key_event(self, event) -> bool:
+        """
+        Handle a key event (UILayer interface method).
+        
+        This method delegates to the existing handle_input method for KeyEvents.
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Only handle KeyEvents, not CharEvents
+        if isinstance(event, KeyEvent):
+            result = self.handle_input(event)
+            # Mark dirty if event was consumed (content likely changed)
+            if result:
+                self._dirty = True
+            return result
+        return False
+    
+    def handle_char_event(self, event) -> bool:
+        """
+        Handle a character event (UILayer interface method).
+        
+        DiffViewer doesn't handle character events (no text input in viewer mode).
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            False (viewers don't handle char events)
+        """
+        return False
+    
+    def render(self, renderer) -> None:
+        """
+        Render the layer's content (UILayer interface method).
+        
+        This method delegates to the existing draw method.
+        
+        Args:
+            renderer: TTK renderer instance for drawing
+        """
+        self.draw()
+    
+    def is_full_screen(self) -> bool:
+        """
+        Query if this layer occupies the full screen (UILayer interface method).
+        
+        DiffViewer is always full-screen.
+        
+        Returns:
+            True (viewers occupy full screen)
+        """
+        return True
+    
+    def needs_redraw(self) -> bool:
+        """
+        Query if this layer has dirty content that needs redrawing (UILayer interface method).
+        
+        Returns:
+            True if the layer needs redrawing, False otherwise
+        """
+        return self._dirty
+    
+    def mark_dirty(self) -> None:
+        """
+        Mark this layer as needing a redraw (UILayer interface method).
+        
+        Called when content changes or when a lower layer has been redrawn.
+        """
+        self._dirty = True
+    
+    def clear_dirty(self) -> None:
+        """
+        Clear the dirty flag after rendering (UILayer interface method).
+        
+        Called by the layer stack after successfully rendering this layer.
+        """
+        self._dirty = False
+    
+    def should_close(self) -> bool:
+        """
+        Query if this layer wants to close (UILayer interface method).
+        
+        Returns:
+            True if the layer should be closed, False otherwise
+        """
+        return self._should_close
+    
+    def on_activate(self) -> None:
+        """
+        Called when this layer becomes the top layer (UILayer interface method).
+        
+        Hide cursor when viewer becomes active and mark dirty for initial render.
+        """
+        # Hide cursor when viewer becomes active
+        self.renderer.set_cursor_visibility(False)
+        # Mark dirty to ensure viewer is drawn when activated
+        self._dirty = True
+    
+    def on_deactivate(self) -> None:
+        """
+        Called when this layer is no longer the top layer (UILayer interface method).
+        
+        Viewer is being covered or closed - no special cleanup needed.
+        """
+        pass
 
 
 def create_diff_viewer(renderer, file1_path: Path, file2_path: Path):

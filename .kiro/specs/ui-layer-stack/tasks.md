@@ -6,7 +6,7 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
 
 ## Tasks
 
-- [ ] 1. Create UILayer interface and UILayerStack class
+- [x] 1. Create UILayer interface and UILayerStack class
   - Create new file `src/tfm_ui_layer.py` with UILayer abstract base class
   - Implement all required abstract methods: handle_key_event, handle_char_event, render, is_full_screen, needs_redraw, mark_dirty, clear_dirty, should_close, on_activate, on_deactivate
   - Create UILayerStack class with push, pop, get_top_layer, get_layer_count, handle_key_event, handle_char_event, render, check_and_close_top_layer methods
@@ -50,7 +50,7 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - **Property 19: Stack Never Empty**
   - **Validates: Requirements 9.3**
 
-- [ ] 2. Modify ListDialog to inherit from UILayer
+- [x] 2. Modify ListDialog to inherit from UILayer
   - Update `src/tfm_list_dialog.py` to make ListDialog inherit from UILayer
   - Implement handle_key_event() and handle_char_event() by refactoring existing handle_input()
   - Implement render() by calling existing draw()
@@ -61,40 +61,40 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - Ensure existing functionality is preserved
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.3_
 
-- [ ] 3. Modify InfoDialog to inherit from UILayer
+- [x] 3. Modify InfoDialog to inherit from UILayer
   - Update `src/tfm_info_dialog.py` to make InfoDialog inherit from UILayer
   - Implement all UILayer methods following the same pattern as ListDialog
   - Ensure existing functionality is preserved
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.3_
 
-- [ ] 4. Modify SearchDialog to inherit from UILayer
+- [x] 4. Modify SearchDialog to inherit from UILayer
   - Update `src/tfm_search_dialog.py` to make SearchDialog inherit from UILayer
   - Implement all UILayer methods following the same pattern as ListDialog
   - Ensure existing functionality is preserved
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.3_
 
-- [ ] 5. Modify JumpDialog to inherit from UILayer
+- [x] 5. Modify JumpDialog to inherit from UILayer
   - Update `src/tfm_jump_dialog.py` to make JumpDialog inherit from UILayer
   - Implement all UILayer methods following the same pattern as ListDialog
   - Ensure existing functionality is preserved
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.3_
 
-- [ ] 6. Modify DrivesDialog to inherit from UILayer
+- [x] 6. Modify DrivesDialog to inherit from UILayer
   - Update `src/tfm_drives_dialog.py` to make DrivesDialog inherit from UILayer
   - Implement all UILayer methods following the same pattern as ListDialog
   - Ensure existing functionality is preserved
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.3_
 
-- [ ] 7. Modify BatchRenameDialog to inherit from UILayer
+- [x] 7. Modify BatchRenameDialog to inherit from UILayer
   - Update `src/tfm_batch_rename_dialog.py` to make BatchRenameDialog inherit from UILayer
   - Implement all UILayer methods following the same pattern as ListDialog
   - Ensure existing functionality is preserved
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.3_
 
-- [ ] 8. Checkpoint - Ensure all dialog tests pass
+- [x] 8. Checkpoint - Ensure all dialog tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Modify TextViewer to inherit from UILayer
+- [x] 9. Modify TextViewer to inherit from UILayer
   - Update `src/tfm_text_viewer.py` to make TextViewer inherit from UILayer
   - Implement handle_key_event() by refactoring existing handle_input()
   - Implement handle_char_event() to return False (no text input in viewer)
@@ -107,7 +107,7 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - Ensure existing functionality is preserved
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.1_
 
-- [ ] 10. Modify DiffViewer to inherit from UILayer
+- [x] 10. Modify DiffViewer to inherit from UILayer
   - Update `src/tfm_diff_viewer.py` to make DiffViewer inherit from UILayer
   - Implement all UILayer methods following the same pattern as TextViewer
   - Ensure existing functionality is preserved
@@ -133,7 +133,7 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - **Property 12: Full-Screen Layer Removal Restores Rendering**
   - **Validates: Requirements 4.3**
 
-- [ ] 11. Create FileManagerLayer wrapper
+- [x] 11. Create FileManagerLayer wrapper
   - Create FileManagerLayer class in `src/tfm_ui_layer.py`
   - Implement handle_key_event() to delegate to FileManager main screen logic
   - Implement handle_char_event() to return False (no text input on main screen)
@@ -146,7 +146,7 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - Add request_close() method for quit functionality
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.4_
 
-- [ ] 12. Integrate UILayerStack into FileManager
+- [x] 12. Integrate UILayerStack into FileManager
   - Add UILayerStack instance to FileManager.__init__()
   - Initialize stack with FileManagerLayer as bottom layer
   - Update FileManager.handle_input() to delegate to UILayerStack
@@ -171,18 +171,20 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - **Property 16: State Restoration During Pop**
   - **Validates: Requirements 8.5**
 
-- [ ] 13. Checkpoint - Ensure integration works correctly
+- [x] 13. Checkpoint - Ensure integration works correctly
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 14. Remove if-elif chains from handle_input()
+- [x] 14. Remove if-elif chains from handle_input()
   - Remove if-elif blocks for dialog checking in FileManager.handle_input()
   - Remove if-elif blocks for viewer checking in FileManager.handle_input()
   - Simplify event routing to just call UILayerStack.handle_key_event() or handle_char_event()
   - Remove get_active_text_widget() method (no longer needed)
   - Ensure all event handling still works correctly
+  - Created test file `test/test_handle_input_simplification.py` with 10 passing tests
+  - All 123 integration tests pass
   - _Requirements: 7.1, 7.2_
 
-- [ ] 15. Remove if-elif chains from rendering methods
+- [x] 15. Remove if-elif chains from rendering methods
   - Remove if-elif blocks from _check_dialog_content_changed()
   - Remove if-elif blocks from _draw_dialogs_if_needed()
   - Remove if-elif blocks from _force_immediate_redraw()
@@ -191,7 +193,7 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - Ensure all rendering still works correctly
   - _Requirements: 7.1, 7.3_
 
-- [ ] 16. Update dialog/viewer creation to use layer stack
+- [x] 16. Update dialog/viewer creation to use layer stack
   - Update show_list_dialog() to push ListDialog onto stack
   - Update show_info_dialog() to push InfoDialog onto stack
   - Update show_search_dialog() to push SearchDialog onto stack
@@ -204,17 +206,17 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - Ensure all dialog/viewer creation still works correctly
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 17. Checkpoint - Ensure all tests pass
+- [x] 17. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 18. Measure code complexity reduction
+- [x] 18. Measure code complexity reduction
   - Count lines of code in handle_input() before and after refactoring
   - Count lines of code in rendering methods before and after refactoring
   - Measure cyclomatic complexity before and after refactoring
   - Verify that code is simpler and more maintainable
   - _Requirements: 7.4, 7.5_
 
-- [ ] 19. Final integration testing
+- [x] 19. Final integration testing
   - Test opening and closing dialogs
   - Test opening and closing viewers
   - Test stacking multiple dialogs
@@ -225,7 +227,7 @@ This implementation plan breaks down the UI Layer Stack feature into discrete, i
   - Verify all existing functionality still works
   - _Requirements: 6.6_
 
-- [ ] 20. Final checkpoint - Ensure all tests pass
+- [x] 20. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

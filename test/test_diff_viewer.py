@@ -86,10 +86,11 @@ class TestDiffViewer(unittest.TestCase):
         self.assertTrue(result)
         self.assertGreaterEqual(viewer.scroll_offset, initial_offset)
         
-        # Test quit
+        # Test quit - should set _should_close flag and return True
         event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=0, char='')
         result = viewer.handle_input(event)
-        self.assertFalse(result)
+        self.assertTrue(result)
+        self.assertTrue(viewer._should_close)
     
     def test_handle_input_horizontal_scroll(self):
         """Test horizontal scrolling"""
@@ -105,17 +106,17 @@ class TestDiffViewer(unittest.TestCase):
         viewer.handle_input(event)
         self.assertEqual(viewer.horizontal_offset, 0)
     
-    def test_view_diff_function(self):
-        """Test view_diff function"""
-        with patch.object(DiffViewer, 'run'):
-            result = view_diff(self.mock_renderer, Path(self.file1_path), Path(self.file2_path))
-            self.assertTrue(result)
+    def test_create_diff_viewer_function(self):
+        """Test create_diff_viewer function"""
+        result = create_diff_viewer(self.mock_renderer, Path(self.file1_path), Path(self.file2_path))
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result, DiffViewer)
     
-    def test_view_diff_with_invalid_files(self):
-        """Test view_diff with invalid files"""
+    def test_create_diff_viewer_with_invalid_files(self):
+        """Test create_diff_viewer with invalid files"""
         non_existent = Path('/non/existent/file.txt')
-        result = view_diff(self.mock_renderer, non_existent, Path(self.file2_path))
-        self.assertFalse(result)
+        result = create_diff_viewer(self.mock_renderer, non_existent, Path(self.file2_path))
+        self.assertIsNone(result)
     
     def test_binary_file_handling(self):
         """Test handling of binary files"""
@@ -233,14 +234,14 @@ def farewell():
         self.assertFalse(has_changes_ignore)
     
     def test_whitespace_ignore_toggle(self):
-        """Test toggling whitespace ignore mode with 'w' key"""
+        """Test toggling whitespace ignore mode with 'i' key"""
         viewer = DiffViewer(self.mock_renderer, Path(self.file1_path), Path(self.file2_path))
         
         # Initially disabled
         self.assertFalse(viewer.ignore_whitespace)
         
-        # Toggle on
-        event = KeyEvent(key_code=None, modifiers=0, char='w')
+        # Toggle on with 'i' key
+        event = KeyEvent(key_code=None, modifiers=0, char='i')
         viewer.handle_input(event)
         self.assertTrue(viewer.ignore_whitespace)
         
