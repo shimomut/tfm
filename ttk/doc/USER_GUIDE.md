@@ -60,11 +60,33 @@ pip install ttk[dev]
 
 ## Quick Start
 
-Here's a minimal TTK application:
+Here's a minimal TTK application using callback mode:
 
 ```python
 from ttk.backends.curses_backend import CursesBackend
 from ttk import KeyCode
+from ttk.renderer import EventCallback
+
+class SimpleCallback(EventCallback):
+    """Event callback for simple application."""
+    
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event):
+        """Handle key events."""
+        if event.key_code == KeyCode.ESCAPE:
+            self.should_quit = True
+            return True
+        return False
+    
+    def on_char_event(self, event):
+        """Handle character events."""
+        return False
+    
+    def should_close(self):
+        """Check if application should quit."""
+        return self.should_quit
 
 # Create and initialize renderer
 renderer = CursesBackend()
@@ -76,11 +98,13 @@ try:
     renderer.draw_text(1, 0, "Press ESC to quit")
     renderer.refresh()
     
-    # Wait for ESC key
-    while True:
-        event = renderer.get_input()
-        if event.key_code == KeyCode.ESCAPE:
-            break
+    # Set up event callback
+    callback = SimpleCallback()
+    renderer.set_event_callback(callback)
+    
+    # Event loop
+    while not callback.should_quit:
+        renderer.run_event_loop_iteration(timeout_ms=16)
 
 finally:
     # Always clean up
@@ -277,32 +301,98 @@ renderer.draw_text(0, 0, "Default colors", color_pair=0)
 
 ## Handling Input
 
-### Basic Input
+TTK uses a callback-based event system for handling user input. You implement the `EventCallback` interface to receive events from the renderer.
 
-Get input events with `get_input()`:
+### Event Callback Interface
+
+The `EventCallback` interface defines methods that the renderer calls to deliver events:
 
 ```python
-# Blocking - wait forever for input
-event = renderer.get_input()
+from ttk.renderer import EventCallback
+from ttk.input_event import KeyEvent, CharEvent
 
-# Non-blocking - return immediately
-event = renderer.get_input(timeout_ms=0)
-if event is None:
-    print("No input available")
+class MyCallback(EventCallback):
+    """Custom event callback."""
+    
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event: KeyEvent) -> bool:
+        """
+        Handle key events (commands, special keys).
+        
+        Returns:
+            True if event was consumed, False otherwise
+        """
+        if event.key_code == KeyCode.ESCAPE:
+            self.should_quit = True
+            return True
+        return False
+    
+    def on_char_event(self, event: CharEvent) -> bool:
+        """
+        Handle character events (text input).
+        
+        Returns:
+            True if event was consumed, False otherwise
+        """
+        # Handle text input here
+        return False
+    
+    def should_close(self) -> bool:
+        """Check if application should quit."""
+        return self.should_quit
+```
 
-# Timeout - wait up to 1 second
-event = renderer.get_input(timeout_ms=1000)
+### Setting Up Event Callbacks
+
+Register your callback with the renderer before running the event loop:
+
+```python
+# Create renderer
+renderer = CursesBackend()
+renderer.initialize()
+
+# Create and register callback
+callback = MyCallback()
+renderer.set_event_callback(callback)
+
+# Run event loop
+while not callback.should_quit:
+    renderer.run_event_loop_iteration(timeout_ms=16)
+```
+
+### Basic Input
+
+Process events in your event loop:
+
+```python
+# Blocking - wait forever for events
+while not callback.should_quit:
+    renderer.run_event_loop_iteration()
+
+# Non-blocking - return immediately if no events
+while not callback.should_quit:
+    renderer.run_event_loop_iteration(timeout_ms=0)
+    # Do other work here
+
+# Timeout - wait up to 1 second for events
+while not callback.should_quit:
+    renderer.run_event_loop_iteration(timeout_ms=1000)
 ```
 
 ### Checking Key Types
 
-```python
-event = renderer.get_input()
+In your `on_key_event()` callback:
 
-if event.is_printable():
-    print(f"Printable character: {event.char}")
-elif event.is_special_key():
-    print(f"Special key: {event.key_code}")
+```python
+def on_key_event(self, event):
+    """Handle key events."""
+    if event.is_printable():
+        print(f"Printable character: {event.char}")
+    elif event.is_special_key():
+        print(f"Special key: {event.key_code}")
+    return False
 ```
 
 ### Handling Specific Keys
@@ -310,56 +400,70 @@ elif event.is_special_key():
 ```python
 from ttk import KeyCode
 
-event = renderer.get_input()
-
-if event.key_code == KeyCode.ENTER:
-    print("Enter pressed")
-elif event.key_code == KeyCode.ESCAPE:
-    print("Escape pressed")
-elif event.key_code == KeyCode.UP:
-    print("Up arrow pressed")
-elif event.key_code == KeyCode.F1:
-    print("F1 pressed")
-elif event.char == 'q':
-    print("Q key pressed")
+def on_key_event(self, event):
+    """Handle key events."""
+    if event.key_code == KeyCode.ENTER:
+        print("Enter pressed")
+        return True
+    elif event.key_code == KeyCode.ESCAPE:
+        print("Escape pressed")
+        self.should_quit = True
+        return True
+    elif event.key_code == KeyCode.UP:
+        print("Up arrow pressed")
+        return True
+    elif event.key_code == KeyCode.F1:
+        print("F1 pressed")
+        return True
+    elif event.char == 'q':
+        print("Q key pressed")
+        return True
+    return False
 ```
 
 ### Modifier Keys
 
-Check for modifier keys like Ctrl, Shift, Alt:
+Check for modifier keys like Ctrl, Shift, Alt in your callback:
 
 ```python
 from ttk import ModifierKey
 
-event = renderer.get_input()
+def on_key_event(self, event):
+    """Handle key events."""
+    # Check for Ctrl+C
+    if event.char == 'c' and event.has_modifier(ModifierKey.CONTROL):
+        print("Ctrl+C pressed")
+        return True
 
-# Check for Ctrl+C
-if event.char == 'c' and event.has_modifier(ModifierKey.CONTROL):
-    print("Ctrl+C pressed")
+    # Check for Shift+Arrow
+    if event.key_code == KeyCode.UP and event.has_modifier(ModifierKey.SHIFT):
+        print("Shift+Up pressed")
+        return True
 
-# Check for Shift+Arrow
-if event.key_code == KeyCode.UP and event.has_modifier(ModifierKey.SHIFT):
-    print("Shift+Up pressed")
-
-# Check for multiple modifiers
-if event.has_modifier(ModifierKey.CONTROL) and \
-   event.has_modifier(ModifierKey.ALT):
-    print("Ctrl+Alt pressed")
+    # Check for multiple modifiers
+    if event.has_modifier(ModifierKey.CONTROL) and \
+       event.has_modifier(ModifierKey.ALT):
+        print("Ctrl+Alt pressed")
+        return True
+    
+    return False
 ```
 
 ### Window Resize Events
 
-Handle terminal/window resizing:
+Handle terminal/window resizing in your callback:
 
 ```python
-event = renderer.get_input()
-
-if event.key_code == KeyCode.RESIZE:
-    # Window was resized
-    rows, cols = renderer.get_dimensions()
-    print(f"New size: {rows}x{cols}")
-    # Redraw your UI with new dimensions
-    redraw_ui()
+def on_key_event(self, event):
+    """Handle key events."""
+    if event.key_code == KeyCode.RESIZE:
+        # Window was resized
+        rows, cols = self.renderer.get_dimensions()
+        print(f"New size: {rows}x{cols}")
+        # Redraw your UI with new dimensions
+        self.redraw_ui()
+        return True
+    return False
 ```
 
 ## Drawing Operations

@@ -232,9 +232,9 @@ class FileManager:
 
         self.should_quit = False  # Flag to control main loop exit
         
-        # Event callback system (for future migration to callback-based event handling)
-        self.event_callback = None  # Will be set when enabling callback mode
-        self.callback_mode_enabled = False  # Flag to track if callback mode is active
+        # Set up event callback (callback mode is always enabled)
+        self.event_callback = TFMEventCallback(self)
+        self.renderer.set_event_callback(self.event_callback)
 
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
@@ -919,50 +919,13 @@ class FileManager:
         # No active text widget
         return None
     
-    def enable_callback_mode(self):
-        """
-        Enable callback-based event handling.
-        
-        This method sets up the TFMEventCallback and registers it with the backend.
-        Once enabled, events will be delivered via callbacks instead of polling.
-        
-        Note: This is for future migration. Current implementation uses polling.
-        """
-        if not self.callback_mode_enabled:
-            # Create and register the event callback
-            self.event_callback = TFMEventCallback(self)
-            self.renderer.set_event_callback(self.event_callback)
-            self.callback_mode_enabled = True
-            self.log_manager.add_message("INFO", "Callback-based event handling enabled")
-    
-    def disable_callback_mode(self):
-        """
-        Disable callback-based event handling and return to polling mode.
-        
-        This method unregisters the event callback and returns to traditional
-        polling-based event handling.
-        """
-        if self.callback_mode_enabled:
-            # Unregister the event callback
-            self.renderer.set_event_callback(None)
-            self.event_callback = None
-            self.callback_mode_enabled = False
-            self.log_manager.add_message("INFO", "Callback-based event handling disabled")
-    
-    def run_with_callbacks(self):
+    def run(self):
         """
         Run the main application loop using callback-based event handling.
         
-        This is an alternative to the traditional run() method that uses
-        callbacks instead of polling. It enables callback mode and then
-        runs the backend's event loop with integrated drawing.
-        
-        Note: The backend's run_event_loop() only handles events, so we need
-        to integrate drawing into the event handling callbacks.
+        Events are delivered via the TFMEventCallback that was set up during
+        initialization. The event loop processes events and redraws the interface.
         """
-        # Enable callback mode
-        self.enable_callback_mode()
-        
         # Draw initial interface
         self.draw_interface()
         
@@ -997,8 +960,8 @@ class FileManager:
                     self._last_selection_count = current_selection_count
                     self._update_menu_states()
             
-            # Process one event with timeout
-            self.renderer.get_event(timeout_ms=16)  # This will trigger callbacks
+            # Process one event with timeout (events delivered via callbacks)
+            self.renderer.run_event_loop_iteration(timeout_ms=16)
             
             # Draw interface after event processing
             self.draw_interface()
@@ -3576,12 +3539,10 @@ class FileManager:
         elif self.is_key_for_action(event, 'select_file'):  # Toggle file selection
             self.toggle_selection()
             self.needs_full_redraw = True
-        elif event.key_code == KeyCode.ESCAPE:  # ESC key - check for Option key sequences
-            # Option+Space sends ESC followed by another key
-            next_event = self.renderer.get_input(timeout_ms=100)
-            if next_event:
-                # Log unknown ESC sequence for debugging
-                print(f"Unknown ESC sequence: ESC, {next_event.key_code}")
+        elif event.key_code == KeyCode.ESCAPE:  # ESC key
+            # In callback mode, we can't peek at the next event
+            # Option key sequences are handled by the backend
+            pass
         elif self.is_key_for_action(event, 'select_all_files'):  # Toggle all files selection
             self.toggle_all_files_selection()
         elif self.is_key_for_action(event, 'select_all_items'):  # Toggle all items selection
@@ -3892,7 +3853,7 @@ def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profilin
     fm = None
     try:
         fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, profiling_enabled=profiling_enabled)
-        fm.run_with_callbacks()
+        fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
         pass

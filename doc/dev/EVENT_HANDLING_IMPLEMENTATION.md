@@ -115,38 +115,35 @@ class EventCallback:
 
 ```python
 class CursesBackend(Renderer):
-    def get_event(self, timeout: int = -1) -> Optional[InputEvent]:
-        """Get the next input event with callback support."""
+    def run_event_loop_iteration(self, timeout_ms: int = -1) -> None:
+        """Process one iteration of the event loop."""
+        if self.event_callback is None:
+            raise RuntimeError("Event callback not set")
+        
         # Poll for input
         key = self.stdscr.getch()
         if key == -1:
-            return None
+            return
 
         # Create KeyEvent
         event = KeyEvent(key_code=key)
 
-        # Add char for printable characters
-        if 32 <= key <= 126:
+        # Deliver KeyEvent to application
+        consumed = self.event_callback.on_key_event(event)
+        
+        # If not consumed and printable, generate CharEvent
+        if not consumed and 32 <= key <= 126:
             char = chr(key)
-            event.char = char
-            
-            # Create CharEvent and invoke callback
             char_event = CharEvent(char=char)
-            if self.callback:
-                self.callback.on_event(char_event)
-
-        # Invoke callback with KeyEvent
-        if self.callback:
-            self.callback.on_event(event)
-
-        return event
+            self.event_callback.on_char_event(char_event)
 ```
 
 **Key Points:**
+- Validates that event callback is set before processing
 - Always generates KeyEvent for all input
-- Creates CharEvent for printable characters
-- Invokes callback with both CharEvent and KeyEvent
-- Returns KeyEvent for backward compatibility
+- Creates CharEvent for printable characters if KeyEvent not consumed
+- Delivers events via callback methods only
+- Never returns events directly
 
 #### CoreGraphics Backend
 
@@ -290,22 +287,13 @@ def handle_key(self, event, handle_vertical_nav=False) -> bool:
 - KeyEvent → navigation and editing commands
 - No longer handles printable characters in KeyEvent branch
 
-## Migration Guide
+## Event Delivery Architecture
 
-### From Polling to Callbacks
+### Callback-Only Mode
 
-**Old Code (Polling):**
-```python
-while running:
-    event = backend.get_event()
-    if event:
-        if event.char == 'q':
-            quit()
-        elif event.is_printable():
-            insert_char(event.char)
-```
+TTK uses a callback-only event delivery system. All events are delivered asynchronously via the EventCallback interface. The application must set an event callback before running the event loop.
 
-**New Code (Callbacks):**
+**Required Setup:**
 ```python
 class MyCallback(EventCallback):
     def on_key_event(self, event: KeyEvent) -> bool:
@@ -319,10 +307,16 @@ class MyCallback(EventCallback):
         return True
 
 callback = MyCallback()
-backend.set_event_callback(callback)
+backend.set_event_callback(callback)  # Required before event loop
 while running:
-    backend.get_event()  # Events delivered via callbacks
+    backend.run_event_loop_iteration()  # Events delivered via callbacks
 ```
+
+**Key Points:**
+- Event callback must be set via `set_event_callback()` before running the event loop
+- Calling `run_event_loop()` or `run_event_loop_iteration()` without a callback raises `RuntimeError`
+- All events are delivered via callback methods, never returned directly
+- The event loop processes OS events and delivers them asynchronously
 
 ### Adding isinstance Checks
 
@@ -497,10 +491,10 @@ if char and len(char) == 1 and char.isprintable():
 event = CharEvent(char='')  # Raises ValueError
 ```
 
-### 5. Use Callbacks for New Code
+### 5. Always Use Callbacks
 
 ```python
-# ✅ Good (new code)
+# ✅ Correct - callback-only mode
 class MyCallback(EventCallback):
     def on_key_event(self, event: KeyEvent) -> bool:
         return self.handle_command(event)
@@ -509,13 +503,11 @@ class MyCallback(EventCallback):
         return self.handle_text_input(event)
 
 backend.set_event_callback(MyCallback())
-
-# ✅ OK (legacy code)
 while running:
-    event = backend.get_event()
-    if event:
-        handle_event(event)
+    backend.run_event_loop_iteration()  # Events delivered via callbacks
 ```
+
+**Note:** TTK uses callback-only mode. The polling API (`get_event()`, `get_input()`) has been removed.
 
 ## Troubleshooting
 

@@ -21,6 +21,67 @@ import sys
 from ttk import Renderer, KeyEvent, KeyCode, ModifierKey, TextAttribute
 from ttk.backends.curses_backend import CursesBackend
 from ttk.utils import get_recommended_backend
+from ttk.renderer import EventCallback
+
+
+class SimpleTextAppCallback(EventCallback):
+    """Event callback handler for SimpleTextApp."""
+    
+    def __init__(self, app):
+        """
+        Initialize the callback handler.
+        
+        Args:
+            app: SimpleTextApp instance to handle events for
+        """
+        self.app = app
+    
+    def on_key_event(self, event: KeyEvent) -> bool:
+        """
+        Handle key events.
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if event was consumed
+        """
+        # Handle quit commands
+        if event.key_code == KeyCode.ESCAPE:
+            self.app.running = False
+            return True
+        
+        if event.char == 'q' or event.char == 'Q':
+            self.app.running = False
+            return True
+        
+        # Handle space to increment counter
+        if event.char == ' ':
+            self.app.counter += 1
+            self.app.draw()
+            return True
+        
+        # Handle 'r' to reset counter
+        if event.char == 'r' or event.char == 'R':
+            self.app.counter = 0
+            self.app.draw()
+            return True
+        
+        return False
+    
+    def on_char_event(self, event) -> bool:
+        """Handle character events."""
+        return False
+    
+    def on_system_event(self, event) -> bool:
+        """Handle system events (resize)."""
+        # Redraw on resize
+        self.app.draw()
+        return True
+    
+    def should_close(self) -> bool:
+        """Check if application should quit."""
+        return not self.app.running
 
 
 class SimpleTextApp:
@@ -31,6 +92,7 @@ class SimpleTextApp:
         self.running = False
         self.message = "Hello from TTK!"
         self.counter = 0
+        self.event_callback = None
         
     def initialize(self):
         """Initialize the application."""
@@ -41,6 +103,10 @@ class SimpleTextApp:
         self.backend.init_color_pair(2, (0, 255, 0), (0, 0, 0))          # Green on black
         self.backend.init_color_pair(3, (255, 255, 0), (0, 0, 0))        # Yellow on black
         self.backend.init_color_pair(4, (255, 0, 0), (0, 0, 0))          # Red on black
+        
+        # Set up event callback
+        self.event_callback = SimpleTextAppCallback(self)
+        self.backend.set_event_callback(self.event_callback)
         
     def draw(self):
         """Draw the application UI."""
@@ -89,48 +155,19 @@ class SimpleTextApp:
         
         # Refresh display
         self.backend.refresh()
-        
-    def handle_input(self, event: KeyEvent) -> bool:
-        """
-        Handle input event.
-        
-        Returns:
-            True to continue running, False to quit
-        """
-        if event.key_code == KeyCode.ESCAPE:
-            return False
-        
-        if event.char == 'q' or event.char == 'Q':
-            return False
-        
-        if event.char == ' ':
-            self.counter += 1
-            return True
-        
-        if event.char == 'r' or event.char == 'R':
-            self.counter = 0
-            return True
-        
-        if event.key_code == KeyCode.RESIZE:
-            # Window was resized, just redraw
-            return True
-        
-        return True
     
     def run(self):
         """Run the application main loop."""
         self.running = True
         
         try:
+            # Draw initial screen
+            self.draw()
+            
+            # Main event loop
             while self.running:
-                # Draw UI
-                self.draw()
-                
-                # Get input with timeout
-                event = self.backend.get_input(timeout_ms=100)
-                
-                if event:
-                    self.running = self.handle_input(event)
+                # Process events (delivered via callbacks)
+                self.backend.run_event_loop_iteration(timeout_ms=100)
                     
         except KeyboardInterrupt:
             pass

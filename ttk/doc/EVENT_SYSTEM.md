@@ -29,7 +29,7 @@ The callback system allows applications to:
 1. Handle commands immediately via `on_key_event()` callback
 2. Receive text input via `on_char_event()` callback
 3. Distinguish between command keys and text input
-4. Support IME (Input Method Editor) for international text input (future)
+4. Support IME (Input Method Editor) for international text input
 
 ## Event Types
 
@@ -252,21 +252,21 @@ Curses Backend
 **Implementation:**
 ```python
 class CursesBackend(Renderer):
-    def get_event(self, timeout: int = -1) -> Optional[InputEvent]:
-        """Get the next input event with callback support."""
-        if not self.stdscr:
-            return None
-
+    def run_event_loop_iteration(self, timeout_ms=-1):
+        """Process one iteration of events."""
+        if self.event_callback is None:
+            raise RuntimeError("Event callback not set")
+        
         # Set timeout
-        if timeout >= 0:
-            self.stdscr.timeout(timeout)
+        if timeout_ms >= 0:
+            self.stdscr.timeout(timeout_ms)
         else:
             self.stdscr.timeout(-1)
 
         try:
             key = self.stdscr.getch()
             if key == -1:  # Timeout
-                return None
+                return
 
             # Create KeyEvent
             event = KeyEvent(key_code=key)
@@ -275,20 +275,17 @@ class CursesBackend(Renderer):
             if 32 <= key <= 126:  # Printable ASCII
                 char = chr(key)
                 event.char = char
-                
-                # Create CharEvent for printable characters and invoke callback
-                char_event = CharEvent(char=char)
-                if self.callback:
-                    self.callback.on_event(char_event)
 
-            # Invoke callback with KeyEvent for backward compatibility
-            if self.callback:
-                self.callback.on_event(event)
-
-            return event
+            # Deliver to application
+            consumed = self.event_callback.on_key_event(event)
+            
+            # If not consumed and printable, deliver as CharEvent
+            if not consumed and event.char:
+                char_event = CharEvent(char=event.char)
+                self.event_callback.on_char_event(char_event)
 
         except curses.error:
-            return None
+            pass
 ```
 
 ### Desktop Mode (CoreGraphics Backend)
@@ -351,39 +348,6 @@ class TTKView(Cocoa.NSView):
             if self.backend.event_callback:
                 self.backend.event_callback.on_char_event(char_event)
 ```
-
-## Backward Compatibility
-
-The `get_event()` polling method is maintained for backward compatibility:
-
-```python
-class Renderer:
-    def get_event(self, timeout_ms: int = -1) -> Optional[Event]:
-        """
-        Get event (polling mode - for backward compatibility).
-        
-        This method is maintained for:
-        - Backward compatibility with existing code
-        - Unit testing and demo scripts
-        - Gradual migration to callback-based system
-        
-        When callbacks are enabled, this method may return None
-        as events are delivered via callbacks instead.
-        """
-        if self.event_callback:
-            # Callbacks enabled - process events but don't return them
-            self._process_events(timeout_ms)
-            return None
-        else:
-            # Callbacks disabled - use traditional polling
-            return self._poll_event(timeout_ms)
-```
-
-**Migration Path:**
-1. Existing code continues to use `get_event()` polling
-2. New code can use callbacks via `set_event_callback()`
-3. Gradual migration from polling to callbacks
-4. Both modes supported indefinitely
 
 ## Best Practices
 
@@ -454,11 +418,15 @@ class MyAppCallback(EventCallback):
         if self.app.active_text_widget:
             return self.app.active_text_widget.handle_key(event)
         return False
+    
+    def should_close(self) -> bool:
+        """Check if application should quit."""
+        return self.app.should_quit
 ```
 
 ### 5. Register Callback with Backend
 
-Register your callback with the backend:
+Register your callback with the backend before running the event loop:
 
 ```python
 # Create backend
@@ -469,10 +437,9 @@ backend.initialize()
 callback = MyAppCallback(app)
 backend.set_event_callback(callback)
 
-# Run event loop (or use get_event() for polling)
-while running:
-    event = backend.get_event()
-    # Events are delivered via callbacks
+# Run event loop
+while not callback.should_close():
+    backend.run_event_loop_iteration(timeout_ms=16)
 ```
 
 ## Examples

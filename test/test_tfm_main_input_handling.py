@@ -153,8 +153,8 @@ def test_handle_isearch_input_with_input_event():
         print("✓ handle_isearch_input test passed")
 
 
-def test_main_loop_uses_get_input():
-    """Test that main loop uses renderer.get_input()"""
+def test_main_loop_uses_callback_mode():
+    """Test that main loop uses callback mode via run_event_loop_iteration()"""
     # Create mock renderer
     mock_renderer = Mock()
     mock_renderer.get_dimensions.return_value = (24, 80)
@@ -164,45 +164,43 @@ def test_main_loop_uses_get_input():
     mock_renderer.refresh = Mock()
     mock_renderer.draw_text = Mock()
     mock_renderer.set_cursor_visibility = Mock()
-    
-    # Mock get_input to return None (timeout) then quit event
-    quit_event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
-    mock_renderer.get_input = Mock(side_effect=[None, quit_event])
+    mock_renderer.set_event_callback = Mock()
+    mock_renderer.run_event_loop_iteration = Mock()
     
     # Create FileManager with mock renderer
     with patch('tfm_main.get_config'), \
          patch('tfm_main.LogManager'), \
          patch('tfm_main.get_state_manager'), \
-         patch('tfm_main.init_colors'), \
-         patch('tfm_main.is_key_bound_to_with_selection') as mock_is_bound:
+         patch('tfm_main.init_colors'):
         
         fm = FileManager(mock_renderer)
         fm.log_height_ratio = 0.25  # Set required attribute
         fm.should_quit = False
         
-        # Mock is_key_bound_to_with_selection to return True for quit
-        mock_is_bound.return_value = True
+        # Verify that set_event_callback was called during initialization
+        mock_renderer.set_event_callback.assert_called_once()
+        
+        # Get the callback that was set
+        callback = mock_renderer.set_event_callback.call_args[0][0]
+        assert callback is not None, "Event callback should be set"
+        
+        # Simulate a key event being delivered via callback
+        quit_event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
         
         # Mock show_confirmation to immediately call callback with True
-        def mock_show_confirmation(message, callback):
-            callback(True)
+        def mock_show_confirmation(message, callback_fn):
+            callback_fn(True)
         fm.show_confirmation = mock_show_confirmation
         
-        # Run one iteration of the main loop
-        # First iteration: timeout (None)
-        event = mock_renderer.get_input(timeout_ms=16)
-        assert event is None, "First call should return None (timeout)"
+        # Mock is_key_bound_to_with_selection to return True for quit
+        with patch('tfm_main.is_key_bound_to_with_selection', return_value=True):
+            # Deliver event via callback
+            callback.on_key_event(quit_event)
         
-        # Second iteration: quit event
-        event = mock_renderer.get_input(timeout_ms=16)
-        assert event is not None, "Second call should return quit event"
-        assert event.key_code == ord('q'), "Event should be 'q' key"
-        
-        # Handle the quit event
-        fm.handle_input(event)
+        # Verify should_quit was set
         assert fm.should_quit is True, "should_quit should be set to True"
         
-        print("✓ Main loop get_input test passed")
+        print("✓ Main loop callback mode test passed")
 
 
 def test_special_keys_use_keycode_enum():
@@ -259,7 +257,7 @@ if __name__ == '__main__':
     test_input_event_handling()
     test_is_key_for_action_with_input_event()
     test_handle_isearch_input_with_input_event()
-    test_main_loop_uses_get_input()
+    test_main_loop_uses_callback_mode()
     test_special_keys_use_keycode_enum()
     
     print()

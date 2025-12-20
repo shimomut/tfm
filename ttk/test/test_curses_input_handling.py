@@ -2,7 +2,7 @@
 Unit tests for TTK CursesBackend input handling.
 
 This module tests the input handling functionality of the CursesBackend,
-including timeout support, key translation, special keys, and printable characters.
+including callback mode, key translation, special keys, and printable characters.
 """
 
 import curses
@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 from ttk.backends.curses_backend import CursesBackend
 from ttk import KeyEvent, KeyCode, ModifierKey
+from ttk.test.test_utils import EventCapture
 
 
 class TestCursesInputHandling(unittest.TestCase):
@@ -21,58 +22,34 @@ class TestCursesInputHandling(unittest.TestCase):
         self.backend = CursesBackend()
         # Mock the stdscr to avoid actual curses initialization
         self.backend.stdscr = Mock()
+        
+        # Set up event capture
+        self.capture = EventCapture()
+        self.backend.set_event_callback(self.capture)
     
-    def test_get_input_blocking(self):
-        """Test get_input with blocking mode (timeout=-1)."""
+    def test_callback_mode_required(self):
+        """Test that callback must be set before processing events."""
+        backend = CursesBackend()
+        backend.stdscr = Mock()
+        
+        # Should raise error if callback not set
+        with self.assertRaises(RuntimeError):
+            backend.run_event_loop_iteration(timeout_ms=0)
+    
+    def test_event_delivered_via_callback(self):
+        """Test that events are delivered via callback."""
         # Mock getch to return a key code
         self.backend.stdscr.getch.return_value = ord('a')
         
-        event = self.backend.get_input(timeout_ms=-1)
+        # Process event
+        self.backend.run_event_loop_iteration(timeout_ms=0)
         
-        # Verify timeout was set correctly
-        self.backend.stdscr.timeout.assert_called_once_with(-1)
-        
-        # Verify event is correct
-        self.assertIsNotNone(event)
+        # Verify event was delivered via callback
+        self.assertTrue(len(self.capture.events) > 0)
+        event_type, event = self.capture.events[0]
+        self.assertEqual(event_type, 'key')
         self.assertEqual(event.key_code, ord('a'))
         self.assertEqual(event.char, 'a')
-    
-    def test_get_input_non_blocking(self):
-        """Test get_input with non-blocking mode (timeout=0)."""
-        # Mock getch to return -1 (no input available)
-        self.backend.stdscr.getch.return_value = -1
-        
-        event = self.backend.get_input(timeout_ms=0)
-        
-        # Verify timeout was set correctly
-        self.backend.stdscr.timeout.assert_called_once_with(0)
-        
-        # Verify no event returned
-        self.assertIsNone(event)
-    
-    def test_get_input_with_timeout(self):
-        """Test get_input with specific timeout value."""
-        # Mock getch to return a key code
-        self.backend.stdscr.getch.return_value = ord('b')
-        
-        event = self.backend.get_input(timeout_ms=100)
-        
-        # Verify timeout was set correctly
-        self.backend.stdscr.timeout.assert_called_once_with(100)
-        
-        # Verify event is correct
-        self.assertIsNotNone(event)
-        self.assertEqual(event.key_code, ord('b'))
-    
-    def test_get_input_curses_error(self):
-        """Test get_input handles curses.error gracefully."""
-        # Mock getch to raise curses.error
-        self.backend.stdscr.getch.side_effect = curses.error
-        
-        event = self.backend.get_input()
-        
-        # Verify None is returned on error
-        self.assertIsNone(event)
     
     def test_translate_printable_characters(self):
         """Test translation of printable ASCII characters."""
@@ -198,8 +175,8 @@ class TestCursesInputHandling(unittest.TestCase):
         self.assertIsNone(event.char)
         self.assertEqual(event.modifiers, ModifierKey.NONE)
     
-    def test_get_input_integration(self):
-        """Test get_input with various key types."""
+    def test_callback_integration(self):
+        """Test event delivery via callback with various key types."""
         test_cases = [
             (ord('x'), ord('x'), 'x'),  # Printable character
             (curses.KEY_UP, KeyCode.UP, None),  # Arrow key
@@ -210,10 +187,13 @@ class TestCursesInputHandling(unittest.TestCase):
         
         for curses_key, expected_keycode, expected_char in test_cases:
             self.backend.stdscr.getch.return_value = curses_key
+            self.capture.clear_events()
             
-            event = self.backend.get_input()
+            self.backend.run_event_loop_iteration(timeout_ms=0)
             
-            self.assertIsNotNone(event)
+            self.assertTrue(len(self.capture.events) > 0)
+            event_type, event = self.capture.events[0]
+            self.assertEqual(event_type, 'key')
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, expected_char)
 

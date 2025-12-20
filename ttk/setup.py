@@ -16,7 +16,7 @@ with open(readme_path, 'r', encoding='utf-8') as f:
 
 setup(
     name='ttk',
-    version='0.1.0',
+    version='0.2.0',
     description='TUI Toolkit - A generic rendering library for character-grid-based applications',
     long_description=long_description,
     long_description_content_type='text/markdown',

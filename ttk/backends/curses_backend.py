@@ -220,6 +220,23 @@ class CursesBackend(Renderer):
         except (curses.error, OSError) as e:
             print(f"Warning: Error resuming curses: {e}")
     
+    def set_event_callback(self, callback: 'EventCallback') -> None:
+        """
+        Set the event callback for event delivery (REQUIRED).
+        
+        This method enables callback-based event delivery. All events are delivered
+        via the callback methods instead of being returned by polling methods.
+        
+        Args:
+            callback: EventCallback instance (required, not optional)
+        
+        Raises:
+            ValueError: If callback is None
+        """
+        if callback is None:
+            raise ValueError("Event callback cannot be None")
+        self.event_callback = callback
+    
     def get_dimensions(self) -> Tuple[int, int]:
         """
         Get terminal dimensions.
@@ -686,47 +703,78 @@ class CursesBackend(Renderer):
         # Default to white for unclassified colors
         return curses.COLOR_WHITE
     
-    def get_event(self, timeout_ms: int = -1) -> Optional[Event]:
+    def run_event_loop_iteration(self, timeout_ms: int = -1) -> None:
         """
-        Get event from terminal (polling mode - for backward compatibility).
+        Process one iteration of the event loop.
         
-        This method retrieves the next event from the terminal using polling.
-        It supports blocking, non-blocking, and timeout modes.
-        
-        When callbacks are enabled via set_event_callback(), this method processes
-        events and delivers them via callbacks, then returns None. This allows
-        existing code to continue using get_event() while new code can use callbacks.
+        Processes pending terminal events and delivers them via callbacks.
+        Returns after processing events or timeout.
         
         Args:
-            timeout_ms: Timeout in milliseconds
-                       -1: Block indefinitely
-                        0: Non-blocking
-                       >0: Wait up to timeout_ms milliseconds
+            timeout_ms: Maximum time to wait for events (-1 = indefinite)
         
-        Returns:
-            Optional[Event]: Event if input is available and callbacks are disabled,
-                            None if timeout or if callbacks are enabled
+        Raises:
+            RuntimeError: If event callback not set
         """
-        if self.event_callback:
-            # Callbacks enabled - process events but deliver via callbacks
-            self._process_events(timeout_ms)
-            return None
+        if self.event_callback is None:
+            raise RuntimeError("Event callback not set. Call set_event_callback() first.")
+        
+        # Set timeout for getch()
+        if timeout_ms >= 0:
+            self.stdscr.timeout(timeout_ms)
         else:
-            # Callbacks disabled - use traditional polling
-            if timeout_ms >= 0:
-                self.stdscr.timeout(timeout_ms)
-            else:
-                self.stdscr.timeout(-1)
+            self.stdscr.timeout(-1)
+        
+        try:
+            # Poll for keyboard input
+            key = self.stdscr.getch()
+            if key == -1:
+                return
             
-            try:
-                key = self.stdscr.getch()
-                if key == -1:
-                    return None
-                
-                return self._translate_curses_key(key)
-            except curses.error as e:
-                # Timeout or input error
-                return None
+            # Handle resize event separately (it's a system event, not a key event)
+            if key == curses.KEY_RESIZE:
+                event = SystemEvent(event_type=SystemEventType.RESIZE)
+                self.event_callback.on_system_event(event)
+                return
+            
+            # Special keys (> 255) are not UTF-8 bytes - handle them directly
+            if key > 255:
+                # This is a special key (arrow, function key, etc.)
+                key_event = self._translate_curses_key(key)
+                if isinstance(key_event, KeyEvent):
+                    self.event_callback.on_key_event(key_event)
+                elif isinstance(key_event, SystemEvent):
+                    self.event_callback.on_system_event(key_event)
+                return
+            
+            # Try to accumulate as UTF-8 byte (only for 0-255 range)
+            char = self.utf8_accumulator.add_byte(key)
+            
+            if char is not None:
+                # Complete character formed
+                if len(char) == 1 and ord(char) < 128:
+                    # ASCII - generate KeyEvent (for command matching)
+                    # Use the original key byte for translation
+                    key_event = self._translate_curses_key(key)
+                    consumed = False
+                    if isinstance(key_event, KeyEvent):
+                        consumed = self.event_callback.on_key_event(key_event)
+                    
+                    # If not consumed, translate to CharEvent
+                    if not consumed and isinstance(key_event, KeyEvent):
+                        char_event = self._translate_key_to_char(key_event)
+                        if char_event:
+                            self.event_callback.on_char_event(char_event)
+                else:
+                    # Multi-byte Unicode - generate CharEvent directly
+                    # Skip KeyEvent generation for multi-byte characters
+                    char_event = CharEvent(char=char)
+                    self.event_callback.on_char_event(char_event)
+            # else: still accumulating, wait for more bytes
+        
+        except curses.error:
+            # Timeout or input error - ignore
+            pass
     
     def _translate_curses_key(self, key: int) -> Event:
         """
@@ -879,80 +927,21 @@ class CursesBackend(Renderer):
         """
         Run the event loop with callback-based event delivery.
         
-        This method runs an event loop that continuously polls for keyboard input
-        and delivers events via the registered callback. The loop continues until
-        the callback returns False for a system event or an exception occurs.
+        This method runs an event loop that continuously processes events
+        and delivers them via the registered callback. The loop continues until
+        interrupted or an exception occurs.
         
-        This method requires that set_event_callback() has been called to register
-        a callback. If no callback is registered, this method does nothing.
-        
-        The event loop:
-        1. Polls for keyboard input using getch()
-        2. Accumulates UTF-8 bytes for multi-byte characters
-        3. Generates KeyEvent for ASCII characters
-        4. Delivers KeyEvent via on_key_event() callback
-        5. If not consumed, translates to CharEvent (if applicable)
-        6. Delivers CharEvent via on_char_event() callback
-        7. Generates CharEvent directly for multi-byte Unicode characters
-        
-        Note: This is the callback-based event system. For polling-based event
-        handling, use get_event() instead.
+        Raises:
+            RuntimeError: If event callback not set
         """
-        if not self.event_callback:
-            # No callback registered - nothing to do
-            return
+        if self.event_callback is None:
+            raise RuntimeError("Event callback not set. Call set_event_callback() first.")
         
         # Run event loop until interrupted
         while True:
             try:
-                # Poll for keyboard input (blocking)
-                self.stdscr.timeout(-1)
-                key = self.stdscr.getch()
-                
-                if key == -1:
-                    continue
-                
-                # Handle resize event separately (it's a system event, not a key event)
-                if key == curses.KEY_RESIZE:
-                    event = SystemEvent(event_type=SystemEventType.RESIZE)
-                    self.event_callback.on_system_event(event)
-                    continue
-                
-                # Special keys (> 255) are not UTF-8 bytes - handle them directly
-                if key > 255:
-                    # This is a special key (arrow, function key, etc.)
-                    key_event = self._translate_curses_key(key)
-                    if isinstance(key_event, KeyEvent):
-                        self.event_callback.on_key_event(key_event)
-                    elif isinstance(key_event, SystemEvent):
-                        self.event_callback.on_system_event(key_event)
-                    continue
-                
-                # Try to accumulate as UTF-8 byte (only for 0-255 range)
-                char = self.utf8_accumulator.add_byte(key)
-                
-                if char is not None:
-                    # Complete character formed
-                    if len(char) == 1 and ord(char) < 128:
-                        # ASCII - generate KeyEvent (for command matching)
-                        # Use the original key byte for translation (not the char)
-                        # because _translate_curses_key expects raw curses key codes
-                        key_event = self._translate_curses_key(key)
-                        consumed = False
-                        if isinstance(key_event, KeyEvent):
-                            consumed = self.event_callback.on_key_event(key_event)
-                        
-                        # If not consumed, translate to CharEvent
-                        if not consumed and isinstance(key_event, KeyEvent):
-                            char_event = self._translate_key_to_char(key_event)
-                            if char_event:
-                                self.event_callback.on_char_event(char_event)
-                    else:
-                        # Multi-byte Unicode - generate CharEvent directly
-                        # Skip KeyEvent generation for multi-byte characters
-                        char_event = CharEvent(char=char)
-                        self.event_callback.on_char_event(char_event)
-                # else: still accumulating, wait for more bytes
+                # Process one iteration (blocking)
+                self.run_event_loop_iteration(timeout_ms=-1)
                 
             except KeyboardInterrupt:
                 # Allow Ctrl+C to break the loop
@@ -962,82 +951,6 @@ class CursesBackend(Renderer):
                 print(f"Error in event loop: {e}")
                 continue
     
-    def _process_events(self, timeout_ms: int = -1) -> None:
-        """
-        Process one event cycle and deliver via callbacks.
-        
-        This method is used by get_event() when callbacks are enabled. It polls
-        for one event, translates it, and delivers it via the registered callback.
-        It properly handles UTF-8 multi-byte characters by accumulating bytes.
-        
-        This allows get_event() to maintain backward compatibility while supporting
-        the callback-based event system.
-        
-        Args:
-            timeout_ms: Timeout in milliseconds
-                       -1: Block indefinitely
-                        0: Non-blocking
-                       >0: Wait up to timeout_ms milliseconds
-        """
-        if not self.event_callback:
-            return
-        
-        # Set timeout for getch()
-        if timeout_ms >= 0:
-            self.stdscr.timeout(timeout_ms)
-        else:
-            self.stdscr.timeout(-1)
-        
-        try:
-            # Poll for keyboard input
-            key = self.stdscr.getch()
-            if key == -1:
-                return
-            
-            # Handle resize event separately (it's a system event, not a key event)
-            if key == curses.KEY_RESIZE:
-                event = SystemEvent(event_type=SystemEventType.RESIZE)
-                self.event_callback.on_system_event(event)
-                return
-            
-            # Special keys (> 255) are not UTF-8 bytes - handle them directly
-            if key > 255:
-                # This is a special key (arrow, function key, etc.)
-                key_event = self._translate_curses_key(key)
-                if isinstance(key_event, KeyEvent):
-                    self.event_callback.on_key_event(key_event)
-                elif isinstance(key_event, SystemEvent):
-                    self.event_callback.on_system_event(key_event)
-                return
-            
-            # Try to accumulate as UTF-8 byte (only for 0-255 range)
-            char = self.utf8_accumulator.add_byte(key)
-            
-            if char is not None:
-                # Complete character formed
-                if len(char) == 1 and ord(char) < 128:
-                    # ASCII - generate KeyEvent (for command matching)
-                    # Use the original key byte for translation
-                    key_event = self._translate_curses_key(key)
-                    consumed = False
-                    if isinstance(key_event, KeyEvent):
-                        consumed = self.event_callback.on_key_event(key_event)
-                    
-                    # If not consumed, translate to CharEvent
-                    if not consumed and isinstance(key_event, KeyEvent):
-                        char_event = self._translate_key_to_char(key_event)
-                        if char_event:
-                            self.event_callback.on_char_event(char_event)
-                else:
-                    # Multi-byte Unicode - generate CharEvent directly
-                    # Skip KeyEvent generation for multi-byte characters
-                    char_event = CharEvent(char=char)
-                    self.event_callback.on_char_event(char_event)
-            # else: still accumulating, wait for more bytes
-        
-        except curses.error:
-            # Timeout or input error - ignore
-            pass
     
     def _translate_key_to_char(self, event: KeyEvent) -> Optional['CharEvent']:
         """

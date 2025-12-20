@@ -18,13 +18,62 @@ sys.path.insert(0, str(project_root))
 
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-    from ttk.renderer import TextAttribute
-    from ttk.input_event import KeyCode
+    from ttk.renderer import TextAttribute, EventCallback
+    from ttk.input_event import KeyCode, KeyEvent
     import Cocoa
     BACKEND_AVAILABLE = True
 except ImportError as e:
     print(f"CoreGraphics backend not available: {e}")
     BACKEND_AVAILABLE = False
+
+
+class CharDrawingCallback(EventCallback):
+    """Event callback handler for character drawing demo."""
+    
+    def __init__(self, demo):
+        """Initialize the callback handler."""
+        self.demo = demo
+    
+    def on_key_event(self, event: KeyEvent) -> bool:
+        """Handle key events."""
+        if event.char:
+            key = event.char.upper()
+            
+            if key == 'Q':
+                self.demo.running = False
+            elif key == 'H':
+                self.demo.current_pattern = "help"
+                draw_help_screen(self.demo.backend)
+            elif key == '1':
+                self.demo.current_pattern = "full"
+                print("\n--- Switching to Full Grid Pattern ---")
+                draw_test_pattern(self.demo.backend, "full")
+            elif key == '2':
+                self.demo.current_pattern = "colors"
+                print("\n--- Switching to Color Pairs Pattern ---")
+                draw_test_pattern(self.demo.backend, "colors")
+            elif key == '3':
+                self.demo.current_pattern = "attributes"
+                print("\n--- Switching to Attributes Pattern ---")
+                draw_test_pattern(self.demo.backend, "attributes")
+            elif key == '4':
+                self.demo.current_pattern = "mixed"
+                print("\n--- Switching to Mixed Pattern ---")
+                draw_test_pattern(self.demo.backend, "mixed")
+        
+        return True
+    
+    def on_char_event(self, event) -> bool:
+        """Handle character events."""
+        return False
+    
+    def on_system_event(self, event) -> bool:
+        """Handle system events."""
+        return False
+    
+    def should_close(self) -> bool:
+        """Check if application should quit."""
+        return not self.demo.running
 
 
 def draw_test_pattern(backend, pattern_type="full"):
@@ -165,6 +214,15 @@ def run_demo():
         cols=80
     )
     
+    # Create demo state object
+    class DemoState:
+        def __init__(self):
+            self.backend = backend
+            self.current_pattern = "help"
+            self.running = True
+    
+    demo = DemoState()
+    
     try:
         # Initialize backend
         backend.initialize()
@@ -179,42 +237,14 @@ def run_demo():
         # Show help screen
         draw_help_screen(backend)
         
-        # Main event loop
-        current_pattern = "help"
-        running = True
+        # Set up event callback
+        callback = CharDrawingCallback(demo)
+        backend.set_event_callback(callback)
         
-        while running:
-            # Get input
-            event = backend.get_input(timeout_ms=100)
-            
-            if event is None:
-                continue
-            
-            # Handle key presses
-            if event.char:
-                key = event.char.upper()
-                
-                if key == 'Q':
-                    running = False
-                elif key == 'H':
-                    current_pattern = "help"
-                    draw_help_screen(backend)
-                elif key == '1':
-                    current_pattern = "full"
-                    print("\n--- Switching to Full Grid Pattern ---")
-                    draw_test_pattern(backend, "full")
-                elif key == '2':
-                    current_pattern = "colors"
-                    print("\n--- Switching to Color Pairs Pattern ---")
-                    draw_test_pattern(backend, "colors")
-                elif key == '3':
-                    current_pattern = "attributes"
-                    print("\n--- Switching to Attributes Pattern ---")
-                    draw_test_pattern(backend, "attributes")
-                elif key == '4':
-                    current_pattern = "mixed"
-                    print("\n--- Switching to Mixed Pattern ---")
-                    draw_test_pattern(backend, "mixed")
+        # Main event loop
+        while demo.running:
+            # Process events (delivered via callbacks)
+            backend.run_event_loop_iteration(timeout_ms=100)
         
         print("\nDemo complete.")
         return True

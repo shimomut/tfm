@@ -452,7 +452,13 @@ class TestInterface:
         This displays the test interface and handles user input until
         the user quits.
         """
+        from ttk.test.test_utils import EventCapture
+        
         self.running = True
+        
+        # Set up event capture for callback mode
+        capture = EventCapture()
+        self.renderer.set_event_callback(capture)
         
         try:
             # Initialize colors
@@ -469,25 +475,30 @@ class TestInterface:
                 if self.performance_monitor:
                     self.performance_monitor.start_frame()
                 
-                # Get input with timeout
-                event = self.renderer.get_input(timeout_ms=100)
+                # Get input using callback mode
+                event_tuple = capture.get_next_event(self.renderer, timeout_ms=100)
                 
-                if event is None:
+                if event_tuple is None:
                     # No input, but still redraw to update performance metrics
                     if self.performance_monitor:
                         self.draw_interface()
                     continue
                 
-                # Check for resize event first
-                if event.key_code == KeyCode.RESIZE:
-                    # Window was resized - redraw interface with new dimensions
-                    self.draw_interface()
-                    continue
+                event_type, event = event_tuple
                 
-                # Handle the input
-                if not self.handle_input(event):
-                    self.running = False
-                    break
+                # Check for resize event first
+                if event_type == 'system' and hasattr(event, 'key_code'):
+                    if event.key_code == KeyCode.RESIZE:
+                        # Window was resized - redraw interface with new dimensions
+                        self.draw_interface()
+                        continue
+                
+                # Handle key and char events
+                if event_type in ('key', 'char'):
+                    # Convert to KeyEvent format for handle_input
+                    if not self.handle_input(event):
+                        self.running = False
+                        break
                 
                 # Redraw interface to show updated input
                 self.draw_interface()

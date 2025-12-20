@@ -44,7 +44,47 @@ if sys.platform != 'darwin':
     sys.exit(1)
 
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-from ttk.input_event import KeyCode, ModifierKey
+from ttk.input_event import KeyCode, ModifierKey, KeyEvent
+from ttk.renderer import EventCallback
+
+
+class ResizeDemoCallback(EventCallback):
+    """Event callback handler for resize demo."""
+    
+    def __init__(self, demo):
+        """Initialize the callback handler."""
+        self.demo = demo
+    
+    def on_key_event(self, event: KeyEvent) -> bool:
+        """Handle key events."""
+        # Handle resize event
+        if event.key_code == KeyCode.RESIZE:
+            self.demo.resize_count += 1
+            print(f"Resize event #{self.demo.resize_count} detected!")
+            rows, cols = self.demo.backend.get_dimensions()
+            print(f"  New dimensions: {rows} rows × {cols} columns")
+            self.demo.draw_interface()
+            return True
+        
+        # Handle quit
+        if event.char and event.char.lower() == 'q':
+            print(f"\nDemo completed. Total resize events: {self.demo.resize_count}")
+            self.demo.running = False
+            return True
+        
+        return False
+    
+    def on_char_event(self, event) -> bool:
+        """Handle character events."""
+        return False
+    
+    def on_system_event(self, event) -> bool:
+        """Handle system events."""
+        return False
+    
+    def should_close(self) -> bool:
+        """Check if application should quit."""
+        return not self.demo.running
 
 
 class ResizeDemo:
@@ -60,6 +100,7 @@ class ResizeDemo:
             cols=80
         )
         self.resize_count = 0
+        self.running = True
     
     def draw_interface(self):
         """Draw the demo interface."""
@@ -151,30 +192,17 @@ class ResizeDemo:
         # Draw initial interface
         self.draw_interface()
         
+        # Set up event callback
+        callback = ResizeDemoCallback(self)
+        self.backend.set_event_callback(callback)
+        
         # Main event loop
         print("Demo running. Resize the window to test resize events.")
         print("Press 'q' to quit.")
         
-        while True:
-            # Get input with short timeout for responsive UI
-            event = self.backend.get_input(timeout_ms=100)
-            
-            if event is None:
-                continue
-            
-            # Handle resize event
-            if event.key_code == KeyCode.RESIZE:
-                self.resize_count += 1
-                print(f"Resize event #{self.resize_count} detected!")
-                rows, cols = self.backend.get_dimensions()
-                print(f"  New dimensions: {rows} rows × {cols} columns")
-                self.draw_interface()
-                continue
-            
-            # Handle quit
-            if event.char and event.char.lower() == 'q':
-                print(f"\nDemo completed. Total resize events: {self.resize_count}")
-                break
+        while self.running:
+            # Process events (delivered via callbacks)
+            self.backend.run_event_loop_iteration(timeout_ms=100)
         
         # Clean up
         self.backend.shutdown()

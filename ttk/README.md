@@ -57,6 +57,28 @@ pip install ttk[dev]
 ```python
 from ttk.backends.curses_backend import CursesBackend
 from ttk import KeyCode
+from ttk.renderer import EventCallback
+
+class SimpleAppCallback(EventCallback):
+    """Event callback for simple application."""
+    
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event):
+        """Handle key events."""
+        if event.key_code == KeyCode.ESCAPE:
+            self.should_quit = True
+            return True
+        return False
+    
+    def on_char_event(self, event):
+        """Handle character events."""
+        return False
+    
+    def should_close(self):
+        """Check if application should quit."""
+        return self.should_quit
 
 # Create and initialize renderer
 renderer = CursesBackend()
@@ -65,6 +87,10 @@ renderer.initialize()
 try:
     # Initialize colors
     renderer.init_color_pair(1, (255, 255, 255), (0, 0, 128))
+    
+    # Set up event callback
+    callback = SimpleAppCallback()
+    renderer.set_event_callback(callback)
     
     # Draw text
     renderer.draw_text(0, 0, "Hello, TTK!", color_pair=1)
@@ -76,11 +102,9 @@ try:
     # Refresh to display
     renderer.refresh()
     
-    # Wait for ESC key
-    while True:
-        event = renderer.get_input()
-        if event.key_code == KeyCode.ESCAPE:
-            break
+    # Event loop
+    while not callback.should_quit:
+        renderer.run_event_loop_iteration(timeout_ms=16)
     
 finally:
     renderer.shutdown()
@@ -91,6 +115,28 @@ finally:
 ```python
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk import KeyCode
+from ttk.renderer import EventCallback
+
+class DesktopAppCallback(EventCallback):
+    """Event callback for desktop application."""
+    
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event):
+        """Handle key events."""
+        if event.key_code == KeyCode.ESCAPE:
+            self.should_quit = True
+            return True
+        return False
+    
+    def on_char_event(self, event):
+        """Handle character events."""
+        return False
+    
+    def should_close(self):
+        """Check if application should quit."""
+        return self.should_quit
 
 # Create CoreGraphics backend with custom window
 renderer = CoreGraphicsBackend(
@@ -101,46 +147,20 @@ renderer = CoreGraphicsBackend(
 renderer.initialize()
 
 try:
-    # Same drawing code works with CoreGraphics backend!
+    # Initialize colors
     renderer.init_color_pair(1, (255, 255, 255), (30, 30, 30))
+    
+    # Set up event callback
+    callback = DesktopAppCallback()
+    renderer.set_event_callback(callback)
+    
+    # Draw text
     renderer.draw_text(0, 0, "Desktop Application", color_pair=1)
     renderer.refresh()
     
     # Event loop
-    while True:
-        event = renderer.get_input()
-        if event and event.key_code == KeyCode.ESCAPE:
-            break
-
-finally:
-    renderer.shutdown()
-```
-
-### macOS Desktop Application (CoreGraphics)
-
-```python
-from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-from ttk import KeyCode
-
-# Create CoreGraphics backend for native macOS rendering
-renderer = CoreGraphicsBackend(
-    window_title="My Desktop App",
-    font_name="Menlo",
-    font_size=14
-)
-renderer.initialize()
-
-try:
-    # Same drawing code works with CoreGraphics backend!
-    renderer.init_color_pair(1, (255, 255, 255), (30, 30, 30))
-    renderer.draw_text(0, 0, "Desktop Application", color_pair=1)
-    renderer.refresh()
-    
-    # Event loop
-    while True:
-        event = renderer.get_input(timeout_ms=16)  # ~60 FPS
-        if event and event.key_code == KeyCode.ESCAPE:
-            break
+    while not callback.should_quit:
+        renderer.run_event_loop_iteration(timeout_ms=16)
 
 finally:
     renderer.shutdown()
@@ -289,18 +309,47 @@ renderer.draw_rect(row, col, height=10, width=30, filled=False)
 
 ```python
 from ttk import KeyCode, ModifierKey
+from ttk.renderer import EventCallback
 
-event = renderer.get_input()
+class InputHandlerCallback(EventCallback):
+    """Event callback for input handling."""
+    
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event):
+        """Handle key events."""
+        if event.is_printable():
+            print(f"Character: {event.char}")
+        elif event.key_code == KeyCode.UP:
+            print("Up arrow pressed")
+        
+        # Check modifiers
+        if event.has_modifier(ModifierKey.CONTROL):
+            print("Control key held")
+        
+        if event.key_code == KeyCode.ESCAPE:
+            self.should_quit = True
+            return True
+        
+        return False
+    
+    def on_char_event(self, event):
+        """Handle character events."""
+        print(f"Text input: {event.char}")
+        return False
+    
+    def should_close(self):
+        """Check if application should quit."""
+        return self.should_quit
 
-# Check key type
-if event.is_printable():
-    print(f"Character: {event.char}")
-elif event.key_code == KeyCode.UP:
-    print("Up arrow pressed")
+# Set up callback
+callback = InputHandlerCallback()
+renderer.set_event_callback(callback)
 
-# Check modifiers
-if event.has_modifier(ModifierKey.CONTROL):
-    print("Control key held")
+# Event loop
+while not callback.should_quit:
+    renderer.run_event_loop_iteration(timeout_ms=16)
 ```
 
 ### Window Management
@@ -342,15 +391,23 @@ renderer.refresh_region(row=5, col=10, height=10, width=20)
 
 TTK is currently in active development. The core API is stable, but new features may be added in future versions.
 
-### Current Version: 0.1.0 (Alpha)
+### Current Version: 0.2.0 (Beta)
 
+**Breaking Changes in 0.2.0:**
+- ⚠️ **Polling mode removed** - Callback-only event delivery
+- ⚠️ **`get_event()` removed** - Use `EventCallback` interface
+- ⚠️ **`set_event_callback()` required** - Callback parameter is mandatory
+- See [CHANGELOG.md](CHANGELOG.md) and [MIGRATION_GUIDE_V0.2.0.md](doc/MIGRATION_GUIDE_V0.2.0.md)
+
+**Features:**
 - ✅ Core rendering API
 - ✅ Curses backend (stable)
 - ✅ CoreGraphics backend (stable)
-- ✅ Input event system
+- ✅ Callback-only event system
 - ✅ Color management
 - ✅ Text attributes
 - ✅ Command serialization
+- ✅ IME support (Japanese, Chinese, Korean)
 - 🚧 Image rendering (planned)
 - 🚧 Additional backends (planned)
 

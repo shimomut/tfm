@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+    from ttk.test.test_utils import EventCapture
     BACKEND_AVAILABLE = True
 except ImportError:
     BACKEND_AVAILABLE = False
@@ -44,6 +45,10 @@ def test_drawrect_with_batching():
         backend.initialize()
         print("✓ Backend initialized successfully")
         
+        # Set up event capture
+        capture = EventCapture()
+        backend.set_event_callback(capture)
+        
         # Initialize some color pairs
         backend.init_color_pair(1, (255, 255, 255), (0, 0, 255))    # White on blue
         backend.init_color_pair(2, (0, 0, 0), (255, 0, 0))          # Black on red
@@ -70,10 +75,10 @@ def test_drawrect_with_batching():
         assert backend._font_cache is not None, "Font cache should be initialized"
         print("✓ Caches are initialized")
         
-        # Test that we can get input (ensures window is responsive)
+        # Test that we can process events (ensures window is responsive)
         # Use non-blocking mode
-        event = backend.get_input(timeout_ms=0)
-        print("✓ Input system responsive")
+        backend.run_event_loop_iteration(timeout_ms=0)
+        print("✓ Event system responsive")
         
         print("\n✅ All tests passed!")
         print("\nVisual verification:")

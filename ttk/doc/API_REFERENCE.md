@@ -244,27 +244,80 @@ renderer.draw_text(1, 0, "Yellow on black", color_pair=2)
 
 #### Input Handling
 
-##### `get_input(timeout_ms: int = -1) -> Optional[KeyEvent]`
+##### `set_event_callback(callback: EventCallback) -> None`
 
-Get the next input event.
+Set the event callback for event delivery (REQUIRED).
+
+Must be called before `run_event_loop()` or `run_event_loop_iteration()`. All events are delivered via callback methods.
 
 **Parameters:**
-- `timeout_ms`: Timeout in milliseconds. -1 for blocking, 0 for non-blocking.
+- `callback`: EventCallback instance (required, not optional)
 
-**Returns:** `KeyEvent` if input is available, `None` if timeout expires.
+**Raises:**
+- `ValueError`: If callback is None
 
 **Example:**
 ```python
-# Blocking input (wait forever)
-event = renderer.get_input()
+from ttk.renderer import EventCallback
 
-# Non-blocking input (return immediately)
-event = renderer.get_input(timeout_ms=0)
-if event is None:
-    print("No input available")
+class MyCallback(EventCallback):
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event):
+        if event.key_code == KeyCode.ESCAPE:
+            self.should_quit = True
+            return True
+        return False
+    
+    def on_char_event(self, event):
+        return False
+    
+    def should_close(self):
+        return self.should_quit
 
-# Timeout after 1 second
-event = renderer.get_input(timeout_ms=1000)
+callback = MyCallback()
+renderer.set_event_callback(callback)
+```
+
+##### `run_event_loop() -> None`
+
+Run the main event loop until application quits.
+
+Blocks until the application terminates. Events are delivered via the EventCallback set with `set_event_callback()`.
+
+**Raises:**
+- `RuntimeError`: If event callback not set
+
+**Example:**
+```python
+renderer.set_event_callback(callback)
+renderer.run_event_loop()  # Blocks until callback.should_close() returns True
+```
+
+##### `run_event_loop_iteration(timeout_ms: int = -1) -> None`
+
+Process one iteration of the event loop.
+
+Processes pending OS events and delivers them via callbacks. Returns after processing events or timeout.
+
+**Parameters:**
+- `timeout_ms`: Maximum time to wait for events. -1 for blocking, 0 for non-blocking.
+
+**Raises:**
+- `RuntimeError`: If event callback not set
+
+**Example:**
+```python
+# Blocking iteration (wait forever)
+renderer.run_event_loop_iteration()
+
+# Non-blocking iteration (return immediately)
+renderer.run_event_loop_iteration(timeout_ms=0)
+
+# Timeout after 16ms (~60 FPS)
+while not callback.should_quit:
+    renderer.run_event_loop_iteration(timeout_ms=16)
 ```
 
 #### Cursor Control
@@ -513,6 +566,23 @@ renderer = CursesBackend()
 **Example:**
 ```python
 from ttk.backends.curses_backend import CursesBackend
+from ttk.renderer import EventCallback
+
+class TerminalCallback(EventCallback):
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event):
+        if event.key_code == KeyCode.ESCAPE:
+            self.should_quit = True
+            return True
+        return False
+    
+    def on_char_event(self, event):
+        return False
+    
+    def should_close(self):
+        return self.should_quit
 
 renderer = CursesBackend()
 renderer.initialize()
@@ -521,12 +591,17 @@ try:
     # Initialize colors
     renderer.init_color_pair(1, (255, 255, 255), (0, 0, 255))
     
+    # Set up callback
+    callback = TerminalCallback()
+    renderer.set_event_callback(callback)
+    
     # Draw text
     renderer.draw_text(0, 0, "Terminal Application", color_pair=1)
     renderer.refresh()
     
-    # Wait for input
-    event = renderer.get_input()
+    # Event loop
+    while not callback.should_quit:
+        renderer.run_event_loop_iteration(timeout_ms=16)
     
 finally:
     renderer.shutdown()
@@ -627,6 +702,24 @@ renderer = CoreGraphicsBackend(
 **Example:**
 ```python
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
+from ttk import KeyCode
+from ttk.renderer import EventCallback
+
+class DesktopCallback(EventCallback):
+    def __init__(self):
+        self.should_quit = False
+    
+    def on_key_event(self, event):
+        if event.key_code == KeyCode.ESCAPE:
+            self.should_quit = True
+            return True
+        return False
+    
+    def on_char_event(self, event):
+        return False
+    
+    def should_close(self):
+        return self.should_quit
 
 renderer = CoreGraphicsBackend(
     window_title="Desktop File Manager",
@@ -639,15 +732,17 @@ try:
     # Initialize colors
     renderer.init_color_pair(1, (255, 255, 255), (30, 30, 30))
     
+    # Set up callback
+    callback = DesktopCallback()
+    renderer.set_event_callback(callback)
+    
     # Draw text
     renderer.draw_text(0, 0, "Desktop Application", color_pair=1)
     renderer.refresh()
     
     # Event loop
-    while True:
-        event = renderer.get_input(timeout_ms=16)  # ~60 FPS
-        if event and event.key_code == KeyCode.ESCAPE:
-            break
+    while not callback.should_quit:
+        renderer.run_event_loop_iteration(timeout_ms=16)
     
 finally:
     renderer.shutdown()
@@ -804,35 +899,44 @@ renderer.draw_text(rows + 10, cols + 10, "Out of bounds")
        renderer.shutdown()
    ```
 
-2. **Initialize color pairs before use:**
+2. **Set up event callback before running event loop:**
+   ```python
+   callback = MyCallback()
+   renderer.set_event_callback(callback)
+   
+   while not callback.should_quit:
+       renderer.run_event_loop_iteration(timeout_ms=16)
+   ```
+
+3. **Initialize color pairs before use:**
    ```python
    renderer.init_color_pair(1, (255, 255, 255), (0, 0, 255))
    renderer.draw_text(0, 0, "Text", color_pair=1)
    ```
 
-3. **Call refresh() after drawing:**
+4. **Call refresh() after drawing:**
    ```python
    renderer.draw_text(0, 0, "Hello")
    renderer.draw_text(1, 0, "World")
    renderer.refresh()  # Display both lines
    ```
 
-4. **Use non-blocking input for animations:**
+5. **Use non-blocking iteration for animations:**
    ```python
-   while running:
+   while not callback.should_quit:
        # Update display
        renderer.refresh()
        
-       # Check for input without blocking
-       event = renderer.get_input(timeout_ms=0)
-       if event:
-           handle_input(event)
+       # Process events without blocking
+       renderer.run_event_loop_iteration(timeout_ms=0)
    ```
 
-5. **Handle window resize events:**
+6. **Handle window resize events in callback:**
    ```python
-   event = renderer.get_input()
-   if event.key_code == KeyCode.RESIZE:
-       rows, cols = renderer.get_dimensions()
-       # Redraw UI with new dimensions
+   def on_key_event(self, event):
+       if event.key_code == KeyCode.RESIZE:
+           rows, cols = self.renderer.get_dimensions()
+           # Redraw UI with new dimensions
+           return True
+       return False
    ```

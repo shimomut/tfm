@@ -6,7 +6,7 @@ This script creates a simple interactive application that displays
 keyboard input events, allowing manual verification of:
 - Key code translation
 - Modifier key detection
-- Timeout modes (blocking, non-blocking, timed)
+- Callback mode event delivery
 - Special key handling (arrows, function keys, etc.)
 
 Usage:
@@ -33,6 +33,7 @@ except ImportError:
 
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.input_event import KeyCode, ModifierKey
+from ttk.test.test_utils import EventCapture
 
 
 def format_modifiers(modifiers):
@@ -110,8 +111,12 @@ def main():
         cols=80
     )
     
+    # Set up event capture
+    capture = EventCapture()
+    
     try:
         backend.initialize()
+        backend.set_event_callback(capture)
         
         # Draw instructions on the window
         backend.clear()
@@ -126,26 +131,38 @@ def main():
         
         # Event loop
         while True:
-            # Get input with blocking mode (wait indefinitely)
-            event = backend.get_input(timeout_ms=-1)
+            # Get input using callback mode
+            event_tuple = capture.get_next_event(backend, timeout_ms=100)
             
-            if event is None:
+            if event_tuple is None:
+                continue
+            
+            event_type, event = event_tuple
+            
+            # Only process key and char events
+            if event_type not in ('key', 'char'):
                 continue
             
             event_count += 1
             
             # Check for ESC to exit
-            if event.key_code == KeyCode.ESCAPE:
+            if event_type == 'key' and event.key_code == KeyCode.ESCAPE:
                 print("\nESC pressed - exiting")
                 break
             
             # Format event details
-            key_str = format_key_code(event.key_code)
-            mod_str = format_modifiers(event.modifiers)
-            char_str = f"'{event.char}'" if event.char else "None"
+            if event_type == 'key':
+                key_str = format_key_code(event.key_code)
+                mod_str = format_modifiers(event.modifiers)
+                char_str = f"'{event.char}'" if event.char else "None"
+            else:  # char event
+                key_str = "Character input"
+                mod_str = "None"
+                char_str = f"'{event.char}'"
             
             # Display event details in terminal
             print(f"Event #{event_count}:")
+            print(f"  Type: {event_type}")
             print(f"  Key: {key_str}")
             print(f"  Modifiers: {mod_str}")
             print(f"  Character: {char_str}")
@@ -158,7 +175,7 @@ def main():
                 row = 7
             
             event_text = f"Event #{event_count}: {key_str}"
-            if event.modifiers != ModifierKey.NONE:
+            if event_type == 'key' and event.modifiers != ModifierKey.NONE:
                 event_text += f" ({mod_str})"
             
             backend.draw_text(row, 0, event_text, color_pair=0)
