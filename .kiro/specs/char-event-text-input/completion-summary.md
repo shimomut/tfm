@@ -36,6 +36,20 @@ The CharEvent text input feature has been successfully implemented and tested. T
 - refresh() call added to apply cursor position immediately
 - Help text removed during editing to prevent visual instability
 
+### Caret API Simplification (Tasks 19-21)
+✅ **COMPLETE** - Caret visibility management simplified
+- Removed show_caret() and hide_caret() methods from TTK API
+- Terminal caret kept hidden at all times (TFM renders its own cursor)
+- Eliminated double cursor issue (terminal caret + TFM cursor)
+- Simplified API with fewer methods to maintain
+
+### Automatic Caret Restoration (Task 22)
+✅ **COMPLETE** - TTK automatically restores caret position
+- TTK refresh() now automatically restores caret position
+- Applications no longer need to call set_caret_position() before refresh()
+- Caret position stored in backend state and restored during refresh
+- Cleaner code with better separation of concerns
+
 ## Requirements Validation
 
 All 10 requirements have been validated:
@@ -82,6 +96,24 @@ python temp/test_caret_positioning_fix.py
 ```
 **Result: ✅ ALL PASSED**
 
+### Caret Hiding Tests
+```bash
+python temp/test_dialog_caret_hiding.py
+```
+**Result: ✅ ALL PASSED**
+
+### Caret API Removal Tests
+```bash
+python temp/test_dialog_caret_positioning.py
+```
+**Result: ✅ ALL PASSED**
+
+### Automatic Caret Restoration Tests
+```bash
+python temp/test_automatic_caret_restoration.py
+```
+**Result: ✅ ALL PASSED (5 tests)**
+
 ## Key Technical Achievements
 
 ### 1. UTF-8 Byte Accumulation
@@ -105,6 +137,14 @@ Achieved clean separation by:
 - Callback-based event delivery
 - Type checking with isinstance
 
+### 4. Automatic Caret Position Management
+Simplified caret handling by:
+- Removing show_caret() and hide_caret() API methods
+- Keeping terminal caret hidden (TFM renders its own cursor)
+- Automatic caret position restoration in refresh()
+- Applications don't need to call set_caret_position() before refresh()
+- Cleaner API with better separation of concerns
+
 ## Files Modified
 
 ### Core Implementation
@@ -123,6 +163,9 @@ Achieved clean separation by:
 - `temp/SPECIAL_KEYS_AND_UTF8_FIX_SUMMARY.md` - Special keys fix summary
 - `temp/CARET_FIX_FINAL.md` - IME caret positioning fix
 - `temp/CARET_POSITIONING_SOLUTION_SUMMARY.md` - Caret solution summary
+- `temp/DIALOG_CARET_HIDING_FIX.md` - Dialog caret hiding fix
+- `temp/CARET_API_REMOVAL.md` - Caret API removal documentation
+- `temp/AUTOMATIC_CARET_RESTORATION.md` - Automatic caret restoration documentation
 
 ### Tests
 - `test/test_single_line_text_edit.py` - CharEvent handling tests
@@ -132,6 +175,9 @@ Achieved clean separation by:
 - `temp/test_japanese_input_integration.py` - Japanese input integration tests
 - `temp/test_special_keys_fix.py` - Special keys tests
 - `temp/test_caret_positioning_fix.py` - Caret positioning tests
+- `temp/test_dialog_caret_hiding.py` - Dialog caret hiding tests
+- `temp/test_dialog_caret_positioning.py` - Caret positioning without show/hide tests
+- `temp/test_automatic_caret_restoration.py` - Automatic caret restoration tests
 
 ## Known Limitations
 
@@ -182,6 +228,8 @@ The implementation provides:
 - ✅ Reliable caret position management
 - ✅ Consistent behavior across backends
 - ✅ Backward compatibility with existing code
+- ✅ Simplified caret API (no show/hide methods needed)
+- ✅ Automatic caret position restoration in refresh()
 
 ## Date Completed
 December 19, 2025

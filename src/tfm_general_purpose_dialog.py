@@ -193,26 +193,15 @@ class GeneralPurposeDialog:
             max_field_width = min_field_width
         
         # Draw input field using SingleLineTextEdit
+        # SingleLineTextEdit.draw() will set the caret position for IME
         self.text_editor.draw(
             self.renderer, status_y, 2, max_field_width,
             self.prompt_text,
             is_active=True
         )
         
-        # CRITICAL: Set caret position AFTER all text drawing is complete
-        # Drawing text moves the cursor, so we must restore the caret position
-        # Calculate the correct caret position based on the text editor state
-        prompt_width = get_width(self.prompt_text)
-        text_before_cursor = self.text_editor.text[:self.text_editor.cursor_pos]
-        cursor_display_offset = get_width(text_before_cursor)
-        caret_x = 2 + prompt_width + cursor_display_offset
-        
-        # Set caret position (keep caret hidden - TFM renders its own cursor)
-        # IME will use this position for composition text
-        self.renderer.set_caret_position(caret_x, status_y)
-        
-        # CRITICAL: Refresh to apply the cursor position change
-        # Without refresh, the cursor position is staged but not visible
+        # Refresh to make changes visible
+        # TTK automatically restores the caret position set by SingleLineTextEdit
         self.renderer.refresh()
 
 

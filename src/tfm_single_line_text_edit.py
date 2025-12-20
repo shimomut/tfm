@@ -313,13 +313,8 @@ class SingleLineTextEdit:
                     # Store caret position at last character
                     caret_x = last_char_x
         
-        # Set caret position and visibility after rendering
-        # Note: Caret position is set here, but actual visibility should be
-        # controlled by the caller after all rendering is complete to avoid
-        # IME composition text appearing in wrong locations
-        # Set caret position after rendering
-        # Note: Caret position is set here for IME composition text positioning
-        # The caret remains hidden - TFM renders its own cursor
+        # Set caret position for IME composition text positioning
+        # TTK refresh() will automatically restore this position
         if is_active:
             renderer.set_caret_position(caret_x, y)
     

@@ -128,6 +128,8 @@ class CursesBackend(Renderer):
         self.rgb_to_color_cache = {}  # Cache RGB -> color index mappings
         self.event_callback = None  # EventCallback instance for callback-based event delivery
         self.utf8_accumulator = UTF8Accumulator()  # UTF-8 byte accumulator for multi-byte characters
+        self.caret_x = 0  # Stored caret X position
+        self.caret_y = 0  # Stored caret Y position
     
     def initialize(self) -> None:
         """
@@ -421,7 +423,18 @@ class CursesBackend(Renderer):
         Refresh the terminal.
         
         This makes all pending drawing operations visible by updating the display.
+        The caret position set by set_caret_position() is automatically restored
+        before refreshing, so applications don't need to call set_caret_position()
+        again before each refresh.
         """
+        # Restore the caret position before refreshing
+        # This ensures the caret is at the correct position for IME composition text
+        try:
+            self.stdscr.move(self.caret_y, self.caret_x)
+        except curses.error:
+            # Position out of bounds - ignore
+            pass
+        
         self.stdscr.refresh()
     
     def refresh_region(self, row: int, col: int, height: int, width: int) -> None:
@@ -844,24 +857,23 @@ class CursesBackend(Renderer):
         """
         Set the terminal caret position.
         
-        This method positions the terminal cursor at the specified screen
-        coordinates. The caret position can be set even when hidden, which
-        is useful for IME (Input Method Editor) composition text positioning.
+        This method stores the caret position, which will be automatically
+        restored by refresh(). The caret position can be set even when hidden,
+        which is useful for IME (Input Method Editor) composition text positioning.
+        
+        Applications no longer need to call this method immediately before refresh()
+        - the position is remembered and automatically restored.
         
         Args:
             x: Column position (0-based, 0 is left)
             y: Row position (0-based, 0 is top)
         
         Note: Coordinates outside the window bounds are handled gracefully
-        by catching curses.error exceptions.
+        during refresh().
         """
-        try:
-            # Use move() to set the cursor position
-            # This sets the position for the next refresh
-            self.stdscr.move(y, x)
-        except curses.error:
-            # Position out of bounds or other curses error - ignore
-            pass
+        # Store the caret position for automatic restoration during refresh()
+        self.caret_x = x
+        self.caret_y = y
     
     def run_event_loop(self) -> None:
         """
