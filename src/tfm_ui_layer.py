@@ -456,9 +456,9 @@ class FileManagerLayer(UILayer):
     
     def handle_key_event(self, event) -> bool:
         """
-        Handle a key event by delegating to FileManager.
+        Handle a key event for the main FileManager screen.
         
-        This method delegates to the FileManager's handle_input method,
+        This method delegates to the FileManager's handle_main_screen_key_event method,
         which processes all main screen keyboard events including navigation,
         selection, commands, and shortcuts.
         
@@ -468,8 +468,8 @@ class FileManagerLayer(UILayer):
         Returns:
             True if the event was consumed, False otherwise
         """
-        # Delegate to existing FileManager key handling logic
-        result = self.file_manager.handle_input(event)
+        # Delegate to FileManager's main screen key handling logic
+        result = self.file_manager.handle_main_screen_key_event(event)
         
         # Mark dirty if event was consumed (content likely changed)
         if result:

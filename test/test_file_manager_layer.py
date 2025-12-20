@@ -34,9 +34,9 @@ class TestFileManagerLayerBasics:
         assert layer.is_full_screen() is True
     
     def test_handle_key_event_delegates_to_file_manager(self):
-        """Test that key events are delegated to FileManager."""
+        """Test that key events are delegated to FileManager's main screen handler."""
         mock_fm = Mock()
-        mock_fm.handle_input = Mock(return_value=True)
+        mock_fm.handle_main_screen_key_event = Mock(return_value=True)
         layer = FileManagerLayer(mock_fm)
         
         # Create mock event
@@ -45,15 +45,16 @@ class TestFileManagerLayerBasics:
         # Handle event
         result = layer.handle_key_event(mock_event)
         
-        # Verify delegation
-        mock_fm.handle_input.assert_called_once_with(mock_event)
+        # Verify delegation to handle_main_screen_key_event (not handle_input)
+        mock_fm.handle_main_screen_key_event.assert_called_once_with(mock_event)
         assert result is True
+        assert layer._dirty is True  # Should mark dirty when event consumed
         assert layer._dirty is True  # Should mark dirty when event consumed
     
     def test_handle_key_event_no_dirty_when_not_consumed(self):
         """Test that layer doesn't mark dirty when event not consumed."""
         mock_fm = Mock()
-        mock_fm.handle_input = Mock(return_value=False)
+        mock_fm.handle_main_screen_key_event = Mock(return_value=False)
         layer = FileManagerLayer(mock_fm)
         layer._dirty = False  # Clear initial dirty flag
         
