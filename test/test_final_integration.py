@@ -383,7 +383,7 @@ class TestEventRoutingThroughLayers:
         assert len(bottom.key_events_received) == 0
     
     def test_event_propagates_when_not_consumed(self):
-        """Test that events propagate to lower layers when not consumed."""
+        """Test that events only go to top layer (no propagation)."""
         bottom = MockLayer("bottom", consume_events=True)
         middle = MockLayer("middle", consume_events=False)
         top = MockLayer("top", consume_events=False)
@@ -395,13 +395,14 @@ class TestEventRoutingThroughLayers:
         mock_event = Mock()
         result = stack.handle_key_event(mock_event)
         
-        assert result is True
+        # Only top layer receives events (no propagation)
+        assert result is False  # Top doesn't consume
         assert len(top.key_events_received) == 1
-        assert len(middle.key_events_received) == 1
-        assert len(bottom.key_events_received) == 1
+        assert len(middle.key_events_received) == 0
+        assert len(bottom.key_events_received) == 0
     
     def test_event_stops_at_consuming_layer(self):
-        """Test that event propagation stops at a consuming layer."""
+        """Test that only top layer receives events."""
         bottom = MockLayer("bottom", consume_events=True)
         middle = MockLayer("middle", consume_events=True)
         top = MockLayer("top", consume_events=False)
@@ -413,9 +414,10 @@ class TestEventRoutingThroughLayers:
         mock_event = Mock()
         result = stack.handle_key_event(mock_event)
         
-        assert result is True
+        # Only top layer receives events (no propagation)
+        assert result is False  # Top doesn't consume
         assert len(top.key_events_received) == 1
-        assert len(middle.key_events_received) == 1
+        assert len(middle.key_events_received) == 0
         assert len(bottom.key_events_received) == 0
     
     def test_char_event_routing(self):
@@ -552,9 +554,9 @@ class TestErrorHandling:
         # Should not raise exception
         result = stack.handle_key_event(mock_event)
         
-        # Event should propagate to bottom layer
-        assert result is True
-        assert len(bottom.key_events_received) == 1
+        # Exception caught, event not consumed (no propagation)
+        assert result is False
+        assert len(bottom.key_events_received) == 0
     
     def test_exception_during_char_event_handling(self):
         """Test that exceptions during char event handling are caught."""
@@ -573,9 +575,9 @@ class TestErrorHandling:
         # Should not raise exception
         result = stack.handle_char_event(mock_event)
         
-        # Event should propagate to bottom layer
-        assert result is True
-        assert len(bottom.char_events_received) == 1
+        # Exception caught, event not consumed (no propagation)
+        assert result is False
+        assert len(bottom.char_events_received) == 0
     
     def test_exception_during_rendering(self):
         """Test that exceptions during rendering are caught."""
@@ -598,7 +600,7 @@ class TestErrorHandling:
         assert len(bottom.render_calls) == 1
     
     def test_multiple_exceptions_dont_stop_processing(self):
-        """Test that multiple exceptions don't stop event processing."""
+        """Test that exception in top layer is caught (no propagation)."""
         
         class ExceptionLayer(MockLayer):
             def handle_key_event(self, event):
@@ -615,9 +617,9 @@ class TestErrorHandling:
         mock_event = Mock()
         result = stack.handle_key_event(mock_event)
         
-        # Event should still reach bottom layer
-        assert result is True
-        assert len(bottom.key_events_received) == 1
+        # Only top layer (exception2) receives event, exception caught
+        assert result is False
+        assert len(bottom.key_events_received) == 0
 
 
 class TestExistingFunctionality:

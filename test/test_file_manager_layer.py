@@ -93,10 +93,18 @@ class TestFileManagerLayerBasics:
         mock_fm.draw_log_pane = Mock()
         mock_fm.draw_status = Mock()
         
-        layer = FileManagerLayer(mock_fm)
+        # Mock general_dialog and quick_choice_bar
+        mock_fm.general_dialog = Mock()
+        mock_fm.general_dialog.is_active = False
+        mock_fm.quick_choice_bar = Mock()
+        mock_fm.quick_choice_bar.is_active = False
         
-        # Create mock renderer
+        # Create mock renderer with get_dimensions method
         mock_renderer = Mock()
+        mock_renderer.get_dimensions = Mock(return_value=(24, 80))
+        mock_fm.renderer = mock_renderer
+        
+        layer = FileManagerLayer(mock_fm)
         
         # Render
         layer.render(mock_renderer)

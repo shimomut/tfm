@@ -2612,6 +2612,8 @@ class FileManager:
     def show_help_dialog(self):
         """Show help dialog with key bindings and usage information"""
         InfoDialogHelpers.show_help_dialog(self.info_dialog)
+        # Push dialog onto layer stack
+        self.push_layer(self.info_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -3246,9 +3248,8 @@ class FileManager:
         if self.is_key_for_action(event, 'quit'):
             def quit_callback(confirmed):
                 if confirmed:
-                    # Request the FileManagerLayer to close (which will exit the app)
-                    if hasattr(self, 'file_manager_layer'):
-                        self.file_manager_layer.request_close()
+                    # Set the flag to exit the main loop
+                    self.should_quit = True
             
             # Check if quit confirmation is enabled
             if getattr(self.config, 'CONFIRM_QUIT', True):
@@ -3604,15 +3605,30 @@ class FileManager:
         
         # Handle isearch mode input (not part of layer stack)
         if self.isearch_mode:
-            return self.handle_isearch_input(event)
+            result = self.handle_isearch_input(event)
+            if result:
+                # Mark the FileManagerLayer dirty so it redraws with the updated isearch
+                self.file_manager_layer.mark_dirty()
+                self.needs_full_redraw = True
+            return result
         
         # Handle general dialog input (not part of layer stack)
         if self.general_dialog.is_active:
-            return self.general_dialog.handle_input(event)
+            result = self.general_dialog.handle_input(event)
+            if result:
+                # Mark the FileManagerLayer dirty so it redraws with the updated dialog
+                self.file_manager_layer.mark_dirty()
+                self.needs_full_redraw = True
+            return result
         
         # Handle quick choice mode input (not part of layer stack, KeyEvent only)
         if isinstance(event, KeyEvent) and self.quick_choice_bar.is_active:
-            return self.handle_quick_choice_input(event)
+            result = self.handle_quick_choice_input(event)
+            if result:
+                # Mark the FileManagerLayer dirty so it redraws with the updated quick choice bar
+                self.file_manager_layer.mark_dirty()
+                self.needs_full_redraw = True
+            return result
         
         # Delegate to UI layer stack for all other event handling
         # This handles dialogs, viewers, and the main FileManager screen
@@ -3931,6 +3947,7 @@ def cli_main():
         # Store debug mode in environment for access by other modules
         if args.debug:
             os.environ['TFM_DEBUG'] = '1'
+            print("Debug mode enabled - logs will be written to both terminal and log pane", file=sys.stderr)
         
         # Handle color testing mode
         if args.color_test:

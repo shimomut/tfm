@@ -140,7 +140,7 @@ def test_event_routing_to_top_layer():
 
 
 def test_event_propagation():
-    """Test that events propagate when not consumed."""
+    """Test that events only go to top layer (no propagation)."""
     bottom = MockLayer("bottom")
     stack = UILayerStack(bottom)
     
@@ -150,8 +150,9 @@ def test_event_propagation():
     event = {'type': 'key', 'consume': False}
     result = stack.handle_key_event(event)
     
+    # Only top layer receives events (no propagation)
     assert len(top.key_events_received) == 1
-    assert len(bottom.key_events_received) == 1
+    assert len(bottom.key_events_received) == 0
 
 
 def test_rendering_dirty_layers():

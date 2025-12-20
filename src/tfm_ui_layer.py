@@ -3,17 +3,17 @@ UI Layer Stack System for TFM
 
 This module provides a dynamic stack-based architecture for managing UI components
 in the TFM file manager. It replaces complex if-elif chains with a clean layer-based
-approach where layers are managed in a stack structure with proper event routing and
-intelligent rendering optimization.
+approach where layers are managed in a stack structure with intelligent rendering
+optimization.
 
 Key Components:
 - UILayer: Abstract base class defining the interface for all UI layers
 - UILayerStack: Manages the stack of UI layers with event routing and rendering
 
 The stack maintains layers in LIFO order with the FileManager main screen as the
-permanent bottom layer. Events are routed to the top layer first, with propagation
-to lower layers if not consumed. Rendering is optimized by skipping layers obscured
-by full-screen layers.
+permanent bottom layer. Events are routed ONLY to the top layer - there is no
+event propagation to lower layers. Rendering is optimized by skipping layers
+obscured by full-screen layers.
 """
 
 from abc import ABC, abstractmethod
@@ -40,15 +40,18 @@ class UILayer(ABC):
         """
         Handle a key event.
         
-        This method is called when a keyboard event occurs. The layer should
-        process the event and return True if it consumed the event, or False
-        to allow propagation to the next layer below.
+        This method is called when a keyboard event occurs and this layer is
+        the top layer in the stack. The layer should process the event and
+        return True if it consumed the event, or False if it did not handle it.
+        
+        Note: Events are only sent to the top layer. Lower layers do not
+        receive events unless they become the top layer.
         
         Args:
             event: KeyEvent to handle (from TTK backend)
         
         Returns:
-            True if the event was consumed, False to propagate to next layer
+            True if the event was consumed, False otherwise
         """
         pass
     
@@ -58,15 +61,18 @@ class UILayer(ABC):
         Handle a character event.
         
         This method is called when a character input event occurs (typically
-        for text input). The layer should process the event and return True
-        if it consumed the event, or False to allow propagation to the next
-        layer below.
+        for text input) and this layer is the top layer in the stack. The
+        layer should process the event and return True if it consumed the
+        event, or False if it did not handle it.
+        
+        Note: Events are only sent to the top layer. Lower layers do not
+        receive events unless they become the top layer.
         
         Args:
             event: CharEvent to handle (from TTK backend)
         
         Returns:
-            True if the event was consumed, False to propagate to next layer
+            True if the event was consumed, False otherwise
         """
         pass
     
@@ -180,13 +186,13 @@ class UILayerStack:
     Manages a stack of UI layers with event routing and rendering coordination.
     
     The stack maintains layers in LIFO order, with the FileManager main screen
-    as the permanent bottom layer. Events are routed to the top layer first,
-    with propagation to lower layers if not consumed. Rendering is optimized
+    as the permanent bottom layer. Events are routed ONLY to the top layer -
+    there is no event propagation to lower layers. Rendering is optimized
     by skipping layers obscured by full-screen layers.
     
     Key Features:
     - LIFO stack ordering with bottom layer protection
-    - Event routing with propagation chain
+    - Top-layer-only event routing (no propagation)
     - Intelligent dirty tracking for rendering optimization
     - Full-screen layer optimization (skip rendering obscured layers)
     - Exception handling for robustness
@@ -279,71 +285,61 @@ class UILayerStack:
     
     def handle_key_event(self, event) -> bool:
         """
-        Route a key event to layers, starting from the top.
+        Route a key event to the top layer only.
         
-        Events are routed to the top layer first. If the top layer consumes
-        the event (returns True), propagation stops. Otherwise, the event
-        is propagated to the next layer below, continuing until a layer
-        consumes it or the bottom layer is reached.
+        Events are only sent to the top layer. The top layer is responsible
+        for handling the event completely. Event propagation to lower layers
+        is not supported - only the topmost layer receives events.
         
-        Exception handling: If a layer raises an exception during event
-        handling, the exception is caught, logged, and propagation continues
-        to the next layer.
+        Exception handling: If the top layer raises an exception during event
+        handling, the exception is caught and logged.
         
         Args:
             event: KeyEvent to route
         
         Returns:
-            True if any layer consumed the event, False otherwise
+            True if the top layer consumed the event, False otherwise
         """
-        # Iterate from top to bottom
-        for layer in reversed(self._layers):
-            try:
-                if layer.handle_key_event(event):
-                    return True
-            except Exception as e:
-                if self._log_manager:
-                    self._log_manager.add_message(
-                        "ERROR",
-                        f"Layer {layer.__class__.__name__} raised exception during key event: {e}"
-                    )
-                # Continue to next layer despite error
-        
-        return False
+        # Only route to the top layer
+        top_layer = self._layers[-1]
+        try:
+            return top_layer.handle_key_event(event)
+        except Exception as e:
+            if self._log_manager:
+                self._log_manager.add_message(
+                    "ERROR",
+                    f"Layer {top_layer.__class__.__name__} raised exception during key event: {e}"
+                )
+            return False
     
     def handle_char_event(self, event) -> bool:
         """
-        Route a character event to layers, starting from the top.
+        Route a character event to the top layer only.
         
-        Events are routed to the top layer first. If the top layer consumes
-        the event (returns True), propagation stops. Otherwise, the event
-        is propagated to the next layer below, continuing until a layer
-        consumes it or the bottom layer is reached.
+        Events are only sent to the top layer. The top layer is responsible
+        for handling the event completely. Event propagation to lower layers
+        is not supported - only the topmost layer receives events.
         
-        Exception handling: If a layer raises an exception during event
-        handling, the exception is caught, logged, and propagation continues
-        to the next layer.
+        Exception handling: If the top layer raises an exception during event
+        handling, the exception is caught and logged.
         
         Args:
             event: CharEvent to route
         
         Returns:
-            True if any layer consumed the event, False otherwise
+            True if the top layer consumed the event, False otherwise
         """
-        # Iterate from top to bottom
-        for layer in reversed(self._layers):
-            try:
-                if layer.handle_char_event(event):
-                    return True
-            except Exception as e:
-                if self._log_manager:
-                    self._log_manager.add_message(
-                        "ERROR",
-                        f"Layer {layer.__class__.__name__} raised exception during char event: {e}"
-                    )
-                # Continue to next layer despite error
-        
-        return False
+        # Only route to the top layer
+        top_layer = self._layers[-1]
+        try:
+            return top_layer.handle_char_event(event)
+        except Exception as e:
+            if self._log_manager:
+                self._log_manager.add_message(
+                    "ERROR",
+                    f"Layer {top_layer.__class__.__name__} raised exception during char event: {e}"
+                )
+            return False
     
     def render(self, renderer) -> None:
         """
@@ -500,7 +496,8 @@ class FileManagerLayer(UILayer):
         Render the FileManager main screen.
         
         This method renders the complete main screen including header, file panes,
-        log pane, and status bar. It only performs a full redraw when needed.
+        log pane, status bar, and any active dialogs (general_dialog, quick_choice_bar).
+        It only performs a full redraw when needed.
         
         Args:
             renderer: TTK renderer instance for drawing
@@ -517,6 +514,18 @@ class FileManagerLayer(UILayer):
             self.file_manager.draw_files()
             self.file_manager.draw_log_pane()
             self.file_manager.draw_status()
+            
+            # Get dimensions for drawing overlays
+            height, width = self.file_manager.renderer.get_dimensions()
+            status_y = height - 1
+            
+            # Draw general dialog if active (for text input in status bar)
+            if self.file_manager.general_dialog.is_active:
+                self.file_manager.general_dialog.draw()
+            
+            # Draw quick choice bar if active
+            if self.file_manager.quick_choice_bar.is_active:
+                self.file_manager.quick_choice_bar.draw(status_y, width)
             
             # Note: Don't call renderer.refresh() here - UILayerStack will do it
     

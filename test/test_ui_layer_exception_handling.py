@@ -129,7 +129,7 @@ def test_exception_during_rendering():
 
 
 def test_event_propagation_continues_after_exception():
-    """Test that event propagation continues to next layer after exception."""
+    """Test that exception in top layer is caught and logged (no propagation)."""
     log_manager = MockLogManager()
     
     # Bottom layer that doesn't throw
@@ -149,11 +149,11 @@ def test_event_propagation_continues_after_exception():
     top = ExceptionThrowingLayer("top", throw_on_key=True)
     stack.push(top)
     
-    # Event should propagate to bottom layer despite top layer exception
+    # Only top layer receives event (no propagation even on exception)
     result = stack.handle_key_event({'type': 'key'})
     
-    assert result is True  # Bottom layer consumed it
-    assert bottom.key_received is True
+    assert result is False  # Event not consumed (exception caught)
+    assert bottom.key_received is False  # Bottom layer never received event
     assert len(log_manager.messages) == 1  # Exception was logged
 
 
