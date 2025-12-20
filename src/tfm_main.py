@@ -157,8 +157,11 @@ class FileManager:
         color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
         init_colors(renderer, color_scheme)
         
+        # Check if debug mode is enabled
+        debug_mode = os.environ.get('TFM_DEBUG') == '1'
+        
         # Initialize modular components
-        self.log_manager = LogManager(self.config, remote_port=remote_log_port)
+        self.log_manager = LogManager(self.config, remote_port=remote_log_port, debug_mode=debug_mode)
         self.state_manager = get_state_manager()
         
         # Track whether command line directories were provided
