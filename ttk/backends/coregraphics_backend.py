@@ -89,6 +89,7 @@ Example Usage:
 
 import time
 import unicodedata
+import warnings
 from functools import lru_cache
 
 # Check PyObjC availability
@@ -97,6 +98,12 @@ try:
     import Quartz
     import objc
     COCOA_AVAILABLE = True
+    
+    # Suppress PyObjC pointer warnings
+    # These warnings are informational and occur during normal NSTextInputClient
+    # protocol implementation when handling output parameters (like actual_range).
+    # The pointer creation is correct and expected behavior.
+    warnings.filterwarnings('ignore', category=objc.ObjCPointerWarning)
 except ImportError:
     COCOA_AVAILABLE = False
 
