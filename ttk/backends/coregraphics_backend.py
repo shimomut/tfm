@@ -1409,6 +1409,11 @@ class CoreGraphicsBackend(Renderer):
         self.view = TTKView.alloc().initWithFrame_backend_(content_rect, self)
         self.window.setContentView_(self.view)
         
+        # Set resize increments to snap to character grid
+        # This makes the window resize in increments of character cell size
+        resize_increment = Cocoa.NSMakeSize(self.char_width, self.char_height)
+        self.window.setResizeIncrements_(resize_increment)
+        
         # Show the window and make it the key window (receives keyboard input)
         # makeKeyAndOrderFront_() corresponds to Objective-C makeKeyAndOrderFront:
         # The parameter (None) is the sender, which we don't need
@@ -2758,8 +2763,11 @@ if COCOA_AVAILABLE:
                 Handle window resize events.
                 
                 This method is called when the window is resized. We recalculate
-                the grid dimensions based on the new window size, then adjust the
-                window size to fit the best text grid size to minimize frame gaps.
+                the grid dimensions based on the new window size.
+                
+                The window uses setResizeIncrements_ to snap to character grid
+                boundaries automatically, so we don't need to manually adjust
+                the frame here. The OS handles the snapping for us.
                 
                 Args:
                     notification: NSNotification containing resize information
@@ -2769,44 +2777,9 @@ if COCOA_AVAILABLE:
                 new_width = int(content_rect.size.width)
                 new_height = int(content_rect.size.height)
                 
-                # Calculate new grid dimensions
+                # Calculate new grid dimensions based on content size
                 new_cols = max(1, new_width // self.backend.char_width)
                 new_rows = max(1, new_height // self.backend.char_height)
-                
-                # Calculate the ideal window size for this grid (minimizes gaps)
-                ideal_width = new_cols * self.backend.char_width
-                ideal_height = new_rows * self.backend.char_height
-                
-                # Check if we need to adjust the window size to fit the grid
-                # Only adjust if there's a significant gap (more than 1 pixel)
-                width_gap = new_width - ideal_width
-                height_gap = new_height - ideal_height
-                
-                if width_gap > 1 or height_gap > 1:
-                    # Adjust window size to fit the text grid perfectly
-                    # Get current window frame (includes title bar and borders)
-                    window_frame = self.backend.window.frame()
-                    
-                    # Calculate the difference between window frame and content rect
-                    # This accounts for title bar and window borders
-                    frame_width_overhead = window_frame.size.width - content_rect.size.width
-                    frame_height_overhead = window_frame.size.height - content_rect.size.height
-                    
-                    # Create new window frame with adjusted content size
-                    new_frame = Cocoa.NSMakeRect(
-                        window_frame.origin.x,
-                        window_frame.origin.y + (content_rect.size.height - ideal_height),  # Adjust y to keep top-left corner fixed
-                        ideal_width + frame_width_overhead,
-                        ideal_height + frame_height_overhead
-                    )
-                    
-                    # Set the new frame without animation to avoid visual glitches
-                    self.backend.window.setFrame_display_(new_frame, True)
-                    
-                    # Update content rect after adjustment
-                    content_rect = self.backend.window.contentView().frame()
-                    new_width = int(content_rect.size.width)
-                    new_height = int(content_rect.size.height)
                 
                 # Only update if dimensions actually changed
                 if new_cols != self.backend.cols or new_rows != self.backend.rows:
