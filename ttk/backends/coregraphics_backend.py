@@ -1756,6 +1756,24 @@ class CoreGraphicsBackend(Renderer):
         if self.event_callback is None:
             raise RuntimeError("Event callback not set. Call set_event_callback() first.")
         
+        # Check for pending system events and deliver them via callback
+        # These flags are set by window delegate methods (windowDidResize_, windowShouldClose_)
+        
+        # Check for resize event
+        if self.resize_pending:
+            self.resize_pending = False
+            resize_event = SystemEvent(
+                event_type=SystemEventType.RESIZE
+            )
+            self.event_callback.on_system_event(resize_event)
+        
+        # Check for close event
+        if self.should_close:
+            close_event = SystemEvent(
+                event_type=SystemEventType.CLOSE
+            )
+            self.event_callback.on_system_event(close_event)
+        
         # Get the shared application instance
         app = Cocoa.NSApplication.sharedApplication()
         
