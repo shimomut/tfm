@@ -87,6 +87,7 @@ Example Usage:
     backend.shutdown()
 """
 
+import os
 import time
 import unicodedata
 import warnings
@@ -2796,18 +2797,21 @@ class CoreGraphicsBackend(Renderer):
     
     def set_caret_position(self, x: int, y: int) -> None:
         """
-        Set the terminal caret position (no-op for desktop mode).
+        Set the caret position for IME composition text positioning.
         
-        In desktop mode, the OS manages the caret position through the
-        NSTextInputClient protocol. This method is a no-op as the caret
-        is automatically positioned by macOS based on text input context.
+        This method updates the cursor position used by the NSTextInputClient
+        protocol to position the IME composition overlay and candidate window.
+        
+        Note: In TTK, x is the column and y is the row (different from typical
+        screen coordinates where x is horizontal and y is vertical).
         
         Args:
-            x: Column position (ignored)
-            y: Row position (ignored)
+            x: Column position (0-based)
+            y: Row position (0-based)
         """
-        # No-op: Desktop mode uses OS-managed caret via NSTextInputClient
-        pass
+        # Update cursor position for IME
+        # Note: x is column, y is row in TTK convention
+        self.set_cursor_position(y, x)
 
 
 # Define TTKWindowDelegate class for handling window events
@@ -3311,6 +3315,38 @@ if COCOA_AVAILABLE:
                         char_height
                     )
                     Cocoa.NSRectFill(cursor_rect)
+                
+                # Draw IME marked text (composition text) if present
+                if hasattr(self, 'marked_text') and self.marked_text:
+                    # Calculate position for marked text (at cursor position)
+                    # Note: TFM needs to call backend.set_cursor_position(row, col) or
+                    # backend.move_cursor(row, col) to update cursor position for IME.
+                    # If cursor is at (0, 0), marked text will appear at top-left.
+                    marked_x = self.backend.cursor_col * char_width
+                    marked_y = (rows - self.backend.cursor_row - 1) * char_height
+                    
+                    # Debug: Print cursor position when rendering marked text
+                    # This helps diagnose positioning issues
+                    if os.environ.get('TFM_DEBUG') == '1':
+                        print(f"[IME] Rendering marked text '{self.marked_text}' at cursor ({self.backend.cursor_row}, {self.backend.cursor_col})")
+                    
+                    # Create attributes for marked text
+                    # Use underline to indicate composition state
+                    attrs = {
+                        Cocoa.NSFontAttributeName: self.backend.font,
+                        Cocoa.NSForegroundColorAttributeName: self.backend._color_cache.get_color(0, 0, 0),
+                        Cocoa.NSBackgroundColorAttributeName: self.backend._color_cache.get_color(255, 255, 200),  # Light yellow background
+                        Cocoa.NSUnderlineStyleAttributeName: Cocoa.NSUnderlineStyleSingle
+                    }
+                    
+                    # Create attributed string for marked text
+                    marked_attr_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
+                        self.marked_text,
+                        attrs
+                    )
+                    
+                    # Draw marked text at cursor position
+                    marked_attr_string.drawAtPoint_(Cocoa.NSMakePoint(marked_x, marked_y))
 
             def acceptsFirstResponder(self):
                 """
@@ -3527,8 +3563,8 @@ if COCOA_AVAILABLE:
                 Handle composition text updates from IME.
                 
                 This method is called repeatedly as the user types with IME active.
-                macOS handles all visual rendering - we just track the state for
-                position queries.
+                We track the composition state and trigger a redraw to display the
+                marked text with visual feedback (underline, highlighted background).
                 
                 This is part of the NSTextInputClient protocol and is called by
                 macOS during IME composition to update the marked (composition) text.
@@ -3553,6 +3589,9 @@ if COCOA_AVAILABLE:
                 
                 # Store selected range within composition
                 self.selected_range = selected_range
+                
+                # Trigger redraw to show marked text
+                self.setNeedsDisplay_(True)
             
             def unmarkText(self):
                 """
@@ -3569,6 +3608,9 @@ if COCOA_AVAILABLE:
                 self.marked_text = ""
                 self.marked_range = Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
                 self.selected_range = Cocoa.NSMakeRange(0, 0)
+                
+                # Trigger redraw to clear marked text display
+                self.setNeedsDisplay_(True)
             
             def insertText_replacementRange_(self, string, replacement_range):
                 """
@@ -3598,6 +3640,9 @@ if COCOA_AVAILABLE:
                 self.marked_text = ""
                 self.marked_range = Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)
                 self.selected_range = Cocoa.NSMakeRange(0, 0)
+                
+                # Trigger redraw to clear marked text display
+                self.setNeedsDisplay_(True)
                 
                 # Extract plain text if NSAttributedString
                 if hasattr(string, 'string'):
