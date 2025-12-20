@@ -312,6 +312,10 @@ class Renderer(ABC):
         display. Drawing operations (draw_text, draw_rect, etc.) are buffered
         and not visible until this method is called.
         
+        The caret position set by set_caret_position() is automatically restored
+        before refreshing, so applications don't need to call set_caret_position()
+        immediately before refresh().
+        
         For optimal performance, batch multiple drawing operations and call
         refresh() once after all operations are complete.
         
@@ -319,7 +323,8 @@ class Renderer(ABC):
             renderer.clear()
             renderer.draw_text(0, 0, "Line 1")
             renderer.draw_text(1, 0, "Line 2")
-            renderer.refresh()  # Now both lines become visible
+            renderer.set_caret_position(10, 5)  # For IME
+            renderer.refresh()  # Caret position is automatically restored
         """
         pass
     
@@ -604,5 +609,39 @@ class Renderer(ABC):
             
             # Enable the "Delete" menu item when files are selected
             renderer.update_menu_item_state('file.delete', True)
+        """
+        pass
+    
+    @abstractmethod
+    def set_caret_position(self, x: int, y: int) -> None:
+        """
+        Set the terminal caret position.
+        
+        This method stores the caret position, which will be automatically
+        restored by refresh(). The caret position should match the logical
+        cursor position in text input widgets to provide visual feedback
+        about where text input will appear.
+        
+        Applications no longer need to call this method immediately before
+        refresh() - the position is remembered and automatically restored.
+        
+        In terminal mode (curses), this controls the actual terminal cursor.
+        In desktop mode (CoreGraphics), this is typically a no-op as the OS
+        manages the caret through the NSTextInputClient protocol.
+        
+        Args:
+            x: Column position (0-based, 0 is left)
+            y: Row position (0-based, 0 is top)
+        
+        Note: The caret position can be set even when the caret is hidden.
+        This is useful for IME (Input Method Editor) composition text positioning.
+        Coordinates outside the window bounds are handled gracefully (typically
+        ignored or clamped).
+        
+        Example:
+            # Position caret at column 10, row 5 for IME
+            renderer.set_caret_position(10, 5)
+            # ... do other drawing operations ...
+            renderer.refresh()  # Caret position is automatically restored
         """
         pass

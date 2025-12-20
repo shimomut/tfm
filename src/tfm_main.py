@@ -537,6 +537,11 @@ class FileManager:
             # TTK renderer handles background color automatically
             # No need for manual background filling
             
+            # Set default caret position to bottom-left corner
+            # This keeps the caret out of the way when not editing text
+            height, width = self.renderer.get_dimensions()
+            self.renderer.set_caret_position(0, height - 1)
+            
         except Exception as e:
             # Any other error, use regular clear
             print(f"Warning: Screen clear with background failed: {e}")

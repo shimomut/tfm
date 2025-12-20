@@ -193,6 +193,7 @@ class SingleLineTextEdit:
         text_max_width = max_width - label_width
         
         if text_max_width <= 0:
+            # Not enough space - return early
             return
         
         # Get color and attributes
@@ -208,6 +209,8 @@ class SingleLineTextEdit:
                 # Show cursor at beginning of empty field
                 self._safe_draw_text(renderer, y, text_start_x, " ", base_color, 
                                    base_attributes | TextAttribute.REVERSE)
+                # Set caret position at the beginning of the text field
+                renderer.set_caret_position(text_start_x, y)
             return
         
         # Ensure cursor is within bounds
@@ -271,6 +274,7 @@ class SingleLineTextEdit:
         
         # Draw text with cursor highlighting, accounting for wide characters
         current_x = text_start_x
+        caret_x = text_start_x  # Track caret position
         
         for i, char in enumerate(visible_text):
             char_width = get_width(char)
@@ -279,6 +283,8 @@ class SingleLineTextEdit:
                 # Draw cursor character with reversed colors
                 self._safe_draw_text(renderer, y, current_x, char, base_color, 
                                    base_attributes | TextAttribute.REVERSE)
+                # Store caret position at cursor
+                caret_x = current_x
             else:
                 # Draw normal character
                 self._safe_draw_text(renderer, y, current_x, char, base_color, base_attributes)
@@ -292,6 +298,8 @@ class SingleLineTextEdit:
             if current_x < x + max_width:
                 self._safe_draw_text(renderer, y, current_x, " ", base_color, 
                                    base_attributes | TextAttribute.REVERSE)
+                # Store caret position at end
+                caret_x = current_x
             elif len(visible_text) > 0:
                 # If we're at the edge, we need to be more careful with wide characters
                 # Find the last character that we can highlight as cursor
@@ -302,6 +310,13 @@ class SingleLineTextEdit:
                     last_char_x = current_x - last_char_width
                     self._safe_draw_text(renderer, y, last_char_x, last_char, base_color, 
                                        base_attributes | TextAttribute.REVERSE)
+                    # Store caret position at last character
+                    caret_x = last_char_x
+        
+        # Set caret position for IME composition text positioning
+        # TTK refresh() will automatically restore this position
+        if is_active:
+            renderer.set_caret_position(caret_x, y)
     
     def _safe_draw_text(self, renderer, y, x, text, color_pair, attributes):
         """Safely draw text to screen, handling boundary conditions and wide characters"""

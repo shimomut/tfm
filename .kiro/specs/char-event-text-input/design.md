@@ -606,6 +606,231 @@ def handle_input(self, event):
     return False  # Not consumed - can be translated to CharEvent
 ```
 
+### 6. UTF-8 Byte Accumulator (New)
+
+**Location:** `ttk/backends/curses_backend.py`
+
+**Purpose:** Accumulate multi-byte UTF-8 sequences in curses backend to generate single CharEvent for Unicode characters
+
+**Interface:**
+```python
+class UTF8Accumulator:
+    """
+    Accumulates UTF-8 byte sequences to form complete Unicode characters.
+    
+    UTF-8 encoding uses 1-4 bytes per character:
+    - 0xxxxxxx: 1-byte character (ASCII)
+    - 110xxxxx 10xxxxxx: 2-byte character
+    - 1110xxxx 10xxxxxx 10xxxxxx: 3-byte character
+    - 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx: 4-byte character
+    """
+    
+    def __init__(self):
+        self.buffer: bytearray = bytearray()
+        self.expected_bytes: int = 0
+    
+    def add_byte(self, byte: int) -> Optional[str]:
+        """
+        Add a byte to the accumulator.
+        
+        Args:
+            byte: Integer value of the byte (0-255)
+        
+        Returns:
+            Complete Unicode character if sequence is complete, None otherwise
+        """
+        # First byte - determine expected length
+        if self.expected_bytes == 0:
+            if byte < 0x80:  # ASCII (1 byte)
+                return chr(byte)
+            elif (byte & 0xE0) == 0xC0:  # 2-byte sequence
+                self.expected_bytes = 2
+                self.buffer.append(byte)
+            elif (byte & 0xF0) == 0xE0:  # 3-byte sequence
+                self.expected_bytes = 3
+                self.buffer.append(byte)
+            elif (byte & 0xF8) == 0xF0:  # 4-byte sequence
+                self.expected_bytes = 4
+                self.buffer.append(byte)
+            else:
+                # Invalid start byte - discard
+                self.reset()
+                return None
+        else:
+            # Continuation byte - should start with 10xxxxxx
+            if (byte & 0xC0) != 0x80:
+                # Invalid continuation byte - discard buffer
+                self.reset()
+                return None
+            
+            self.buffer.append(byte)
+            
+            # Check if sequence is complete
+            if len(self.buffer) == self.expected_bytes:
+                try:
+                    char = self.buffer.decode('utf-8')
+                    self.reset()
+                    return char
+                except UnicodeDecodeError:
+                    # Invalid sequence - discard
+                    self.reset()
+                    return None
+        
+        return None
+    
+    def reset(self):
+        """Reset the accumulator state."""
+        self.buffer.clear()
+        self.expected_bytes = 0
+    
+    def is_accumulating(self) -> bool:
+        """Check if currently accumulating a multi-byte sequence."""
+        return len(self.buffer) > 0
+```
+
+**Integration in CursesBackend:**
+```python
+class CursesBackend(Renderer):
+    def __init__(self):
+        super().__init__()
+        self.utf8_accumulator = UTF8Accumulator()
+    
+    def run_event_loop(self):
+        """Run event loop with UTF-8 accumulation."""
+        while True:
+            # Poll for input
+            key = self.stdscr.getch()
+            if key == -1:
+                continue
+            
+            # Try to accumulate as UTF-8 byte
+            char = self.utf8_accumulator.add_byte(key)
+            
+            if char is not None:
+                # Complete character formed
+                if len(char) == 1 and ord(char) < 128:
+                    # ASCII - generate KeyEvent (for command matching)
+                    key_event = KeyEvent(key_code=ord(char), modifiers=ModifierKey.NONE, char=char)
+                    consumed = False
+                    if self.event_callback:
+                        consumed = self.event_callback.on_key_event(key_event)
+                    
+                    # If not consumed, translate to CharEvent
+                    if not consumed:
+                        char_event = CharEvent(char=char)
+                        if self.event_callback:
+                            self.event_callback.on_char_event(char_event)
+                else:
+                    # Multi-byte Unicode - generate CharEvent directly
+                    char_event = CharEvent(char=char)
+                    if self.event_callback:
+                        self.event_callback.on_char_event(char_event)
+            # else: still accumulating, wait for more bytes
+```
+
+### 7. Caret Position Manager (New)
+
+**Location:** `ttk/renderer.py` (base class) and backend implementations
+
+**Purpose:** Manage terminal caret position to match text widget cursor position
+
+**Interface:**
+```python
+class Renderer:
+    """Base renderer class."""
+    
+    def set_caret_position(self, x: int, y: int) -> None:
+        """
+        Set the terminal caret position.
+        
+        Args:
+            x: Column position (0-based)
+            y: Row position (0-based)
+        """
+        pass
+    
+    def hide_caret(self) -> None:
+        """Hide the terminal caret."""
+        pass
+    
+    def show_caret(self) -> None:
+        """Show the terminal caret."""
+        pass
+```
+
+**Curses Backend Implementation:**
+```python
+class CursesBackend(Renderer):
+    def set_caret_position(self, x: int, y: int) -> None:
+        """Set caret position using curses.setsyx()."""
+        try:
+            curses.setsyx(y, x)
+            self.stdscr.refresh()
+        except curses.error:
+            # Position out of bounds - ignore
+            pass
+    
+    def hide_caret(self) -> None:
+        """Hide caret by setting invisible cursor."""
+        try:
+            curses.curs_set(0)
+        except curses.error:
+            pass
+    
+    def show_caret(self) -> None:
+        """Show caret by setting visible cursor."""
+        try:
+            curses.curs_set(1)
+        except curses.error:
+            pass
+```
+
+**CoreGraphics Backend Implementation:**
+```python
+class CoreGraphicsBackend(Renderer):
+    def set_caret_position(self, x: int, y: int) -> None:
+        """Set caret position (no-op in desktop mode - OS handles caret)."""
+        # Desktop mode uses OS-managed caret via NSTextInputClient
+        pass
+    
+    def hide_caret(self) -> None:
+        """Hide caret (no-op in desktop mode)."""
+        pass
+    
+    def show_caret(self) -> None:
+        """Show caret (no-op in desktop mode)."""
+        pass
+```
+
+**Integration in SingleLineTextEdit:**
+```python
+class SingleLineTextEdit:
+    def draw(self, renderer: Renderer, x: int, y: int, width: int) -> None:
+        """Draw the text edit widget and update caret position."""
+        # Draw the widget content
+        self._draw_content(renderer, x, y, width)
+        
+        # Update caret position to match cursor
+        if self.has_focus:
+            caret_x = x + self.cursor_pos - self.scroll_offset
+            caret_y = y
+            renderer.set_caret_position(caret_x, caret_y)
+            renderer.show_caret()
+        else:
+            renderer.hide_caret()
+    
+    def handle_key(self, event, handle_vertical_nav=False) -> bool:
+        """Handle key event and update caret position."""
+        result = self._handle_key_internal(event, handle_vertical_nav)
+        
+        # Caret position will be updated on next draw()
+        # Request redraw if cursor moved
+        if result:
+            self.request_redraw()
+        
+        return result
+```
+
 ## Data Models
 
 ### Event Type Enumeration
@@ -696,6 +921,54 @@ No new enumeration needed. Event types are distinguished by class type using `is
 
 **Validates: Requirements 7.5**
 
+### Property 11: Multi-byte UTF-8 sequences form single CharEvent
+
+*For any* multi-byte UTF-8 character input in curses mode, the system should accumulate all bytes and generate exactly one CharEvent with the complete Unicode character.
+
+**Validates: Requirements 8.1, 8.2**
+
+### Property 12: Incomplete UTF-8 sequences are buffered
+
+*For any* incomplete UTF-8 byte sequence, the system should buffer the bytes without generating events until the sequence is complete.
+
+**Validates: Requirements 8.3**
+
+### Property 13: Invalid UTF-8 sequences are discarded
+
+*For any* invalid UTF-8 byte sequence, the system should discard the invalid bytes and continue processing subsequent input without generating events for the invalid bytes.
+
+**Validates: Requirements 8.4**
+
+### Property 14: No KeyEvents for UTF-8 continuation bytes
+
+*For any* multi-byte UTF-8 character being accumulated, the system should not generate KeyEvent instances for the continuation bytes.
+
+**Validates: Requirements 8.5**
+
+### Property 15: Caret position matches cursor position
+
+*For any* text input widget with focus, the terminal caret position should match the widget's logical cursor position accounting for screen coordinates.
+
+**Validates: Requirements 9.1, 9.3**
+
+### Property 16: Caret updates on cursor movement
+
+*For any* cursor position change within a text widget, the terminal caret position should be updated to reflect the new position.
+
+**Validates: Requirements 9.2**
+
+### Property 17: Caret hidden when widget loses focus
+
+*For any* text widget that loses focus, the terminal caret should be hidden or moved away from the widget.
+
+**Validates: Requirements 9.4**
+
+### Property 18: Caret set after widget rendering
+
+*For any* text widget rendering operation, the caret position should be set after the widget content is drawn.
+
+**Validates: Requirements 9.5**
+
 ## Error Handling
 
 ### Invalid CharEvent Creation
@@ -723,6 +996,27 @@ No new enumeration needed. Event types are distinguished by class type using `is
 **Handling:**
 - Unit tests verify backend consistency
 - Integration tests compare backend behavior
+
+### UTF-8 Decoding Errors
+
+**Scenario:** Invalid UTF-8 byte sequences received from terminal
+
+**Handling:**
+- UTF8Accumulator catches UnicodeDecodeError
+- Invalid sequences are discarded silently
+- Accumulator resets and continues processing
+- No events generated for invalid sequences
+- Logging can be added for debugging
+
+### Caret Position Out of Bounds
+
+**Scenario:** Attempt to set caret position outside terminal bounds
+
+**Handling:**
+- Backend catches curses.error exception
+- Invalid position is ignored silently
+- Widget continues to function normally
+- Caret remains at last valid position
 - Bugs fixed in backend translation logic
 
 ## Testing Strategy
