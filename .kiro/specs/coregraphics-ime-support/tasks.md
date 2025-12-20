@@ -29,13 +29,22 @@
   - Update marked_text instance variable
   - Update marked_range based on text length
   - Store selected_range parameter
+  - Trigger redraw via setNeedsDisplay_(True)
   - _Requirements: 3.4, 5.1_
 
 - [x] 3.2 Implement unmarkText method
   - Clear marked_text to empty string
   - Reset marked_range to NSNotFound location
   - Reset selected_range to zero-length
+  - Trigger redraw via setNeedsDisplay_(True)
   - _Requirements: 5.4, 5.5, 7.3_
+
+- [x] 3.3 Add marked text rendering in drawRect_ method
+  - Render marked text at cursor position after cursor drawing
+  - Use yellow background (RGB: 255, 255, 200) for composition text
+  - Add underline to match macOS IME conventions
+  - Add debug output when TFM_DEBUG=1
+  - _Requirements: 9.1, 9.2, 9.3_
 
 - [x] 4. Implement text commit handling
 - [x] 4.1 Implement insertText_ method
@@ -43,6 +52,7 @@
   - Extract plain text from NSString or NSAttributedString
   - Generate CharEvent for each character in the text
   - Deliver CharEvent via backend.event_callback.on_char_event()
+  - Trigger redraw via setNeedsDisplay_(True)
   - _Requirements: 1.5, 3.5, 6.1, 6.2_
 
 - [ ]* 4.2 Write property test for CharEvent generation
@@ -61,7 +71,13 @@
   - Store in cursor_row and cursor_col
   - _Requirements: 2.4, 2.5, 4.4_
 
-- [ ]* 5.3 Write property test for cursor position clamping
+- [x] 5.3 Fix set_caret_position to actually update cursor position
+  - Changed from no-op to call set_cursor_position(y, x)
+  - Note: x is column, y is row in TTK convention
+  - Fixes both marked text rendering and candidate window positioning
+  - _Requirements: 2.4, 2.5, 4.1, 4.2, 4.4_
+
+- [ ]* 5.4 Write property test for cursor position clamping
   - **Property 2: Cursor position determines IME overlay position**
   - **Validates: Requirements 2.4, 2.5, 4.1, 4.2**
 
@@ -76,7 +92,15 @@
   - Return screen rectangle
   - _Requirements: 2.4, 2.5, 4.1, 4.2, 4.3, 4.4_
 
-- [ ]* 6.2 Write unit test for coordinate conversion
+- [x] 6.2 Fix PyObjC pointer assignment error in firstRectForCharacterRange_actualRange_
+  - Wrap actual_range assignment in try-except block
+  - Handle TypeError/AttributeError gracefully
+  - Allow method to complete successfully and return correct coordinates
+  - Add debug output when TFM_DEBUG=1
+  - _Requirements: 4.1, 4.2, 4.3_
+  - _Note: actual_range is optional; macOS uses char_range if not set_
+
+- [ ]* 6.3 Write unit test for coordinate conversion
   - Test TTK to CoreGraphics coordinate transformation
   - Test view to screen coordinate conversion
   - Test with various cursor positions
@@ -131,10 +155,47 @@
   - Log warning about missing font
   - _Requirements: 2.1_
 
+- [x] 9.5 Suppress PyObjC pointer warnings
+  - Add warning filter for objc.ObjCPointerWarning
+  - Prevents harmless warnings about pointer creation in NSTextInputClient methods
+  - _Note: Warnings are expected PyObjC behavior and don't affect functionality_
+
+- [x] 9.6 Implement debug mode for TFM
+  - Add dual output to LogCapture class (log pane + terminal)
+  - Pass debug_mode flag from TFM_DEBUG environment variable
+  - Enable with --debug flag or TFM_DEBUG=1
+  - _Note: Allows seeing stdout/stderr in both log pane and terminal_
+
 - [x] 10. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ]* 11. Create integration test for Japanese IME
+- [x] 11. Debug and fix IME rendering issues
+- [x] 11.1 Fix composition text rendering
+  - Added marked text rendering in drawRect_ method
+  - Renders at cursor position with yellow background
+  - Adds underline to match macOS conventions
+  - _Requirements: 9.1, 9.2_
+
+- [x] 11.2 Fix composition text positioning
+  - Fixed set_caret_position to actually update cursor position
+  - Changed from no-op to call set_cursor_position(y, x)
+  - Fixes marked text rendering at correct location
+  - _Requirements: 2.4, 2.5, 4.1, 4.2_
+
+- [x] 11.3 Fix candidate window positioning
+  - Added debug output to trace coordinate transformations
+  - Discovered PyObjC pointer assignment error in firstRectForCharacterRange_actualRange_
+  - Wrapped actual_range assignment in try-except block
+  - Allows method to complete and return correct screen coordinates
+  - _Requirements: 4.1, 4.2, 4.3_
+
+- [x] 11.4 Add comprehensive debug output
+  - Added debug output for marked text rendering (when TFM_DEBUG=1)
+  - Added debug output for coordinate transformations (when TFM_DEBUG=1)
+  - Added debug output for PyObjC pointer handling (when TFM_DEBUG=1)
+  - _Note: Helps troubleshoot IME issues during development_
+
+- [ ]* 12. Create integration test for Japanese IME
   - Test hiragana input and kanji conversion
   - Test composition text positioning
   - Test candidate window appearance
