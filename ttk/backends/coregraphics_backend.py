@@ -3706,11 +3706,19 @@ if COCOA_AVAILABLE:
                     cursor_row = getattr(self.backend, 'cursor_row', 0)
                     cursor_col = getattr(self.backend, 'cursor_col', 0)
                     
+                    # Debug: Print cursor position
+                    if os.environ.get('TFM_DEBUG') == '1':
+                        print(f"[IME] firstRectForCharacterRange called: cursor=({cursor_row}, {cursor_col})")
+                    
                     # Convert to pixel coordinates (TTK to CoreGraphics)
                     # TTK: (0, 0) is top-left, row increases downward
                     # CoreGraphics: (0, 0) is bottom-left, y increases upward
                     x_pixel = cursor_col * self.backend.char_width
                     y_pixel = (self.backend.rows - cursor_row - 1) * self.backend.char_height
+                    
+                    # Debug: Print pixel coordinates
+                    if os.environ.get('TFM_DEBUG') == '1':
+                        print(f"[IME] View coordinates: x={x_pixel}, y={y_pixel}")
                     
                     # Create rect at cursor position with character dimensions
                     # This rect represents where the first character of composition will appear
@@ -3726,27 +3734,49 @@ if COCOA_AVAILABLE:
                     # Pass None as the second argument to convert to window coordinates
                     window_rect = self.convertRect_toView_(rect, None)
                     
+                    # Debug: Print window coordinates
+                    if os.environ.get('TFM_DEBUG') == '1':
+                        print(f"[IME] Window coordinates: x={window_rect.origin.x}, y={window_rect.origin.y}")
+                    
                     # Step 2: Convert from window coordinates to screen coordinates
                     # Check if window exists before conversion
                     window = self.window()
                     if window is not None:
                         screen_rect = window.convertRectToScreen_(window_rect)
+                        
+                        # Debug: Print screen coordinates
+                        if os.environ.get('TFM_DEBUG') == '1':
+                            print(f"[IME] Screen coordinates: x={screen_rect.origin.x}, y={screen_rect.origin.y}")
                     else:
                         # No window - return zero rect at origin
                         # This shouldn't happen in normal operation, but provides a fallback
                         screen_rect = Cocoa.NSMakeRect(0, 0, 0, 0)
+                        
+                        if os.environ.get('TFM_DEBUG') == '1':
+                            print(f"[IME] WARNING: No window found, returning zero rect")
                     
                     # Fill actual_range if provided
                     # actual_range is a pointer that macOS may provide to receive the
                     # actual range we're returning information for
+                    # Note: In PyObjC, output parameters can be tricky. We try to set it
+                    # but catch any errors since it's optional.
                     if actual_range is not None:
-                        # We're returning information for the requested range
-                        actual_range[0] = char_range
+                        try:
+                            # Try to set the actual range
+                            # PyObjC should handle the pointer conversion automatically
+                            actual_range[0] = char_range
+                        except (TypeError, AttributeError) as e:
+                            # If setting fails, it's okay - actual_range is optional
+                            # macOS will use the char_range parameter instead
+                            if os.environ.get('TFM_DEBUG') == '1':
+                                print(f"[IME] Note: Could not set actual_range (this is okay): {e}")
                     
                     return screen_rect
                 except Exception as e:
                     # If anything goes wrong, return a zero rect at origin
                     # This prevents IME from crashing but may position the candidate window incorrectly
+                    if os.environ.get('TFM_DEBUG') == '1':
+                        print(f"[IME] ERROR in firstRectForCharacterRange: {e}")
                     return Cocoa.NSMakeRect(0, 0, 0, 0)
             
             def attributedSubstringForProposedRange_actualRange_(self, proposed_range, actual_range):
