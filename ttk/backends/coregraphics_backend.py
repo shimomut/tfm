@@ -3023,6 +3023,11 @@ if COCOA_AVAILABLE:
                 self.marked_range = Cocoa.NSMakeRange(Cocoa.NSNotFound, 0)  # Composition range
                 self.selected_range = Cocoa.NSMakeRange(0, 0)  # Selection within composition
                 
+                # Create and store the text input context for IME support
+                # This is critical for IME to work - without an active input context,
+                # the IME system cannot communicate with the view
+                self._input_context = Cocoa.NSTextInputContext.alloc().initWithClient_(self)
+                
                 return self
             
             def drawRect_(self, rect):
@@ -3318,6 +3323,64 @@ if COCOA_AVAILABLE:
                     bool: True to receive keyboard input
                 """
                 return True
+            
+            def inputContext(self):
+                """
+                Return the text input context for this view.
+                
+                This method is called by macOS to get the NSTextInputContext for
+                handling IME input. We return our custom input context that was
+                created in initWithFrame_backend_.
+                
+                Returns:
+                    NSTextInputContext: The input context for IME support
+                """
+                return self._input_context
+            
+            def becomeFirstResponder(self):
+                """
+                Called when the view becomes the first responder (receives focus).
+                
+                This method activates the NSTextInputContext for the view, which is
+                required for IME (Input Method Editor) support. Without activating
+                the input context, the IME system cannot communicate with the view.
+                
+                Returns:
+                    bool: True if the view successfully became first responder
+                """
+                # Call superclass implementation
+                result = objc.super(TTKView, self).becomeFirstResponder()
+                
+                if result:
+                    # Activate the text input context for IME support
+                    # This is critical - without this, IME will not work
+                    input_context = self.inputContext()
+                    if input_context:
+                        input_context.activate()
+                
+                return result
+            
+            def resignFirstResponder(self):
+                """
+                Called when the view is about to lose first responder status.
+                
+                This method deactivates the NSTextInputContext and clears any
+                active IME composition state.
+                
+                Returns:
+                    bool: True if the view successfully resigned first responder
+                """
+                # Deactivate the text input context
+                input_context = self.inputContext()
+                if input_context:
+                    input_context.deactivate()
+                
+                # Clear any active composition
+                if self.hasMarkedText():
+                    self.unmarkText()
+                
+                # Call superclass implementation
+                return objc.super(TTKView, self).resignFirstResponder()
             
             # NSTextInputClient protocol methods
             # These methods are required for proper text input handling on macOS
@@ -3656,6 +3719,11 @@ if COCOA_AVAILABLE:
                     actual_range[0] = Cocoa.NSMakeRange(0, 1)
                 
                 return attr_string
+        
+        # Explicitly declare NSTextInputClient protocol conformance
+        # This is required for macOS to recognize the view as an IME-capable text input
+        TTKView.pyobjc_protocols = [objc.protocolNamed('NSTextInputClient')]
+
 else:
     # Provide a dummy class when PyObjC is not available
     class TTKView:
