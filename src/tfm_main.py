@@ -375,6 +375,14 @@ class FileManager:
             return self._action_sort_by('extension')
         elif item_id == MenuManager.VIEW_REFRESH:
             return self._action_refresh()
+        elif item_id == MenuManager.VIEW_MOVE_PANE_DIVIDER_LEFT:
+            return self._action_pane_left()
+        elif item_id == MenuManager.VIEW_MOVE_PANE_DIVIDER_RIGHT:
+            return self._action_pane_right()
+        elif item_id == MenuManager.VIEW_MOVE_LOG_DIVIDER_UP:
+            return self._action_log_up()
+        elif item_id == MenuManager.VIEW_MOVE_LOG_DIVIDER_DOWN:
+            return self._action_log_down()
         
         # Go menu
         elif item_id == MenuManager.GO_PARENT:
@@ -449,7 +457,7 @@ class FileManager:
     
     def _action_delete(self):
         """Delete selected files."""
-        self.file_operations_ui.delete_files()
+        self.file_operations_ui.delete_selected_files()
         return True
     
     def _action_rename(self):
@@ -509,6 +517,26 @@ class FileManager:
         self.refresh_files()
         self.needs_full_redraw = True
         print("Refreshed file list")
+        return True
+    
+    def _action_pane_left(self):
+        """Move pane divider left."""
+        self.adjust_pane_boundary('left')
+        return True
+    
+    def _action_pane_right(self):
+        """Move pane divider right."""
+        self.adjust_pane_boundary('right')
+        return True
+    
+    def _action_log_up(self):
+        """Move log divider up."""
+        self.adjust_log_boundary('up')
+        return True
+    
+    def _action_log_down(self):
+        """Move log divider down."""
+        self.adjust_log_boundary('down')
         return True
     
     def _action_go_parent(self):
@@ -3034,11 +3062,11 @@ class FileManager:
     def adjust_log_boundary(self, direction):
         """Adjust the boundary between file panes and log pane"""
         if direction == 'up':
-            # Make log pane smaller, file panes larger
-            self.log_height_ratio = max(MIN_LOG_HEIGHT_RATIO, self.log_height_ratio - LOG_HEIGHT_ADJUST_STEP)
-        elif direction == 'down':
-            # Make log pane larger, file panes smaller
+            # Make log pane larger (divider moves up), file panes smaller
             self.log_height_ratio = min(MAX_LOG_HEIGHT_RATIO, self.log_height_ratio + LOG_HEIGHT_ADJUST_STEP)
+        elif direction == 'down':
+            # Make log pane smaller (divider moves down), file panes larger
+            self.log_height_ratio = max(MIN_LOG_HEIGHT_RATIO, self.log_height_ratio - LOG_HEIGHT_ADJUST_STEP)
             
         # Trigger a full redraw for the new layout
         self.needs_full_redraw = True
@@ -3504,10 +3532,10 @@ class FileManager:
             self.adjust_pane_boundary('right')
             return True
         elif self.is_key_for_action(event, 'adjust_log_up'):  # Adjust log boundary up
-            self.adjust_log_boundary('down')
+            self.adjust_log_boundary('up')
             return True
         elif self.is_key_for_action(event, 'adjust_log_down'):  # Adjust log boundary down
-            self.adjust_log_boundary('up')
+            self.adjust_log_boundary('down')
             return True
         elif self.is_key_for_action(event, 'reset_log_height'):  # Reset log pane height
             self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)

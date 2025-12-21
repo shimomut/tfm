@@ -37,6 +37,10 @@ class MenuManager:
     VIEW_SORT_BY_DATE = 'view.sort_by_date'
     VIEW_SORT_BY_EXTENSION = 'view.sort_by_extension'
     VIEW_REFRESH = 'view.refresh'
+    VIEW_MOVE_PANE_DIVIDER_LEFT = 'view.move_pane_divider_left'
+    VIEW_MOVE_PANE_DIVIDER_RIGHT = 'view.move_pane_divider_right'
+    VIEW_MOVE_LOG_DIVIDER_UP = 'view.move_log_divider_up'
+    VIEW_MOVE_LOG_DIVIDER_DOWN = 'view.move_log_divider_down'
     
     # Go menu
     GO_PARENT = 'go.parent'
@@ -255,6 +259,31 @@ class MenuManager:
                     'label': 'Refresh',
                     'shortcut': f'{modifier}+R',
                     'enabled': True
+                },
+                {'separator': True},
+                {
+                    'id': self.VIEW_MOVE_PANE_DIVIDER_LEFT,
+                    'label': 'Move Pane Divider Left',
+                    'shortcut': f'{modifier}+Left',
+                    'enabled': True
+                },
+                {
+                    'id': self.VIEW_MOVE_PANE_DIVIDER_RIGHT,
+                    'label': 'Move Pane Divider Right',
+                    'shortcut': f'{modifier}+Right',
+                    'enabled': True
+                },
+                {
+                    'id': self.VIEW_MOVE_LOG_DIVIDER_UP,
+                    'label': 'Move Log Divider Up',
+                    'shortcut': f'{modifier}+Up',
+                    'enabled': True
+                },
+                {
+                    'id': self.VIEW_MOVE_LOG_DIVIDER_DOWN,
+                    'label': 'Move Log Divider Down',
+                    'shortcut': f'{modifier}+Down',
+                    'enabled': True
                 }
             ]
         }
@@ -380,6 +409,10 @@ class MenuManager:
         states[self.VIEW_SORT_BY_DATE] = True
         states[self.VIEW_SORT_BY_EXTENSION] = True
         states[self.VIEW_REFRESH] = True
+        states[self.VIEW_MOVE_PANE_DIVIDER_LEFT] = True
+        states[self.VIEW_MOVE_PANE_DIVIDER_RIGHT] = True
+        states[self.VIEW_MOVE_LOG_DIVIDER_UP] = True
+        states[self.VIEW_MOVE_LOG_DIVIDER_DOWN] = True
         
         # Go menu states
         states[self.GO_PARENT] = not is_at_root
