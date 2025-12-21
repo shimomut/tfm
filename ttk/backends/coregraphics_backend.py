@@ -1409,10 +1409,9 @@ class CoreGraphicsBackend(Renderer):
         self.view = TTKView.alloc().initWithFrame_backend_(content_rect, self)
         self.window.setContentView_(self.view)
         
-        # Set resize increments to snap to character grid
-        # This makes the window resize in increments of character cell size
-        resize_increment = Cocoa.NSMakeSize(self.char_width, self.char_height)
-        self.window.setResizeIncrements_(resize_increment)
+        # Note: Resize increments are set dynamically during resize operations
+        # (in windowWillStartLiveResize_) to allow macOS window management
+        # features like maximize and split view to work properly
         
         # Show the window and make it the key window (receives keyboard input)
         # makeKeyAndOrderFront_() corresponds to Objective-C makeKeyAndOrderFront:
@@ -2763,6 +2762,92 @@ if COCOA_AVAILABLE:
                 self.backend.should_close = True
                 return False
             
+            def windowWillStartLiveResize_(self, notification):
+                """
+                Handle the start of a live resize operation.
+                
+                This method is called when the user starts dragging the window
+                resize handle. We snap the window size to the character grid
+                to ensure proper alignment before the resize begins, and enable
+                resize increments for manual resizing.
+                
+                Args:
+                    notification: NSNotification containing resize information
+                """
+                # Snap to grid before resize starts
+                self._snap_window_to_grid()
+                
+                # Enable resize increments for manual resizing
+                resize_increment = Cocoa.NSMakeSize(self.backend.char_width, self.backend.char_height)
+                self.backend.window.setResizeIncrements_(resize_increment)
+            
+            def windowDidEndLiveResize_(self, notification):
+                """
+                Handle the end of a live resize operation.
+                
+                This method is called when the user finishes dragging the window
+                resize handle. We disable resize increments to allow macOS window
+                management features (maximized, split view, tiled windows) to work
+                properly.
+                
+                Args:
+                    notification: NSNotification containing resize information
+                """
+                # Disable resize increments to allow macOS window management
+                # Setting increments to (1, 1) effectively disables the constraint
+                self.backend.window.setResizeIncrements_(Cocoa.NSMakeSize(1.0, 1.0))
+            
+            def _snap_window_to_grid(self):
+                """
+                Snap the window size to the character grid.
+                
+                This method adjusts the window frame to ensure the content size
+                is an exact multiple of the character cell size. This prevents
+                partial character cells from appearing at the edges of the window.
+                
+                Called only at the start of resize operations to ensure proper
+                initial alignment. Not called at the end to respect macOS window
+                management features (maximized, split view, tiled windows).
+                """
+                # Get current window frame and content rect
+                window_frame = self.backend.window.frame()
+                content_rect = self.backend.window.contentView().frame()
+                
+                # Calculate current content size
+                current_width = content_rect.size.width
+                current_height = content_rect.size.height
+                
+                # Calculate snapped content size (rounded down to nearest cell)
+                snapped_cols = max(1, int(current_width / self.backend.char_width))
+                snapped_rows = max(1, int(current_height / self.backend.char_height))
+                snapped_width = snapped_cols * self.backend.char_width
+                snapped_height = snapped_rows * self.backend.char_height
+                
+                # Check if snapping is needed
+                if abs(current_width - snapped_width) < 0.5 and abs(current_height - snapped_height) < 0.5:
+                    # Already aligned, no need to snap
+                    return
+                
+                # Calculate the difference between window frame and content rect
+                # This accounts for title bar and window decorations
+                frame_width_diff = window_frame.size.width - current_width
+                frame_height_diff = window_frame.size.height - current_height
+                
+                # Calculate new window frame size
+                new_frame_width = snapped_width + frame_width_diff
+                new_frame_height = snapped_height + frame_height_diff
+                
+                # Create new frame with snapped size, keeping the same origin
+                new_frame = Cocoa.NSMakeRect(
+                    window_frame.origin.x,
+                    window_frame.origin.y,
+                    new_frame_width,
+                    new_frame_height
+                )
+                
+                # Set the new frame without animation
+                self.backend.window.setFrame_display_(new_frame, True)
+            
             def windowDidResize_(self, notification):
                 """
                 Handle window resize events.
@@ -2771,8 +2856,9 @@ if COCOA_AVAILABLE:
                 the grid dimensions based on the new window size.
                 
                 The window uses setResizeIncrements_ to snap to character grid
-                boundaries automatically, so we don't need to manually adjust
-                the frame here. The OS handles the snapping for us.
+                boundaries during dragging. Additionally, windowWillStartLiveResize_
+                and windowDidEndLiveResize_ ensure proper alignment at the start
+                and end of resize operations.
                 
                 Args:
                     notification: NSNotification containing resize information
