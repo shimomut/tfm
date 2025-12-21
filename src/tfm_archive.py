@@ -2891,10 +2891,11 @@ class ArchiveUI:
     
     def _progress_callback(self, progress_data):
         """Callback for progress manager updates"""
-        # Force a screen refresh to show progress
+        # Mark as needing redraw to show progress
+        # Note: Don't call renderer.refresh() here - UILayerStack will do it
         try:
             self.file_manager.draw_status()
-            self.file_manager.renderer.refresh()
+            self.file_manager.needs_full_redraw = True
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     

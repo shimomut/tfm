@@ -1572,7 +1572,9 @@ class FileManager:
         height, width = self.renderer.get_dimensions()
         error_color_pair, error_attributes = get_error_color()
         self.renderer.draw_text(height - 1, 2, f"ERROR: {message}", color_pair=error_color_pair, attributes=error_attributes)
-        self.renderer.refresh()
+        # Note: Don't call renderer.refresh() here - UILayerStack will do it
+        # Mark as needing redraw to ensure the error message is displayed
+        self.needs_full_redraw = True
         import time
         time.sleep(2.0)  # Show for 2 seconds
         
@@ -1580,7 +1582,9 @@ class FileManager:
         """Show info message"""
         height, width = self.renderer.get_dimensions()
         self.renderer.draw_text(height - 1, 2, message)
-        self.renderer.refresh()
+        # Note: Don't call renderer.refresh() here - UILayerStack will do it
+        # Mark as needing redraw to ensure the info message is displayed
+        self.needs_full_redraw = True
         import time
         time.sleep(1.5)  # Show for 1.5 seconds
         
@@ -2837,10 +2841,11 @@ class FileManager:
     
     def _progress_callback(self, progress_data):
         """Callback for progress manager updates"""
-        # Force a screen refresh to show progress
+        # Mark as needing redraw to show progress
+        # Note: Don't call renderer.refresh() here - UILayerStack will do it
         try:
             self.draw_status()
-            self.renderer.refresh()
+            self.needs_full_redraw = True
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     

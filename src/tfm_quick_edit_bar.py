@@ -182,9 +182,8 @@ class QuickEditBar:
             is_active=True
         )
         
-        # Refresh to make changes visible
-        # TTK automatically restores the caret position set by SingleLineTextEdit
-        self.renderer.refresh()
+        # Note: Don't call renderer.refresh() here - UILayerStack will do it
+        # after rendering all layers
 
 
 # Helper functions for common dialog patterns
