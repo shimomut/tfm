@@ -513,8 +513,6 @@ class FileManagerLayer(UILayer):
         """
         # Only do full redraw when needed
         if self.needs_redraw():
-            self.file_manager.refresh_files()
-            
             # Clear screen with proper background
             self.file_manager.clear_screen_with_background()
             
