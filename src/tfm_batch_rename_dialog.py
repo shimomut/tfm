@@ -512,6 +512,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
             # Pass the KeyEvent directly to SingleLineTextEdit
             if active_editor.handle_key(event):
                 # Text changed, update preview
+                self.update_preview()
                 self.content_changed = True
                 return True
         
@@ -538,6 +539,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         active_editor = self.get_active_editor()
         if active_editor.handle_key(event):
             # Text changed, update preview
+            self.update_preview()
             self.content_changed = True
             return True
         

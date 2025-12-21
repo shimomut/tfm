@@ -1981,25 +1981,6 @@ class FileManager:
         self.batch_rename_dialog.exit()
         self.needs_full_redraw = True
     
-    def update_batch_rename_preview(self):
-        """Update the preview list for batch rename - wrapper for batch rename dialog component"""
-        self.batch_rename_dialog.update_preview()
-    
-    def perform_batch_rename(self):
-        """Perform the batch rename operation - wrapper for batch rename dialog component"""
-        success_count, errors = self.batch_rename_dialog.perform_rename()
-        
-        # Report results using helper
-        result_message = BatchRenameDialogHelpers.format_rename_results(success_count, errors)
-        print(result_message)
-        
-        # Clear selections and refresh
-        current_pane = self.get_current_pane()
-        current_pane['selected_files'].clear()
-        self.refresh_files(current_pane)
-        
-        self.exit_batch_rename_mode()
-        
     def show_dialog(self, message, choices, callback):
         """Show quick choice dialog - wrapper for quick choice bar component
         
@@ -2126,16 +2107,7 @@ class FileManager:
         # Force immediate display of the dialog
         self._force_immediate_redraw()
     
-    def exit_info_dialog_mode(self):
-        """Exit info dialog mode - wrapper for info dialog component"""
-        self.info_dialog.exit()
-        self.needs_full_redraw = True
-    
-    def exit_list_dialog_mode(self):
-        """Exit list dialog mode - wrapper for list dialog component"""
-        self.list_dialog.exit()
-        self.needs_full_redraw = True
-    
+
     def show_favorite_directories(self):
         """Show favorite directories using the searchable list dialog"""
         # Create a wrapper print function that also triggers redraw
@@ -3038,17 +3010,7 @@ class FileManager:
         # Force immediate display of the dialog
         self._force_immediate_redraw()
     
-    def exit_search_dialog_mode(self):
-        """Exit search dialog mode - wrapper for search dialog component"""
-        self.search_dialog.exit()
-        self.needs_full_redraw = True
-    
-    def perform_search(self):
-        """Perform the actual search based on current pattern and type - wrapper for search dialog component"""
-        current_pane = self.get_current_pane()
-        search_root = current_pane['path']
-        self.search_dialog.perform_search(search_root)
-    
+
     def _navigate_to_search_result(self, result):
         """Navigate to the selected search result - wrapper for search dialog helper"""
         SearchDialogHelpers.navigate_to_result(result, self.pane_manager, self.file_operations, print)
@@ -3074,11 +3036,7 @@ class FileManager:
         # Force immediate redraw to show dialog
         self._force_immediate_redraw()
     
-    def exit_jump_dialog_mode(self):
-        """Exit jump dialog mode - wrapper for jump dialog component"""
-        self.jump_dialog.exit()
-        self.needs_full_redraw = True
-    
+
     def show_drives_dialog(self):
         """Show the drives dialog - wrapper for drives dialog component"""
         self.drives_dialog.show()
@@ -3086,11 +3044,7 @@ class FileManager:
         self.push_layer(self.drives_dialog)
         self._force_immediate_redraw()
     
-    def exit_drives_dialog_mode(self):
-        """Exit drives dialog mode - wrapper for drives dialog component"""
-        self.drives_dialog.exit()
-        self.needs_full_redraw = True
-    
+
     def handle_main_screen_key_event(self, event):
         """
         Handle key events for the main FileManager screen.
