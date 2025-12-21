@@ -2994,40 +2994,6 @@ class FileManager:
         """Switch the active field in batch rename mode"""
         self.batch_rename_dialog.switch_field(field)
         self.needs_full_redraw = True
-    
-    def handle_batch_rename_input(self, key):
-        """Handle input while in batch rename mode - wrapper for batch rename dialog component"""
-        was_active = self.batch_rename_dialog.is_active
-        result = self.batch_rename_dialog.handle_input(key)
-        
-        if result == True:
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.batch_rename_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(result, tuple):
-            action, data = result
-            if action == 'cancel':
-                print("Batch rename cancelled")
-                self.exit_batch_rename_mode()
-                return True
-            elif action == 'field_switch':
-                return True
-            elif action == 'scroll':
-                return True
-            elif action == 'execute':
-                self.perform_batch_rename()
-                return True
-            elif action == 'error':
-                print(data)
-                return True
-            elif action == 'text_changed':
-                self.update_batch_rename_preview()
-                self.needs_full_redraw = True
-                return True
-        
-        # Return False if event not handled to allow CharEvent generation
-        return False
 
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""

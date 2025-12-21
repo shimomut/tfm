@@ -65,7 +65,7 @@ class TestJumpDialogTTKIntegration(unittest.TestCase):
         # Test ESC key (cancel)
         event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
         with patch.object(self.dialog, '_cancel_current_scan'):
-            result = self.dialog.handle_input(event)
+            result = self.dialog.handle_key_event(event)
         
         self.assertTrue(result)
         self.assertFalse(self.dialog.is_active)
@@ -78,7 +78,7 @@ class TestJumpDialogTTKIntegration(unittest.TestCase):
         
         # Test DOWN key
         event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=set())
-        result = self.dialog.handle_input(event)
+        result = self.dialog.handle_key_event(event)
         
         self.assertTrue(result)
         self.assertEqual(self.dialog.selected, 1)
@@ -92,9 +92,11 @@ class TestJumpDialogTTKIntegration(unittest.TestCase):
         # Test ENTER key
         event = KeyEvent(key_code=KeyCode.ENTER, char=None, modifiers=set())
         with patch.object(self.dialog, '_cancel_current_scan'):
-            result = self.dialog.handle_input(event)
+            result = self.dialog.handle_key_event(event)
         
-        self.assertEqual(result, ('navigate', Path('/dir2')))
+        # handle_key_event now returns boolean, check dialog state instead
+        self.assertTrue(result)
+        self.assertFalse(self.dialog.is_active)
         
     @unittest.skip("Requires SingleLineTextEdit TTK migration (task 26)")
     def test_draw_uses_renderer(self):

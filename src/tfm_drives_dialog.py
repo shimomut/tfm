@@ -118,53 +118,6 @@ class DrivesDialog(UILayer, BaseListDialog):
         # Reset animation
         self.progress_animator.reset()
         
-    def handle_input(self, event):
-        """Handle input while in drives dialog mode
-        
-        Args:
-            event: KeyEvent from TTK renderer (or integer key code for backward compatibility)
-        """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
-        # Use base class navigation handling with thread safety
-        with self.s3_lock:
-            current_filtered = self.filtered_drives.copy()
-        
-        result = self.handle_common_navigation(event, current_filtered)
-        
-        if result == 'cancel':
-            # Cancel S3 scan before exiting
-            self._cancel_current_s3_scan()
-            self.exit()
-            return True
-        elif result == 'select':
-            # Cancel S3 scan before navigating
-            self._cancel_current_s3_scan()
-            
-            # Return the selected drive for navigation (thread-safe)
-            with self.s3_lock:
-                if self.filtered_drives and 0 <= self.selected < len(self.filtered_drives):
-                    selected_drive = self.filtered_drives[self.selected]
-                    return ('navigate', selected_drive)
-            return ('navigate', None)
-        elif result == 'text_changed':
-            self._filter_drives()
-            self.content_changed = True
-            return True
-        elif result:
-            # Update selection in thread-safe manner for navigation keys
-            if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
-                with self.s3_lock:
-                    # The base class already updated self.selected, just need to adjust scroll
-                    self._adjust_scroll(len(self.filtered_drives))
-            
-            # Mark content as changed for ANY handled key to ensure continued rendering
-            self.content_changed = True
-            return True
-            
-        return False
-    
     def _load_local_drives(self):
         """Load local filesystem drives/locations"""
         local_drives = []

@@ -69,105 +69,6 @@ class BatchRenameDialog(UILayer, BaseListDialog):
             return True
         return False
         
-    def handle_input(self, event):
-        """Handle input while in batch rename mode
-        
-        Args:
-            event: KeyEvent or CharEvent from TTK
-            
-        Returns:
-            Tuple of (action, data) or True/False
-        """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
-        if not event:
-            return False
-        
-        # Handle KeyEvents for navigation and special keys
-        if isinstance(event, KeyEvent):
-            # ESC - cancel batch rename
-            if event.key_code == KeyCode.ESCAPE:
-                return ('cancel', None)
-                
-            # Tab - switch between regex and destination input
-            elif event.key_code == KeyCode.TAB:
-                if self.active_field == 'regex':
-                    self.switch_field('destination')
-                else:
-                    self.switch_field('regex')
-                self.content_changed = True  # Mark content as changed when switching fields
-                return ('field_switch', None)
-                
-            # Up arrow - move to regex field (previous field)
-            elif event.key_code == KeyCode.UP:
-                if self.switch_field('regex'):
-                    self.content_changed = True  # Mark content as changed when switching fields
-                    return ('field_switch', None)
-                # Always mark content as changed for any handled key to ensure continued rendering
-                self.content_changed = True
-                return True
-                
-            # Down arrow - move to destination field (next field)
-            elif event.key_code == KeyCode.DOWN:
-                if self.switch_field('destination'):
-                    self.content_changed = True  # Mark content as changed when switching fields
-                    return ('field_switch', None)
-                # Always mark content as changed for any handled key to ensure continued rendering
-                self.content_changed = True
-                return True
-                
-            # Page Up - scroll preview up
-            elif event.key_code == KeyCode.PAGE_UP:
-                if self.scroll > 0:
-                    self.scroll = max(0, self.scroll - 10)
-                    self.content_changed = True  # Mark content as changed when scrolling
-                    return ('scroll', None)
-                # Always mark content as changed for any handled key to ensure continued rendering
-                self.content_changed = True
-                return True
-                
-            # Page Down - scroll preview down
-            elif event.key_code == KeyCode.PAGE_DOWN:
-                if self.preview:
-                    max_scroll = max(0, len(self.preview) - 10)
-                    self.scroll = min(max_scroll, self.scroll + 10)
-                    self.content_changed = True  # Mark content as changed when scrolling
-                    return ('scroll', None)
-                # Always mark content as changed for any handled key to ensure continued rendering
-                self.content_changed = True
-                return True
-                
-            # Enter - perform batch rename
-            elif event.key_code == KeyCode.ENTER:
-                regex_text = self.regex_editor.get_text()
-                dest_text = self.destination_editor.get_text()
-                if regex_text and dest_text:
-                    return ('execute', None)
-                else:
-                    return ('error', "Please enter both regex pattern and destination pattern")
-                
-            else:
-                # Let the active editor handle other KeyEvents
-                active_editor = self.get_active_editor()
-                
-                # Pass the KeyEvent directly to SingleLineTextEdit
-                if active_editor.handle_key(event):
-                    # Text changed, update preview
-                    self.content_changed = True  # Mark content as changed when text changes
-                    return ('text_changed', None)
-        
-        # Handle CharEvents - pass to active text editor
-        if isinstance(event, CharEvent):
-            active_editor = self.get_active_editor()
-            if active_editor.handle_key(event):
-                # Text changed, update preview
-                self.content_changed = True
-                return ('text_changed', None)
-        
-        # Event not handled - return False to allow CharEvent generation
-        return False
-        
     def update_preview(self):
         """Update the preview list for batch rename"""
         self.preview = []
@@ -552,25 +453,70 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         if not event or not isinstance(event, KeyEvent):
             return False
         
-        # Handle the key event using existing handle_input logic
-        result = self.handle_input(event)
-        
-        # Convert result to boolean
-        if isinstance(result, tuple):
-            action, data = result
-            if action == 'cancel':
-                self.exit()
-                return True
-            elif action == 'execute':
+        # ESC - cancel batch rename
+        if event.key_code == KeyCode.ESCAPE:
+            self.exit()
+            return True
+            
+        # Tab - switch between regex and destination input
+        elif event.key_code == KeyCode.TAB:
+            if self.active_field == 'regex':
+                self.switch_field('destination')
+            else:
+                self.switch_field('regex')
+            self.content_changed = True
+            return True
+            
+        # Up arrow - move to regex field (previous field)
+        elif event.key_code == KeyCode.UP:
+            self.switch_field('regex')
+            self.content_changed = True
+            return True
+            
+        # Down arrow - move to destination field (next field)
+        elif event.key_code == KeyCode.DOWN:
+            self.switch_field('destination')
+            self.content_changed = True
+            return True
+            
+        # Page Up - scroll preview up
+        elif event.key_code == KeyCode.PAGE_UP:
+            if self.scroll > 0:
+                self.scroll = max(0, self.scroll - 10)
+            self.content_changed = True
+            return True
+            
+        # Page Down - scroll preview down
+        elif event.key_code == KeyCode.PAGE_DOWN:
+            if self.preview:
+                max_scroll = max(0, len(self.preview) - 10)
+                self.scroll = min(max_scroll, self.scroll + 10)
+            self.content_changed = True
+            return True
+            
+        # Enter - perform batch rename
+        elif event.key_code == KeyCode.ENTER:
+            regex_text = self.regex_editor.get_text()
+            dest_text = self.destination_editor.get_text()
+            if regex_text and dest_text:
                 # Don't close here - let the caller handle the execution
                 return True
-            elif action == 'error':
-                # Error occurred, but event was handled
+            else:
+                # Error: missing pattern - but event was handled
                 return True
-            elif action in ['field_switch', 'scroll', 'text_changed']:
+            
+        else:
+            # Let the active editor handle other KeyEvents
+            active_editor = self.get_active_editor()
+            
+            # Pass the KeyEvent directly to SingleLineTextEdit
+            if active_editor.handle_key(event):
+                # Text changed, update preview
+                self.content_changed = True
                 return True
         
-        return bool(result)
+        # Event not handled - return False to allow CharEvent generation
+        return False
     
     def handle_char_event(self, event: CharEvent) -> bool:
         """

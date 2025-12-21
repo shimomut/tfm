@@ -1109,18 +1109,6 @@ class TextViewer(UILayer):
         """
         pass
     
-    def handle_input(self, event):
-        """
-        Handle input event (legacy method for backward compatibility).
-        
-        This method is kept for backward compatibility with existing code that
-        calls handle_input directly. It delegates to handle_key_event.
-        
-        Returns:
-            bool: True if event was consumed, False otherwise
-        """
-        return self.handle_key_event(event)
-
 
 def is_text_file(file_path: Path) -> bool:
     """Check if a file is likely to be a text file"""

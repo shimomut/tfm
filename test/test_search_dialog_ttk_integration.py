@@ -122,13 +122,13 @@ def test_handle_input_tab_switches_search_type(search_dialog):
     
     # Create Tab event with modifiers
     event = KeyEvent(key_code=KeyCode.TAB, modifiers=set())
-    result = search_dialog.handle_input(event)
+    result = search_dialog.handle_key_event(event)
     
     assert result == True  # Now returns boolean
     assert search_dialog.search_type == 'content'
     
     # Tab again to switch back
-    result = search_dialog.handle_input(event)
+    result = search_dialog.handle_key_event(event)
     assert search_dialog.search_type == 'filename'
 
 
@@ -137,7 +137,7 @@ def test_handle_input_escape_exits(search_dialog):
     search_dialog.show('filename')
     
     event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=set())
-    result = search_dialog.handle_input(event)
+    result = search_dialog.handle_key_event(event)
     
     assert result == True
     assert search_dialog.is_active == False
@@ -153,7 +153,7 @@ def test_handle_input_enter_selects_result(search_dialog):
     search_dialog.selected = 1
     
     event = KeyEvent(key_code=KeyCode.ENTER, modifiers=set())
-    result = search_dialog.handle_input(event)
+    result = search_dialog.handle_key_event(event)
     
     # Now returns True and stores result internally
     assert result == True
@@ -172,32 +172,32 @@ def test_handle_input_navigation_keys(search_dialog):
     
     # Test Down
     event = KeyEvent(key_code=KeyCode.DOWN, modifiers=set())
-    search_dialog.handle_input(event)
+    search_dialog.handle_key_event(event)
     assert search_dialog.selected == 6
     
     # Test Up
     event = KeyEvent(key_code=KeyCode.UP, modifiers=set())
-    search_dialog.handle_input(event)
+    search_dialog.handle_key_event(event)
     assert search_dialog.selected == 5
     
     # Test Page Down
     event = KeyEvent(key_code=KeyCode.PAGE_DOWN, modifiers=set())
-    search_dialog.handle_input(event)
+    search_dialog.handle_key_event(event)
     assert search_dialog.selected == 15
     
     # Test Page Up
     event = KeyEvent(key_code=KeyCode.PAGE_UP, modifiers=set())
-    search_dialog.handle_input(event)
+    search_dialog.handle_key_event(event)
     assert search_dialog.selected == 5
     
     # Test Home
     event = KeyEvent(key_code=KeyCode.HOME, modifiers=set())
-    search_dialog.handle_input(event)
+    search_dialog.handle_key_event(event)
     assert search_dialog.selected == 0
     
     # Test End
     event = KeyEvent(key_code=KeyCode.END, modifiers=set())
-    search_dialog.handle_input(event)
+    search_dialog.handle_key_event(event)
     assert search_dialog.selected == 19
 
 

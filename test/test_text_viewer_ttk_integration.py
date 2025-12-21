@@ -122,7 +122,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with UP arrow key
         event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
-        result = viewer.handle_input(event)
+        result = viewer.handle_key_event(event)
         
         # Should return True (continue viewing)
         self.assertTrue(result)
@@ -133,7 +133,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with 'q' character
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='q')
-        result = viewer.handle_input(event)
+        result = viewer.handle_char_event(event)
         
         # Should return False (exit viewer)
         self.assertFalse(result)
@@ -144,7 +144,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with ESC key
         event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE)
-        result = viewer.handle_input(event)
+        result = viewer.handle_key_event(event)
         
         # Should return False (exit viewer)
         self.assertFalse(result)
@@ -156,7 +156,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with DOWN arrow key
         event = KeyEvent(key_code=KeyCode.DOWN, modifiers=ModifierKey.NONE)
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         
         # Scroll offset should increase
         self.assertGreaterEqual(viewer.scroll_offset, initial_offset)
@@ -168,7 +168,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with UP arrow key
         event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         
         # Scroll offset should decrease
         self.assertEqual(viewer.scroll_offset, 4)
@@ -180,7 +180,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with PAGE_DOWN key
         event = KeyEvent(key_code=KeyCode.PAGE_DOWN, modifiers=ModifierKey.NONE)
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         
         # Scroll offset should increase by display height
         self.assertGreater(viewer.scroll_offset, initial_offset)
@@ -192,7 +192,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with PAGE_UP key
         event = KeyEvent(key_code=KeyCode.PAGE_UP, modifiers=ModifierKey.NONE)
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         
         # Scroll offset should decrease
         self.assertLess(viewer.scroll_offset, 10)
@@ -205,7 +205,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with HOME key
         event = KeyEvent(key_code=KeyCode.HOME, modifiers=ModifierKey.NONE)
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         
         # Both offsets should be reset
         self.assertEqual(viewer.scroll_offset, 0)
@@ -217,7 +217,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with END key
         event = KeyEvent(key_code=KeyCode.END, modifiers=ModifierKey.NONE)
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         
         # Scroll offset should be at maximum
         self.assertGreater(viewer.scroll_offset, 0)
@@ -229,7 +229,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with 'n' character
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='n')
-        viewer.handle_input(event)
+        viewer.handle_char_event(event)
         
         # Line numbers should be toggled
         self.assertEqual(viewer.show_line_numbers, not initial_state)
@@ -241,7 +241,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with 'w' character
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='w')
-        viewer.handle_input(event)
+        viewer.handle_char_event(event)
         
         # Wrap mode should be toggled
         self.assertEqual(viewer.wrap_lines, not initial_state)
@@ -252,7 +252,7 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
         
         # Test with 'f' character
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='f')
-        viewer.handle_input(event)
+        viewer.handle_char_event(event)
         
         # Should enter isearch mode
         self.assertTrue(viewer.isearch_mode)

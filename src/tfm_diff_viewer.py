@@ -1044,29 +1044,36 @@ class DiffViewer(UILayer):
         self.draw_content()
         self.draw_status_bar()
     
-    def handle_input(self, event):
+
+
+    # UILayer interface methods
+    
+    def handle_key_event(self, event) -> bool:
         """
-        Handle input event (called by FileManager's main loop)
+        Handle a key event (UILayer interface method).
+        
+        This method handles all key events for the diff viewer.
+        
+        Args:
+            event: KeyEvent to handle
         
         Returns:
-            bool: True if event was consumed, False otherwise
+            True if the event was consumed, False to propagate to next layer
         """
-        if event is None:
-            return False
-        
-        # DiffViewer doesn't handle CharEvents - return False so backend generates them
-        if isinstance(event, CharEvent):
+        # Only handle KeyEvents, not CharEvents
+        if not isinstance(event, KeyEvent) or event is None:
             return False
         
         start_y, start_x, display_height, display_width = self.get_display_dimensions()
         
         # Check for character-based commands (only from KeyEvent)
-        if isinstance(event, KeyEvent) and event.char:
+        if event.char:
             char_lower = event.char.lower()
             if char_lower == 'n':
                 # Toggle line numbers
                 self.show_line_numbers = not self.show_line_numbers
                 self._dirty = True
+                return True
             elif char_lower == 's':
                 # Toggle syntax highlighting
                 if PYGMENTS_AVAILABLE:
@@ -1080,6 +1087,7 @@ class DiffViewer(UILayer):
                         self.file1_highlighted = [[(line, COLOR_REGULAR_FILE)] for line in self.file1_lines]
                         self.file2_highlighted = [[(line, COLOR_REGULAR_FILE)] for line in self.file2_lines]
                     self._dirty = True
+                return True
             elif char_lower == 't':
                 # Cycle through tab widths: 2, 4, 8
                 if self.tab_width == 2:
@@ -1092,12 +1100,14 @@ class DiffViewer(UILayer):
                 # Re-expand tabs with new tab width
                 self.refresh_tab_expansion()
                 self._dirty = True
+                return True
             elif char_lower == 'i':
                 # Toggle whitespace ignore mode
                 self.ignore_whitespace = not self.ignore_whitespace
                 # Recompute diff with new whitespace mode
                 self.compute_diff()
                 self._dirty = True
+                return True
             elif char_lower == 'w':
                 # Toggle wrap mode
                 self.wrap_lines = not self.wrap_lines
@@ -1105,13 +1115,16 @@ class DiffViewer(UILayer):
                 if self.wrap_lines:
                     self.horizontal_offset = 0
                 self._dirty = True
+                return True
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
             self._should_close = True
+            self._dirty = True
             return True
         elif event.key_code == KeyCode.ENTER:
             self._should_close = True
+            self._dirty = True
             return True
         elif event.key_code == KeyCode.UP:
             # Check for Shift modifier to jump to previous diff
@@ -1133,6 +1146,7 @@ class DiffViewer(UILayer):
                 if self.scroll_offset > 0:
                     self.scroll_offset -= 1
                     self._dirty = True
+            return True
         elif event.key_code == KeyCode.DOWN:
             # Check for Shift modifier to jump to next diff
             if event.has_modifier(ModifierKey.SHIFT):
@@ -1165,16 +1179,20 @@ class DiffViewer(UILayer):
                 if self.scroll_offset < max_scroll:
                     self.scroll_offset += 1
                     self._dirty = True
+            return True
         elif event.key_code == KeyCode.LEFT:
             if self.horizontal_offset > 0:
                 self.horizontal_offset = max(0, self.horizontal_offset - 1)
                 self._dirty = True
+            return True
         elif event.key_code == KeyCode.RIGHT:
             self.horizontal_offset += 1
             self._dirty = True
+            return True
         elif event.key_code == KeyCode.PAGE_UP:
             self.scroll_offset = max(0, self.scroll_offset - display_height)
             self._dirty = True
+            return True
         elif event.key_code == KeyCode.PAGE_DOWN:
             # Calculate max scroll based on whether wrapping is enabled
             if self.wrap_lines:
@@ -1189,10 +1207,12 @@ class DiffViewer(UILayer):
                 max_scroll = max(0, len(self.diff_lines) - display_height)
             self.scroll_offset = min(max_scroll, self.scroll_offset + display_height)
             self._dirty = True
+            return True
         elif event.key_code == KeyCode.HOME:
             self.scroll_offset = 0
             self.horizontal_offset = 0
             self._dirty = True
+            return True
         elif event.key_code == KeyCode.END:
             # Calculate max scroll based on whether wrapping is enabled
             if self.wrap_lines:
@@ -1207,31 +1227,8 @@ class DiffViewer(UILayer):
                 max_scroll = max(0, len(self.diff_lines) - display_height)
             self.scroll_offset = max_scroll
             self._dirty = True
+            return True
         
-        return True
-
-
-    # UILayer interface methods
-    
-    def handle_key_event(self, event) -> bool:
-        """
-        Handle a key event (UILayer interface method).
-        
-        This method delegates to the existing handle_input method for KeyEvents.
-        
-        Args:
-            event: KeyEvent to handle
-        
-        Returns:
-            True if the event was consumed, False to propagate to next layer
-        """
-        # Only handle KeyEvents, not CharEvents
-        if isinstance(event, KeyEvent):
-            result = self.handle_input(event)
-            # Mark dirty if event was consumed (content likely changed)
-            if result:
-                self._dirty = True
-            return result
         return False
     
     def handle_char_event(self, event) -> bool:

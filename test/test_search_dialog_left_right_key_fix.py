@@ -53,7 +53,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.search_dialog.content_changed = False  # Simulate after drawing
         
         # Press left key
-        result = self.search_dialog.handle_input(KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
+        result = self.search_dialog.handle_key_event(KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         
         # Verify the fix
         self.assertTrue(result, "Left key should be handled")
@@ -69,7 +69,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.search_dialog.content_changed = False  # Simulate after drawing
         
         # Press right key
-        result = self.search_dialog.handle_input(KeyEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE))
+        result = self.search_dialog.handle_key_event(KeyEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE))
         
         # Verify the fix
         self.assertTrue(result, "Right key should be handled")
@@ -98,7 +98,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
                 self.search_dialog.content_changed = False
                 
                 # Press the key
-                result = self.search_dialog.handle_input(key)
+                result = self.search_dialog.handle_key_event(key)
                 
                 # All navigation keys should set content_changed
                 self.assertTrue(result, f"Key {key} should be handled")
@@ -117,7 +117,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.search_dialog.content_changed = False
         
         # Press a printable key (CharEvent)
-        result = self.search_dialog.handle_input(CharEvent(char='a'))
+        result = self.search_dialog.handle_char_event(CharEvent(char='a'))
         
         # Should return True and trigger search internally
         self.assertTrue(result, "Printable key should be handled")
@@ -128,7 +128,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.search_dialog.show('filename')
         
         # Press escape
-        result = self.search_dialog.handle_input(KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE))
+        result = self.search_dialog.handle_key_event(KeyEvent(key_code=KeyCode.ESCAPE, modifiers=ModifierKey.NONE))
         
         # Should close dialog
         self.assertTrue(result, "Escape should be handled")
@@ -151,7 +151,7 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
         self.assertFalse(self.search_dialog.needs_redraw(), "Dialog should not need redraw after being drawn")
         
         # Step 3: Press left key immediately (the problematic scenario)
-        result = self.search_dialog.handle_input(KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
+        result = self.search_dialog.handle_key_event(KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE))
         
         # Step 4: Verify dialog is still visible
         self.assertTrue(result, "Left key should be handled")

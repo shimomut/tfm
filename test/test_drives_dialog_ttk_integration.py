@@ -77,7 +77,7 @@ class TestDrivesDialogInputHandling:
     def test_handle_input_accepts_input_event(self, drives_dialog):
         """Test that handle_input accepts KeyEvent"""
         event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
+        result = drives_dialog.handle_key_event(event)
         assert result is True
         assert not drives_dialog.is_active
     
@@ -85,7 +85,7 @@ class TestDrivesDialogInputHandling:
         """Test that ESC key cancels the dialog"""
         drives_dialog.show()
         event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
+        result = drives_dialog.handle_key_event(event)
         assert result is True
         assert not drives_dialog.is_active
     
@@ -99,8 +99,10 @@ class TestDrivesDialogInputHandling:
         drives_dialog.selected = 0
         
         event = KeyEvent(key_code=KeyCode.ENTER, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
-        assert result == ('navigate', test_drive)
+        result = drives_dialog.handle_key_event(event)
+        # handle_key_event now returns boolean, check dialog state instead
+        assert result is True
+        assert not drives_dialog.is_active
     
     def test_handle_input_up_arrow(self, drives_dialog):
         """Test that UP arrow navigates up"""
@@ -113,7 +115,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.selected = 1
         
         event = KeyEvent(key_code=KeyCode.UP, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
+        result = drives_dialog.handle_key_event(event)
         assert result is True
         assert drives_dialog.selected == 0
     
@@ -128,7 +130,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.selected = 0
         
         event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
+        result = drives_dialog.handle_key_event(event)
         assert result is True
         assert drives_dialog.selected == 1
     
@@ -140,7 +142,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.selected = 15
         
         event = KeyEvent(key_code=KeyCode.PAGE_UP, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
+        result = drives_dialog.handle_key_event(event)
         assert result is True
         assert drives_dialog.selected < 15
     
@@ -152,7 +154,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.selected = 0
         
         event = KeyEvent(key_code=KeyCode.PAGE_DOWN, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
+        result = drives_dialog.handle_key_event(event)
         assert result is True
         assert drives_dialog.selected > 0
     
@@ -164,7 +166,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.selected = 5
         
         event = KeyEvent(key_code=KeyCode.HOME, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
+        result = drives_dialog.handle_key_event(event)
         assert result is True
         assert drives_dialog.selected == 0
     
@@ -176,7 +178,7 @@ class TestDrivesDialogInputHandling:
         drives_dialog.selected = 0
         
         event = KeyEvent(key_code=KeyCode.END, char=None, modifiers=set())
-        result = drives_dialog.handle_input(event)
+        result = drives_dialog.handle_key_event(event)
         assert result is True
         assert drives_dialog.selected == 9
     
@@ -194,7 +196,7 @@ class TestDrivesDialogInputHandling:
         # Type 's3' to filter
         for char in "s3":
             event = KeyEvent(key_code=None, char=char, modifiers=set())
-            drives_dialog.handle_input(event)
+            drives_dialog.handle_char_event(event)
         
         assert len(drives_dialog.filtered_drives) == 1
         assert drives_dialog.filtered_drives[0].name == "test-bucket"

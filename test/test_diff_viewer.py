@@ -82,13 +82,13 @@ class TestDiffViewer(unittest.TestCase):
         # Test scroll down
         initial_offset = viewer.scroll_offset
         event = KeyEvent(key_code=KeyCode.DOWN, modifiers=0, char='')
-        result = viewer.handle_input(event)
+        result = viewer.handle_key_event(event)
         self.assertTrue(result)
         self.assertGreaterEqual(viewer.scroll_offset, initial_offset)
         
         # Test quit - should set _should_close flag and return True
         event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=0, char='')
-        result = viewer.handle_input(event)
+        result = viewer.handle_key_event(event)
         self.assertTrue(result)
         self.assertTrue(viewer._should_close)
     
@@ -98,12 +98,12 @@ class TestDiffViewer(unittest.TestCase):
         
         # Test scroll right
         event = KeyEvent(key_code=KeyCode.RIGHT, modifiers=0, char='')
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         self.assertGreater(viewer.horizontal_offset, 0)
         
         # Test scroll left
         event = KeyEvent(key_code=KeyCode.LEFT, modifiers=0, char='')
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         self.assertEqual(viewer.horizontal_offset, 0)
     
     def test_create_diff_viewer_function(self):
@@ -240,13 +240,13 @@ def farewell():
         # Initially disabled
         self.assertFalse(viewer.ignore_whitespace)
         
-        # Toggle on with 'i' key
+        # Toggle on with 'i' key - DiffViewer handles chars through KeyEvent
         event = KeyEvent(key_code=None, modifiers=0, char='i')
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         self.assertTrue(viewer.ignore_whitespace)
         
         # Toggle off
-        viewer.handle_input(event)
+        viewer.handle_key_event(event)
         self.assertFalse(viewer.ignore_whitespace)
     
     def test_whitespace_ignore_with_real_differences(self):

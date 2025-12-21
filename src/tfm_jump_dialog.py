@@ -86,65 +86,6 @@ class JumpDialog(UILayer, BaseListDialog):
         # Reset animation
         self.progress_animator.reset()
         
-    def handle_input(self, event):
-        """Handle input while in jump dialog mode
-        
-        Args:
-            event: KeyEvent or CharEvent from TTK
-        """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
-        if not event:
-            return False
-        
-        # Only pass KeyEvents to navigation handler (CharEvents go to text editor)
-        if isinstance(event, KeyEvent):
-            # Use base class navigation handling with thread safety
-            with self.scan_lock:
-                current_filtered = self.filtered_directories.copy()
-            
-            result = self.handle_common_navigation(event, current_filtered)
-            
-            if result == 'cancel':
-                # Cancel scan before exiting
-                self._cancel_current_scan()
-                self.exit()
-                return True
-            elif result == 'select':
-                # Cancel scan before navigating
-                self._cancel_current_scan()
-                
-                # Return the selected directory for navigation (thread-safe)
-                with self.scan_lock:
-                    if self.filtered_directories and 0 <= self.selected < len(self.filtered_directories):
-                        selected_directory = self.filtered_directories[self.selected]
-                        return ('navigate', selected_directory)
-                return ('navigate', None)
-            elif result == 'text_changed':
-                self._filter_directories()
-                self.content_changed = True  # Mark content as changed when filtering
-                return True
-            elif result:
-                # Update selection in thread-safe manner for navigation keys
-                if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
-                    with self.scan_lock:
-                        # The base class already updated self.selected, just need to adjust scroll
-                        self._adjust_scroll(len(self.filtered_directories))
-                
-                # Mark content as changed for ANY handled key to ensure continued rendering
-                self.content_changed = True
-                return True
-        
-        # CharEvent - pass to text editor
-        if isinstance(event, CharEvent):
-            if self.text_editor.handle_key(event):
-                self._filter_directories()
-                self.content_changed = True
-                return True
-            
-        return False
-        
     def _start_directory_scan(self, root_directory):
         """Start asynchronous directory scanning
         
