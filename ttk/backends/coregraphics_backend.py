@@ -1162,6 +1162,10 @@ class CoreGraphicsBackend(Renderer):
     # This creates a pleasant frame around the text grid that edge cells will fill
     WINDOW_PADDING_MULTIPLIER = 0.5
     
+    # Backend selector flag: enables C++ rendering when True, defaults to PyObjC for backward compatibility
+    # Can be set via environment variable TTK_USE_CPP_RENDERING=true
+    USE_CPP_RENDERING = os.environ.get('TTK_USE_CPP_RENDERING', 'false').lower() == 'true'
+    
     def __init__(self, window_title: str = "TTK Application",
                  font_name: str = "Menlo", font_size: int = 12,
                  rows: int = 24, cols: int = 80,
@@ -1224,6 +1228,9 @@ class CoreGraphicsBackend(Renderer):
         
         # Event callback for callback-based event delivery
         self.event_callback: Optional['EventCallback'] = None
+        
+        # C++ renderer module (initialized in initialize() if USE_CPP_RENDERING is True)
+        self._cpp_renderer = None
     
     def initialize(self) -> None:
         """
@@ -1237,6 +1244,7 @@ class CoreGraphicsBackend(Renderer):
         5. Creates the window and view
         6. Initializes the character grid
         7. Sets up default color pairs
+        8. Attempts to import C++ renderer if USE_CPP_RENDERING is enabled
         
         Raises:
             ValueError: If the specified font is not found
@@ -1270,6 +1278,19 @@ class CoreGraphicsBackend(Renderer):
         # AttributedStringCache initialized with AttributeDictCache for creating
         # pre-built NSAttributedString objects with LRU eviction (max 1000 entries)
         self._attr_string_cache = AttributedStringCache(self._attr_dict_cache, max_cache_size=1000)
+        
+        # Try to import C++ renderer if enabled
+        if self.USE_CPP_RENDERING:
+            try:
+                import cpp_renderer
+                self._cpp_renderer = cpp_renderer
+                print("CoreGraphicsBackend: Using C++ rendering implementation")
+            except ImportError as e:
+                print(f"CoreGraphicsBackend: C++ renderer not available ({e}), falling back to PyObjC")
+                # Disable C++ rendering flag since module is not available
+                self.USE_CPP_RENDERING = False
+        else:
+            print("CoreGraphicsBackend: Using PyObjC rendering implementation")
         
         # Create window and view
         self._create_window()
@@ -3034,6 +3055,10 @@ if COCOA_AVAILABLE:
                 adjacent cells with the same background color to reduce CoreGraphics
                 API calls.
                 
+                The method supports two rendering implementations:
+                1. C++ rendering (when USE_CPP_RENDERING is True and cpp_renderer is available)
+                2. PyObjC rendering (default, backward compatible)
+                
                 PyObjC Method Name Translation:
                     Objective-C: drawRect:
                     PyObjC: drawRect_()
@@ -3071,6 +3096,94 @@ if COCOA_AVAILABLE:
                 
                 offset_x = (view_width - grid_width) / 2.0
                 offset_y = (view_height - grid_height) / 2.0
+                
+                # Choose rendering implementation based on backend selector
+                if self.backend.USE_CPP_RENDERING and self.backend._cpp_renderer:
+                    # Use C++ rendering
+                    try:
+                        self._render_with_cpp(rect, offset_x, offset_y)
+                    except Exception as e:
+                        print(f"CoreGraphicsBackend: C++ rendering failed: {e}")
+                        print("CoreGraphicsBackend: Falling back to PyObjC rendering")
+                        # Fall back to PyObjC rendering on error
+                        self._render_with_pyobjc(rect, offset_x, offset_y)
+                else:
+                    # Use PyObjC rendering (default)
+                    self._render_with_pyobjc(rect, offset_x, offset_y)
+            
+            def _render_with_cpp(self, rect, offset_x: float, offset_y: float):
+                """
+                Render using C++ implementation.
+                
+                This method calls the C++ render_frame() function with all necessary
+                parameters. The C++ implementation provides direct CoreGraphics/CoreText
+                API access for improved performance.
+                
+                Args:
+                    rect: NSRect indicating the region that needs to be redrawn
+                    offset_x: Horizontal centering offset in pixels
+                    offset_y: Vertical centering offset in pixels
+                
+                Raises:
+                    Exception: If C++ rendering fails (caught by caller for fallback)
+                """
+                # Get the CoreGraphics context
+                context = Cocoa.NSGraphicsContext.currentContext().CGContext()
+                
+                # Convert CGContextRef to integer pointer for C++
+                # PyObjC wraps CoreFoundation pointers, we need the raw pointer value
+                # The C++ function expects unsigned long long (pointer as integer)
+                if hasattr(context, '__c_void_p__'):
+                    # PyObjC provides __c_void_p__() to get the raw pointer
+                    context_ptr = context.__c_void_p__().value
+                else:
+                    # Fallback: try to convert directly to int
+                    context_ptr = int(context)
+                
+                # Convert NSRect to tuple (x, y, width, height) for C++
+                # NSRect is a PyObjC structure, C++ expects a simple tuple
+                dirty_rect = (
+                    float(rect.origin.x),
+                    float(rect.origin.y),
+                    float(rect.size.width),
+                    float(rect.size.height)
+                )
+                
+                # Get marked text if present
+                marked_text = getattr(self, 'marked_text', None) or ""
+                
+                # Call C++ render_frame() function
+                self.backend._cpp_renderer.render_frame(
+                    context_ptr,
+                    self.backend.grid,
+                    self.backend.color_pairs,
+                    dirty_rect,
+                    self.backend.char_width,
+                    self.backend.char_height,
+                    self.backend.rows,
+                    self.backend.cols,
+                    offset_x,
+                    offset_y,
+                    self.backend.cursor_visible,
+                    self.backend.cursor_row,
+                    self.backend.cursor_col,
+                    marked_text
+                )
+            
+            def _render_with_pyobjc(self, rect, offset_x: float, offset_y: float):
+                """
+                Render using PyObjC implementation (original implementation).
+                
+                This method contains the original PyObjC rendering code that uses
+                NSAttributedString and CoreGraphics APIs through the PyObjC bridge.
+                It serves as the default rendering implementation and fallback when
+                C++ rendering is not available or fails.
+                
+                Args:
+                    rect: NSRect indicating the region that needs to be redrawn
+                    offset_x: Horizontal centering offset in pixels
+                    offset_y: Vertical centering offset in pixels
+                """
                 
                 # Calculate dirty region - which cells need to be redrawn
                 start_row, end_row, start_col, end_col = (
