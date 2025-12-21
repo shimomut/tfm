@@ -386,6 +386,12 @@ class FileManager:
         elif item_id == MenuManager.GO_RECENT:
             return self._action_show_recent()
         
+        # Help menu
+        elif item_id == MenuManager.HELP_ABOUT:
+            return self._action_show_about()
+        elif item_id == MenuManager.HELP_REPORT_ISSUE:
+            return self._action_report_issue()
+        
         return False
     
     # Menu action methods
@@ -543,6 +549,20 @@ class FileManager:
     def _action_show_recent(self):
         """Show recent locations dialog."""
         self.show_recent_directories_dialog()
+        return True
+    
+    def _action_report_issue(self):
+        """Open GitHub issues page in browser."""
+        from tfm_const import GITHUB_URL
+        try:
+            import webbrowser
+            issues_url = f"{GITHUB_URL}/issues"
+            webbrowser.open(issues_url)
+            self.log_manager.add_message("INFO", f"Opened {issues_url} in browser")
+        except Exception as e:
+            self.log_manager.add_message("ERROR", f"Failed to open browser: {e}")
+            self.log_manager.add_message("INFO", f"Please visit: {GITHUB_URL}/issues")
+        self.needs_full_redraw = True
         return True
         
     def safe_addstr(self, y, x, text, attr=None):

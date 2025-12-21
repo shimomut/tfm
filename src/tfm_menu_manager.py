@@ -44,6 +44,10 @@ class MenuManager:
     GO_FAVORITES = 'go.favorites'
     GO_RECENT = 'go.recent'
     
+    # Help menu
+    HELP_ABOUT = 'help.about'
+    HELP_REPORT_ISSUE = 'help.report_issue'
+    
     def __init__(self, file_manager):
         """Initialize MenuManager with reference to FileManager.
         
@@ -81,7 +85,8 @@ class MenuManager:
             self._build_file_menu(modifier),
             self._build_edit_menu(modifier),
             self._build_view_menu(modifier),
-            self._build_go_menu(modifier)
+            self._build_go_menu(modifier),
+            self._build_help_menu(modifier)
         ])
         
         return {
@@ -295,6 +300,33 @@ class MenuManager:
             ]
         }
     
+    def _build_help_menu(self, modifier):
+        """Build the Help menu structure.
+        
+        Args:
+            modifier: Keyboard modifier key (Cmd or Ctrl)
+        
+        Returns:
+            dict: Help menu structure
+        """
+        return {
+            'id': 'help',
+            'label': 'Help',
+            'items': [
+                {
+                    'id': self.HELP_ABOUT,
+                    'label': 'About TFM',
+                    'enabled': True
+                },
+                {'separator': True},
+                {
+                    'id': self.HELP_REPORT_ISSUE,
+                    'label': 'Report Issue',
+                    'enabled': True
+                }
+            ]
+        }
+    
     def get_menu_structure(self):
         """Get current menu structure.
         
@@ -354,6 +386,10 @@ class MenuManager:
         states[self.GO_HOME] = True
         states[self.GO_FAVORITES] = True
         states[self.GO_RECENT] = True
+        
+        # Help menu states (all always enabled)
+        states[self.HELP_ABOUT] = True
+        states[self.HELP_REPORT_ISSUE] = True
         
         return states
     
