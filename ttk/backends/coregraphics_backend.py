@@ -3023,6 +3023,20 @@ if COCOA_AVAILABLE:
                     # Not in a valid drawing context, skip rendering
                     return
                 
+                # Calculate centering offset to center text grid within view
+                # When window is resized, content view size may not perfectly match
+                # the text grid size (cols * char_width, rows * char_height).
+                # Center the grid so white background appears evenly on all sides.
+                view_frame = self.frame()
+                view_width = view_frame.size.width
+                view_height = view_frame.size.height
+                
+                grid_width = self.backend.cols * self.backend.char_width
+                grid_height = self.backend.rows * self.backend.char_height
+                
+                offset_x = (view_width - grid_width) / 2.0
+                offset_y = (view_height - grid_height) / 2.0
+                
                 # Calculate dirty region - which cells need to be redrawn
                 start_row, end_row, start_col, end_col = (
                     DirtyRegionCalculator.get_dirty_cells(
@@ -3083,7 +3097,7 @@ if COCOA_AVAILABLE:
                     #
                     # Impact: Reduces y-coordinate calculations from 1,920 to 24 per frame
                     # Performance gain: ~4-6% faster
-                    y = (rows - row - 1) * char_height
+                    y = (rows - row - 1) * char_height + offset_y
                     
                     for col in range(start_col, end_col):
                         # Get cell data: (char, color_pair, attributes)
@@ -3093,7 +3107,7 @@ if COCOA_AVAILABLE:
                         
                         # Calculate x pixel position (no transformation needed for x-axis)
                         # Both TTK and CoreGraphics use left-to-right x-axis
-                        x = col * char_width
+                        x = col * char_width + offset_x
                         
                         # Optimization 3: Use dict.get() for color pair lookup
                         # ----------------------------------------------------
@@ -3161,7 +3175,7 @@ if COCOA_AVAILABLE:
                 # Reuse cached attributes from Phase 1
                 for row in range(start_row, end_row):
                     # Pre-calculate row Y-coordinate (same optimization as Phase 1)
-                    y = (rows - row - 1) * char_height
+                    y = (rows - row - 1) * char_height + offset_y
                     
                     # Use column index to iterate through the row
                     col = start_col
@@ -3235,7 +3249,7 @@ if COCOA_AVAILABLE:
                             # Draw each character at its exact grid position
                             for i, char in enumerate(batch_chars):
                                 # Calculate exact x-coordinate for this character's grid position
-                                x_pos = (start_col_batch + i) * char_width
+                                x_pos = (start_col_batch + i) * char_width + offset_x
                                 
                                 # Get cached NSAttributedString for single character
                                 # The cache is particularly effective for repeated characters
@@ -3253,8 +3267,8 @@ if COCOA_AVAILABLE:
                 # Draw cursor if visible
                 if self.backend.cursor_visible:
                     # Calculate cursor pixel position using cached values
-                    cursor_x = self.backend.cursor_col * char_width
-                    cursor_y = (rows - self.backend.cursor_row - 1) * char_height
+                    cursor_x = self.backend.cursor_col * char_width + offset_x
+                    cursor_y = (rows - self.backend.cursor_row - 1) * char_height + offset_y
                     
                     # Draw cursor as a filled rectangle with inverted colors
                     # Use white color for visibility with slight transparency
@@ -3277,8 +3291,8 @@ if COCOA_AVAILABLE:
                     # Note: TFM needs to call backend.set_cursor_position(row, col) or
                     # backend.move_cursor(row, col) to update cursor position for IME.
                     # If cursor is at (0, 0), marked text will appear at top-left.
-                    marked_x = self.backend.cursor_col * char_width
-                    marked_y = (rows - self.backend.cursor_row - 1) * char_height
+                    marked_x = self.backend.cursor_col * char_width + offset_x
+                    marked_y = (rows - self.backend.cursor_row - 1) * char_height + offset_y
                     
                     # Create attributes for marked text
                     # Use underline to indicate composition state
