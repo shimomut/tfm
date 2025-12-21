@@ -1324,10 +1324,11 @@ class FileManager:
                         padded_extension = pad_to_width(extension, ext_width, align='left')
                         line = f"{selection_marker} {padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
                     else:
-                        # No extension
-                        if safe_get_display_width(display_name) > name_width:
-                            display_name = truncate_to_width(display_name, name_width, "…")
-                        padded_name = pad_to_width(display_name, name_width, align='left')
+                        # No extension - use full width (name_width + ext_width + 1 space)
+                        full_name_width = name_width + ext_width + (1 if ext_width > 0 else 0)
+                        if safe_get_display_width(display_name) > full_name_width:
+                            display_name = truncate_to_width(display_name, full_name_width, "…")
+                        padded_name = pad_to_width(display_name, full_name_width, align='left')
                         line = f"{selection_marker} {padded_name} {size_str:>8} {mtime_str}"
                 else:
                     # Narrow layout without datetime
@@ -1336,12 +1337,14 @@ class FileManager:
                             basename = truncate_to_width(basename, name_width, "…")
                         padded_basename = pad_to_width(basename, name_width, align='left')
                         padded_extension = pad_to_width(extension, ext_width, align='left')
-                        line = f"{selection_marker} {padded_basename} {padded_extension}{size_str:>8}"
+                        line = f"{selection_marker} {padded_basename} {padded_extension} {size_str:>8}"
                     else:
-                        if safe_get_display_width(display_name) > name_width:
-                            display_name = truncate_to_width(display_name, name_width, "…")
-                        padded_name = pad_to_width(display_name, name_width, align='left')
-                        line = f"{selection_marker} {padded_name}{size_str:>8}"
+                        # No extension - use full width (name_width + ext_width + 1 space)
+                        full_name_width = name_width + ext_width + (1 if ext_width > 0 else 0)
+                        if safe_get_display_width(display_name) > full_name_width:
+                            display_name = truncate_to_width(display_name, full_name_width, "…")
+                        padded_name = pad_to_width(display_name, full_name_width, align='left')
+                        line = f"{selection_marker} {padded_name} {size_str:>8}"
             
             try:
                 # Final truncation if needed
