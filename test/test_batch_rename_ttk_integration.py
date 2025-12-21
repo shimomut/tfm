@@ -72,7 +72,7 @@ class TestBatchRenameDialogTTKIntegration(unittest.TestCase):
 
         
     def test_handle_input_uses_input_event(self):
-        """Test that handle_input uses KeyEvent instead of key codes"""
+        """Test that handle_key_event uses KeyEvent instead of key codes"""
         dialog = self.BatchRenameDialog(self.mock_config, renderer=self.mock_renderer)
         
         # Create temporary test files
@@ -83,40 +83,41 @@ class TestBatchRenameDialogTTKIntegration(unittest.TestCase):
             
             dialog.show(test_files)
             
-            # Test ESC key
+            # Test ESC key - should close dialog
             event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=set())
-            result = dialog.handle_input(event)
-            self.assertEqual(result, ('cancel', None))
+            result = dialog.handle_key_event(event)
+            self.assertTrue(result)  # Event was handled
+            self.assertFalse(dialog.is_active)  # Dialog should be closed
             
             # Reset dialog
             dialog.show(test_files)
             
-            # Test Tab key
+            # Test Tab key - should switch fields
             event = KeyEvent(key_code=KeyCode.TAB, modifiers=set())
-            result = dialog.handle_input(event)
-            self.assertEqual(result, ('field_switch', None))
+            result = dialog.handle_key_event(event)
+            self.assertTrue(result)  # Event was handled
             self.assertEqual(dialog.active_field, 'destination')
             
-            # Test Up arrow
+            # Test Up arrow - should switch to regex field
             event = KeyEvent(key_code=KeyCode.UP, modifiers=set())
-            result = dialog.handle_input(event)
-            self.assertEqual(result, ('field_switch', None))
+            result = dialog.handle_key_event(event)
+            self.assertTrue(result)  # Event was handled
             self.assertEqual(dialog.active_field, 'regex')
             
-            # Test Down arrow
+            # Test Down arrow - should switch to destination field
             event = KeyEvent(key_code=KeyCode.DOWN, modifiers=set())
-            result = dialog.handle_input(event)
-            self.assertEqual(result, ('field_switch', None))
+            result = dialog.handle_key_event(event)
+            self.assertTrue(result)  # Event was handled
             self.assertEqual(dialog.active_field, 'destination')
             
             # Test Page Up (returns True when scroll is already at 0)
             event = KeyEvent(key_code=KeyCode.PAGE_UP, modifiers=set())
-            result = dialog.handle_input(event)
+            result = dialog.handle_key_event(event)
             self.assertTrue(result)  # Returns True when at top
             
             # Test Page Down (returns True when no preview)
             event = KeyEvent(key_code=KeyCode.PAGE_DOWN, modifiers=set())
-            result = dialog.handle_input(event)
+            result = dialog.handle_key_event(event)
             self.assertTrue(result)  # Returns True when no preview
             
         finally:
@@ -241,7 +242,7 @@ class TestBatchRenameDialogTTKIntegration(unittest.TestCase):
             
             # Handle input - should mark content as changed
             event = KeyEvent(key_code=KeyCode.TAB, modifiers=set())
-            dialog.handle_input(event)
+            dialog.handle_key_event(event)
             self.assertTrue(dialog.content_changed)
             
         finally:

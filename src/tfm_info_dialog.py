@@ -6,6 +6,7 @@ Provides scrollable information dialog functionality
 
 from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
 from tfm_base_list_dialog import BaseListDialog
+from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_config import config_manager
 from tfm_wide_char_utils import get_display_width, get_safe_functions
@@ -13,7 +14,7 @@ from tfm_input_compat import ensure_input_event
 from tfm_scrollbar import draw_scrollbar
 
 
-class InfoDialog(BaseListDialog):
+class InfoDialog(UILayer, BaseListDialog):
     """Scrollable information dialog component"""
     
     def __init__(self, config, renderer=None):
@@ -44,77 +45,6 @@ class InfoDialog(BaseListDialog):
         self.title = ""
         self.lines = []
         self.content_changed = True  # Mark content as changed when exiting
-        
-    def handle_input(self, event):
-        """Handle input while in info dialog mode
-        
-        Args:
-            event: KeyEvent from TTK
-            
-        Returns:
-            True if key was handled, False otherwise
-        """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
-        if not event:
-            return False
-            
-        # Only handle KeyEvent (not CharEvent)
-        if not isinstance(event, KeyEvent):
-            return False
-            
-        # ESC or Q - close
-        if event.key_code == KeyCode.ESCAPE or (event.char and event.char.lower() == 'q'):
-            self.exit()
-            return True
-        # Up arrow - scroll up
-        elif event.key_code == KeyCode.UP:
-            if self.scroll > 0:
-                self.scroll -= 1
-            # Always mark content as changed for any handled key to ensure continued rendering
-            self.content_changed = True
-            return True
-        # Down arrow - scroll down
-        elif event.key_code == KeyCode.DOWN:
-            # Scroll down - calculate max scroll based on cached content height
-            max_scroll = max(0, len(self.lines) - self.cached_content_height)
-            if self.scroll < max_scroll:
-                self.scroll += 1
-            # Always mark content as changed for any handled key to ensure continued rendering
-            self.content_changed = True
-            return True
-        # Page Up
-        elif event.key_code == KeyCode.PAGE_UP:
-            old_scroll = self.scroll
-            self.scroll = max(0, self.scroll - 10)
-            # Always mark content as changed for any handled key to ensure continued rendering
-            self.content_changed = True
-            return True
-        # Page Down
-        elif event.key_code == KeyCode.PAGE_DOWN:
-            max_scroll = max(0, len(self.lines) - self.cached_content_height)
-            old_scroll = self.scroll
-            self.scroll = min(max_scroll, self.scroll + 10)
-            # Always mark content as changed for any handled key to ensure continued rendering
-            self.content_changed = True
-            return True
-        # Home - go to top
-        elif event.key_code == KeyCode.HOME:
-            if self.scroll != 0:
-                self.scroll = 0
-            # Always mark content as changed for any handled key to ensure continued rendering
-            self.content_changed = True
-            return True
-        # End - go to bottom
-        elif event.key_code == KeyCode.END:
-            max_scroll = max(0, len(self.lines) - self.cached_content_height)
-            if self.scroll != max_scroll:
-                self.scroll = max_scroll
-            # Always mark content as changed for any handled key to ensure continued rendering
-            self.content_changed = True
-            return True
-        return False
         
     def needs_redraw(self):
         """Check if this dialog needs to be redrawn"""
@@ -251,6 +181,132 @@ class InfoDialog(BaseListDialog):
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False
+    
+    # UILayer interface implementation
+    
+    def handle_key_event(self, event: KeyEvent) -> bool:
+        """
+        Handle a key event (UILayer interface).
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to KeyEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, KeyEvent):
+            return False
+        
+        # ESC or Q - close
+        if event.key_code == KeyCode.ESCAPE or (event.char and event.char.lower() == 'q'):
+            self.exit()
+            return True
+        # Up arrow - scroll up
+        elif event.key_code == KeyCode.UP:
+            if self.scroll > 0:
+                self.scroll -= 1
+            self.content_changed = True
+            return True
+        # Down arrow - scroll down
+        elif event.key_code == KeyCode.DOWN:
+            max_scroll = max(0, len(self.lines) - self.cached_content_height)
+            if self.scroll < max_scroll:
+                self.scroll += 1
+            self.content_changed = True
+            return True
+        # Page Up
+        elif event.key_code == KeyCode.PAGE_UP:
+            self.scroll = max(0, self.scroll - 10)
+            self.content_changed = True
+            return True
+        # Page Down
+        elif event.key_code == KeyCode.PAGE_DOWN:
+            max_scroll = max(0, len(self.lines) - self.cached_content_height)
+            self.scroll = min(max_scroll, self.scroll + 10)
+            self.content_changed = True
+            return True
+        # Home - go to top
+        elif event.key_code == KeyCode.HOME:
+            if self.scroll != 0:
+                self.scroll = 0
+            self.content_changed = True
+            return True
+        # End - go to bottom
+        elif event.key_code == KeyCode.END:
+            max_scroll = max(0, len(self.lines) - self.cached_content_height)
+            if self.scroll != max_scroll:
+                self.scroll = max_scroll
+            self.content_changed = True
+            return True
+        
+        return False
+    
+    def handle_char_event(self, event: CharEvent) -> bool:
+        """
+        Handle a character event (UILayer interface).
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # InfoDialog doesn't handle character events (no text input)
+        return False
+    
+    def render(self, renderer) -> None:
+        """
+        Render the layer's content (UILayer interface).
+        
+        Args:
+            renderer: TTK renderer instance for drawing
+        """
+        self.draw()
+    
+    def is_full_screen(self) -> bool:
+        """
+        Query if this layer occupies the full screen (UILayer interface).
+        
+        Returns:
+            False - dialogs are overlays, not full-screen
+        """
+        return False
+    
+    def mark_dirty(self) -> None:
+        """
+        Mark this layer as needing a redraw (UILayer interface).
+        """
+        self.content_changed = True
+    
+    def clear_dirty(self) -> None:
+        """
+        Clear the dirty flag after rendering (UILayer interface).
+        """
+        self.content_changed = False
+    
+    def should_close(self) -> bool:
+        """
+        Query if this layer wants to close (UILayer interface).
+        
+        Returns:
+            True if the layer should be closed, False otherwise
+        """
+        return not self.is_active
+    
+    def on_activate(self) -> None:
+        """
+        Called when this layer becomes the top layer (UILayer interface).
+        """
+        self.content_changed = True  # Ensure dialog is drawn when activated
+    
+    def on_deactivate(self) -> None:
+        """
+        Called when this layer is no longer the top layer (UILayer interface).
+        """
+        pass
 
 
 class InfoDialogHelpers:

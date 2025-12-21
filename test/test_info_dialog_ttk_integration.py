@@ -50,16 +50,16 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         
         # Test ESC key
         event = KeyEvent(key_code=KeyCode.ESCAPE, char=None, modifiers=0)
-        result = dialog.handle_input(event)
+        result = dialog.handle_key_event(event)
         self.assertTrue(result)
         self.assertFalse(dialog.is_active)
         
         # Reset dialog
         dialog.show("Test", many_lines)
         
-        # Test Q key
+        # Test Q key - InfoDialog handles 'q' through KeyEvent
         event = KeyEvent(key_code=None, char='q', modifiers=0)
-        result = dialog.handle_input(event)
+        result = dialog.handle_key_event(event)
         self.assertTrue(result)
         self.assertFalse(dialog.is_active)
         
@@ -69,39 +69,39 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         # Test UP arrow
         event = KeyEvent(key_code=KeyCode.UP, char=None, modifiers=0)
         dialog.scroll = 1
-        result = dialog.handle_input(event)
+        result = dialog.handle_key_event(event)
         self.assertTrue(result)
         self.assertEqual(dialog.scroll, 0)
         
         # Test DOWN arrow
         event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=0)
-        result = dialog.handle_input(event)
+        result = dialog.handle_key_event(event)
         self.assertTrue(result)
         self.assertEqual(dialog.scroll, 1)
         
         # Test PAGE_UP
         event = KeyEvent(key_code=KeyCode.PAGE_UP, char=None, modifiers=0)
         dialog.scroll = 5
-        result = dialog.handle_input(event)
+        result = dialog.handle_key_event(event)
         self.assertTrue(result)
         self.assertEqual(dialog.scroll, 0)
         
         # Test PAGE_DOWN
         event = KeyEvent(key_code=KeyCode.PAGE_DOWN, char=None, modifiers=0)
-        result = dialog.handle_input(event)
+        result = dialog.handle_key_event(event)
         self.assertTrue(result)
         self.assertGreater(dialog.scroll, 0)
         
         # Test HOME
         event = KeyEvent(key_code=KeyCode.HOME, char=None, modifiers=0)
         dialog.scroll = 5
-        result = dialog.handle_input(event)
+        result = dialog.handle_key_event(event)
         self.assertTrue(result)
         self.assertEqual(dialog.scroll, 0)
         
         # Test END
         event = KeyEvent(key_code=KeyCode.END, char=None, modifiers=0)
-        result = dialog.handle_input(event)
+        result = dialog.handle_key_event(event)
         self.assertTrue(result)
         # Scroll should be at or near max
         self.assertGreaterEqual(dialog.scroll, 0)
@@ -165,7 +165,7 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         
         # After input, should need redraw
         event = KeyEvent(key_code=KeyCode.DOWN, char=None, modifiers=0)
-        dialog.handle_input(event)
+        dialog.handle_key_event(event)
         self.assertTrue(dialog.needs_redraw())
         
     def test_no_curses_imports(self):

@@ -10,7 +10,7 @@ import time
 # Add src directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from tfm_general_purpose_dialog import GeneralPurposeDialog
+from tfm_quick_edit_bar import QuickEditBar
 from tfm_list_dialog import ListDialog
 from tfm_config import get_config
 
@@ -42,7 +42,7 @@ def demo_optimization():
     mock_stdscr = MockStdscr()
     
     # Create a dialog
-    dialog = GeneralPurposeDialog(config)
+    dialog = QuickEditBar(config)
     
     # Track draw calls
     original_draw = dialog._draw_status_line_input

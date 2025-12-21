@@ -9,12 +9,13 @@ import time
 from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
+from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_input_compat import ensure_input_event
 
 
-class JumpDialog(BaseListDialog):
+class JumpDialog(UILayer, BaseListDialog):
     """Jump dialog component for directory navigation with threading support"""
     
     def __init__(self, config, renderer=None):
@@ -84,65 +85,6 @@ class JumpDialog(BaseListDialog):
         
         # Reset animation
         self.progress_animator.reset()
-        
-    def handle_input(self, event):
-        """Handle input while in jump dialog mode
-        
-        Args:
-            event: KeyEvent or CharEvent from TTK
-        """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
-        if not event:
-            return False
-        
-        # Only pass KeyEvents to navigation handler (CharEvents go to text editor)
-        if isinstance(event, KeyEvent):
-            # Use base class navigation handling with thread safety
-            with self.scan_lock:
-                current_filtered = self.filtered_directories.copy()
-            
-            result = self.handle_common_navigation(event, current_filtered)
-            
-            if result == 'cancel':
-                # Cancel scan before exiting
-                self._cancel_current_scan()
-                self.exit()
-                return True
-            elif result == 'select':
-                # Cancel scan before navigating
-                self._cancel_current_scan()
-                
-                # Return the selected directory for navigation (thread-safe)
-                with self.scan_lock:
-                    if self.filtered_directories and 0 <= self.selected < len(self.filtered_directories):
-                        selected_directory = self.filtered_directories[self.selected]
-                        return ('navigate', selected_directory)
-                return ('navigate', None)
-            elif result == 'text_changed':
-                self._filter_directories()
-                self.content_changed = True  # Mark content as changed when filtering
-                return True
-            elif result:
-                # Update selection in thread-safe manner for navigation keys
-                if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
-                    with self.scan_lock:
-                        # The base class already updated self.selected, just need to adjust scroll
-                        self._adjust_scroll(len(self.filtered_directories))
-                
-                # Mark content as changed for ANY handled key to ensure continued rendering
-                self.content_changed = True
-                return True
-        
-        # CharEvent - pass to text editor
-        if isinstance(event, CharEvent):
-            if self.text_editor.handle_key(event):
-                self._filter_directories()
-                self.content_changed = True
-                return True
-            
-        return False
         
     def _start_directory_scan(self, root_directory):
         """Start asynchronous directory scanning
@@ -439,6 +381,153 @@ class JumpDialog(BaseListDialog):
         # Automatically mark as not needing redraw after drawing (unless still searching)
         if not self.searching:
             self.content_changed = False
+    
+    # UILayer interface implementation
+    
+    def handle_key_event(self, event) -> bool:
+        """
+        Handle a key event (UILayer interface).
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to KeyEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, KeyEvent):
+            return False
+        
+        # Use base class navigation handling with thread safety
+        with self.scan_lock:
+            current_filtered = self.filtered_directories.copy()
+        
+        result = self.handle_common_navigation(event, current_filtered)
+        
+        if result == 'cancel':
+            # Cancel scan before exiting
+            self._cancel_current_scan()
+            self.exit()
+            return True
+        elif result == 'select':
+            # Cancel scan before navigating
+            self._cancel_current_scan()
+            
+            # Return the selected directory for navigation (thread-safe)
+            # Note: This returns a tuple which the caller needs to handle
+            with self.scan_lock:
+                if self.filtered_directories and 0 <= self.selected < len(self.filtered_directories):
+                    selected_directory = self.filtered_directories[self.selected]
+                    # Store the selected directory for retrieval
+                    self._selected_directory = selected_directory
+                else:
+                    self._selected_directory = None
+            
+            # Exit the dialog
+            self.exit()
+            return True
+        elif result == 'text_changed':
+            self._filter_directories()
+            self.content_changed = True
+            return True
+        elif result:
+            # Update selection in thread-safe manner for navigation keys
+            if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
+                with self.scan_lock:
+                    # The base class already updated self.selected, just need to adjust scroll
+                    self._adjust_scroll(len(self.filtered_directories))
+            
+            # Mark content as changed for ANY handled key to ensure continued rendering
+            self.content_changed = True
+            return True
+        
+        return False
+    
+    def handle_char_event(self, event) -> bool:
+        """
+        Handle a character event (UILayer interface).
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to CharEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, CharEvent):
+            return False
+        
+        # Pass to text editor
+        if self.text_editor.handle_key(event):
+            self._filter_directories()
+            self.content_changed = True
+            return True
+        
+        return False
+    
+    def render(self, renderer) -> None:
+        """
+        Render the layer's content (UILayer interface).
+        
+        Args:
+            renderer: TTK renderer instance for drawing
+        """
+        self.draw()
+    
+    def is_full_screen(self) -> bool:
+        """
+        Query if this layer occupies the full screen (UILayer interface).
+        
+        Returns:
+            False - dialogs are overlays, not full-screen
+        """
+        return False
+    
+    def mark_dirty(self) -> None:
+        """
+        Mark this layer as needing a redraw (UILayer interface).
+        """
+        self.content_changed = True
+    
+    def clear_dirty(self) -> None:
+        """
+        Clear the dirty flag after rendering (UILayer interface).
+        """
+        self.content_changed = False
+    
+    def should_close(self) -> bool:
+        """
+        Query if this layer wants to close (UILayer interface).
+        
+        Returns:
+            True if the layer should be closed, False otherwise
+        """
+        return not self.is_active
+    
+    def on_activate(self) -> None:
+        """
+        Called when this layer becomes the top layer (UILayer interface).
+        """
+        self.content_changed = True  # Ensure dialog is drawn when activated
+    
+    def on_deactivate(self) -> None:
+        """
+        Called when this layer is no longer the top layer (UILayer interface).
+        """
+        pass
+    
+    def get_selected_directory(self):
+        """
+        Get the selected directory after the dialog closes.
+        
+        Returns:
+            Path object of the selected directory, or None if cancelled
+        """
+        return getattr(self, '_selected_directory', None)
 
 
 class JumpDialogHelpers:

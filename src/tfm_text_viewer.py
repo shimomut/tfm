@@ -28,9 +28,10 @@ from tfm_colors import *
 from tfm_const import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width, split_at_width, safe_get_display_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
+from tfm_ui_layer import UILayer
 
 
-class TextViewer:
+class TextViewer(UILayer):
     """Text file viewer with syntax highlighting support"""
     
     def __init__(self, renderer, file_path: Path):
@@ -45,7 +46,8 @@ class TextViewer:
         self.wrap_lines = False
         self.syntax_highlighting = PYGMENTS_AVAILABLE
         self.tab_width = 4  # Number of spaces per tab
-        self.should_close = False  # Flag to indicate viewer wants to close
+        self._should_close = False  # Flag to indicate viewer wants to close
+        self._dirty = True  # Start dirty to ensure initial render
         
         # Isearch mode state
         self.isearch_mode = False
@@ -878,12 +880,15 @@ class TextViewer:
         self.draw_content()
         self.draw_status_bar()
     
-    def handle_input(self, event):
+    def handle_key_event(self, event) -> bool:
         """
-        Handle input event (called by FileManager's main loop)
+        Handle a key event (UILayer interface method).
+        
+        Args:
+            event: KeyEvent to handle
         
         Returns:
-            bool: True if event was consumed, False otherwise
+            True if the event was consumed, False to propagate to next layer
         """
         # Handle None event
         if event is None:
@@ -893,7 +898,10 @@ class TextViewer:
         
         # Handle isearch mode input first
         if self.isearch_mode:
-            return self.handle_isearch_input(event)
+            result = self.handle_isearch_input(event)
+            if result:
+                self._dirty = True
+            return result
         
         # CharEvents should only be handled in isearch mode
         # Return False for unhandled CharEvents so backend generates them
@@ -903,8 +911,15 @@ class TextViewer:
         # Check for character-based commands (only from KeyEvent)
         if isinstance(event, KeyEvent) and event.char:
             char_lower = event.char.lower()
-            if char_lower == 'n':
+            if char_lower == 'q':
+                # Quit viewer
+                self._should_close = True
+                self._dirty = True
+                return True
+            elif char_lower == 'n':
                 self.show_line_numbers = not self.show_line_numbers
+                self._dirty = True
+                return True
             elif char_lower == 'w':
                 # When toggling wrap mode, adjust scroll position to maintain context
                 old_scroll = self.scroll_offset
@@ -921,6 +936,8 @@ class TextViewer:
                     display_lines, _ = self.get_wrapped_lines_with_mapping()
                     max_scroll = max(0, len(display_lines) - display_height)
                     self.scroll_offset = min(old_scroll, max_scroll)
+                self._dirty = True
+                return True
             elif char_lower == 's':
                 if PYGMENTS_AVAILABLE:
                     self.syntax_highlighting = not self.syntax_highlighting
@@ -931,9 +948,13 @@ class TextViewer:
                     else:
                         # Create plain highlighted lines (no colors)
                         self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
+                    self._dirty = True
+                    return True
             elif char_lower == 'f':
                 # Enter isearch mode
                 self.enter_isearch_mode()
+                self._dirty = True
+                return True
             elif char_lower == 't':
                 # Cycle through tab widths: 2, 4, 8
                 if self.tab_width == 2:
@@ -945,48 +966,149 @@ class TextViewer:
                 
                 # Re-expand tabs with new tab width
                 self.refresh_tab_expansion()
+                self._dirty = True
+                return True
         
         # Check for special keys
         if event.key_code == KeyCode.ESCAPE:
-            self.should_close = True
+            self._should_close = True
+            self._dirty = True
             return True
         elif event.key_code == KeyCode.ENTER:
-            self.should_close = True
+            self._should_close = True
+            self._dirty = True
             return True
         elif event.key_code == KeyCode.UP:
             if self.scroll_offset > 0:
                 self.scroll_offset -= 1
+                self._dirty = True
+            return True
         elif event.key_code == KeyCode.DOWN:
             # Use display lines for scrolling when wrapping is enabled
             display_lines, _ = self.get_wrapped_lines_with_mapping()
             max_scroll = max(0, len(display_lines) - display_height)
             if self.scroll_offset < max_scroll:
                 self.scroll_offset += 1
+                self._dirty = True
+            return True
         elif event.key_code == KeyCode.LEFT:
             # Use display width units for horizontal scrolling
             if self.horizontal_offset > 0:
                 self.horizontal_offset = max(0, self.horizontal_offset - 1)
+                self._dirty = True
+            return True
         elif event.key_code == KeyCode.RIGHT:
             # Increment horizontal offset by display width units
             self.horizontal_offset += 1
+            self._dirty = True
+            return True
         elif event.key_code == KeyCode.PAGE_UP:
             self.scroll_offset = max(0, self.scroll_offset - display_height)
+            self._dirty = True
+            return True
         elif event.key_code == KeyCode.PAGE_DOWN:
             # Use display lines for page scrolling when wrapping is enabled
             display_lines, _ = self.get_wrapped_lines_with_mapping()
             max_scroll = max(0, len(display_lines) - display_height)
             self.scroll_offset = min(max_scroll, self.scroll_offset + display_height)
+            self._dirty = True
+            return True
         elif event.key_code == KeyCode.HOME:
             self.scroll_offset = 0
             self.horizontal_offset = 0
+            self._dirty = True
+            return True
         elif event.key_code == KeyCode.END:
             # Use display lines for end positioning when wrapping is enabled
             display_lines, _ = self.get_wrapped_lines_with_mapping()
             max_scroll = max(0, len(display_lines) - display_height)
             self.scroll_offset = max_scroll
+            self._dirty = True
+            return True
             
         return True
-
+    
+    def handle_char_event(self, event) -> bool:
+        """
+        Handle a character event (UILayer interface method).
+        
+        TextViewer doesn't handle character events directly (no text input in viewer mode).
+        Character events are only handled in isearch mode, which is triggered by key events.
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            False (viewers don't handle char events)
+        """
+        return False
+    
+    def render(self, renderer) -> None:
+        """
+        Render the layer's content (UILayer interface method).
+        
+        Args:
+            renderer: TTK renderer instance for drawing
+        """
+        self.draw()
+    
+    def is_full_screen(self) -> bool:
+        """
+        Query if this layer occupies the full screen (UILayer interface method).
+        
+        Returns:
+            True (viewers occupy full screen)
+        """
+        return True
+    
+    def needs_redraw(self) -> bool:
+        """
+        Query if this layer has dirty content that needs redrawing (UILayer interface method).
+        
+        Returns:
+            True if the layer needs redrawing, False otherwise
+        """
+        return self._dirty
+    
+    def mark_dirty(self) -> None:
+        """
+        Mark this layer as needing a redraw (UILayer interface method).
+        """
+        self._dirty = True
+    
+    def clear_dirty(self) -> None:
+        """
+        Clear the dirty flag after rendering (UILayer interface method).
+        """
+        self._dirty = False
+    
+    def should_close(self) -> bool:
+        """
+        Query if this layer wants to close (UILayer interface method).
+        
+        Returns:
+            True if the layer should be closed, False otherwise
+        """
+        return self._should_close
+    
+    def on_activate(self) -> None:
+        """
+        Called when this layer becomes the top layer (UILayer interface method).
+        
+        Hides cursor when viewer becomes active and marks dirty for initial render.
+        """
+        # Hide cursor when viewer becomes active
+        self.renderer.set_cursor_visibility(False)
+        self._dirty = True
+    
+    def on_deactivate(self) -> None:
+        """
+        Called when this layer is no longer the top layer (UILayer interface method).
+        
+        Viewer is being covered or closed - no special cleanup needed.
+        """
+        pass
+    
 
 def is_text_file(file_path: Path) -> bool:
     """Check if a file is likely to be a text file"""

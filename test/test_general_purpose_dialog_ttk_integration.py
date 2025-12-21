@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Test GeneralPurposeDialog TTK integration
+Test QuickEditBar TTK integration
 
-This test verifies that GeneralPurposeDialog has been successfully migrated
+This test verifies that QuickEditBar has been successfully migrated
 to use TTK's Renderer API instead of direct curses calls.
 """
 
@@ -20,11 +20,11 @@ ttk_path = Path(__file__).parent.parent / 'ttk'
 sys.path.insert(0, str(ttk_path))
 
 from ttk import KeyEvent, KeyCode, ModifierKey
-from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogType, DialogHelpers
+from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
 
 
-class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
-    """Test GeneralPurposeDialog TTK integration"""
+class TestQuickEditBarTTKIntegration(unittest.TestCase):
+    """Test QuickEditBar TTK integration"""
     
     def setUp(self):
         """Set up test fixtures"""
@@ -36,23 +36,22 @@ class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
         self.mock_config = Mock()
         
     def test_initialization(self):
-        """Test that GeneralPurposeDialog can be initialized with renderer"""
+        """Test that QuickEditBar can be initialized with renderer"""
         # Create dialog with renderer
-        dialog = GeneralPurposeDialog(config=self.mock_config, renderer=self.mock_renderer)
+        dialog = QuickEditBar(config=self.mock_config, renderer=self.mock_renderer)
         
         # Verify initialization
         self.assertIsNotNone(dialog.renderer)
         self.assertEqual(dialog.renderer, self.mock_renderer)
         self.assertEqual(dialog.config, self.mock_config)
         self.assertFalse(dialog.is_active)
-        self.assertIsNone(dialog.dialog_type)
     
     def test_no_curses_imports(self):
-        """Test that GeneralPurposeDialog doesn't import curses directly"""
-        import tfm_general_purpose_dialog
+        """Test that QuickEditBar doesn't import curses directly"""
+        import tfm_quick_edit_bar
         import inspect
         
-        source = inspect.getsource(tfm_general_purpose_dialog)
+        source = inspect.getsource(tfm_quick_edit_bar)
         
         # Check for direct curses imports (excluding comments)
         lines = source.split('\n')
@@ -66,19 +65,19 @@ class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
                 self.fail(f"Found curses import: {line}")
     
     def test_uses_ttk_types(self):
-        """Test that GeneralPurposeDialog uses TTK types"""
-        import tfm_general_purpose_dialog
+        """Test that QuickEditBar uses TTK types"""
+        import tfm_quick_edit_bar
         import inspect
         
-        source = inspect.getsource(tfm_general_purpose_dialog)
+        source = inspect.getsource(tfm_quick_edit_bar)
         
         # Check for TTK imports
         self.assertIn('KeyCode', source, "KeyCode should be imported from TTK")
         self.assertIn('TextAttribute', source, "TextAttribute should be imported from TTK")
     
     def test_handle_input_method(self):
-        """Test that GeneralPurposeDialog has handle_input method"""
-        dialog = GeneralPurposeDialog(config=self.mock_config, renderer=self.mock_renderer)
+        """Test that QuickEditBar has handle_input method"""
+        dialog = QuickEditBar(config=self.mock_config, renderer=self.mock_renderer)
         
         # Check that handle_input method exists
         self.assertTrue(hasattr(dialog, 'handle_input'))
@@ -93,8 +92,8 @@ class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
         self.assertFalse(result)
     
     def test_draw_method(self):
-        """Test that GeneralPurposeDialog has draw method using renderer"""
-        dialog = GeneralPurposeDialog(config=self.mock_config, renderer=self.mock_renderer)
+        """Test that QuickEditBar has draw method using renderer"""
+        dialog = QuickEditBar(config=self.mock_config, renderer=self.mock_renderer)
         
         # Check that draw method exists
         self.assertTrue(hasattr(dialog, 'draw'))
@@ -112,7 +111,7 @@ class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
     
     def test_status_line_input_dialog(self):
         """Test status line input dialog functionality"""
-        dialog = GeneralPurposeDialog(config=self.mock_config, renderer=self.mock_renderer)
+        dialog = QuickEditBar(config=self.mock_config, renderer=self.mock_renderer)
         
         # Show status line input dialog
         callback_called = []
@@ -128,7 +127,6 @@ class TestGeneralPurposeDialogTTKIntegration(unittest.TestCase):
         
         # Verify dialog is active
         self.assertTrue(dialog.is_active)
-        self.assertEqual(dialog.dialog_type, DialogType.STATUS_LINE_INPUT)
         self.assertEqual(dialog.get_text(), "initial")
         
         # Test ESC key

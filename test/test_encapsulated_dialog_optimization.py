@@ -11,7 +11,7 @@ from unittest.mock import Mock
 # Add src directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from tfm_general_purpose_dialog import GeneralPurposeDialog
+from tfm_quick_edit_bar import QuickEditBar
 from tfm_list_dialog import ListDialog
 from tfm_info_dialog import InfoDialog
 from tfm_search_dialog import SearchDialog
@@ -20,13 +20,13 @@ from tfm_batch_rename_dialog import BatchRenameDialog
 from tfm_config import get_config
 
 
-def test_general_purpose_dialog_encapsulation():
-    """Test GeneralPurposeDialog encapsulated optimization"""
+def test_quick_edit_bar_encapsulation():
+    """Test QuickEditBar encapsulated optimization"""
     
     config = get_config()
-    dialog = GeneralPurposeDialog(config)
+    dialog = QuickEditBar(config)
     
-    print("Testing GeneralPurposeDialog:")
+    print("Testing QuickEditBar:")
     print("============================")
     
     # Show dialog
@@ -123,7 +123,7 @@ def test_main_loop_integration():
     # Mock FileManager
     class MockFileManager:
         def __init__(self):
-            self.general_dialog = GeneralPurposeDialog(config)
+            self.quick_edit_bar = QuickEditBar(config)
             self.list_dialog = ListDialog(config)
             self.info_dialog = InfoDialog(config)
             self.search_dialog = SearchDialog(config)
@@ -133,8 +133,8 @@ def test_main_loop_integration():
         
         def _check_dialog_content_changed(self):
             """Use the new encapsulated approach"""
-            if self.general_dialog.is_active:
-                return self.general_dialog.needs_redraw()
+            if self.quick_edit_bar.is_active:
+                return self.quick_edit_bar.needs_redraw()
             elif self.list_dialog.mode:
                 return self.list_dialog.needs_redraw()
             elif self.info_dialog.mode:
@@ -158,13 +158,13 @@ def test_main_loop_integration():
     print("✓ No active dialogs: returns False")
     
     # Test active dialog with content change
-    fm.general_dialog.show_status_line_input("Test")
+    fm.quick_edit_bar.show_status_line_input("Test")
     result = fm._check_dialog_content_changed()
     assert result == True, "Should return True when dialog needs redraw"
     print("✓ Active dialog with content change: returns True")
     
     # Test search dialog animation
-    fm.general_dialog.hide()
+    fm.quick_edit_bar.hide()
     fm.search_dialog.show('filename')
     fm.search_dialog.searching = True
     fm.search_dialog.content_changed = False
@@ -185,7 +185,7 @@ def test_all_dialogs_have_methods():
     print("==========================================")
     
     dialogs = [
-        ("GeneralPurposeDialog", GeneralPurposeDialog(config)),
+        ("QuickEditBar", QuickEditBar(config)),
         ("ListDialog", ListDialog(config)),
         ("InfoDialog", InfoDialog(config)),
         ("SearchDialog", SearchDialog(config)),
@@ -205,7 +205,7 @@ def test_all_dialogs_have_methods():
 
 if __name__ == "__main__":
     try:
-        test_general_purpose_dialog_encapsulation()
+        test_quick_edit_bar_encapsulation()
         test_search_dialog_animation_encapsulation()
         test_main_loop_integration()
         test_all_dialogs_have_methods()

@@ -49,7 +49,7 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
         initial_needs_redraw = dialog.needs_redraw()
         
         # Press the key
-        result = dialog.handle_input(key)
+        result = dialog.handle_key_event(key)
         
         # Check results
         if result:  # If key was handled
@@ -175,7 +175,7 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
         # Step 1: Open dialog (simulating HelpDialog)
         test_lines = ["Help Line 1", "Help Line 2", "Help Line 3"]
         dialog.show("Help", test_lines)
-        self.assertTrue(dialog.mode, "Dialog should be open")
+        self.assertTrue(dialog.is_active, "Dialog should be open")
         self.assertEqual(dialog.scroll, 0, "Should start at top")
         self.assertTrue(dialog.needs_redraw(), "Dialog should need initial draw")
         
@@ -184,11 +184,11 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
         self.assertFalse(dialog.needs_redraw(), "Dialog should not need redraw after being drawn")
         
         # Step 3: Press UP key immediately (the problematic scenario)
-        result = dialog.handle_input(KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE))
+        result = dialog.handle_key_event(KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE))
         
         # Step 4: Verify dialog is still visible
         self.assertTrue(result, "UP key should be handled")
-        self.assertTrue(dialog.mode, "Dialog should still be open")
+        self.assertTrue(dialog.is_active, "Dialog should still be open")
         self.assertEqual(dialog.scroll, 0, "Should still be at top (can't scroll up)")
         self.assertTrue(dialog.needs_redraw(), 
                        "Dialog should need redraw after UP key (this was the bug)")
@@ -213,8 +213,8 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
                 # Test that all dialogs have the required methods
                 self.assertTrue(hasattr(dialog, 'needs_redraw'), 
                               f"{dialog_name} should have needs_redraw method")
-                self.assertTrue(hasattr(dialog, 'handle_input'), 
-                              f"{dialog_name} should have handle_input method")
+                self.assertTrue(hasattr(dialog, 'handle_key_event'), 
+                              f"{dialog_name} should have handle_key_event method")
                 self.assertTrue(hasattr(dialog, 'content_changed'), 
                               f"{dialog_name} should have content_changed attribute")
                 

@@ -33,7 +33,7 @@ class MockFileManager:
             'CONFIRM_EXTRACT_ARCHIVE': False
         })()
         self.needs_full_redraw = False
-        self.general_dialog = type('Dialog', (), {
+        self.quick_edit_bar = type('Dialog', (), {
             'hide': lambda: None,
             'show_status_line_input': lambda *args, **kwargs: None
         })()

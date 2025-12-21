@@ -45,7 +45,7 @@ class TestJumpDialogIntegration(unittest.TestCase):
         jump_dialog = JumpDialog(self.config)
         
         # Check initial state
-        self.assertFalse(jump_dialog.mode)
+        self.assertFalse(jump_dialog.is_active)
         self.assertEqual(jump_dialog.max_directories, self.config.MAX_JUMP_DIRECTORIES)
         self.assertIsNotNone(jump_dialog.progress_animator)
     
@@ -63,7 +63,7 @@ class TestJumpDialogIntegration(unittest.TestCase):
             
             # Show dialog
             jump_dialog.show(temp_path)
-            self.assertTrue(jump_dialog.mode)
+            self.assertTrue(jump_dialog.is_active)
             self.assertTrue(jump_dialog.searching)
             
             # Wait for scanning to start
@@ -71,7 +71,7 @@ class TestJumpDialogIntegration(unittest.TestCase):
             
             # Exit dialog
             jump_dialog.exit()
-            self.assertFalse(jump_dialog.mode)
+            self.assertFalse(jump_dialog.is_active)
             self.assertFalse(jump_dialog.searching)
     
     def test_key_binding_uniqueness(self):

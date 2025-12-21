@@ -11,13 +11,14 @@ import time
 from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
+from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_wide_char_utils import get_display_width, get_safe_functions
 from tfm_input_compat import ensure_input_event
 
 
-class SearchDialog(BaseListDialog):
+class SearchDialog(UILayer, BaseListDialog):
     """Search dialog component for filename and content search with threading support"""
     
     def __init__(self, config, renderer=None):
@@ -28,6 +29,8 @@ class SearchDialog(BaseListDialog):
         self.results = []  # List of search results
         self.searching = False  # Whether search is in progress
         self.content_changed = True  # Track if content needs redraw
+        self.search_root = None  # Root directory for search
+        self._selected_result = None  # Selected result when dialog closes
         
         # Threading support
         self.search_thread = None
@@ -41,11 +44,12 @@ class SearchDialog(BaseListDialog):
         # Get configurable search result limit
         self.max_search_results = getattr(config, 'MAX_SEARCH_RESULTS', 10000)
         
-    def show(self, search_type='filename'):
+    def show(self, search_type='filename', search_root=None):
         """Show the search dialog for filename or content search
         
         Args:
             search_type: 'filename' or 'content' search mode
+            search_root: Path object representing the root directory to search from
         """
         # Cancel any existing search first
         self._cancel_current_search()
@@ -53,12 +57,14 @@ class SearchDialog(BaseListDialog):
         
         self.is_active = True
         self.search_type = search_type
+        self.search_root = search_root
         self.text_editor.clear()
         self.results = []
         self.selected = 0
         self.scroll = 0
         self.searching = False
         self.last_search_pattern = ""
+        self._selected_result = None  # Clear any previous selection
         
         # Reset animation
         self.progress_animator.reset()
@@ -73,73 +79,20 @@ class SearchDialog(BaseListDialog):
         self.results = []
         self.searching = False
         self.last_search_pattern = ""
+        self.search_root = None
+        # Don't clear _selected_result here - it needs to persist for retrieval
         self.content_changed = True  # Mark content as changed when exiting
         
         # Reset animation
         self.progress_animator.reset()
+    
+    def get_selected_result(self):
+        """Get the selected result after dialog exits
         
-    def handle_input(self, event):
-        """Handle input while in search dialog mode
-        
-        Args:
-            event: KeyEvent or CharEvent from TTK (or integer key code for backward compatibility)
+        Returns:
+            The selected search result, or None if no result was selected
         """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
-        if not event:
-            return False
-        
-        # Handle Tab key for search type switching first (KeyEvent only)
-        if isinstance(event, KeyEvent) and event.key_code == KeyCode.TAB:
-            self.search_type = 'content' if self.search_type == 'filename' else 'filename'
-            self.content_changed = True  # Mark content as changed when switching search type
-            return ('search', None)
-            
-        # Only pass KeyEvents to navigation handler (CharEvents go to text editor)
-        if isinstance(event, KeyEvent):
-            # Use base class navigation handling with thread safety
-            with self.search_lock:
-                current_results = self.results.copy()
-            
-            result = self.handle_common_navigation(event, current_results)
-            
-            if result == 'cancel':
-                # Cancel search before exiting
-                self._cancel_current_search()
-                self.exit()
-                return True
-            elif result == 'select':
-                # Cancel search before navigating
-                self._cancel_current_search()
-                
-                # Return the selected result for navigation (thread-safe)
-                with self.search_lock:
-                    if self.results and 0 <= self.selected < len(self.results):
-                        selected_result = self.results[self.selected]
-                        return ('navigate', selected_result)
-                return ('navigate', None)
-            elif result == 'text_changed':
-                self.content_changed = True  # Mark content as changed when text changes
-                return ('search', None)
-            elif result:
-                # Update selection in thread-safe manner for navigation keys
-                if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
-                    with self.search_lock:
-                        # The base class already updated self.selected, just need to adjust scroll
-                        self._adjust_scroll(len(self.results))
-                
-                # Mark content as changed for ANY handled key to ensure continued rendering
-                self.content_changed = True
-                return True
-        
-        # CharEvent - pass to text editor
-        if isinstance(event, CharEvent):
-            if self.text_editor.handle_key(event):
-                self.content_changed = True
-                return ('search', None)
-            
-        return False
+        return getattr(self, '_selected_result', None)
         
     def perform_search(self, search_root):
         """Start asynchronous search based on current pattern and type
@@ -504,6 +457,153 @@ class SearchDialog(BaseListDialog):
         # Automatically mark as not needing redraw after drawing (unless still searching)
         if not self.searching:
             self.content_changed = False
+    
+    # UILayer interface implementation
+    
+    def handle_key_event(self, event) -> bool:
+        """
+        Handle a key event (UILayer interface).
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to KeyEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, KeyEvent):
+            return False
+        
+        # Handle Tab key for search type switching first
+        if event.key_code == KeyCode.TAB:
+            self.search_type = 'content' if self.search_type == 'filename' else 'filename'
+            self.content_changed = True
+            # Trigger search with new search type if we have a pattern
+            if self.search_root and self.text_editor.text.strip():
+                self.perform_search(self.search_root)
+            return True
+        
+        # Use base class navigation handling with thread safety
+        with self.search_lock:
+            current_results = self.results.copy()
+        
+        result = self.handle_common_navigation(event, current_results)
+        
+        if result == 'cancel':
+            # Cancel search before exiting
+            self._cancel_current_search()
+            self.exit()
+            return True
+        elif result == 'select':
+            # Cancel search before navigating
+            self._cancel_current_search()
+            
+            # Store selected result for retrieval
+            with self.search_lock:
+                if self.results and 0 <= self.selected < len(self.results):
+                    self._selected_result = self.results[self.selected]
+            
+            self.exit()
+            return True
+        elif result == 'text_changed':
+            self.content_changed = True
+            # Automatically trigger search when text changes
+            if self.search_root:
+                self.perform_search(self.search_root)
+            return True
+        elif result:
+            # Update selection in thread-safe manner for navigation keys
+            if event.key_code in [KeyCode.UP, KeyCode.DOWN, KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.HOME, KeyCode.END]:
+                with self.search_lock:
+                    # The base class already updated self.selected, just need to adjust scroll
+                    self._adjust_scroll(len(self.results))
+            
+            # Mark content as changed for ANY handled key to ensure continued rendering
+            self.content_changed = True
+            return True
+        
+        return False
+    
+    def handle_char_event(self, event) -> bool:
+        """
+        Handle a character event (UILayer interface).
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False to propagate to next layer
+        """
+        # Backward compatibility: convert integer key codes to CharEvent
+        event = ensure_input_event(event)
+        
+        if not event or not isinstance(event, CharEvent):
+            return False
+        
+        # Pass to text editor
+        if self.text_editor.handle_key(event):
+            self.content_changed = True
+            # Automatically trigger search when text changes
+            if self.search_root:
+                self.perform_search(self.search_root)
+            return True
+        
+        return False
+    
+    def render(self, renderer) -> None:
+        """
+        Render the layer's content (UILayer interface).
+        
+        Args:
+            renderer: TTK renderer instance for drawing
+        """
+        self.draw()
+    
+    def is_full_screen(self) -> bool:
+        """
+        Query if this layer occupies the full screen (UILayer interface).
+        
+        Returns:
+            False - dialogs are overlays, not full-screen
+        """
+        return False
+    
+    def mark_dirty(self) -> None:
+        """
+        Mark this layer as needing a redraw (UILayer interface).
+        """
+        self.content_changed = True
+    
+    def clear_dirty(self) -> None:
+        """
+        Clear the dirty flag after rendering (UILayer interface).
+        """
+        # Only clear if not searching (searching keeps it dirty for animation)
+        if not self.searching:
+            self.content_changed = False
+    
+    def should_close(self) -> bool:
+        """
+        Query if this layer wants to close (UILayer interface).
+        
+        Returns:
+            True if the layer should be closed, False otherwise
+        """
+        return not self.is_active
+    
+    def on_activate(self) -> None:
+        """
+        Called when this layer becomes the top layer (UILayer interface).
+        """
+        self.content_changed = True  # Ensure dialog is drawn when activated
+    
+    def on_deactivate(self) -> None:
+        """
+        Called when this layer is no longer the top layer (UILayer interface).
+        """
+        pass
 
 
 class SearchDialogHelpers:

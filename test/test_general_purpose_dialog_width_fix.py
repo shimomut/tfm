@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test for GeneralPurposeDialog width calculation fix
+Test for QuickEditBar width calculation fix
 
 This test verifies that the input field width is calculated correctly
 and doesn't truncate text unnecessarily due to incorrect width calculation.
@@ -12,17 +12,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
 from unittest.mock import Mock, patch
-from tfm_general_purpose_dialog import GeneralPurposeDialog
+from tfm_quick_edit_bar import QuickEditBar
 
 
-class TestGeneralPurposeDialogWidthFix(unittest.TestCase):
-    """Test the width calculation fix in GeneralPurposeDialog"""
+class TestQuickEditBarWidthFix(unittest.TestCase):
+    """Test the width calculation fix in QuickEditBar"""
     
     def setUp(self):
         """Set up test fixtures"""
-        self.dialog = GeneralPurposeDialog()
+        self.dialog = QuickEditBar()
         
-    @patch('tfm_general_purpose_dialog.get_status_color')
+    @patch('tfm_quick_edit_bar.get_status_color')
     def test_width_calculation_with_prompt(self, mock_get_status_color):
         """Test that max_width includes both prompt and input area"""
         # Mock the color function to avoid curses initialization
@@ -86,7 +86,7 @@ class TestGeneralPurposeDialogWidthFix(unittest.TestCase):
         # This should be enough for reasonable input text
         self.assertGreaterEqual(available_text_width, 20)
         
-    @patch('tfm_general_purpose_dialog.get_status_color')
+    @patch('tfm_quick_edit_bar.get_status_color')
     def test_width_calculation_without_help_text(self, mock_get_status_color):
         """Test width calculation when no help text is provided"""
         mock_get_status_color.return_value = 0
@@ -128,7 +128,7 @@ class TestGeneralPurposeDialogWidthFix(unittest.TestCase):
         available_text_width = max_width - len(prompt)
         self.assertEqual(available_text_width, 68)
         
-    @patch('tfm_general_purpose_dialog.get_status_color')
+    @patch('tfm_quick_edit_bar.get_status_color')
     def test_long_text_input_not_truncated_unnecessarily(self, mock_get_status_color):
         """Test that long text input is not truncated due to width bug"""
         mock_get_status_color.return_value = 0

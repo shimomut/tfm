@@ -46,7 +46,7 @@ from tfm_drives_dialog import DrivesDialog, DrivesDialogHelpers
 from tfm_wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
-from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
+from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
 from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
@@ -54,6 +54,7 @@ from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_cache_manager import CacheManager
 from tfm_profiling import ProfilingManager
 from tfm_menu_manager import MenuManager
+from tfm_ui_layer import UILayerStack, FileManagerLayer
 
 
 class TFMEventCallback(EventCallback):
@@ -193,7 +194,7 @@ class FileManager:
         self.drives_dialog = DrivesDialog(self.config, renderer)
         self.batch_rename_dialog = BatchRenameDialog(self.config, renderer)
         self.quick_choice_bar = QuickChoiceBar(self.config, renderer)
-        self.general_dialog = GeneralPurposeDialog(self.config, renderer)
+        self.quick_edit_bar = QuickEditBar(self.config, renderer)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager, renderer)
         self.progress_manager = ProgressManager()
         self.cache_manager = CacheManager(self.log_manager)
@@ -210,7 +211,6 @@ class FileManager:
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
         self.needs_full_redraw = True  # Flag to control when to redraw everything
-        self.needs_dialog_redraw = False  # Flag to control when to redraw dialogs
         
         # Isearch mode state
         self.isearch_mode = False
@@ -220,11 +220,8 @@ class FileManager:
         
 
         
-        # Dialog state (now handled by general_dialog)
+        # Dialog state (now handled by quick_edit_bar)
         self.rename_file_path = None  # Still needed for rename operations
-        
-        # Viewer state (TextViewer and DiffViewer)
-        self.active_viewer = None  # Current active viewer instance
         
         # Operation state flags
         self.operation_in_progress = False  # Flag to block input during operations
@@ -235,6 +232,10 @@ class FileManager:
         # Set up event callback (callback mode is always enabled)
         self.event_callback = TFMEventCallback(self)
         self.renderer.set_event_callback(self.event_callback)
+        
+        # Initialize UI layer stack with FileManager as bottom layer
+        self.file_manager_layer = FileManagerLayer(self)
+        self.ui_layer_stack = UILayerStack(self.file_manager_layer, self.log_manager)
 
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
@@ -893,32 +894,6 @@ class FileManager:
         """Get the inactive pane"""
         return self.pane_manager.get_inactive_pane()
     
-    def get_active_text_widget(self):
-        """
-        Get the currently active text input widget, if any.
-        
-        Returns:
-            The active text widget (SingleLineTextEdit) or None
-        """
-        # Check if general dialog is active and has a text widget
-        if self.general_dialog.is_active and hasattr(self.general_dialog, 'text_editor'):
-            return self.general_dialog.text_editor
-        
-        # Check if search dialog is active and has a text widget
-        if self.search_dialog.is_active and hasattr(self.search_dialog, 'text_edit'):
-            return self.search_dialog.text_edit
-        
-        # Check if jump dialog is active and has a text widget
-        if self.jump_dialog.is_active and hasattr(self.jump_dialog, 'text_edit'):
-            return self.jump_dialog.text_edit
-        
-        # Check if batch rename dialog is active and has a text widget
-        if self.batch_rename_dialog.is_active and hasattr(self.batch_rename_dialog, 'text_edit'):
-            return self.batch_rename_dialog.text_edit
-        
-        # No active text widget
-        return None
-    
     def run(self):
         """
         Run the main application loop using callback-based event handling.
@@ -1483,7 +1458,7 @@ class FileManager:
                 
                 self.needs_full_redraw = True
             except PermissionError:
-                self.show_error("Permission denied")
+                print("ERROR: Permission denied")
         elif self.archive_operations.is_archive(focused_file):
             # Navigate into archive as virtual directory
             try:
@@ -1516,36 +1491,24 @@ class FileManager:
             except FileNotFoundError as e:
                 # Archive file doesn't exist
                 user_msg = getattr(e, 'args', ['Archive file not found'])[1] if len(getattr(e, 'args', [])) > 1 else "Archive file not found"
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Archive not found: {focused_file}: {e}")
             except ArchiveCorruptedError as e:
                 # Archive is corrupted
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Corrupted archive: {focused_file}: {e}")
             except ArchiveFormatError as e:
                 # Unsupported or invalid format
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Invalid archive format: {focused_file}: {e}")
             except ArchivePermissionError as e:
                 # Permission denied
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Permission denied: {focused_file}: {e}")
             except ArchiveDiskSpaceError as e:
                 # Insufficient disk space
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Insufficient disk space: {e}")
             except ArchiveError as e:
                 # Generic archive error
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Archive error: {focused_file}: {e}")
             except Exception as e:
                 # Unexpected error
-                self.show_error(f"Cannot open archive: {e}")
                 self.log_manager.add_message("ERROR", f"Unexpected error opening archive: {focused_file}: {e}")
         else:
             # For files, try to use file association for 'open' action
@@ -1581,33 +1544,17 @@ class FileManager:
                 # Fallback to text viewer for text files without association
                 viewer = create_text_viewer(self.renderer, focused_file)
                 if viewer:
-                    self.active_viewer = viewer
+                    # Push viewer onto layer stack
+                    self.push_layer(viewer)
                     self.renderer.set_cursor_visibility(False)
                     self.needs_full_redraw = True
                     print(f"Viewing file: {focused_file.name}")
                 else:
-                    self.show_info(f"File: {focused_file.name}")
+                    print(f"File: {focused_file.name}")
             else:
                 # For files without association, show file info
-                self.show_info(f"File: {focused_file.name}")
+                print(f"File: {focused_file.name}")
             
-    def show_error(self, message):
-        """Show error message"""
-        height, width = self.renderer.get_dimensions()
-        error_color_pair, error_attributes = get_error_color()
-        self.renderer.draw_text(height - 1, 2, f"ERROR: {message}", color_pair=error_color_pair, attributes=error_attributes)
-        self.renderer.refresh()
-        import time
-        time.sleep(2.0)  # Show for 2 seconds
-        
-    def show_info(self, message):
-        """Show info message"""
-        height, width = self.renderer.get_dimensions()
-        self.renderer.draw_text(height - 1, 2, message)
-        self.renderer.refresh()
-        import time
-        time.sleep(1.5)  # Show for 1.5 seconds
-        
     def find_matches(self, pattern):
         """Find all files matching the fnmatch patterns in current pane
         
@@ -1677,9 +1624,9 @@ class FileManager:
     def enter_filter_mode(self):
         """Enter filename filter mode"""
         current_pane = self.get_current_pane()
-        DialogHelpers.create_filter_dialog(self.general_dialog, current_pane['filter_pattern'])
-        self.general_dialog.callback = self.on_filter_confirm
-        self.general_dialog.cancel_callback = self.on_filter_cancel
+        QuickEditBarHelpers.create_filter_dialog(self.quick_edit_bar, current_pane['filter_pattern'])
+        self.quick_edit_bar.callback = self.on_filter_confirm
+        self.quick_edit_bar.cancel_callback = self.on_filter_cancel
         self.needs_full_redraw = True
         
     def on_filter_confirm(self, filter_text):
@@ -1694,12 +1641,12 @@ class FileManager:
             print(f"Applied filter '{filter_text}' to {pane_name} pane")
             print(f"Showing {count} items")
         
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.needs_full_redraw = True
     
     def on_filter_cancel(self):
         """Handle filter cancellation"""
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.needs_full_redraw = True
     
     def apply_filter(self):
@@ -1764,9 +1711,9 @@ class FileManager:
         
         # Enter rename mode using general dialog
         self.rename_file_path = focused_file
-        DialogHelpers.create_rename_dialog(self.general_dialog, focused_file.name, focused_file.name)
-        self.general_dialog.callback = self.on_rename_confirm
-        self.general_dialog.cancel_callback = self.on_rename_cancel
+        QuickEditBarHelpers.create_rename_dialog(self.quick_edit_bar, focused_file.name, focused_file.name)
+        self.quick_edit_bar.callback = self.on_rename_confirm
+        self.quick_edit_bar.cancel_callback = self.on_rename_cancel
         self.needs_full_redraw = True
         print(f"Renaming: {focused_file.name}")
     
@@ -1774,7 +1721,7 @@ class FileManager:
         """Handle rename confirmation"""
         if not self.rename_file_path or not new_name.strip():
             print("Invalid rename operation")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
             return
@@ -1783,7 +1730,7 @@ class FileManager:
         
         if new_name == original_name:
             print("Name unchanged")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
             return
@@ -1795,7 +1742,7 @@ class FileManager:
             # Check if target already exists
             if new_path.exists():
                 print(f"File '{new_name}' already exists")
-                self.general_dialog.hide()
+                self.quick_edit_bar.hide()
                 self.rename_file_path = None
                 self.needs_full_redraw = True
                 return
@@ -1815,25 +1762,25 @@ class FileManager:
                     self.adjust_scroll_for_focus(current_pane)
                     break
             
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
             
         except PermissionError:
             print(f"Permission denied: Cannot rename '{original_name}'")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
         except OSError as e:
             print(f"Error renaming file: {e}")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
     
     def on_rename_cancel(self):
         """Handle rename cancellation"""
         print("Rename cancelled")
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.rename_file_path = None
         self.needs_full_redraw = True
     
@@ -1847,9 +1794,9 @@ class FileManager:
             return
         
         # Enter create directory mode using general dialog
-        DialogHelpers.create_create_directory_dialog(self.general_dialog)
-        self.general_dialog.callback = self.on_create_directory_confirm
-        self.general_dialog.cancel_callback = self.on_create_directory_cancel
+        QuickEditBarHelpers.create_create_directory_dialog(self.quick_edit_bar)
+        self.quick_edit_bar.callback = self.on_create_directory_confirm
+        self.quick_edit_bar.cancel_callback = self.on_create_directory_cancel
         self.needs_full_redraw = True
         print("Creating new directory...")
     
@@ -1857,7 +1804,7 @@ class FileManager:
         """Handle create directory confirmation"""
         if not dir_name.strip():
             print("Invalid directory name")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             return
         
@@ -1868,7 +1815,7 @@ class FileManager:
         # Check if directory already exists
         if new_dir_path.exists():
             print(f"Directory '{new_dir_name}' already exists")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             return
         
@@ -1890,18 +1837,18 @@ class FileManager:
                     self.adjust_scroll_for_focus(current_pane)
                     break
             
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             
         except OSError as e:
             print(f"Failed to create directory '{new_dir_name}': {e}")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
     
     def on_create_directory_cancel(self):
         """Handle create directory cancellation"""
         print("Directory creation cancelled")
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.needs_full_redraw = True
     
     def enter_create_file_mode(self):
@@ -1914,9 +1861,9 @@ class FileManager:
             return
         
         # Enter create file mode using general dialog
-        DialogHelpers.create_create_file_dialog(self.general_dialog)
-        self.general_dialog.callback = self.on_create_file_confirm
-        self.general_dialog.cancel_callback = self.on_create_file_cancel
+        QuickEditBarHelpers.create_create_file_dialog(self.quick_edit_bar)
+        self.quick_edit_bar.callback = self.on_create_file_confirm
+        self.quick_edit_bar.cancel_callback = self.on_create_file_cancel
         self.needs_full_redraw = True
         print("Creating new text file...")
     
@@ -1924,7 +1871,7 @@ class FileManager:
         """Handle create file confirmation"""
         if not file_name.strip():
             print("Invalid file name")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             return
         
@@ -1935,7 +1882,7 @@ class FileManager:
         # Check if file already exists
         if new_file_path.exists():
             print(f"File '{new_file_name}' already exists")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             return
         
@@ -1961,18 +1908,18 @@ class FileManager:
             if is_text_file(new_file_path):
                 self.edit_selected_file()
             
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             
         except OSError as e:
             print(f"Failed to create file '{new_file_name}': {e}")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
     
     def on_create_file_cancel(self):
         """Handle create file cancellation"""
         print("File creation cancelled")
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.needs_full_redraw = True
 
     def enter_batch_rename_mode(self):
@@ -1995,7 +1942,8 @@ class FileManager:
             return
         
         if self.batch_rename_dialog.show(selected_files):
-            self.needs_full_redraw = True
+            # Push dialog onto layer stack
+            self.push_layer(self.batch_rename_dialog)
             self._force_immediate_redraw()
             print(f"Batch rename mode: {len(selected_files)} files selected")
     
@@ -2004,25 +1952,6 @@ class FileManager:
         self.batch_rename_dialog.exit()
         self.needs_full_redraw = True
     
-    def update_batch_rename_preview(self):
-        """Update the preview list for batch rename - wrapper for batch rename dialog component"""
-        self.batch_rename_dialog.update_preview()
-    
-    def perform_batch_rename(self):
-        """Perform the batch rename operation - wrapper for batch rename dialog component"""
-        success_count, errors = self.batch_rename_dialog.perform_rename()
-        
-        # Report results using helper
-        result_message = BatchRenameDialogHelpers.format_rename_results(success_count, errors)
-        print(result_message)
-        
-        # Clear selections and refresh
-        current_pane = self.get_current_pane()
-        current_pane['selected_files'].clear()
-        self.refresh_files(current_pane)
-        
-        self.exit_batch_rename_mode()
-        
     def show_dialog(self, message, choices, callback):
         """Show quick choice dialog - wrapper for quick choice bar component
         
@@ -2090,131 +2019,65 @@ class FileManager:
     def show_info_dialog(self, title, info_lines):
         """Show an information dialog with scrollable content - wrapper for info dialog component"""
         self.info_dialog.show(title, info_lines)
-        self.needs_full_redraw = True
+        # Push dialog onto layer stack
+        self.push_layer(self.info_dialog)
         
         # Force immediate display of the dialog
         self._force_immediate_redraw()
     
-    def _check_dialog_content_changed(self):
-        """Check if any active dialog content has changed and needs redraw"""
-        if self.general_dialog.is_active:
-            return self.general_dialog.needs_redraw()
-        elif self.list_dialog.is_active:
-            return self.list_dialog.needs_redraw()
-        elif self.info_dialog.is_active:
-            return self.info_dialog.needs_redraw()
-        elif self.search_dialog.is_active:
-            return self.search_dialog.needs_redraw()
-        elif self.jump_dialog.is_active:
-            return self.jump_dialog.needs_redraw()
-        elif self.drives_dialog.is_active:
-            return self.drives_dialog.needs_redraw()
-        elif self.batch_rename_dialog.is_active:
-            return self.batch_rename_dialog.needs_redraw()
-        return False
+    def push_layer(self, layer):
+        """
+        Push a new UI layer onto the stack.
+        
+        This method adds a new layer (dialog or viewer) to the UI layer stack,
+        making it the active layer that receives input events.
+        
+        Args:
+            layer: UILayer instance to push onto the stack
+        """
+        self.ui_layer_stack.push(layer)
+        self.needs_full_redraw = True
     
-
-    def _draw_dialogs_if_needed(self):
-        """Draw dialog overlays if content has changed or full redraw is needed. Returns True if any dialog was drawn."""
-        dialog_drawn = False
-        dialog_content_changed = self._check_dialog_content_changed()
+    def pop_layer(self):
+        """
+        Pop the top UI layer from the stack.
         
-        if dialog_content_changed or self.needs_full_redraw:
-            if self.general_dialog.is_active:
-                self.general_dialog.draw()
-                dialog_drawn = True
-            elif self.list_dialog.is_active:
-                self.list_dialog.draw()
-                dialog_drawn = True
-            elif self.info_dialog.is_active:
-                self.info_dialog.draw()
-                dialog_drawn = True
-            elif self.search_dialog.is_active:
-                self.search_dialog.draw()
-                dialog_drawn = True
-            elif self.jump_dialog.is_active:
-                self.jump_dialog.draw()
-                dialog_drawn = True
-            elif self.drives_dialog.is_active:
-                self.drives_dialog.draw()
-                dialog_drawn = True
-            elif self.batch_rename_dialog.is_active:
-                self.batch_rename_dialog.draw()
-                dialog_drawn = True
-            
-            
-        # Refresh screen if dialog was drawn or full redraw occurred
-        if dialog_drawn or self.needs_full_redraw:
-            self.renderer.refresh()
-            
-        return dialog_drawn
-
+        This method removes the current top layer (dialog or viewer) from the
+        UI layer stack, returning control to the layer below.
+        
+        Returns:
+            The popped layer, or None if the operation was rejected
+        """
+        layer = self.ui_layer_stack.pop()
+        self.needs_full_redraw = True
+        return layer
+    
+    def check_and_close_top_layer(self):
+        """
+        Check if the top layer wants to close and pop it if so.
+        
+        This method should be called after event handling to automatically
+        close layers that have signaled they want to close.
+        
+        Returns:
+            True if a layer was closed, False otherwise
+        """
+        return self.ui_layer_stack.check_and_close_top_layer()
+    
     def _force_immediate_redraw(self):
-        """Force an immediate screen redraw to show dialogs instantly"""
-        # Perform the same drawing sequence as the main loop
-        self.refresh_files()
-        self.clear_screen_with_background()
-        self.draw_header()
-        self.draw_files()
-        self.draw_log_pane()
-        self.draw_status()
-        
-        # Draw dialog overlays
-        if self.list_dialog.is_active:
-            self.list_dialog.draw()
-        elif self.info_dialog.is_active:
-            self.info_dialog.draw()
-        elif self.search_dialog.is_active:
-            self.search_dialog.draw()
-        elif self.jump_dialog.is_active:
-            self.jump_dialog.draw()
-        elif self.drives_dialog.is_active:
-            self.drives_dialog.draw()
-        elif self.batch_rename_dialog.is_active:
-            self.batch_rename_dialog.draw()
-        
-        # Refresh screen immediately
-        self.renderer.refresh()
-        self.needs_full_redraw = False
-        self.needs_dialog_redraw = False
+        """Force an immediate screen redraw using the UI layer stack"""
+        # Delegate rendering to the UI layer stack
+        self.ui_layer_stack.render(self.renderer)
 
     def show_list_dialog(self, title, items, callback):
         """Show a searchable list dialog - wrapper for list dialog component"""
         self.list_dialog.show(title, items, callback)
-        self.needs_full_redraw = True
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         
         # Force immediate display of the dialog
         self._force_immediate_redraw()
     
-    def exit_info_dialog_mode(self):
-        """Exit info dialog mode - wrapper for info dialog component"""
-        self.info_dialog.exit()
-        self.needs_full_redraw = True
-    
-    def exit_list_dialog_mode(self):
-        """Exit list dialog mode - wrapper for list dialog component"""
-        self.list_dialog.exit()
-        self.needs_full_redraw = True
-    
-    def handle_info_dialog_input(self, key):
-        """Handle input while in info dialog mode - wrapper for info dialog component"""
-        was_active = self.info_dialog.is_active
-        if self.info_dialog.handle_input(key):
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.info_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        return False
-    
-    def handle_list_dialog_input(self, key):
-        """Handle input while in list dialog mode - wrapper for list dialog component"""
-        was_active = self.list_dialog.is_active
-        if self.list_dialog.handle_input(key):
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.list_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        return False
 
     def show_favorite_directories(self):
         """Show favorite directories using the searchable list dialog"""
@@ -2226,6 +2089,8 @@ class FileManager:
         ListDialogHelpers.show_favorite_directories(
             self.list_dialog, self.pane_manager, print_with_redraw
         )
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2281,6 +2146,8 @@ class FileManager:
         other_pane_name = 'Right' if pane_name == 'left' else 'Left'
         help_text = f"↑↓:select  Enter:choose  TAB:switch to {other_pane_name}  Type:search  ESC:cancel"
         self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys, help_text)
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2344,6 +2211,8 @@ class FileManager:
         ListDialogHelpers.show_programs_dialog(
             self.list_dialog, execute_program_wrapper, print
         )
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2360,6 +2229,8 @@ class FileManager:
         ListDialogHelpers.show_compare_selection(
             self.list_dialog, current_pane, other_pane, print_with_redraw
         )
+        # Push dialog onto layer stack
+        self.push_layer(self.list_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2624,6 +2495,8 @@ class FileManager:
         
         # Use the helper method to show file details
         InfoDialogHelpers.show_file_details(self.info_dialog, files_to_show, current_pane)
+        # Push dialog onto layer stack
+        self.push_layer(self.info_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2672,6 +2545,8 @@ class FileManager:
     def show_help_dialog(self):
         """Show help dialog with key bindings and usage information"""
         InfoDialogHelpers.show_help_dialog(self.info_dialog)
+        # Push dialog onto layer stack
+        self.push_layer(self.info_dialog)
         self.needs_full_redraw = True
         self._force_immediate_redraw()
     
@@ -2725,7 +2600,8 @@ class FileManager:
                 try:
                     viewer = create_text_viewer(self.renderer, focused_file)
                     if viewer:
-                        self.active_viewer = viewer
+                        # Push viewer onto layer stack
+                        self.push_layer(viewer)
                         self.renderer.set_cursor_visibility(False)
                         self.needs_full_redraw = True
                         print(f"Viewing text file: {focused_file.name}")
@@ -2778,7 +2654,8 @@ class FileManager:
         try:
             viewer = create_diff_viewer(self.renderer, file1, file2)
             if viewer:
-                self.active_viewer = viewer
+                # Push viewer onto layer stack
+                self.push_layer(viewer)
                 self.renderer.set_cursor_visibility(False)
                 self.needs_full_redraw = True
                 print(f"Comparing: {file1.name} <-> {file2.name}")
@@ -2931,10 +2808,11 @@ class FileManager:
     
     def _progress_callback(self, progress_data):
         """Callback for progress manager updates"""
-        # Force a screen refresh to show progress
+        # Mark as needing redraw to show progress
+        # Note: Don't call renderer.refresh() here - UILayerStack will do it
         try:
             self.draw_status()
-            self.renderer.refresh()
+            self.needs_full_redraw = True
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     
@@ -3060,40 +2938,6 @@ class FileManager:
         """Switch the active field in batch rename mode"""
         self.batch_rename_dialog.switch_field(field)
         self.needs_full_redraw = True
-    
-    def handle_batch_rename_input(self, key):
-        """Handle input while in batch rename mode - wrapper for batch rename dialog component"""
-        was_active = self.batch_rename_dialog.is_active
-        result = self.batch_rename_dialog.handle_input(key)
-        
-        if result == True:
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.batch_rename_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(result, tuple):
-            action, data = result
-            if action == 'cancel':
-                print("Batch rename cancelled")
-                self.exit_batch_rename_mode()
-                return True
-            elif action == 'field_switch':
-                return True
-            elif action == 'scroll':
-                return True
-            elif action == 'execute':
-                self.perform_batch_rename()
-                return True
-            elif action == 'error':
-                print(data)
-                return True
-            elif action == 'text_changed':
-                self.update_batch_rename_preview()
-                self.needs_full_redraw = True
-                return True
-        
-        # Return False if event not handled to allow CharEvent generation
-        return False
 
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
@@ -3129,51 +2973,15 @@ class FileManager:
     
     def show_search_dialog(self, search_type='filename'):
         """Show the search dialog for filename or content search - wrapper for search dialog component"""
-        self.search_dialog.show(search_type)
-        self.needs_full_redraw = True
+        current_pane = self.get_current_pane()
+        search_root = current_pane['path']
+        self.search_dialog.show(search_type, search_root)
+        # Push dialog onto layer stack
+        self.push_layer(self.search_dialog)
         
         # Force immediate display of the dialog
         self._force_immediate_redraw()
     
-    def exit_search_dialog_mode(self):
-        """Exit search dialog mode - wrapper for search dialog component"""
-        self.search_dialog.exit()
-        self.needs_full_redraw = True
-    
-    def perform_search(self):
-        """Perform the actual search based on current pattern and type - wrapper for search dialog component"""
-        current_pane = self.get_current_pane()
-        search_root = current_pane['path']
-        self.search_dialog.perform_search(search_root)
-    
-    def handle_search_dialog_input(self, key):
-        """Handle input while in search dialog mode - wrapper for search dialog component"""
-        was_active = self.search_dialog.is_active
-        result = self.search_dialog.handle_input(key)
-        
-        if result == True:
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.search_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(result, tuple):
-            action, data = result
-            if action == 'search':
-                self.perform_search()
-                return True
-            elif action == 'navigate':
-                if data:
-                    self._navigate_to_search_result(data)
-                    
-                # Save search term to history if it's not empty
-                search_term = self.search_dialog.text_editor.text.strip()
-                if search_term:
-                    self.add_search_to_history(search_term)
-                    
-                self.exit_search_dialog_mode()
-                return True
-        
-        return False
 
     def _navigate_to_search_result(self, result):
         """Navigate to the selected search result - wrapper for search dialog helper"""
@@ -3194,140 +3002,36 @@ class FileManager:
         current_pane = self.get_current_pane()
         root_directory = current_pane['path']
         self.jump_dialog.show(root_directory, self.file_operations)
+        # Push dialog onto layer stack
+        self.push_layer(self.jump_dialog)
         
         # Force immediate redraw to show dialog
         self._force_immediate_redraw()
     
-    def exit_jump_dialog_mode(self):
-        """Exit jump dialog mode - wrapper for jump dialog component"""
-        self.jump_dialog.exit()
-        self.needs_full_redraw = True
-    
+
     def show_drives_dialog(self):
         """Show the drives dialog - wrapper for drives dialog component"""
         self.drives_dialog.show()
+        # Push dialog onto layer stack
+        self.push_layer(self.drives_dialog)
         self._force_immediate_redraw()
     
-    def exit_drives_dialog_mode(self):
-        """Exit drives dialog mode - wrapper for drives dialog component"""
-        self.drives_dialog.exit()
-        self.needs_full_redraw = True
-    
-    def handle_jump_dialog_input(self, key):
-        """Handle input while in jump dialog mode - wrapper for jump dialog component"""
-        was_active = self.jump_dialog.is_active
-        result = self.jump_dialog.handle_input(key)
-        
-        if result == True:
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.jump_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(result, tuple):
-            action, data = result
-            if action == 'navigate':
-                if data:
-                    JumpDialogHelpers.navigate_to_directory(data, self.pane_manager, print)
-                    
-                self.exit_jump_dialog_mode()
-                return True
-        
-        return False
-    
-    def handle_drives_dialog_input(self, event):
-        """Handle input while in drives dialog mode - wrapper for drives dialog component"""
-        was_active = self.drives_dialog.is_active
-        result = self.drives_dialog.handle_input(event)
-        
-        if result == True:
-            # If dialog was active but is no longer active, it exited - need full redraw
-            if was_active and not self.drives_dialog.is_active:
-                self.needs_full_redraw = True
-            return True
-        elif isinstance(result, tuple):
-            action, data = result
-            if action == 'navigate':
-                if data:
-                    DrivesDialogHelpers.navigate_to_drive(data, self.pane_manager, print)
-                    
-                self.exit_drives_dialog_mode()
-                return True
-        
-        return False
 
-    def handle_input(self, event):
+    def handle_main_screen_key_event(self, event):
         """
-        Handle input event (KeyEvent or CharEvent) and return True if the event was processed.
+        Handle key events for the main FileManager screen.
+        
+        This method contains all the main screen keyboard event handling logic
+        including navigation, selection, commands, and shortcuts. It's called
+        by FileManagerLayer to avoid recursion through handle_input().
         
         Args:
-            event: KeyEvent or CharEvent to handle
+            event: KeyEvent to handle
         
         Returns:
             True if the event was consumed, False otherwise
         """
-        # Type check: only handle KeyEvent and CharEvent
-        if not isinstance(event, (KeyEvent, CharEvent)):
-            return False
-        
-        # Handle active viewer input (TextViewer or DiffViewer)
-        if self.active_viewer:
-            consumed = self.active_viewer.handle_input(event)
-            
-            # Check if viewer wants to close
-            if self.active_viewer.should_close:
-                self.active_viewer = None
-                self.renderer.set_cursor_visibility(False)
-                self.needs_full_redraw = True
-            elif consumed:
-                # Viewer consumed the event, needs redraw
-                self.needs_full_redraw = True
-            
-            return consumed
-        
         current_pane = self.get_current_pane()
-        
-        # Handle isearch mode input
-        if self.isearch_mode:
-            return self.handle_isearch_input(event)
-        
-        # Handle general dialog input
-        if self.general_dialog.is_active:
-            return self.general_dialog.handle_input(event)
-        
-        # Handle quick choice mode input (KeyEvent only)
-        if isinstance(event, KeyEvent) and self.quick_choice_bar.is_active:
-            return self.handle_quick_choice_input(event)
-        
-        # Handle info dialog mode input
-        if self.info_dialog.is_active:
-            return self.handle_info_dialog_input(event)
-        
-        # Handle list dialog mode input
-        if self.list_dialog.is_active:
-            return self.handle_list_dialog_input(event)
-        
-        # Handle search dialog mode input
-        if self.search_dialog.is_active:
-            return self.handle_search_dialog_input(event)
-        
-        # Handle jump dialog mode input
-        if self.jump_dialog.is_active:
-            return self.handle_jump_dialog_input(event)
-        
-        # Handle drives dialog mode input
-        if self.drives_dialog.is_active:
-            return self.handle_drives_dialog_input(event)
-        
-        # Handle batch rename dialog mode input
-        if self.batch_rename_dialog.is_active:
-            return self.handle_batch_rename_input(event)
-        
-        # Handle CharEvents for active text widgets
-        if isinstance(event, CharEvent):
-            active_widget = self.get_active_text_widget()
-            if active_widget:
-                return active_widget.handle_key(event)
-            return False
         
         # Handle main application keys (KeyEvent only)
         # CharEvents are not processed here as they don't have key_code
@@ -3357,7 +3061,7 @@ class FileManager:
         if self.is_key_for_action(event, 'quit'):
             def quit_callback(confirmed):
                 if confirmed:
-                    # Set a flag to exit the main loop
+                    # Set the flag to exit the main loop
                     self.should_quit = True
             
             # Check if quit confirmation is enabled
@@ -3365,22 +3069,26 @@ class FileManager:
                 self.show_confirmation("Are you sure you want to quit TFM?", quit_callback)
             else:
                 quit_callback(True)
-
+            return True
 
         elif event.key_code == KeyCode.TAB:  # Tab key - switch panes
             self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
             self.needs_full_redraw = True
+            return True
         elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['focused_index'] > 0:
                 current_pane['focused_index'] -= 1
                 self.needs_full_redraw = True
+            return True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['focused_index'] < len(current_pane['files']) - 1:
                 current_pane['focused_index'] += 1
                 self.needs_full_redraw = True
+            return True
         elif event.key_code == KeyCode.ENTER:
             self.handle_enter()
             self.needs_full_redraw = True
+            return True
         elif self.is_key_for_action(event, 'toggle_hidden'):
             self.file_operations.toggle_hidden_files()
             # Reset both panes
@@ -3389,6 +3097,7 @@ class FileManager:
             self.pane_manager.right_pane['focused_index'] = 0
             self.pane_manager.right_pane['scroll_offset'] = 0
             self.needs_full_redraw = True
+            return True
         elif self.is_key_for_action(event, 'toggle_color_scheme'):
             # Toggle between dark and light color schemes
             new_scheme = toggle_color_scheme()
@@ -3400,16 +3109,21 @@ class FileManager:
             # Clear screen to apply new background color immediately
             self.clear_screen_with_background()
             self.needs_full_redraw = True
+            return True
         elif self.is_key_for_action(event, 'select_all'):
             self.select_all()
+            return True
         elif self.is_key_for_action(event, 'unselect_all'):
             self.unselect_all()
+            return True
         elif event.key_code == KeyCode.PAGE_UP:  # Page Up - file navigation only
             current_pane['focused_index'] = max(0, current_pane['focused_index'] - 10)
             self.needs_full_redraw = True
+            return True
         elif event.key_code == KeyCode.PAGE_DOWN:  # Page Down - file navigation only
             current_pane['focused_index'] = min(len(current_pane['files']) - 1, current_pane['focused_index'] + 10)
             self.needs_full_redraw = True
+            return True
         elif event.key_code == KeyCode.BACKSPACE:  # Backspace - go to parent directory
             # Check if we're at the root of an archive
             current_path_str = str(current_pane['path'])
@@ -3451,7 +3165,6 @@ class FileManager:
                     self.needs_full_redraw = True
                     self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
                 except Exception as e:
-                    self.show_error(f"Error exiting archive: {e}")
                     self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
                     self.needs_full_redraw = True
             elif current_pane['path'] != current_pane['path'].parent:
@@ -3484,10 +3197,11 @@ class FileManager:
                         current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
+                    self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
+                except Exception as e:
+                    self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
                     self.needs_full_redraw = True
-                except PermissionError:
-                    self.show_error("Permission denied")
-                    self.needs_full_redraw = True
+            return True
         elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
             if current_pane['path'] != current_pane['path'].parent:
                 try:
@@ -3508,7 +3222,8 @@ class FileManager:
                     
                     self.needs_full_redraw = True
                 except PermissionError:
-                    self.show_error("Permission denied")
+                    self.log_manager.add_message("ERROR", "Permission denied")
+            return True
         elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
             if current_pane['path'] != current_pane['path'].parent:
                 try:
@@ -3529,152 +3244,235 @@ class FileManager:
                     
                     self.needs_full_redraw = True
                 except PermissionError:
-                    self.show_error("Permission denied")
+                    self.log_manager.add_message("ERROR", "Permission denied")
+            return True
         elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left' and not (event.modifiers & ModifierKey.SHIFT):  # Right arrow in left pane - switch to right pane
             self.pane_manager.active_pane = 'right'
             self.needs_full_redraw = True
+            return True
         elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'right' and not (event.modifiers & ModifierKey.SHIFT):  # Left arrow in right pane - switch to left pane
             self.pane_manager.active_pane = 'left'
             self.needs_full_redraw = True
+            return True
         elif self.is_key_for_action(event, 'select_file'):  # Toggle file selection
             self.toggle_selection()
             self.needs_full_redraw = True
+            return True
         elif event.key_code == KeyCode.ESCAPE:  # ESC key
             # In callback mode, we can't peek at the next event
             # Option key sequences are handled by the backend
             pass
         elif self.is_key_for_action(event, 'select_all_files'):  # Toggle all files selection
             self.toggle_all_files_selection()
+            return True
         elif self.is_key_for_action(event, 'select_all_items'):  # Toggle all items selection
             self.toggle_all_items_selection()
+            return True
         elif self.is_key_for_action(event, 'sync_current_to_other'):  # Sync current pane to other
             self.sync_current_to_other()
+            return True
         elif self.is_key_for_action(event, 'sync_other_to_current'):  # Sync other pane to current
             self.sync_other_to_current()
+            return True
         elif self.is_key_for_action(event, 'search_dialog'):  # Show search dialog (filename)
             self.show_search_dialog('filename')
+            return True
         elif self.is_key_for_action(event, 'jump_dialog'):  # Show jump dialog (Shift+J)
             self.show_jump_dialog()
+            return True
         elif self.is_key_for_action(event, 'drives_dialog'):  # Show drives dialog
             self.show_drives_dialog()
+            return True
         elif self.is_key_for_action(event, 'search_content'):  # Show search dialog (content)
             self.show_search_dialog('content')
+            return True
         elif self.is_key_for_action(event, 'edit_file'):  # Edit existing file
             self.edit_selected_file()
+            return True
         elif self.is_key_for_action(event, 'create_file'):  # Create new file
             self.enter_create_file_mode()
+            return True
         elif self.is_key_for_action(event, 'create_directory'):  # Create new directory
             self.enter_create_directory_mode()
+            return True
         elif self.is_key_for_action(event, 'toggle_fallback_colors'):  # Toggle fallback color mode
             self.toggle_fallback_color_mode()
+            return True
         elif self.is_key_for_action(event, 'view_options'):  # Show view options
             self.show_view_options()
+            return True
         elif self.is_key_for_action(event, 'settings_menu'):  # Show settings menu
             self.show_settings_menu()
+            return True
         elif self.is_key_for_action(event, 'search'):  # Search key - enter isearch mode
             self.enter_isearch_mode()
+            return True
         elif self.is_key_for_action(event, 'filter'):  # Filter key - enter filter mode
             self.enter_filter_mode()
+            return True
         elif self.is_key_for_action(event, 'clear_filter'):  # Clear filter key
             self.clear_filter()
+            return True
         elif self.is_key_for_action(event, 'sort_menu'):  # Sort menu
             self.show_sort_menu()
+            return True
         elif self.is_key_for_action(event, 'quick_sort_name'):  # Quick sort by name
             self.quick_sort('name')
+            return True
         elif self.is_key_for_action(event, 'quick_sort_size'):  # Quick sort by size
             self.quick_sort('size')
+            return True
         elif self.is_key_for_action(event, 'quick_sort_date'):  # Quick sort by date
             self.quick_sort('date')
+            return True
         elif self.is_key_for_action(event, 'quick_sort_ext'):  # Quick sort by extension
             self.quick_sort('ext')
+            return True
         elif self.is_key_for_action(event, 'file_details'):  # Show file details
             self.show_file_details()
+            return True
         elif self.is_key_for_action(event, 'view_file'):  # View file
             self.view_selected_file()
+            return True
         elif self.is_key_for_action(event, 'diff_files'):  # Diff two selected files
             self.diff_selected_files()
+            return True
         elif self.is_key_for_action(event, 'copy_files'):  # Copy selected files
             self.copy_selected_files()
+            return True
         elif self.is_key_for_action(event, 'move_files'):  # Move selected files
             self.move_selected_files()
+            return True
         elif self.is_key_for_action(event, 'delete_files'):  # Delete selected files
             self.delete_selected_files()
+            return True
         elif self.is_key_for_action(event, 'create_archive'):  # Create archive
             self.enter_create_archive_mode()
+            return True
         elif self.is_key_for_action(event, 'extract_archive'):  # Extract archive
             self.extract_selected_archive()
+            return True
         elif self.is_key_for_action(event, 'rename_file'):  # Rename file
             self.enter_rename_mode()
+            return True
         elif self.is_key_for_action(event, 'favorites'):  # Show favorite directories
             self.show_favorite_directories()
+            return True
         elif self.is_key_for_action(event, 'history'):  # Show history
             self.show_history()
+            return True
         elif self.is_key_for_action(event, 'programs'):  # Show external programs
             self.show_programs_dialog()
+            return True
         elif self.is_key_for_action(event, 'compare_selection'):  # Show compare selection menu
             self.show_compare_selection_dialog()
+            return True
         elif self.is_key_for_action(event, 'help'):  # Show help dialog
             self.show_help_dialog()
+            return True
         elif self.is_key_for_action(event, 'adjust_pane_left'):  # Adjust pane boundary left
             self.adjust_pane_boundary('left')
+            return True
         elif self.is_key_for_action(event, 'adjust_pane_right'):  # Adjust pane boundary right
             self.adjust_pane_boundary('right')
+            return True
         elif self.is_key_for_action(event, 'adjust_log_up'):  # Adjust log boundary up
             self.adjust_log_boundary('down')
+            return True
         elif self.is_key_for_action(event, 'adjust_log_down'):  # Adjust log boundary down
             self.adjust_log_boundary('up')
+            return True
         elif self.is_key_for_action(event, 'reset_log_height'):  # Reset log pane height
             self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
             self.needs_full_redraw = True
             print(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
+            return True
         elif event.key_code == ord('-'):  # '-' key - reset pane ratio to 50/50
             self.pane_manager.left_pane_ratio = 0.5
             self.needs_full_redraw = True
             print("Pane split reset to 50% | 50%")
+            return True
         elif self.is_key_for_action(event, 'subshell'):  # Sub-shell mode
             self.external_program_manager.enter_subshell_mode(
                 self.pane_manager
             )
             self.needs_full_redraw = True
+            return True
         else:
             return False  # Key was not handled
+
+    def handle_input(self, event):
+        """
+        Handle input event (KeyEvent or CharEvent) and return True if the event was processed.
         
-        return True  # Key was handled
+        Args:
+            event: KeyEvent or CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        # Type check: only handle KeyEvent and CharEvent
+        if not isinstance(event, (KeyEvent, CharEvent)):
+            return False
+        
+        # Handle isearch mode input (not part of layer stack)
+        if self.isearch_mode:
+            result = self.handle_isearch_input(event)
+            if result:
+                # Mark the FileManagerLayer dirty so it redraws with the updated isearch
+                self.file_manager_layer.mark_dirty()
+                self.needs_full_redraw = True
+            return result
+        
+        # Handle general dialog input (not part of layer stack)
+        if self.quick_edit_bar.is_active:
+            result = self.quick_edit_bar.handle_input(event)
+            if result:
+                # Mark the FileManagerLayer dirty so it redraws with the updated dialog
+                self.file_manager_layer.mark_dirty()
+                self.needs_full_redraw = True
+            return result
+        
+        # Handle quick choice mode input (not part of layer stack, KeyEvent only)
+        if isinstance(event, KeyEvent) and self.quick_choice_bar.is_active:
+            result = self.handle_quick_choice_input(event)
+            if result:
+                # Mark the FileManagerLayer dirty so it redraws with the updated quick choice bar
+                self.file_manager_layer.mark_dirty()
+                self.needs_full_redraw = True
+            return result
+        
+        # Delegate to UI layer stack for all other event handling
+        # This handles dialogs, viewers, and the main FileManager screen
+        if isinstance(event, KeyEvent):
+            consumed = self.ui_layer_stack.handle_key_event(event)
+        else:  # CharEvent
+            consumed = self.ui_layer_stack.handle_char_event(event)
+        
+        # Check if top layer wants to close and pop it if so
+        if self.ui_layer_stack.check_and_close_top_layer():
+            # Check if search dialog just closed with a selected result
+            if hasattr(self, 'search_dialog'):
+                selected_result = self.search_dialog.get_selected_result()
+                if selected_result:
+                    self._navigate_to_search_result(selected_result)
+                    # Save search term to history if it's not empty
+                    search_term = self.search_dialog.text_editor.text.strip()
+                    if search_term:
+                        self.add_search_to_history(search_term)
+            
+            self.needs_full_redraw = True
+        
+        # Mark for redraw if event was consumed
+        if consumed:
+            self.needs_full_redraw = True
+        
+        return consumed
 
     def draw_interface(self):
-        """Draw the complete interface"""
-        # Check if a viewer is active
-        if self.active_viewer:
-            # Draw viewer instead of normal interface
-            if self.needs_full_redraw:
-                self.renderer.clear()
-                self.active_viewer.draw()
-                self.renderer.refresh()
-                self.needs_full_redraw = False
-            return
-        
-        # Only do full redraw when needed
-        if self.needs_full_redraw:
-            self.refresh_files()
-            
-            # Clear screen with proper background
-            self.clear_screen_with_background()
-            
-            # Draw interface
-            self.draw_header()
-            self.draw_files()
-            self.draw_log_pane()
-            self.draw_status()
-            
-            # Refresh screen
-            self.renderer.refresh()
-        
-        # Draw dialogs if needed
-        self._draw_dialogs_if_needed()
-        
-        # Reset full redraw flag after both main screen and dialogs are rendered
-        if self.needs_full_redraw:
-            self.needs_full_redraw = False
+        """Draw the complete interface using the UI layer stack"""
+        # Delegate rendering to the UI layer stack
+        self.ui_layer_stack.render(self.renderer)
 
 
     def load_application_state(self):
@@ -3971,6 +3769,7 @@ def cli_main():
         # Store debug mode in environment for access by other modules
         if args.debug:
             os.environ['TFM_DEBUG'] = '1'
+            print("Debug mode enabled - logs will be written to both terminal and log pane", file=sys.stderr)
         
         # Handle color testing mode
         if args.color_test:

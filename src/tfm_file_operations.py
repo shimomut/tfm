@@ -1811,21 +1811,21 @@ class FileOperationsUI:
         }
         
         # Use the general dialog for input
-        from tfm_general_purpose_dialog import DialogHelpers
-        DialogHelpers.create_rename_dialog(
-            self.file_manager.general_dialog,
+        from tfm_quick_edit_bar import QuickEditBarHelpers
+        QuickEditBarHelpers.create_rename_dialog(
+            self.file_manager.quick_edit_bar,
             source_file.name,
             source_file.name
         )
-        self.file_manager.general_dialog.callback = self._on_copy_rename_confirm
-        self.file_manager.general_dialog.cancel_callback = self._on_copy_rename_cancel
+        self.file_manager.quick_edit_bar.callback = self._on_copy_rename_confirm
+        self.file_manager.quick_edit_bar.cancel_callback = self._on_copy_rename_cancel
         self.file_manager.needs_full_redraw = True
     
     def _on_copy_rename_confirm(self, new_name):
         """Handle copy rename confirmation"""
         if not new_name or new_name.strip() == "":
             print("Copy cancelled: empty filename")
-            self.file_manager.general_dialog.hide()
+            self.file_manager.quick_edit_bar.hide()
             self.file_manager.needs_full_redraw = True
             return
         
@@ -1836,7 +1836,7 @@ class FileOperationsUI:
         new_dest_path = destination_dir / new_name
         
         # Hide the dialog first
-        self.file_manager.general_dialog.hide()
+        self.file_manager.quick_edit_bar.hide()
         self.file_manager.needs_full_redraw = True
         
         # Check if the new name also conflicts
@@ -1885,7 +1885,7 @@ class FileOperationsUI:
     def _on_copy_rename_cancel(self):
         """Handle copy rename cancellation"""
         print("Copy operation cancelled")
-        self.file_manager.general_dialog.hide()
+        self.file_manager.quick_edit_bar.hide()
         self.file_manager.needs_full_redraw = True
     
     def _handle_move_rename_batch(self, files_to_move, destination_dir, conflicts):
@@ -1975,21 +1975,21 @@ class FileOperationsUI:
         }
         
         # Use the general dialog for input
-        from tfm_general_purpose_dialog import DialogHelpers
-        DialogHelpers.create_rename_dialog(
-            self.file_manager.general_dialog,
+        from tfm_quick_edit_bar import QuickEditBarHelpers
+        QuickEditBarHelpers.create_rename_dialog(
+            self.file_manager.quick_edit_bar,
             source_file.name,
             source_file.name
         )
-        self.file_manager.general_dialog.callback = self._on_move_rename_confirm
-        self.file_manager.general_dialog.cancel_callback = self._on_move_rename_cancel
+        self.file_manager.quick_edit_bar.callback = self._on_move_rename_confirm
+        self.file_manager.quick_edit_bar.cancel_callback = self._on_move_rename_cancel
         self.file_manager.needs_full_redraw = True
     
     def _on_move_rename_confirm(self, new_name):
         """Handle move rename confirmation"""
         if not new_name or new_name.strip() == "":
             print("Move cancelled: empty filename")
-            self.file_manager.general_dialog.hide()
+            self.file_manager.quick_edit_bar.hide()
             self.file_manager.needs_full_redraw = True
             return
         
@@ -2000,7 +2000,7 @@ class FileOperationsUI:
         new_dest_path = destination_dir / new_name
         
         # Hide the dialog first
-        self.file_manager.general_dialog.hide()
+        self.file_manager.quick_edit_bar.hide()
         self.file_manager.needs_full_redraw = True
         
         # Check if the new name also conflicts
@@ -2049,7 +2049,7 @@ class FileOperationsUI:
     def _on_move_rename_cancel(self):
         """Handle move rename cancellation"""
         print("Move operation cancelled")
-        self.file_manager.general_dialog.hide()
+        self.file_manager.quick_edit_bar.hide()
         self.file_manager.needs_full_redraw = True
     
     def _perform_single_copy(self, source_file, dest_path, overwrite=False):
