@@ -1152,6 +1152,10 @@ class CoreGraphicsBackend(Renderer):
     to match TTK's top-left origin convention.
     """
     
+    # Window padding multiplier: adds (WINDOW_PADDING_MULTIPLIER * char_height) to window dimensions
+    # This creates a pleasant frame around the text grid that edge cells will fill
+    WINDOW_PADDING_MULTIPLIER = 0.5
+    
     def __init__(self, window_title: str = "TTK Application",
                  font_name: str = "Menlo", font_size: int = 12,
                  rows: int = 24, cols: int = 80,
@@ -1318,8 +1322,9 @@ class CoreGraphicsBackend(Renderer):
             RuntimeError: If window creation fails
         """
         # Calculate window dimensions from grid size and character dimensions
-        window_width = self.cols * self.char_width
-        window_height = self.rows * self.char_height
+        # Add padding to both width and height for better visual appearance
+        window_width = self.cols * self.char_width + (self.WINDOW_PADDING_MULTIPLIER * self.char_height)
+        window_height = self.rows * self.char_height + (self.WINDOW_PADDING_MULTIPLIER * self.char_height)
         
         # Create window frame (positioned at top-left of screen with some offset)
         # NSMakeRect(x, y, width, height) - x,y is bottom-left corner in screen coordinates
@@ -1386,9 +1391,10 @@ class CoreGraphicsBackend(Renderer):
         
         if restored_width != initial_width or restored_height != initial_height:
             # Window size was restored to a different size
-            # Calculate new grid dimensions
-            new_cols = max(1, restored_width // self.char_width)
-            new_rows = max(1, restored_height // self.char_height)
+            # Calculate new grid dimensions, accounting for padding
+            padding = self.WINDOW_PADDING_MULTIPLIER * self.char_height
+            new_cols = max(1, int((restored_width - padding) / self.char_width))
+            new_rows = max(1, int((restored_height - padding) / self.char_height))
             
             # Update dimensions if they changed
             if new_cols != self.cols or new_rows != self.rows:
@@ -1614,8 +1620,9 @@ class CoreGraphicsBackend(Renderer):
         
         try:
             # Calculate default window dimensions from grid size and character size
-            window_width = self.cols * self.char_width
-            window_height = self.rows * self.char_height
+            # Add padding to both width and height for better visual appearance
+            window_width = self.cols * self.char_width + (self.WINDOW_PADDING_MULTIPLIER * self.char_height)
+            window_height = self.rows * self.char_height + (self.WINDOW_PADDING_MULTIPLIER * self.char_height)
             
             # Create default frame at position (100, 100)
             # This matches the default position used in _create_window()
@@ -2802,8 +2809,9 @@ if COCOA_AVAILABLE:
                 Snap the window size to the character grid.
                 
                 This method adjusts the window frame to ensure the content size
-                is an exact multiple of the character cell size. This prevents
-                partial character cells from appearing at the edges of the window.
+                is an exact multiple of the character cell size plus the standard
+                padding. This prevents partial character cells
+                from appearing at the edges of the window.
                 
                 Called only at the start of resize operations to ensure proper
                 initial alignment. Not called at the end to respect macOS window
@@ -2817,11 +2825,14 @@ if COCOA_AVAILABLE:
                 current_width = content_rect.size.width
                 current_height = content_rect.size.height
                 
-                # Calculate snapped content size (rounded down to nearest cell)
+                # Calculate padding
+                padding = self.backend.WINDOW_PADDING_MULTIPLIER * self.backend.char_height
+                
+                # Calculate snapped content size (rounded down to nearest cell + padding)
                 snapped_cols = max(1, int(current_width / self.backend.char_width))
                 snapped_rows = max(1, int(current_height / self.backend.char_height))
-                snapped_width = snapped_cols * self.backend.char_width
-                snapped_height = snapped_rows * self.backend.char_height
+                snapped_width = snapped_cols * self.backend.char_width + padding
+                snapped_height = snapped_rows * self.backend.char_height + padding
                 
                 # Check if snapping is needed
                 if abs(current_width - snapped_width) < 0.5 and abs(current_height - snapped_height) < 0.5:
@@ -2869,8 +2880,10 @@ if COCOA_AVAILABLE:
                 new_height = int(content_rect.size.height)
                 
                 # Calculate new grid dimensions based on content size
-                new_cols = max(1, new_width // self.backend.char_width)
-                new_rows = max(1, new_height // self.backend.char_height)
+                # Account for padding added to window size
+                padding = self.backend.WINDOW_PADDING_MULTIPLIER * self.backend.char_height
+                new_cols = max(1, int((new_width - padding) / self.backend.char_width))
+                new_rows = max(1, int((new_height - padding) / self.backend.char_height))
                 
                 # Only update if dimensions actually changed
                 if new_cols != self.backend.cols or new_rows != self.backend.rows:
