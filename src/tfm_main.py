@@ -2358,7 +2358,11 @@ class FileManager:
             if option is None:
                 return  # User cancelled
             
-            if option == "Edit config.py (~/.tfm/config.py)":
+            if option == "About TFM":
+                # Show About TFM information
+                self._action_show_about()
+                
+            elif option == "Edit config.py (~/.tfm/config.py)":
                 config_path = os.path.expanduser("~/.tfm/config.py")
                 
                 # Check if config file exists
@@ -2444,6 +2448,7 @@ class FileManager:
         
         # Define the settings options
         options = [
+            "About TFM",
             "Edit config.py (~/.tfm/config.py)",
             "Reload config.py",
             "Report issues"
