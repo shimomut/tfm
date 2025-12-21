@@ -114,6 +114,14 @@ try:
     import Cocoa
     import Quartz
     import objc
+    from CoreText import (
+        CTLineCreateWithAttributedString,
+        CTLineDraw,
+        kCTFontAttributeName,
+        kCTForegroundColorAttributeName,
+        kCTUnderlineStyleAttributeName,
+        kCTUnderlineStyleSingle
+    )
     COCOA_AVAILABLE = True
     
     # Suppress PyObjC pointer warnings
@@ -906,22 +914,20 @@ class AttributeDictCache:
             font = self._font_cache.get_font(font_attributes)
             color = self._color_cache.get_color(*color_rgb)
             
-            # Build NSDictionary with required attributes
-            # NSAttributedString requires NSFontAttributeName and NSForegroundColorAttributeName
+            # Build NSDictionary with required attributes using CoreText constants
+            # CoreText uses kCT* constants instead of NS* constants for better performance
             text_attributes = {
-                Cocoa.NSFontAttributeName: font,
-                Cocoa.NSForegroundColorAttributeName: color
+                kCTFontAttributeName: font,
+                kCTForegroundColorAttributeName: color.CGColor()
             }
             
             # Add underline style if requested
             if underline:
-                text_attributes[Cocoa.NSUnderlineStyleAttributeName] = (
-                    Cocoa.NSUnderlineStyleSingle
-                )
+                text_attributes[kCTUnderlineStyleAttributeName] = kCTUnderlineStyleSingle
             
             # Cache the dictionary
-            # Note: Python dict is automatically converted to NSDictionary by PyObjC
-            # when passed to Cocoa APIs
+            # Note: Python dict is automatically converted to CFDictionary by PyObjC
+            # when passed to CoreText APIs
             self._cache[key] = text_attributes
         else:
             # Cache hit - increment hit counter
@@ -3200,17 +3206,24 @@ if COCOA_AVAILABLE:
                     batcher.finish_row()
                 
                 # Draw all batched backgrounds using cached colors
+                # Get the current CoreGraphics context for low-level drawing
+                context = Cocoa.NSGraphicsContext.currentContext().CGContext()
+                
                 for batch in batcher.get_batches():
-                    # Get cached NSColor for the background
-                    bg_color = self.backend._color_cache.get_color(*batch.bg_rgb)
-                    bg_color.setFill()
+                    # Get RGB components for the background color
+                    r, g, b = batch.bg_rgb
                     
-                    # Create rectangle for the entire batch
-                    batch_rect = Cocoa.NSMakeRect(
+                    # Set fill color using low-level CoreGraphics API
+                    # CGContextSetRGBFillColor takes normalized values (0.0-1.0)
+                    Quartz.CGContextSetRGBFillColor(context, r/255.0, g/255.0, b/255.0, 1.0)
+                    
+                    # Create CGRect for the batch
+                    batch_rect = Quartz.CGRectMake(
                         batch.x, batch.y, batch.width, batch.height
                     )
-                    # Draw the batched background with a single API call
-                    Cocoa.NSRectFill(batch_rect)
+                    
+                    # Draw the batched background with low-level CoreGraphics API
+                    Quartz.CGContextFillRect(context, batch_rect)
                 
                 # Phase 2: Draw characters with batching and caching optimization
                 # Instead of drawing each character individually, we identify continuous
@@ -3309,7 +3322,10 @@ if COCOA_AVAILABLE:
                             # Convert attributes to string for cache key
                             font_key = str(start_attributes)
                             
-                            # Draw each character at its exact grid position
+                            # Get the current CoreGraphics context for low-level drawing
+                            context = Cocoa.NSGraphicsContext.currentContext().CGContext()
+                            
+                            # Draw each character at its exact grid position using CoreText
                             for i, char in enumerate(batch_chars):
                                 # Calculate exact x-coordinate for this character's grid position
                                 x_pos = (start_col_batch + i) * char_width + offset_x
@@ -3324,8 +3340,19 @@ if COCOA_AVAILABLE:
                                     has_underline
                                 )
                                 
-                                # Draw character at its exact grid position
-                                attr_string.drawAtPoint_(Cocoa.NSMakePoint(x_pos, y))
+                                # Create CTLine from attributed string for low-level drawing
+                                line = CTLineCreateWithAttributedString(attr_string)
+                                
+                                # Set text position using CoreGraphics transform
+                                # CTLineDraw draws at the current text position, so we need to
+                                # set the text matrix to position the text correctly
+                                Quartz.CGContextSaveGState(context)
+                                Quartz.CGContextSetTextPosition(context, x_pos, y)
+                                
+                                # Draw the line using low-level CoreText API
+                                CTLineDraw(line, context)
+                                
+                                Quartz.CGContextRestoreGState(context)
 
                 # Draw cursor if visible
                 if self.backend.cursor_visible:
@@ -3333,20 +3360,23 @@ if COCOA_AVAILABLE:
                     cursor_x = self.backend.cursor_col * char_width + offset_x
                     cursor_y = (rows - self.backend.cursor_row - 1) * char_height + offset_y
                     
-                    # Draw cursor as a filled rectangle with inverted colors
-                    # Use white color for visibility with slight transparency
-                    # Use ColorCache to avoid redundant NSColor creation
-                    cursor_color = self.backend._color_cache.get_color(255, 255, 255, 0.8)
-                    cursor_color.setFill()
+                    # Get the current CoreGraphics context for low-level drawing
+                    context = Cocoa.NSGraphicsContext.currentContext().CGContext()
                     
-                    # Create rectangle for the cursor
-                    cursor_rect = Cocoa.NSMakeRect(
+                    # Set fill color using low-level CoreGraphics API
+                    # Use white color for visibility with slight transparency
+                    Quartz.CGContextSetRGBFillColor(context, 1.0, 1.0, 1.0, 0.8)
+                    
+                    # Create CGRect for the cursor
+                    cursor_rect = Quartz.CGRectMake(
                         cursor_x,
                         cursor_y,
                         char_width,
                         char_height
                     )
-                    Cocoa.NSRectFill(cursor_rect)
+                    
+                    # Draw cursor using low-level CoreGraphics API
+                    Quartz.CGContextFillRect(context, cursor_rect)
                 
                 # Draw IME marked text (composition text) if present
                 if hasattr(self, 'marked_text') and self.marked_text:
@@ -3357,13 +3387,31 @@ if COCOA_AVAILABLE:
                     marked_x = self.backend.cursor_col * char_width + offset_x
                     marked_y = (rows - self.backend.cursor_row - 1) * char_height + offset_y
                     
-                    # Create attributes for marked text
+                    # Get the current CoreGraphics context for low-level drawing
+                    context = Cocoa.NSGraphicsContext.currentContext().CGContext()
+                    
+                    # First, draw the background rectangle for marked text
+                    # Calculate the width of the marked text
+                    marked_text_len = len(self.marked_text)
+                    marked_width = marked_text_len * char_width
+                    
+                    # Set background color (light yellow) using low-level CoreGraphics API
+                    Quartz.CGContextSetRGBFillColor(context, 1.0, 1.0, 200.0/255.0, 1.0)
+                    
+                    # Create and fill background rectangle
+                    bg_rect = Quartz.CGRectMake(marked_x, marked_y, marked_width, char_height)
+                    Quartz.CGContextFillRect(context, bg_rect)
+                    
+                    # Create attributes for marked text using CoreText constants
                     # Use underline to indicate composition state
+                    
+                    # Get black color for text
+                    black_color = self.backend._color_cache.get_color(0, 0, 0)
+                    
                     attrs = {
-                        Cocoa.NSFontAttributeName: self.backend.font,
-                        Cocoa.NSForegroundColorAttributeName: self.backend._color_cache.get_color(0, 0, 0),
-                        Cocoa.NSBackgroundColorAttributeName: self.backend._color_cache.get_color(255, 255, 200),  # Light yellow background
-                        Cocoa.NSUnderlineStyleAttributeName: Cocoa.NSUnderlineStyleSingle
+                        kCTFontAttributeName: self.backend.font,
+                        kCTForegroundColorAttributeName: black_color.CGColor(),
+                        kCTUnderlineStyleAttributeName: kCTUnderlineStyleSingle
                     }
                     
                     # Create attributed string for marked text
@@ -3372,8 +3420,14 @@ if COCOA_AVAILABLE:
                         attrs
                     )
                     
-                    # Draw marked text at cursor position
-                    marked_attr_string.drawAtPoint_(Cocoa.NSMakePoint(marked_x, marked_y))
+                    # Create CTLine and draw using low-level CoreText API
+                    marked_line = CTLineCreateWithAttributedString(marked_attr_string)
+                    
+                    # Set text position and draw
+                    Quartz.CGContextSaveGState(context)
+                    Quartz.CGContextSetTextPosition(context, marked_x, marked_y)
+                    CTLineDraw(marked_line, context)
+                    Quartz.CGContextRestoreGState(context)
 
             def acceptsFirstResponder(self):
                 """
