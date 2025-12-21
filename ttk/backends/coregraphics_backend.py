@@ -3313,11 +3313,9 @@ if COCOA_AVAILABLE:
                             batch_chars.append(char)
                             col += 1
                         
-                        # Draw the batched characters individually at their grid positions
-                        # While we batch characters with the same attributes together for cache efficiency,
-                        # we must draw each character at its exact grid position to maintain alignment.
-                        # Drawing multiple characters as a single string would cause misalignment because
-                        # NSAttributedString uses proportional spacing even with monospace fonts.
+                        # Draw the batched characters as a single string
+                        # Since all characters in the batch have the same attributes,
+                        # we can draw them together in a single CTLineDraw call for better performance.
                         #
                         # Wide Character Handling:
                         # Wide characters (zenkaku) like Japanese, Chinese, Korean characters occupy
@@ -3333,38 +3331,38 @@ if COCOA_AVAILABLE:
                             # Get the current CoreGraphics context for low-level drawing
                             context = Cocoa.NSGraphicsContext.currentContext().CGContext()
                             
-                            # Draw each character at its exact grid position using CoreText
-                            for i, char in enumerate(batch_chars):
-                                # Calculate exact x-coordinate for this character's grid position
-                                x_pos = (start_col_batch + i) * char_width + offset_x
-                                
-                                # Get cached NSAttributedString for single character
-                                # The cache is particularly effective for repeated characters
-                                # like spaces, dots, slashes in file listings
-                                attr_string = self.backend._attr_string_cache.get_attributed_string(
-                                    char,
-                                    font_key,
-                                    start_fg_rgb,
-                                    has_underline
-                                )
-                                
-                                # Create CTLine from attributed string for low-level drawing
-                                line = CTLineCreateWithAttributedString(attr_string)
-                                
-                                # Set text position using CoreGraphics transform
-                                # In CoreGraphics (bottom-left origin), y is the bottom of the cell.
-                                # CTLineDraw draws at the baseline. The baseline should be at:
-                                # y + (char_height - font_ascent) to position text correctly.
-                                # This accounts for the descender space below the baseline.
-                                baseline_y = y + (char_height - self.backend.font_ascent)
-                                
-                                Quartz.CGContextSaveGState(context)
-                                Quartz.CGContextSetTextPosition(context, x_pos, baseline_y)
-                                
-                                # Draw the line using low-level CoreText API
-                                CTLineDraw(line, context)
-                                
-                                Quartz.CGContextRestoreGState(context)
+                            # Concatenate all characters in the batch into a single string
+                            batch_text = ''.join(batch_chars)
+                            
+                            # Calculate starting x-coordinate for the batch
+                            x_pos = start_col_batch * char_width + offset_x
+                            
+                            # Get cached NSAttributedString for the entire batch
+                            # The cache is particularly effective for repeated strings
+                            attr_string = self.backend._attr_string_cache.get_attributed_string(
+                                batch_text,
+                                font_key,
+                                start_fg_rgb,
+                                has_underline
+                            )
+                            
+                            # Create CTLine from attributed string for low-level drawing
+                            line = CTLineCreateWithAttributedString(attr_string)
+                            
+                            # Set text position using CoreGraphics transform
+                            # In CoreGraphics (bottom-left origin), y is the bottom of the cell.
+                            # CTLineDraw draws at the baseline. The baseline should be at:
+                            # y + (char_height - font_ascent) to position text correctly.
+                            # This accounts for the descender space below the baseline.
+                            baseline_y = y + (char_height - self.backend.font_ascent)
+                            
+                            Quartz.CGContextSaveGState(context)
+                            Quartz.CGContextSetTextPosition(context, x_pos, baseline_y)
+                            
+                            # Draw the entire batch with a single CoreText API call
+                            CTLineDraw(line, context)
+                            
+                            Quartz.CGContextRestoreGState(context)
 
                 # Draw cursor if visible
                 if self.backend.cursor_visible:
