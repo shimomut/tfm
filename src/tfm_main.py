@@ -1236,141 +1236,119 @@ class FileManager:
             pane_data['scroll_offset'] = pane_data['focused_index']
         elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
             pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
+        
+        # Pre-calculate layout constants (once per pane, not per file)
+        datetime_width = self.get_date_column_width()
+        size_width = 8
+        marker_width = 2
+        usable_width = pane_width - 2
+        
+        # Determine layout mode based on pane width
+        min_width_for_datetime = 2 + 1 + 16 + 1 + 4 + 1 + 8 + 1 + datetime_width
+        show_datetime = pane_width >= min_width_for_datetime
+        
+        # Pre-calculate extension width once for the entire pane
+        ext_width = self.calculate_max_extension_width(pane_data) if pane_width >= 20 else 0
+        
+        # Pre-calculate name width based on layout mode
+        if pane_width < 20:
+            max_name_width = max(1, pane_width - 5)
+            name_width = None  # Will use max_name_width for truncation
+        elif show_datetime:
+            # Wide layout: marker + name + ext + size + datetime
+            if ext_width > 0:
+                name_width = usable_width - (13 + ext_width + datetime_width)
+            else:
+                name_width = usable_width - (12 + datetime_width)
+        else:
+            # Narrow layout: marker + name + ext + size (no datetime)
+            if ext_width > 0:
+                name_width = usable_width - (12 + ext_width)
+            else:
+                name_width = usable_width - 11
+        
+        # Cache for isearch matches (convert to set for O(1) lookup)
+        isearch_match_set = set(self.isearch_matches) if self.isearch_mode and is_active else set()
+        
+        # Cache selected files set for O(1) lookup
+        selected_set = pane_data['selected_files']
             
         # Draw files
         for i in range(display_height):
             file_index = i + pane_data['scroll_offset']
-            y = i + 1  # Start after header (no controls line anymore)
+            y = i + 1  # Start after header
             
             if file_index >= len(pane_data['files']):
                 break
                 
             file_path = pane_data['files'][file_index]
             
-            # Determine display name and attributes
-            # Parent directory (..) is no longer shown
+            # Get file info (this is still per-file, but unavoidable)
             display_name = file_path.name
             is_dir = file_path.is_dir()
-                
-            # Get file info
             size_str, mtime_str = self.get_file_info(file_path)
             
-            # Check if this file is selected (marked for batch operations)
-            is_selected = str(file_path) in pane_data['selected_files']
-            
-            # Check if this file is an isearch match
-            is_search_match = (self.isearch_mode and is_active and 
-                             file_index in self.isearch_matches)
-            
-            # Choose color based on file properties and focus (cursor position)
-            is_executable = file_path.is_file() and os.access(file_path, os.X_OK)
+            # Fast lookups using pre-computed sets
+            is_selected = str(file_path) in selected_set
+            is_search_match = file_index in isearch_match_set
             is_focused = file_index == pane_data['focused_index']
             
+            # Choose color
+            is_executable = file_path.is_file() and os.access(file_path, os.X_OK)
             color = get_file_color(is_dir, is_executable, is_focused, is_active)
             
-            # Add underline attribute for search matches (can combine with focus)
+            # Add underline for search matches
             if is_search_match:
                 color_pair, base_attrs = color
                 color = (color_pair, base_attrs | TextAttribute.UNDERLINE)
-            # Selected files use normal colors with ● marker (no color reversal needed)
-            # The ● marker provides sufficient visual distinction
-                
-            # Add selection marker for selected files
+            
+            # Selection marker
             selection_marker = "●" if is_selected else " "
             
-            # Separate filename into basename and extension
-            basename, extension = self.separate_filename_extension(display_name, is_dir)
-            
-            # Format line to fit pane - with safety checks for narrow panes
-            datetime_width = self.get_date_column_width()
-            size_width = 8
-            marker_width = 2  # Space for selection marker
-            
-            # Safety check: ensure we have minimum space for formatting
-            if pane_width < 20:  # Too narrow to display properly
-                # Use wide character aware truncation
-                max_name_width = max(1, pane_width - 5)
+            # Format line based on pre-calculated layout
+            if pane_width < 20:
+                # Very narrow: just truncate name
                 truncated_name = truncate_to_width(display_name, max_name_width, "…")
                 line = f"{selection_marker} {truncated_name}"
             else:
-                # Calculate precise filename width for column alignment
-                # Account for the fact that line will be truncated to pane_width-2
-                usable_width = pane_width - 2
+                # Separate filename into basename and extension
+                basename, extension = self.separate_filename_extension(display_name, is_dir)
                 
-                # Calculate minimum width needed to show datetime
-                # marker(2) + space(1) + min_name(16) + space(1) + ext(4) + space(1) + size(8) + space(1) + datetime
-                min_width_for_datetime = 2 + 1 + 16 + 1 + 4 + 1 + 8 + 1 + datetime_width  # = 38 + datetime_width
-                
-                if pane_width < min_width_for_datetime:
-                    # For narrow panes: "● basename ext size" (no datetime)
-                    if extension:
-                        # Calculate actual maximum extension width for this pane
-                        ext_width = self.calculate_max_extension_width(pane_data)
-                        if ext_width == 0:  # No extensions in this pane
-                            ext_width = safe_get_display_width(extension)
-                        
-                        # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) = 12 + ext_width
-                        name_width = usable_width - (12 + ext_width)
-                        
-                        # Truncate basename using wide character aware truncation
+                if show_datetime:
+                    # Wide layout with datetime
+                    if extension and ext_width > 0:
+                        # Truncate and pad basename
                         if safe_get_display_width(basename) > name_width:
                             basename = truncate_to_width(basename, name_width, "…")
-                        
-                        # Pad basename to maintain column alignment using display width
-                        padded_basename = pad_to_width(basename, name_width, align='left')
-                        padded_extension = pad_to_width(extension, ext_width, align='left')
-                        line = f"{selection_marker} {padded_basename} {padded_extension}{size_str:>8}"
-                    else:
-                        # No extension separation - use full width for filename
-                        # Reserve space for: marker(2) + space(1) + size(8) = 11
-                        name_width = usable_width - 11
-                        
-                        # Truncate filename using wide character aware truncation
-                        if safe_get_display_width(display_name) > name_width:
-                            display_name = truncate_to_width(display_name, name_width, "…")
-                        
-                        # Pad filename to maintain column alignment using display width
-                        padded_name = pad_to_width(display_name, name_width, align='left')
-                        line = f"{selection_marker} {padded_name}{size_str:>8}"
-                else:
-                    # For wider panes: "● basename ext size datetime"
-                    if extension:
-                        # Calculate actual maximum extension width for this pane
-                        ext_width = self.calculate_max_extension_width(pane_data)
-                        if ext_width == 0:  # No extensions in this pane
-                            ext_width = safe_get_display_width(extension)
-                        
-                        # Reserve space for: marker(2) + space(1) + ext_width + space(1) + size(8) + space(1) + datetime(len) = 13 + ext_width + datetime_width
-                        name_width = usable_width - (13 + ext_width + datetime_width)
-                        
-                        # Truncate basename using wide character aware truncation
-                        if safe_get_display_width(basename) > name_width:
-                            basename = truncate_to_width(basename, name_width, "…")
-                        
-                        # Pad basename to maintain column alignment using display width
                         padded_basename = pad_to_width(basename, name_width, align='left')
                         padded_extension = pad_to_width(extension, ext_width, align='left')
                         line = f"{selection_marker} {padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
                     else:
-                        # No extension separation - use full width for filename
-                        # Reserve space for: marker(2) + space(1) + size(8) + space(1) + datetime(len) = 12 + datetime_width
-                        name_width = usable_width - (12 + datetime_width)
-                        
-                        # Truncate filename using wide character aware truncation
+                        # No extension
                         if safe_get_display_width(display_name) > name_width:
                             display_name = truncate_to_width(display_name, name_width, "…")
-                        
-                        # Pad filename to maintain column alignment using display width
                         padded_name = pad_to_width(display_name, name_width, align='left')
                         line = f"{selection_marker} {padded_name} {size_str:>8} {mtime_str}"
+                else:
+                    # Narrow layout without datetime
+                    if extension and ext_width > 0:
+                        if safe_get_display_width(basename) > name_width:
+                            basename = truncate_to_width(basename, name_width, "…")
+                        padded_basename = pad_to_width(basename, name_width, align='left')
+                        padded_extension = pad_to_width(extension, ext_width, align='left')
+                        line = f"{selection_marker} {padded_basename} {padded_extension}{size_str:>8}"
+                    else:
+                        if safe_get_display_width(display_name) > name_width:
+                            display_name = truncate_to_width(display_name, name_width, "…")
+                        padded_name = pad_to_width(display_name, name_width, align='left')
+                        line = f"{selection_marker} {padded_name}{size_str:>8}"
             
             try:
-                # Use wide character aware truncation for final line display
+                # Final truncation if needed
                 max_line_width = pane_width - 2
                 if safe_get_display_width(line) > max_line_width:
                     line = truncate_to_width(line, max_line_width, "")
                 
-                # Color is already a tuple of (color_pair, attributes)
                 color_pair, attributes = color
                 self.renderer.draw_text(y, start_x + 1, line, color_pair=color_pair, attributes=attributes)
             except Exception:
