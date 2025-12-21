@@ -13,13 +13,16 @@ class MenuManager:
     """Manages menu structure and state for TFM Desktop mode."""
     
     # Menu item ID constants
+    # App menu (macOS)
+    APP_ABOUT = 'app.about'
+    APP_QUIT = 'app.quit'
+    
     # File menu
     FILE_NEW_FILE = 'file.new_file'
     FILE_NEW_FOLDER = 'file.new_folder'
     FILE_OPEN = 'file.open'
     FILE_DELETE = 'file.delete'
     FILE_RENAME = 'file.rename'
-    FILE_QUIT = 'file.quit'
     
     # Edit menu
     EDIT_COPY = 'edit.copy'
@@ -99,13 +102,13 @@ class MenuManager:
             'label': 'TFM',  # This will show as the app name in the menu bar
             'items': [
                 {
-                    'id': 'app.about',
+                    'id': self.APP_ABOUT,
                     'label': 'About TFM',
-                    'enabled': False  # Not implemented yet
+                    'enabled': True
                 },
                 {'separator': True},
                 {
-                    'id': self.FILE_QUIT,
+                    'id': self.APP_QUIT,
                     'label': 'Quit TFM',
                     'shortcut': f'{modifier}+Q',
                     'enabled': True
@@ -321,13 +324,16 @@ class MenuManager:
             is_at_root = True
             has_clipboard = False
         
+        # App menu states
+        states[self.APP_ABOUT] = True
+        states[self.APP_QUIT] = True
+        
         # File menu states
         states[self.FILE_NEW_FILE] = True
         states[self.FILE_NEW_FOLDER] = True
         states[self.FILE_OPEN] = True
         states[self.FILE_DELETE] = has_selection
         states[self.FILE_RENAME] = has_selection
-        states[self.FILE_QUIT] = True
         
         # Edit menu states
         states[self.EDIT_COPY] = has_selection

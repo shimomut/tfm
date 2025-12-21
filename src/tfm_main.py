@@ -334,8 +334,14 @@ class FileManager:
         
         item_id = event.item_id
         
+        # App menu
+        if item_id == MenuManager.APP_ABOUT:
+            return self._action_show_about()
+        elif item_id == MenuManager.APP_QUIT:
+            return self._action_quit()
+        
         # File menu
-        if item_id == MenuManager.FILE_NEW_FILE:
+        elif item_id == MenuManager.FILE_NEW_FILE:
             return self._action_create_file()
         elif item_id == MenuManager.FILE_NEW_FOLDER:
             return self._action_create_directory()
@@ -345,8 +351,6 @@ class FileManager:
             return self._action_delete()
         elif item_id == MenuManager.FILE_RENAME:
             return self._action_rename()
-        elif item_id == MenuManager.FILE_QUIT:
-            return self._action_quit()
         
         # Edit menu
         elif item_id == MenuManager.EDIT_COPY:
@@ -385,6 +389,43 @@ class FileManager:
         return False
     
     # Menu action methods
+    def _action_show_about(self):
+        """Show About TFM information in the log pane."""
+        from tfm_const import VERSION, GITHUB_URL
+        
+        # Add empty line and separator before
+        self.log_manager.add_message("INFO", "")
+        self.log_manager.add_message("INFO", "─" * 50)
+        self.log_manager.add_message("INFO", "")
+        
+        # TFM ASCII art logo (filled block style)
+        logo = [
+            "████████╗███████╗███╗   ███╗",
+            "╚══██╔══╝██╔════╝████╗ ████║",
+            "   ██║   █████╗  ██╔████╔██║",
+            "   ██║   ██╔══╝  ██║╚██╔╝██║",
+            "   ██║   ██║     ██║ ╚═╝ ██║",
+            "   ╚═╝   ╚═╝     ╚═╝     ╚═╝"
+        ]
+        
+        # Add logo to log
+        for line in logo:
+            self.log_manager.add_message("INFO", line)
+        
+        # Add version and GitHub URL
+        self.log_manager.add_message("INFO", "")
+        self.log_manager.add_message("INFO", f"Version: {VERSION}")
+        self.log_manager.add_message("INFO", f"GitHub: {GITHUB_URL}")
+        
+        # Add empty line and separator after
+        self.log_manager.add_message("INFO", "")
+        self.log_manager.add_message("INFO", "─" * 50)
+        self.log_manager.add_message("INFO", "")
+        
+        # Trigger redraw to show the messages
+        self.needs_full_redraw = True
+        return True
+    
     def _action_create_file(self):
         """Create a new file."""
         self.enter_create_file_mode()
