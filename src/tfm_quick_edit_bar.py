@@ -2,11 +2,8 @@
 """
 Quick Edit Bar component for TFM (Terminal File Manager)
 
-This module provides a reusable QuickEditBar class that can handle
-various overlay dialog types including:
-- Single-line text input dialogs (filter, rename, create file/directory, etc.)
-- Status line dialogs
-- Future: Multi-line dialogs, choice dialogs, etc.
+This module provides a reusable QuickEditBar class for single-line text input
+in the status bar area (filter, rename, create file/directory, etc.)
 """
 
 from ttk import TextAttribute, KeyCode
@@ -17,20 +14,12 @@ from tfm_wide_char_utils import get_display_width, get_safe_functions
 from tfm_input_compat import ensure_input_event
 
 
-class DialogType:
-    """Constants for different dialog types"""
-    STATUS_LINE_INPUT = "status_line_input"
-    # Future dialog types can be added here
-    # OVERLAY_INPUT = "overlay_input"
-    # CHOICE_DIALOG = "choice_dialog"
-
-
 class QuickEditBar:
-    """A flexible dialog system for various TFM dialog needs"""
+    """A quick edit bar for single-line text input in the status bar"""
     
     def __init__(self, config=None, renderer=None):
         """
-        Initialize the dialog system
+        Initialize the quick edit bar
         
         Args:
             config: TFM configuration object
@@ -39,7 +28,6 @@ class QuickEditBar:
         self.config = config
         self.renderer = renderer
         self.is_active = False
-        self.dialog_type = None
         self.content_changed = True  # Track if content needs redraw
         
         # Status line input dialog state
@@ -62,7 +50,6 @@ class QuickEditBar:
             cancel_callback (callable): Function to call when ESC is pressed
         """
         self.is_active = True
-        self.dialog_type = DialogType.STATUS_LINE_INPUT
         self.prompt_text = prompt
         self.help_text = help_text
         self.callback = callback
@@ -75,7 +62,6 @@ class QuickEditBar:
     def hide(self):
         """Hide the dialog"""
         self.is_active = False
-        self.dialog_type = None
         self.content_changed = True  # Mark content as changed when hiding
         self.text_editor.clear()
         self.prompt_text = ""
@@ -107,10 +93,7 @@ class QuickEditBar:
         if not self.is_active or not event:
             return False
         
-        if self.dialog_type == DialogType.STATUS_LINE_INPUT:
-            return self._handle_status_line_input(event)
-        
-        return False
+        return self._handle_status_line_input(event)
     
     def _handle_status_line_input(self, event):
         """Handle input for status line input dialog"""
@@ -156,8 +139,7 @@ class QuickEditBar:
         if not self.is_active or not self.renderer:
             return
         
-        if self.dialog_type == DialogType.STATUS_LINE_INPUT:
-            self._draw_status_line_input()
+        self._draw_status_line_input()
         
         # Automatically mark as not needing redraw after drawing
         self.content_changed = False

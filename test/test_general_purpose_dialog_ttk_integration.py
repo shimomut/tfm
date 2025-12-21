@@ -20,7 +20,7 @@ ttk_path = Path(__file__).parent.parent / 'ttk'
 sys.path.insert(0, str(ttk_path))
 
 from ttk import KeyEvent, KeyCode, ModifierKey
-from tfm_quick_edit_bar import QuickEditBar, DialogType, QuickEditBarHelpers
+from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
 
 
 class TestQuickEditBarTTKIntegration(unittest.TestCase):
@@ -45,7 +45,6 @@ class TestQuickEditBarTTKIntegration(unittest.TestCase):
         self.assertEqual(dialog.renderer, self.mock_renderer)
         self.assertEqual(dialog.config, self.mock_config)
         self.assertFalse(dialog.is_active)
-        self.assertIsNone(dialog.dialog_type)
     
     def test_no_curses_imports(self):
         """Test that QuickEditBar doesn't import curses directly"""
@@ -128,7 +127,6 @@ class TestQuickEditBarTTKIntegration(unittest.TestCase):
         
         # Verify dialog is active
         self.assertTrue(dialog.is_active)
-        self.assertEqual(dialog.dialog_type, DialogType.STATUS_LINE_INPUT)
         self.assertEqual(dialog.get_text(), "initial")
         
         # Test ESC key
