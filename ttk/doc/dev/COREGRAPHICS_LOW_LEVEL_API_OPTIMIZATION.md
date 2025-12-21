@@ -64,8 +64,12 @@ attr_string = self.backend._attr_string_cache.get_attributed_string(
     char, font_key, start_fg_rgb, has_underline
 )
 line = CTLineCreateWithAttributedString(attr_string)
+
+# CTLineDraw uses baseline positioning, adjust y by adding ascent
+baseline_y = y + self.backend.font_ascent
+
 Quartz.CGContextSaveGState(context)
-Quartz.CGContextSetTextPosition(context, x_pos, y)
+Quartz.CGContextSetTextPosition(context, x_pos, baseline_y)
 CTLineDraw(line, context)
 Quartz.CGContextRestoreGState(context)
 ```
@@ -74,6 +78,11 @@ Quartz.CGContextRestoreGState(context)
 - Direct CoreText rendering without NSAttributedString overhead
 - More control over text positioning and rendering
 - Better performance for repeated character drawing
+
+**Important Note:**
+CTLineDraw uses baseline positioning (where the baseline is the reference point for text),
+while NSAttributedString.drawAtPoint_ uses top-left corner positioning. The y-coordinate
+must be adjusted by adding the font's ascent value to maintain correct vertical alignment.
 
 ### 3. Attribute Dictionary: NS Constants → CoreText Constants
 
@@ -161,6 +170,25 @@ color = self._color_cache.get_color(*color_rgb)
 # Convert to CGColor for CoreText
 kCTForegroundColorAttributeName: color.CGColor()
 ```
+
+### Baseline Positioning
+
+CTLineDraw uses baseline positioning, while NSAttributedString.drawAtPoint_ uses top-left corner positioning:
+
+```python
+# Calculate font ascent during initialization
+self.font_ascent = self.font.ascender()
+
+# Adjust y-coordinate for baseline positioning
+baseline_y = y + self.font_ascent
+Quartz.CGContextSetTextPosition(context, x_pos, baseline_y)
+```
+
+**Why this matters:**
+- NSAttributedString.drawAtPoint_ positions text by its top-left corner
+- CTLineDraw positions text by its baseline (the line where letters sit)
+- Without adjustment, text would appear lower than expected
+- The ascent value is the distance from the baseline to the top of the tallest character
 
 ## Performance Impact
 

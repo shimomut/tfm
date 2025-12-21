@@ -1301,6 +1301,9 @@ class CoreGraphicsBackend(Renderer):
         Uses the character 'M' (typically the widest in monospace fonts) to
         determine dimensions. No line spacing is added to ensure box-drawing
         characters connect seamlessly.
+        
+        Also calculates the font ascent for proper baseline positioning when
+        using CoreText APIs.
         """
         # Create an attributed string with the font to measure character size
         test_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
@@ -1315,6 +1318,11 @@ class CoreGraphicsBackend(Renderer):
         # Use exact font dimensions without line spacing for seamless box-drawing
         self.char_width = int(size.width)
         self.char_height = int(size.height)
+        
+        # Get font ascent for baseline positioning
+        # CTLineDraw uses baseline positioning, while NSAttributedString.drawAtPoint_
+        # uses top-left corner positioning. We need the ascent to convert between them.
+        self.font_ascent = self.font.ascender()
     
     def _create_window(self) -> None:
         """
@@ -3344,10 +3352,14 @@ if COCOA_AVAILABLE:
                                 line = CTLineCreateWithAttributedString(attr_string)
                                 
                                 # Set text position using CoreGraphics transform
-                                # CTLineDraw draws at the current text position, so we need to
-                                # set the text matrix to position the text correctly
+                                # In CoreGraphics (bottom-left origin), y is the bottom of the cell.
+                                # CTLineDraw draws at the baseline. The baseline should be at:
+                                # y + (char_height - font_ascent) to position text correctly.
+                                # This accounts for the descender space below the baseline.
+                                baseline_y = y + (char_height - self.backend.font_ascent)
+                                
                                 Quartz.CGContextSaveGState(context)
-                                Quartz.CGContextSetTextPosition(context, x_pos, y)
+                                Quartz.CGContextSetTextPosition(context, x_pos, baseline_y)
                                 
                                 # Draw the line using low-level CoreText API
                                 CTLineDraw(line, context)
@@ -3424,8 +3436,12 @@ if COCOA_AVAILABLE:
                     marked_line = CTLineCreateWithAttributedString(marked_attr_string)
                     
                     # Set text position and draw
+                    # CTLineDraw uses baseline positioning
+                    # In CoreGraphics coordinates, baseline is at: y + (char_height - font_ascent)
+                    baseline_y = marked_y + (char_height - self.backend.font_ascent)
+                    
                     Quartz.CGContextSaveGState(context)
-                    Quartz.CGContextSetTextPosition(context, marked_x, marked_y)
+                    Quartz.CGContextSetTextPosition(context, marked_x, baseline_y)
                     CTLineDraw(marked_line, context)
                     Quartz.CGContextRestoreGState(context)
 
