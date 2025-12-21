@@ -1458,7 +1458,7 @@ class FileManager:
                 
                 self.needs_full_redraw = True
             except PermissionError:
-                self.show_error("Permission denied")
+                print("ERROR: Permission denied")
         elif self.archive_operations.is_archive(focused_file):
             # Navigate into archive as virtual directory
             try:
@@ -1491,36 +1491,24 @@ class FileManager:
             except FileNotFoundError as e:
                 # Archive file doesn't exist
                 user_msg = getattr(e, 'args', ['Archive file not found'])[1] if len(getattr(e, 'args', [])) > 1 else "Archive file not found"
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Archive not found: {focused_file}: {e}")
             except ArchiveCorruptedError as e:
                 # Archive is corrupted
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Corrupted archive: {focused_file}: {e}")
             except ArchiveFormatError as e:
                 # Unsupported or invalid format
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Invalid archive format: {focused_file}: {e}")
             except ArchivePermissionError as e:
                 # Permission denied
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Permission denied: {focused_file}: {e}")
             except ArchiveDiskSpaceError as e:
                 # Insufficient disk space
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Insufficient disk space: {e}")
             except ArchiveError as e:
                 # Generic archive error
-                user_msg = getattr(e, 'user_message', str(e))
-                self.show_error(user_msg)
                 self.log_manager.add_message("ERROR", f"Archive error: {focused_file}: {e}")
             except Exception as e:
                 # Unexpected error
-                self.show_error(f"Cannot open archive: {e}")
                 self.log_manager.add_message("ERROR", f"Unexpected error opening archive: {focused_file}: {e}")
         else:
             # For files, try to use file association for 'open' action
@@ -1562,32 +1550,11 @@ class FileManager:
                     self.needs_full_redraw = True
                     print(f"Viewing file: {focused_file.name}")
                 else:
-                    self.show_info(f"File: {focused_file.name}")
+                    print(f"File: {focused_file.name}")
             else:
                 # For files without association, show file info
-                self.show_info(f"File: {focused_file.name}")
+                print(f"File: {focused_file.name}")
             
-    def show_error(self, message):
-        """Show error message"""
-        height, width = self.renderer.get_dimensions()
-        error_color_pair, error_attributes = get_error_color()
-        self.renderer.draw_text(height - 1, 2, f"ERROR: {message}", color_pair=error_color_pair, attributes=error_attributes)
-        # Note: Don't call renderer.refresh() here - UILayerStack will do it
-        # Mark as needing redraw to ensure the error message is displayed
-        self.needs_full_redraw = True
-        import time
-        time.sleep(2.0)  # Show for 2 seconds
-        
-    def show_info(self, message):
-        """Show info message"""
-        height, width = self.renderer.get_dimensions()
-        self.renderer.draw_text(height - 1, 2, message)
-        # Note: Don't call renderer.refresh() here - UILayerStack will do it
-        # Mark as needing redraw to ensure the info message is displayed
-        self.needs_full_redraw = True
-        import time
-        time.sleep(1.5)  # Show for 1.5 seconds
-        
     def find_matches(self, pattern):
         """Find all files matching the fnmatch patterns in current pane
         
@@ -3198,7 +3165,6 @@ class FileManager:
                     self.needs_full_redraw = True
                     self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
                 except Exception as e:
-                    self.show_error(f"Error exiting archive: {e}")
                     self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
                     self.needs_full_redraw = True
             elif current_pane['path'] != current_pane['path'].parent:
@@ -3231,9 +3197,9 @@ class FileManager:
                         current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
-                    self.needs_full_redraw = True
-                except PermissionError:
-                    self.show_error("Permission denied")
+                    self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
+                except Exception as e:
+                    self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
                     self.needs_full_redraw = True
             return True
         elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
@@ -3256,7 +3222,7 @@ class FileManager:
                     
                     self.needs_full_redraw = True
                 except PermissionError:
-                    self.show_error("Permission denied")
+                    self.log_manager.add_message("ERROR", "Permission denied")
             return True
         elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
             if current_pane['path'] != current_pane['path'].parent:
@@ -3278,7 +3244,7 @@ class FileManager:
                     
                     self.needs_full_redraw = True
                 except PermissionError:
-                    self.show_error("Permission denied")
+                    self.log_manager.add_message("ERROR", "Permission denied")
             return True
         elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left' and not (event.modifiers & ModifierKey.SHIFT):  # Right arrow in left pane - switch to right pane
             self.pane_manager.active_pane = 'right'
