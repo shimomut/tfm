@@ -1813,8 +1813,10 @@ static void initialize_caches() {
         return;
     }
     
-    // Create base font (Monaco 12pt - standard monospace font on macOS)
-    CFStringRef font_name = CFSTR("Monaco");
+    // Create base font (Menlo 12pt - matches Python default)
+    // Note: This should match the font used in CoreGraphicsBackend.__init__()
+    // Python default: font_name="Menlo", font_size=12
+    CFStringRef font_name = CFSTR("Menlo");
     CGFloat font_size = 12.0;
     
     g_base_font = CTFontCreateWithName(font_name, font_size, nullptr);
