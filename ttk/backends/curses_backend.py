@@ -254,8 +254,11 @@ class CursesBackend(Renderer):
         
         This fills the entire terminal with spaces using black background.
         Changes are not visible until refresh() is called.
+        
+        Note: Uses erase() instead of clear() to avoid forcing a complete
+        screen redraw, which can cause flickering.
         """
-        self.stdscr.clear()
+        self.stdscr.erase()
     
     def clear_region(self, row: int, col: int, height: int, width: int) -> None:
         """
