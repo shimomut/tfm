@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test edge cases for GeneralPurposeDialog width handling
+Test edge cases for QuickEditBar width handling
 
 This test verifies that the dialog handles narrow terminals and help text
 display correctly without disappearing elements.
@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
 from unittest.mock import Mock, patch
-from tfm_general_purpose_dialog import GeneralPurposeDialog
+from tfm_quick_edit_bar import QuickEditBar
 
 
 class TestDialogWidthEdgeCases(unittest.TestCase):
@@ -20,9 +20,9 @@ class TestDialogWidthEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        self.dialog = GeneralPurposeDialog()
+        self.dialog = QuickEditBar()
         
-    @patch('tfm_general_purpose_dialog.get_status_color')
+    @patch('tfm_quick_edit_bar.get_status_color')
     def test_narrow_terminal_text_editor_visible(self, mock_get_status_color):
         """Test that text editor remains visible even in narrow terminals"""
         mock_get_status_color.return_value = 0
@@ -64,7 +64,7 @@ class TestDialogWidthEdgeCases(unittest.TestCase):
         available_text_width = max_width - len(prompt)
         self.assertGreater(available_text_width, 0)
         
-    @patch('tfm_general_purpose_dialog.get_status_color')
+    @patch('tfm_quick_edit_bar.get_status_color')
     def test_help_text_shows_when_space_available(self, mock_get_status_color):
         """Test that help text shows when there's adequate space"""
         mock_get_status_color.return_value = 0
@@ -102,7 +102,7 @@ class TestDialogWidthEdgeCases(unittest.TestCase):
         
         self.assertTrue(help_text_drawn, "Help text should be drawn when space is available")
         
-    @patch('tfm_general_purpose_dialog.get_status_color')
+    @patch('tfm_quick_edit_bar.get_status_color')
     def test_help_text_hidden_when_no_space(self, mock_get_status_color):
         """Test that help text is hidden when terminal is too narrow"""
         mock_get_status_color.return_value = 0
@@ -143,7 +143,7 @@ class TestDialogWidthEdgeCases(unittest.TestCase):
         
         self.assertFalse(help_text_drawn, "Help text should be hidden when no space available")
         
-    @patch('tfm_general_purpose_dialog.get_status_color')
+    @patch('tfm_quick_edit_bar.get_status_color')
     def test_minimum_field_width_guaranteed(self, mock_get_status_color):
         """Test that input field gets minimum width even without help text space"""
         mock_get_status_color.return_value = 0
@@ -182,7 +182,7 @@ class TestDialogWidthEdgeCases(unittest.TestCase):
         min_expected_width = len(prompt) + 5
         self.assertGreaterEqual(max_width, min_expected_width)
         
-    @patch('tfm_general_purpose_dialog.get_status_color')
+    @patch('tfm_quick_edit_bar.get_status_color')
     def test_help_text_positioning_no_overlap(self, mock_get_status_color):
         """Test that help text doesn't overlap with input field"""
         mock_get_status_color.return_value = 0

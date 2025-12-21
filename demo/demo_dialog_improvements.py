@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Demonstration of GeneralPurposeDialog improvements
+Demonstration of QuickEditBar improvements
 
 This script shows how the dialog now handles:
 1. Help text visibility in different terminal widths
@@ -13,13 +13,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from unittest.mock import Mock, patch
-from tfm_general_purpose_dialog import GeneralPurposeDialog
+from tfm_quick_edit_bar import QuickEditBar
 
 
 def simulate_dialog_drawing(width, prompt, help_text, input_text=""):
     """Simulate drawing a dialog and return the results"""
     
-    dialog = GeneralPurposeDialog()
+    dialog = QuickEditBar()
     dialog.show_status_line_input(
         prompt=prompt,
         help_text=help_text,
@@ -39,7 +39,7 @@ def simulate_dialog_drawing(width, prompt, help_text, input_text=""):
     def mock_draw(*args, **kwargs):
         draw_calls.append(args)
     
-    with patch('tfm_general_purpose_dialog.get_status_color', return_value=0):
+    with patch('tfm_quick_edit_bar.get_status_color', return_value=0):
         dialog.text_editor.draw = mock_draw
         dialog.draw(mock_stdscr, mock_safe_addstr)
     
@@ -69,7 +69,7 @@ def simulate_dialog_drawing(width, prompt, help_text, input_text=""):
 def demonstrate_width_handling():
     """Demonstrate how dialog handles different terminal widths"""
     
-    print("GeneralPurposeDialog Width Handling Improvements")
+    print("QuickEditBar Width Handling Improvements")
     print("=" * 55)
     print()
     

@@ -21,7 +21,7 @@ from tfm_jump_dialog import JumpDialog
 from tfm_list_dialog import ListDialog
 from tfm_info_dialog import InfoDialog
 from tfm_batch_rename_dialog import BatchRenameDialog
-from tfm_general_purpose_dialog import GeneralPurposeDialog
+from tfm_quick_edit_bar import QuickEditBar
 
 
 class TestComprehensiveDialogKeyHandling(unittest.TestCase):
@@ -155,19 +155,19 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
         else:
             print("✓ BatchRenameDialog: No key handling issues found")
             
-    def test_general_purpose_dialog_comprehensive(self):
-        """Comprehensive test of GeneralPurposeDialog key handling"""
-        dialog = GeneralPurposeDialog(self.config)
+    def test_quick_edit_bar_comprehensive(self):
+        """Comprehensive test of QuickEditBar key handling"""
+        dialog = QuickEditBar(self.config)
         
         def setup(d):
             d.show_status_line_input("Test prompt: ", "default_text")
             
-        issues = self._test_dialog_key_handling('GeneralPurposeDialog', dialog, setup)
+        issues = self._test_dialog_key_handling('QuickEditBar', dialog, setup)
         
         if issues:
-            self.fail(f"GeneralPurposeDialog issues found:\n" + "\n".join(f"  • {issue}" for issue in issues))
+            self.fail(f"QuickEditBar issues found:\n" + "\n".join(f"  • {issue}" for issue in issues))
         else:
-            print("✓ GeneralPurposeDialog: No key handling issues found")
+            print("✓ QuickEditBar: No key handling issues found")
             
     def test_specific_regression_cases(self):
         """Test specific regression cases reported by user"""

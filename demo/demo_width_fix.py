@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Demonstration of the GeneralPurposeDialog width calculation fix
+Demonstration of the QuickEditBar width calculation fix
 
 This script shows the difference between the old buggy calculation
 and the new fixed calculation for input field width.
@@ -9,7 +9,7 @@ and the new fixed calculation for input field width.
 def demonstrate_width_calculation():
     """Demonstrate the width calculation fix"""
     
-    print("GeneralPurposeDialog Width Calculation Fix")
+    print("QuickEditBar Width Calculation Fix")
     print("=" * 50)
     print()
     print("The Bug:")

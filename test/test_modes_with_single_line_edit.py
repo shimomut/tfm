@@ -64,7 +64,7 @@ def test_modes_use_single_line_edit():
         print("✓ Batch rename mode uses SingleLineTextEdit")
         
         # Test general dialog (used for create file/directory operations)
-        assert hasattr(fm, 'general_dialog'), "general_dialog attribute missing"
+        assert hasattr(fm, 'quick_edit_bar'), "quick_edit_bar attribute missing"
         print("✓ General dialog exists for create operations")
         
         print("\n✅ All modes successfully updated to use SingleLineTextEdit!")
@@ -79,7 +79,7 @@ def test_modes_use_single_line_edit():
         assert hasattr(fm, 'list_dialog'), "list_dialog should exist"
         assert hasattr(fm, 'search_dialog'), "search_dialog should exist"
         assert hasattr(fm, 'batch_rename_dialog'), "batch_rename_dialog should exist"
-        assert hasattr(fm, 'general_dialog'), "general_dialog should exist"
+        assert hasattr(fm, 'quick_edit_bar'), "quick_edit_bar should exist"
         print("✓ All dialog components properly integrated")
         
         return True

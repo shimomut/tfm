@@ -496,7 +496,7 @@ class FileManagerLayer(UILayer):
         Render the FileManager main screen.
         
         This method renders the complete main screen including header, file panes,
-        log pane, status bar, and any active dialogs (general_dialog, quick_choice_bar).
+        log pane, status bar, and any active dialogs (quick_edit_bar, quick_choice_bar).
         It only performs a full redraw when needed.
         
         Args:
@@ -520,8 +520,8 @@ class FileManagerLayer(UILayer):
             status_y = height - 1
             
             # Draw general dialog if active (for text input in status bar)
-            if self.file_manager.general_dialog.is_active:
-                self.file_manager.general_dialog.draw()
+            if self.file_manager.quick_edit_bar.is_active:
+                self.file_manager.quick_edit_bar.draw()
             
             # Draw quick choice bar if active
             if self.file_manager.quick_choice_bar.is_active:

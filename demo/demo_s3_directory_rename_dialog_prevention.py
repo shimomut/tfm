@@ -28,7 +28,7 @@ def demo_s3_directory_rename_dialog_prevention():
     
     # Create mock FileManager
     file_manager = Mock(spec=FileManager)
-    file_manager.general_dialog = Mock()
+    file_manager.quick_edit_bar = Mock()
     file_manager.needs_full_redraw = False
     
     print("1. Testing S3 directory rename attempt...")
@@ -90,8 +90,8 @@ def demo_s3_directory_rename_dialog_prevention():
     print(f"   Selected: {s3_file_path}")
     print("   User presses 'r' to rename...")
     
-    # Mock DialogHelpers to track dialog creation
-    with patch('tfm_main.DialogHelpers') as mock_dialog_helpers:
+    # Mock QuickEditBarHelpers to track dialog creation
+    with patch('tfm_main.QuickEditBarHelpers') as mock_dialog_helpers:
         # Call enter_rename_mode
         FileManager.enter_rename_mode(file_manager)
         
@@ -124,8 +124,8 @@ def demo_s3_directory_rename_dialog_prevention():
     print(f"   Selected: {local_path}")
     print("   User presses 'r' to rename...")
     
-    # Mock DialogHelpers to track dialog creation
-    with patch('tfm_main.DialogHelpers') as mock_dialog_helpers:
+    # Mock QuickEditBarHelpers to track dialog creation
+    with patch('tfm_main.QuickEditBarHelpers') as mock_dialog_helpers:
         # Call enter_rename_mode
         FileManager.enter_rename_mode(file_manager)
         

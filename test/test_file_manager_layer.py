@@ -93,9 +93,9 @@ class TestFileManagerLayerBasics:
         mock_fm.draw_log_pane = Mock()
         mock_fm.draw_status = Mock()
         
-        # Mock general_dialog and quick_choice_bar
-        mock_fm.general_dialog = Mock()
-        mock_fm.general_dialog.is_active = False
+        # Mock quick_edit_bar and quick_choice_bar
+        mock_fm.quick_edit_bar = Mock()
+        mock_fm.quick_edit_bar.is_active = False
         mock_fm.quick_choice_bar = Mock()
         mock_fm.quick_choice_bar.is_active = False
         

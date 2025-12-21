@@ -42,7 +42,7 @@ class TestS3DirectoryRenameDialogPrevention(unittest.TestCase):
             'files': [s3_path],
             'selected_index': 0
         }
-        file_manager.general_dialog = Mock()
+        file_manager.quick_edit_bar = Mock()
         file_manager.needs_full_redraw = False
         
         # Mock print to capture the error message
@@ -80,11 +80,11 @@ class TestS3DirectoryRenameDialogPrevention(unittest.TestCase):
             'files': [s3_path],
             'selected_index': 0
         }
-        file_manager.general_dialog = Mock()
+        file_manager.quick_edit_bar = Mock()
         file_manager.needs_full_redraw = False
         
-        # Mock DialogHelpers to verify dialog creation
-        with patch('tfm_main.DialogHelpers') as mock_dialog_helpers:
+        # Mock QuickEditBarHelpers to verify dialog creation
+        with patch('tfm_main.QuickEditBarHelpers') as mock_dialog_helpers:
             # Call the actual enter_rename_mode method
             FileManager.enter_rename_mode(file_manager)
             
@@ -112,11 +112,11 @@ class TestS3DirectoryRenameDialogPrevention(unittest.TestCase):
             'files': [local_path],
             'selected_index': 0
         }
-        file_manager.general_dialog = Mock()
+        file_manager.quick_edit_bar = Mock()
         file_manager.needs_full_redraw = False
         
-        # Mock DialogHelpers to verify dialog creation
-        with patch('tfm_main.DialogHelpers') as mock_dialog_helpers:
+        # Mock QuickEditBarHelpers to verify dialog creation
+        with patch('tfm_main.QuickEditBarHelpers') as mock_dialog_helpers:
             # Call the actual enter_rename_mode method
             FileManager.enter_rename_mode(file_manager)
             
@@ -143,11 +143,11 @@ class TestS3DirectoryRenameDialogPrevention(unittest.TestCase):
             'files': [mock_path],
             'selected_index': 0
         }
-        file_manager.general_dialog = Mock()
+        file_manager.quick_edit_bar = Mock()
         file_manager.needs_full_redraw = False
         
-        # Mock DialogHelpers and print
-        with patch('tfm_main.DialogHelpers') as mock_dialog_helpers:
+        # Mock QuickEditBarHelpers and print
+        with patch('tfm_main.QuickEditBarHelpers') as mock_dialog_helpers:
             with patch('builtins.print') as mock_print:
                 # Call the actual enter_rename_mode method
                 FileManager.enter_rename_mode(file_manager)

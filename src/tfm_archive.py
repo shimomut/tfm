@@ -2539,7 +2539,7 @@ class ArchiveUI:
             default_filename = f"{basename}."
         
         # Enter archive creation mode using general dialog with default filename
-        self.file_manager.general_dialog.show_status_line_input(
+        self.file_manager.quick_edit_bar.show_status_line_input(
             prompt="Archive filename: ",
             help_text="ESC:cancel Enter:create (.zip/.tar.gz/.tgz)",
             initial_text=default_filename,
@@ -2559,7 +2559,7 @@ class ArchiveUI:
         """Handle create archive confirmation"""
         if not archive_name.strip():
             print("Invalid archive name")
-            self.file_manager.general_dialog.hide()
+            self.file_manager.quick_edit_bar.hide()
             self.file_manager.needs_full_redraw = True
             return
         
@@ -2583,7 +2583,7 @@ class ArchiveUI:
         
         if not files_to_archive:
             print("No files to archive")
-            self.file_manager.general_dialog.hide()
+            self.file_manager.quick_edit_bar.hide()
             self.file_manager.needs_full_redraw = True
             return
         
@@ -2593,7 +2593,7 @@ class ArchiveUI:
         # Check if archive already exists
         if archive_path.exists():
             print(f"Archive '{archive_filename}' already exists")
-            self.file_manager.general_dialog.hide()
+            self.file_manager.quick_edit_bar.hide()
             self.file_manager.needs_full_redraw = True
             return
         
@@ -2603,7 +2603,7 @@ class ArchiveUI:
             
             if not format_type:
                 print(f"Unsupported archive format. Supported: .zip, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .txz")
-                self.file_manager.general_dialog.hide()
+                self.file_manager.quick_edit_bar.hide()
                 self.file_manager.needs_full_redraw = True
                 return
             
@@ -2638,19 +2638,19 @@ class ArchiveUI:
             finally:
                 self.progress_manager.finish_operation()
             
-            self.file_manager.general_dialog.hide()
+            self.file_manager.quick_edit_bar.hide()
             self.file_manager.needs_full_redraw = True
             
         except Exception as e:
             print(f"Error creating archive: {e}")
             self.progress_manager.finish_operation()
-            self.file_manager.general_dialog.hide()
+            self.file_manager.quick_edit_bar.hide()
             self.file_manager.needs_full_redraw = True
     
     def on_create_archive_cancel(self):
         """Handle create archive cancellation"""
         print("Archive creation cancelled")
-        self.file_manager.general_dialog.hide()
+        self.file_manager.quick_edit_bar.hide()
         self.file_manager.needs_full_redraw = True
     
     def extract_selected_archive(self):
@@ -2790,21 +2790,21 @@ class ArchiveUI:
         }
         
         # Use the general dialog for input
-        from tfm_general_purpose_dialog import DialogHelpers
-        DialogHelpers.create_rename_dialog(
-            self.file_manager.general_dialog,
+        from tfm_quick_edit_bar import QuickEditBarHelpers
+        QuickEditBarHelpers.create_rename_dialog(
+            self.file_manager.quick_edit_bar,
             original_basename,
             original_basename
         )
-        self.file_manager.general_dialog.callback = self._on_extraction_rename_confirm
-        self.file_manager.general_dialog.cancel_callback = self._on_extraction_rename_cancel
+        self.file_manager.quick_edit_bar.callback = self._on_extraction_rename_confirm
+        self.file_manager.quick_edit_bar.cancel_callback = self._on_extraction_rename_cancel
         self.file_manager.needs_full_redraw = True
     
     def _on_extraction_rename_confirm(self, new_name):
         """Handle extraction rename confirmation"""
         if not new_name or new_name.strip() == "":
             print("Extraction cancelled: empty directory name")
-            self.file_manager.general_dialog.hide()
+            self.file_manager.quick_edit_bar.hide()
             self.file_manager.needs_full_redraw = True
             return
         
@@ -2816,7 +2816,7 @@ class ArchiveUI:
         new_extract_dir = other_pane['path'] / new_name
         
         # Hide the dialog first
-        self.file_manager.general_dialog.hide()
+        self.file_manager.quick_edit_bar.hide()
         self.file_manager.needs_full_redraw = True
         
         # Check if the new name also conflicts
@@ -2849,7 +2849,7 @@ class ArchiveUI:
     def _on_extraction_rename_cancel(self):
         """Handle extraction rename cancellation"""
         print("Extraction cancelled")
-        self.file_manager.general_dialog.hide()
+        self.file_manager.quick_edit_bar.hide()
         self.file_manager.needs_full_redraw = True
     
     def _get_archive_format_from_filename(self, filename):

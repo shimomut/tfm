@@ -136,8 +136,8 @@ def test_main_loop_animation_logic():
     class MockFileManager:
         def __init__(self):
             self.search_dialog = search_dialog
-            self.general_dialog = Mock()
-            self.general_dialog.is_active = False
+            self.quick_edit_bar = Mock()
+            self.quick_edit_bar.is_active = False
             self.list_dialog = Mock()
             self.list_dialog.is_active = False
             self.info_dialog = Mock()

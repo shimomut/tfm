@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-General Purpose Dialog component for TFM (Terminal File Manager)
+Quick Edit Bar component for TFM (Terminal File Manager)
 
-This module provides a reusable GeneralPurposeDialog class that can handle
+This module provides a reusable QuickEditBar class that can handle
 various overlay dialog types including:
 - Single-line text input dialogs (filter, rename, create file/directory, etc.)
 - Status line dialogs
@@ -25,7 +25,7 @@ class DialogType:
     # CHOICE_DIALOG = "choice_dialog"
 
 
-class GeneralPurposeDialog:
+class QuickEditBar:
     """A flexible dialog system for various TFM dialog needs"""
     
     def __init__(self, config=None, renderer=None):
@@ -206,7 +206,7 @@ class GeneralPurposeDialog:
 
 
 # Helper functions for common dialog patterns
-class DialogHelpers:
+class QuickEditBarHelpers:
     """Helper functions for common dialog operations"""
     
     @staticmethod

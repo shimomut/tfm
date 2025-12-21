@@ -46,7 +46,7 @@ from tfm_drives_dialog import DrivesDialog, DrivesDialogHelpers
 from tfm_wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
-from tfm_general_purpose_dialog import GeneralPurposeDialog, DialogHelpers
+from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
 from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
@@ -194,7 +194,7 @@ class FileManager:
         self.drives_dialog = DrivesDialog(self.config, renderer)
         self.batch_rename_dialog = BatchRenameDialog(self.config, renderer)
         self.quick_choice_bar = QuickChoiceBar(self.config, renderer)
-        self.general_dialog = GeneralPurposeDialog(self.config, renderer)
+        self.quick_edit_bar = QuickEditBar(self.config, renderer)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager, renderer)
         self.progress_manager = ProgressManager()
         self.cache_manager = CacheManager(self.log_manager)
@@ -220,7 +220,7 @@ class FileManager:
         
 
         
-        # Dialog state (now handled by general_dialog)
+        # Dialog state (now handled by quick_edit_bar)
         self.rename_file_path = None  # Still needed for rename operations
         
         # Operation state flags
@@ -1653,9 +1653,9 @@ class FileManager:
     def enter_filter_mode(self):
         """Enter filename filter mode"""
         current_pane = self.get_current_pane()
-        DialogHelpers.create_filter_dialog(self.general_dialog, current_pane['filter_pattern'])
-        self.general_dialog.callback = self.on_filter_confirm
-        self.general_dialog.cancel_callback = self.on_filter_cancel
+        QuickEditBarHelpers.create_filter_dialog(self.quick_edit_bar, current_pane['filter_pattern'])
+        self.quick_edit_bar.callback = self.on_filter_confirm
+        self.quick_edit_bar.cancel_callback = self.on_filter_cancel
         self.needs_full_redraw = True
         
     def on_filter_confirm(self, filter_text):
@@ -1670,12 +1670,12 @@ class FileManager:
             print(f"Applied filter '{filter_text}' to {pane_name} pane")
             print(f"Showing {count} items")
         
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.needs_full_redraw = True
     
     def on_filter_cancel(self):
         """Handle filter cancellation"""
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.needs_full_redraw = True
     
     def apply_filter(self):
@@ -1740,9 +1740,9 @@ class FileManager:
         
         # Enter rename mode using general dialog
         self.rename_file_path = focused_file
-        DialogHelpers.create_rename_dialog(self.general_dialog, focused_file.name, focused_file.name)
-        self.general_dialog.callback = self.on_rename_confirm
-        self.general_dialog.cancel_callback = self.on_rename_cancel
+        QuickEditBarHelpers.create_rename_dialog(self.quick_edit_bar, focused_file.name, focused_file.name)
+        self.quick_edit_bar.callback = self.on_rename_confirm
+        self.quick_edit_bar.cancel_callback = self.on_rename_cancel
         self.needs_full_redraw = True
         print(f"Renaming: {focused_file.name}")
     
@@ -1750,7 +1750,7 @@ class FileManager:
         """Handle rename confirmation"""
         if not self.rename_file_path or not new_name.strip():
             print("Invalid rename operation")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
             return
@@ -1759,7 +1759,7 @@ class FileManager:
         
         if new_name == original_name:
             print("Name unchanged")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
             return
@@ -1771,7 +1771,7 @@ class FileManager:
             # Check if target already exists
             if new_path.exists():
                 print(f"File '{new_name}' already exists")
-                self.general_dialog.hide()
+                self.quick_edit_bar.hide()
                 self.rename_file_path = None
                 self.needs_full_redraw = True
                 return
@@ -1791,25 +1791,25 @@ class FileManager:
                     self.adjust_scroll_for_focus(current_pane)
                     break
             
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
             
         except PermissionError:
             print(f"Permission denied: Cannot rename '{original_name}'")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
         except OSError as e:
             print(f"Error renaming file: {e}")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.needs_full_redraw = True
     
     def on_rename_cancel(self):
         """Handle rename cancellation"""
         print("Rename cancelled")
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.rename_file_path = None
         self.needs_full_redraw = True
     
@@ -1823,9 +1823,9 @@ class FileManager:
             return
         
         # Enter create directory mode using general dialog
-        DialogHelpers.create_create_directory_dialog(self.general_dialog)
-        self.general_dialog.callback = self.on_create_directory_confirm
-        self.general_dialog.cancel_callback = self.on_create_directory_cancel
+        QuickEditBarHelpers.create_create_directory_dialog(self.quick_edit_bar)
+        self.quick_edit_bar.callback = self.on_create_directory_confirm
+        self.quick_edit_bar.cancel_callback = self.on_create_directory_cancel
         self.needs_full_redraw = True
         print("Creating new directory...")
     
@@ -1833,7 +1833,7 @@ class FileManager:
         """Handle create directory confirmation"""
         if not dir_name.strip():
             print("Invalid directory name")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             return
         
@@ -1844,7 +1844,7 @@ class FileManager:
         # Check if directory already exists
         if new_dir_path.exists():
             print(f"Directory '{new_dir_name}' already exists")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             return
         
@@ -1866,18 +1866,18 @@ class FileManager:
                     self.adjust_scroll_for_focus(current_pane)
                     break
             
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             
         except OSError as e:
             print(f"Failed to create directory '{new_dir_name}': {e}")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
     
     def on_create_directory_cancel(self):
         """Handle create directory cancellation"""
         print("Directory creation cancelled")
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.needs_full_redraw = True
     
     def enter_create_file_mode(self):
@@ -1890,9 +1890,9 @@ class FileManager:
             return
         
         # Enter create file mode using general dialog
-        DialogHelpers.create_create_file_dialog(self.general_dialog)
-        self.general_dialog.callback = self.on_create_file_confirm
-        self.general_dialog.cancel_callback = self.on_create_file_cancel
+        QuickEditBarHelpers.create_create_file_dialog(self.quick_edit_bar)
+        self.quick_edit_bar.callback = self.on_create_file_confirm
+        self.quick_edit_bar.cancel_callback = self.on_create_file_cancel
         self.needs_full_redraw = True
         print("Creating new text file...")
     
@@ -1900,7 +1900,7 @@ class FileManager:
         """Handle create file confirmation"""
         if not file_name.strip():
             print("Invalid file name")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             return
         
@@ -1911,7 +1911,7 @@ class FileManager:
         # Check if file already exists
         if new_file_path.exists():
             print(f"File '{new_file_name}' already exists")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             return
         
@@ -1937,18 +1937,18 @@ class FileManager:
             if is_text_file(new_file_path):
                 self.edit_selected_file()
             
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
             
         except OSError as e:
             print(f"Failed to create file '{new_file_name}': {e}")
-            self.general_dialog.hide()
+            self.quick_edit_bar.hide()
             self.needs_full_redraw = True
     
     def on_create_file_cancel(self):
         """Handle create file cancellation"""
         print("File creation cancelled")
-        self.general_dialog.hide()
+        self.quick_edit_bar.hide()
         self.needs_full_redraw = True
 
     def enter_batch_rename_mode(self):
@@ -3454,8 +3454,8 @@ class FileManager:
             return result
         
         # Handle general dialog input (not part of layer stack)
-        if self.general_dialog.is_active:
-            result = self.general_dialog.handle_input(event)
+        if self.quick_edit_bar.is_active:
+            result = self.quick_edit_bar.handle_input(event)
             if result:
                 # Mark the FileManagerLayer dirty so it redraws with the updated dialog
                 self.file_manager_layer.mark_dirty()

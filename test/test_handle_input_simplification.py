@@ -167,11 +167,11 @@ class TestHandleInputSimplification(unittest.TestCase):
             self.mock_layer_stack.handle_key_event.assert_not_called()
             self.assertTrue(result)
     
-    def test_general_dialog_bypasses_layer_stack(self):
+    def test_quick_edit_bar_bypasses_layer_stack(self):
         """Test that general dialog events bypass the layer stack"""
         # Activate general dialog
-        self.file_manager.general_dialog.is_active = True
-        self.file_manager.general_dialog.handle_input = Mock(return_value=True)
+        self.file_manager.quick_edit_bar.is_active = True
+        self.file_manager.quick_edit_bar.handle_input = Mock(return_value=True)
         
         # Create a key event
         event = KeyEvent(key_code=KeyCode.ENTER, modifiers=0, char='')
