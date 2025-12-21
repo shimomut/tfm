@@ -543,12 +543,12 @@ class FileManager:
     
     def _action_show_favorites(self):
         """Show favorites dialog."""
-        self.show_favorites_dialog()
+        self.show_favorite_directories()
         return True
     
     def _action_show_recent(self):
         """Show recent locations dialog."""
-        self.show_recent_directories_dialog()
+        self.show_history()
         return True
     
     def _action_report_issue(self):
