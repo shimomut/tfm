@@ -1728,6 +1728,7 @@ static void render_cursor(
  * @param rows Total number of rows in grid
  * @param offset_x X offset for centering the grid in the view
  * @param offset_y Y offset for centering the grid in the view
+ * @param font_ascent Font ascent for baseline positioning
  * @param base_font Base CTFontRef to use for rendering
  * @param color_cache ColorCache for getting foreground color
  */
@@ -1741,6 +1742,7 @@ static void render_marked_text(
     int rows,
     CGFloat offset_x,
     CGFloat offset_y,
+    CGFloat font_ascent,
     CTFontRef base_font,
     ColorCache& color_cache
 ) {
@@ -1847,10 +1849,18 @@ static void render_marked_text(
     }
     
     // Set text position in the graphics context
-    CGContextSetTextPosition(context, x, y);
+    // Use baseline positioning like character rendering
+    CGFloat baseline_y = y + (char_height - font_ascent);
+    
+    // Save graphics state before drawing
+    CGContextSaveGState(context);
+    CGContextSetTextPosition(context, x, baseline_y);
     
     // Draw with CTLineDraw
     CTLineDraw(line, context);
+    
+    // Restore graphics state
+    CGContextRestoreGState(context);
     
     // Release CTLine
     CFRelease(line);
@@ -2185,6 +2195,7 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
                 rows,
                 static_cast<CGFloat>(offset_x),
                 static_cast<CGFloat>(offset_y),
+                static_cast<CGFloat>(font_ascent),
                 g_base_font,
                 *g_color_cache
             );
