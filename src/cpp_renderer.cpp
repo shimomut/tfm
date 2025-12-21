@@ -1179,6 +1179,13 @@ static void render_backgrounds(
             
             const ColorPair& colors = color_it->second;
             uint32_t bg_rgb = colors.bg_rgb;
+            uint32_t fg_rgb = colors.fg_rgb;
+            
+            // Handle REVERSE attribute (bit 2) by swapping foreground and background
+            // This is a common terminal attribute for highlighting text
+            if (cell.attributes & 4) {  // REVERSE is bit 2 (value 4)
+                std::swap(bg_rgb, fg_rgb);
+            }
             
             // Calculate base pixel position for this cell
             // Convert TTK row to CoreGraphics y-coordinate
@@ -1533,6 +1540,13 @@ static void render_characters(
             
             const ColorPair& colors = color_it->second;
             uint32_t fg_rgb = colors.fg_rgb;
+            uint32_t bg_rgb = colors.bg_rgb;
+            
+            // Handle REVERSE attribute (bit 2) by swapping foreground and background
+            // This is a common terminal attribute for highlighting text
+            if (cell.attributes & 4) {  // REVERSE is bit 2 (value 4)
+                std::swap(fg_rgb, bg_rgb);
+            }
             
             // Extract attributes
             int font_attributes = cell.attributes & 1;  // BOLD is bit 0
