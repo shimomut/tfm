@@ -2774,17 +2774,19 @@ if COCOA_AVAILABLE:
                 Handle the start of a live resize operation.
                 
                 This method is called when the user starts dragging the window
-                resize handle. We snap the window size to the character grid
-                to ensure proper alignment before the resize begins, and enable
-                resize increments for manual resizing.
+                resize handle. We enable resize increments to ensure the window
+                snaps to character grid boundaries during manual resizing.
+                
+                Note: We no longer call _snap_window_to_grid() here because:
+                1. It would change both dimensions even when resizing only one edge
+                2. The resize increments handle snapping during the drag operation
+                3. This prevents unwanted dimension changes (e.g., width changing when adjusting height)
                 
                 Args:
                     notification: NSNotification containing resize information
                 """
-                # Snap to grid before resize starts
-                self._snap_window_to_grid()
-                
                 # Enable resize increments for manual resizing
+                # This ensures the window snaps to character grid boundaries during drag
                 resize_increment = Cocoa.NSMakeSize(self.backend.char_width, self.backend.char_height)
                 self.backend.window.setResizeIncrements_(resize_increment)
             
@@ -2828,9 +2830,15 @@ if COCOA_AVAILABLE:
                 # Calculate padding
                 padding = self.backend.WINDOW_PADDING_MULTIPLIER * self.backend.char_height
                 
-                # Calculate snapped content size (rounded down to nearest cell + padding)
-                snapped_cols = max(1, int(current_width / self.backend.char_width))
-                snapped_rows = max(1, int(current_height / self.backend.char_height))
+                # Calculate snapped content size
+                # First subtract padding to get the grid area, then calculate cols/rows
+                grid_width = current_width - padding
+                grid_height = current_height - padding
+                
+                snapped_cols = max(1, int(grid_width / self.backend.char_width))
+                snapped_rows = max(1, int(grid_height / self.backend.char_height))
+                
+                # Now add padding back to get the final content size
                 snapped_width = snapped_cols * self.backend.char_width + padding
                 snapped_height = snapped_rows * self.backend.char_height + padding
                 
