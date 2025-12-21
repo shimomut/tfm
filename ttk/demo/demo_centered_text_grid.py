@@ -1,23 +1,24 @@
 """
-Demo: Centered Text Grid
+Demo: Extended Edge Background
 
-This demo demonstrates the centered text grid rendering feature where the
-text grid is centered within the window when the window size doesn't perfectly
-match the grid dimensions.
+This demo demonstrates the extended edge background feature where the
+background colors of edge cells (top, bottom, left, right) are extended
+to fill the frame area when the window size doesn't perfectly match the
+grid dimensions.
 
-When you resize the window, you should see equal white background (frame) on
-all sides of the text grid, rather than having it bunched up on the top and left.
+When you resize the window, you should see NO white background - the edge
+cells' backgrounds extend to fill the entire window.
 
 Features demonstrated:
-- Text grid centered within window content area
-- Equal frame width on top/bottom and left/right
-- Proper centering maintained during window resize
+- Edge cell backgrounds extend beyond grid boundaries
+- No white background visible around edges
+- Smooth appearance during window resize
 
 Usage:
     python ttk/demo/demo_centered_text_grid.py
 
 Controls:
-    - Resize the window to see the centering effect
+    - Resize the window to see the effect
     - Press 'q' to quit
 """
 
@@ -31,13 +32,13 @@ from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.input_event import Event, KeyEvent
 
 
-class CenteredGridDemo:
-    """Demo application showing centered text grid."""
+class ExtendedEdgeBackgroundDemo:
+    """Demo application showing extended edge backgrounds."""
     
     def __init__(self):
         """Initialize the demo."""
         self.backend = CoreGraphicsBackend(
-            window_title="Centered Text Grid Demo",
+            window_title="Extended Edge Background Demo",
             font_name="Menlo",
             font_size=14,
             rows=20,
@@ -66,44 +67,53 @@ class CenteredGridDemo:
     
     def draw_content(self):
         """Draw demo content."""
-        # Initialize color pairs
+        # Initialize color pairs with distinct colors for edge visibility
         self.backend.init_color_pair(1, (255, 255, 255), (0, 100, 200))    # White on blue
         self.backend.init_color_pair(2, (255, 255, 0), (0, 100, 200))      # Yellow on blue
-        self.backend.init_color_pair(3, (0, 255, 0), (0, 0, 0))            # Green on black
+        self.backend.init_color_pair(3, (0, 255, 0), (50, 50, 50))         # Green on dark gray
+        self.backend.init_color_pair(4, (255, 255, 255), (200, 0, 0))      # White on red (for edges)
+        
+        # Fill entire grid with blue background to show edge extension
+        for row in range(20):
+            for col in range(60):
+                self.backend.draw_text(row, col, " ", color_pair=1)
         
         # Draw title
-        title = "Centered Text Grid Demo"
+        title = "Extended Edge Background Demo"
         self.backend.draw_text(0, (60 - len(title)) // 2, title, color_pair=2)
         
         # Draw instructions
-        self.backend.draw_text(2, 2, "This demo shows the centered text grid feature.", color_pair=1)
-        self.backend.draw_text(3, 2, "Resize the window to see the effect.", color_pair=1)
-        self.backend.draw_text(5, 2, "Notice:", color_pair=2)
-        self.backend.draw_text(6, 2, "- Equal white frame on all sides", color_pair=1)
-        self.backend.draw_text(7, 2, "- Text grid stays centered", color_pair=1)
-        self.backend.draw_text(8, 2, "- Frame width adjusts automatically", color_pair=1)
+        self.backend.draw_text(2, 2, "Edge cells extend their background to fill frame.", color_pair=1)
+        self.backend.draw_text(3, 2, "Resize the window - no white background visible!", color_pair=1)
         
-        # Draw a border to show the grid boundaries
+        # Highlight the edge cells with red background
+        # Top row
         for col in range(60):
-            self.backend.draw_text(10, col, "─", color_pair=3)
-            self.backend.draw_text(18, col, "─", color_pair=3)
+            self.backend.draw_text(0, col, " ", color_pair=4)
         
-        for row in range(10, 19):
-            self.backend.draw_text(row, 0, "│", color_pair=3)
-            self.backend.draw_text(row, 59, "│", color_pair=3)
+        # Bottom row
+        for col in range(60):
+            self.backend.draw_text(19, col, " ", color_pair=4)
         
-        # Draw corners
-        self.backend.draw_text(10, 0, "┌", color_pair=3)
-        self.backend.draw_text(10, 59, "┐", color_pair=3)
-        self.backend.draw_text(18, 0, "└", color_pair=3)
-        self.backend.draw_text(18, 59, "┘", color_pair=3)
+        # Left column
+        for row in range(20):
+            self.backend.draw_text(row, 0, " ", color_pair=4)
         
-        # Draw centered text
-        msg = "Text Grid Area"
-        self.backend.draw_text(14, (60 - len(msg)) // 2, msg, color_pair=1)
+        # Right column
+        for row in range(20):
+            self.backend.draw_text(row, 59, " ", color_pair=4)
+        
+        # Redraw title and instructions on top of red edges
+        self.backend.draw_text(0, (60 - len(title)) // 2, title, color_pair=2)
+        
+        # Draw centered message
+        msg1 = "Red edges extend beyond grid"
+        msg2 = "to fill the frame area"
+        self.backend.draw_text(9, (60 - len(msg1)) // 2, msg1, color_pair=1)
+        self.backend.draw_text(10, (60 - len(msg2)) // 2, msg2, color_pair=1)
         
         # Draw quit instruction
-        self.backend.draw_text(19, 2, "Press 'q' to quit", color_pair=2)
+        self.backend.draw_text(19, (60 - 17) // 2, "Press 'q' to quit", color_pair=2)
         
         self.backend.refresh()
     
@@ -123,5 +133,5 @@ class CenteredGridDemo:
 
 
 if __name__ == '__main__':
-    demo = CenteredGridDemo()
+    demo = ExtendedEdgeBackgroundDemo()
     demo.run()

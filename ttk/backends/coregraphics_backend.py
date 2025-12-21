@@ -3126,11 +3126,36 @@ if COCOA_AVAILABLE:
                         if attributes & TextAttribute.REVERSE:
                             fg_rgb, bg_rgb = bg_rgb, fg_rgb
                         
-                        # Add cell to batch
+                        # Determine cell dimensions with edge extension
+                        # For edge cells, extend the background to fill the frame area
+                        cell_x = x
+                        cell_y = y
+                        cell_width = char_width
+                        cell_height = char_height
+                        
+                        # Extend left edge (leftmost column)
+                        if col == 0:
+                            cell_x = 0
+                            cell_width = char_width + offset_x
+                        
+                        # Extend right edge (rightmost column)
+                        if col == self.backend.cols - 1:
+                            cell_width = char_width + offset_x
+                        
+                        # Extend top edge (topmost row)
+                        if row == 0:
+                            cell_height = char_height + offset_y
+                        
+                        # Extend bottom edge (bottommost row)
+                        if row == self.backend.rows - 1:
+                            cell_y = 0
+                            cell_height = char_height + offset_y
+                        
+                        # Add cell to batch with extended dimensions
                         # The batcher accumulates adjacent cells with the same background
                         # color into rectangular batches for efficient rendering
-                        batcher.add_cell(x, y, char_width, 
-                                       char_height, bg_rgb)
+                        batcher.add_cell(cell_x, cell_y, cell_width, 
+                                       cell_height, bg_rgb)
                     
                     # Finish row - ensures current batch is completed
                     # This is called after each row to handle row boundaries correctly
