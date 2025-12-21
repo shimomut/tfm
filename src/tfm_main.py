@@ -41,7 +41,6 @@ from tfm_file_operations import FileOperations, FileOperationsUI
 from tfm_list_dialog import ListDialog, ListDialogHelpers
 from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
-from tfm_jump_dialog import JumpDialog, JumpDialogHelpers
 from tfm_drives_dialog import DrivesDialog, DrivesDialogHelpers
 from tfm_wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
@@ -190,7 +189,6 @@ class FileManager:
         self.list_dialog = ListDialog(self.config, renderer)
         self.info_dialog = InfoDialog(self.config, renderer)
         self.search_dialog = SearchDialog(self.config, renderer)
-        self.jump_dialog = JumpDialog(self.config, renderer)
         self.drives_dialog = DrivesDialog(self.config, renderer)
         self.batch_rename_dialog = BatchRenameDialog(self.config, renderer)
         self.quick_choice_bar = QuickChoiceBar(self.config, renderer)
@@ -2997,16 +2995,67 @@ class FileManager:
         SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
         # needs_full_redraw will be set when dialog exits
 
-    def show_jump_dialog(self):
-        """Show the jump dialog - wrapper for jump dialog component"""
+    def enter_jump_to_path_mode(self):
+        """Enter jump to path mode using QuickEditBar"""
         current_pane = self.get_current_pane()
-        root_directory = current_pane['path']
-        self.jump_dialog.show(root_directory, self.file_operations)
-        # Push dialog onto layer stack
-        self.push_layer(self.jump_dialog)
+        current_path = str(current_pane['path'])
         
-        # Force immediate redraw to show dialog
-        self._force_immediate_redraw()
+        def on_confirm(path_str):
+            """Handle path confirmation"""
+            if not path_str.strip():
+                return
+            
+            try:
+                from tfm_path import Path
+                target_path = Path(path_str.strip())
+                
+                # Expand ~ to home directory
+                if str(target_path).startswith('~'):
+                    target_path = Path.home() / str(target_path)[2:].lstrip('/')
+                
+                # Check if path exists and is a directory
+                if not target_path.exists():
+                    self.log_manager.add_message("ERROR", f"Path does not exist: {target_path}")
+                    return
+                
+                if not target_path.is_dir():
+                    self.log_manager.add_message("ERROR", f"Not a directory: {target_path}")
+                    return
+                
+                # Save current cursor position
+                self.save_cursor_position(current_pane)
+                
+                # Navigate to the path
+                current_pane['path'] = target_path
+                current_pane['focused_index'] = 0
+                current_pane['scroll_offset'] = 0
+                current_pane['selected_files'].clear()
+                self.refresh_files(current_pane)
+                
+                # Try to restore cursor position for this directory
+                if not self.restore_cursor_position(current_pane):
+                    current_pane['focused_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                
+                self.needs_full_redraw = True
+                print(f"Jumped to: {target_path}")
+                
+            except Exception as e:
+                self.log_manager.add_message("ERROR", f"Failed to jump to path: {e}")
+        
+        def on_cancel():
+            """Handle cancellation"""
+            pass
+        
+        # Show QuickEditBar for path input
+        self.quick_edit_bar.show_status_line_input(
+            prompt="Jump to path: ",
+            help_text="ESC:cancel Enter:jump",
+            initial_text=current_path,
+            callback=on_confirm,
+            cancel_callback=on_cancel
+        )
+        self.needs_full_redraw = True
     
 
     def show_drives_dialog(self):
@@ -3277,8 +3326,8 @@ class FileManager:
         elif self.is_key_for_action(event, 'search_dialog'):  # Show search dialog (filename)
             self.show_search_dialog('filename')
             return True
-        elif self.is_key_for_action(event, 'jump_dialog'):  # Show jump dialog (Shift+J)
-            self.show_jump_dialog()
+        elif self.is_key_for_action(event, 'jump_to_path'):  # Jump to path (Shift+J)
+            self.enter_jump_to_path_mode()
             return True
         elif self.is_key_for_action(event, 'drives_dialog'):  # Show drives dialog
             self.show_drives_dialog()

@@ -115,7 +115,7 @@ class DefaultConfig:
         'delete_files': {'keys': ['k', 'K'], 'selection': 'required'}, # Delete selected files/directories
         'rename_file': ['r', 'R'],            # Rename selected file/directory
         'favorites': ['j'],                   # Show favorite directories dialog
-        'jump_dialog': ['J'],                 # Show jump to directory dialog (Shift+J)
+        'jump_to_path': ['J'],                # Jump to path (Shift+J)
         'history': ['h', 'H'],                # Show history for current pane
         'subshell': ['X'],                     # Enter subshell (command line) mode
         'programs': ['x'],                     # Show external programs menu
