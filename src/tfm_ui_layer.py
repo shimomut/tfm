@@ -197,13 +197,15 @@ class UILayerStack:
     - Full-screen layer optimization (skip rendering obscured layers)
     - Exception handling for robustness
     - Lifecycle management (activation/deactivation callbacks)
+    - Adaptive FPS integration (marks activity on rendering)
     
     Attributes:
         _layers: List of layers in the stack (index 0 = bottom)
         _log_manager: Optional LogManager for error logging
+        _adaptive_fps: Optional AdaptiveFPSManager for CPU optimization
     """
     
-    def __init__(self, bottom_layer: UILayer, log_manager=None):
+    def __init__(self, bottom_layer: UILayer, log_manager=None, adaptive_fps=None):
         """
         Initialize the layer stack with a bottom layer.
         
@@ -213,9 +215,11 @@ class UILayerStack:
         Args:
             bottom_layer: The permanent bottom layer (FileManager main screen)
             log_manager: Optional LogManager for error logging
+            adaptive_fps: Optional AdaptiveFPSManager for CPU optimization
         """
         self._layers: List[UILayer] = [bottom_layer]
         self._log_manager = log_manager
+        self._adaptive_fps = adaptive_fps
         
         # Activate the bottom layer
         bottom_layer.on_activate()
@@ -352,6 +356,7 @@ class UILayerStack:
         4. Render from the lowest dirty layer upward
         5. Clear dirty flags after successful rendering
         6. Refresh the screen
+        7. Mark activity for adaptive FPS (rendering indicates UI changes)
         
         Only renders layers that have dirty content or are above a dirty layer.
         Layers below the topmost full-screen layer are skipped for performance.
@@ -380,6 +385,10 @@ class UILayerStack:
         # If no dirty layers, nothing to render
         if lowest_dirty_index is None:
             return
+        
+        # Mark activity for adaptive FPS since we're about to render
+        if self._adaptive_fps:
+            self._adaptive_fps.mark_activity()
         
         # Mark all layers above the lowest dirty layer as dirty
         # (they need to redraw because a lower layer changed)

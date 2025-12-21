@@ -54,6 +54,7 @@ from tfm_cache_manager import CacheManager
 from tfm_profiling import ProfilingManager
 from tfm_menu_manager import MenuManager
 from tfm_ui_layer import UILayerStack, FileManagerLayer
+from tfm_adaptive_fps import AdaptiveFPSManager
 
 
 class TFMEventCallback(EventCallback):
@@ -84,6 +85,9 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed (command executed), False otherwise
         """
+        # Mark activity for adaptive FPS
+        self.file_manager.adaptive_fps.mark_activity()
+        
         # Route to the file manager's unified input handler
         return self.file_manager.handle_input(event)
     
@@ -97,6 +101,9 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed (character inserted), False otherwise
         """
+        # Mark activity for adaptive FPS
+        self.file_manager.adaptive_fps.mark_activity()
+        
         # Route to the file manager's unified input handler
         # handle_input() will route CharEvents to active dialogs
         return self.file_manager.handle_input(event)
@@ -111,6 +118,9 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed, False otherwise
         """
+        # Mark activity for adaptive FPS
+        self.file_manager.adaptive_fps.mark_activity()
+        
         if event.is_resize():
             # Handle window resize
             self.file_manager.clear_screen_with_background()
@@ -138,6 +148,9 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed, False otherwise
         """
+        # Mark activity for adaptive FPS
+        self.file_manager.adaptive_fps.mark_activity()
+        
         return self.file_manager._handle_menu_event(event)
 
 
@@ -149,6 +162,9 @@ class FileManager:
         # Initialize profiling manager if enabled
         # This must be done early to ensure zero overhead when disabled
         self.profiling_manager = ProfilingManager(enabled=profiling_enabled) if profiling_enabled else None
+        
+        # Initialize adaptive FPS manager for CPU optimization
+        self.adaptive_fps = AdaptiveFPSManager()
         
         # Display profiling mode message if enabled
         if self.profiling_manager:
@@ -245,7 +261,7 @@ class FileManager:
         
         # Initialize UI layer stack with FileManager as bottom layer
         self.file_manager_layer = FileManagerLayer(self)
-        self.ui_layer_stack = UILayerStack(self.file_manager_layer, self.log_manager)
+        self.ui_layer_stack = UILayerStack(self.file_manager_layer, self.log_manager, self.adaptive_fps)
 
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
@@ -999,6 +1015,7 @@ class FileManager:
         
         Events are delivered via the TFMEventCallback that was set up during
         initialization. The event loop processes events and redraws the interface.
+        Uses adaptive FPS to reduce CPU usage during idle periods.
         """
         # Draw initial interface
         self.draw_interface()
@@ -1034,8 +1051,11 @@ class FileManager:
                     self._last_selection_count = current_selection_count
                     self._update_menu_states()
             
-            # Process one event with timeout (events delivered via callbacks)
-            self.renderer.run_event_loop_iteration(timeout_ms=16)
+            # Get adaptive timeout based on activity level
+            timeout_ms = self.adaptive_fps.get_timeout_ms()
+
+            # Process one event with adaptive timeout (events delivered via callbacks)
+            self.renderer.run_event_loop_iteration(timeout_ms=timeout_ms)
             
             # Draw interface after event processing
             self.draw_interface()
