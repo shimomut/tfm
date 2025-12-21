@@ -3096,6 +3096,14 @@ if COCOA_AVAILABLE:
 
                 # Iterate through dirty region cells and accumulate into batches
                 # For a 24x80 grid, this processes 1,920 cells per full-screen update
+                
+                # Pre-calculate edge cell boundaries for performance
+                # Only edge cells need special handling for background extension
+                is_top_edge = (start_row == 0)
+                is_bottom_edge = (end_row == rows)
+                left_col = 0
+                right_col = self.backend.cols - 1
+                
                 for row in range(start_row, end_row):
                     # Optimization 2: Pre-calculate row Y-coordinate
                     # -----------------------------------------------
@@ -3111,6 +3119,9 @@ if COCOA_AVAILABLE:
                     # Impact: Reduces y-coordinate calculations from 1,920 to 24 per frame
                     # Performance gain: ~4-6% faster
                     y = (rows - row - 1) * char_height + offset_y
+                    
+                    # Check if this row is an edge row (only check once per row)
+                    is_edge_row = (row == 0 or row == rows - 1)
                     
                     for col in range(start_col, end_col):
                         # Get cell data: (char, color_pair, attributes)
@@ -3139,36 +3150,42 @@ if COCOA_AVAILABLE:
                         if attributes & TextAttribute.REVERSE:
                             fg_rgb, bg_rgb = bg_rgb, fg_rgb
                         
-                        # Determine cell dimensions with edge extension
-                        # For edge cells, extend the background to fill the frame area
-                        cell_x = x
-                        cell_y = y
-                        cell_width = char_width
-                        cell_height = char_height
+                        # Edge extension optimization: Only check edge cells
+                        # For non-edge cells, use standard dimensions (fast path)
+                        # For edge cells, calculate extended dimensions (slow path)
+                        is_edge_col = (col == left_col or col == right_col)
                         
-                        # Extend left edge (leftmost column)
-                        if col == 0:
-                            cell_x = 0
-                            cell_width = char_width + offset_x
-                        
-                        # Extend right edge (rightmost column)
-                        if col == self.backend.cols - 1:
-                            cell_width = char_width + offset_x
-                        
-                        # Extend top edge (topmost row)
-                        if row == 0:
-                            cell_height = char_height + offset_y
-                        
-                        # Extend bottom edge (bottommost row)
-                        if row == self.backend.rows - 1:
-                            cell_y = 0
-                            cell_height = char_height + offset_y
-                        
-                        # Add cell to batch with extended dimensions
-                        # The batcher accumulates adjacent cells with the same background
-                        # color into rectangular batches for efficient rendering
-                        batcher.add_cell(cell_x, cell_y, cell_width, 
-                                       cell_height, bg_rgb)
+                        if is_edge_row or is_edge_col:
+                            # Slow path: Edge cell - calculate extended dimensions
+                            cell_x = x
+                            cell_y = y
+                            cell_width = char_width
+                            cell_height = char_height
+                            
+                            # Extend left edge (leftmost column)
+                            if col == left_col:
+                                cell_x = 0
+                                cell_width = char_width + offset_x
+                            
+                            # Extend right edge (rightmost column)
+                            if col == right_col:
+                                cell_width = char_width + offset_x
+                            
+                            # Extend top edge (topmost row)
+                            if row == 0:
+                                cell_height = char_height + offset_y
+                            
+                            # Extend bottom edge (bottommost row)
+                            if row == rows - 1:
+                                cell_y = 0
+                                cell_height = char_height + offset_y
+                            
+                            batcher.add_cell(cell_x, cell_y, cell_width, 
+                                           cell_height, bg_rgb)
+                        else:
+                            # Fast path: Interior cell - use standard dimensions
+                            batcher.add_cell(x, y, char_width, 
+                                           char_height, bg_rgb)
                     
                     # Finish row - ensures current batch is completed
                     # This is called after each row to handle row boundaries correctly
