@@ -127,6 +127,18 @@ class TFMEventCallback(EventCallback):
                 self.file_manager.should_quit = True
                 return True
         return False
+    
+    def on_menu_event(self, event) -> bool:
+        """
+        Handle a menu event by routing to FileManager._handle_menu_event().
+        
+        Args:
+            event: MenuEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        return self.file_manager._handle_menu_event(event)
 
 
 class FileManager:

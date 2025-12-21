@@ -70,6 +70,18 @@ class EventCallback:
             True if the event was consumed (handled), False otherwise
         """
         return False
+    
+    def on_menu_event(self, event: 'MenuEvent') -> bool:
+        """
+        Handle a menu event.
+        
+        Args:
+            event: MenuEvent to handle
+        
+        Returns:
+            True if the event was consumed (handled), False otherwise
+        """
+        return False
 
 
 class Renderer(ABC):

@@ -1779,6 +1779,11 @@ class CoreGraphicsBackend(Renderer):
             )
             self.event_callback.on_system_event(close_event)
         
+        # Check for pending menu events and deliver them via callback
+        if hasattr(self, 'menu_event_queue') and self.menu_event_queue:
+            menu_event = self.menu_event_queue.pop(0)
+            self.event_callback.on_menu_event(menu_event)
+        
         # Get the shared application instance
         app = Cocoa.NSApplication.sharedApplication()
         
