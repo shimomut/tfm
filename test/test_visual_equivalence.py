@@ -163,6 +163,13 @@ class OffscreenRenderer:
         import objc
         context_ptr = objc.pyobjc_id(context)
         
+        # Calculate font_ascent for baseline positioning
+        # Create font to get ascent value
+        font_name = "Menlo"
+        font_size = 12.0
+        font = Cocoa.NSFont.fontWithName_size_(font_name, font_size)
+        font_ascent = font.ascender()
+        
         # Render using C++ implementation
         dirty_rect = (0.0, 0.0, float(self.width), float(self.height))
         
@@ -180,7 +187,8 @@ class OffscreenRenderer:
             cursor_visible=cursor_visible,
             cursor_row=cursor_row,
             cursor_col=cursor_col,
-            marked_text=marked_text or ""
+            marked_text=marked_text or "",
+            font_ascent=font_ascent
         )
         
         return buffer
@@ -192,7 +200,8 @@ class OffscreenRenderer:
         PyObjC rendering implementation.
         
         This is a simplified version of the PyObjC rendering logic from
-        CoreGraphicsBackend for testing purposes.
+        CoreGraphicsBackend for testing purposes. Uses CTLineDraw with baseline
+        positioning to match the actual backend implementation.
         """
         # Create font
         font_name = "Menlo"
@@ -200,6 +209,9 @@ class OffscreenRenderer:
         font = Cocoa.NSFont.fontWithName_size_(font_name, font_size)
         if font is None:
             font = Cocoa.NSFont.monospacedSystemFontOfSize_weight_(font_size, 0.0)
+        
+        # Get font ascent for baseline positioning
+        font_ascent = font.ascender()
         
         # Render backgrounds
         for row in range(rows):
@@ -282,15 +294,20 @@ class OffscreenRenderer:
                     char, attrs
                 )
                 
-                # Draw character
+                # Draw character using CTLineDraw with baseline positioning
                 x = col * char_width
                 y = (rows - row - 1) * char_height  # Flip Y coordinate
+                
+                # Calculate baseline position
+                # CTLineDraw draws at the baseline, so we need to position it at:
+                # y + (char_height - font_ascent)
+                baseline_y = y + (char_height - font_ascent)
                 
                 # Save graphics state
                 Quartz.CGContextSaveGState(context)
                 
-                # Set text position
-                Quartz.CGContextSetTextPosition(context, x, y)
+                # Set text position at baseline
+                Quartz.CGContextSetTextPosition(context, x, baseline_y)
                 
                 # Draw using CoreText
                 line = CTLineCreateWithAttributedString(attr_string)
@@ -315,6 +332,9 @@ class OffscreenRenderer:
             x = cursor_col * char_width
             y = (rows - cursor_row - 1) * char_height
             
+            # Calculate baseline position for marked text
+            baseline_y = y + (char_height - font_ascent)
+            
             # Create underlined attributed string
             attrs = {
                 Cocoa.NSFontAttributeName: font,
@@ -327,7 +347,7 @@ class OffscreenRenderer:
             )
             
             Quartz.CGContextSaveGState(context)
-            Quartz.CGContextSetTextPosition(context, x, y)
+            Quartz.CGContextSetTextPosition(context, x, baseline_y)
             
             line = CTLineCreateWithAttributedString(attr_string)
             CTLineDraw(line, context)

@@ -1379,6 +1379,7 @@ static bool is_wide_character(const std::string& utf8_char) {
  * @param cols Total number of columns in grid
  * @param offset_x X offset for centering the grid in the view
  * @param offset_y Y offset for centering the grid in the view
+ * @param font_ascent Font ascent for baseline positioning
  * @param attr_dict_cache AttributeDictCache for getting attribute dictionaries
  */
 static void render_characters(
@@ -1392,6 +1393,7 @@ static void render_characters(
     int cols,
     CGFloat offset_x,
     CGFloat offset_y,
+    CGFloat font_ascent,
     AttributeDictCache& attr_dict_cache
 );
 
@@ -1399,6 +1401,8 @@ static void render_characters(
 static void draw_character_batch(
     CGContextRef context,
     const CharacterBatch& batch,
+    CGFloat char_height,
+    CGFloat font_ascent,
     AttributeDictCache& attr_dict_cache
 );
 
@@ -1409,11 +1413,15 @@ static void draw_character_batch(
  * 
  * @param context CGContextRef to draw to
  * @param batch CharacterBatch containing the text and attributes to draw
+ * @param char_height Height of each character cell in pixels
+ * @param font_ascent Font ascent for baseline positioning
  * @param attr_dict_cache AttributeDictCache for getting attribute dictionaries
  */
 static void draw_character_batch(
     CGContextRef context,
     const CharacterBatch& batch,
+    CGFloat char_height,
+    CGFloat font_ascent,
     AttributeDictCache& attr_dict_cache
 ) {
     // Get attribute dictionary from cache
@@ -1468,13 +1476,22 @@ static void draw_character_batch(
     
     // Set text position in the graphics context
     // CoreText draws text with the baseline at the specified y position
-    // We need to adjust y to account for font descent to position text correctly
-    // For now, we'll use the y position directly and rely on the font metrics
-    // being consistent with the grid layout
-    CGContextSetTextPosition(context, batch.x, batch.y);
+    // In CoreGraphics coordinates (bottom-left origin), y is the bottom of the cell.
+    // CTLineDraw draws at the baseline. The baseline should be at:
+    // y + (char_height - font_ascent) to position text correctly.
+    // This accounts for the descender space below the baseline.
+    CGFloat baseline_y = batch.y + (char_height - font_ascent);
+    
+    // Save graphics state before drawing
+    // This ensures the text matrix is not affected by previous draws
+    CGContextSaveGState(context);
+    CGContextSetTextPosition(context, batch.x, baseline_y);
     
     // Draw the line
     CTLineDraw(line, context);
+    
+    // Restore graphics state
+    CGContextRestoreGState(context);
     
     // Release CTLine
     CFRelease(line);
@@ -1495,6 +1512,7 @@ static void render_characters(
     int cols,
     CGFloat offset_x,
     CGFloat offset_y,
+    CGFloat font_ascent,
     AttributeDictCache& attr_dict_cache
 ) {
     // Current batch being accumulated
@@ -1510,7 +1528,7 @@ static void render_characters(
             if (cell.character == " " || cell.character.empty()) {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
-                    draw_character_batch(context, current_batch.value(), attr_dict_cache);
+                    draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
                 continue;
@@ -1521,7 +1539,7 @@ static void render_characters(
             if (cell.character.empty()) {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
-                    draw_character_batch(context, current_batch.value(), attr_dict_cache);
+                    draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
                 continue;
@@ -1532,7 +1550,7 @@ static void render_characters(
             if (color_it == color_pairs.end()) {
                 // Color pair not found - skip this cell
                 if (current_batch.has_value()) {
-                    draw_character_batch(context, current_batch.value(), attr_dict_cache);
+                    draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
                 continue;
@@ -1606,7 +1624,7 @@ static void render_characters(
             } else {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
-                    draw_character_batch(context, current_batch.value(), attr_dict_cache);
+                    draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
                 }
                 
                 // Start new batch
@@ -1630,14 +1648,14 @@ static void render_characters(
         
         // Finish batch at end of row
         if (current_batch.has_value()) {
-            draw_character_batch(context, current_batch.value(), attr_dict_cache);
+            draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
             current_batch = std::nullopt;
         }
     }
     
     // Finish any remaining batch
     if (current_batch.has_value()) {
-        draw_character_batch(context, current_batch.value(), attr_dict_cache);
+        draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
     }
 }
 
@@ -1946,6 +1964,7 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             "cursor_row",
             "cursor_col",
             "marked_text",
+            "font_ascent",
             nullptr
         };
         
@@ -1964,11 +1983,12 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
         int cursor_row = 0;
         int cursor_col = 0;
         const char* marked_text = nullptr;
+        double font_ascent = 0.0;
         
         // Parse arguments
         if (!PyArg_ParseTupleAndKeywords(
             args, kwargs,
-            "KOOOddiiddpii|z:render_frame",
+            "KOOOddiiddpii|zd:render_frame",
             const_cast<char**>(kwlist),
             &context_ptr,
             &grid_obj,
@@ -1983,7 +2003,8 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             &cursor_visible,
             &cursor_row,
             &cursor_col,
-            &marked_text
+            &marked_text,
+            &font_ascent
         )) {
             // PyArg_ParseTupleAndKeywords sets the exception
             return nullptr;
@@ -2133,6 +2154,7 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             cols,
             static_cast<CGFloat>(offset_x),
             static_cast<CGFloat>(offset_y),
+            static_cast<CGFloat>(font_ascent),
             *g_attr_dict_cache
         );
         

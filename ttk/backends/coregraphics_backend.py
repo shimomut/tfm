@@ -3167,7 +3167,8 @@ if COCOA_AVAILABLE:
                     self.backend.cursor_visible,
                     self.backend.cursor_row,
                     self.backend.cursor_col,
-                    marked_text
+                    marked_text,
+                    self.backend.font_ascent  # Add font_ascent for baseline positioning
                 )
             
             def _render_with_pyobjc(self, rect, offset_x: float, offset_y: float):
