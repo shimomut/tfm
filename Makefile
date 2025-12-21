@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo
+.PHONY: help run run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo build-cpp rebuild-cpp
 
 # Backend selection (default: curses)
 # Usage: make run BACKEND=coregraphics
@@ -17,6 +17,8 @@ help:
 	@echo "  monitor-log  - Connect to remote log monitoring (port 8123)"
 	@echo "  test         - Run all tests"
 	@echo "  test-quick   - Run quick verification tests"
+	@echo "  build-cpp    - Build C++ rendering extension"
+	@echo "  rebuild-cpp  - Clean and rebuild C++ rendering extension"
 	@echo "  clean        - Clean up temporary files"
 	@echo "  install      - Install TFM"
 	@echo "  uninstall    - Uninstall TFM"
@@ -32,6 +34,7 @@ help:
 	@echo "  make run                        # Run with curses backend (default)"
 	@echo "  make run BACKEND=coregraphics   # Run with CoreGraphics backend"
 	@echo "  make test BACKEND=coregraphics  # Test with CoreGraphics backend"
+	@echo "  make build-cpp                  # Build C++ renderer"
 
 run:
 	@echo "Running TFM (backend: $(BACKEND))..."
@@ -98,3 +101,18 @@ format:
 demo:
 	@echo "Running TFM demo..."
 	@cd test && python3 demo_delete_feature.py
+
+build-cpp:
+	@echo "Building C++ rendering extension..."
+	@python3 setup.py build_ext --inplace
+	@echo "Build complete! Extension file:"
+	@ls -lh cpp_renderer*.so 2>/dev/null || echo "Build failed - no .so file created"
+
+rebuild-cpp:
+	@echo "Cleaning previous C++ build..."
+	@rm -f cpp_renderer*.so
+	@rm -rf build/temp.*
+	@echo "Rebuilding C++ rendering extension..."
+	@python3 setup.py build_ext --inplace --force
+	@echo "Rebuild complete! Extension file:"
+	@ls -lh cpp_renderer*.so 2>/dev/null || echo "Build failed - no .so file created"

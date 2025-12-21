@@ -1155,6 +1155,15 @@ static void render_backgrounds(
     CGFloat offset_x,
     CGFloat offset_y
 ) {
+    // Pre-calculate edge cell boundaries for performance
+    // Only edge cells need special handling for background extension
+    int left_col = 0;
+    int right_col = cols - 1;
+    
+    // Only apply edge extension if there's actual padding (offset > 0)
+    // This prevents unnecessary extension when rendering without padding
+    bool has_padding = (offset_x > 0.01f || offset_y > 0.01f);
+    
     // Iterate through dirty region cells
     for (int row = dirty_cells.start_row; row < dirty_cells.end_row; ++row) {
         for (int col = dirty_cells.start_col; col < dirty_cells.end_col; ++col) {
@@ -1171,26 +1180,55 @@ static void render_backgrounds(
             const ColorPair& colors = color_it->second;
             uint32_t bg_rgb = colors.bg_rgb;
             
-            // Calculate pixel position for this cell
+            // Calculate base pixel position for this cell
             // Convert TTK row to CoreGraphics y-coordinate
             CGFloat y = ttk_to_cg_y(row, rows, char_height) + offset_y;
             CGFloat x = static_cast<CGFloat>(col) * char_width + offset_x;
             
-            // Determine cell width (handle edge cell extension for window padding)
-            CGFloat width = char_width;
+            // Edge extension optimization: Only check edge cells when padding exists
+            // For non-edge cells, use standard dimensions (fast path)
+            // For edge cells with padding, calculate extended dimensions (slow path)
+            bool is_edge_row = (row == 0 || row == rows - 1);
+            bool is_edge_col = (col == left_col || col == right_col);
             
-            // Edge cell extension: if this is the last column, extend width
-            // to fill any remaining space in the view (for window padding)
-            if (col == cols - 1) {
-                // For the rightmost column, we might want to extend the background
-                // to fill the padding area. However, we need the view width to calculate this.
-                // For now, just use standard char_width. This can be enhanced later
-                // if we pass view dimensions to this function.
-                width = char_width;
+            if (has_padding && (is_edge_row || is_edge_col)) {
+                // Slow path: Edge cell with padding - calculate extended dimensions
+                // This matches the PyObjC backend behavior to fill window padding
+                CGFloat cell_x = x;
+                CGFloat cell_y = y;
+                CGFloat cell_width = char_width;
+                CGFloat cell_height = char_height;
+                
+                // Extend left edge (leftmost column)
+                if (col == left_col) {
+                    cell_x = 0;
+                    cell_width = char_width + offset_x;
+                }
+                
+                // Extend right edge (rightmost column)
+                if (col == right_col) {
+                    cell_width = char_width + offset_x;
+                }
+                
+                // Extend top edge (topmost row)
+                // In CoreGraphics coordinates, top edge is at highest y value
+                if (row == 0) {
+                    cell_height = char_height + offset_y;
+                }
+                
+                // Extend bottom edge (bottommost row)
+                // In CoreGraphics coordinates, bottom edge is at y=0
+                if (row == rows - 1) {
+                    cell_y = 0;
+                    cell_height = char_height + offset_y;
+                }
+                
+                // Add extended cell to batcher
+                batcher.add_cell(cell_x, cell_y, cell_width, cell_height, bg_rgb);
+            } else {
+                // Fast path: Interior cell or no padding - use standard dimensions
+                batcher.add_cell(x, y, char_width, char_height, bg_rgb);
             }
-            
-            // Add cell to batcher
-            batcher.add_cell(x, y, width, char_height, bg_rgb);
         }
         
         // Finish row to ensure batches don't span rows
