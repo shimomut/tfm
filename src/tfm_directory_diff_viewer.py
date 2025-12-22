@@ -510,6 +510,10 @@ class DirectoryDiffViewer(UILayer):
         # Display options
         self.show_identical = True  # Whether to show identical files
         
+        # Layout constants
+        self.separator = "  |  "
+        self.separator_width = get_display_width(self.separator)
+        
         # Scanning state
         self.scan_in_progress = False
         self.scan_progress = 0.0
@@ -741,11 +745,12 @@ class DirectoryDiffViewer(UILayer):
         # Render normal view
         self._render_header(renderer, width)
         self._render_content(renderer, width, height)
+        self._render_help_bar(renderer, width, height)
         self._render_status_bar(renderer, width, height)
     
     def _render_header(self, renderer, width: int) -> None:
         """
-        Render the header with directory paths and controls.
+        Render the header with directory paths.
         
         Args:
             renderer: TTK renderer instance
@@ -755,33 +760,36 @@ class DirectoryDiffViewer(UILayer):
         status_color_pair, status_attrs = get_status_color()
         
         # Line 1: Directory paths
-        left_label = f"Left: {self.left_path}"
-        right_label = f"Right: {self.right_path}"
+        left_label = str(self.left_path)
+        right_label = str(self.right_path)
         
         # Calculate available space for each path
-        # Format: "Left: <path>  |  Right: <path>"
-        separator = "  |  "
-        available_width = width - len(separator)
-        left_width = available_width // 2
-        right_width = available_width - left_width
+        # Format: "<path>  |  <path>"
+        available_width = width - self.separator_width
+        # Split evenly, giving any extra character to the left side
+        right_width = available_width // 2
+        left_width = available_width - right_width
         
-        # Truncate paths if needed
-        if len(left_label) > left_width:
-            left_label = "Left: ..." + str(self.left_path)[-left_width+9:]
-        if len(right_label) > right_width:
-            right_label = "Right: ..." + str(self.right_path)[-right_width+10:]
+        # Truncate paths if needed using wide-char aware functions
+        left_display_width = get_display_width(left_label)
+        if left_display_width > left_width:
+            left_label = truncate_to_width(left_label, left_width, ellipsis="...")
+        
+        right_display_width = get_display_width(right_label)
+        if right_display_width > right_width:
+            right_label = truncate_to_width(right_label, right_width, ellipsis="...")
+        
+        # Pad labels to exact widths using spaces
+        left_actual_width = get_display_width(left_label)
+        right_actual_width = get_display_width(right_label)
+        left_padding = " " * (left_width - left_actual_width)
+        right_padding = " " * (right_width - right_actual_width)
         
         # Build header line
-        header_line = left_label.ljust(left_width) + separator + right_label
-        header_line = header_line[:width]
+        header_line = left_label + left_padding + self.separator + right_label + right_padding
         
         # Draw header with background color
         renderer.draw_text(0, 0, header_line.ljust(width), status_color_pair, status_attrs)
-        
-        # Line 2: Controls/help text
-        controls = "↑↓:Navigate  ←→/Enter:Expand/Collapse  Ctrl+Enter:View Diff  i:Toggle Identical  q/ESC:Quit"
-        controls = controls[:width]
-        renderer.draw_text(1, 0, controls.ljust(width), status_color_pair, status_attrs)
     
     def _render_progress_screen(self, renderer, width: int, height: int) -> None:
         """
@@ -921,8 +929,8 @@ class DirectoryDiffViewer(UILayer):
             width: Terminal width
             height: Terminal height
         """
-        # Calculate content area (header is 2 lines, status bar is 1 line)
-        content_start_y = 2
+        # Calculate content area (header is 1 line, help bar is 1 line, status bar is 1 line)
+        content_start_y = 1
         content_height = height - 3
         
         # Check if directories are empty or identical
@@ -936,12 +944,14 @@ class DirectoryDiffViewer(UILayer):
         
         # Calculate column widths for side-by-side layout
         # Format: [indent][expand][name] | [indent][expand][name] [scrollbar]
-        separator_width = 3  # " | "
-        available_width = width - separator_width - scrollbar_width
-        column_width = available_width // 2
+        # Use the same separator as the header for alignment
+        available_width = width - self.separator_width - scrollbar_width
+        # Split evenly, giving any extra character to the left side (same as header)
+        right_column_width = available_width // 2
+        left_column_width = available_width - right_column_width  # Left gets any extra character
         left_column_x = 0
-        separator_x = column_width
-        right_column_x = column_width + separator_width
+        separator_x = left_column_width
+        right_column_x = left_column_width + self.separator_width
         scrollbar_x = width - scrollbar_width if scrollbar_width > 0 else width
         
         # Render visible nodes
@@ -994,26 +1004,32 @@ class DirectoryDiffViewer(UILayer):
             # Render left column
             if node.left_path:
                 # Node exists on left side
-                left_text = truncate_to_width(node_text, column_width)
-                left_text = left_text.ljust(column_width)
+                left_text = truncate_to_width(node_text, left_column_width)
+                # Pad to exact width using display width
+                left_text_width = get_display_width(left_text)
+                left_padding = " " * (left_column_width - left_text_width)
+                left_text = left_text + left_padding
                 renderer.draw_text(y_pos, left_column_x, left_text, color_pair, attrs)
             else:
                 # Node doesn't exist on left side - show blank with gray background
-                blank_text = " " * column_width
+                blank_text = " " * left_column_width
                 renderer.draw_text(y_pos, left_column_x, blank_text, blank_color_pair, blank_attrs)
             
             # Render separator
-            renderer.draw_text(y_pos, separator_x, " | ", color_pair, attrs)
+            renderer.draw_text(y_pos, separator_x, self.separator, color_pair, attrs)
             
             # Render right column
             if node.right_path:
                 # Node exists on right side
-                right_text = truncate_to_width(node_text, column_width)
-                right_text = right_text.ljust(column_width)
+                right_text = truncate_to_width(node_text, right_column_width)
+                # Pad to exact width using display width
+                right_text_width = get_display_width(right_text)
+                right_padding = " " * (right_column_width - right_text_width)
+                right_text = right_text + right_padding
                 renderer.draw_text(y_pos, right_column_x, right_text, color_pair, attrs)
             else:
                 # Node doesn't exist on right side - show blank with gray background
-                blank_text = " " * column_width
+                blank_text = " " * right_column_width
                 renderer.draw_text(y_pos, right_column_x, blank_text, blank_color_pair, blank_attrs)
         
         # Draw scrollbar if needed
@@ -1090,6 +1106,23 @@ class DirectoryDiffViewer(UILayer):
                 return get_color_with_attrs(COLOR_DIRECTORIES)
             else:
                 return get_color_with_attrs(COLOR_REGULAR_FILE)
+    
+    def _render_help_bar(self, renderer, width: int, height: int) -> None:
+        """
+        Render the help bar with navigation controls.
+        
+        Args:
+            renderer: TTK renderer instance
+            width: Terminal width
+            height: Terminal height
+        """
+        help_y = height - 2
+        status_color_pair, status_attrs = get_status_color()
+        
+        # Controls/help text
+        controls = "↑↓:Navigate  ←→/Enter:Expand/Collapse  Ctrl+Enter:View Diff  i:Toggle Identical  q/ESC:Quit"
+        controls = controls[:width]
+        renderer.draw_text(help_y, 0, controls.ljust(width), status_color_pair, status_attrs)
     
     def _render_status_bar(self, renderer, width: int, height: int) -> None:
         """
