@@ -212,22 +212,12 @@ class DirectoryScanner:
                 
                 except Exception as e:
                     # Log error but continue scanning
-                    try:
-                        from tfm_log_manager import LogManager
-                        LogManager.log_warning(f"Error scanning {current_path}: {e}")
-                    except Exception:
-                        # LogManager not available or failed, print to stderr
-                        print(f"Error scanning {current_path}: {e}", file=__import__('sys').stderr)
+                    print(f"Error scanning {current_path}: {e}", file=__import__('sys').stderr)
                     continue
         
         except Exception as e:
             # Fatal error scanning root directory
-            try:
-                from tfm_log_manager import LogManager
-                LogManager.log_error(f"Fatal error scanning {root_path}: {e}")
-            except Exception:
-                # LogManager not available or failed, print to stderr
-                print(f"Fatal error scanning {root_path}: {e}", file=__import__('sys').stderr)
+            print(f"Fatal error scanning {root_path}: {e}", file=__import__('sys').stderr)
             raise
         
         return files
@@ -489,13 +479,8 @@ class DiffEngine:
             error_msg = f"Error comparing files: {e}"
             self.comparison_errors[error_key] = error_msg
             
-            # Try to log the error if LogManager is available
-            try:
-                from tfm_log_manager import LogManager
-                LogManager.log_warning(error_msg)
-            except Exception:
-                # LogManager not available or failed, print to stderr
-                print(error_msg, file=__import__('sys').stderr)
+            # Log the error
+            print(error_msg, file=__import__('sys').stderr)
             
             # If we can't read the files, consider them different
             return False
@@ -1930,11 +1915,11 @@ class DirectoryDiffViewer(UILayer):
     
     def open_file_diff(self, node_index: int) -> None:
         """
-        Open file diff viewer for a content-different file node.
+        Open file diff viewer for a file node.
         
-        This method checks if the cursor is on a file node that is marked as
-        content-different, and if so, creates a DiffViewer instance with both
-        file paths and pushes it onto the UI layer stack.
+        This method checks if the cursor is on a file node that exists on both sides,
+        and if so, creates a DiffViewer instance with both file paths and pushes it
+        onto the UI layer stack.
         
         Args:
             node_index: Index of the node in visible_nodes list
@@ -1949,22 +1934,15 @@ class DirectoryDiffViewer(UILayer):
         if node.is_directory:
             return
         
-        # Only open diff for content-different files
-        if node.difference_type != DifferenceType.CONTENT_DIFFERENT:
-            return
-        
-        # Both paths must exist for content-different files
+        # Need both paths to open diff viewer
         if not node.left_path or not node.right_path:
+            # File only exists on one side, cannot open diff viewer
             return
         
         # Check if layer_stack is available
         if not self.layer_stack:
-            # Log warning if LogManager is available
-            try:
-                from tfm_log_manager import LogManager
-                LogManager.log_warning("Cannot open file diff: layer_stack not provided to DirectoryDiffViewer")
-            except Exception:
-                pass
+            # Log warning
+            print("Cannot open file diff: layer_stack not provided to DirectoryDiffViewer", file=__import__('sys').stderr)
             return
         
         # Create DiffViewer instance
@@ -1978,10 +1956,5 @@ class DirectoryDiffViewer(UILayer):
             self.mark_dirty()
             
         except Exception as e:
-            # Log error if LogManager is available
-            try:
-                from tfm_log_manager import LogManager
-                LogManager.log_error(f"Error opening file diff viewer: {e}")
-            except Exception:
-                # LogManager not available or failed, print to stderr
-                print(f"Error opening file diff viewer: {e}", file=__import__('sys').stderr)
+            # Log error
+            print(f"Error opening file diff viewer: {e}", file=__import__('sys').stderr)
