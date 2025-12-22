@@ -515,6 +515,9 @@ class TextViewer(UILayer):
                     self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
                     self.jump_to_match()
                 return True
+            else:
+                # For other KeyEvents, return False so backend can generate CharEvent
+                return False
         
         return False
     
@@ -1032,15 +1035,22 @@ class TextViewer(UILayer):
         """
         Handle a character event (UILayer interface method).
         
-        TextViewer doesn't handle character events directly (no text input in viewer mode).
-        Character events are only handled in isearch mode, which is triggered by key events.
+        Character events are handled in isearch mode for text input.
         
         Args:
             event: CharEvent to handle
         
         Returns:
-            False (viewers don't handle char events)
+            True if event was handled, False otherwise
         """
+        # Handle character input in isearch mode
+        if self.isearch_mode:
+            result = self.handle_isearch_input(event)
+            if result:
+                self._dirty = True
+            return result
+        
+        # Outside isearch mode, don't handle character events
         return False
     
     def render(self, renderer) -> None:
