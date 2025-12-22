@@ -2336,6 +2336,8 @@ class FileManager:
             if option == "Toggle hidden files":
                 old_state = self.file_operations.show_hidden
                 new_state = self.file_operations.toggle_hidden_files()
+                # Refresh file lists for both panes
+                self.refresh_files()
                 # Reset both panes
                 self.pane_manager.left_pane['focused_index'] = 0
                 self.pane_manager.left_pane['scroll_offset'] = 0
@@ -3292,6 +3294,8 @@ class FileManager:
             return True
         elif self.is_key_for_action(event, 'toggle_hidden'):
             self.file_operations.toggle_hidden_files()
+            # Refresh file lists for both panes
+            self.refresh_files()
             # Reset both panes
             self.pane_manager.left_pane['focused_index'] = 0
             self.pane_manager.left_pane['scroll_offset'] = 0
