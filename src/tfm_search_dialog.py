@@ -31,6 +31,7 @@ class SearchDialog(UILayer, BaseListDialog):
         self.content_changed = True  # Track if content needs redraw
         self.search_root = None  # Root directory for search
         self._selected_result = None  # Selected result when dialog closes
+        self.callback = None  # Callback function when result is selected
         
         # Threading support
         self.search_thread = None
@@ -44,12 +45,14 @@ class SearchDialog(UILayer, BaseListDialog):
         # Get configurable search result limit
         self.max_search_results = getattr(config, 'MAX_SEARCH_RESULTS', 10000)
         
-    def show(self, search_type='filename', search_root=None):
+    def show(self, search_type='filename', search_root=None, callback=None):
         """Show the search dialog for filename or content search
         
         Args:
             search_type: 'filename' or 'content' search mode
             search_root: Path object representing the root directory to search from
+            callback: Optional callback function to call when a result is selected.
+                     Callback receives the selected result as an argument.
         """
         # Cancel any existing search first
         self._cancel_current_search()
@@ -58,6 +61,7 @@ class SearchDialog(UILayer, BaseListDialog):
         self.is_active = True
         self.search_type = search_type
         self.search_root = search_root
+        self.callback = callback
         self.text_editor.clear()
         self.results = []
         self.selected = 0
@@ -80,6 +84,7 @@ class SearchDialog(UILayer, BaseListDialog):
         self.searching = False
         self.last_search_pattern = ""
         self.search_root = None
+        self.callback = None
         # Don't clear _selected_result here - it needs to persist for retrieval
         self.content_changed = True  # Mark content as changed when exiting
         
@@ -492,20 +497,36 @@ class SearchDialog(UILayer, BaseListDialog):
         result = self.handle_common_navigation(event, current_results)
         
         if result == 'cancel':
+            # Store callback before exiting
+            callback = self.callback
+            
             # Cancel search before exiting
             self._cancel_current_search()
             self.exit()
+            
+            # Call callback after exiting to allow new dialogs
+            if callback:
+                callback(None)
             return True
         elif result == 'select':
+            # Store callback before exiting
+            callback = self.callback
+            
             # Cancel search before navigating
             self._cancel_current_search()
             
             # Store selected result for retrieval
+            selected_result = None
             with self.search_lock:
                 if self.results and 0 <= self.selected < len(self.results):
-                    self._selected_result = self.results[self.selected]
+                    selected_result = self.results[self.selected]
+                    self._selected_result = selected_result
             
             self.exit()
+            
+            # Call callback after exiting to allow new dialogs
+            if callback and selected_result:
+                callback(selected_result)
             return True
         elif result == 'text_changed':
             self.content_changed = True

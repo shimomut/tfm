@@ -1043,6 +1043,12 @@ class FileManager:
             # Process one event with adaptive timeout (events delivered via callbacks)
             self.renderer.run_event_loop_iteration(timeout_ms=timeout_ms)
             
+            # Check if top layer wants to close and pop it if so
+            # This must be done after event processing but before drawing
+            # to handle layers that want to close due to system events
+            if self.ui_layer_stack.check_and_close_top_layer():
+                self.needs_full_redraw = True
+            
             # Draw interface after event processing
             self.draw_interface()
             
@@ -3066,7 +3072,19 @@ class FileManager:
         """Show the search dialog for filename or content search - wrapper for search dialog component"""
         current_pane = self.get_current_pane()
         search_root = current_pane['path']
-        self.search_dialog.show(search_type, search_root)
+        
+        # Define callback for when a result is selected
+        def on_search_result_selected(result):
+            if result:
+                # Navigate to the selected result
+                self._navigate_to_search_result(result)
+                
+                # Save search term to history if it's not empty
+                search_term = self.search_dialog.text_editor.text.strip()
+                if search_term:
+                    self.add_search_to_history(search_term)
+        
+        self.search_dialog.show(search_type, search_root, callback=on_search_result_selected)
         # Push dialog onto layer stack
         self.push_layer(self.search_dialog)
         
@@ -3590,20 +3608,6 @@ class FileManager:
             consumed = self.ui_layer_stack.handle_key_event(event)
         else:  # CharEvent
             consumed = self.ui_layer_stack.handle_char_event(event)
-        
-        # Check if top layer wants to close and pop it if so
-        if self.ui_layer_stack.check_and_close_top_layer():
-            # Check if search dialog just closed with a selected result
-            if hasattr(self, 'search_dialog'):
-                selected_result = self.search_dialog.get_selected_result()
-                if selected_result:
-                    self._navigate_to_search_result(selected_result)
-                    # Save search term to history if it's not empty
-                    search_term = self.search_dialog.text_editor.text.strip()
-                    if search_term:
-                        self.add_search_to_history(search_term)
-            
-            self.needs_full_redraw = True
         
         # Mark for redraw if event was consumed
         if consumed:
