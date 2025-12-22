@@ -15,6 +15,8 @@
 #include <cstdint>
 #include <cmath>
 #include <chrono>
+#include <locale>
+#include <codecvt>
 
 // Module version
 #define CPP_RENDERER_VERSION "1.0.0"
@@ -25,9 +27,9 @@
 
 // Cell structure representing a single grid cell
 struct Cell {
-    std::string character;  // UTF-8 encoded character
-    int color_pair;         // Color pair ID
-    int attributes;         // Text attributes (BOLD, UNDERLINE, etc.)
+    std::u16string character;  // UTF-16 encoded character
+    int color_pair;            // Color pair ID
+    int attributes;            // Text attributes (BOLD, UNDERLINE, etc.)
 };
 
 // Color pair structure with packed RGB values
@@ -947,7 +949,7 @@ static std::vector<std::vector<Cell>> parse_grid(PyObject* grid_obj, int expecte
                 );
             }
             
-            // Extract character (UTF-8 string)
+            // Extract character (UTF-8 string from Python)
             PyObject* char_obj = PyTuple_GetItem(cell_obj, 0);  // Borrowed reference
             if (!PyUnicode_Check(char_obj)) {
                 throw std::runtime_error(
@@ -956,13 +958,30 @@ static std::vector<std::vector<Cell>> parse_grid(PyObject* grid_obj, int expecte
                 );
             }
             
-            // Convert Python string to UTF-8 C++ string
-            const char* char_utf8 = PyUnicode_AsUTF8(char_obj);
-            if (char_utf8 == nullptr) {
-                throw std::runtime_error(
-                    "Failed to convert character to UTF-8 at (" + std::to_string(row) +
-                    ", " + std::to_string(col) + ")"
-                );
+            // Convert Python Unicode string to UTF-16 (std::u16string)
+            // Python 3 uses Unicode internally, so we can get UTF-16 directly
+            Py_ssize_t char_length;
+            const Py_UCS2* char_data = PyUnicode_2BYTE_DATA(char_obj);
+            char_length = PyUnicode_GET_LENGTH(char_obj);
+            
+            std::u16string character;
+            if (char_data != nullptr && char_length > 0) {
+                // Check if Python is using UCS-2 (2-byte) representation
+                if (PyUnicode_KIND(char_obj) == PyUnicode_2BYTE_KIND) {
+                    character = std::u16string(reinterpret_cast<const char16_t*>(char_data), char_length);
+                } else {
+                    // Fallback: convert via UTF-8
+                    const char* char_utf8 = PyUnicode_AsUTF8(char_obj);
+                    if (char_utf8 == nullptr) {
+                        throw std::runtime_error(
+                            "Failed to convert character at (" + std::to_string(row) +
+                            ", " + std::to_string(col) + ")"
+                        );
+                    }
+                    // Convert UTF-8 to UTF-16
+                    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
+                    character = converter.from_bytes(char_utf8);
+                }
             }
             
             // Extract color_pair (integer)
@@ -999,7 +1018,7 @@ static std::vector<std::vector<Cell>> parse_grid(PyObject* grid_obj, int expecte
             
             // Create cell and add to row
             Cell cell;
-            cell.character = char_utf8;
+            cell.character = std::move(character);
             cell.color_pair = static_cast<int>(color_pair);
             cell.attributes = static_cast<int>(attributes);
             
@@ -1298,7 +1317,7 @@ static void draw_batched_backgrounds(
  * Structure representing a batch of consecutive characters with the same attributes.
  */
 struct CharacterBatch {
-    std::string text;        // Accumulated UTF-8 text
+    std::u16string text;     // UTF-16 text (compatible with UniChar)
     int font_attributes;     // Font attributes (BOLD, etc.)
     uint32_t fg_rgb;         // Foreground color (packed RGB)
     bool underline;          // Underline flag
@@ -1310,41 +1329,11 @@ struct CharacterBatch {
  * Check if a character is a wide character (occupies 2 grid cells).
  * Wide characters include CJK characters and other full-width Unicode characters.
  * 
- * @param utf8_char UTF-8 encoded character string
+ * @param ch UTF-16 character (char16_t)
  * @return true if the character is wide, false otherwise
  */
-static bool is_wide_character(const std::string& utf8_char) {
-    // Empty string is not wide
-    if (utf8_char.empty()) {
-        return false;
-    }
-    
-    // Decode UTF-8 to get Unicode code point
-    const unsigned char* bytes = reinterpret_cast<const unsigned char*>(utf8_char.c_str());
-    uint32_t codepoint = 0;
-    
-    // UTF-8 decoding
-    if ((bytes[0] & 0x80) == 0) {
-        // 1-byte character (ASCII)
-        codepoint = bytes[0];
-    } else if ((bytes[0] & 0xE0) == 0xC0) {
-        // 2-byte character
-        if (utf8_char.length() < 2) return false;
-        codepoint = ((bytes[0] & 0x1F) << 6) | (bytes[1] & 0x3F);
-    } else if ((bytes[0] & 0xF0) == 0xE0) {
-        // 3-byte character
-        if (utf8_char.length() < 3) return false;
-        codepoint = ((bytes[0] & 0x0F) << 12) | ((bytes[1] & 0x3F) << 6) | (bytes[2] & 0x3F);
-    } else if ((bytes[0] & 0xF8) == 0xF0) {
-        // 4-byte character
-        if (utf8_char.length() < 4) return false;
-        codepoint = ((bytes[0] & 0x07) << 18) | ((bytes[1] & 0x3F) << 12) |
-                    ((bytes[2] & 0x3F) << 6) | (bytes[3] & 0x3F);
-    } else {
-        return false;
-    }
-    
-    // Check if codepoint is in wide character ranges
+static bool is_wide_character(char16_t ch) {
+    // Check if character is in wide character ranges
     // CJK Unified Ideographs: U+4E00 - U+9FFF
     // CJK Compatibility Ideographs: U+F900 - U+FAFF
     // Hangul Syllables: U+AC00 - U+D7AF
@@ -1352,12 +1341,12 @@ static bool is_wide_character(const std::string& utf8_char) {
     // Katakana: U+30A0 - U+30FF
     // Fullwidth ASCII variants: U+FF00 - U+FFEF
     
-    if ((codepoint >= 0x4E00 && codepoint <= 0x9FFF) ||   // CJK Unified Ideographs
-        (codepoint >= 0xF900 && codepoint <= 0xFAFF) ||   // CJK Compatibility
-        (codepoint >= 0xAC00 && codepoint <= 0xD7AF) ||   // Hangul
-        (codepoint >= 0x3040 && codepoint <= 0x309F) ||   // Hiragana
-        (codepoint >= 0x30A0 && codepoint <= 0x30FF) ||   // Katakana
-        (codepoint >= 0xFF00 && codepoint <= 0xFFEF)) {   // Fullwidth ASCII
+    if ((ch >= 0x4E00 && ch <= 0x9FFF) ||   // CJK Unified Ideographs
+        (ch >= 0xF900 && ch <= 0xFAFF) ||   // CJK Compatibility
+        (ch >= 0xAC00 && ch <= 0xD7AF) ||   // Hangul
+        (ch >= 0x3040 && ch <= 0x309F) ||   // Hiragana
+        (ch >= 0x30A0 && ch <= 0x30FF) ||   // Katakana
+        (ch >= 0xFF00 && ch <= 0xFFEF)) {   // Fullwidth ASCII
         return true;
     }
     
@@ -1458,19 +1447,9 @@ static void draw_character_batch(
         return;
     }
     
-    // Convert UTF-8 string to UniChar array for glyph lookup
-    CFStringRef text_string = CFStringCreateWithCString(
-        kCFAllocatorDefault,
-        batch.text.c_str(),
-        kCFStringEncodingUTF8
-    );
-    
-    if (text_string == nullptr) {
-        fprintf(stderr, "  ERROR: text_string is nullptr\n");
-        return;
-    }
-    
-    CFIndex length = CFStringGetLength(text_string);
+    // Convert UTF-16 string to UniChar array for glyph lookup
+    // Since char16_t and UniChar are both 16-bit, we can directly copy
+    CFIndex length = static_cast<CFIndex>(batch.text.length());
     if (length == 0) {
         return;
     }
@@ -1480,9 +1459,10 @@ static void draw_character_batch(
     std::vector<CGGlyph> glyphs(length);
     std::vector<CGPoint> positions(length);
     
-    // Get UniChar characters from string
-    CFStringGetCharacters(text_string, CFRangeMake(0, length), characters.data());
-    CFRelease(text_string);
+    // Copy UTF-16 characters directly to UniChar array
+    for (CFIndex i = 0; i < length; ++i) {
+        characters[i] = static_cast<UniChar>(batch.text[i]);
+    }
     
     // Get glyphs for characters
     bool all_glyphs_found = CTFontGetGlyphsForCharacters(font, characters.data(), glyphs.data(), length);
@@ -1510,49 +1490,22 @@ static void draw_character_batch(
         }
     }
     
-    // Note: text_string may be autoreleased, so we don't manually release it
-    
     // Calculate baseline position
     CGFloat baseline_y = batch.y + (char_height - font_ascent);
     
     // Calculate position for each glyph at exact grid positions
+    // With UTF-16, we can directly iterate through characters
     CGFloat x = batch.x;
-    size_t utf8_pos = 0;
     
     for (CFIndex i = 0; i < length; ++i) {
         positions[i].x = x;
         positions[i].y = baseline_y;
         
-        // Extract the current UTF-8 character to check if it's wide
-        size_t char_start = utf8_pos;
-        
-        // Parse UTF-8 character boundaries
-        if (utf8_pos < batch.text.length()) {
-            unsigned char first_byte = batch.text[utf8_pos];
-            ++utf8_pos;
-            
-            // Determine continuation bytes based on first byte
-            if ((first_byte & 0x80) == 0) {
-                // 1-byte character
-            } else if ((first_byte & 0xE0) == 0xC0) {
-                // 2-byte character
-                if (utf8_pos < batch.text.length()) ++utf8_pos;
-            } else if ((first_byte & 0xF0) == 0xE0) {
-                // 3-byte character
-                if (utf8_pos < batch.text.length()) ++utf8_pos;
-                if (utf8_pos < batch.text.length()) ++utf8_pos;
-            } else if ((first_byte & 0xF8) == 0xF0) {
-                // 4-byte character
-                if (utf8_pos < batch.text.length()) ++utf8_pos;
-                if (utf8_pos < batch.text.length()) ++utf8_pos;
-                if (utf8_pos < batch.text.length()) ++utf8_pos;
-            }
-        }
-        
-        std::string current_char = batch.text.substr(char_start, utf8_pos - char_start);
+        // Check if this character is wide
+        char16_t ch = batch.text[i];
         
         // Advance by char_width for normal characters, char_width * 2 for wide characters
-        if (is_wide_character(current_char)) {
+        if (is_wide_character(ch)) {
             x += char_width * 2.0f;
         } else {
             x += char_width;
@@ -1645,7 +1598,7 @@ static void render_characters(
             const Cell& cell = grid[row][col];
             
             // Skip spaces - backgrounds already rendered
-            if (cell.character == " " || cell.character.empty()) {
+            if (cell.character.empty() || (cell.character.length() == 1 && cell.character[0] == u' ')) {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
@@ -1710,23 +1663,13 @@ static void render_characters(
                                        batch.underline == underline);
                 
                 // Calculate expected x position for next character
-                // Need to account for wide characters in the batch
+                // With UTF-16, we can directly iterate through characters
                 CGFloat expected_x = batch.x;
-                for (size_t i = 0; i < batch.text.length(); ) {
-                    // Find the next UTF-8 character boundary
-                    size_t char_start = i;
-                    while (i < batch.text.length() && (batch.text[i] & 0xC0) == 0x80) {
-                        ++i;
-                    }
-                    if (i < batch.text.length()) {
-                        ++i;
-                    }
-                    
-                    // Extract the character
-                    std::string batch_char = batch.text.substr(char_start, i - char_start);
+                for (size_t i = 0; i < batch.text.length(); ++i) {
+                    char16_t ch = batch.text[i];
                     
                     // Add width (double for wide characters)
-                    if (is_wide_character(batch_char)) {
+                    if (is_wide_character(ch)) {
                         expected_x += char_width * 2.0f;
                     } else {
                         expected_x += char_width;
@@ -1760,7 +1703,7 @@ static void render_characters(
             }
             
             // If this is a wide character, skip the next column (placeholder cell)
-            if (is_wide_character(cell.character)) {
+            if (!cell.character.empty() && is_wide_character(cell.character[0])) {
                 // The next column should be a placeholder, so we'll skip it
                 // in the next iteration
             }
