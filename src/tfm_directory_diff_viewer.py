@@ -567,7 +567,7 @@ class DirectoryDiffViewer(UILayer):
             return True
         
         # Get display dimensions for scrolling calculations
-        width, height = self.renderer.get_size()
+        height, width = self.renderer.get_dimensions()
         # Reserve space for header (2 lines) and status bar (1 line)
         display_height = height - 3
         
@@ -714,7 +714,7 @@ class DirectoryDiffViewer(UILayer):
         Args:
             renderer: TTK renderer instance
         """
-        width, height = renderer.get_size()
+        height, width = renderer.get_dimensions()
         
         # Clear screen
         renderer.clear()
