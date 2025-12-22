@@ -6,7 +6,7 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
 
 ## Tasks
 
-- [ ] 1. Create core data structures and enumerations
+- [x] 1. Create core data structures and enumerations
   - Create `src/tfm_directory_diff_viewer.py` file
   - Define `DifferenceType` enumeration (IDENTICAL, ONLY_LEFT, ONLY_RIGHT, CONTENT_DIFFERENT, CONTAINS_DIFFERENCE)
   - Define `FileInfo` dataclass for file metadata
@@ -17,8 +17,8 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
   - **Property 1: Tree Structure Completeness**
   - **Validates: Requirements 2.4**
 
-- [ ] 2. Implement DirectoryScanner class
-  - [ ] 2.1 Create DirectoryScanner class with threading support
+- [x] 2. Implement DirectoryScanner class
+  - [x] 2.1 Create DirectoryScanner class with threading support
     - Implement `__init__` with path parameters and progress callback
     - Implement `scan()` method for recursive directory traversal
     - Implement `cancel()` method for cancellation support
@@ -33,8 +33,8 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
     - **Property 9: Cancellation Responsiveness**
     - **Validates: Requirements 10.4, 10.5**
 
-- [ ] 3. Implement DiffEngine class
-  - [ ] 3.1 Create DiffEngine class for tree building
+- [-] 3. Implement DiffEngine class
+  - [x] 3.1 Create DiffEngine class for tree building
     - Implement `__init__` with file dictionaries
     - Implement `build_tree()` to create unified tree structure
     - Implement `classify_node()` for difference detection
@@ -53,24 +53,24 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
     - **Property 7: File Content Comparison Accuracy**
     - **Validates: Requirements 4.3**
 
-- [ ] 4. Checkpoint - Ensure core data structures and scanning work
+- [x] 4. Checkpoint - Ensure core data structures and scanning work
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement DirectoryDiffViewer class skeleton
-  - [ ] 5.1 Create DirectoryDiffViewer class implementing UILayer interface
+- [x] 5. Implement DirectoryDiffViewer class skeleton
+  - [x] 5.1 Create DirectoryDiffViewer class implementing UILayer interface
     - Implement `__init__` with renderer and directory paths
     - Implement all UILayer interface methods (stubs initially)
     - Initialize state variables (scroll_offset, cursor_position, etc.)
     - _Requirements: 1.1, 1.2_
 
-  - [ ] 5.2 Implement scanning initialization
+  - [x] 5.2 Implement scanning initialization
     - Implement `start_scan()` to launch DirectoryScanner in worker thread
     - Implement progress callback to update UI state
     - Handle scan completion and error cases
     - _Requirements: 2.1, 10.1, 10.2_
 
-- [ ] 6. Implement tree structure management
-  - [ ] 6.1 Implement tree flattening and visibility
+- [x] 6. Implement tree structure management
+  - [x] 6.1 Implement tree flattening and visibility
     - Implement method to flatten tree into visible_nodes list
     - Implement method to update visible_nodes when expanding/collapsing
     - Maintain node_index_map for efficient lookups
@@ -80,8 +80,8 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
     - **Property 5: Expand/Collapse State Preservation**
     - **Validates: Requirements 7.2, 7.3**
 
-- [ ] 7. Implement keyboard navigation
-  - [ ] 7.1 Implement handle_key_event for navigation
+- [x] 7. Implement keyboard navigation
+  - [x] 7.1 Implement handle_key_event for navigation
     - Implement UP/DOWN arrow keys for cursor movement
     - Implement LEFT/RIGHT or ENTER for expand/collapse
     - Implement ESC/Q for closing viewer
@@ -92,24 +92,24 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
     - **Property 4: Tree Navigation Consistency**
     - **Validates: Requirements 7.1**
 
-- [ ] 8. Checkpoint - Ensure navigation and tree management work
+- [x] 8. Checkpoint - Ensure navigation and tree management work
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 9. Implement rendering system
-  - [ ] 9.1 Implement header rendering
+  - [x] 9.1 Implement header rendering
     - Draw header with directory paths
     - Draw controls/help text
     - Use tfm_colors for consistent styling
     - _Requirements: 1.2_
 
-  - [ ] 9.2 Implement content rendering
+  - [x] 9.2 Implement content rendering
     - Draw tree structure with indentation
     - Draw expand/collapse indicators for directories
     - Implement side-by-side layout with separator
     - Apply horizontal scrolling if needed
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 9.3 Implement difference highlighting
+  - [x] 9.3 Implement difference highlighting
     - Apply background colors based on DifferenceType
     - Use COLOR_DIFF_ONLY_ONE_SIDE for only-left/only-right
     - Use COLOR_DIFF_CHANGE for content-different
@@ -121,32 +121,32 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
     - **Property 6: Side-by-Side Alignment**
     - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
 
-  - [ ] 9.5 Implement status bar rendering
+  - [x] 9.5 Implement status bar rendering
     - Display current position and statistics
     - Show scan progress when scanning
     - Display error count if errors occurred
     - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 10. Implement progress feedback during scanning
-  - [ ] 10.1 Add progress indicator display
+- [x] 10. Implement progress feedback during scanning
+  - [x] 10.1 Add progress indicator display
     - Show progress bar or percentage during scan
     - Update status message with current operation
     - _Requirements: 10.1, 10.2_
 
-  - [ ] 10.2 Implement scan cancellation UI
+  - [x] 10.2 Implement scan cancellation UI
     - Handle ESC key during scanning to cancel
     - Display cancellation message
     - Clean up worker thread properly
     - _Requirements: 10.4, 10.5_
 
-- [ ] 11. Implement error handling
-  - [ ] 11.1 Handle permission errors gracefully
+- [x] 11. Implement error handling
+  - [x] 11.1 Handle permission errors gracefully
     - Mark inaccessible nodes with error indicator
     - Store error messages in node metadata
     - Continue processing accessible portions
     - _Requirements: 11.1_
 
-  - [ ] 11.2 Handle I/O errors during file comparison
+  - [x] 11.2 Handle I/O errors during file comparison
     - Catch and log file read errors
     - Mark affected nodes with error indicator
     - Display error count in status bar
@@ -156,17 +156,17 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
     - **Property 10: Error Handling Graceful Degradation**
     - **Validates: Requirements 11.1, 11.2**
 
-  - [ ] 11.4 Handle empty or identical directories
+  - [x] 11.4 Handle empty or identical directories
     - Display appropriate message when no differences
     - Show statistics in status bar
     - Allow normal viewer closure
     - _Requirements: 11.3_
 
-- [ ] 12. Checkpoint - Ensure rendering and error handling work
+- [x] 12. Checkpoint - Ensure rendering and error handling work
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. Implement file diff viewer integration
-  - [ ] 13.1 Add key binding to open file diff
+- [x] 13. Implement file diff viewer integration
+  - [x] 13.1 Add key binding to open file diff
     - Detect when cursor is on a content-different file node
     - Create DiffViewer instance with both file paths
     - Push DiffViewer onto UI layer stack
@@ -177,8 +177,8 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
     - Test returning to DirectoryDiffViewer after closing DiffViewer
     - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 14. Integrate with FileManager
-  - [ ] 14.1 Add command to invoke directory diff viewer
+- [x] 14. Integrate with FileManager
+  - [x] 14.1 Add command to invoke directory diff viewer
     - Add key binding in FileManager (e.g., Ctrl+D)
     - Capture left and right pane paths
     - Validate that both paths are directories
@@ -193,36 +193,36 @@ This implementation plan breaks down the Directory Diff Viewer feature into disc
     - _Requirements: 1.1, 1.2, 1.3_
 
 - [ ] 15. Add optional features and polish
-  - [ ] 15.1 Add filter to hide identical files
+  - [x] 15.1 Add filter to hide identical files
     - Add toggle key binding (e.g., 'i' for identical)
     - Update visible_nodes to exclude identical nodes when filter active
     - Update status bar to show filter state
     - _Requirements: 3.1, 3.5_
 
-  - [ ] 15.2 Add scrollbar support
+  - [x] 15.2 Add scrollbar support
     - Use tfm_scrollbar module for consistent scrollbar rendering
     - Calculate scrollbar position based on visible nodes
     - _Requirements: 9.3_
 
-  - [ ] 15.3 Add wide character support
+  - [x] 15.3 Add wide character support
     - Use tfm_wide_char_utils for proper display width calculation
     - Handle wide characters in file names correctly
     - _Requirements: 6.4_
 
-- [ ] 16. Create demo script
+- [x] 16. Create demo script
   - Create `demo/demo_directory_diff_viewer.py`
   - Set up test directory structures with various difference types
   - Demonstrate all viewer features
   - Include examples of error handling
 
-- [ ] 17. Create documentation
+- [x] 17. Create documentation
   - Create `doc/DIRECTORY_DIFF_VIEWER_FEATURE.md` for end users
   - Document key bindings and usage
   - Include screenshots or examples
   - Create `doc/dev/DIRECTORY_DIFF_VIEWER_IMPLEMENTATION.md` for developers
   - Document architecture and implementation details
 
-- [ ] 18. Final checkpoint - Integration testing
+- [x] 18. Final checkpoint - Integration testing
   - Run all unit tests and property tests
   - Test with various directory structures (empty, large, nested, with errors)
   - Test integration with FileManager and DiffViewer
