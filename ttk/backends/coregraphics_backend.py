@@ -2067,6 +2067,15 @@ if COCOA_AVAILABLE:
                 # Get marked text if present
                 marked_text = getattr(self, 'marked_text', None) or ""
                 
+                # Get selected range within marked text (for IME)
+                selected_range = getattr(self, 'selected_range', None)
+                if selected_range is not None:
+                    selected_range_location = int(selected_range.location)
+                    selected_range_length = int(selected_range.length)
+                else:
+                    selected_range_location = 0
+                    selected_range_length = 0
+                
                 # Call C++ render_frame() function
                 self.backend._cpp_renderer.render_frame(
                     context_ptr,
@@ -2083,6 +2092,8 @@ if COCOA_AVAILABLE:
                     self.backend.cursor_row,
                     self.backend.cursor_col,
                     marked_text,
+                    selected_range_location,
+                    selected_range_length,
                     self.backend.font_ascent,  # Add font_ascent for baseline positioning
                     self.backend.font_names,   # Pass font list to C++ renderer (includes cascade fonts)
                     self.backend.font_size     # Pass font size to C++ renderer

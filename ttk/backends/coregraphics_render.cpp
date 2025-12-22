@@ -827,6 +827,8 @@ static PyMethodDef CppRendererMethods[] = {
         "  cursor_row: Cursor row position (int)\n"
         "  cursor_col: Cursor column position (int)\n"
         "  marked_text: IME marked text string (str or None)\n"
+        "  selected_range_location: Location of selected portion within marked text (int)\n"
+        "  selected_range_length: Length of selected portion within marked text (int)\n"
         "  font_ascent: Font ascent for baseline positioning (float)\n"
         "  font_names: List of font names (first is primary, rest are cascade) (list or str, optional, default=['Menlo'])\n"
         "  font_size: Font size in points (float, optional, default=12.0)\n"
@@ -1863,7 +1865,9 @@ static void render_cursor(
 
 /**
  * Render IME marked text (composition text) at the cursor position.
- * Draws the marked text with an underline to indicate it's being composed.
+ * Draws the marked text with background rectangles and an underline to indicate it's being composed.
+ * The selected portion within marked text gets a different background color.
+ * Uses the same font cascade and glyph layout logic as regular text rendering.
  * If marked_text is empty or null, no rendering is performed.
  * 
  * @param context CGContextRef to draw to
@@ -1876,8 +1880,10 @@ static void render_cursor(
  * @param offset_x X offset for centering the grid in the view
  * @param offset_y Y offset for centering the grid in the view
  * @param font_ascent Font ascent for baseline positioning
- * @param base_font Base CTFontRef to use for rendering
+ * @param base_font Base CTFontRef to use for rendering (with cascade list)
  * @param color_cache ColorCache for getting foreground color
+ * @param selected_range_location Location of selected portion within marked text
+ * @param selected_range_length Length of selected portion within marked text
  */
 static void render_marked_text(
     CGContextRef context,
@@ -1891,7 +1897,9 @@ static void render_marked_text(
     CGFloat offset_y,
     CGFloat font_ascent,
     CTFontRef base_font,
-    ColorCache& color_cache
+    ColorCache& color_cache,
+    int selected_range_location,
+    int selected_range_length
 ) {
     // Check if marked_text is non-empty
     if (marked_text == nullptr || marked_text[0] == '\0') {
@@ -1904,7 +1912,7 @@ static void render_marked_text(
     CGFloat y = ttk_to_cg_y(cursor_row, rows, char_height) + offset_y;
     CGFloat x = static_cast<CGFloat>(cursor_col) * char_width + offset_x;
     
-    // Create CFString from UTF-8 marked text
+    // Convert UTF-8 marked text to UTF-16 for CoreText
     CFStringRef text_string = CFStringCreateWithCString(
         kCFAllocatorDefault,
         marked_text,
@@ -1916,101 +1924,212 @@ static void render_marked_text(
         return;
     }
     
+    // Get the length of the marked text in characters
+    CFIndex length = CFStringGetLength(text_string);
+    if (length == 0) {
+        CFRelease(text_string);
+        return;
+    }
+    
+    // Convert to UniChar array for glyph lookup
+    std::vector<UniChar> characters(length);
+    CFStringGetCharacters(text_string, CFRangeMake(0, length), characters.data());
+    
+    // Allocate arrays for glyphs and positions
+    std::vector<CGGlyph> glyphs(length);
+    std::vector<CGPoint> positions(length);
+    
+    // Get glyphs for characters using font cascade
+    bool all_glyphs_found = CTFontGetGlyphsForCharacters(base_font, characters.data(), glyphs.data(), length);
+    
+    CTFontRef font_to_use = base_font;
+    CTFontRef fallback_font = nullptr;
+    
+    if (!all_glyphs_found) {
+        // Some glyphs are missing - try cascade list fonts
+        CTFontDescriptorRef descriptor = CTFontCopyFontDescriptor(base_font);
+        if (descriptor != nullptr) {
+            CFArrayRef cascade_list = (CFArrayRef)CTFontDescriptorCopyAttribute(
+                descriptor,
+                kCTFontCascadeListAttribute
+            );
+            CFRelease(descriptor);
+            
+            if (cascade_list != nullptr) {
+                CFIndex cascade_count = CFArrayGetCount(cascade_list);
+                
+                // Try each font in the cascade list
+                for (CFIndex i = 0; i < cascade_count && !all_glyphs_found; ++i) {
+                    CTFontDescriptorRef cascade_desc = (CTFontDescriptorRef)CFArrayGetValueAtIndex(cascade_list, i);
+                    
+                    // Create font from descriptor with same size as base font
+                    CGFloat font_size = CTFontGetSize(base_font);
+                    CTFontRef cascade_font = CTFontCreateWithFontDescriptor(
+                        cascade_desc,
+                        font_size,
+                        nullptr
+                    );
+                    
+                    if (cascade_font != nullptr) {
+                        // Try to get glyphs with this cascade font
+                        if (CTFontGetGlyphsForCharacters(cascade_font, characters.data(), glyphs.data(), length)) {
+                            all_glyphs_found = true;
+                            fallback_font = cascade_font;
+                            font_to_use = fallback_font;
+                        } else {
+                            CFRelease(cascade_font);
+                        }
+                    }
+                }
+                
+                CFRelease(cascade_list);
+            }
+        }
+        
+        // If still not found, skip rendering
+        if (!all_glyphs_found) {
+            CFRelease(text_string);
+            return;
+        }
+    }
+    
+    // Get actual glyph advances from the font
+    std::vector<CGSize> advances(length);
+    CTFontGetAdvancesForGlyphs(
+        font_to_use,
+        kCTFontOrientationHorizontal,
+        glyphs.data(),
+        advances.data(),
+        length
+    );
+    
+    // Save graphics state before drawing
+    CGContextSaveGState(context);
+    
+    // Draw background rectangles for marked text
+    // Use dark gray background for unselected portions: RGB(60, 60, 60)
+    // Use lighter gray background for selected portion: RGB(100, 100, 100)
+    CGColorRef unselected_bg_color = color_cache.get_color(60, 60, 60, 1.0f);
+    CGColorRef selected_bg_color = color_cache.get_color(100, 100, 100, 1.0f);
+    
+    if (unselected_bg_color != nullptr && selected_bg_color != nullptr) {
+        CGFloat bg_x = x;
+        
+        // Draw background for each character position
+        for (CFIndex i = 0; i < length; ++i) {
+            // Determine if this character is in the selected range
+            bool is_selected = (i >= selected_range_location && 
+                              i < selected_range_location + selected_range_length);
+            
+            // Choose background color based on selection
+            CGColorRef bg_color = is_selected ? selected_bg_color : unselected_bg_color;
+            
+            // Check if this is a wide character (CJK, etc.)
+            // Use East Asian Width property to determine width
+            bool is_wide = false;
+            UniChar ch = characters[i];
+            if (ch >= 0x1100) {  // Quick check for potential wide characters
+                // For simplicity, check common CJK ranges
+                // Full width: 0x3000-0x9FFF (CJK), 0xAC00-0xD7AF (Hangul), 0xFF00-0xFFEF (Fullwidth)
+                is_wide = (ch >= 0x3000 && ch <= 0x9FFF) ||
+                         (ch >= 0xAC00 && ch <= 0xD7AF) ||
+                         (ch >= 0xFF00 && ch <= 0xFFEF);
+            }
+            
+            CGFloat cell_width = is_wide ? (char_width * 2.0f) : char_width;
+            
+            // Calculate rectangle for this character
+            CGRect bg_rect = CGRectMake(bg_x, y, cell_width, char_height);
+            
+            // Fill the background rectangle
+            CGContextSetFillColorWithColor(context, bg_color);
+            CGContextFillRect(context, bg_rect);
+            
+            bg_x += cell_width;
+        }
+    }
+    
+    // Calculate baseline position
+    CGFloat baseline_y = y + (char_height - font_ascent);
+    
+    // Calculate position for each glyph using actual advances
+    CGFloat glyph_x = x;
+    
+    for (CFIndex i = 0; i < length; ++i) {
+        // Get the actual glyph advance width
+        CGFloat glyph_advance = advances[i].width;
+        
+        // Check if this is a wide character
+        bool is_wide = false;
+        UniChar ch = characters[i];
+        if (ch >= 0x1100) {
+            is_wide = (ch >= 0x3000 && ch <= 0x9FFF) ||
+                     (ch >= 0xAC00 && ch <= 0xD7AF) ||
+                     (ch >= 0xFF00 && ch <= 0xFFEF);
+        }
+        
+        CGFloat cell_width = is_wide ? (char_width * 2.0f) : char_width;
+        
+        // Center the glyph within its cell(s)
+        CGFloat centering_offset = (cell_width - glyph_advance) / 2.0f;
+        
+        positions[i].x = glyph_x + centering_offset;
+        positions[i].y = baseline_y;
+        
+        // Advance by the cell width to maintain grid alignment
+        glyph_x += cell_width;
+    }
+    
     // Get white color for marked text (standard IME appearance)
     CGColorRef text_color = color_cache.get_color(255, 255, 255, 1.0f);
     
     if (text_color == nullptr) {
+        if (fallback_font != nullptr) {
+            CFRelease(fallback_font);
+        }
         CFRelease(text_string);
+        CGContextRestoreGState(context);
         return;
     }
     
-    // Create attribute dictionary with underline
-    CFStringRef keys[3];
-    CFTypeRef values[3];
+    // Set fill color for text
+    CGContextSetFillColorWithColor(context, text_color);
     
-    // Add font attribute
-    keys[0] = kCTFontAttributeName;
-    values[0] = base_font;
+    // Set text drawing mode
+    CGContextSetTextDrawingMode(context, kCGTextFill);
     
-    // Add foreground color attribute
-    keys[1] = kCTForegroundColorAttributeName;
-    values[1] = text_color;
+    // Enable anti-aliasing for smooth text
+    CGContextSetShouldAntialias(context, true);
+    CGContextSetShouldSmoothFonts(context, true);
     
-    // Add underline attribute (single underline)
-    keys[2] = kCTUnderlineStyleAttributeName;
-    int underline_style = kCTUnderlineStyleSingle;
-    CFNumberRef underline_number = CFNumberCreate(
-        kCFAllocatorDefault,
-        kCFNumberIntType,
-        &underline_style
+    // Draw glyphs using CTFontDrawGlyphs for proper rendering
+    CTFontDrawGlyphs(
+        font_to_use,
+        glyphs.data(),
+        positions.data(),
+        length,
+        context
     );
     
-    if (underline_number == nullptr) {
-        CFRelease(text_string);
-        return;
-    }
+    // Draw underline to indicate composition
+    // Underline should be below the text baseline
+    CGFloat underline_y = baseline_y - 2.0f;  // 2 pixels below baseline
+    CGFloat underline_width = glyph_x - x;    // Total width of marked text
     
-    values[2] = underline_number;
-    
-    // Create attribute dictionary
-    CFDictionaryRef attributes = CFDictionaryCreate(
-        kCFAllocatorDefault,
-        (const void**)keys,
-        (const void**)values,
-        3,
-        &kCFTypeDictionaryKeyCallBacks,
-        &kCFTypeDictionaryValueCallBacks
-    );
-    
-    // Release underline number (dictionary retains it)
-    CFRelease(underline_number);
-    
-    if (attributes == nullptr) {
-        CFRelease(text_string);
-        return;
-    }
-    
-    // Create CFAttributedString with text and attributes
-    CFAttributedStringRef attributed_string = CFAttributedStringCreate(
-        kCFAllocatorDefault,
-        text_string,
-        attributes
-    );
-    
-    // Release text_string and attributes (no longer needed)
-    CFRelease(text_string);
-    CFRelease(attributes);
-    
-    if (attributed_string == nullptr) {
-        return;
-    }
-    
-    // Create CTLine from attributed string
-    CTLineRef line = CTLineCreateWithAttributedString(attributed_string);
-    
-    // Release attributed_string (no longer needed)
-    CFRelease(attributed_string);
-    
-    if (line == nullptr) {
-        return;
-    }
-    
-    // Set text position in the graphics context
-    // Use baseline positioning like character rendering
-    CGFloat baseline_y = y + (char_height - font_ascent);
-    
-    // Save graphics state before drawing
-    CGContextSaveGState(context);
-    CGContextSetTextPosition(context, x, baseline_y);
-    
-    // Draw with CTLineDraw
-    CTLineDraw(line, context);
+    CGContextSetStrokeColorWithColor(context, text_color);
+    CGContextSetLineWidth(context, 1.0f);
+    CGContextMoveToPoint(context, x, underline_y);
+    CGContextAddLineToPoint(context, x + underline_width, underline_y);
+    CGContextStrokePath(context);
     
     // Restore graphics state
     CGContextRestoreGState(context);
     
-    // Release CTLine
-    CFRelease(line);
+    // Release resources
+    if (fallback_font != nullptr) {
+        CFRelease(fallback_font);
+    }
+    CFRelease(text_string);
 }
 
 //=============================================================================
@@ -2290,6 +2409,8 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             "cursor_row",
             "cursor_col",
             "marked_text",
+            "selected_range_location",
+            "selected_range_length",
             "font_ascent",
             "font_names",
             "font_size",
@@ -2311,6 +2432,8 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
         int cursor_row = 0;
         int cursor_col = 0;
         const char* marked_text = nullptr;
+        int selected_range_location = 0;
+        int selected_range_length = 0;
         double font_ascent = 0.0;
         PyObject* font_names_obj = nullptr;  // Python list or string of font names
         double font_size = 12.0;  // Default font size
@@ -2318,7 +2441,7 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
         // Parse arguments
         if (!PyArg_ParseTupleAndKeywords(
             args, kwargs,
-            "KOOOddiiddpii|zdOd:render_frame",
+            "KOOOddiiddpii|ziidOd:render_frame",
             const_cast<char**>(kwlist),
             &context_ptr,
             &grid_obj,
@@ -2334,6 +2457,8 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             &cursor_row,
             &cursor_col,
             &marked_text,
+            &selected_range_location,
+            &selected_range_length,
             &font_ascent,
             &font_names_obj,
             &font_size
@@ -2526,7 +2651,9 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
                 static_cast<CGFloat>(offset_y),
                 static_cast<CGFloat>(font_ascent),
                 g_base_font,
-                *g_color_cache
+                *g_color_cache,
+                selected_range_location,
+                selected_range_length
             );
         }
         
