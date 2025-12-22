@@ -114,6 +114,14 @@ try:
     import Cocoa
     import Quartz
     import objc
+    from CoreText import (
+        CTLineCreateWithAttributedString,
+        CTLineDraw,
+        kCTFontAttributeName,
+        kCTForegroundColorAttributeName,
+        kCTUnderlineStyleAttributeName,
+        kCTUnderlineStyleSingle
+    )
     COCOA_AVAILABLE = True
     
     # Suppress PyObjC pointer warnings
@@ -165,980 +173,6 @@ def _is_wide_character(char: str) -> bool:
         return False
 
 
-@dataclass
-class CharacterDrawingMetrics:
-    """
-    Performance metrics for character drawing phase.
-    
-    This dataclass captures detailed performance metrics for the character drawing
-    phase (Phase 2) of the rendering pipeline. It tracks cache efficiency, batching
-    effectiveness, and timing information to help identify performance bottlenecks
-    and validate optimization improvements.
-    
-    Attributes:
-        total_time: Total time for character drawing phase in seconds (t4-t3)
-        characters_drawn: Number of non-space characters drawn
-        batches_drawn: Number of drawAtPoint_() calls made (batches)
-        avg_batch_size: Average characters per batch (characters_drawn / batches_drawn)
-        attr_dict_cache_hits: Number of attribute dictionary cache hits
-        attr_dict_cache_misses: Number of attribute dictionary cache misses
-        attr_string_cache_hits: Number of NSAttributedString cache hits
-        attr_string_cache_misses: Number of NSAttributedString cache misses
-        avg_time_per_char: Average time per character in microseconds
-        avg_time_per_batch: Average time per batch in microseconds
-    
-    Example:
-        metrics = CharacterDrawingMetrics(
-            total_time=0.008,
-            characters_drawn=1920,
-            batches_drawn=80,
-            avg_batch_size=24.0,
-            attr_dict_cache_hits=75,
-            attr_dict_cache_misses=5,
-            attr_string_cache_hits=70,
-            attr_string_cache_misses=10,
-            avg_time_per_char=4.17,
-            avg_time_per_batch=100.0
-        )
-    """
-    total_time: float
-    characters_drawn: int
-    batches_drawn: int
-    avg_batch_size: float
-    attr_dict_cache_hits: int
-    attr_dict_cache_misses: int
-    attr_string_cache_hits: int
-    attr_string_cache_misses: int
-    avg_time_per_char: float
-    avg_time_per_batch: float
-
-
-@dataclass
-class RectBatch:
-    """
-    A batch of adjacent rectangles with the same background color.
-    
-    This class represents a horizontal run of cells that share the same background
-    color and can be drawn with a single NSRectFill call. Batching adjacent cells
-    significantly reduces the number of CoreGraphics API calls, improving rendering
-    performance.
-    
-    The batch tracks its position (x, y), dimensions (width, height), and the
-    background color (bg_rgb). As adjacent cells with the same color are encountered,
-    the batch width is extended to cover them.
-    
-    Attributes:
-        x: Left edge x-coordinate in CoreGraphics coordinate system
-        y: Bottom edge y-coordinate in CoreGraphics coordinate system
-        width: Total width of the batch (sum of all cell widths)
-        height: Height of the batch (single cell height)
-        bg_rgb: Background color as RGB tuple (r, g, b) where each value is 0-255
-    
-    Example:
-        # Create a batch for a single cell
-        batch = RectBatch(x=0.0, y=100.0, width=10.0, height=20.0, bg_rgb=(255, 0, 0))
-        
-        # Extend the batch to cover an adjacent cell
-        batch.extend(10.0)  # Now width is 20.0
-        
-        # Check the right edge position
-        right = batch.right_edge()  # Returns 20.0
-    """
-    x: float
-    y: float
-    width: float
-    height: float
-    bg_rgb: Tuple[int, int, int]
-    
-    def extend(self, additional_width: float):
-        """
-        Extend the batch width to cover an adjacent cell.
-        
-        This method is called when an adjacent cell with the same background color
-        is encountered. It increases the batch width to include the new cell.
-        
-        Args:
-            additional_width: Width of the cell to add to the batch
-        
-        Example:
-            batch = RectBatch(x=0.0, y=0.0, width=10.0, height=20.0, bg_rgb=(0, 0, 0))
-            batch.extend(10.0)  # width is now 20.0
-            batch.extend(10.0)  # width is now 30.0
-        """
-        self.width += additional_width
-    
-    def right_edge(self) -> float:
-        """
-        Get the right edge x-coordinate of the batch.
-        
-        This is used to check if the next cell is adjacent to the current batch.
-        
-        Returns:
-            The x-coordinate of the right edge (x + width)
-        
-        Example:
-            batch = RectBatch(x=5.0, y=0.0, width=15.0, height=20.0, bg_rgb=(0, 0, 0))
-            edge = batch.right_edge()  # Returns 20.0
-        """
-        return self.x + self.width
-
-
-class RectangleBatcher:
-    """
-    Batch consecutive rectangles with the same background color.
-    
-    This class accumulates adjacent cells with the same background color into
-    batches that can be drawn with a single NSRectFill call. This significantly
-    reduces the number of CoreGraphics API calls, improving rendering performance.
-    
-    The batcher maintains a current batch and a list of completed batches. As cells
-    are added, it checks if they can extend the current batch (same row, same color,
-    adjacent position). If not, it finishes the current batch and starts a new one.
-    
-    Typical usage pattern:
-        1. Create a RectangleBatcher
-        2. For each row:
-           a. For each cell in the row, call add_cell()
-           b. Call finish_row() at the end of the row
-        3. Call get_batches() to retrieve all batches and reset
-    
-    Attributes:
-        _current_batch: The batch currently being built (None if no batch in progress)
-        _batches: List of completed batches
-    
-    Example:
-        batcher = RectangleBatcher()
-        
-        # Add cells from a row
-        batcher.add_cell(0.0, 100.0, 10.0, 20.0, (255, 0, 0))    # Red cell
-        batcher.add_cell(10.0, 100.0, 10.0, 20.0, (255, 0, 0))   # Adjacent red cell - extends batch
-        batcher.add_cell(20.0, 100.0, 10.0, 20.0, (0, 255, 0))   # Green cell - new batch
-        
-        # Finish the row
-        batcher.finish_row()
-        
-        # Get all batches
-        batches = batcher.get_batches()
-        # Returns: [RectBatch(x=0, y=100, width=20, ...), RectBatch(x=20, y=100, width=10, ...)]
-    """
-    
-    def __init__(self):
-        """
-        Initialize the rectangle batcher.
-        
-        Creates an empty batcher with no current batch and an empty batch list.
-        """
-        self._current_batch: Optional[RectBatch] = None
-        self._batches: List[RectBatch] = []
-    
-    def add_cell(self, x: float, y: float, width: float, height: float,
-                 bg_rgb: Tuple[int, int, int]):
-        """
-        Add a cell to the current batch or start a new batch.
-        
-        This method checks if the cell can extend the current batch (same row,
-        same color, adjacent position). If so, it extends the batch. If not,
-        it finishes the current batch and starts a new one with this cell.
-        
-        Args:
-            x: Cell x-coordinate (left edge)
-            y: Cell y-coordinate (bottom edge in CoreGraphics coords)
-            width: Cell width
-            height: Cell height
-            bg_rgb: Background color as RGB tuple (r, g, b)
-        
-        Example:
-            batcher = RectangleBatcher()
-            
-            # Add first cell - starts new batch
-            batcher.add_cell(0.0, 100.0, 10.0, 20.0, (255, 0, 0))
-            
-            # Add adjacent cell with same color - extends batch
-            batcher.add_cell(10.0, 100.0, 10.0, 20.0, (255, 0, 0))
-            
-            # Add cell with different color - finishes batch and starts new one
-            batcher.add_cell(20.0, 100.0, 10.0, 20.0, (0, 255, 0))
-        """
-        if self._current_batch is None:
-            # No current batch - start a new one
-            self._current_batch = RectBatch(x, y, width, height, bg_rgb)
-        elif self._can_extend_batch(x, y, bg_rgb):
-            # Can extend current batch
-            self._current_batch.extend(width)
-        else:
-            # Cannot extend - finish current batch and start new one
-            self._batches.append(self._current_batch)
-            self._current_batch = RectBatch(x, y, width, height, bg_rgb)
-    
-    def _can_extend_batch(self, x: float, y: float, 
-                         bg_rgb: Tuple[int, int, int]) -> bool:
-        """
-        Check if a cell can be added to the current batch.
-        
-        A cell can extend the current batch if:
-        1. There is a current batch
-        2. The cell is on the same row (same y-coordinate)
-        3. The cell has the same background color
-        4. The cell is adjacent to the current batch (x matches right edge)
-        
-        Args:
-            x: Cell x-coordinate
-            y: Cell y-coordinate
-            bg_rgb: Cell background color
-        
-        Returns:
-            True if the cell can extend the current batch, False otherwise
-        
-        Example:
-            # Assuming current batch at (0, 100) with width 10 and red color
-            batcher._can_extend_batch(10.0, 100.0, (255, 0, 0))  # True - adjacent, same color
-            batcher._can_extend_batch(10.0, 100.0, (0, 255, 0))  # False - different color
-            batcher._can_extend_batch(10.0, 120.0, (255, 0, 0))  # False - different row
-            batcher._can_extend_batch(20.0, 100.0, (255, 0, 0))  # False - not adjacent
-        """
-        if self._current_batch is None:
-            return False
-        
-        # Check same row, same color, and adjacent position
-        # Use small epsilon (0.1) for floating-point comparison
-        return (self._current_batch.y == y and
-                self._current_batch.bg_rgb == bg_rgb and
-                abs(self._current_batch.right_edge() - x) < 0.1)
-    
-    def finish_row(self):
-        """
-        Finish the current batch at the end of a row.
-        
-        This method should be called at the end of each row to ensure the current
-        batch is added to the batch list. After calling this method, the next
-        add_cell() call will start a new batch.
-        
-        Example:
-            batcher = RectangleBatcher()
-            
-            # Add cells from row 0
-            batcher.add_cell(0.0, 100.0, 10.0, 20.0, (255, 0, 0))
-            batcher.add_cell(10.0, 100.0, 10.0, 20.0, (255, 0, 0))
-            batcher.finish_row()  # Finish row 0
-            
-            # Add cells from row 1
-            batcher.add_cell(0.0, 80.0, 10.0, 20.0, (0, 255, 0))
-            batcher.finish_row()  # Finish row 1
-        """
-        if self._current_batch is not None:
-            self._batches.append(self._current_batch)
-            self._current_batch = None
-    
-    def get_batches(self) -> List[RectBatch]:
-        """
-        Get all batches and reset the batcher.
-        
-        This method returns all completed batches and resets the batcher to its
-        initial state. If there is a current batch in progress, it is finished
-        and included in the returned list.
-        
-        After calling this method, the batcher is ready to start accumulating
-        new batches.
-        
-        Returns:
-            List of all RectBatch objects accumulated since the last get_batches() call
-        
-        Example:
-            batcher = RectangleBatcher()
-            
-            # Add some cells
-            batcher.add_cell(0.0, 100.0, 10.0, 20.0, (255, 0, 0))
-            batcher.add_cell(10.0, 100.0, 10.0, 20.0, (255, 0, 0))
-            batcher.finish_row()
-            
-            # Get batches and reset
-            batches = batcher.get_batches()
-            # batches contains one RectBatch with width=20.0
-            
-            # Batcher is now reset and ready for new batches
-            batcher.add_cell(0.0, 80.0, 10.0, 20.0, (0, 255, 0))
-        """
-        # Finish current batch if exists
-        if self._current_batch is not None:
-            self._batches.append(self._current_batch)
-            self._current_batch = None
-        
-        # Get all batches and reset
-        result = self._batches
-        self._batches = []
-        return result
-
-
-class DirtyRegionCalculator:
-    """
-    Calculate which cells are in the dirty region.
-    
-    This class provides a static method to determine which cells in the character
-    grid intersect with a dirty rectangle. The dirty rectangle is provided by
-    Cocoa's drawRect_ method and indicates which portion of the view needs to
-    be redrawn.
-    
-    The calculator handles coordinate system transformation between CoreGraphics
-    (bottom-left origin) and TTK (top-left origin), and clamps the results to
-    valid grid bounds to prevent out-of-bounds errors.
-    
-    Example:
-        # Get dirty cells for a rect that covers the top-left corner
-        rect = Cocoa.NSMakeRect(0, 400, 200, 100)  # CG coords
-        start_row, end_row, start_col, end_col = (
-            DirtyRegionCalculator.get_dirty_cells(
-                rect, rows=24, cols=80,
-                char_width=10.0, char_height=20.0
-            )
-        )
-        # Returns: (0, 5, 0, 20) - rows 0-4, cols 0-19
-    """
-    
-    @staticmethod
-    def get_dirty_cells(rect: Any, rows: int, cols: int,
-                       char_width: float, char_height: float) -> Tuple[int, int, int, int]:
-        """
-        Calculate which cells intersect with the dirty rect.
-        
-        This method converts the dirty rectangle from CoreGraphics pixel coordinates
-        to TTK cell coordinates, handling the coordinate system transformation and
-        boundary clamping.
-        
-        Coordinate System Transformation:
-            CoreGraphics uses bottom-left origin where (0, 0) is at the bottom-left
-            corner and y increases upward. TTK uses top-left origin where (0, 0) is
-            at the top-left corner and y increases downward.
-            
-            The transformation for rows is:
-                ttk_row = rows - cg_row - 1
-            
-            For the dirty rect:
-                - rect.origin.y is the bottom edge in CG coordinates
-                - rect.origin.y + rect.size.height is the top edge in CG coordinates
-                - We convert these to TTK row indices
-        
-        Boundary Clamping:
-            All calculated indices are clamped to valid grid bounds [0, rows) and
-            [0, cols) to prevent out-of-bounds errors. This handles edge cases where
-            the dirty rect extends beyond the grid boundaries.
-        
-        Args:
-            rect: NSRect indicating dirty region in CoreGraphics coordinates
-            rows: Grid height in characters
-            cols: Grid width in characters
-            char_width: Width of a single character cell in pixels
-            char_height: Height of a single character cell in pixels
-        
-        Returns:
-            Tuple of (start_row, end_row, start_col, end_col) where:
-                - start_row: First row to redraw (inclusive)
-                - end_row: Last row to redraw (exclusive)
-                - start_col: First column to redraw (inclusive)
-                - end_col: Last column to redraw (exclusive)
-            
-            The returned range can be used directly in Python range() calls:
-                for row in range(start_row, end_row):
-                    for col in range(start_col, end_col):
-                        # Draw cell at (row, col)
-        
-        Example:
-            # Full-screen dirty rect (entire grid needs redraw)
-            rect = Cocoa.NSMakeRect(0, 0, 800, 480)
-            result = DirtyRegionCalculator.get_dirty_cells(
-                rect, rows=24, cols=80, char_width=10.0, char_height=20.0
-            )
-            # Returns: (0, 24, 0, 80) - entire grid
-            
-            # Partial dirty rect (only top-left corner)
-            rect = Cocoa.NSMakeRect(0, 400, 200, 80)
-            result = DirtyRegionCalculator.get_dirty_cells(
-                rect, rows=24, cols=80, char_width=10.0, char_height=20.0
-            )
-            # Returns: (0, 4, 0, 20) - top-left 4x20 region
-        """
-        # Calculate column range from x-coordinates
-        # Columns don't need coordinate transformation (x-axis is the same)
-        # Use integer division to convert pixel coordinates to cell indices
-        start_col = max(0, int(rect.origin.x / char_width))
-        # For end_col, we need to round up to include partially visible cells
-        # Using int() truncates, so we add 1 only if there's a remainder
-        end_col_raw = (rect.origin.x + rect.size.width) / char_width
-        end_col = min(cols, int(end_col_raw) + (1 if end_col_raw % 1 > 0 else 0))
-        
-        # Calculate row range from y-coordinates with coordinate transformation
-        # CoreGraphics y-coordinates:
-        #   - rect.origin.y is the bottom edge of the dirty rect
-        #   - rect.origin.y + rect.size.height is the top edge of the dirty rect
-        #   - y increases upward
-        
-        # Get bottom and top edges in CoreGraphics coordinates
-        bottom_y = rect.origin.y
-        top_y = rect.origin.y + rect.size.height
-        
-        # Convert to TTK row coordinates
-        # TTK row 0 is at the top of the screen, which corresponds to the highest
-        # y-coordinate in CoreGraphics. We need to flip the coordinate system.
-        #
-        # The formula for converting a CG y-coordinate to a TTK row is:
-        #   ttk_row = rows - ceil(cg_y / char_height)
-        #
-        # For the dirty rect:
-        #   - The top edge (highest CG y) maps to the lowest TTK row (start_row)
-        #   - The bottom edge (lowest CG y) maps to the highest TTK row (end_row)
-        
-        # Calculate TTK row for the top edge of the dirty rect
-        # This is the first row that needs to be redrawn
-        # We use int() which truncates, giving us the row that contains the top edge
-        start_row = max(0, rows - int((top_y + char_height - 0.01) / char_height))
-        
-        # Calculate TTK row for the bottom edge of the dirty rect
-        # This is one past the last row that needs to be redrawn
-        end_row = min(rows, rows - int(bottom_y / char_height))
-        
-        # Ensure start_row <= end_row (handle edge cases)
-        if start_row > end_row:
-            start_row = end_row
-        
-        return (start_row, end_row, start_col, end_col)
-
-
-class ColorCache:
-    """
-    Cache for NSColor objects to avoid repeated creation.
-    
-    This cache stores NSColor objects keyed by their RGBA values to eliminate
-    redundant color object creation during rendering. When the cache reaches
-    its maximum size, it uses a simple LRU eviction strategy (clearing half
-    the cache) to prevent unbounded growth.
-    
-    The cache significantly improves performance by reducing the overhead of
-    creating NSColor objects for frequently used colors (e.g., background colors,
-    status bar colors, syntax highlighting colors).
-    
-    Attributes:
-        _cache: Dictionary mapping (r, g, b, alpha_int) tuples to NSColor objects
-        _max_size: Maximum number of colors to cache before eviction
-    
-    Example:
-        cache = ColorCache(max_size=256)
-        
-        # First call creates and caches the color
-        color1 = cache.get_color(255, 0, 0)  # Red
-        
-        # Subsequent calls return the cached object
-        color2 = cache.get_color(255, 0, 0)  # Same red, from cache
-        assert color1 is color2  # Same object reference
-    """
-    
-    def __init__(self, max_size: int = 256):
-        """
-        Initialize color cache with maximum size.
-        
-        Args:
-            max_size: Maximum number of colors to cache before eviction.
-                     Default is 256, which provides ample space for typical
-                     TFM usage (10-20 unique colors) with generous headroom.
-        """
-        self._cache: Dict[Tuple[int, int, int, int], Any] = {}
-        self._max_size = max_size
-    
-    def get_color(self, r: int, g: int, b: int, alpha: float = 1.0) -> Any:
-        """
-        Get cached NSColor or create and cache if not exists.
-        
-        This method checks if an NSColor with the specified RGBA values already
-        exists in the cache. If found, it returns the cached object. If not found,
-        it creates a new NSColor, caches it, and returns it.
-        
-        When the cache reaches max_size, it clears all entries to prevent unbounded
-        growth. This simple LRU strategy is sufficient for typical usage patterns
-        where color usage is relatively stable.
-        
-        Args:
-            r: Red component (0-255)
-            g: Green component (0-255)
-            b: Blue component (0-255)
-            alpha: Alpha/opacity value (0.0-1.0), default 1.0 (fully opaque)
-        
-        Returns:
-            NSColor object with the specified RGBA values
-        
-        Example:
-            # Get a semi-transparent red color
-            color = cache.get_color(255, 0, 0, 0.5)
-            
-            # Get an opaque blue color
-            color = cache.get_color(0, 0, 255)
-        """
-        # Create cache key from RGBA values
-        # Convert alpha to integer (0-100) for consistent hashing
-        key = (r, g, b, int(alpha * 100))
-        
-        if key not in self._cache:
-            # Cache miss - check if we need to evict
-            if len(self._cache) >= self._max_size:
-                # Simple LRU: clear entire cache when full
-                # This is sufficient for typical usage patterns
-                self._cache.clear()
-            
-            # Create new NSColor and cache it
-            # NSColor expects values in range 0.0-1.0
-            self._cache[key] = Cocoa.NSColor.colorWithRed_green_blue_alpha_(
-                r / 255.0, g / 255.0, b / 255.0, alpha
-            )
-        
-        return self._cache[key]
-    
-    def clear(self):
-        """
-        Clear the color cache.
-        
-        This method removes all cached NSColor objects. It should be called
-        when the color scheme changes or when resetting the rendering state.
-        
-        Example:
-            cache.clear()  # Remove all cached colors
-        """
-        self._cache.clear()
-
-
-class FontCache:
-    """
-    Cache for NSFont objects with attributes applied.
-    
-    This cache stores NSFont objects keyed by their text attributes to eliminate
-    redundant font object creation and attribute application during rendering.
-    Font attributes like BOLD require expensive NSFontManager operations, so
-    caching these results significantly improves performance.
-    
-    The cache is particularly effective for text-heavy applications where the
-    same font attributes (normal, bold, underline, bold+underline) are used
-    repeatedly across many characters.
-    
-    Attributes:
-        _base_font: The base NSFont object without any attributes applied
-        _cache: Dictionary mapping attribute bitmasks to NSFont objects
-    
-    Example:
-        cache = FontCache(base_font)
-        
-        # First call creates and caches the bold font
-        bold_font = cache.get_font(TextAttribute.BOLD)
-        
-        # Subsequent calls return the cached object
-        bold_font2 = cache.get_font(TextAttribute.BOLD)
-        assert bold_font is bold_font2  # Same object reference
-    """
-    
-    def __init__(self, base_font: Any):
-        """
-        Initialize font cache with base font.
-        
-        Args:
-            base_font: The base NSFont object to use for creating variants.
-                      This should be the monospace font configured for the
-                      backend (e.g., Menlo, Monaco, Courier).
-        """
-        self._base_font = base_font
-        self._cache: Dict[int, Any] = {}
-    
-    def get_font(self, attributes: int) -> Any:
-        """
-        Get cached font with attributes or create and cache if not exists.
-        
-        This method checks if an NSFont with the specified attributes already
-        exists in the cache. If found, it returns the cached object. If not found,
-        it creates a new font with the attributes applied, caches it, and returns it.
-        
-        Currently supports the BOLD attribute. Other attributes (UNDERLINE, REVERSE)
-        are handled separately in the text rendering attributes dictionary and do
-        not require font modifications.
-        
-        Args:
-            attributes: TextAttribute bitmask (e.g., TextAttribute.BOLD)
-        
-        Returns:
-            NSFont object with the specified attributes applied
-        
-        Example:
-            # Get normal font (no attributes)
-            normal_font = cache.get_font(0)
-            
-            # Get bold font
-            bold_font = cache.get_font(TextAttribute.BOLD)
-            
-            # Get font with multiple attributes (only BOLD affects font)
-            bold_underline_font = cache.get_font(TextAttribute.BOLD | TextAttribute.UNDERLINE)
-        """
-        if attributes not in self._cache:
-            # Cache miss - create font with attributes
-            font = self._base_font
-            
-            # Apply BOLD attribute if present
-            if attributes & TextAttribute.BOLD:
-                # Use NSFontManager to convert font to bold variant
-                font_manager = Cocoa.NSFontManager.sharedFontManager()
-                # PyObjC method: convertFont_toHaveTrait_()
-                # Corresponds to Objective-C: convertFont:toHaveTrait:
-                font = font_manager.convertFont_toHaveTrait_(
-                    font,
-                    Cocoa.NSBoldFontMask
-                )
-            
-            # Cache the font
-            self._cache[attributes] = font
-        
-        return self._cache[attributes]
-    
-    def clear(self):
-        """
-        Clear the font cache.
-        
-        This method removes all cached NSFont objects. It should be called
-        when the base font changes or when resetting the rendering state.
-        
-        Note: The base font reference is preserved, only the cached variants
-        are cleared.
-        
-        Example:
-            cache.clear()  # Remove all cached font variants
-        """
-        self._cache.clear()
-
-
-class AttributeDictCache:
-    """
-    Cache for NSAttributedString attribute dictionaries.
-    
-    This cache stores pre-built NSDictionary objects containing text attributes
-    (NSFont, NSForegroundColor, and optional NSUnderlineStyle) to eliminate
-    redundant dictionary allocations during character drawing. Each unique
-    combination of font, color, and underline attributes is cached and reused.
-    
-    The cache significantly improves performance by:
-    1. Eliminating Python dict → NSDictionary conversion overhead
-    2. Reducing memory allocations for repeated attribute combinations
-    3. Enabling fast attribute dictionary lookup for NSAttributedString creation
-    
-    This cache works in conjunction with FontCache and ColorCache to provide
-    a complete caching solution for text rendering attributes.
-    
-    Attributes:
-        _cache: Dictionary mapping (font_key, color_rgb, underline) to NSDictionary
-        _font_cache: Reference to FontCache for getting NSFont objects
-        _color_cache: Reference to ColorCache for getting NSColor objects
-        _hits: Number of cache hits (for performance metrics)
-        _misses: Number of cache misses (for performance metrics)
-    
-    Example:
-        attr_cache = AttributeDictCache(font_cache, color_cache)
-        
-        # First call creates and caches the attribute dictionary
-        attrs1 = attr_cache.get_attributes("normal", (255, 255, 255), False)
-        
-        # Subsequent calls return the cached dictionary
-        attrs2 = attr_cache.get_attributes("normal", (255, 255, 255), False)
-        assert attrs1 is attrs2  # Same object reference
-    """
-    
-    def __init__(self, font_cache: FontCache, color_cache: ColorCache):
-        """
-        Initialize attribute dictionary cache.
-        
-        Args:
-            font_cache: FontCache instance for retrieving NSFont objects
-            color_cache: ColorCache instance for retrieving NSColor objects
-        """
-        self._cache: Dict[Tuple[str, Tuple[int, int, int], bool], Any] = {}
-        self._font_cache = font_cache
-        self._color_cache = color_cache
-        self._hits = 0
-        self._misses = 0
-    
-    def get_attributes(self, font_key: str, color_rgb: Tuple[int, int, int], 
-                      underline: bool) -> Any:
-        """
-        Get cached attribute dictionary or create and cache if not exists.
-        
-        This method checks if an NSDictionary with the specified attributes already
-        exists in the cache. If found, it returns the cached object. If not found,
-        it creates a new NSDictionary with NSFont, NSForegroundColor, and optional
-        NSUnderlineStyle, caches it, and returns it.
-        
-        The font_key is used to look up the appropriate NSFont from the FontCache.
-        Common font keys include:
-        - "normal" (0): Regular font, no attributes
-        - "bold" (TextAttribute.BOLD): Bold font
-        - "bold_underline" (TextAttribute.BOLD | TextAttribute.UNDERLINE): Bold with underline
-        
-        Args:
-            font_key: String or integer identifying the font attributes
-                     (typically the TextAttribute bitmask as a string)
-            color_rgb: Tuple of (red, green, blue) values (0-255)
-            underline: Boolean indicating if underline style should be applied
-        
-        Returns:
-            NSDictionary object containing NSFont, NSForegroundColor, and
-            optional NSUnderlineStyle attributes
-        
-        Example:
-            # Get attributes for normal white text
-            attrs = cache.get_attributes("0", (255, 255, 255), False)
-            
-            # Get attributes for bold red text with underline
-            attrs = cache.get_attributes(str(TextAttribute.BOLD), (255, 0, 0), True)
-        """
-        # Create cache key from font, color, and underline attributes
-        key = (font_key, color_rgb, underline)
-        
-        if key not in self._cache:
-            # Cache miss - increment miss counter
-            self._misses += 1
-            
-            # Convert font_key to integer for FontCache lookup
-            # font_key can be either a string or already an integer
-            if isinstance(font_key, str):
-                font_attributes = int(font_key) if font_key.isdigit() else 0
-            else:
-                font_attributes = font_key
-            
-            # Get cached font and color objects
-            font = self._font_cache.get_font(font_attributes)
-            color = self._color_cache.get_color(*color_rgb)
-            
-            # Build NSDictionary with required attributes
-            # NSAttributedString requires NSFontAttributeName and NSForegroundColorAttributeName
-            text_attributes = {
-                Cocoa.NSFontAttributeName: font,
-                Cocoa.NSForegroundColorAttributeName: color
-            }
-            
-            # Add underline style if requested
-            if underline:
-                text_attributes[Cocoa.NSUnderlineStyleAttributeName] = (
-                    Cocoa.NSUnderlineStyleSingle
-                )
-            
-            # Cache the dictionary
-            # Note: Python dict is automatically converted to NSDictionary by PyObjC
-            # when passed to Cocoa APIs
-            self._cache[key] = text_attributes
-        else:
-            # Cache hit - increment hit counter
-            self._hits += 1
-        
-        return self._cache[key]
-    
-    def clear(self):
-        """
-        Clear the attribute dictionary cache.
-        
-        This method removes all cached attribute dictionaries. It should be called
-        when the font or color scheme changes, or when resetting the rendering state.
-        
-        The FontCache and ColorCache references are preserved, only the cached
-        attribute dictionaries are cleared.
-        
-        Example:
-            cache.clear()  # Remove all cached attribute dictionaries
-        """
-        self._cache.clear()
-    
-    def get_hit_count(self) -> int:
-        """
-        Get the number of cache hits.
-        
-        Returns:
-            Number of times get_attributes() returned a cached value
-        """
-        return self._hits
-    
-    def get_miss_count(self) -> int:
-        """
-        Get the number of cache misses.
-        
-        Returns:
-            Number of times get_attributes() had to create a new value
-        """
-        return self._misses
-    
-    def reset_metrics(self):
-        """
-        Reset hit/miss counters to zero.
-        
-        This should be called at the start of each frame to get per-frame metrics.
-        """
-        self._hits = 0
-        self._misses = 0
-
-
-class AttributedStringCache:
-    """
-    Cache for NSAttributedString objects.
-    
-    This cache stores pre-built NSAttributedString objects to eliminate redundant
-    instantiation overhead during character drawing. Each unique combination of
-    text content and attributes (font, color, underline) is cached and reused.
-    
-    The cache significantly improves performance by:
-    1. Eliminating NSAttributedString.alloc().initWithString_attributes_() overhead
-    2. Reducing memory allocations for repeated text patterns
-    3. Enabling fast attributed string lookup for drawing operations
-    
-    The cache implements LRU (Least Recently Used) eviction to prevent unbounded
-    memory growth. When the cache exceeds max_cache_size, the least recently used
-    entries are removed to make room for new entries.
-    
-    This cache is particularly effective for:
-    - Repeated strings in file listings (e.g., "..", ".", common extensions)
-    - Batched character strings with identical attributes
-    - Common UI elements that appear frequently
-    
-    Attributes:
-        _cache: Dictionary mapping (text, font_key, color_rgb, underline) to NSAttributedString
-        _attr_dict_cache: Reference to AttributeDictCache for building new strings
-        _max_cache_size: Maximum number of entries before LRU eviction
-        _access_order: List tracking access order for LRU eviction
-        _hits: Number of cache hits (for performance metrics)
-        _misses: Number of cache misses (for performance metrics)
-    
-    Example:
-        attr_string_cache = AttributedStringCache(attr_dict_cache)
-        
-        # First call creates and caches the attributed string
-        str1 = attr_string_cache.get_attributed_string("Hello", "normal", (255, 255, 255), False)
-        
-        # Subsequent calls return the cached string
-        str2 = attr_string_cache.get_attributed_string("Hello", "normal", (255, 255, 255), False)
-        assert str1 is str2  # Same object reference
-    """
-    
-    def __init__(self, attr_dict_cache: AttributeDictCache, max_cache_size: int = 1000):
-        """
-        Initialize attributed string cache.
-        
-        Args:
-            attr_dict_cache: AttributeDictCache instance for building new strings
-            max_cache_size: Maximum number of cached entries before LRU eviction (default: 1000)
-        """
-        self._cache: Dict[Tuple[str, str, Tuple[int, int, int], bool], Any] = {}
-        self._attr_dict_cache = attr_dict_cache
-        self._max_cache_size = max_cache_size
-        self._access_order: List[Tuple[str, str, Tuple[int, int, int], bool]] = []
-        self._hits = 0
-        self._misses = 0
-    
-    def get_attributed_string(self, text: str, font_key: str, 
-                             color_rgb: Tuple[int, int, int], 
-                             underline: bool) -> Any:
-        """
-        Get cached NSAttributedString or create and cache if not exists.
-        
-        This method checks if an NSAttributedString with the specified text and
-        attributes already exists in the cache. If found, it returns the cached
-        object and updates its access order for LRU tracking. If not found, it
-        creates a new NSAttributedString using the AttributeDictCache for attributes,
-        caches it, and returns it.
-        
-        When the cache exceeds max_cache_size, the least recently used entry is
-        evicted to make room for the new entry.
-        
-        Args:
-            text: The string content to render
-            font_key: String or integer identifying the font attributes
-            color_rgb: Tuple of (red, green, blue) values (0-255)
-            underline: Boolean indicating if underline style should be applied
-        
-        Returns:
-            NSAttributedString object ready for drawing with drawAtPoint_()
-        
-        Example:
-            # Get attributed string for normal white text
-            attr_str = cache.get_attributed_string("Hello", "0", (255, 255, 255), False)
-            
-            # Get attributed string for bold red text with underline
-            attr_str = cache.get_attributed_string("World", str(TextAttribute.BOLD), (255, 0, 0), True)
-        """
-        # Create cache key from text and all attributes
-        key = (text, font_key, color_rgb, underline)
-        
-        if key in self._cache:
-            # Cache hit - increment hit counter and update access order for LRU tracking
-            self._hits += 1
-            self._access_order.remove(key)
-            self._access_order.append(key)
-            return self._cache[key]
-        
-        # Cache miss - increment miss counter
-        self._misses += 1
-        
-        # Get attribute dictionary from AttributeDictCache
-        attributes = self._attr_dict_cache.get_attributes(font_key, color_rgb, underline)
-        
-        # Create NSAttributedString with text and attributes
-        # NSAttributedString.alloc().initWithString_attributes_() creates an immutable
-        # attributed string that can be reused for drawing
-        attr_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
-            text, attributes
-        )
-        
-        # Check if cache is full and needs LRU eviction
-        if len(self._cache) >= self._max_cache_size:
-            # Remove least recently used entry (first in access order)
-            lru_key = self._access_order.pop(0)
-            del self._cache[lru_key]
-        
-        # Cache the attributed string
-        self._cache[key] = attr_string
-        self._access_order.append(key)
-        
-        return attr_string
-    
-    def clear(self):
-        """
-        Clear the attributed string cache.
-        
-        This method removes all cached NSAttributedString objects. It should be
-        called when the font or color scheme changes, or when resetting the
-        rendering state.
-        
-        The AttributeDictCache reference is preserved, only the cached attributed
-        strings and access order are cleared.
-        
-        Example:
-            cache.clear()  # Remove all cached attributed strings
-        """
-        self._cache.clear()
-        self._access_order.clear()
-    
-    def get_hit_count(self) -> int:
-        """
-        Get the number of cache hits.
-        
-        Returns:
-            Number of times get_attributed_string() returned a cached value
-        """
-        return self._hits
-    
-    def get_miss_count(self) -> int:
-        """
-        Get the number of cache misses.
-        
-        Returns:
-            Number of times get_attributed_string() had to create a new value
-        """
-        return self._misses
-    
-    def reset_metrics(self):
-        """
-        Reset hit/miss counters to zero.
-        
-        This should be called at the start of each frame to get per-frame metrics.
-        """
-        self._hits = 0
-        self._misses = 0
-
-
 class CoreGraphicsBackend(Renderer):
     """
     CoreGraphics rendering backend for macOS.
@@ -1155,6 +189,7 @@ class CoreGraphicsBackend(Renderer):
     # Window padding multiplier: adds (WINDOW_PADDING_MULTIPLIER * char_height) to window dimensions
     # This creates a pleasant frame around the text grid that edge cells will fill
     WINDOW_PADDING_MULTIPLIER = 0.5
+    
     
     def __init__(self, window_title: str = "TTK Application",
                  font_name: str = "Menlo", font_size: int = 12,
@@ -1201,11 +236,6 @@ class CoreGraphicsBackend(Renderer):
         self.grid: List[List[Tuple]] = []
         self.color_pairs: Dict[int, Tuple[Tuple[int, int, int], Tuple[int, int, int]]] = {}
         
-        # Performance optimization caches
-        self._color_cache: Optional[ColorCache] = None
-        self._font_cache: Optional[FontCache] = None
-        self._attr_dict_cache: Optional[AttributeDictCache] = None
-        self._attr_string_cache: Optional[AttributedStringCache] = None
         
         # Cursor state
         self.cursor_visible = False
@@ -1218,6 +248,9 @@ class CoreGraphicsBackend(Renderer):
         
         # Event callback for callback-based event delivery
         self.event_callback: Optional['EventCallback'] = None
+        
+        # C++ renderer module (initialized in initialize())
+        self._cpp_renderer = None
     
     def initialize(self) -> None:
         """
@@ -1231,6 +264,7 @@ class CoreGraphicsBackend(Renderer):
         5. Creates the window and view
         6. Initializes the character grid
         7. Sets up default color pairs
+        8. Imports C++ renderer module
         
         Raises:
             ValueError: If the specified font is not found
@@ -1249,21 +283,15 @@ class CoreGraphicsBackend(Renderer):
         # Calculate character dimensions
         self._calculate_char_dimensions()
         
-        # Initialize performance optimization caches
-        # ColorCache with max_size=256 provides ample space for typical TFM usage
-        # (10-20 unique colors) with generous headroom
-        self._color_cache = ColorCache(max_size=256)
-        
-        # FontCache initialized with base font for creating attribute variants
-        self._font_cache = FontCache(self.font)
-        
-        # AttributeDictCache initialized with font and color caches for creating
-        # pre-built attribute dictionaries
-        self._attr_dict_cache = AttributeDictCache(self._font_cache, self._color_cache)
-        
-        # AttributedStringCache initialized with AttributeDictCache for creating
-        # pre-built NSAttributedString objects with LRU eviction (max 1000 entries)
-        self._attr_string_cache = AttributedStringCache(self._attr_dict_cache, max_cache_size=1000)
+        # Import C++ renderer module
+        try:
+            import ttk_coregraphics_render
+            self._cpp_renderer = ttk_coregraphics_render
+            print("CoreGraphicsBackend: Using C++ rendering implementation")
+        except ImportError as e:
+            print(f"CoreGraphicsBackend: C++ renderer module not available: {e}")
+            print("CoreGraphicsBackend: Falling back to PyObjC rendering")
+            self.USE_CPP_RENDERING = False
         
         # Create window and view
         self._create_window()
@@ -1295,6 +323,9 @@ class CoreGraphicsBackend(Renderer):
         Uses the character 'M' (typically the widest in monospace fonts) to
         determine dimensions. No line spacing is added to ensure box-drawing
         characters connect seamlessly.
+        
+        Also calculates the font ascent for proper baseline positioning when
+        using CoreText APIs.
         """
         # Create an attributed string with the font to measure character size
         test_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
@@ -1309,6 +340,11 @@ class CoreGraphicsBackend(Renderer):
         # Use exact font dimensions without line spacing for seamless box-drawing
         self.char_width = int(size.width)
         self.char_height = int(size.height)
+        
+        # Get font ascent for baseline positioning
+        # CTLineDraw uses baseline positioning, while NSAttributedString.drawAtPoint_
+        # uses top-left corner positioning. We need the ascent to convert between them.
+        self.font_ascent = self.font.ascender()
     
     def _create_window(self) -> None:
         """
@@ -1442,9 +478,9 @@ class CoreGraphicsBackend(Renderer):
         and no attributes.
         """
         # Create 2D grid initialized with empty cells
-        # Each cell is (char, color_pair, attributes)
+        # Each cell is (char, color_pair, attributes, is_wide)
         self.grid = [
-            [(' ', 0, 0) for _ in range(self.cols)]
+            [(' ', 0, 0, False) for _ in range(self.cols)]
             for _ in range(self.rows)
         ]
     
@@ -1493,31 +529,6 @@ class CoreGraphicsBackend(Renderer):
         
         # Clear font reference
         self.font = None
-        
-        # Clear performance optimization caches
-        if self._color_cache is not None:
-            try:
-                self._color_cache.clear()
-            except Exception as e:
-                print(f"Warning: Error clearing color cache during shutdown: {e}")
-            finally:
-                self._color_cache = None
-        
-        if self._font_cache is not None:
-            try:
-                self._font_cache.clear()
-            except Exception as e:
-                print(f"Warning: Error clearing font cache during shutdown: {e}")
-            finally:
-                self._font_cache = None
-        
-        if self._attr_dict_cache is not None:
-            try:
-                self._attr_dict_cache.clear()
-            except Exception as e:
-                print(f"Warning: Error clearing attribute dict cache during shutdown: {e}")
-            finally:
-                self._attr_dict_cache = None
         
         # Clear character grid
         self.grid = []
@@ -1818,68 +829,6 @@ class CoreGraphicsBackend(Renderer):
             # Update the application (process any pending operations)
             app.updateWindows()
     
-    def get_character_drawing_metrics(self) -> CharacterDrawingMetrics:
-        """
-        Collect and return character drawing performance metrics from the last frame.
-        
-        This method gathers metrics from the caching layers and combines them with
-        timing and batching information collected during the last drawRect_ call to
-        provide a comprehensive view of character drawing performance.
-        
-        The metrics are automatically updated during each drawRect_ call and can be
-        retrieved at any time after a frame has been rendered.
-        
-        Returns:
-            CharacterDrawingMetrics object with all performance metrics from last frame
-        
-        Example:
-            # After triggering a refresh
-            backend.refresh()
-            # Process events to ensure drawRect_ is called
-            # ...
-            # Get metrics from the last frame
-            metrics = backend.get_character_drawing_metrics()
-            print(f"Drawing time: {metrics.total_time*1000:.2f}ms")
-            print(f"Cache hit rate: {metrics.attr_string_cache_hits / 
-                  (metrics.attr_string_cache_hits + metrics.attr_string_cache_misses):.2%}")
-        """
-        # Get cache hit/miss counts
-        attr_dict_hits = self._attr_dict_cache.get_hit_count() if self._attr_dict_cache else 0
-        attr_dict_misses = self._attr_dict_cache.get_miss_count() if self._attr_dict_cache else 0
-        attr_string_hits = self._attr_string_cache.get_hit_count() if self._attr_string_cache else 0
-        attr_string_misses = self._attr_string_cache.get_miss_count() if self._attr_string_cache else 0
-        
-        return CharacterDrawingMetrics(
-            total_time=0.0,
-            characters_drawn=0,
-            batches_drawn=0,
-            avg_batch_size=0.0,
-            attr_dict_cache_hits=attr_dict_hits,
-            attr_dict_cache_misses=attr_dict_misses,
-            attr_string_cache_hits=attr_string_hits,
-            attr_string_cache_misses=attr_string_misses,
-            avg_time_per_char=0.0,
-            avg_time_per_batch=0.0
-        )
-    
-    def reset_character_drawing_metrics(self):
-        """
-        Reset character drawing metrics counters.
-        
-        This method resets the hit/miss counters in both cache layers to zero.
-        It should be called at the start of each frame to get per-frame metrics.
-        
-        Example:
-            # At start of frame
-            backend.reset_character_drawing_metrics()
-            # ... render frame ...
-            metrics = backend.get_character_drawing_metrics(...)
-        """
-        if self._attr_dict_cache:
-            self._attr_dict_cache.reset_metrics()
-        if self._attr_string_cache:
-            self._attr_string_cache.reset_metrics()
-    
     def clear(self) -> None:
         """
         Clear the entire window.
@@ -1894,7 +843,7 @@ class CoreGraphicsBackend(Renderer):
             # Reset all cells to space with default color pair and no attributes
             for row in range(self.rows):
                 for col in range(self.cols):
-                    self.grid[row][col] = (' ', 0, 0)
+                    self.grid[row][col] = (' ', 0, 0, False)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: clear failed: {e}")
@@ -1924,7 +873,7 @@ class CoreGraphicsBackend(Renderer):
             # Clear cells in the specified region
             for r in range(start_row, end_row):
                 for c in range(start_col, end_col):
-                    self.grid[r][c] = (' ', 0, 0)
+                    self.grid[r][c] = (' ', 0, 0, False)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: clear_region failed at ({row}, {col}, {height}, {width}): {e}")
@@ -1960,16 +909,19 @@ class CoreGraphicsBackend(Renderer):
                 if current_col >= self.cols:
                     break
                 
-                # Update the grid cell with the character, color pair, and attributes
-                self.grid[row][current_col] = (char, color_pair, attributes)
+                # Check if this is a wide character (occupies 2 cells)
+                is_wide = _is_wide_character(char)
+                
+                # Update the grid cell with the character, color pair, attributes, and is_wide flag
+                self.grid[row][current_col] = (char, color_pair, attributes, is_wide)
                 
                 # Check if this is a wide character (occupies 2 cells)
-                if _is_wide_character(char):
+                if is_wide:
                     # Move to next column and store empty placeholder
                     current_col += 1
                     if current_col < self.cols:
                         # Store empty string as placeholder for the second cell of wide char
-                        self.grid[row][current_col] = ('', color_pair, attributes)
+                        self.grid[row][current_col] = ('', color_pair, attributes, False)
                 
                 # Move to next column
                 current_col += 1
@@ -2006,8 +958,9 @@ class CoreGraphicsBackend(Renderer):
             end_col = min(col + length, self.cols)
             
             # Draw the horizontal line
+            is_wide = _is_wide_character(char)
             for c in range(start_col, end_col):
-                self.grid[row][c] = (char, color_pair, 0)
+                self.grid[row][c] = (char, color_pair, 0, is_wide)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: draw_hline failed at ({row}, {col}): {e}")
@@ -2041,8 +994,9 @@ class CoreGraphicsBackend(Renderer):
             end_row = min(row + length, self.rows)
             
             # Draw the vertical line
+            is_wide = _is_wide_character(char)
             for r in range(start_row, end_row):
-                self.grid[r][col] = (char, color_pair, 0)
+                self.grid[r][col] = (char, color_pair, 0, is_wide)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: draw_vline failed at ({row}, {col}): {e}")
@@ -2098,7 +1052,7 @@ class CoreGraphicsBackend(Renderer):
                 # The background color from the color pair will show through
                 for r in range(start_row, end_row):
                     for c in range(start_col, end_col):
-                        self.grid[r][c] = (' ', color_pair, 0)
+                        self.grid[r][c] = (' ', color_pair, 0, False)
             else:
                 # Draw outlined rectangle using box-drawing characters
                 # For rectangles with height or width of 1 or 2, we need special handling
@@ -2106,43 +1060,43 @@ class CoreGraphicsBackend(Renderer):
                 if actual_height == 1:
                     # Single row rectangle - just draw horizontal line
                     for c in range(start_col, end_col):
-                        self.grid[start_row][c] = ('─', color_pair, 0)
+                        self.grid[start_row][c] = ('─', color_pair, 0, False)
                 elif actual_width == 1:
                     # Single column rectangle - just draw vertical line
                     for r in range(start_row, end_row):
-                        self.grid[r][start_col] = ('│', color_pair, 0)
+                        self.grid[r][start_col] = ('│', color_pair, 0, False)
                 else:
                     # Normal rectangle with at least 2x2 dimensions
                     
                     # Draw top edge
                     # Top-left corner
-                    self.grid[start_row][start_col] = ('┌', color_pair, 0)
+                    self.grid[start_row][start_col] = ('┌', color_pair, 0, False)
                     
                     # Top edge
                     for c in range(start_col + 1, end_col - 1):
-                        self.grid[start_row][c] = ('─', color_pair, 0)
+                        self.grid[start_row][c] = ('─', color_pair, 0, False)
                     
                     # Top-right corner
-                    self.grid[start_row][end_col - 1] = ('┐', color_pair, 0)
+                    self.grid[start_row][end_col - 1] = ('┐', color_pair, 0, False)
                     
                     # Draw left and right edges (if there are rows between top and bottom)
                     for r in range(start_row + 1, end_row - 1):
                         # Left edge
-                        self.grid[r][start_col] = ('│', color_pair, 0)
+                        self.grid[r][start_col] = ('│', color_pair, 0, False)
                         
                         # Right edge
-                        self.grid[r][end_col - 1] = ('│', color_pair, 0)
+                        self.grid[r][end_col - 1] = ('│', color_pair, 0, False)
                     
                     # Draw bottom edge
                     # Bottom-left corner
-                    self.grid[end_row - 1][start_col] = ('└', color_pair, 0)
+                    self.grid[end_row - 1][start_col] = ('└', color_pair, 0, False)
                     
                     # Bottom edge
                     for c in range(start_col + 1, end_col - 1):
-                        self.grid[end_row - 1][c] = ('─', color_pair, 0)
+                        self.grid[end_row - 1][c] = ('─', color_pair, 0, False)
                     
                     # Bottom-right corner
-                    self.grid[end_row - 1][end_col - 1] = ('┘', color_pair, 0)
+                    self.grid[end_row - 1][end_col - 1] = ('┘', color_pair, 0, False)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: draw_rect failed at ({row}, {col}, {height}, {width}): {e}")
@@ -2241,16 +1195,6 @@ class CoreGraphicsBackend(Renderer):
         # Store color pair in dictionary
         self.color_pairs[pair_id] = (fg_color, bg_color)
         
-        # Clear attribute dictionary cache when color scheme changes
-        # This ensures cached attribute dictionaries are rebuilt with new colors
-        if hasattr(self, '_attr_dict_cache') and self._attr_dict_cache is not None:
-            self._attr_dict_cache.clear()
-        
-        # Clear attributed string cache when color scheme changes
-        # This ensures cached NSAttributedString objects are rebuilt with new colors
-        if hasattr(self, '_attr_string_cache') and self._attr_string_cache is not None:
-            self._attr_string_cache.clear()
-    
 
     def _translate_event(self, event) -> Optional[KeyEvent]:
         """
@@ -3013,26 +1957,16 @@ if COCOA_AVAILABLE:
             
             def drawRect_(self, rect):
                 """
-                Render the character grid with optimized background batching.
+                Render the character grid using C++ CoreGraphics implementation.
                 
                 This method is called by the Cocoa event loop when the view needs
-                to be redrawn. It uses an optimized rendering approach that batches
-                adjacent cells with the same background color to reduce CoreGraphics
-                API calls.
+                to be redrawn. It uses the C++ rendering implementation for optimal
+                performance with direct CoreGraphics/CoreText API access.
                 
                 PyObjC Method Name Translation:
                     Objective-C: drawRect:
                     PyObjC: drawRect_()
                     The trailing underscore indicates a single parameter method.
-                
-                The optimized rendering process:
-                1. Calculate dirty region from rect parameter
-                2. Phase 1: Batch and draw backgrounds
-                   - Iterate through dirty region cells
-                   - Accumulate adjacent cells with same color into batches
-                   - Draw all batched backgrounds with cached colors
-                3. Phase 2: Draw characters (not yet implemented in this task)
-                4. Draw cursor if visible
                 
                 Args:
                     rect: NSRect indicating the region that needs to be redrawn
@@ -3058,323 +1992,66 @@ if COCOA_AVAILABLE:
                 offset_x = (view_width - grid_width) / 2.0
                 offset_y = (view_height - grid_height) / 2.0
                 
-                # Calculate dirty region - which cells need to be redrawn
-                start_row, end_row, start_col, end_col = (
-                    DirtyRegionCalculator.get_dirty_cells(
-                        rect, self.backend.rows, self.backend.cols,
-                        self.backend.char_width, self.backend.char_height
-                    )
+                # Use C++ rendering
+                self._render_with_cpp(rect, offset_x, offset_y)
+            
+            def _render_with_cpp(self, rect, offset_x: float, offset_y: float):
+                """
+                Render using C++ implementation.
+                
+                This method calls the C++ render_frame() function with all necessary
+                parameters. The C++ implementation provides direct CoreGraphics/CoreText
+                API access for improved performance.
+                
+                Args:
+                    rect: NSRect indicating the region that needs to be redrawn
+                    offset_x: Horizontal centering offset in pixels
+                    offset_y: Vertical centering offset in pixels
+                """
+                # Get the CoreGraphics context
+                context = Cocoa.NSGraphicsContext.currentContext().CGContext()
+                
+                # Convert CGContextRef to integer pointer for C++
+                # PyObjC wraps CoreFoundation pointers, we need the raw pointer value
+                # The C++ function expects unsigned long long (pointer as integer)
+                if hasattr(context, '__c_void_p__'):
+                    # PyObjC provides __c_void_p__() to get the raw pointer
+                    context_ptr = context.__c_void_p__().value
+                else:
+                    # Fallback: try to convert directly to int
+                    context_ptr = int(context)
+                
+                # Convert NSRect to tuple (x, y, width, height) for C++
+                # NSRect is a PyObjC structure, C++ expects a simple tuple
+                dirty_rect = (
+                    float(rect.origin.x),
+                    float(rect.origin.y),
+                    float(rect.size.width),
+                    float(rect.size.height)
                 )
                 
-                # Phase 1: Batch and draw backgrounds
-                # Create a batcher to accumulate adjacent cells with same background color
-                batcher = RectangleBatcher()
+                # Get marked text if present
+                marked_text = getattr(self, 'marked_text', None) or ""
                 
-                # ============================================================
-                # DIRTY REGION ITERATION - OPTIMIZED FOR PERFORMANCE
-                # ============================================================
-                # This section has been carefully optimized to minimize overhead
-                # while maintaining visual correctness. Three key optimizations
-                # reduce iteration time from ~200ms to ~0.65ms (99.7% improvement):
-                #
-                # 1. Attribute Caching: Reduces attribute access overhead
-                # 2. Y-Coordinate Pre-calculation: Eliminates redundant arithmetic
-                # 3. Efficient Dictionary Lookup: Reduces dictionary operations
-                #
-                # Performance target: < 50ms ✅ ACHIEVED (0.65ms, 98.7% under target)
-                # Visual correctness: ✅ VERIFIED (90+ tests pass)
-                #
-                # See doc/dev/DIRTY_REGION_ITERATION_OPTIMIZATION.md for details
-                # ============================================================
-
-                # Optimization 1: Cache frequently accessed attributes
-                # -------------------------------------------------------
-                # Extract backend attributes to local variables to avoid repeated
-                # attribute access overhead. Python attribute access involves
-                # dictionary lookups in the object's __dict__, which adds up when
-                # accessing the same attributes 1,920 times per frame.
-                #
-                # Impact: Reduces attribute accesses from 9,600 to 5 per frame
-                # Performance gain: ~3-5% faster
-                char_width = self.backend.char_width
-                char_height = self.backend.char_height
-                rows = self.backend.rows
-                grid = self.backend.grid
-                color_pairs = self.backend.color_pairs
-
-                # Iterate through dirty region cells and accumulate into batches
-                # For a 24x80 grid, this processes 1,920 cells per full-screen update
-                
-                # Pre-calculate edge cell boundaries for performance
-                # Only edge cells need special handling for background extension
-                is_top_edge = (start_row == 0)
-                is_bottom_edge = (end_row == rows)
-                left_col = 0
-                right_col = self.backend.cols - 1
-                
-                for row in range(start_row, end_row):
-                    # Optimization 2: Pre-calculate row Y-coordinate
-                    # -----------------------------------------------
-                    # Calculate y once per row instead of once per cell. The y-coordinate
-                    # depends only on the row number, not the column, so we can move this
-                    # calculation outside the inner loop.
-                    #
-                    # IMPORTANT: Coordinate system transformation
-                    # TTK uses top-left origin (0,0) where row 0 is at the top
-                    # CoreGraphics uses bottom-left origin where y=0 is at the bottom
-                    # Transformation formula: y = (rows - row - 1) * char_height
-                    #
-                    # Impact: Reduces y-coordinate calculations from 1,920 to 24 per frame
-                    # Performance gain: ~4-6% faster
-                    y = (rows - row - 1) * char_height + offset_y
-                    
-                    # Check if this row is an edge row (only check once per row)
-                    is_edge_row = (row == 0 or row == rows - 1)
-                    
-                    for col in range(start_col, end_col):
-                        # Get cell data: (char, color_pair, attributes)
-                        # Each cell contains the character to display, its color pair ID,
-                        # and text attributes (BOLD, REVERSE, etc.)
-                        char, color_pair, attributes = grid[row][col]
-                        
-                        # Calculate x pixel position (no transformation needed for x-axis)
-                        # Both TTK and CoreGraphics use left-to-right x-axis
-                        x = col * char_width + offset_x
-                        
-                        # Optimization 3: Use dict.get() for color pair lookup
-                        # ----------------------------------------------------
-                        # Replace conditional check + lookup with single dict.get() call.
-                        # The original code performed two dictionary operations:
-                        #   1. Check if color_pair exists (membership test)
-                        #   2. Retrieve the value (lookup)
-                        # dict.get() combines these into a single operation.
-                        #
-                        # Impact: Reduces dictionary operations from 3,840 to 1,920 per frame
-                        # Performance gain: ~2-3% faster
-                        fg_rgb, bg_rgb = color_pairs.get(color_pair, color_pairs[0])
-                        
-                        # Handle reverse video attribute by swapping foreground/background
-                        # This is a common terminal attribute for highlighting text
-                        if attributes & TextAttribute.REVERSE:
-                            fg_rgb, bg_rgb = bg_rgb, fg_rgb
-                        
-                        # Edge extension optimization: Only check edge cells
-                        # For non-edge cells, use standard dimensions (fast path)
-                        # For edge cells, calculate extended dimensions (slow path)
-                        is_edge_col = (col == left_col or col == right_col)
-                        
-                        if is_edge_row or is_edge_col:
-                            # Slow path: Edge cell - calculate extended dimensions
-                            cell_x = x
-                            cell_y = y
-                            cell_width = char_width
-                            cell_height = char_height
-                            
-                            # Extend left edge (leftmost column)
-                            if col == left_col:
-                                cell_x = 0
-                                cell_width = char_width + offset_x
-                            
-                            # Extend right edge (rightmost column)
-                            if col == right_col:
-                                cell_width = char_width + offset_x
-                            
-                            # Extend top edge (topmost row)
-                            if row == 0:
-                                cell_height = char_height + offset_y
-                            
-                            # Extend bottom edge (bottommost row)
-                            if row == rows - 1:
-                                cell_y = 0
-                                cell_height = char_height + offset_y
-                            
-                            batcher.add_cell(cell_x, cell_y, cell_width, 
-                                           cell_height, bg_rgb)
-                        else:
-                            # Fast path: Interior cell - use standard dimensions
-                            batcher.add_cell(x, y, char_width, 
-                                           char_height, bg_rgb)
-                    
-                    # Finish row - ensures current batch is completed
-                    # This is called after each row to handle row boundaries correctly
-                    batcher.finish_row()
-                
-                # Draw all batched backgrounds using cached colors
-                for batch in batcher.get_batches():
-                    # Get cached NSColor for the background
-                    bg_color = self.backend._color_cache.get_color(*batch.bg_rgb)
-                    bg_color.setFill()
-                    
-                    # Create rectangle for the entire batch
-                    batch_rect = Cocoa.NSMakeRect(
-                        batch.x, batch.y, batch.width, batch.height
-                    )
-                    # Draw the batched background with a single API call
-                    Cocoa.NSRectFill(batch_rect)
-                
-                # Phase 2: Draw characters with batching and caching optimization
-                # Instead of drawing each character individually, we identify continuous
-                # runs of characters with the same attributes and draw them as a single
-                # NSAttributedString. This significantly reduces the number of drawAtPoint_()
-                # calls and improves rendering performance.
-                #
-                # Caching Strategy:
-                # 1. Use AttributedStringCache to reuse pre-built NSAttributedString objects
-                # 2. Cache eliminates NSAttributedString.alloc().initWithString_attributes_() overhead
-                # 3. Particularly effective for repeated strings (file extensions, "..", ".")
-                #
-                # Batching Strategy:
-                # 1. Skip leading spaces efficiently
-                # 2. Identify start of a character run (first non-space)
-                # 3. Collect continuous characters with same attributes
-                # 4. Stop batch at: space, attribute change, or end of row
-                # 5. Draw the entire batch with a single drawAtPoint_() call using cached NSAttributedString
-                #
-                # Performance Impact:
-                # - Reduces drawAtPoint_() calls from ~1920 to ~50-200 per frame
-                # - Eliminates most NSAttributedString instantiations through caching
-                # - Combined: 70-85% reduction in character drawing time
-                
-                # Reuse cached attributes from Phase 1
-                for row in range(start_row, end_row):
-                    # Pre-calculate row Y-coordinate (same optimization as Phase 1)
-                    y = (rows - row - 1) * char_height + offset_y
-                    
-                    # Use column index to iterate through the row
-                    col = start_col
-                    
-                    while col < end_col:
-                        # Skip leading spaces and empty placeholders efficiently
-                        # Spaces don't need to be drawn (background is already rendered)
-                        # Empty strings are placeholders for the second cell of wide characters
-                        while col < end_col and grid[row][col][0] in (' ', ''):
-                            col += 1
-                        
-                        # Check if we've reached the end of the row
-                        if col >= end_col:
-                            break
-                        
-                        # Start of a character run - get attributes for first character
-                        start_col_batch = col
-                        char, color_pair, attributes = grid[row][col]
-                        
-                        # Get foreground and background colors from color pair
-                        fg_rgb, bg_rgb = color_pairs.get(color_pair, color_pairs[0])
-                        
-                        # Handle reverse video attribute by swapping colors
-                        if attributes & TextAttribute.REVERSE:
-                            start_fg_rgb, start_bg_rgb = bg_rgb, fg_rgb
-                        else:
-                            start_fg_rgb, start_bg_rgb = fg_rgb, bg_rgb
-                        
-                        # Store the starting attributes for batch comparison
-                        start_color_pair = color_pair
-                        start_attributes = attributes
-                        
-                        # Collect characters for the batch
-                        batch_chars = [char]
-                        col += 1
-                        
-                        # Collect continuous characters with same attributes
-                        while col < end_col:
-                            char, color_pair, attributes = grid[row][col]
-                            
-                            # Stop batch at space or empty placeholder
-                            if char in (' ', ''):
-                                break
-                            
-                            # Stop batch if attributes changed
-                            # We need to check both color_pair and text attributes
-                            if color_pair != start_color_pair or attributes != start_attributes:
-                                break
-                            
-                            # Add character to batch and continue
-                            batch_chars.append(char)
-                            col += 1
-                        
-                        # Draw the batched characters individually at their grid positions
-                        # While we batch characters with the same attributes together for cache efficiency,
-                        # we must draw each character at its exact grid position to maintain alignment.
-                        # Drawing multiple characters as a single string would cause misalignment because
-                        # NSAttributedString uses proportional spacing even with monospace fonts.
-                        #
-                        # Wide Character Handling:
-                        # Wide characters (zenkaku) like Japanese, Chinese, Korean characters occupy
-                        # 2 grid cells. The draw_text() method stores them with an empty placeholder
-                        # in the next cell, so we just need to draw them with double width.
-                        if batch_chars:
-                            # Determine if underline attribute is present
-                            has_underline = bool(start_attributes & TextAttribute.UNDERLINE)
-                            
-                            # Convert attributes to string for cache key
-                            font_key = str(start_attributes)
-                            
-                            # Draw each character at its exact grid position
-                            for i, char in enumerate(batch_chars):
-                                # Calculate exact x-coordinate for this character's grid position
-                                x_pos = (start_col_batch + i) * char_width + offset_x
-                                
-                                # Get cached NSAttributedString for single character
-                                # The cache is particularly effective for repeated characters
-                                # like spaces, dots, slashes in file listings
-                                attr_string = self.backend._attr_string_cache.get_attributed_string(
-                                    char,
-                                    font_key,
-                                    start_fg_rgb,
-                                    has_underline
-                                )
-                                
-                                # Draw character at its exact grid position
-                                attr_string.drawAtPoint_(Cocoa.NSMakePoint(x_pos, y))
-
-                # Draw cursor if visible
-                if self.backend.cursor_visible:
-                    # Calculate cursor pixel position using cached values
-                    cursor_x = self.backend.cursor_col * char_width + offset_x
-                    cursor_y = (rows - self.backend.cursor_row - 1) * char_height + offset_y
-                    
-                    # Draw cursor as a filled rectangle with inverted colors
-                    # Use white color for visibility with slight transparency
-                    # Use ColorCache to avoid redundant NSColor creation
-                    cursor_color = self.backend._color_cache.get_color(255, 255, 255, 0.8)
-                    cursor_color.setFill()
-                    
-                    # Create rectangle for the cursor
-                    cursor_rect = Cocoa.NSMakeRect(
-                        cursor_x,
-                        cursor_y,
-                        char_width,
-                        char_height
-                    )
-                    Cocoa.NSRectFill(cursor_rect)
-                
-                # Draw IME marked text (composition text) if present
-                if hasattr(self, 'marked_text') and self.marked_text:
-                    # Calculate position for marked text (at cursor position)
-                    # Note: TFM needs to call backend.set_cursor_position(row, col) or
-                    # backend.move_cursor(row, col) to update cursor position for IME.
-                    # If cursor is at (0, 0), marked text will appear at top-left.
-                    marked_x = self.backend.cursor_col * char_width + offset_x
-                    marked_y = (rows - self.backend.cursor_row - 1) * char_height + offset_y
-                    
-                    # Create attributes for marked text
-                    # Use underline to indicate composition state
-                    attrs = {
-                        Cocoa.NSFontAttributeName: self.backend.font,
-                        Cocoa.NSForegroundColorAttributeName: self.backend._color_cache.get_color(0, 0, 0),
-                        Cocoa.NSBackgroundColorAttributeName: self.backend._color_cache.get_color(255, 255, 200),  # Light yellow background
-                        Cocoa.NSUnderlineStyleAttributeName: Cocoa.NSUnderlineStyleSingle
-                    }
-                    
-                    # Create attributed string for marked text
-                    marked_attr_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
-                        self.marked_text,
-                        attrs
-                    )
-                    
-                    # Draw marked text at cursor position
-                    marked_attr_string.drawAtPoint_(Cocoa.NSMakePoint(marked_x, marked_y))
-
+                # Call C++ render_frame() function
+                self.backend._cpp_renderer.render_frame(
+                    context_ptr,
+                    self.backend.grid,
+                    self.backend.color_pairs,
+                    dirty_rect,
+                    self.backend.char_width,
+                    self.backend.char_height,
+                    self.backend.rows,
+                    self.backend.cols,
+                    offset_x,
+                    offset_y,
+                    self.backend.cursor_visible,
+                    self.backend.cursor_row,
+                    self.backend.cursor_col,
+                    marked_text,
+                    self.backend.font_ascent  # Add font_ascent for baseline positioning
+                )
+            
             def acceptsFirstResponder(self):
                 """
                 Indicate that this view can receive keyboard focus.
