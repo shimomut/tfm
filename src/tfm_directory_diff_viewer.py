@@ -621,23 +621,31 @@ class DirectoryDiffViewer(UILayer):
             return True
         
         elif event.key_code == KeyCode.UP:
-            # Move cursor up
-            if self.cursor_position > 0:
-                self.cursor_position -= 1
-                # Adjust scroll if cursor moves above visible area
-                if self.cursor_position < self.scroll_offset:
-                    self.scroll_offset = self.cursor_position
-                self.mark_dirty()
+            # Check for Shift modifier to jump to previous difference
+            if event.modifiers & ModifierKey.SHIFT:
+                self._jump_to_previous_difference(display_height)
+            else:
+                # Move cursor up
+                if self.cursor_position > 0:
+                    self.cursor_position -= 1
+                    # Adjust scroll if cursor moves above visible area
+                    if self.cursor_position < self.scroll_offset:
+                        self.scroll_offset = self.cursor_position
+                    self.mark_dirty()
             return True
         
         elif event.key_code == KeyCode.DOWN:
-            # Move cursor down
-            if self.cursor_position < len(self.visible_nodes) - 1:
-                self.cursor_position += 1
-                # Adjust scroll if cursor moves below visible area
-                if self.cursor_position >= self.scroll_offset + display_height:
-                    self.scroll_offset = self.cursor_position - display_height + 1
-                self.mark_dirty()
+            # Check for Shift modifier to jump to next difference
+            if event.modifiers & ModifierKey.SHIFT:
+                self._jump_to_next_difference(display_height)
+            else:
+                # Move cursor down
+                if self.cursor_position < len(self.visible_nodes) - 1:
+                    self.cursor_position += 1
+                    # Adjust scroll if cursor moves below visible area
+                    if self.cursor_position >= self.scroll_offset + display_height:
+                        self.scroll_offset = self.cursor_position - display_height + 1
+                    self.mark_dirty()
             return True
         
         elif event.key_code == KeyCode.PAGE_UP:
@@ -1724,6 +1732,58 @@ class DirectoryDiffViewer(UILayer):
         if node.is_expanded:
             for child in node.children:
                 self._flatten_tree(child)
+    
+    def _jump_to_previous_difference(self, display_height: int) -> None:
+        """
+        Jump cursor to the previous node with a difference.
+        
+        Searches backwards from current position for a node that is not identical.
+        Adjusts scroll position to keep the cursor visible.
+        
+        Args:
+            display_height: Height of the display area for scroll adjustment
+        """
+        if not self.visible_nodes:
+            return
+        
+        # Search backwards from current position
+        for i in range(self.cursor_position - 1, -1, -1):
+            node = self.visible_nodes[i]
+            if node.difference_type != DifferenceType.IDENTICAL:
+                self.cursor_position = i
+                # Adjust scroll if cursor moves above visible area
+                if self.cursor_position < self.scroll_offset:
+                    self.scroll_offset = self.cursor_position
+                self.mark_dirty()
+                return
+        
+        # No previous difference found - stay at current position
+    
+    def _jump_to_next_difference(self, display_height: int) -> None:
+        """
+        Jump cursor to the next node with a difference.
+        
+        Searches forwards from current position for a node that is not identical.
+        Adjusts scroll position to keep the cursor visible.
+        
+        Args:
+            display_height: Height of the display area for scroll adjustment
+        """
+        if not self.visible_nodes:
+            return
+        
+        # Search forwards from current position
+        for i in range(self.cursor_position + 1, len(self.visible_nodes)):
+            node = self.visible_nodes[i]
+            if node.difference_type != DifferenceType.IDENTICAL:
+                self.cursor_position = i
+                # Adjust scroll if cursor moves below visible area
+                if self.cursor_position >= self.scroll_offset + display_height:
+                    self.scroll_offset = self.cursor_position - display_height + 1
+                self.mark_dirty()
+                return
+        
+        # No next difference found - stay at current position
     
     # ========================================================================
     # Tree Structure Management (Task 6.1)
