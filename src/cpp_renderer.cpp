@@ -1401,6 +1401,7 @@ static void render_characters(
 static void draw_character_batch(
     CGContextRef context,
     const CharacterBatch& batch,
+    CGFloat char_width,
     CGFloat char_height,
     CGFloat font_ascent,
     AttributeDictCache& attr_dict_cache
@@ -1408,11 +1409,12 @@ static void draw_character_batch(
 
 /**
  * Draw a batch of characters with the same attributes.
- * Creates a CFAttributedString with the text and attributes, then uses
- * CTLineDraw to render the text to the CoreGraphics context.
+ * Uses CGContextShowGlyphsAtPositions to render glyphs at exact grid positions,
+ * ensuring proper monospace alignment regardless of font metrics.
  * 
  * @param context CGContextRef to draw to
  * @param batch CharacterBatch containing the text and attributes to draw
+ * @param char_width Width of each character cell in pixels
  * @param char_height Height of each character cell in pixels
  * @param font_ascent Font ascent for baseline positioning
  * @param attr_dict_cache AttributeDictCache for getting attribute dictionaries
@@ -1420,11 +1422,12 @@ static void draw_character_batch(
 static void draw_character_batch(
     CGContextRef context,
     const CharacterBatch& batch,
+    CGFloat char_width,
     CGFloat char_height,
     CGFloat font_ascent,
     AttributeDictCache& attr_dict_cache
 ) {
-    // Get attribute dictionary from cache
+    // Get font and color from attribute dictionary
     CFDictionaryRef attributes = attr_dict_cache.get_attributes(
         batch.font_attributes,
         batch.fg_rgb,
@@ -1432,11 +1435,30 @@ static void draw_character_batch(
     );
     
     if (attributes == nullptr) {
-        // Failed to get attributes - skip this batch
         return;
     }
     
-    // Create CFString from UTF-8 text
+    // Extract font from attributes
+    CTFontRef font = (CTFontRef)CFDictionaryGetValue(
+        attributes, 
+        kCTFontAttributeName
+    );
+    
+    if (font == nullptr) {
+        return;
+    }
+    
+    // Extract color from attributes
+    CGColorRef color = (CGColorRef)CFDictionaryGetValue(
+        attributes, 
+        kCTForegroundColorAttributeName
+    );
+    
+    if (color == nullptr) {
+        return;
+    }
+    
+    // Convert UTF-8 string to UniChar array for glyph lookup
     CFStringRef text_string = CFStringCreateWithCString(
         kCFAllocatorDefault,
         batch.text.c_str(),
@@ -1444,57 +1466,92 @@ static void draw_character_batch(
     );
     
     if (text_string == nullptr) {
-        // Failed to create CFString - skip this batch
         return;
     }
     
-    // Create CFAttributedString with text and attributes
-    CFAttributedStringRef attributed_string = CFAttributedStringCreate(
-        kCFAllocatorDefault,
-        text_string,
-        attributes
-    );
+    CFIndex length = CFStringGetLength(text_string);
+    if (length == 0) {
+        CFRelease(text_string);
+        return;
+    }
     
-    // Release text_string (no longer needed)
+    // Allocate arrays for characters, glyphs, and positions
+    std::vector<UniChar> characters(length);
+    std::vector<CGGlyph> glyphs(length);
+    std::vector<CGPoint> positions(length);
+    
+    // Get UniChar characters from string
+    CFStringGetCharacters(text_string, CFRangeMake(0, length), characters.data());
     CFRelease(text_string);
     
-    if (attributed_string == nullptr) {
-        // Failed to create attributed string - skip this batch
+    // Get glyphs for characters
+    if (!CTFontGetGlyphsForCharacters(font, characters.data(), glyphs.data(), length)) {
+        // Failed to get glyphs
         return;
     }
     
-    // Create CTLine from attributed string
-    CTLineRef line = CTLineCreateWithAttributedString(attributed_string);
-    
-    // Release attributed_string (no longer needed)
-    CFRelease(attributed_string);
-    
-    if (line == nullptr) {
-        // Failed to create CTLine - skip this batch
-        return;
-    }
-    
-    // Set text position in the graphics context
-    // CoreText draws text with the baseline at the specified y position
-    // In CoreGraphics coordinates (bottom-left origin), y is the bottom of the cell.
-    // CTLineDraw draws at the baseline. The baseline should be at:
-    // y + (char_height - font_ascent) to position text correctly.
-    // This accounts for the descender space below the baseline.
+    // Calculate baseline position
     CGFloat baseline_y = batch.y + (char_height - font_ascent);
     
-    // Save graphics state before drawing
-    // This ensures the text matrix is not affected by previous draws
-    CGContextSaveGState(context);
-    CGContextSetTextPosition(context, batch.x, baseline_y);
+    // Calculate position for each glyph at exact grid positions
+    CGFloat x = batch.x;
+    for (CFIndex i = 0; i < length; ++i) {
+        positions[i].x = x;
+        positions[i].y = baseline_y;
+        
+        // Advance by char_width for next character
+        // For wide characters, we would advance by char_width * 2, but
+        // the batch text already accounts for this by having the wide char
+        // followed by an empty placeholder in the grid
+        x += char_width;
+    }
     
-    // Draw the line
-    CTLineDraw(line, context);
+    // Set fill color for text
+    CGContextSetFillColorWithColor(context, color);
+    
+    // Set text drawing mode to fill
+    CGContextSetTextDrawingMode(context, kCGTextFill);
+    
+    // Save graphics state
+    CGContextSaveGState(context);
+    
+    // Disable anti-aliasing for pixel-perfect rendering
+    // This matches the behavior when using monospace fonts at exact grid positions
+    CGContextSetShouldAntialias(context, true);
+    CGContextSetShouldSmoothFonts(context, true);
+    
+    // Get CGFont from CTFont for glyph rendering
+    CGFontRef cg_font = CTFontCopyGraphicsFont(font, nullptr);
+    if (cg_font != nullptr) {
+        CGContextSetFont(context, cg_font);
+        CGContextSetFontSize(context, CTFontGetSize(font));
+        CFRelease(cg_font);
+    }
+    
+    // Draw glyphs at exact positions
+    CGContextShowGlyphsAtPositions(
+        context,
+        glyphs.data(),
+        positions.data(),
+        length
+    );
+    
+    // Draw underline if needed
+    if (batch.underline) {
+        // Calculate underline position and thickness
+        CGFloat underline_position = baseline_y + CTFontGetUnderlinePosition(font);
+        CGFloat underline_thickness = CTFontGetUnderlineThickness(font);
+        
+        // Draw underline as a filled rectangle
+        CGFloat underline_width = char_width * length;
+        CGContextFillRect(
+            context,
+            CGRectMake(batch.x, underline_position, underline_width, underline_thickness)
+        );
+    }
     
     // Restore graphics state
     CGContextRestoreGState(context);
-    
-    // Release CTLine
-    CFRelease(line);
 }
 
 /**
@@ -1528,7 +1585,7 @@ static void render_characters(
             if (cell.character == " " || cell.character.empty()) {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
-                    draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
+                    draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
                 continue;
@@ -1539,7 +1596,7 @@ static void render_characters(
             if (cell.character.empty()) {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
-                    draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
+                    draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
                 continue;
@@ -1550,7 +1607,7 @@ static void render_characters(
             if (color_it == color_pairs.end()) {
                 // Color pair not found - skip this cell
                 if (current_batch.has_value()) {
-                    draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
+                    draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
                 continue;
@@ -1624,7 +1681,7 @@ static void render_characters(
             } else {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
-                    draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
+                    draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
                 }
                 
                 // Start new batch
@@ -1648,14 +1705,14 @@ static void render_characters(
         
         // Finish batch at end of row
         if (current_batch.has_value()) {
-            draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
+            draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
             current_batch = std::nullopt;
         }
     }
     
     // Finish any remaining batch
     if (current_batch.has_value()) {
-        draw_character_batch(context, current_batch.value(), char_height, font_ascent, attr_dict_cache);
+        draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
     }
 }
 
