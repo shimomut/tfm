@@ -53,7 +53,7 @@ from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_cache_manager import CacheManager
 from tfm_profiling import ProfilingManager
 from tfm_menu_manager import MenuManager
-from tfm_ui_layer import UILayerStack, FileManagerLayer
+from tfm_ui_layer import UILayerStack, UILayer
 from tfm_adaptive_fps import AdaptiveFPSManager
 
 
@@ -150,7 +150,7 @@ class TFMEventCallback(EventCallback):
         return self.file_manager._handle_menu_event(event)
 
 
-class FileManager:
+class FileManager(UILayer):
     def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_enabled=False):
         self.renderer = renderer
         self.stdscr = renderer  # Keep stdscr as alias for compatibility during migration
@@ -257,8 +257,11 @@ class FileManager:
         self.renderer.set_event_callback(self.event_callback)
         
         # Initialize UI layer stack with FileManager as bottom layer
-        self.file_manager_layer = FileManagerLayer(self)
-        self.ui_layer_stack = UILayerStack(self.file_manager_layer, self.log_manager, self.adaptive_fps)
+        self.ui_layer_stack = UILayerStack(self, self.log_manager, self.adaptive_fps)
+        
+        # UILayer interface attributes
+        self._dirty = True  # Start dirty to ensure initial render
+        self._close_requested = False  # Flag for quit handling
 
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
@@ -295,6 +298,186 @@ class FileManager:
             # If we can't create the directories, log a warning but don't fail
             # TFM should still work without user directories
             print(f"Warning: Could not create TFM user directories: {e}", file=sys.stderr)
+    
+    # UILayer interface implementation
+    
+    def handle_key_event(self, event) -> bool:
+        """
+        Handle a key event for the main FileManager screen.
+        
+        This method delegates to FileManager.handle_input(), which handles both
+        FileManager-specific input modes and main screen keyboard events.
+        
+        Args:
+            event: KeyEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        return self.handle_input(event)
+    
+    def handle_char_event(self, event) -> bool:
+        """
+        Handle a character event.
+        
+        This method delegates to FileManager.handle_input(), which checks for
+        FileManager-specific input modes that handle character input (isearch,
+        quick_edit_bar). The main screen doesn't handle char events directly.
+        
+        Args:
+            event: CharEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        return self.handle_input(event)
+    
+    def handle_system_event(self, event) -> bool:
+        """
+        Handle a system event (resize, close, etc.).
+        
+        This method handles window resize and close events for the main
+        FileManager screen.
+        
+        Args:
+            event: SystemEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        if event.is_resize():
+            # Handle window resize
+            self.clear_screen_with_background()
+            self.needs_full_redraw = True
+            self._dirty = True
+            return True
+        elif event.is_close():
+            # Handle window close request
+            if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
+                # Ignore close event during operations
+                print("Cannot close: file operation in progress")
+                return True
+            else:
+                # No operations in progress, request close
+                self._close_requested = True
+                return True
+        return False
+    
+    def render(self, renderer) -> None:
+        """
+        Render the FileManager main screen.
+        
+        This method renders the complete main screen including header, file panes,
+        log pane, status bar, and any active dialogs (quick_edit_bar, quick_choice_bar).
+        It only performs a full redraw when needed.
+        
+        Args:
+            renderer: TTK renderer instance for drawing
+        """
+        # Only do full redraw when needed
+        if self.needs_redraw():
+            # Clear screen with proper background
+            self.clear_screen_with_background()
+            
+            # Draw interface components
+            self.draw_header()
+            self.draw_files()
+            self.draw_log_pane()
+            self.draw_status()
+            
+            # Get dimensions for drawing overlays
+            height, width = self.renderer.get_dimensions()
+            status_y = height - 1
+            
+            # Draw general dialog if active (for text input in status bar)
+            if self.quick_edit_bar.is_active:
+                self.quick_edit_bar.draw()
+            
+            # Draw quick choice bar if active
+            if self.quick_choice_bar.is_active:
+                self.quick_choice_bar.draw(status_y, width)
+            
+            # Note: Don't call renderer.refresh() here - UILayerStack will do it
+    
+    def is_full_screen(self) -> bool:
+        """
+        Query if this layer occupies the full screen.
+        
+        The FileManager main screen always occupies the full terminal screen.
+        
+        Returns:
+            True (main screen is always full-screen)
+        """
+        return True
+    
+    def needs_redraw(self) -> bool:
+        """
+        Query if this layer needs redrawing.
+        
+        The layer needs redrawing if either:
+        - Its internal dirty flag is set
+        - The FileManager's needs_full_redraw flag is set
+        
+        Returns:
+            True if the layer needs redrawing, False otherwise
+        """
+        return self._dirty or self.needs_full_redraw
+    
+    def mark_dirty(self) -> None:
+        """
+        Mark this layer as needing a redraw.
+        
+        This is called by the layer stack when a lower layer has been redrawn,
+        or by the layer itself when its content changes.
+        """
+        self._dirty = True
+    
+    def clear_dirty(self) -> None:
+        """
+        Clear the dirty flag after rendering.
+        
+        This is called by the layer stack after successfully rendering this
+        layer. It clears both the layer's internal dirty flag and the
+        FileManager's needs_full_redraw flag.
+        """
+        self._dirty = False
+        self.needs_full_redraw = False
+    
+    def should_close(self) -> bool:
+        """
+        Query if this layer wants to close.
+        
+        The FileManager signals it wants to close when the user has
+        requested to quit the application (e.g., by pressing 'q' and
+        confirming the quit dialog).
+        
+        Returns:
+            True if application quit was requested, False otherwise
+        """
+        return self._close_requested
+    
+    def on_activate(self) -> None:
+        """
+        Called when this layer becomes the top layer.
+        
+        The FileManager main screen is typically always active as the bottom
+        layer, so no special activation is needed. However, if it becomes
+        the top layer again after a dialog/viewer is closed, we mark it
+        dirty to ensure it's redrawn.
+        """
+        # Main screen is always active, but mark dirty to ensure redraw
+        # when it becomes the top layer again
+        self._dirty = True
+    
+    def on_deactivate(self) -> None:
+        """
+        Called when this layer is no longer the top layer.
+        
+        The FileManager main screen remains active even when covered by
+        dialogs or viewers, so no special deactivation is needed.
+        """
+        # Main screen remains active even when covered by dialogs
+        pass
     
     def is_desktop_mode(self):
         """Check if running in desktop mode.
@@ -3236,7 +3419,7 @@ class FileManager:
         
         This method contains all the main screen keyboard event handling logic
         including navigation, selection, commands, and shortcuts. It's called
-        by FileManagerLayer to avoid recursion through handle_input().
+        by handle_input() after checking for special input modes.
         
         Args:
             event: KeyEvent to handle
@@ -3638,7 +3821,7 @@ class FileManager:
         if self.isearch_mode:
             result = self.handle_isearch_input(event)
             if result:
-                self.file_manager_layer.mark_dirty()
+                self.mark_dirty()
                 self.needs_full_redraw = True
             return result
         
@@ -3646,7 +3829,7 @@ class FileManager:
         if self.quick_edit_bar.is_active:
             result = self.quick_edit_bar.handle_input(event)
             if result:
-                self.file_manager_layer.mark_dirty()
+                self.mark_dirty()
                 self.needs_full_redraw = True
             return result
         
@@ -3654,7 +3837,7 @@ class FileManager:
         if isinstance(event, KeyEvent) and self.quick_choice_bar.is_active:
             result = self.handle_quick_choice_input(event)
             if result:
-                self.file_manager_layer.mark_dirty()
+                self.mark_dirty()
                 self.needs_full_redraw = True
             return result
         

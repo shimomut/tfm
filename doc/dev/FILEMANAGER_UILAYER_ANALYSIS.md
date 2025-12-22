@@ -1,5 +1,20 @@
 # FileManager as UILayer Subclass - Design Analysis
 
+## DESIGN CHANGE NOTICE (December 2025)
+
+**This analysis has been superseded by implementation changes.**
+
+The original recommendation to keep FileManagerLayer as a wrapper has been reversed. FileManager now directly implements the UILayer interface, eliminating the FileManagerLayer wrapper class.
+
+**Current Implementation**: FileManager extends UILayer directly
+**Previous Implementation**: FileManagerLayer wrapped FileManager
+
+See EVENT_FLOW_ANALYSIS.md for the current architecture.
+
+---
+
+## Original Analysis (Historical Reference)
+
 ## Executive Summary
 
 **Recommendation: Do NOT make FileManager a direct subclass of UILayer**
