@@ -1228,6 +1228,48 @@ class CoreGraphicsBackend(Renderer):
         
         # Store color pair in dictionary
         self.color_pairs[pair_id] = (fg_color, bg_color)
+    
+    def update_background(self, bg_color: Tuple[int, int, int]) -> None:
+        """
+        Update the window background color.
+        
+        This method updates the background color of the entire window view.
+        It should be called after color scheme changes to ensure all areas
+        (including those where no characters are drawn) have the correct background.
+        
+        Args:
+            bg_color: Background color as (R, G, B) tuple (0-255 each)
+        """
+        try:
+            # Update color pair 0 (default) with new background
+            self.color_pairs[0] = (self.color_pairs[0][0], bg_color)
+            
+            # Convert RGB (0-255) to NSColor (0.0-1.0)
+            r = bg_color[0] / 255.0
+            g = bg_color[1] / 255.0
+            b = bg_color[2] / 255.0
+            
+            # Create NSColor with RGB values
+            ns_color = Cocoa.NSColor.colorWithCalibratedRed_green_blue_alpha_(
+                r, g, b, 1.0
+            )
+            
+            # Set the view's background color
+            # This ensures areas outside the character grid show the correct color
+            if self.view is not None:
+                # Set the layer background color for proper rendering
+                if not self.view.wantsLayer():
+                    self.view.setWantsLayer_(True)
+                
+                # Convert NSColor to CGColor for layer
+                cg_color = ns_color.CGColor()
+                self.view.layer().setBackgroundColor_(cg_color)
+                
+                # Mark view as needing display to apply the change
+                self.view.setNeedsDisplay_(True)
+                
+        except Exception as e:
+            print(f"Warning: Could not update background: {e}")
         
 
     def _translate_event(self, event) -> Optional[KeyEvent]:
