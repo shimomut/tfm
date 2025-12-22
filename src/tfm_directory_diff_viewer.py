@@ -1002,9 +1002,10 @@ class DirectoryDiffViewer(UILayer):
             color_pair, attrs = self._get_node_colors(node, is_focused)
             blank_color_pair, blank_attrs = get_color_with_attrs(COLOR_DIFF_BLANK)
             
-            # Build node display text with indentation and expand/collapse indicator
-            indent = "  " * node.depth
+            # Build tree lines to show parent-child relationships
+            tree_lines = self._build_tree_lines(node)
             
+            # Build expand/collapse indicator
             if node.is_directory:
                 if node.is_expanded:
                     indicator = "▼ "
@@ -1031,7 +1032,7 @@ class DirectoryDiffViewer(UILayer):
             if has_left_error or has_right_error or has_comparison_error:
                 error_indicator = "⚠ "
             
-            node_text = indent + indicator + error_indicator + node.name
+            node_text = tree_lines + indicator + error_indicator + node.name
             
             # Choose separator based on difference type
             if node.difference_type == DifferenceType.IDENTICAL:
@@ -1057,8 +1058,10 @@ class DirectoryDiffViewer(UILayer):
                 left_text = left_text + left_padding
                 renderer.draw_text(y_pos, left_column_x, left_text, color_pair, attrs)
             else:
-                # Node doesn't exist on left side - show blank with gray background
-                blank_text = " " * left_column_width
+                # Node doesn't exist on left side - show tree lines for missing item
+                # Use continuation lines only (no branch connectors)
+                missing_tree_lines = self._build_tree_lines_for_missing(node)
+                blank_text = missing_tree_lines + " " * (left_column_width - len(missing_tree_lines))
                 renderer.draw_text(y_pos, left_column_x, blank_text, blank_color_pair, blank_attrs)
             
             # Render separator with appropriate color
@@ -1086,8 +1089,11 @@ class DirectoryDiffViewer(UILayer):
                 right_text = right_text + right_padding
                 renderer.draw_text(y_pos, right_column_x, right_text, color_pair, attrs)
             else:
-                # Node doesn't exist on right side - show blank with gray background
-                blank_text = " " * right_column_width
+                # Node doesn't exist on right side - show tree lines for missing item
+                # Use continuation lines only (no branch connectors)
+                missing_tree_lines = self._build_tree_lines_for_missing(node)
+                blank_text = missing_tree_lines + " " * (right_column_width - len(missing_tree_lines))
+                renderer.draw_text(y_pos, right_column_x, blank_text, blank_color_pair, blank_attrs)
                 renderer.draw_text(y_pos, right_column_x, blank_text, blank_color_pair, blank_attrs)
         
         # Draw scrollbar if needed
@@ -1336,6 +1342,116 @@ class DirectoryDiffViewer(UILayer):
             current = current.parent
         
         return "/".join(parts)
+    
+    def _build_tree_lines(self, node: TreeNode) -> str:
+        """
+        Build tree lines to show parent-child relationships.
+        
+        Uses box-drawing characters to create visual tree structure:
+        - ├── for nodes with siblings below
+        - └── for last child
+        - │   for continuation lines
+        -     for spacing
+        
+        Args:
+            node: Node to build tree lines for
+            
+        Returns:
+            String with tree line characters
+        """
+        if node.depth == 0:
+            return ""
+        
+        lines = []
+        ancestors = []
+        
+        # Collect all ancestors from node to root (excluding root itself)
+        current = node
+        while current.parent and current.parent.depth >= 0:
+            ancestors.insert(0, current)
+            current = current.parent
+            if current.depth == 0:  # Stop at root
+                break
+        
+        # Build tree lines for each level
+        for i, ancestor in enumerate(ancestors):
+            parent = ancestor.parent
+            if parent is None or parent.depth < 0:
+                continue
+            
+            # Check if this ancestor is the last child of its parent
+            is_last_child = (parent.children[-1] == ancestor)
+            
+            if i == len(ancestors) - 1:
+                # This is the node we're rendering
+                if is_last_child:
+                    lines.append("└─")
+                else:
+                    lines.append("├─")
+            else:
+                # This is an ancestor - show continuation or spacing
+                if is_last_child:
+                    lines.append("  ")  # No line needed
+                else:
+                    lines.append("│ ")  # Continuation line
+        
+        return "".join(lines)
+    
+    def _build_tree_lines_for_missing(self, node: TreeNode) -> str:
+        """
+        Build tree lines for missing items (items that don't exist on this side).
+        
+        For missing items, we only show vertical continuation lines from parent
+        directories, not the branch connectors (├─ or └─).
+        
+        Uses box-drawing characters:
+        - │   for continuation lines (when parent has more siblings)
+        -     for spacing (when parent is last child)
+        
+        Args:
+            node: Node to build tree lines for
+            
+        Returns:
+            String with tree line characters (only vertical lines, no branches)
+        """
+        if node.depth == 0:
+            return ""
+        
+        lines = []
+        ancestors = []
+        
+        # Collect all ancestors from node to root (excluding root itself)
+        current = node
+        while current.parent and current.parent.depth >= 0:
+            ancestors.insert(0, current)
+            current = current.parent
+            if current.depth == 0:  # Stop at root
+                break
+        
+        # Build tree lines for each level (only continuation lines, no branches)
+        for i, ancestor in enumerate(ancestors):
+            parent = ancestor.parent
+            if parent is None or parent.depth < 0:
+                continue
+            
+            # Check if this ancestor is the last child of its parent
+            is_last_child = (parent.children[-1] == ancestor)
+            
+            if i == len(ancestors) - 1:
+                # This is the node we're rendering (missing item)
+                # Don't show branch connector, only continuation from parent
+                if is_last_child:
+                    lines.append("  ")  # No line needed (last child)
+                else:
+                    lines.append("│ ")  # Continuation line (has siblings below)
+            else:
+                # This is an ancestor - show continuation or spacing
+                if is_last_child:
+                    lines.append("  ")  # No line needed
+                else:
+                    lines.append("│ ")  # Continuation line
+        
+        return "".join(lines)
     
     def is_full_screen(self) -> bool:
         """
