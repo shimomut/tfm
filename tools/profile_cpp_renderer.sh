@@ -59,7 +59,7 @@ if ! command -v instruments &> /dev/null; then
 fi
 
 # Check if benchmark script exists
-if [ ! -f "test/benchmark_rendering.py" ]; then
+if [ ! -f "ttk/test/benchmark_rendering.py" ]; then
     echo "Error: Benchmark script not found"
     echo "Please run from project root directory"
     exit 1
@@ -83,7 +83,7 @@ echo "Starting profiling..."
 echo ""
 
 # Run profiling
-instruments -t "$INSTRUMENTS_TEMPLATE" -D "$OUTPUT" python test/benchmark_rendering.py
+instruments -t "$INSTRUMENTS_TEMPLATE" -D "$OUTPUT" python ttk/test/benchmark_rendering.py
 
 echo ""
 echo "============================================================"

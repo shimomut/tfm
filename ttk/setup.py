@@ -6,13 +6,37 @@ the TTK package. It handles the flat package layout where package files
 are in the same directory as the setup script.
 """
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
 import os
+import platform
 
 # Read the README file for long description
 readme_path = os.path.join(os.path.dirname(__file__), 'README.md')
 with open(readme_path, 'r', encoding='utf-8') as f:
     long_description = f.read()
+
+# Configure C++ extension module (macOS only)
+ext_modules = []
+if platform.system() == 'Darwin':  # macOS
+    cpp_renderer = Extension(
+        'ttk_coregraphics_render',
+        sources=['backends/coregraphics_render.cpp'],
+        include_dirs=['/usr/include'],
+        extra_compile_args=[
+            '-std=c++17',           # C++17 standard
+            '-O3',                  # Optimization level 3
+            '-Wall',                # Enable all warnings
+            '-Wextra',              # Enable extra warnings
+            '-Wno-unused-parameter' # Suppress unused parameter warnings
+        ],
+        extra_link_args=[
+            '-framework', 'CoreGraphics',
+            '-framework', 'CoreText',
+            '-framework', 'CoreFoundation'
+        ],
+        language='c++'
+    )
+    ext_modules.append(cpp_renderer)
 
 setup(
     name='ttk',
@@ -39,6 +63,9 @@ setup(
     
     # Include package files explicitly
     include_package_data=True,
+    
+    # C++ extension modules
+    ext_modules=ext_modules,
     
     # Dependencies
     install_requires=[

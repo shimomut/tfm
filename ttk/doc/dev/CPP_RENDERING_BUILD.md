@@ -108,7 +108,7 @@ pip install .
 ```
 
 The build process will:
-1. Compile `src/cpp_renderer.cpp` with C++17 standard
+1. Compile `ttk/backends/coregraphics_render.cpp` with C++17 standard
 2. Link against CoreGraphics, CoreText, and CoreFoundation frameworks
 3. Create `cpp_renderer.cpython-<version>-darwin.so` in the project directory
 
@@ -199,7 +199,7 @@ To customize the build, edit `setup.py`:
 ```python
 cpp_renderer = Extension(
     'cpp_renderer',
-    sources=['src/cpp_renderer.cpp'],
+    sources=['ttk/backends/coregraphics_render.cpp'],
     include_dirs=['/usr/include'],
     extra_compile_args=[
         '-std=c++17',
@@ -414,7 +414,7 @@ After a successful build, you should have:
 ```
 cpp_renderer.cpython-<version>-darwin.so  # The compiled extension
 build/                                     # Build directory (can be deleted)
-src/cpp_renderer.cpp                       # Source file
+ttk/backends/coregraphics_render.cpp       # Source file
 ```
 
 ## Verification Checklist
@@ -457,7 +457,7 @@ from setuptools import setup, Extension
 
 cpp_renderer = Extension(
     'cpp_renderer',
-    sources=['src/cpp_renderer.cpp'],
+    sources=['ttk/backends/coregraphics_render.cpp'],
     include_dirs=['/usr/include'],
     extra_compile_args=[
         '-std=c++17',
@@ -498,8 +498,8 @@ Typical build output:
 running build_ext
 building 'cpp_renderer' extension
 creating build/temp.macosx-13.0-arm64-cpython-312
-clang++ -std=c++17 -O3 -Wall -Wextra -c src/cpp_renderer.cpp -o build/temp.macosx-13.0-arm64-cpython-312/src/cpp_renderer.o
-clang++ -bundle -undefined dynamic_lookup build/temp.macosx-13.0-arm64-cpython-312/src/cpp_renderer.o -framework CoreGraphics -framework CoreText -framework CoreFoundation -o cpp_renderer.cpython-312-darwin.so
+clang++ -std=c++17 -O3 -Wall -Wextra -c ttk/backends/coregraphics_render.cpp -o build/temp.macosx-13.0-arm64-cpython-312/ttk/backends/coregraphics_render.o
+clang++ -bundle -undefined dynamic_lookup build/temp.macosx-13.0-arm64-cpython-312/ttk/backends/coregraphics_render.o -framework CoreGraphics -framework CoreText -framework CoreFoundation -o cpp_renderer.cpython-312-darwin.so
 ```
 
 ### Compiler Versions

@@ -641,7 +641,7 @@ import os
 # Define C++ extension module
 cpp_renderer = Extension(
     'cpp_renderer',
-    sources=['src/cpp_renderer.cpp'],
+    sources=['ttk/backends/coregraphics_render.cpp'],
     include_dirs=['/usr/include'],
     extra_compile_args=[
         '-std=c++17',

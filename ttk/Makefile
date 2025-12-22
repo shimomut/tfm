@@ -1,7 +1,7 @@
 # TTK Library Makefile
 # Provides convenient targets for running demo applications and tests
 
-.PHONY: help demo-ttk demo-performance demo-standalone demo-test-interface demo-all test clean install install-dev uninstall build
+.PHONY: help demo-ttk demo-performance demo-standalone demo-test-interface demo-all test clean install install-dev uninstall build build-cpp rebuild-cpp
 
 # Backend selection (default: curses)
 # Usage: make demo-ttk BACKEND=coregraphics
@@ -18,6 +18,8 @@ help:
 	@echo "  make install-dev           - Install TTK in development mode (pip install -e .)"
 	@echo "  make uninstall             - Uninstall TTK from Python"
 	@echo "  make build                 - Build distribution packages (wheel and sdist)"
+	@echo "  make build-cpp             - Build C++ rendering extension (macOS only)"
+	@echo "  make rebuild-cpp           - Clean and rebuild C++ rendering extension (macOS only)"
 	@echo ""
 	@echo "Demo Applications:"
 	@echo "  make demo-ttk              - Run the main TTK demo"
@@ -116,3 +118,26 @@ clean-all: clean
 	@echo "Cleaning build artifacts..."
 	@rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .coverage
 	@echo "All artifacts cleaned!"
+
+# C++ extension building (macOS only)
+build-cpp:
+	@echo "Building C++ rendering extension..."
+	@python3 setup.py build_ext --inplace
+	@echo "Copying extension to project root for compatibility..."
+	@cp -f ttk_coregraphics_render*.so ../ 2>/dev/null || true
+	@echo "Build complete! Extension files:"
+	@ls -lh ttk_coregraphics_render*.so 2>/dev/null || echo "Build failed - no .so file created"
+	@ls -lh ../ttk_coregraphics_render*.so 2>/dev/null || true
+
+rebuild-cpp:
+	@echo "Cleaning previous C++ build..."
+	@rm -f ttk_coregraphics_render*.so
+	@rm -f ../ttk_coregraphics_render*.so
+	@rm -rf build/temp.*
+	@echo "Rebuilding C++ rendering extension..."
+	@python3 setup.py build_ext --inplace --force
+	@echo "Copying extension to project root for compatibility..."
+	@cp -f ttk_coregraphics_render*.so ../ 2>/dev/null || true
+	@echo "Rebuild complete! Extension files:"
+	@ls -lh ttk_coregraphics_render*.so 2>/dev/null || echo "Build failed - no .so file created"
+	@ls -lh ../ttk_coregraphics_render*.so 2>/dev/null || true

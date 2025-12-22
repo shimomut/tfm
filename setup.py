@@ -5,8 +5,7 @@ TFM Setup Script
 
 import os
 import sys
-import platform
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, find_packages
 from pathlib import Path
 
 # Read README for long description
@@ -22,29 +21,6 @@ if requirements_path.exists():
 
 # Add Windows-specific requirements using environment markers
 requirements.append('windows-curses; sys_platform == "win32"')
-
-# Configure C++ extension module (macOS only)
-ext_modules = []
-if platform.system() == 'Darwin':  # macOS
-    cpp_renderer = Extension(
-        'cpp_renderer',
-        sources=['src/cpp_renderer.cpp'],
-        include_dirs=['/usr/include'],
-        extra_compile_args=[
-            '-std=c++17',           # C++17 standard
-            '-O3',                  # Optimization level 3
-            '-Wall',                # Enable all warnings
-            '-Wextra',              # Enable extra warnings
-            '-Wno-unused-parameter' # Suppress unused parameter warnings
-        ],
-        extra_link_args=[
-            '-framework', 'CoreGraphics',
-            '-framework', 'CoreText',
-            '-framework', 'CoreFoundation'
-        ],
-        language='c++'
-    )
-    ext_modules.append(cpp_renderer)
 
 setup(
     name="tfm",
@@ -65,7 +41,6 @@ setup(
         ],
     },
     install_requires=requirements,
-    ext_modules=ext_modules,  # Add C++ extension modules
     python_requires=">=3.9",
     classifiers=[
         "Development Status :: 4 - Beta",

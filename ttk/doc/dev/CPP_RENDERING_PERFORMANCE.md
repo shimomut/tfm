@@ -27,7 +27,7 @@ The C++ rendering backend provides significant performance improvements over the
 
 ### Test Methodology
 
-Benchmarks were conducted using the `test/benchmark_rendering.py` script with the following parameters:
+Benchmarks were conducted using the `ttk/test/benchmark_rendering.py` script with the following parameters:
 
 - **Iterations**: 100 renders per grid size
 - **Warm-up**: 5 renders before timing (to populate caches)
@@ -306,7 +306,7 @@ The implementation achieves the design goals of providing direct CoreGraphics/Co
 
 ## References
 
-- Benchmark script: `test/benchmark_rendering.py`
-- Profiling guide: `doc/dev/CPP_RENDERING_PROFILING_GUIDE.md`
+- Benchmark script: `ttk/test/benchmark_rendering.py`
+- Profiling guide: `ttk/doc/dev/CPP_RENDERING_PROFILING_GUIDE.md`
 - Design document: `.kiro/specs/cpp-rendering-backend/design.md`
 - Requirements: `.kiro/specs/cpp-rendering-backend/requirements.md`

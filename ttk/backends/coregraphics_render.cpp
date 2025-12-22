@@ -853,9 +853,9 @@ static PyMethodDef CppRendererMethods[] = {
 // Module Definition
 //=============================================================================
 
-static struct PyModuleDef cpp_renderer_module = {
+static struct PyModuleDef ttk_coregraphics_render_module = {
     PyModuleDef_HEAD_INIT,
-    "cpp_renderer",                                      // Module name
+    "ttk_coregraphics_render",                           // Module name
     "C++ rendering backend for CoreGraphics/CoreText",  // Module docstring
     -1,                                                  // Module state size
     CppRendererMethods                                   // Module methods
@@ -865,8 +865,8 @@ static struct PyModuleDef cpp_renderer_module = {
 // Module Initialization
 //=============================================================================
 
-PyMODINIT_FUNC PyInit_cpp_renderer(void) {
-    PyObject* module = PyModule_Create(&cpp_renderer_module);
+PyMODINIT_FUNC PyInit_ttk_coregraphics_render(void) {
+    PyObject* module = PyModule_Create(&ttk_coregraphics_render_module);
     if (module == nullptr) {
         return nullptr;
     }

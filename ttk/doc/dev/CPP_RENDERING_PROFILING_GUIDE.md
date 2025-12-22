@@ -40,7 +40,7 @@ CFLAGS="-g -O2" python setup.py build_ext --inplace
 
 4. Start profiling and run the benchmark:
    ```bash
-   python test/benchmark_rendering.py
+   python ttk/test/benchmark_rendering.py
    ```
 
 5. Stop profiling after the benchmark completes
@@ -67,13 +67,13 @@ Use `instruments` command-line tool for automated profiling:
 
 ```bash
 # Time profiling
-instruments -t "Time Profiler" -D profile_time.trace python test/benchmark_rendering.py
+instruments -t "Time Profiler" -D profile_time.trace python ttk/test/benchmark_rendering.py
 
 # Memory profiling
-instruments -t "Allocations" -D profile_alloc.trace python test/benchmark_rendering.py
+instruments -t "Allocations" -D profile_alloc.trace python ttk/test/benchmark_rendering.py
 
 # Leak detection
-instruments -t "Leaks" -D profile_leaks.trace python test/benchmark_rendering.py
+instruments -t "Leaks" -D profile_leaks.trace python ttk/test/benchmark_rendering.py
 ```
 
 View results:
@@ -148,10 +148,10 @@ Run initial profiling to establish baseline:
 
 ```bash
 # Run benchmark and capture metrics
-python test/benchmark_rendering.py > baseline_results.txt
+python ttk/test/benchmark_rendering.py > baseline_results.txt
 
 # Profile with Instruments
-instruments -t "Time Profiler" -D baseline_time.trace python test/benchmark_rendering.py
+instruments -t "Time Profiler" -D baseline_time.trace python ttk/test/benchmark_rendering.py
 ```
 
 ### 2. Identify Bottlenecks
@@ -174,7 +174,7 @@ Re-run profiling after optimizations:
 
 ```bash
 # Run benchmark again
-python test/benchmark_rendering.py > optimized_results.txt
+python ttk/test/benchmark_rendering.py > optimized_results.txt
 
 # Compare results
 diff baseline_results.txt optimized_results.txt

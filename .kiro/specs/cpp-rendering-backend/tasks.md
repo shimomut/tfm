@@ -7,7 +7,7 @@ This plan outlines the implementation of a C++ rendering backend for the CoreGra
 ## Tasks
 
 - [x] 1. Set up C++ extension module infrastructure
-  - Create `src/cpp_renderer.cpp` with Python extension boilerplate
+  - Create `ttk/backends/coregraphics_render.cpp` with Python extension boilerplate
   - Configure `setup.py` to build the C++ extension with CoreGraphics/CoreText linking
   - Add compiler flags for C++17, optimization, and warnings
   - Verify module can be imported from Python

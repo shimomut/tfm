@@ -285,14 +285,13 @@ class CoreGraphicsBackend(Renderer):
         
         # Import C++ renderer module
         try:
-            import cpp_renderer
-            self._cpp_renderer = cpp_renderer
+            import ttk_coregraphics_render
+            self._cpp_renderer = ttk_coregraphics_render
             print("CoreGraphicsBackend: Using C++ rendering implementation")
         except ImportError as e:
-            raise RuntimeError(
-                f"C++ renderer module not available: {e}\n"
-                "Please build the C++ renderer with: python setup.py build_ext --inplace"
-            )
+            print(f"CoreGraphicsBackend: C++ renderer module not available: {e}")
+            print("CoreGraphicsBackend: Falling back to PyObjC rendering")
+            self.USE_CPP_RENDERING = False
         
         # Create window and view
         self._create_window()
