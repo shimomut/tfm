@@ -693,31 +693,57 @@ class DirectoryDiffViewer(UILayer):
             return True
         
         elif event.key_code == KeyCode.ENTER:
-            # Enter: Open diff viewer for files, expand directories
+            # Enter: Toggle expand/collapse for directories, open diff viewer for files
             if 0 <= self.cursor_position < len(self.visible_nodes):
                 node = self.visible_nodes[self.cursor_position]
-                if node.is_directory and not node.is_expanded:
-                    # Expand directory
-                    self.expand_node(self.cursor_position)
-                elif not node.is_directory:
+                if node.is_directory:
+                    # Toggle expand/collapse for directories
+                    if node.is_expanded:
+                        self.collapse_node(self.cursor_position)
+                    else:
+                        self.expand_node(self.cursor_position)
+                else:
                     # Open file diff viewer for files
                     self.open_file_diff(self.cursor_position)
             return True
         
         elif event.key_code == KeyCode.RIGHT:
-            # Right arrow: Expand directory node
+            # Right arrow: Expand directory or move to first child if already expanded
             if 0 <= self.cursor_position < len(self.visible_nodes):
                 node = self.visible_nodes[self.cursor_position]
-                if node.is_directory and not node.is_expanded:
-                    self.expand_node(self.cursor_position)
+                if node.is_directory:
+                    if not node.is_expanded:
+                        # Expand collapsed directory
+                        self.expand_node(self.cursor_position)
+                    else:
+                        # Already expanded, move to first child if it exists
+                        if node.children and self.cursor_position + 1 < len(self.visible_nodes):
+                            self.cursor_position += 1
+                            # Adjust scroll if needed
+                            if self.cursor_position >= self.scroll_offset + display_height:
+                                self.scroll_offset = self.cursor_position - display_height + 1
+                            self.mark_dirty()
             return True
         
         elif event.key_code == KeyCode.LEFT:
-            # Collapse directory node
+            # Left arrow: Collapse directory or move to parent
             if 0 <= self.cursor_position < len(self.visible_nodes):
                 node = self.visible_nodes[self.cursor_position]
                 if node.is_directory and node.is_expanded:
+                    # Collapse expanded directory
                     self.collapse_node(self.cursor_position)
+                elif node.parent and node.parent.depth >= 0:
+                    # Move to parent (for files or collapsed directories)
+                    # Find parent in visible_nodes
+                    parent_node = node.parent
+                    for i, visible_node in enumerate(self.visible_nodes):
+                        if visible_node is parent_node:
+                            self.cursor_position = i
+                            # Adjust scroll if needed
+                            if self.cursor_position < self.scroll_offset:
+                                self.scroll_offset = self.cursor_position
+                            self.mark_dirty()
+                            break
             return True
         
         return False
