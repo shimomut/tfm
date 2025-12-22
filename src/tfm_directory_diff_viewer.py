@@ -774,9 +774,12 @@ class DirectoryDiffViewer(UILayer):
         left_label = " " + str(self.left_path)  # Add 1-char space prefix
         right_label = " " + str(self.right_path)  # Add 1-char space prefix
         
+        # Reserve space for scrollbar to match content area
+        reserved_scrollbar_width = 1
+        
         # Calculate available space for each path
-        # Format: "<path>  |  <path>"
-        available_width = width - self.separator_width
+        # Format: "<path>  |  <path> [scrollbar]"
+        available_width = width - self.separator_width - reserved_scrollbar_width
         # Split evenly, giving any extra character to the left side
         right_width = available_width // 2
         left_width = available_width - right_width
@@ -954,10 +957,14 @@ class DirectoryDiffViewer(UILayer):
         # Calculate scrollbar width
         scrollbar_width = calculate_scrollbar_width(len(self.visible_nodes), content_height)
         
+        # Always reserve space for scrollbar to prevent separator from moving
+        # when tree expands/collapses and scrollbar appears/disappears
+        reserved_scrollbar_width = 1  # Always reserve at least 1 column for scrollbar
+        
         # Calculate column widths for side-by-side layout
         # Format: [indent][expand][name] | [indent][expand][name] [scrollbar]
         # Use the same separator as the header for alignment
-        available_width = width - self.separator_width - scrollbar_width
+        available_width = width - self.separator_width - reserved_scrollbar_width
         # Split evenly, giving any extra character to the left side (same as header)
         right_column_width = available_width // 2
         left_column_width = available_width - right_column_width  # Left gets any extra character
@@ -1537,8 +1544,8 @@ class DirectoryDiffViewer(UILayer):
         Expand a directory node to show its children.
         
         This method updates the visible_nodes list to include the children
-        of the specified node. The node_index_map is also updated to maintain
-        efficient lookups.
+        of the specified node. The cursor position is adjusted to stay on
+        the same node after expansion.
         
         Args:
             node_index: Index of the node to expand in visible_nodes list
@@ -1551,6 +1558,9 @@ class DirectoryDiffViewer(UILayer):
         # Only expand directories that aren't already expanded
         if not node.is_directory or node.is_expanded:
             return
+        
+        # Remember the node we're expanding (by identity, not index)
+        expanding_node_id = id(node)
         
         # Mark node as expanded
         node.is_expanded = True
@@ -1566,6 +1576,21 @@ class DirectoryDiffViewer(UILayer):
         # Rebuild node_index_map for efficient lookups
         self._rebuild_node_index_map()
         
+        # Update cursor position to stay on the same node
+        # The node we expanded is still at the same position (node_index)
+        # But if cursor was below it, we need to adjust for inserted children
+        if self.cursor_position > node_index:
+            # Cursor was below the expanded node, adjust for inserted children
+            self.cursor_position += len(children_to_insert)
+        
+        # Ensure scroll position keeps the cursor visible
+        height, width = self.renderer.get_dimensions()
+        display_height = height - 3
+        
+        # If cursor is below visible area, adjust scroll
+        if self.cursor_position >= self.scroll_offset + display_height:
+            self.scroll_offset = self.cursor_position - display_height + 1
+        
         # Mark dirty to trigger redraw
         self.mark_dirty()
     
@@ -1574,7 +1599,8 @@ class DirectoryDiffViewer(UILayer):
         Collapse a directory node to hide its children.
         
         This method updates the visible_nodes list to remove all descendants
-        of the specified node. The node_index_map is also updated.
+        of the specified node. The cursor position is adjusted to stay on
+        a logical node after collapse.
         
         Args:
             node_index: Index of the node to collapse in visible_nodes list
@@ -1588,12 +1614,25 @@ class DirectoryDiffViewer(UILayer):
         if not node.is_directory or not node.is_expanded:
             return
         
+        # Remember which node the cursor is on (by identity)
+        cursor_node_id = id(self.visible_nodes[self.cursor_position]) if self.cursor_position < len(self.visible_nodes) else None
+        
         # Mark node as collapsed
         node.is_expanded = False
         
         # Find all descendants to remove
         descendants_to_remove = []
         self._collect_all_descendants(node, descendants_to_remove)
+        descendant_ids = {id(d) for d in descendants_to_remove}
+        
+        # Count how many descendants are before the cursor
+        descendants_before_cursor = 0
+        for i in range(node_index + 1, self.cursor_position):
+            if i < len(self.visible_nodes) and id(self.visible_nodes[i]) in descendant_ids:
+                descendants_before_cursor += 1
+        
+        # Check if cursor is on a descendant that will be removed
+        cursor_on_descendant = cursor_node_id in descendant_ids
         
         # Remove descendants from visible_nodes
         # Work backwards to avoid index shifting issues
@@ -1607,9 +1646,28 @@ class DirectoryDiffViewer(UILayer):
         # Rebuild node_index_map for efficient lookups
         self._rebuild_node_index_map()
         
-        # Adjust cursor if it was on a removed node
+        # Adjust cursor position
+        if cursor_on_descendant:
+            # Cursor was on a removed descendant, move to the collapsed parent
+            self.cursor_position = node_index
+        elif self.cursor_position > node_index:
+            # Cursor was below the collapsed node, adjust for removed descendants
+            self.cursor_position -= descendants_before_cursor
+        
+        # Ensure cursor is within bounds
         if self.cursor_position >= len(self.visible_nodes):
             self.cursor_position = max(0, len(self.visible_nodes) - 1)
+        
+        # Ensure cursor is visible in scroll area
+        height, width = self.renderer.get_dimensions()
+        display_height = height - 3
+        
+        # If cursor is above visible area, adjust scroll
+        if self.cursor_position < self.scroll_offset:
+            self.scroll_offset = self.cursor_position
+        # If cursor is below visible area, adjust scroll
+        elif self.cursor_position >= self.scroll_offset + display_height:
+            self.scroll_offset = self.cursor_position - display_height + 1
         
         # Mark dirty to trigger redraw
         self.mark_dirty()
