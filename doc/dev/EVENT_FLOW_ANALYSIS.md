@@ -2,13 +2,13 @@
 
 ## Summary
 
-**The event routing follows proper layer architecture.**
+**The event routing follows proper layer architecture with a unified input handler.**
 
-TFMEventCallback routes all events directly to the UI layer stack. FileManager-specific features (isearch, quick_edit_bar, quick_choice_bar) are handled by FileManagerLayer, maintaining clean layer separation.
+TFMEventCallback routes all events directly to the UI layer stack. FileManagerLayer delegates to FileManager.handle_input(), which is a unified handler for all FileManager input (special modes + main screen events).
 
 ## Event Flow
 
-### Key/Char Events (Correct Layer Architecture)
+### Key/Char Events (Clean Layer Architecture)
 ```
 TTK Backend
     ↓
@@ -19,13 +19,12 @@ ui_layer_stack.handle_key_event()
 Top Layer (Dialog/Viewer/FileManagerLayer)
     ↓
 FileManagerLayer.handle_key_event()
-    ├─ FileManager.handle_input() → Check FileManager-specific features
-    │   ├─ isearch_mode → return True if handled
-    │   ├─ quick_edit_bar → return True if handled
-    │   ├─ quick_choice_bar → return True if handled
-    │   └─ return False (not handled)
-    │
-    └─ FileManager.handle_main_screen_key_event() → if not handled
+    ↓
+FileManager.handle_input() [Unified Handler]
+    ├─ Check isearch_mode → return True if handled
+    ├─ Check quick_edit_bar → return True if handled
+    ├─ Check quick_choice_bar → return True if handled
+    └─ Handle main screen key events → return True/False
 ```
 
 ### System Events (Broadcast to All Layers)
@@ -68,33 +67,26 @@ class TFMEventCallback(EventCallback):
 ```python
 class FileManagerLayer(UILayer):
     def handle_key_event(self, event) -> bool:
-        # Check FileManager-specific input modes first
+        # Delegate to FileManager's unified input handler
         result = self.file_manager.handle_input(event)
         if result:
             self._dirty = True
-            return True
-        
-        # Delegate to main screen key handling
-        result = self.file_manager.handle_main_screen_key_event(event)
-        if result:
-            self._dirty = True
-        
         return result
 ```
 
 **Key Points**:
-- Handles FileManager-specific features (via handle_input())
-- Delegates to main screen logic if not handled
+- Simple delegation to FileManager
 - Manages dirty state
 - Proper layer abstraction
+- No knowledge of FileManager internals
 
-### 3. FileManager.handle_input(): Feature Handler
-**Responsibility**: Handle FileManager-specific input features only
+### 3. FileManager.handle_input(): Unified Input Handler
+**Responsibility**: Handle all FileManager input (special modes + main screen)
 
 ```python
 class FileManager:
     def handle_input(self, event):
-        # Handle FileManager-specific features
+        # Handle FileManager-specific input modes first
         if self.isearch_mode:
             result = self.handle_isearch_input(event)
             if result:
@@ -116,14 +108,18 @@ class FileManager:
                 self.needs_full_redraw = True
             return result
         
-        # Not handled by FileManager-specific features
-        return False
+        # Handle main screen key events
+        if not isinstance(event, KeyEvent):
+            return False
+        
+        return self.handle_main_screen_key_event(event)
 ```
 
 **Key Points**:
-- Only handles FileManager-specific features
-- Returns True if handled, False if not
-- Called by FileManagerLayer, not TFMEventCallback
+- Unified handler for all FileManager input
+- Checks special modes first
+- Falls through to main screen handling
+- Single entry point for all FileManager input
 
 ### 4. UILayerStack: Layer Manager
 **Responsibility**: Route events to appropriate layer
@@ -146,94 +142,103 @@ UILayerStack (Layer Manager)
     ↓
 FileManagerLayer (Layer Adapter)
     ↓
-FileManager (Business Logic)
+FileManager.handle_input() (Unified Input Handler)
 ```
 
-### 2. FileManager-Specific Features in the Right Place
+### 2. Single Entry Point
 
-The isearch, quick_edit_bar, and quick_choice_bar are:
-- Part of the FileManager main screen (not separate layers)
-- Handled by FileManagerLayer (the layer that represents the main screen)
-- Not visible to TFMEventCallback (proper encapsulation)
+FileManager has one unified input handler:
+- No confusion about which method to call
+- Special modes checked first, then main screen
+- Clear, linear flow through the handler
 
 ### 3. Consistent with Other Layers
 
 Just like Dialog and Viewer layers handle their own input:
 - SearchDialog handles search input
 - TextViewer handles viewer navigation
-- FileManagerLayer handles main screen input (including special modes)
+- FileManagerLayer handles main screen input (via unified handler)
 
 ### 4. Clean Separation of Concerns
 
 **TFMEventCallback**: Routes events (no knowledge of layers or features)
 **UILayerStack**: Manages layers (no knowledge of features)
-**FileManagerLayer**: Handles main screen (knows about FileManager features)
-**FileManager**: Business logic (knows about its own features)
+**FileManagerLayer**: Adapts to UILayer interface (simple delegation)
+**FileManager.handle_input()**: Handles all input (special modes + main screen)
 
 ## Key Improvements
 
-### Before (Incorrect - Bypassing Layer Stack)
+### Before (Two Separate Methods)
 ```python
-class TFMEventCallback(EventCallback):
-    def on_key_event(self, event: KeyEvent) -> bool:
-        # Bypassing layer stack!
-        if self.file_manager.handle_input(event):
-            return True
-        
-        # Then routing to layer stack
-        return self.file_manager.ui_layer_stack.handle_key_event(event)
-```
-
-**Problems**:
-- TFMEventCallback knows about FileManager features
-- Bypasses layer architecture
-- Inconsistent with how other layers work
-
-### After (Correct - Through Layer Stack)
-```python
-class TFMEventCallback(EventCallback):
-    def on_key_event(self, event: KeyEvent) -> bool:
-        # Always route through layer stack
-        consumed = self.file_manager.ui_layer_stack.handle_key_event(event)
-        if consumed:
-            self.file_manager.needs_full_redraw = True
-        return consumed
+class FileManager:
+    def handle_input(self, event):
+        # Only handled special modes
+        if self.isearch_mode:
+            return self.handle_isearch_input(event)
+        # ...
+        return False  # Not handled
+    
+    def handle_main_screen_key_event(self, event):
+        # Handled main screen events
+        # ...
 
 class FileManagerLayer(UILayer):
     def handle_key_event(self, event) -> bool:
-        # FileManagerLayer handles FileManager features
-        result = self.file_manager.handle_input(event)
-        if result:
-            self._dirty = True
+        # Had to call both methods
+        if self.file_manager.handle_input(event):
             return True
+        return self.file_manager.handle_main_screen_key_event(event)
+```
+
+**Problems**:
+- Two separate methods for FileManager input
+- FileManagerLayer had to know about both
+- Confusing which method does what
+
+### After (Unified Handler)
+```python
+class FileManager:
+    def handle_input(self, event):
+        # Unified handler for all input
+        # Check special modes first
+        if self.isearch_mode:
+            return self.handle_isearch_input(event)
+        # ...
         
-        # Then delegates to main screen logic
-        result = self.file_manager.handle_main_screen_key_event(event)
+        # Then handle main screen
+        if not isinstance(event, KeyEvent):
+            return False
+        return self.handle_main_screen_key_event(event)
+
+class FileManagerLayer(UILayer):
+    def handle_key_event(self, event) -> bool:
+        # Simple delegation to unified handler
+        result = self.file_manager.handle_input(event)
         if result:
             self._dirty = True
         return result
 ```
 
 **Benefits**:
-- TFMEventCallback is simple and clean
-- Proper layer architecture maintained
-- FileManager features handled by FileManagerLayer
-- Consistent with other layers
+- Single entry point for all FileManager input
+- FileManagerLayer is simple and clean
+- Clear flow: special modes → main screen
+- Easy to understand and maintain
 
 ## Benefits
 
 1. **Proper Layer Architecture**: All events go through the layer stack
 2. **Clean Separation**: TFMEventCallback doesn't know about FileManager features
-3. **Consistent Pattern**: FileManagerLayer works like other layers
-4. **Better Encapsulation**: FileManager features hidden from TFMEventCallback
-5. **Easier to Understand**: Clear, consistent event flow
+3. **Unified Handler**: Single entry point for all FileManager input
+4. **Simple Delegation**: FileManagerLayer just delegates to handle_input()
+5. **Easier to Maintain**: Clear, linear flow through the input handler
 
 ## Conclusion
 
-The corrected design properly maintains layer architecture:
+The design properly maintains layer architecture with a unified input handler:
 - **TFMEventCallback**: Simple event router (TTK → UILayerStack)
 - **UILayerStack**: Layer manager (routes to top layer)
-- **FileManagerLayer**: Layer adapter (handles FileManager features + main screen)
-- **FileManager**: Business logic (implements features)
+- **FileManagerLayer**: Layer adapter (simple delegation)
+- **FileManager.handle_input()**: Unified input handler (special modes + main screen)
 
-This creates a clean, maintainable architecture where events always flow through the layer stack, and each layer handles its own concerns.
+This creates a clean, maintainable architecture where events always flow through the layer stack, and FileManager has a single, unified entry point for all input handling.

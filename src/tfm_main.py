@@ -3618,18 +3618,17 @@ class FileManager:
 
     def handle_input(self, event):
         """
-        Handle FileManager-specific input modes.
+        Handle all FileManager input events.
         
-        This method checks for FileManager-specific features (isearch, quick_edit_bar,
-        quick_choice_bar) and handles them if active. If none are active, returns False
-        to allow TFMEventCallback to route the event to the UI layer stack.
+        This method handles both FileManager-specific input modes (isearch,
+        quick_edit_bar, quick_choice_bar) and main screen keyboard events
+        (navigation, selection, commands, shortcuts).
         
         Args:
             event: KeyEvent or CharEvent to handle
         
         Returns:
-            True if the event was consumed by a FileManager-specific feature,
-            False if the event should be routed to the UI layer stack
+            True if the event was consumed, False otherwise
         """
         # Type check: only handle KeyEvent and CharEvent
         if not isinstance(event, (KeyEvent, CharEvent)):
@@ -3659,9 +3658,13 @@ class FileManager:
                 self.needs_full_redraw = True
             return result
         
-        # No FileManager-specific feature handled the event
-        # Return False to let TFMEventCallback route to UI layer stack
-        return False
+        # Handle main screen key events
+        # CharEvents are not processed for main screen (no text input on main screen)
+        if not isinstance(event, KeyEvent):
+            return False
+        
+        # Delegate to main screen key handling
+        return self.handle_main_screen_key_event(event)
 
     def draw_interface(self):
         """Draw the complete interface using the UI layer stack"""

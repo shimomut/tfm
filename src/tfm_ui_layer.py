@@ -525,9 +525,8 @@ class FileManagerLayer(UILayer):
         """
         Handle a key event for the main FileManager screen.
         
-        This method first checks for FileManager-specific input modes (isearch,
-        quick_edit_bar, quick_choice_bar) before delegating to the main screen
-        key handling logic.
+        This method delegates to FileManager.handle_input(), which handles both
+        FileManager-specific input modes and main screen keyboard events.
         
         Args:
             event: KeyEvent to handle
@@ -535,14 +534,8 @@ class FileManagerLayer(UILayer):
         Returns:
             True if the event was consumed, False otherwise
         """
-        # Check FileManager-specific input modes first
+        # Delegate to FileManager's unified input handler
         result = self.file_manager.handle_input(event)
-        if result:
-            self._dirty = True
-            return True
-        
-        # Delegate to FileManager's main screen key handling logic
-        result = self.file_manager.handle_main_screen_key_event(event)
         
         # Mark dirty if event was consumed (content likely changed)
         if result:
@@ -554,9 +547,9 @@ class FileManagerLayer(UILayer):
         """
         Handle a character event.
         
-        This method first checks for FileManager-specific input modes (isearch,
-        quick_edit_bar) that handle character input, before falling back to
-        the main screen (which doesn't handle char events).
+        This method delegates to FileManager.handle_input(), which checks for
+        FileManager-specific input modes that handle character input (isearch,
+        quick_edit_bar). The main screen doesn't handle char events directly.
         
         Args:
             event: CharEvent to handle
@@ -564,14 +557,14 @@ class FileManagerLayer(UILayer):
         Returns:
             True if the event was consumed, False otherwise
         """
-        # Check FileManager-specific input modes first
+        # Delegate to FileManager's unified input handler
         result = self.file_manager.handle_input(event)
+        
+        # Mark dirty if event was consumed
         if result:
             self._dirty = True
-            return True
         
-        # FileManager main screen doesn't handle char events
-        return False
+        return result
     
     def handle_system_event(self, event) -> bool:
         """
