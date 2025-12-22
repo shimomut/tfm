@@ -28,6 +28,7 @@ from tfm_colors import (
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_diff_viewer import DiffViewer
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
+from tfm_info_dialog import InfoDialog
 
 
 class DifferenceType(Enum):
@@ -551,6 +552,9 @@ class DirectoryDiffViewer(UILayer):
         self.scan_error: Optional[str] = None
         self.comparison_errors: Dict[str, str] = {}  # File comparison errors
         
+        # Help dialog
+        self.info_dialog = InfoDialog(None, renderer)
+        
         # UILayer interface state
         self._dirty = True
         self._should_close = False
@@ -593,8 +597,8 @@ class DirectoryDiffViewer(UILayer):
         
         # Get display dimensions for scrolling calculations
         height, width = self.renderer.get_dimensions()
-        # Reserve space for header (2 lines) and status bar (1 line)
-        display_height = height - 3
+        # Reserve space for header (1 line) and status bar (1 line)
+        display_height = height - 2
         
         # Handle character-based commands (only from KeyEvent)
         if event.char:
@@ -612,6 +616,10 @@ class DirectoryDiffViewer(UILayer):
                 if self.cursor_position >= len(self.visible_nodes):
                     self.cursor_position = max(0, len(self.visible_nodes) - 1)
                 self.mark_dirty()
+                return True
+            elif event.char == '?':
+                # Show help dialog
+                self._show_help_dialog()
                 return True
         
         # Handle special keys
@@ -806,7 +814,6 @@ class DirectoryDiffViewer(UILayer):
         # Render normal view
         self._render_header(renderer, width)
         self._render_content(renderer, width, height)
-        self._render_help_bar(renderer, width, height)
         self._render_status_bar(renderer, width, height)
     
     def _render_header(self, renderer, width: int) -> None:
@@ -994,9 +1001,9 @@ class DirectoryDiffViewer(UILayer):
             width: Terminal width
             height: Terminal height
         """
-        # Calculate content area (header is 1 line, help bar is 1 line, status bar is 1 line)
+        # Calculate content area (header is 1 line, status bar is 1 line)
         content_start_y = 1
-        content_height = height - 3
+        content_height = height - 2
         
         # Check if directories are empty or identical
         if not self.visible_nodes or len(self.visible_nodes) == 0:
@@ -1246,22 +1253,38 @@ class DirectoryDiffViewer(UILayer):
             else:
                 return get_color_with_attrs(COLOR_REGULAR_FILE)
     
-    def _render_help_bar(self, renderer, width: int, height: int) -> None:
-        """
-        Render the help bar with navigation controls.
+    def _show_help_dialog(self) -> None:
+        """Show help dialog with keyboard shortcuts."""
+        title = "Directory Diff Viewer - Help"
+        help_lines = [
+            "NAVIGATION",
+            "  ↑/↓           Move cursor up/down",
+            "  Shift+↑/↓     Jump to previous/next difference",
+            "  PgUp/PgDn     Scroll one page up/down",
+            "  Home/End      Jump to first/last item",
+            "",
+            "TREE OPERATIONS",
+            "  ←/→           Collapse/expand directory or move to parent/child",
+            "  Enter         View file diff (files) or toggle expand (directories)",
+            "",
+            "DISPLAY OPTIONS",
+            "  i             Toggle showing identical files",
+            "",
+            "GENERAL",
+            "  ?             Show this help",
+            "  q/ESC         Close viewer",
+            "",
+            "LEGEND",
+            "  =             Items are identical",
+            "  !             Items are different",
+            "  <             Item only exists on left side",
+            "  >             Item only exists on right side",
+        ]
         
-        Args:
-            renderer: TTK renderer instance
-            width: Terminal width
-            height: Terminal height
-        """
-        help_y = height - 2
-        status_color_pair, status_attrs = get_status_color()
-        
-        # Controls/help text
-        controls = "↑↓:Navigate  ←→:Expand/Collapse  Enter:View Diff/Expand  i:Toggle Identical  q/ESC:Quit"
-        controls = controls[:width]
-        renderer.draw_text(help_y, 0, controls.ljust(width), status_color_pair, status_attrs)
+        self.info_dialog.show(title, help_lines)
+        if self.layer_stack:
+            self.layer_stack.push(self.info_dialog)
+        self.mark_dirty()
     
     def _render_status_bar(self, renderer, width: int, height: int) -> None:
         """
