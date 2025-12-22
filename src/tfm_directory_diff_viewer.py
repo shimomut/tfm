@@ -510,9 +510,14 @@ class DirectoryDiffViewer(UILayer):
         # Display options
         self.show_identical = True  # Whether to show identical files
         
-        # Layout constants
-        self.separator = "  |  "
-        self.separator_width = get_display_width(self.separator)
+        # Layout constants - use ASCII characters for consistent width
+        self.separator_identical = " = "   # Items are identical
+        self.separator_different = " ! "   # Items are different
+        self.separator_only_left = " < "   # Only on left
+        self.separator_only_right = " > "  # Only on right
+        self.separator_contains_diff = " ! " # Directory contains differences
+        # All separators are now 3 characters wide
+        self.separator_width = 3
         
         # Scanning state
         self.scan_in_progress = False
@@ -657,14 +662,20 @@ class DirectoryDiffViewer(UILayer):
                 self.mark_dirty()
             return True
         
-        elif event.key_code == KeyCode.ENTER and event.modifiers & ModifierKey.CONTROL:
-            # Open file diff viewer for content-different files (Ctrl+Enter)
+        elif event.key_code == KeyCode.ENTER:
+            # Enter: Open diff viewer for files, expand directories
             if 0 <= self.cursor_position < len(self.visible_nodes):
-                self.open_file_diff(self.cursor_position)
+                node = self.visible_nodes[self.cursor_position]
+                if node.is_directory and not node.is_expanded:
+                    # Expand directory
+                    self.expand_node(self.cursor_position)
+                elif not node.is_directory:
+                    # Open file diff viewer for files
+                    self.open_file_diff(self.cursor_position)
             return True
         
-        elif event.key_code == KeyCode.RIGHT or event.key_code == KeyCode.ENTER:
-            # Expand directory node
+        elif event.key_code == KeyCode.RIGHT:
+            # Right arrow: Expand directory node
             if 0 <= self.cursor_position < len(self.visible_nodes):
                 node = self.visible_nodes[self.cursor_position]
                 if node.is_directory and not node.is_expanded:
@@ -760,8 +771,8 @@ class DirectoryDiffViewer(UILayer):
         status_color_pair, status_attrs = get_status_color()
         
         # Line 1: Directory paths
-        left_label = str(self.left_path)
-        right_label = str(self.right_path)
+        left_label = " " + str(self.left_path)  # Add 1-char space prefix
+        right_label = " " + str(self.right_path)  # Add 1-char space prefix
         
         # Calculate available space for each path
         # Format: "<path>  |  <path>"
@@ -786,7 +797,8 @@ class DirectoryDiffViewer(UILayer):
         right_padding = " " * (right_width - right_actual_width)
         
         # Build header line
-        header_line = left_label + left_padding + self.separator + right_label + right_padding
+        header_separator = "   "  # 3 spaces to match separator width, no pipe
+        header_line = left_label + left_padding + header_separator + right_label + right_padding
         
         # Draw header with background color
         renderer.draw_text(0, 0, header_line.ljust(width), status_color_pair, status_attrs)
@@ -960,7 +972,19 @@ class DirectoryDiffViewer(UILayer):
             node_index = self.scroll_offset + i
             
             if node_index >= len(self.visible_nodes):
-                # No more nodes to display
+                # No more nodes to display - render empty rows with separator bar
+                separator_color_pair, separator_attrs = get_status_color()
+                empty_separator = " " * self.separator_width
+                
+                # Render remaining empty rows
+                for j in range(i, content_height):
+                    empty_y_pos = content_start_y + j
+                    # Empty left column
+                    renderer.draw_text(empty_y_pos, left_column_x, " " * left_column_width, 0, 0)
+                    # Separator bar
+                    renderer.draw_text(empty_y_pos, separator_x, empty_separator, separator_color_pair, separator_attrs)
+                    # Empty right column
+                    renderer.draw_text(empty_y_pos, right_column_x, " " * right_column_width, 0, 0)
                 break
             
             node = self.visible_nodes[node_index]
@@ -1001,6 +1025,20 @@ class DirectoryDiffViewer(UILayer):
             
             node_text = indent + indicator + error_indicator + node.name
             
+            # Choose separator based on difference type
+            if node.difference_type == DifferenceType.IDENTICAL:
+                separator = self.separator_identical
+            elif node.difference_type == DifferenceType.ONLY_LEFT:
+                separator = self.separator_only_left
+            elif node.difference_type == DifferenceType.ONLY_RIGHT:
+                separator = self.separator_only_right
+            elif node.difference_type == DifferenceType.CONTENT_DIFFERENT:
+                separator = self.separator_different
+            elif node.difference_type == DifferenceType.CONTAINS_DIFFERENCE:
+                separator = self.separator_contains_diff
+            else:
+                separator = self.separator_different
+            
             # Render left column
             if node.left_path:
                 # Node exists on left side
@@ -1015,8 +1053,9 @@ class DirectoryDiffViewer(UILayer):
                 blank_text = " " * left_column_width
                 renderer.draw_text(y_pos, left_column_x, blank_text, blank_color_pair, blank_attrs)
             
-            # Render separator
-            renderer.draw_text(y_pos, separator_x, self.separator, color_pair, attrs)
+            # Render separator with status bar color (different background)
+            separator_color_pair, separator_attrs = get_status_color()
+            renderer.draw_text(y_pos, separator_x, separator, separator_color_pair, separator_attrs)
             
             # Render right column
             if node.right_path:
@@ -1120,7 +1159,7 @@ class DirectoryDiffViewer(UILayer):
         status_color_pair, status_attrs = get_status_color()
         
         # Controls/help text
-        controls = "↑↓:Navigate  ←→/Enter:Expand/Collapse  Ctrl+Enter:View Diff  i:Toggle Identical  q/ESC:Quit"
+        controls = "↑↓:Navigate  ←→:Expand/Collapse  Enter:View Diff/Expand  i:Toggle Identical  q/ESC:Quit"
         controls = controls[:width]
         renderer.draw_text(help_y, 0, controls.ljust(width), status_color_pair, status_attrs)
     
