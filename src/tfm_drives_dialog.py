@@ -72,6 +72,7 @@ class DrivesDialog(UILayer, BaseListDialog):
         self.loading_s3 = False  # Whether S3 bucket scan is in progress
         self.content_changed = True  # Track if content needs redraw
         self._selected_drive = None  # Store selected drive for retrieval
+        self.callback = None  # Callback function when drive is selected
         
         # Threading support for S3 bucket loading
         self.s3_thread = None
@@ -81,12 +82,17 @@ class DrivesDialog(UILayer, BaseListDialog):
         # Animation support
         self.progress_animator = ProgressAnimatorFactory.create_search_animator(config)
         
-    def show(self):
-        """Show the drives dialog and start loading available drives"""
+    def show(self, callback=None):
+        """Show the drives dialog and start loading available drives
+        
+        Args:
+            callback: Optional callback function(drive_entry) called when drive is selected
+        """
         # Cancel any existing S3 scan first
         self._cancel_current_s3_scan()
         
         self.is_active = True
+        self.callback = callback
         self.text_editor.clear()
         self.drives = []
         self.content_changed = True
@@ -414,20 +420,34 @@ class DrivesDialog(UILayer, BaseListDialog):
         if result == 'cancel':
             # Cancel S3 scan before exiting
             self._cancel_current_s3_scan()
+            
+            # Call callback with None to indicate cancellation
+            if self.callback:
+                self.callback(None)
+            
             self.exit()
             return True
         elif result == 'select':
             # Cancel S3 scan before navigating
             self._cancel_current_s3_scan()
             
-            # Return the selected drive for navigation (thread-safe)
+            # Get the selected drive (thread-safe)
             with self.s3_lock:
                 if self.filtered_drives and 0 <= self.selected < len(self.filtered_drives):
                     selected_drive = self.filtered_drives[self.selected]
                     # Store the selected drive for retrieval
                     self._selected_drive = selected_drive
+                    
+                    # Call callback if provided
+                    if self.callback:
+                        self.callback(selected_drive)
+                    
                     self.exit()
                     return True
+            
+            # No valid selection, just exit
+            if self.callback:
+                self.callback(None)
             self.exit()
             return True
         elif result == 'text_changed':

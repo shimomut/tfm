@@ -3172,7 +3172,47 @@ class FileManager:
 
     def show_drives_dialog(self):
         """Show the drives dialog - wrapper for drives dialog component"""
-        self.drives_dialog.show()
+        
+        # Define callback for when a drive is selected
+        def drive_callback(drive_entry):
+            if drive_entry and drive_entry.path:
+                # Navigate to the selected drive
+                current_pane = self.get_current_pane()
+                
+                try:
+                    # Create Path object for the drive
+                    drive_path = Path(drive_entry.path)
+                    
+                    # Validate the path exists and is accessible (for local drives)
+                    if drive_entry.drive_type == 'local':
+                        if not drive_path.exists() or not drive_path.is_dir():
+                            print(f"Error: Drive path no longer exists or is not accessible: {drive_entry.path}")
+                            self.needs_full_redraw = True
+                            return
+                    
+                    # Update the current pane
+                    old_path = current_pane['path']
+                    current_pane['path'] = drive_path
+                    current_pane['focused_index'] = 0
+                    current_pane['scroll_offset'] = 0
+                    current_pane['selected_files'].clear()
+                    
+                    # Refresh the file list
+                    self.pane_manager.refresh_files(current_pane)
+                    
+                    pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
+                    print(f"Switched to {drive_entry.name}: {drive_entry.path}")
+                    self.needs_full_redraw = True
+                    
+                except Exception as e:
+                    print(f"Error: Failed to navigate to drive: {e}")
+                    self.needs_full_redraw = True
+            else:
+                # Cancelled or no selection
+                print("Drive selection cancelled")
+                self.needs_full_redraw = True
+        
+        self.drives_dialog.show(drive_callback)
         # Push dialog onto layer stack
         self.push_layer(self.drives_dialog)
         self._force_immediate_redraw()
