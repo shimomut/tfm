@@ -20,7 +20,8 @@ from tfm_colors import (
     COLOR_DIFF_BLANK,
     COLOR_DIFF_FOCUSED,
     COLOR_REGULAR_FILE,
-    COLOR_DIRECTORIES
+    COLOR_DIRECTORIES,
+    COLOR_DIFF_SEPARATOR_RED
 )
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_diff_viewer import DiffViewer
@@ -1060,8 +1061,19 @@ class DirectoryDiffViewer(UILayer):
                 blank_text = " " * left_column_width
                 renderer.draw_text(y_pos, left_column_x, blank_text, blank_color_pair, blank_attrs)
             
-            # Render separator with status bar color (different background)
-            separator_color_pair, separator_attrs = get_status_color()
+            # Render separator with appropriate color
+            # Use red foreground (with status background) for difference separators
+            if (separator == self.separator_different or 
+                separator == self.separator_contains_diff or
+                separator == self.separator_only_left or
+                separator == self.separator_only_right):
+                # Red foreground with status bar background for differences
+                separator_color_pair = COLOR_DIFF_SEPARATOR_RED
+                separator_attrs = TextAttribute.NORMAL
+            else:
+                # Status bar color for identical separator
+                separator_color_pair, separator_attrs = get_status_color()
+            
             renderer.draw_text(y_pos, separator_x, separator, separator_color_pair, separator_attrs)
             
             # Render right column
