@@ -121,22 +121,8 @@ class TFMEventCallback(EventCallback):
         # Mark activity for adaptive FPS
         self.file_manager.adaptive_fps.mark_activity()
         
-        if event.is_resize():
-            # Handle window resize
-            self.file_manager.clear_screen_with_background()
-            self.file_manager.needs_full_redraw = True
-            return True
-        elif event.is_close():
-            # Handle window close request
-            if hasattr(self.file_manager, 'operation_in_progress') and self.file_manager.operation_in_progress:
-                # Ignore close event during operations
-                print("Cannot close: file operation in progress")
-                return True
-            else:
-                # No operations in progress, exit immediately
-                self.file_manager.should_quit = True
-                return True
-        return False
+        # Route system events through the layer stack
+        return self.file_manager.ui_layer_stack.handle_system_event(event)
     
     def on_menu_event(self, event) -> bool:
         """

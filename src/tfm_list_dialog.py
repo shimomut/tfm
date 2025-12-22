@@ -235,6 +235,26 @@ class ListDialog(UILayer, BaseListDialog):
         
         return False
     
+    def handle_system_event(self, event) -> bool:
+        """
+        Handle a system event (UILayer interface).
+        
+        Args:
+            event: SystemEvent to handle
+        
+        Returns:
+            True if event was handled, False otherwise
+        """
+        if event.is_resize():
+            # Mark content as changed to trigger redraw with new dimensions
+            self.content_changed = True
+            return True
+        elif event.is_close():
+            # Close the dialog
+            self._should_close = True
+            return True
+        return False
+    
     def render(self, renderer) -> None:
         """
         Render the layer's content (UILayer interface).

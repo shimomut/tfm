@@ -11,7 +11,7 @@ import traceback
 from tfm_path import Path
 from typing import List, Tuple, Optional, Dict, Any
 import re
-from ttk import KeyEvent, KeyCode, CharEvent
+from ttk import KeyEvent, KeyCode, CharEvent, SystemEvent
 from ttk.renderer import TextAttribute
 
 # Try to import pygments for syntax highlighting
@@ -1051,6 +1051,29 @@ class TextViewer(UILayer):
             return result
         
         # Outside isearch mode, don't handle character events
+        return False
+    
+    def handle_system_event(self, event) -> bool:
+        """
+        Handle a system event (UILayer interface method).
+        
+        Handles window resize and close events for the text viewer.
+        
+        Args:
+            event: SystemEvent to handle
+        
+        Returns:
+            True if event was handled, False otherwise
+        """
+        if event.is_resize():
+            # Mark dirty to trigger redraw with new dimensions
+            self._dirty = True
+            return True
+        elif event.is_close():
+            # Close the viewer
+            self._should_close = True
+            self._dirty = True
+            return True
         return False
     
     def render(self, renderer) -> None:

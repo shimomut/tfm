@@ -77,6 +77,29 @@ class UILayer(ABC):
         pass
     
     @abstractmethod
+    def handle_system_event(self, event) -> bool:
+        """
+        Handle a system event (resize, close, etc.).
+        
+        This method is called when a system event occurs. Unlike key and
+        character events which only go to the top layer, system events are
+        BROADCAST to ALL layers in the stack. This allows all layers to
+        update their internal state when system-wide changes occur.
+        
+        Common system events:
+        - Window resize: All layers should mark themselves dirty and may need
+          to recalculate layout based on new dimensions
+        - Window close: Layers can perform cleanup or cancel operations
+        
+        Args:
+            event: SystemEvent to handle (from TTK backend)
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        pass
+    
+    @abstractmethod
     def render(self, renderer) -> None:
         """
         Render the layer's content.
@@ -345,6 +368,45 @@ class UILayerStack:
                 )
             return False
     
+    def handle_system_event(self, event) -> bool:
+        """
+        Broadcast a system event to all layers in the stack.
+        
+        System events (resize, close, etc.) are broadcast to ALL layers in the
+        stack, not just the top layer. This allows all layers to update their
+        internal state when system-wide changes occur (e.g., window resize).
+        
+        Unlike key and character events which only go to the top layer, system
+        events affect the entire application state and all layers need to know
+        about them.
+        
+        Exception handling: If any layer raises an exception during event
+        handling, the exception is caught and logged, but broadcasting continues
+        to other layers.
+        
+        Args:
+            event: SystemEvent to broadcast
+        
+        Returns:
+            True if at least one layer consumed the event, False otherwise
+        """
+        any_handled = False
+        
+        # Broadcast to all layers (bottom to top)
+        for layer in self._layers:
+            try:
+                if layer.handle_system_event(event):
+                    any_handled = True
+            except Exception as e:
+                if self._log_manager:
+                    self._log_manager.add_message(
+                        "ERROR",
+                        f"Layer {layer.__class__.__name__} raised exception during system event: {e}"
+                    )
+                # Continue broadcasting to other layers despite error
+        
+        return any_handled
+    
     def render(self, renderer) -> None:
         """
         Render visible layers with intelligent dirty tracking.
@@ -498,6 +560,37 @@ class FileManagerLayer(UILayer):
         """
         # FileManager main screen doesn't handle char events
         # (no text input on main screen)
+        return False
+    
+    def handle_system_event(self, event) -> bool:
+        """
+        Handle a system event (resize, close, etc.).
+        
+        This method handles window resize and close events for the main
+        FileManager screen.
+        
+        Args:
+            event: SystemEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        if event.is_resize():
+            # Handle window resize
+            self.file_manager.clear_screen_with_background()
+            self.file_manager.needs_full_redraw = True
+            self._dirty = True
+            return True
+        elif event.is_close():
+            # Handle window close request
+            if hasattr(self.file_manager, 'operation_in_progress') and self.file_manager.operation_in_progress:
+                # Ignore close event during operations
+                print("Cannot close: file operation in progress")
+                return True
+            else:
+                # No operations in progress, request close
+                self.request_close()
+                return True
         return False
     
     def render(self, renderer) -> None:

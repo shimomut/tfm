@@ -9,7 +9,7 @@ between two text files with syntax highlighting support.
 import difflib
 from tfm_path import Path
 from typing import List, Tuple, Optional
-from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent
+from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent, SystemEvent
 from tfm_colors import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
@@ -1243,6 +1243,29 @@ class DiffViewer(UILayer):
         Returns:
             False (viewers don't handle char events)
         """
+        return False
+    
+    def handle_system_event(self, event) -> bool:
+        """
+        Handle a system event (UILayer interface method).
+        
+        Handles window resize and close events for the diff viewer.
+        
+        Args:
+            event: SystemEvent to handle
+        
+        Returns:
+            True if event was handled, False otherwise
+        """
+        if event.is_resize():
+            # Mark dirty to trigger redraw with new dimensions
+            self._dirty = True
+            return True
+        elif event.is_close():
+            # Close the viewer
+            self._should_close = True
+            self._dirty = True
+            return True
         return False
     
     def render(self, renderer) -> None:
