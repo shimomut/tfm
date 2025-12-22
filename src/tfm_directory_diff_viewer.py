@@ -22,7 +22,8 @@ from tfm_colors import (
     COLOR_REGULAR_FILE,
     COLOR_DIRECTORIES,
     COLOR_DIFF_SEPARATOR_RED,
-    COLOR_TREE_LINES
+    COLOR_TREE_LINES,
+    COLOR_ERROR
 )
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_diff_viewer import DiffViewer
@@ -1223,17 +1224,21 @@ class DirectoryDiffViewer(UILayer):
             Tuple of (color_pair, attributes)
         """
         if is_focused:
-            # Focused nodes always use focused color
+            # Focused nodes always use focused color (with background)
             return get_color_with_attrs(COLOR_DIFF_FOCUSED)
         
-        # Color based on difference type
+        # Non-focused nodes: use regular colors without background
+        # Differences are indicated by separator symbols and foreground colors
         if node.difference_type == DifferenceType.ONLY_LEFT or \
            node.difference_type == DifferenceType.ONLY_RIGHT:
-            return get_color_with_attrs(COLOR_DIFF_ONLY_ONE_SIDE)
+            # Use error color (red foreground) for items only on one side
+            return (COLOR_ERROR, TextAttribute.NORMAL)
         elif node.difference_type == DifferenceType.CONTENT_DIFFERENT:
-            return get_color_with_attrs(COLOR_DIFF_CHANGE)
+            # Use error color (red foreground) for different content
+            return (COLOR_ERROR, TextAttribute.NORMAL)
         elif node.difference_type == DifferenceType.CONTAINS_DIFFERENCE:
-            return get_color_with_attrs(COLOR_DIFF_FOCUSED)
+            # Directories containing differences - use directory color
+            return get_color_with_attrs(COLOR_DIRECTORIES)
         else:  # IDENTICAL
             # Use regular file/directory color
             if node.is_directory:
