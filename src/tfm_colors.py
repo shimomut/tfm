@@ -69,6 +69,7 @@ COLOR_DIFF_BLANK = 33          # Blank lines in diff viewer (for alignment)
 COLOR_DIFF_CHAR_CHANGE = 34    # Character-level changes within lines (bright highlight)
 COLOR_DIFF_FOCUSED = 35        # Focused difference (highlighted background)
 COLOR_DIFF_SEPARATOR_RED = 36  # Red separator for differences (red fg, status bg)
+COLOR_TREE_LINES = 37          # Gray color for tree lines (├─ └─ │)
 
 # Current color scheme
 current_color_scheme = 'dark'
@@ -476,6 +477,8 @@ def init_colors(renderer, color_scheme=None):
     renderer.init_color_pair(COLOR_DIFF_FOCUSED, default_fg, diff_focused_bg)
     # Red separator for differences (red foreground, status background)
     renderer.init_color_pair(COLOR_DIFF_SEPARATOR_RED, (255, 0, 0), status_bg)
+    # Gray color for tree lines
+    renderer.init_color_pair(COLOR_TREE_LINES, (128, 128, 128), default_bg)
 
 def get_file_color(is_dir, is_executable, is_focused, is_active):
     """

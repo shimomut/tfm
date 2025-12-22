@@ -21,7 +21,8 @@ from tfm_colors import (
     COLOR_DIFF_FOCUSED,
     COLOR_REGULAR_FILE,
     COLOR_DIRECTORIES,
-    COLOR_DIFF_SEPARATOR_RED
+    COLOR_DIFF_SEPARATOR_RED,
+    COLOR_TREE_LINES
 )
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_diff_viewer import DiffViewer
@@ -1004,6 +1005,7 @@ class DirectoryDiffViewer(UILayer):
             
             # Build tree lines to show parent-child relationships
             tree_lines = self._build_tree_lines(node)
+            tree_lines_len = len(tree_lines)
             
             # Build expand/collapse indicator
             if node.is_directory:
@@ -1032,7 +1034,8 @@ class DirectoryDiffViewer(UILayer):
             if has_left_error or has_right_error or has_comparison_error:
                 error_indicator = "⚠ "
             
-            node_text = tree_lines + indicator + error_indicator + node.name
+            # Build node text without tree lines (we'll render them separately in gray)
+            node_content = indicator + error_indicator + node.name
             
             # Choose separator based on difference type
             if node.difference_type == DifferenceType.IDENTICAL:
@@ -1051,18 +1054,28 @@ class DirectoryDiffViewer(UILayer):
             # Render left column
             if node.left_path:
                 # Node exists on left side
-                left_text = truncate_to_width(node_text, left_column_width)
-                # Pad to exact width using display width
-                left_text_width = get_display_width(left_text)
-                left_padding = " " * (left_column_width - left_text_width)
-                left_text = left_text + left_padding
-                renderer.draw_text(y_pos, left_column_x, left_text, color_pair, attrs)
+                # First render tree lines in gray
+                if tree_lines:
+                    renderer.draw_text(y_pos, left_column_x, tree_lines, COLOR_TREE_LINES, TextAttribute.NORMAL)
+                
+                # Then render the rest of the content in normal color
+                content_text = truncate_to_width(node_content, left_column_width - tree_lines_len)
+                content_text_width = get_display_width(content_text)
+                content_padding = " " * (left_column_width - tree_lines_len - content_text_width)
+                content_text = content_text + content_padding
+                renderer.draw_text(y_pos, left_column_x + tree_lines_len, content_text, color_pair, attrs)
             else:
                 # Node doesn't exist on left side - show tree lines for missing item
                 # Use continuation lines only (no branch connectors)
                 missing_tree_lines = self._build_tree_lines_for_missing(node)
-                blank_text = missing_tree_lines + " " * (left_column_width - len(missing_tree_lines))
-                renderer.draw_text(y_pos, left_column_x, blank_text, blank_color_pair, blank_attrs)
+                if missing_tree_lines:
+                    renderer.draw_text(y_pos, left_column_x, missing_tree_lines, COLOR_TREE_LINES, TextAttribute.NORMAL)
+                
+                # Fill rest with blank
+                blank_len = left_column_width - len(missing_tree_lines)
+                if blank_len > 0:
+                    blank_text = " " * blank_len
+                    renderer.draw_text(y_pos, left_column_x + len(missing_tree_lines), blank_text, blank_color_pair, blank_attrs)
             
             # Render separator with appropriate color
             # Use red foreground (with status background) for difference separators
@@ -1082,19 +1095,29 @@ class DirectoryDiffViewer(UILayer):
             # Render right column
             if node.right_path:
                 # Node exists on right side
-                right_text = truncate_to_width(node_text, right_column_width)
-                # Pad to exact width using display width
-                right_text_width = get_display_width(right_text)
-                right_padding = " " * (right_column_width - right_text_width)
-                right_text = right_text + right_padding
-                renderer.draw_text(y_pos, right_column_x, right_text, color_pair, attrs)
+                # First render tree lines in gray
+                if tree_lines:
+                    renderer.draw_text(y_pos, right_column_x, tree_lines, COLOR_TREE_LINES, TextAttribute.NORMAL)
+                
+                # Then render the rest of the content in normal color
+                content_text = truncate_to_width(node_content, right_column_width - tree_lines_len)
+                content_text_width = get_display_width(content_text)
+                content_padding = " " * (right_column_width - tree_lines_len - content_text_width)
+                content_text = content_text + content_padding
+                renderer.draw_text(y_pos, right_column_x + tree_lines_len, content_text, color_pair, attrs)
             else:
                 # Node doesn't exist on right side - show tree lines for missing item
                 # Use continuation lines only (no branch connectors)
                 missing_tree_lines = self._build_tree_lines_for_missing(node)
-                blank_text = missing_tree_lines + " " * (right_column_width - len(missing_tree_lines))
-                renderer.draw_text(y_pos, right_column_x, blank_text, blank_color_pair, blank_attrs)
-                renderer.draw_text(y_pos, right_column_x, blank_text, blank_color_pair, blank_attrs)
+                if missing_tree_lines:
+                    renderer.draw_text(y_pos, right_column_x, missing_tree_lines, COLOR_TREE_LINES, TextAttribute.NORMAL)
+                
+                # Fill rest with blank
+                blank_len = right_column_width - len(missing_tree_lines)
+                if blank_len > 0:
+                    blank_text = " " * blank_len
+                    renderer.draw_text(y_pos, right_column_x + len(missing_tree_lines), blank_text, blank_color_pair, blank_attrs)
+
         
         # Draw scrollbar if needed
         if scrollbar_width > 0:
