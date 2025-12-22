@@ -1884,7 +1884,7 @@ if COCOA_AVAILABLE:
                     
                     # Create new grid
                     new_grid = [
-                        [(' ', 0, 0) for _ in range(new_cols)]
+                        [(' ', 0, 0, False) for _ in range(new_cols)]
                         for _ in range(new_rows)
                     ]
                     
