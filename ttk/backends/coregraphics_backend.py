@@ -222,6 +222,11 @@ class CoreGraphicsBackend(Renderer):
         
         self.window_title = window_title
         self.font_names = font_names if font_names is not None else ['Menlo']
+        
+        # Automatically add system default monospace font as final fallback
+        # This ensures there's always a font available for any character
+        self._add_system_monospace_fallback()
+        
         self.font_size = font_size
         self.rows = rows
         self.cols = cols
@@ -254,6 +259,29 @@ class CoreGraphicsBackend(Renderer):
         
         # C++ renderer module (initialized in initialize())
         self._cpp_renderer = None
+    
+    def _add_system_monospace_fallback(self) -> None:
+        """
+        Add system default monospace font as final fallback in cascade list.
+        
+        This ensures there's always a font available for any character, even if
+        all user-specified fonts don't have the required glyphs.
+        
+        The system monospace font is only added if it's not already in the list.
+        """
+        try:
+            # Get system monospace font
+            system_font = Cocoa.NSFont.monospacedSystemFontOfSize_weight_(self.font_size, 0.0)
+            if system_font:
+                system_font_name = system_font.fontName()
+                
+                # Only add if not already in the list
+                if system_font_name not in self.font_names:
+                    self.font_names.append(system_font_name)
+        except Exception as e:
+            # If we can't get system font, just continue with user-specified fonts
+            # This is non-critical - user fonts should work for most cases
+            print(f"Warning: Could not add system monospace font to cascade: {e}")
     
     def initialize(self) -> None:
         """
