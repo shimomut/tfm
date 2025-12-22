@@ -290,6 +290,9 @@ class DiffEngine:
         for relative_path in sorted(all_paths):
             self._add_path_to_tree(root, relative_path)
         
+        # Sort children at each level: directories first, then files, alphabetically within each group
+        self._sort_tree(root)
+        
         # Classify all nodes (bottom-up to propagate directory differences)
         self._classify_tree(root)
         
@@ -356,6 +359,31 @@ class DiffEngine:
                 
                 current_node.children.append(new_node)
                 current_node = new_node
+    
+    def _sort_tree(self, node: TreeNode) -> None:
+        """
+        Recursively sort children at each level of the tree.
+        
+        Sorting order:
+        1. Directories before files
+        2. Within directories: alphabetical order (case-insensitive)
+        3. Within files: alphabetical order (case-insensitive)
+        
+        Args:
+            node: Node whose children should be sorted (recursively)
+        """
+        if not node.children:
+            return
+        
+        # Sort children: directories first, then files, alphabetically within each group
+        node.children.sort(key=lambda child: (
+            not child.is_directory,  # False (directories) sorts before True (files)
+            child.name.lower()       # Case-insensitive alphabetical order
+        ))
+        
+        # Recursively sort children of each child
+        for child in node.children:
+            self._sort_tree(child)
     
     def _classify_tree(self, node: TreeNode) -> None:
         """
@@ -1007,14 +1035,14 @@ class DirectoryDiffViewer(UILayer):
             tree_lines = self._build_tree_lines(node)
             tree_lines_len = len(tree_lines)
             
-            # Build expand/collapse indicator
+            # Build icon based on node type
             if node.is_directory:
                 if node.is_expanded:
-                    indicator = "▼ "
+                    icon = "📂 "  # Open folder emoji
                 else:
-                    indicator = "▶ "
+                    icon = "📁 "  # Closed folder emoji
             else:
-                indicator = "  "
+                icon = "📄 "  # File emoji
             
             # Check for errors on this node
             relative_path = self._get_relative_path(node)
@@ -1035,7 +1063,7 @@ class DirectoryDiffViewer(UILayer):
                 error_indicator = "⚠ "
             
             # Build node text without tree lines (we'll render them separately in gray)
-            node_content = indicator + error_indicator + node.name
+            node_content = icon + error_indicator + node.name
             
             # Choose separator based on difference type
             if node.difference_type == DifferenceType.IDENTICAL:
