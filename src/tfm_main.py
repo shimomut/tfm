@@ -254,7 +254,6 @@ class FileManager(UILayer):
         
         # UILayer interface attributes
         self._dirty = True  # Start dirty to ensure initial render
-        self._close_requested = False  # Flag for quit handling
 
         # Add startup messages to log
         self.log_manager.add_startup_messages(VERSION, GITHUB_URL, APP_NAME)
@@ -351,7 +350,7 @@ class FileManager(UILayer):
                 return True
             else:
                 # No operations in progress, request close
-                self._close_requested = True
+                self.should_quit = True
                 return True
         return False
     
@@ -432,14 +431,14 @@ class FileManager(UILayer):
         """
         Query if this layer wants to close.
         
-        The FileManager signals it wants to close when the user has
-        requested to quit the application (e.g., by pressing 'q' and
-        confirming the quit dialog).
+        FileManager is the bottom layer and never closes itself.
+        Application quit is handled through the should_quit flag
+        which is checked in the main loop.
         
         Returns:
-            True if application quit was requested, False otherwise
+            False (bottom layer never closes)
         """
-        return self._close_requested
+        return False
     
     def on_activate(self) -> None:
         """
