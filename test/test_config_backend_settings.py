@@ -37,7 +37,7 @@ def test_default_backend_config():
     assert hasattr(config, 'DESKTOP_WINDOW_HEIGHT'), "DefaultConfig should have DESKTOP_WINDOW_HEIGHT"
     
     # Check default values
-    assert config.DESKTOP_FONT_NAME == 'Menlo', "Default font should be Menlo"
+    assert config.DESKTOP_FONT_NAME == ['Menlo', 'Monaco', 'Courier', 'Osaka-Mono', 'Hiragino Sans GB'], "Default font list should include cascade fonts"
     assert config.DESKTOP_FONT_SIZE == 12, "Default font size should be 12"
     assert config.DESKTOP_WINDOW_WIDTH == 1200, "Default window width should be 1200"
     assert config.DESKTOP_WINDOW_HEIGHT == 800, "Default window height should be 800"
@@ -75,14 +75,55 @@ def test_desktop_settings_validation():
     """Test desktop mode settings validation"""
     manager = ConfigManager()
     
-    # Test valid desktop settings
+    # Test valid desktop settings with font list
     class ValidDesktopConfig:
+        DESKTOP_FONT_NAME = ['Monaco', 'Menlo', 'Courier']
         DESKTOP_FONT_SIZE = 14
         DESKTOP_WINDOW_WIDTH = 1200
         DESKTOP_WINDOW_HEIGHT = 800
     
     errors = manager.validate_config(ValidDesktopConfig())
     assert len(errors) == 0, f"Valid desktop settings should have no errors, got: {errors}"
+    
+    # Test valid desktop settings with single font string (backward compatibility)
+    class ValidDesktopConfigString:
+        DESKTOP_FONT_NAME = 'Monaco'
+        DESKTOP_FONT_SIZE = 14
+    
+    errors = manager.validate_config(ValidDesktopConfigString())
+    assert len(errors) == 0, f"Valid desktop settings with string font should have no errors, got: {errors}"
+    
+    # Test invalid font name (empty string)
+    class InvalidFontNameEmpty:
+        DESKTOP_FONT_NAME = ''
+    
+    errors = manager.validate_config(InvalidFontNameEmpty())
+    assert len(errors) > 0, "Empty font name should produce validation error"
+    assert any('DESKTOP_FONT_NAME' in err for err in errors), "Error should mention DESKTOP_FONT_NAME"
+    
+    # Test invalid font name (empty list)
+    class InvalidFontNameEmptyList:
+        DESKTOP_FONT_NAME = []
+    
+    errors = manager.validate_config(InvalidFontNameEmptyList())
+    assert len(errors) > 0, "Empty font name list should produce validation error"
+    assert any('DESKTOP_FONT_NAME' in err for err in errors), "Error should mention DESKTOP_FONT_NAME"
+    
+    # Test invalid font name (list with empty strings)
+    class InvalidFontNameListWithEmpty:
+        DESKTOP_FONT_NAME = ['Monaco', '', 'Courier']
+    
+    errors = manager.validate_config(InvalidFontNameListWithEmpty())
+    assert len(errors) > 0, "Font name list with empty strings should produce validation error"
+    assert any('DESKTOP_FONT_NAME' in err for err in errors), "Error should mention DESKTOP_FONT_NAME"
+    
+    # Test invalid font name (wrong type)
+    class InvalidFontNameType:
+        DESKTOP_FONT_NAME = 123
+    
+    errors = manager.validate_config(InvalidFontNameType())
+    assert len(errors) > 0, "Invalid font name type should produce validation error"
+    assert any('DESKTOP_FONT_NAME' in err for err in errors), "Error should mention DESKTOP_FONT_NAME"
     
     # Test invalid font size (too small)
     class InvalidFontSizeSmall:
@@ -130,7 +171,7 @@ class Config:
     
     # Backend settings
     PREFERRED_BACKEND = 'coregraphics'
-    DESKTOP_FONT_NAME = 'Monaco'
+    DESKTOP_FONT_NAME = ['Monaco', 'Menlo']
     DESKTOP_FONT_SIZE = 16
     DESKTOP_WINDOW_WIDTH = 1400
     DESKTOP_WINDOW_HEIGHT = 900
@@ -161,7 +202,7 @@ class Config:
             assert config.PREFERRED_BACKEND == 'coregraphics', "Backend should be 'coregraphics'"
             
             assert hasattr(config, 'DESKTOP_FONT_NAME'), "Config should have DESKTOP_FONT_NAME"
-            assert config.DESKTOP_FONT_NAME == 'Monaco', "Font name should be 'Monaco'"
+            assert config.DESKTOP_FONT_NAME == ['Monaco', 'Menlo'], "Font name should be ['Monaco', 'Menlo']"
             
             assert hasattr(config, 'DESKTOP_FONT_SIZE'), "Config should have DESKTOP_FONT_SIZE"
             assert config.DESKTOP_FONT_SIZE == 16, "Font size should be 16"

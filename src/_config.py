@@ -24,8 +24,8 @@ class Config:
     # - 'coregraphics': Desktop mode (macOS only, requires PyObjC)
     
     # Desktop mode settings (for CoreGraphics backend)
-    DESKTOP_FONT_NAME = 'Menlo'  # Font name for desktop mode
-    DESKTOP_FONT_SIZE = 12  # Font size for desktop mode
+    DESKTOP_FONT_NAME = ['Menlo', 'Monaco', 'Courier', 'Osaka-Mono', 'Hiragino Sans GB']  # Font names for desktop mode (first is primary, rest are cascade fallbacks)
+    DESKTOP_FONT_SIZE = 12  # Font size for desktop mode (8-72 points)
     DESKTOP_WINDOW_WIDTH = 1200  # Initial window width in pixels
     DESKTOP_WINDOW_HEIGHT = 800  # Initial window height in pixels
     

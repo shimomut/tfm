@@ -52,8 +52,8 @@ class DefaultConfig:
     PREFERRED_BACKEND = 'curses'  # 'curses' or 'coregraphics'
     
     # Desktop mode settings (for CoreGraphics backend)
-    DESKTOP_FONT_NAME = 'Menlo'
-    DESKTOP_FONT_SIZE = 12
+    DESKTOP_FONT_NAME = ['Menlo', 'Monaco', 'Courier', 'Osaka-Mono', 'Hiragino Sans GB']  # Font names for desktop mode (first is primary, rest are cascade fallbacks)
+    DESKTOP_FONT_SIZE = 12  # Font size for desktop mode (8-72 points)
     DESKTOP_WINDOW_WIDTH = 1200
     DESKTOP_WINDOW_HEIGHT = 800
     
@@ -324,6 +324,19 @@ class ConfigManager:
                 errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
         
         # Validate desktop mode settings
+        if hasattr(config, 'DESKTOP_FONT_NAME'):
+            # Accept both string (single font) and list (with fallbacks)
+            if isinstance(config.DESKTOP_FONT_NAME, str):
+                if not config.DESKTOP_FONT_NAME.strip():
+                    errors.append("DESKTOP_FONT_NAME must be a non-empty string")
+            elif isinstance(config.DESKTOP_FONT_NAME, list):
+                if not config.DESKTOP_FONT_NAME:
+                    errors.append("DESKTOP_FONT_NAME list must not be empty")
+                elif not all(isinstance(name, str) and name.strip() for name in config.DESKTOP_FONT_NAME):
+                    errors.append("DESKTOP_FONT_NAME list must contain only non-empty strings")
+            else:
+                errors.append("DESKTOP_FONT_NAME must be a string or list of strings")
+        
         if hasattr(config, 'DESKTOP_FONT_SIZE'):
             if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
                 errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")

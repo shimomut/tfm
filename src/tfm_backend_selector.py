@@ -138,13 +138,16 @@ def _get_backend_options(backend_name, args):
     For coregraphics backend:
         Returns dict with window configuration:
         - window_title: Application window title
-        - font_name: Font to use for rendering
+        - font_name: Font to use for rendering (selected from DESKTOP_FONT_NAME list)
         - font_size: Font size in points
         - rows: Initial window height in character rows
         - cols: Initial window width in character columns
         
-        Options can be customized via user configuration (DESKTOP_FONT_NAME,
-        DESKTOP_FONT_SIZE, DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT).
+        Options can be customized via user configuration:
+        - DESKTOP_FONT_NAME: String or list of font names (tries in order)
+        - DESKTOP_FONT_SIZE: Font size in points
+        - DESKTOP_WINDOW_WIDTH: Window width in pixels
+        - DESKTOP_WINDOW_HEIGHT: Window height in pixels
         
         Window dimensions in pixels are converted to character dimensions
         using approximate character size calculations based on font size.
@@ -158,7 +161,7 @@ def _get_backend_options(backend_name, args):
     """
     if backend_name == 'coregraphics':
         # Default CoreGraphics options
-        font_name = 'Menlo'
+        font_names = ['Menlo', 'Monaco', 'Courier']  # Default font list with fallbacks
         font_size = 14
         window_width = 1200
         window_height = 800
@@ -170,7 +173,11 @@ def _get_backend_options(backend_name, args):
             
             # Override with user configuration if available
             if hasattr(config, 'DESKTOP_FONT_NAME'):
-                font_name = config.DESKTOP_FONT_NAME
+                # Support both string (single font) and list (with fallbacks)
+                if isinstance(config.DESKTOP_FONT_NAME, str):
+                    font_names = [config.DESKTOP_FONT_NAME]
+                elif isinstance(config.DESKTOP_FONT_NAME, list):
+                    font_names = config.DESKTOP_FONT_NAME
             
             if hasattr(config, 'DESKTOP_FONT_SIZE'):
                 font_size = config.DESKTOP_FONT_SIZE
@@ -198,7 +205,7 @@ def _get_backend_options(backend_name, args):
         # Return options that match CoreGraphicsBackend.__init__ parameters
         return {
             'window_title': 'TFM - TUI File Manager',
-            'font_name': font_name,
+            'font_names': font_names,     # Full list: first=primary, rest=cascade
             'font_size': font_size,
             'rows': rows,
             'cols': cols,

@@ -827,6 +827,9 @@ static PyMethodDef CppRendererMethods[] = {
         "  cursor_row: Cursor row position (int)\n"
         "  cursor_col: Cursor column position (int)\n"
         "  marked_text: IME marked text string (str or None)\n"
+        "  font_ascent: Font ascent for baseline positioning (float)\n"
+        "  font_names: List of font names (first is primary, rest are cascade) (list or str, optional, default=['Menlo'])\n"
+        "  font_size: Font size in points (float, optional, default=12.0)\n"
     },
     {
         "clear_caches",
@@ -2029,68 +2032,146 @@ static size_t g_total_batches = 0;
  * Initialize global caches if not already initialized.
  * Creates the base font and all cache objects.
  * 
+ * @param font_names_obj Python list of font names (first is primary, rest are cascade)
+ * @param font_size_val Font size in points
  * @throws std::runtime_error if initialization fails
  */
-static void initialize_caches() {
-    if (g_color_cache != nullptr) {
-        // Already initialized
+static void initialize_caches(PyObject* font_names_obj, double font_size_val = 12.0) {
+    // Extract font names from Python list
+    std::vector<std::string> font_names;
+    
+    if (PyList_Check(font_names_obj)) {
+        Py_ssize_t list_size = PyList_Size(font_names_obj);
+        for (Py_ssize_t i = 0; i < list_size; ++i) {
+            PyObject* item = PyList_GetItem(font_names_obj, i);
+            if (PyUnicode_Check(item)) {
+                const char* font_name_str = PyUnicode_AsUTF8(item);
+                if (font_name_str != nullptr) {
+                    font_names.push_back(font_name_str);
+                }
+            }
+        }
+    } else if (PyUnicode_Check(font_names_obj)) {
+        // Single string for backward compatibility
+        const char* font_name_str = PyUnicode_AsUTF8(font_names_obj);
+        if (font_name_str != nullptr) {
+            font_names.push_back(font_name_str);
+        }
+    }
+    
+    if (font_names.empty()) {
+        // Fallback to default
+        font_names.push_back("Menlo");
+    }
+    
+    // Check if we need to reinitialize due to font change
+    static std::vector<std::string> last_font_names;
+    static double last_font_size = 0.0;
+    
+    bool need_reinit = (g_color_cache == nullptr) ||
+                       (last_font_names != font_names) ||
+                       (std::abs(last_font_size - font_size_val) > 0.01);
+    
+    if (!need_reinit) {
+        // Already initialized with same fonts
         return;
     }
     
-    // Create base font with cascade list for automatic fallback
-    // Note: This should match the font used in CoreGraphicsBackend.__init__()
-    // Python default: font_name="Menlo", font_size=12
-    CFStringRef font_name = CFSTR("Menlo");
-    CGFloat font_size = 12.0;
-    
-    // Create font descriptor with cascade list for Japanese/CJK support
-    // The cascade list must contain font descriptors, not font names
-    CFStringRef cascade_font_names[] = {
-        CFSTR("Osaka-Mono"),           // Japanese monospace
-        CFSTR("Hiragino Sans GB"),     // Chinese monospace
-        CFSTR("Apple SD Gothic Neo")   // Korean monospace
-    };
-    
-    // Create font descriptors from font names
-    CFMutableArrayRef cascade_descriptors = CFArrayCreateMutable(
-        kCFAllocatorDefault,
-        3,
-        &kCFTypeArrayCallBacks
-    );
-    
-    if (cascade_descriptors == nullptr) {
-        throw std::runtime_error("Failed to create cascade descriptors array");
+    // Clean up existing resources if reinitializing
+    if (g_attr_dict_cache != nullptr) {
+        delete g_attr_dict_cache;
+        g_attr_dict_cache = nullptr;
+    }
+    if (g_font_cache != nullptr) {
+        delete g_font_cache;
+        g_font_cache = nullptr;
+    }
+    if (g_color_cache != nullptr) {
+        delete g_color_cache;
+        g_color_cache = nullptr;
+    }
+    if (g_base_font != nullptr) {
+        CFRelease(g_base_font);
+        g_base_font = nullptr;
     }
     
-    for (int i = 0; i < 3; ++i) {
-        CFStringRef keys[] = { kCTFontNameAttribute };
-        CFTypeRef values[] = { cascade_font_names[i] };
-        
-        CFDictionaryRef attrs = CFDictionaryCreate(
+    // Update tracking variables
+    last_font_names = font_names;
+    last_font_size = font_size_val;
+    
+    // First font is the primary font
+    const char* primary_font_name = font_names[0].c_str();
+    
+    // Create base font
+    CFStringRef font_name = CFStringCreateWithCString(
+        kCFAllocatorDefault,
+        primary_font_name,
+        kCFStringEncodingUTF8
+    );
+    
+    if (font_name == nullptr) {
+        throw std::runtime_error("Failed to create font name CFString");
+    }
+    
+    CGFloat font_size = static_cast<CGFloat>(font_size_val);
+    
+    // Create font descriptor with cascade list
+    // Remaining fonts in the list become cascade fonts
+    CFMutableArrayRef cascade_descriptors = nullptr;
+    
+    if (font_names.size() > 1) {
+        cascade_descriptors = CFArrayCreateMutable(
             kCFAllocatorDefault,
-            (const void**)keys,
-            (const void**)values,
-            1,
-            &kCFTypeDictionaryKeyCallBacks,
-            &kCFTypeDictionaryValueCallBacks
+            font_names.size() - 1,
+            &kCFTypeArrayCallBacks
         );
         
-        if (attrs != nullptr) {
-            CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes(attrs);
-            CFRelease(attrs);
-            
-            if (desc != nullptr) {
-                CFArrayAppendValue(cascade_descriptors, desc);
-                CFRelease(desc);
+        if (cascade_descriptors != nullptr) {
+            // Add remaining fonts as cascade fonts
+            for (size_t i = 1; i < font_names.size(); ++i) {
+                CFStringRef cascade_name = CFStringCreateWithCString(
+                    kCFAllocatorDefault,
+                    font_names[i].c_str(),
+                    kCFStringEncodingUTF8
+                );
+                
+                if (cascade_name != nullptr) {
+                    CFStringRef keys[] = { kCTFontNameAttribute };
+                    CFTypeRef values[] = { cascade_name };
+                    
+                    CFDictionaryRef attrs = CFDictionaryCreate(
+                        kCFAllocatorDefault,
+                        (const void**)keys,
+                        (const void**)values,
+                        1,
+                        &kCFTypeDictionaryKeyCallBacks,
+                        &kCFTypeDictionaryValueCallBacks
+                    );
+                    
+                    CFRelease(cascade_name);
+                    
+                    if (attrs != nullptr) {
+                        CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes(attrs);
+                        CFRelease(attrs);
+                        
+                        if (desc != nullptr) {
+                            CFArrayAppendValue(cascade_descriptors, desc);
+                            CFRelease(desc);
+                        }
+                    }
+                }
             }
         }
     }
     
-    // Create font descriptor with cascade list attribute
-    CFStringRef keys[] = { kCTFontCascadeListAttribute };
-    CFTypeRef values[] = { cascade_descriptors };
+    // Create font descriptor with cascade list attribute (if we have cascade fonts)
+    CTFontDescriptorRef descriptor = nullptr;
     
-    CFDictionaryRef attributes = CFDictionaryCreate(
+    if (cascade_descriptors != nullptr && CFArrayGetCount(cascade_descriptors) > 0) {
+        CFStringRef keys[] = { kCTFontCascadeListAttribute };
+        CFTypeRef values[] = { cascade_descriptors };
+        
+        CFDictionaryRef attributes = CFDictionaryCreate(
         kCFAllocatorDefault,
         (const void**)keys,
         (const void**)values,
@@ -2101,39 +2182,43 @@ static void initialize_caches() {
     
     CFRelease(cascade_descriptors);
     
-    if (attributes == nullptr) {
-        throw std::runtime_error("Failed to create font attributes dictionary");
+    if (attributes != nullptr) {
+        descriptor = CTFontDescriptorCreateWithAttributes(attributes);
+        CFRelease(attributes);
+    }
+    } else if (cascade_descriptors != nullptr) {
+        // Clean up empty cascade descriptors
+        CFRelease(cascade_descriptors);
     }
     
-    CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithAttributes(attributes);
-    CFRelease(attributes);
-    
-    if (descriptor == nullptr) {
-        throw std::runtime_error("Failed to create font descriptor");
-    }
-    
-    // Create font with descriptor (includes cascade list)
+    // Create font with descriptor (includes cascade list if available)
     g_base_font = CTFontCreateWithName(font_name, font_size, nullptr);
+    CFRelease(font_name);  // Release the CFString we created
+    
     if (g_base_font == nullptr) {
-        CFRelease(descriptor);
+        if (descriptor != nullptr) {
+            CFRelease(descriptor);
+        }
         throw std::runtime_error("Failed to create base font");
     }
     
-    // Apply descriptor to font to enable cascade list
-    CTFontRef font_with_cascade = CTFontCreateCopyWithAttributes(
-        g_base_font,
-        font_size,
-        nullptr,
-        descriptor
-    );
-    
-    CFRelease(descriptor);
-    
-    if (font_with_cascade != nullptr) {
-        CFRelease(g_base_font);
-        g_base_font = font_with_cascade;
+    // Apply descriptor to font to enable cascade list (if we have one)
+    if (descriptor != nullptr) {
+        CTFontRef font_with_cascade = CTFontCreateCopyWithAttributes(
+            g_base_font,
+            font_size,
+            nullptr,
+            descriptor
+        );
+        
+        CFRelease(descriptor);
+        
+        if (font_with_cascade != nullptr) {
+            CFRelease(g_base_font);
+            g_base_font = font_with_cascade;
+        }
+        // If cascade application fails, continue with base font
     }
-    // If cascade application fails, continue with base font
     
     // Create caches
     try {
@@ -2206,6 +2291,8 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             "cursor_col",
             "marked_text",
             "font_ascent",
+            "font_names",
+            "font_size",
             nullptr
         };
         
@@ -2225,11 +2312,13 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
         int cursor_col = 0;
         const char* marked_text = nullptr;
         double font_ascent = 0.0;
+        PyObject* font_names_obj = nullptr;  // Python list or string of font names
+        double font_size = 12.0;  // Default font size
         
         // Parse arguments
         if (!PyArg_ParseTupleAndKeywords(
             args, kwargs,
-            "KOOOddiiddpii|zd:render_frame",
+            "KOOOddiiddpii|zdOd:render_frame",
             const_cast<char**>(kwlist),
             &context_ptr,
             &grid_obj,
@@ -2245,7 +2334,9 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             &cursor_row,
             &cursor_col,
             &marked_text,
-            &font_ascent
+            &font_ascent,
+            &font_names_obj,
+            &font_size
         )) {
             // PyArg_ParseTupleAndKeywords sets the exception
             return nullptr;
@@ -2345,8 +2436,15 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
         // Task 14.2: Rendering Pipeline
         //=====================================================================
         
-        // Initialize caches if needed
-        initialize_caches();
+        // Initialize caches if needed (with font parameters)
+        // If font_names_obj is None, create a default list
+        if (font_names_obj == nullptr || font_names_obj == Py_None) {
+            // Create default font list
+            font_names_obj = PyList_New(1);
+            PyList_SetItem(font_names_obj, 0, PyUnicode_FromString("Menlo"));
+        }
+        
+        initialize_caches(font_names_obj, font_size);
         
         // Parse grid and color_pairs
         std::vector<std::vector<Cell>> grid = parse_grid(grid_obj, rows, cols);

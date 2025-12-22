@@ -192,21 +192,24 @@ class CoreGraphicsBackend(Renderer):
     
     
     def __init__(self, window_title: str = "TTK Application",
-                 font_name: str = "Menlo", font_size: int = 12,
+                 font_size: int = 12,
                  rows: int = 24, cols: int = 80,
-                 frame_autosave_name: Optional[str] = None):
+                 frame_autosave_name: Optional[str] = None,
+                 font_names: Optional[list] = None):
         """
         Initialize the CoreGraphics backend.
         
         Args:
             window_title: Title for the window
-            font_name: Name of the monospace font to use (default: "Menlo")
             font_size: Font size in points (default: 12)
             rows: Initial grid height in characters (default: 24)
             cols: Initial grid width in characters (default: 80)
             frame_autosave_name: Optional name for NSWindow frame autosave.
                                If provided, enables automatic window geometry persistence.
                                If None, defaults to "TTKApplication".
+            font_names: List of font names for cascade fallback (default: ['Menlo']).
+                       First font is primary, remaining fonts are cascade fonts.
+                       Used by C++ renderer for automatic character fallback.
         
         Raises:
             RuntimeError: If PyObjC is not installed
@@ -218,7 +221,7 @@ class CoreGraphicsBackend(Renderer):
             )
         
         self.window_title = window_title
-        self.font_name = font_name
+        self.font_names = font_names if font_names is not None else ['Menlo']
         self.font_size = font_size
         self.rows = rows
         self.cols = cols
@@ -306,13 +309,16 @@ class CoreGraphicsBackend(Renderer):
         """
         Load the monospace font.
         
+        Uses the first font from font_names list as the primary font.
+        
         Raises:
             ValueError: If the font is not found
         """
-        self.font = Cocoa.NSFont.fontWithName_size_(self.font_name, self.font_size)
+        font_name = self.font_names[0]
+        self.font = Cocoa.NSFont.fontWithName_size_(font_name, self.font_size)
         if not self.font:
             raise ValueError(
-                f"Font '{self.font_name}' not found. "
+                f"Font '{font_name}' not found. "
                 f"Use a valid monospace font like 'Menlo', 'Monaco', or 'Courier'."
             )
     
@@ -2049,7 +2055,9 @@ if COCOA_AVAILABLE:
                     self.backend.cursor_row,
                     self.backend.cursor_col,
                     marked_text,
-                    self.backend.font_ascent  # Add font_ascent for baseline positioning
+                    self.backend.font_ascent,  # Add font_ascent for baseline positioning
+                    self.backend.font_names,   # Pass font list to C++ renderer (includes cascade fonts)
+                    self.backend.font_size     # Pass font size to C++ renderer
                 )
             
             def acceptsFirstResponder(self):
