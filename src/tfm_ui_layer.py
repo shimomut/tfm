@@ -525,9 +525,9 @@ class FileManagerLayer(UILayer):
         """
         Handle a key event for the main FileManager screen.
         
-        This method delegates to the FileManager's handle_main_screen_key_event method,
-        which processes all main screen keyboard events including navigation,
-        selection, commands, and shortcuts.
+        This method first checks for FileManager-specific input modes (isearch,
+        quick_edit_bar, quick_choice_bar) before delegating to the main screen
+        key handling logic.
         
         Args:
             event: KeyEvent to handle
@@ -535,6 +535,12 @@ class FileManagerLayer(UILayer):
         Returns:
             True if the event was consumed, False otherwise
         """
+        # Check FileManager-specific input modes first
+        result = self.file_manager.handle_input(event)
+        if result:
+            self._dirty = True
+            return True
+        
         # Delegate to FileManager's main screen key handling logic
         result = self.file_manager.handle_main_screen_key_event(event)
         
@@ -548,18 +554,23 @@ class FileManagerLayer(UILayer):
         """
         Handle a character event.
         
-        The FileManager main screen doesn't handle character events directly
-        (no text input on main screen), so this always returns False to allow
-        propagation.
+        This method first checks for FileManager-specific input modes (isearch,
+        quick_edit_bar) that handle character input, before falling back to
+        the main screen (which doesn't handle char events).
         
         Args:
             event: CharEvent to handle
         
         Returns:
-            False (main screen doesn't handle char events)
+            True if the event was consumed, False otherwise
         """
+        # Check FileManager-specific input modes first
+        result = self.file_manager.handle_input(event)
+        if result:
+            self._dirty = True
+            return True
+        
         # FileManager main screen doesn't handle char events
-        # (no text input on main screen)
         return False
     
     def handle_system_event(self, event) -> bool:

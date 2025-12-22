@@ -62,8 +62,8 @@ class TFMEventCallback(EventCallback):
     Event callback implementation for TFM application layer.
     
     This class implements the EventCallback interface to handle events
-    delivered by the TTK backend. It routes KeyEvents to command handlers,
-    CharEvents to active text widgets, and SystemEvents to appropriate handlers.
+    delivered by the TTK backend. It routes all events directly to the
+    UI layer stack, which distributes them to the appropriate layer.
     """
     
     def __init__(self, file_manager):
@@ -71,46 +71,53 @@ class TFMEventCallback(EventCallback):
         Initialize the TFMEventCallback.
         
         Args:
-            file_manager: FileManager instance to route events to
+            file_manager: FileManager instance for accessing layer stack
         """
         self.file_manager = file_manager
     
     def on_key_event(self, event: KeyEvent) -> bool:
         """
-        Handle a key event by routing to FileManager.handle_input().
+        Handle a key event by routing to the UI layer stack.
         
         Args:
             event: KeyEvent to handle
         
         Returns:
-            True if the event was consumed (command executed), False otherwise
+            True if the event was consumed, False otherwise
         """
         # Mark activity for adaptive FPS
         self.file_manager.adaptive_fps.mark_activity()
         
-        # Route to the file manager's unified input handler
-        return self.file_manager.handle_input(event)
+        # Route to UI layer stack
+        consumed = self.file_manager.ui_layer_stack.handle_key_event(event)
+        if consumed:
+            self.file_manager.needs_full_redraw = True
+        return consumed
     
     def on_char_event(self, event: CharEvent) -> bool:
         """
-        Handle a character event by routing to FileManager.handle_input().
+        Handle a character event by routing to the UI layer stack.
         
         Args:
             event: CharEvent to handle
         
         Returns:
-            True if the event was consumed (character inserted), False otherwise
+            True if the event was consumed, False otherwise
         """
         # Mark activity for adaptive FPS
         self.file_manager.adaptive_fps.mark_activity()
         
-        # Route to the file manager's unified input handler
-        # handle_input() will route CharEvents to active dialogs
-        return self.file_manager.handle_input(event)
+        # Route to UI layer stack
+        consumed = self.file_manager.ui_layer_stack.handle_char_event(event)
+        if consumed:
+            self.file_manager.needs_full_redraw = True
+        return consumed
     
     def on_system_event(self, event: SystemEvent) -> bool:
         """
-        Handle a system event (resize, close, etc.).
+        Handle a system event by routing to the UI layer stack.
+        
+        System events are broadcast to all layers in the stack.
         
         Args:
             event: SystemEvent to handle
@@ -121,12 +128,15 @@ class TFMEventCallback(EventCallback):
         # Mark activity for adaptive FPS
         self.file_manager.adaptive_fps.mark_activity()
         
-        # Route system events through the layer stack
+        # Route to UI layer stack
         return self.file_manager.ui_layer_stack.handle_system_event(event)
     
     def on_menu_event(self, event) -> bool:
         """
         Handle a menu event by routing to FileManager._handle_menu_event().
+        
+        Menu events are desktop-mode specific and handled directly by FileManager
+        as they affect application-wide state and commands.
         
         Args:
             event: MenuEvent to handle
@@ -3608,57 +3618,50 @@ class FileManager:
 
     def handle_input(self, event):
         """
-        Handle input event (KeyEvent or CharEvent) and return True if the event was processed.
+        Handle FileManager-specific input modes.
+        
+        This method checks for FileManager-specific features (isearch, quick_edit_bar,
+        quick_choice_bar) and handles them if active. If none are active, returns False
+        to allow TFMEventCallback to route the event to the UI layer stack.
         
         Args:
             event: KeyEvent or CharEvent to handle
         
         Returns:
-            True if the event was consumed, False otherwise
+            True if the event was consumed by a FileManager-specific feature,
+            False if the event should be routed to the UI layer stack
         """
         # Type check: only handle KeyEvent and CharEvent
         if not isinstance(event, (KeyEvent, CharEvent)):
             return False
         
-        # Handle isearch mode input (not part of layer stack)
+        # Handle isearch mode input (FileManager-specific, not part of layer stack)
         if self.isearch_mode:
             result = self.handle_isearch_input(event)
             if result:
-                # Mark the FileManagerLayer dirty so it redraws with the updated isearch
                 self.file_manager_layer.mark_dirty()
                 self.needs_full_redraw = True
             return result
         
-        # Handle general dialog input (not part of layer stack)
+        # Handle quick_edit_bar input (FileManager-specific, not part of layer stack)
         if self.quick_edit_bar.is_active:
             result = self.quick_edit_bar.handle_input(event)
             if result:
-                # Mark the FileManagerLayer dirty so it redraws with the updated dialog
                 self.file_manager_layer.mark_dirty()
                 self.needs_full_redraw = True
             return result
         
-        # Handle quick choice mode input (not part of layer stack, KeyEvent only)
+        # Handle quick_choice_bar input (FileManager-specific, not part of layer stack, KeyEvent only)
         if isinstance(event, KeyEvent) and self.quick_choice_bar.is_active:
             result = self.handle_quick_choice_input(event)
             if result:
-                # Mark the FileManagerLayer dirty so it redraws with the updated quick choice bar
                 self.file_manager_layer.mark_dirty()
                 self.needs_full_redraw = True
             return result
         
-        # Delegate to UI layer stack for all other event handling
-        # This handles dialogs, viewers, and the main FileManager screen
-        if isinstance(event, KeyEvent):
-            consumed = self.ui_layer_stack.handle_key_event(event)
-        else:  # CharEvent
-            consumed = self.ui_layer_stack.handle_char_event(event)
-        
-        # Mark for redraw if event was consumed
-        if consumed:
-            self.needs_full_redraw = True
-        
-        return consumed
+        # No FileManager-specific feature handled the event
+        # Return False to let TFMEventCallback route to UI layer stack
+        return False
 
     def draw_interface(self):
         """Draw the complete interface using the UI layer stack"""
