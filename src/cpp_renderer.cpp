@@ -1493,23 +1493,38 @@ static void draw_character_batch(
     // Calculate baseline position
     CGFloat baseline_y = batch.y + (char_height - font_ascent);
     
-    // Calculate position for each glyph at exact grid positions
-    // With UTF-16, we can directly iterate through characters
+    // Get actual glyph advances from the font
+    // This is critical for proper character spacing
+    std::vector<CGSize> advances(length);
+    CTFontGetAdvancesForGlyphs(
+        font_to_use,
+        kCTFontOrientationHorizontal,
+        glyphs.data(),
+        advances.data(),
+        length
+    );
+    
+    // Calculate position for each glyph using actual advances
+    // For monospace rendering, we need to center each glyph within its cell
     CGFloat x = batch.x;
     
     for (CFIndex i = 0; i < length; ++i) {
-        positions[i].x = x;
+        // Get the actual glyph advance width
+        CGFloat glyph_advance = advances[i].width;
+        
+        // Check if this character is wide (occupies 2 cells)
+        char16_t ch = batch.text[i];
+        CGFloat cell_width = is_wide_character(ch) ? (char_width * 2.0f) : char_width;
+        
+        // Center the glyph within its cell(s) for better visual alignment
+        // This prevents glyphs from appearing too far left or right
+        CGFloat centering_offset = (cell_width - glyph_advance) / 2.0f;
+        
+        positions[i].x = x + centering_offset;
         positions[i].y = baseline_y;
         
-        // Check if this character is wide
-        char16_t ch = batch.text[i];
-        
-        // Advance by char_width for normal characters, char_width * 2 for wide characters
-        if (is_wide_character(ch)) {
-            x += char_width * 2.0f;
-        } else {
-            x += char_width;
-        }
+        // Advance by the cell width (not glyph advance) to maintain grid alignment
+        x += cell_width;
     }
     
     // Set fill color for text
