@@ -1466,12 +1466,12 @@ static void draw_character_batch(
     );
     
     if (text_string == nullptr) {
+        fprintf(stderr, "  ERROR: text_string is nullptr\n");
         return;
     }
     
     CFIndex length = CFStringGetLength(text_string);
     if (length == 0) {
-        CFRelease(text_string);
         return;
     }
     
@@ -1485,25 +1485,78 @@ static void draw_character_batch(
     CFRelease(text_string);
     
     // Get glyphs for characters
-    if (!CTFontGetGlyphsForCharacters(font, characters.data(), glyphs.data(), length)) {
-        // Failed to get glyphs
-        return;
+    bool all_glyphs_found = CTFontGetGlyphsForCharacters(font, characters.data(), glyphs.data(), length);
+    
+    CTFontRef font_to_use = font;
+    CTFontRef fallback_font = nullptr;
+    
+    if (!all_glyphs_found) {
+        // Some glyphs are missing - use Hiragino Sans as fallback for Japanese/CJK characters
+        CFStringRef fallback_name = CFSTR("Hiragino Sans");
+        CGFloat font_size = CTFontGetSize(font);
+        fallback_font = CTFontCreateWithName(fallback_name, font_size, nullptr);
+        
+        if (fallback_font != nullptr) {
+            // Try again with fallback font
+            if (CTFontGetGlyphsForCharacters(fallback_font, characters.data(), glyphs.data(), length)) {
+                font_to_use = fallback_font;
+            } else {
+                CFRelease(fallback_font);
+                fallback_font = nullptr;
+                return;
+            }
+        } else {
+            return;
+        }
     }
+    
+    // Note: text_string may be autoreleased, so we don't manually release it
     
     // Calculate baseline position
     CGFloat baseline_y = batch.y + (char_height - font_ascent);
     
     // Calculate position for each glyph at exact grid positions
     CGFloat x = batch.x;
+    size_t utf8_pos = 0;
+    
     for (CFIndex i = 0; i < length; ++i) {
         positions[i].x = x;
         positions[i].y = baseline_y;
         
-        // Advance by char_width for next character
-        // For wide characters, we would advance by char_width * 2, but
-        // the batch text already accounts for this by having the wide char
-        // followed by an empty placeholder in the grid
-        x += char_width;
+        // Extract the current UTF-8 character to check if it's wide
+        size_t char_start = utf8_pos;
+        
+        // Parse UTF-8 character boundaries
+        if (utf8_pos < batch.text.length()) {
+            unsigned char first_byte = batch.text[utf8_pos];
+            ++utf8_pos;
+            
+            // Determine continuation bytes based on first byte
+            if ((first_byte & 0x80) == 0) {
+                // 1-byte character
+            } else if ((first_byte & 0xE0) == 0xC0) {
+                // 2-byte character
+                if (utf8_pos < batch.text.length()) ++utf8_pos;
+            } else if ((first_byte & 0xF0) == 0xE0) {
+                // 3-byte character
+                if (utf8_pos < batch.text.length()) ++utf8_pos;
+                if (utf8_pos < batch.text.length()) ++utf8_pos;
+            } else if ((first_byte & 0xF8) == 0xF0) {
+                // 4-byte character
+                if (utf8_pos < batch.text.length()) ++utf8_pos;
+                if (utf8_pos < batch.text.length()) ++utf8_pos;
+                if (utf8_pos < batch.text.length()) ++utf8_pos;
+            }
+        }
+        
+        std::string current_char = batch.text.substr(char_start, utf8_pos - char_start);
+        
+        // Advance by char_width for normal characters, char_width * 2 for wide characters
+        if (is_wide_character(current_char)) {
+            x += char_width * 2.0f;
+        } else {
+            x += char_width;
+        }
     }
     
     // Set fill color for text
@@ -1521,11 +1574,16 @@ static void draw_character_batch(
     CGContextSetShouldSmoothFonts(context, true);
     
     // Get CGFont from CTFont for glyph rendering
-    CGFontRef cg_font = CTFontCopyGraphicsFont(font, nullptr);
+    CGFontRef cg_font = CTFontCopyGraphicsFont(font_to_use, nullptr);
     if (cg_font != nullptr) {
         CGContextSetFont(context, cg_font);
-        CGContextSetFontSize(context, CTFontGetSize(font));
+        CGContextSetFontSize(context, CTFontGetSize(font_to_use));
         CFRelease(cg_font);
+    } else {
+        if (fallback_font != nullptr) {
+            CFRelease(fallback_font);
+        }
+        return;
     }
     
     // Draw glyphs at exact positions
@@ -1539,8 +1597,8 @@ static void draw_character_batch(
     // Draw underline if needed
     if (batch.underline) {
         // Calculate underline position and thickness
-        CGFloat underline_position = baseline_y + CTFontGetUnderlinePosition(font);
-        CGFloat underline_thickness = CTFontGetUnderlineThickness(font);
+        CGFloat underline_position = baseline_y + CTFontGetUnderlinePosition(font_to_use);
+        CGFloat underline_thickness = CTFontGetUnderlineThickness(font_to_use);
         
         // Draw underline as a filled rectangle
         CGFloat underline_width = char_width * length;
@@ -1552,6 +1610,11 @@ static void draw_character_batch(
     
     // Restore graphics state
     CGContextRestoreGState(context);
+    
+    // Clean up fallback font if we created one
+    if (fallback_font != nullptr) {
+        CFRelease(fallback_font);
+    }
 }
 
 /**
