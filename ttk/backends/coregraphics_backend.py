@@ -1162,9 +1162,6 @@ class CoreGraphicsBackend(Renderer):
     # This creates a pleasant frame around the text grid that edge cells will fill
     WINDOW_PADDING_MULTIPLIER = 0.5
     
-    # Backend selector flag: enables C++ rendering when True, defaults to PyObjC for backward compatibility
-    # Can be set via environment variable TTK_USE_CPP_RENDERING=true
-    USE_CPP_RENDERING = os.environ.get('TTK_USE_CPP_RENDERING', 'false').lower() == 'true'
     
     def __init__(self, window_title: str = "TTK Application",
                  font_name: str = "Menlo", font_size: int = 12,
@@ -1229,7 +1226,7 @@ class CoreGraphicsBackend(Renderer):
         # Event callback for callback-based event delivery
         self.event_callback: Optional['EventCallback'] = None
         
-        # C++ renderer module (initialized in initialize() if USE_CPP_RENDERING is True)
+        # C++ renderer module (initialized in initialize())
         self._cpp_renderer = None
     
     def initialize(self) -> None:
@@ -1244,7 +1241,7 @@ class CoreGraphicsBackend(Renderer):
         5. Creates the window and view
         6. Initializes the character grid
         7. Sets up default color pairs
-        8. Attempts to import C++ renderer if USE_CPP_RENDERING is enabled
+        8. Imports C++ renderer module
         
         Raises:
             ValueError: If the specified font is not found
@@ -1279,18 +1276,16 @@ class CoreGraphicsBackend(Renderer):
         # pre-built NSAttributedString objects with LRU eviction (max 1000 entries)
         self._attr_string_cache = AttributedStringCache(self._attr_dict_cache, max_cache_size=1000)
         
-        # Try to import C++ renderer if enabled
-        if self.USE_CPP_RENDERING:
-            try:
-                import cpp_renderer
-                self._cpp_renderer = cpp_renderer
-                print("CoreGraphicsBackend: Using C++ rendering implementation")
-            except ImportError as e:
-                print(f"CoreGraphicsBackend: C++ renderer not available ({e}), falling back to PyObjC")
-                # Disable C++ rendering flag since module is not available
-                self.USE_CPP_RENDERING = False
-        else:
-            print("CoreGraphicsBackend: Using PyObjC rendering implementation")
+        # Import C++ renderer module
+        try:
+            import cpp_renderer
+            self._cpp_renderer = cpp_renderer
+            print("CoreGraphicsBackend: Using C++ rendering implementation")
+        except ImportError as e:
+            raise RuntimeError(
+                f"C++ renderer module not available: {e}\n"
+                "Please build the C++ renderer with: python setup.py build_ext --inplace"
+            )
         
         # Create window and view
         self._create_window()
@@ -3048,30 +3043,16 @@ if COCOA_AVAILABLE:
             
             def drawRect_(self, rect):
                 """
-                Render the character grid with optimized background batching.
+                Render the character grid using C++ CoreGraphics implementation.
                 
                 This method is called by the Cocoa event loop when the view needs
-                to be redrawn. It uses an optimized rendering approach that batches
-                adjacent cells with the same background color to reduce CoreGraphics
-                API calls.
-                
-                The method supports two rendering implementations:
-                1. C++ rendering (when USE_CPP_RENDERING is True and cpp_renderer is available)
-                2. PyObjC rendering (default, backward compatible)
+                to be redrawn. It uses the C++ rendering implementation for optimal
+                performance with direct CoreGraphics/CoreText API access.
                 
                 PyObjC Method Name Translation:
                     Objective-C: drawRect:
                     PyObjC: drawRect_()
                     The trailing underscore indicates a single parameter method.
-                
-                The optimized rendering process:
-                1. Calculate dirty region from rect parameter
-                2. Phase 1: Batch and draw backgrounds
-                   - Iterate through dirty region cells
-                   - Accumulate adjacent cells with same color into batches
-                   - Draw all batched backgrounds with cached colors
-                3. Phase 2: Draw characters (not yet implemented in this task)
-                4. Draw cursor if visible
                 
                 Args:
                     rect: NSRect indicating the region that needs to be redrawn
@@ -3097,19 +3078,8 @@ if COCOA_AVAILABLE:
                 offset_x = (view_width - grid_width) / 2.0
                 offset_y = (view_height - grid_height) / 2.0
                 
-                # Choose rendering implementation based on backend selector
-                if self.backend.USE_CPP_RENDERING and self.backend._cpp_renderer:
-                    # Use C++ rendering
-                    try:
-                        self._render_with_cpp(rect, offset_x, offset_y)
-                    except Exception as e:
-                        print(f"CoreGraphicsBackend: C++ rendering failed: {e}")
-                        print("CoreGraphicsBackend: Falling back to PyObjC rendering")
-                        # Fall back to PyObjC rendering on error
-                        self._render_with_pyobjc(rect, offset_x, offset_y)
-                else:
-                    # Use PyObjC rendering (default)
-                    self._render_with_pyobjc(rect, offset_x, offset_y)
+                # Use C++ rendering
+                self._render_with_cpp(rect, offset_x, offset_y)
             
             def _render_with_cpp(self, rect, offset_x: float, offset_y: float):
                 """
@@ -3123,9 +3093,6 @@ if COCOA_AVAILABLE:
                     rect: NSRect indicating the region that needs to be redrawn
                     offset_x: Horizontal centering offset in pixels
                     offset_y: Vertical centering offset in pixels
-                
-                Raises:
-                    Exception: If C++ rendering fails (caught by caller for fallback)
                 """
                 # Get the CoreGraphics context
                 context = Cocoa.NSGraphicsContext.currentContext().CGContext()
@@ -3171,392 +3138,6 @@ if COCOA_AVAILABLE:
                     self.backend.font_ascent  # Add font_ascent for baseline positioning
                 )
             
-            def _render_with_pyobjc(self, rect, offset_x: float, offset_y: float):
-                """
-                Render using PyObjC implementation (original implementation).
-                
-                This method contains the original PyObjC rendering code that uses
-                NSAttributedString and CoreGraphics APIs through the PyObjC bridge.
-                It serves as the default rendering implementation and fallback when
-                C++ rendering is not available or fails.
-                
-                Args:
-                    rect: NSRect indicating the region that needs to be redrawn
-                    offset_x: Horizontal centering offset in pixels
-                    offset_y: Vertical centering offset in pixels
-                """
-                
-                # Calculate dirty region - which cells need to be redrawn
-                start_row, end_row, start_col, end_col = (
-                    DirtyRegionCalculator.get_dirty_cells(
-                        rect, self.backend.rows, self.backend.cols,
-                        self.backend.char_width, self.backend.char_height
-                    )
-                )
-                
-                # Phase 1: Batch and draw backgrounds
-                # Create a batcher to accumulate adjacent cells with same background color
-                batcher = RectangleBatcher()
-                
-                # ============================================================
-                # DIRTY REGION ITERATION - OPTIMIZED FOR PERFORMANCE
-                # ============================================================
-                # This section has been carefully optimized to minimize overhead
-                # while maintaining visual correctness. Three key optimizations
-                # reduce iteration time from ~200ms to ~0.65ms (99.7% improvement):
-                #
-                # 1. Attribute Caching: Reduces attribute access overhead
-                # 2. Y-Coordinate Pre-calculation: Eliminates redundant arithmetic
-                # 3. Efficient Dictionary Lookup: Reduces dictionary operations
-                #
-                # Performance target: < 50ms ✅ ACHIEVED (0.65ms, 98.7% under target)
-                # Visual correctness: ✅ VERIFIED (90+ tests pass)
-                #
-                # See doc/dev/DIRTY_REGION_ITERATION_OPTIMIZATION.md for details
-                # ============================================================
-
-                # Optimization 1: Cache frequently accessed attributes
-                # -------------------------------------------------------
-                # Extract backend attributes to local variables to avoid repeated
-                # attribute access overhead. Python attribute access involves
-                # dictionary lookups in the object's __dict__, which adds up when
-                # accessing the same attributes 1,920 times per frame.
-                #
-                # Impact: Reduces attribute accesses from 9,600 to 5 per frame
-                # Performance gain: ~3-5% faster
-                char_width = self.backend.char_width
-                char_height = self.backend.char_height
-                rows = self.backend.rows
-                grid = self.backend.grid
-                color_pairs = self.backend.color_pairs
-
-                # Iterate through dirty region cells and accumulate into batches
-                # For a 24x80 grid, this processes 1,920 cells per full-screen update
-                
-                # Pre-calculate edge cell boundaries for performance
-                # Only edge cells need special handling for background extension
-                is_top_edge = (start_row == 0)
-                is_bottom_edge = (end_row == rows)
-                left_col = 0
-                right_col = self.backend.cols - 1
-                
-                for row in range(start_row, end_row):
-                    # Optimization 2: Pre-calculate row Y-coordinate
-                    # -----------------------------------------------
-                    # Calculate y once per row instead of once per cell. The y-coordinate
-                    # depends only on the row number, not the column, so we can move this
-                    # calculation outside the inner loop.
-                    #
-                    # IMPORTANT: Coordinate system transformation
-                    # TTK uses top-left origin (0,0) where row 0 is at the top
-                    # CoreGraphics uses bottom-left origin where y=0 is at the bottom
-                    # Transformation formula: y = (rows - row - 1) * char_height
-                    #
-                    # Impact: Reduces y-coordinate calculations from 1,920 to 24 per frame
-                    # Performance gain: ~4-6% faster
-                    y = (rows - row - 1) * char_height + offset_y
-                    
-                    # Check if this row is an edge row (only check once per row)
-                    is_edge_row = (row == 0 or row == rows - 1)
-                    
-                    for col in range(start_col, end_col):
-                        # Get cell data: (char, color_pair, attributes)
-                        # Each cell contains the character to display, its color pair ID,
-                        # and text attributes (BOLD, REVERSE, etc.)
-                        char, color_pair, attributes = grid[row][col]
-                        
-                        # Calculate x pixel position (no transformation needed for x-axis)
-                        # Both TTK and CoreGraphics use left-to-right x-axis
-                        x = col * char_width + offset_x
-                        
-                        # Optimization 3: Use dict.get() for color pair lookup
-                        # ----------------------------------------------------
-                        # Replace conditional check + lookup with single dict.get() call.
-                        # The original code performed two dictionary operations:
-                        #   1. Check if color_pair exists (membership test)
-                        #   2. Retrieve the value (lookup)
-                        # dict.get() combines these into a single operation.
-                        #
-                        # Impact: Reduces dictionary operations from 3,840 to 1,920 per frame
-                        # Performance gain: ~2-3% faster
-                        fg_rgb, bg_rgb = color_pairs.get(color_pair, color_pairs[0])
-                        
-                        # Handle reverse video attribute by swapping foreground/background
-                        # This is a common terminal attribute for highlighting text
-                        if attributes & TextAttribute.REVERSE:
-                            fg_rgb, bg_rgb = bg_rgb, fg_rgb
-                        
-                        # Edge extension optimization: Only check edge cells
-                        # For non-edge cells, use standard dimensions (fast path)
-                        # For edge cells, calculate extended dimensions (slow path)
-                        is_edge_col = (col == left_col or col == right_col)
-                        
-                        if is_edge_row or is_edge_col:
-                            # Slow path: Edge cell - calculate extended dimensions
-                            cell_x = x
-                            cell_y = y
-                            cell_width = char_width
-                            cell_height = char_height
-                            
-                            # Extend left edge (leftmost column)
-                            if col == left_col:
-                                cell_x = 0
-                                cell_width = char_width + offset_x
-                            
-                            # Extend right edge (rightmost column)
-                            if col == right_col:
-                                cell_width = char_width + offset_x
-                            
-                            # Extend top edge (topmost row)
-                            if row == 0:
-                                cell_height = char_height + offset_y
-                            
-                            # Extend bottom edge (bottommost row)
-                            if row == rows - 1:
-                                cell_y = 0
-                                cell_height = char_height + offset_y
-                            
-                            batcher.add_cell(cell_x, cell_y, cell_width, 
-                                           cell_height, bg_rgb)
-                        else:
-                            # Fast path: Interior cell - use standard dimensions
-                            batcher.add_cell(x, y, char_width, 
-                                           char_height, bg_rgb)
-                    
-                    # Finish row - ensures current batch is completed
-                    # This is called after each row to handle row boundaries correctly
-                    batcher.finish_row()
-                
-                # Draw all batched backgrounds using cached colors
-                # Get the current CoreGraphics context for low-level drawing
-                context = Cocoa.NSGraphicsContext.currentContext().CGContext()
-                
-                for batch in batcher.get_batches():
-                    # Get RGB components for the background color
-                    r, g, b = batch.bg_rgb
-                    
-                    # Set fill color using low-level CoreGraphics API
-                    # CGContextSetRGBFillColor takes normalized values (0.0-1.0)
-                    Quartz.CGContextSetRGBFillColor(context, r/255.0, g/255.0, b/255.0, 1.0)
-                    
-                    # Create CGRect for the batch
-                    batch_rect = Quartz.CGRectMake(
-                        batch.x, batch.y, batch.width, batch.height
-                    )
-                    
-                    # Draw the batched background with low-level CoreGraphics API
-                    Quartz.CGContextFillRect(context, batch_rect)
-                
-                # Phase 2: Draw characters with batching and caching optimization
-                # Instead of drawing each character individually, we identify continuous
-                # runs of characters with the same attributes and draw them as a single
-                # NSAttributedString. This significantly reduces the number of drawAtPoint_()
-                # calls and improves rendering performance.
-                #
-                # Caching Strategy:
-                # 1. Use AttributedStringCache to reuse pre-built NSAttributedString objects
-                # 2. Cache eliminates NSAttributedString.alloc().initWithString_attributes_() overhead
-                # 3. Particularly effective for repeated strings (file extensions, "..", ".")
-                #
-                # Batching Strategy:
-                # 1. Skip leading spaces efficiently
-                # 2. Identify start of a character run (first non-space)
-                # 3. Collect continuous characters with same attributes
-                # 4. Stop batch at: space, attribute change, or end of row
-                # 5. Draw the entire batch with a single drawAtPoint_() call using cached NSAttributedString
-                #
-                # Performance Impact:
-                # - Reduces drawAtPoint_() calls from ~1920 to ~50-200 per frame
-                # - Eliminates most NSAttributedString instantiations through caching
-                # - Combined: 70-85% reduction in character drawing time
-                
-                # Reuse cached attributes from Phase 1
-                for row in range(start_row, end_row):
-                    # Pre-calculate row Y-coordinate (same optimization as Phase 1)
-                    y = (rows - row - 1) * char_height + offset_y
-                    
-                    # Use column index to iterate through the row
-                    col = start_col
-                    
-                    while col < end_col:
-                        # Skip leading spaces and empty placeholders efficiently
-                        # Spaces don't need to be drawn (background is already rendered)
-                        # Empty strings are placeholders for the second cell of wide characters
-                        while col < end_col and grid[row][col][0] in (' ', ''):
-                            col += 1
-                        
-                        # Check if we've reached the end of the row
-                        if col >= end_col:
-                            break
-                        
-                        # Start of a character run - get attributes for first character
-                        start_col_batch = col
-                        char, color_pair, attributes = grid[row][col]
-                        
-                        # Get foreground and background colors from color pair
-                        fg_rgb, bg_rgb = color_pairs.get(color_pair, color_pairs[0])
-                        
-                        # Handle reverse video attribute by swapping colors
-                        if attributes & TextAttribute.REVERSE:
-                            start_fg_rgb, start_bg_rgb = bg_rgb, fg_rgb
-                        else:
-                            start_fg_rgb, start_bg_rgb = fg_rgb, bg_rgb
-                        
-                        # Store the starting attributes for batch comparison
-                        start_color_pair = color_pair
-                        start_attributes = attributes
-                        
-                        # Collect characters for the batch
-                        batch_chars = [char]
-                        col += 1
-                        
-                        # Collect continuous characters with same attributes
-                        while col < end_col:
-                            char, color_pair, attributes = grid[row][col]
-                            
-                            # Stop batch at space or empty placeholder
-                            if char in (' ', ''):
-                                break
-                            
-                            # Stop batch if attributes changed
-                            # We need to check both color_pair and text attributes
-                            if color_pair != start_color_pair or attributes != start_attributes:
-                                break
-                            
-                            # Add character to batch and continue
-                            batch_chars.append(char)
-                            col += 1
-                        
-                        # Draw the batched characters as a single string
-                        # Since all characters in the batch have the same attributes,
-                        # we can draw them together in a single CTLineDraw call for better performance.
-                        #
-                        # Wide Character Handling:
-                        # Wide characters (zenkaku) like Japanese, Chinese, Korean characters occupy
-                        # 2 grid cells. The draw_text() method stores them with an empty placeholder
-                        # in the next cell, so we just need to draw them with double width.
-                        if batch_chars:
-                            # Determine if underline attribute is present
-                            has_underline = bool(start_attributes & TextAttribute.UNDERLINE)
-                            
-                            # Convert attributes to string for cache key
-                            font_key = str(start_attributes)
-                            
-                            # Get the current CoreGraphics context for low-level drawing
-                            context = Cocoa.NSGraphicsContext.currentContext().CGContext()
-                            
-                            # Concatenate all characters in the batch into a single string
-                            batch_text = ''.join(batch_chars)
-                            
-                            # Calculate starting x-coordinate for the batch
-                            x_pos = start_col_batch * char_width + offset_x
-                            
-                            # Get cached NSAttributedString for the entire batch
-                            # The cache is particularly effective for repeated strings
-                            attr_string = self.backend._attr_string_cache.get_attributed_string(
-                                batch_text,
-                                font_key,
-                                start_fg_rgb,
-                                has_underline
-                            )
-                            
-                            # Create CTLine from attributed string for low-level drawing
-                            line = CTLineCreateWithAttributedString(attr_string)
-                            
-                            # Set text position using CoreGraphics transform
-                            # In CoreGraphics (bottom-left origin), y is the bottom of the cell.
-                            # CTLineDraw draws at the baseline. The baseline should be at:
-                            # y + (char_height - font_ascent) to position text correctly.
-                            # This accounts for the descender space below the baseline.
-                            baseline_y = y + (char_height - self.backend.font_ascent)
-                            
-                            Quartz.CGContextSaveGState(context)
-                            Quartz.CGContextSetTextPosition(context, x_pos, baseline_y)
-                            
-                            # Draw the entire batch with a single CoreText API call
-                            CTLineDraw(line, context)
-                            
-                            Quartz.CGContextRestoreGState(context)
-
-                # Draw cursor if visible
-                if self.backend.cursor_visible:
-                    # Calculate cursor pixel position using cached values
-                    cursor_x = self.backend.cursor_col * char_width + offset_x
-                    cursor_y = (rows - self.backend.cursor_row - 1) * char_height + offset_y
-                    
-                    # Get the current CoreGraphics context for low-level drawing
-                    context = Cocoa.NSGraphicsContext.currentContext().CGContext()
-                    
-                    # Set fill color using low-level CoreGraphics API
-                    # Use white color for visibility with slight transparency
-                    Quartz.CGContextSetRGBFillColor(context, 1.0, 1.0, 1.0, 0.8)
-                    
-                    # Create CGRect for the cursor
-                    cursor_rect = Quartz.CGRectMake(
-                        cursor_x,
-                        cursor_y,
-                        char_width,
-                        char_height
-                    )
-                    
-                    # Draw cursor using low-level CoreGraphics API
-                    Quartz.CGContextFillRect(context, cursor_rect)
-                
-                # Draw IME marked text (composition text) if present
-                if hasattr(self, 'marked_text') and self.marked_text:
-                    # Calculate position for marked text (at cursor position)
-                    # Note: TFM needs to call backend.set_cursor_position(row, col) or
-                    # backend.move_cursor(row, col) to update cursor position for IME.
-                    # If cursor is at (0, 0), marked text will appear at top-left.
-                    marked_x = self.backend.cursor_col * char_width + offset_x
-                    marked_y = (rows - self.backend.cursor_row - 1) * char_height + offset_y
-                    
-                    # Get the current CoreGraphics context for low-level drawing
-                    context = Cocoa.NSGraphicsContext.currentContext().CGContext()
-                    
-                    # First, draw the background rectangle for marked text
-                    # Calculate the width of the marked text
-                    marked_text_len = len(self.marked_text)
-                    marked_width = marked_text_len * char_width
-                    
-                    # Set background color (light yellow) using low-level CoreGraphics API
-                    Quartz.CGContextSetRGBFillColor(context, 1.0, 1.0, 200.0/255.0, 1.0)
-                    
-                    # Create and fill background rectangle
-                    bg_rect = Quartz.CGRectMake(marked_x, marked_y, marked_width, char_height)
-                    Quartz.CGContextFillRect(context, bg_rect)
-                    
-                    # Create attributes for marked text using CoreText constants
-                    # Use underline to indicate composition state
-                    
-                    # Get black color for text
-                    black_color = self.backend._color_cache.get_color(0, 0, 0)
-                    
-                    attrs = {
-                        kCTFontAttributeName: self.backend.font,
-                        kCTForegroundColorAttributeName: black_color.CGColor(),
-                        kCTUnderlineStyleAttributeName: kCTUnderlineStyleSingle
-                    }
-                    
-                    # Create attributed string for marked text
-                    marked_attr_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
-                        self.marked_text,
-                        attrs
-                    )
-                    
-                    # Create CTLine and draw using low-level CoreText API
-                    marked_line = CTLineCreateWithAttributedString(marked_attr_string)
-                    
-                    # Set text position and draw
-                    # CTLineDraw uses baseline positioning
-                    # In CoreGraphics coordinates, baseline is at: y + (char_height - font_ascent)
-                    baseline_y = marked_y + (char_height - self.backend.font_ascent)
-                    
-                    Quartz.CGContextSaveGState(context)
-                    Quartz.CGContextSetTextPosition(context, marked_x, baseline_y)
-                    CTLineDraw(marked_line, context)
-                    Quartz.CGContextRestoreGState(context)
-
             def acceptsFirstResponder(self):
                 """
                 Indicate that this view can receive keyboard focus.
