@@ -332,7 +332,13 @@ class ListDialogHelpers:
     
     @staticmethod
     def show_favorite_directories(list_dialog, pane_manager, print_func):
-        """Show favorite directories using the searchable list dialog"""
+        """Show favorite directories using the searchable list dialog
+        
+        Args:
+            list_dialog: The ListDialog instance
+            pane_manager: The PaneManager instance
+            print_func: Function to print messages
+        """
         favorites = get_favorite_directories()
         
         if not favorites:
@@ -365,6 +371,9 @@ class ListDialogHelpers:
                             current_pane['focused_index'] = 0
                             current_pane['scroll_offset'] = 0
                             current_pane['selected_files'].clear()  # Clear selections
+                            
+                            # Refresh the file list for the current pane
+                            pane_manager.refresh_files(current_pane)
                             
                             pane_name = "left" if pane_manager.active_pane == 'left' else "right"
                             print_func(f"Changed {pane_name} pane to favorite: {old_path} → {target_path}")

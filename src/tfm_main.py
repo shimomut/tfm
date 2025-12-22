@@ -200,6 +200,7 @@ class FileManager:
         self.pane_manager = PaneManager(self.config, initial_left_dir, initial_right_dir, self.state_manager)
         self.file_operations = FileOperations(self.config)
         self.file_operations.log_manager = self.log_manager  # Set log_manager for error reporting
+        self.pane_manager.file_operations = self.file_operations  # Set file_operations for refresh_files
         self.list_dialog = ListDialog(self.config, renderer)
         self.info_dialog = InfoDialog(self.config, renderer)
         self.search_dialog = SearchDialog(self.config, renderer)
