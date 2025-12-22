@@ -561,7 +561,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
             return True
         elif event.is_close():
             # Close the dialog
-            self._should_close = True
+            self.is_active = False
             return True
         return False
     

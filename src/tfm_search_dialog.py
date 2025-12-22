@@ -569,7 +569,7 @@ class SearchDialog(UILayer, BaseListDialog):
         elif event.is_close():
             # Close the dialog and cancel any ongoing search
             self.cancel_search()
-            self._should_close = True
+            self.is_active = False
             return True
         return False
     
