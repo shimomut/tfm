@@ -1465,27 +1465,74 @@ static void draw_character_batch(
     }
     
     // Get glyphs for characters
+    // First try with the primary font
     bool all_glyphs_found = CTFontGetGlyphsForCharacters(font, characters.data(), glyphs.data(), length);
     
     CTFontRef font_to_use = font;
     CTFontRef fallback_font = nullptr;
     
     if (!all_glyphs_found) {
-        // Some glyphs are missing - use Hiragino Sans as fallback for Japanese/CJK characters
-        CFStringRef fallback_name = CFSTR("Hiragino Sans");
-        CGFloat font_size = CTFontGetSize(font);
-        fallback_font = CTFontCreateWithName(fallback_name, font_size, nullptr);
-        
-        if (fallback_font != nullptr) {
-            // Try again with fallback font
-            if (CTFontGetGlyphsForCharacters(fallback_font, characters.data(), glyphs.data(), length)) {
-                font_to_use = fallback_font;
-            } else {
-                CFRelease(fallback_font);
-                fallback_font = nullptr;
-                return;
+        // Some glyphs are missing - try cascade list fonts
+        CTFontDescriptorRef descriptor = CTFontCopyFontDescriptor(font);
+        if (descriptor != nullptr) {
+            CFArrayRef cascade_list = (CFArrayRef)CTFontDescriptorCopyAttribute(
+                descriptor,
+                kCTFontCascadeListAttribute
+            );
+            CFRelease(descriptor);
+            
+            if (cascade_list != nullptr) {
+                CFIndex cascade_count = CFArrayGetCount(cascade_list);
+                
+                // Try each font in the cascade list
+                for (CFIndex i = 0; i < cascade_count && !all_glyphs_found; ++i) {
+                    CTFontDescriptorRef cascade_desc = (CTFontDescriptorRef)CFArrayGetValueAtIndex(cascade_list, i);
+                    
+                    // Create font from descriptor with same size and traits as original
+                    CGFloat font_size = CTFontGetSize(font);
+                    CTFontRef cascade_font = CTFontCreateWithFontDescriptor(
+                        cascade_desc,
+                        font_size,
+                        nullptr
+                    );
+                    
+                    if (cascade_font != nullptr) {
+                        // Check if original font has bold trait and apply it
+                        CTFontSymbolicTraits original_traits = CTFontGetSymbolicTraits(font);
+                        if (original_traits & kCTFontBoldTrait) {
+                            CTFontRef bold_cascade = CTFontCreateCopyWithSymbolicTraits(
+                                cascade_font,
+                                0.0,
+                                nullptr,
+                                kCTFontBoldTrait,
+                                kCTFontBoldTrait
+                            );
+                            
+                            if (bold_cascade != nullptr) {
+                                CFRelease(cascade_font);
+                                cascade_font = bold_cascade;
+                            }
+                            // If bold trait creation fails, the font doesn't support it
+                            // We'll use synthetic bold via stroke width during rendering
+                        }
+                        
+                        // Try to get glyphs with this cascade font
+                        if (CTFontGetGlyphsForCharacters(cascade_font, characters.data(), glyphs.data(), length)) {
+                            all_glyphs_found = true;
+                            fallback_font = cascade_font;
+                            font_to_use = fallback_font;
+                        } else {
+                            CFRelease(cascade_font);
+                        }
+                    }
+                }
+                
+                CFRelease(cascade_list);
             }
-        } else {
+        }
+        
+        // If still not found, skip rendering
+        if (!all_glyphs_found) {
             return;
         }
     }
@@ -1530,8 +1577,28 @@ static void draw_character_batch(
     // Set fill color for text
     CGContextSetFillColorWithColor(context, color);
     
-    // Set text drawing mode to fill
-    CGContextSetTextDrawingMode(context, kCGTextFill);
+    // Check if we need synthetic bold (fallback font with bold attribute)
+    bool use_synthetic_bold = false;
+    if (fallback_font != nullptr && (batch.font_attributes & 1)) {
+        // We're using a fallback font and bold was requested
+        // Check if the fallback font actually has the bold trait
+        CTFontSymbolicTraits fallback_traits = CTFontGetSymbolicTraits(font_to_use);
+        if (!(fallback_traits & kCTFontBoldTrait)) {
+            // Fallback font doesn't have bold trait, use synthetic bold
+            use_synthetic_bold = true;
+        }
+    }
+    
+    // Set text drawing mode
+    if (use_synthetic_bold) {
+        // Use fill and stroke for synthetic bold
+        CGContextSetTextDrawingMode(context, kCGTextFillStroke);
+        CGContextSetLineWidth(context, 0.5);  // Stroke width for synthetic bold
+        CGContextSetStrokeColorWithColor(context, color);
+    } else {
+        // Normal fill mode
+        CGContextSetTextDrawingMode(context, kCGTextFill);
+    }
     
     // Save graphics state
     CGContextSaveGState(context);
@@ -1672,6 +1739,7 @@ static void render_characters(
                 // 1. Same row (y coordinate matches)
                 // 2. Same attributes (font, color, underline)
                 // 3. Adjacent position (x is at the right edge of current batch)
+                // 4. Same character type (don't mix ASCII with non-ASCII to avoid font mixing)
                 bool same_row = (std::abs(batch.y - y) < 0.01f);
                 bool same_attributes = (batch.font_attributes == font_attributes &&
                                        batch.fg_rgb == fg_rgb &&
@@ -1693,7 +1761,18 @@ static void render_characters(
                 
                 bool adjacent = (std::abs(expected_x - x) < 0.01f);
                 
-                can_extend = same_row && same_attributes && adjacent;
+                // Check if character types match (ASCII vs non-ASCII)
+                // This prevents mixing fonts in a single batch
+                bool same_char_type = true;
+                if (!cell.character.empty() && !batch.text.empty()) {
+                    char16_t new_ch = cell.character[0];
+                    char16_t batch_ch = batch.text[0];
+                    bool new_is_ascii = (new_ch < 0x80);
+                    bool batch_is_ascii = (batch_ch < 0x80);
+                    same_char_type = (new_is_ascii == batch_is_ascii);
+                }
+                
+                can_extend = same_row && same_attributes && adjacent && same_char_type;
             }
             
             if (can_extend) {
@@ -1971,16 +2050,103 @@ static void initialize_caches() {
         return;
     }
     
-    // Create base font (Menlo 12pt - matches Python default)
+    // Create base font with cascade list for automatic fallback
     // Note: This should match the font used in CoreGraphicsBackend.__init__()
     // Python default: font_name="Menlo", font_size=12
     CFStringRef font_name = CFSTR("Menlo");
     CGFloat font_size = 12.0;
     
+    // Create font descriptor with cascade list for Japanese/CJK support
+    // The cascade list must contain font descriptors, not font names
+    CFStringRef cascade_font_names[] = {
+        CFSTR("Osaka-Mono"),           // Japanese monospace
+        CFSTR("Hiragino Sans GB"),     // Chinese monospace
+        CFSTR("Apple SD Gothic Neo")   // Korean monospace
+    };
+    
+    // Create font descriptors from font names
+    CFMutableArrayRef cascade_descriptors = CFArrayCreateMutable(
+        kCFAllocatorDefault,
+        3,
+        &kCFTypeArrayCallBacks
+    );
+    
+    if (cascade_descriptors == nullptr) {
+        throw std::runtime_error("Failed to create cascade descriptors array");
+    }
+    
+    for (int i = 0; i < 3; ++i) {
+        CFStringRef keys[] = { kCTFontNameAttribute };
+        CFTypeRef values[] = { cascade_font_names[i] };
+        
+        CFDictionaryRef attrs = CFDictionaryCreate(
+            kCFAllocatorDefault,
+            (const void**)keys,
+            (const void**)values,
+            1,
+            &kCFTypeDictionaryKeyCallBacks,
+            &kCFTypeDictionaryValueCallBacks
+        );
+        
+        if (attrs != nullptr) {
+            CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes(attrs);
+            CFRelease(attrs);
+            
+            if (desc != nullptr) {
+                CFArrayAppendValue(cascade_descriptors, desc);
+                CFRelease(desc);
+            }
+        }
+    }
+    
+    // Create font descriptor with cascade list attribute
+    CFStringRef keys[] = { kCTFontCascadeListAttribute };
+    CFTypeRef values[] = { cascade_descriptors };
+    
+    CFDictionaryRef attributes = CFDictionaryCreate(
+        kCFAllocatorDefault,
+        (const void**)keys,
+        (const void**)values,
+        1,
+        &kCFTypeDictionaryKeyCallBacks,
+        &kCFTypeDictionaryValueCallBacks
+    );
+    
+    CFRelease(cascade_descriptors);
+    
+    if (attributes == nullptr) {
+        throw std::runtime_error("Failed to create font attributes dictionary");
+    }
+    
+    CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithAttributes(attributes);
+    CFRelease(attributes);
+    
+    if (descriptor == nullptr) {
+        throw std::runtime_error("Failed to create font descriptor");
+    }
+    
+    // Create font with descriptor (includes cascade list)
     g_base_font = CTFontCreateWithName(font_name, font_size, nullptr);
     if (g_base_font == nullptr) {
+        CFRelease(descriptor);
         throw std::runtime_error("Failed to create base font");
     }
+    
+    // Apply descriptor to font to enable cascade list
+    CTFontRef font_with_cascade = CTFontCreateCopyWithAttributes(
+        g_base_font,
+        font_size,
+        nullptr,
+        descriptor
+    );
+    
+    CFRelease(descriptor);
+    
+    if (font_with_cascade != nullptr) {
+        CFRelease(g_base_font);
+        g_base_font = font_with_cascade;
+    }
+    // If cascade application fails, continue with base font
     
     // Create caches
     try {
