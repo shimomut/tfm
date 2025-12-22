@@ -30,6 +30,7 @@ struct Cell {
     std::u16string character;  // UTF-16 encoded character
     int color_pair;            // Color pair ID
     int attributes;            // Text attributes (BOLD, UNDERLINE, etc.)
+    bool is_wide;              // True if character occupies 2 grid cells (zenkaku)
 };
 
 // Color pair structure with packed RGB values
@@ -941,11 +942,11 @@ static std::vector<std::vector<Cell>> parse_grid(PyObject* grid_obj, int expecte
                 );
             }
             
-            // Validate tuple has 3 elements
-            if (PyTuple_Size(cell_obj) != 3) {
+            // Validate tuple has 4 elements
+            if (PyTuple_Size(cell_obj) != 4) {
                 throw std::runtime_error(
                     "Grid cell (" + std::to_string(row) + ", " + std::to_string(col) +
-                    ") must have 3 elements (char, color_pair, attributes)"
+                    ") must have 4 elements (char, color_pair, attributes, is_wide)"
                 );
             }
             
@@ -1016,11 +1017,23 @@ static std::vector<std::vector<Cell>> parse_grid(PyObject* grid_obj, int expecte
                 );
             }
             
+            // Extract is_wide (boolean)
+            PyObject* is_wide_obj = PyTuple_GetItem(cell_obj, 3);  // Borrowed reference
+            int is_wide_result = PyObject_IsTrue(is_wide_obj);
+            if (is_wide_result == -1) {
+                throw std::runtime_error(
+                    "Failed to convert is_wide to boolean at (" + std::to_string(row) +
+                    ", " + std::to_string(col) + ")"
+                );
+            }
+            bool is_wide = (is_wide_result == 1);
+            
             // Create cell and add to row
             Cell cell;
             cell.character = std::move(character);
             cell.color_pair = static_cast<int>(color_pair);
             cell.attributes = static_cast<int>(attributes);
+            cell.is_wide = is_wide;
             
             row_cells.push_back(std::move(cell));
         }
@@ -1317,41 +1330,14 @@ static void draw_batched_backgrounds(
  * Structure representing a batch of consecutive characters with the same attributes.
  */
 struct CharacterBatch {
-    std::u16string text;     // UTF-16 text (compatible with UniChar)
-    int font_attributes;     // Font attributes (BOLD, etc.)
-    uint32_t fg_rgb;         // Foreground color (packed RGB)
-    bool underline;          // Underline flag
-    CGFloat x;               // Starting x position
-    CGFloat y;               // Starting y position
+    std::u16string text;           // UTF-16 text (compatible with UniChar)
+    std::vector<bool> is_wide;     // Per-character wide flag (true if occupies 2 cells)
+    int font_attributes;           // Font attributes (BOLD, etc.)
+    uint32_t fg_rgb;               // Foreground color (packed RGB)
+    bool underline;                // Underline flag
+    CGFloat x;                     // Starting x position
+    CGFloat y;                     // Starting y position
 };
-
-/**
- * Check if a character is a wide character (occupies 2 grid cells).
- * Wide characters include CJK characters and other full-width Unicode characters.
- * 
- * @param ch UTF-16 character (char16_t)
- * @return true if the character is wide, false otherwise
- */
-static bool is_wide_character(char16_t ch) {
-    // Check if character is in wide character ranges
-    // CJK Unified Ideographs: U+4E00 - U+9FFF
-    // CJK Compatibility Ideographs: U+F900 - U+FAFF
-    // Hangul Syllables: U+AC00 - U+D7AF
-    // Hiragana: U+3040 - U+309F
-    // Katakana: U+30A0 - U+30FF
-    // Fullwidth ASCII variants: U+FF00 - U+FFEF
-    
-    if ((ch >= 0x4E00 && ch <= 0x9FFF) ||   // CJK Unified Ideographs
-        (ch >= 0xF900 && ch <= 0xFAFF) ||   // CJK Compatibility
-        (ch >= 0xAC00 && ch <= 0xD7AF) ||   // Hangul
-        (ch >= 0x3040 && ch <= 0x309F) ||   // Hiragana
-        (ch >= 0x30A0 && ch <= 0x30FF) ||   // Katakana
-        (ch >= 0xFF00 && ch <= 0xFFEF)) {   // Fullwidth ASCII
-        return true;
-    }
-    
-    return false;
-}
 
 /**
  * Render characters for cells in the dirty region.
@@ -1560,8 +1546,8 @@ static void draw_character_batch(
         CGFloat glyph_advance = advances[i].width;
         
         // Check if this character is wide (occupies 2 cells)
-        char16_t ch = batch.text[i];
-        CGFloat cell_width = is_wide_character(ch) ? (char_width * 2.0f) : char_width;
+        bool char_is_wide = (i < batch.is_wide.size()) ? batch.is_wide[i] : false;
+        CGFloat cell_width = char_is_wide ? (char_width * 2.0f) : char_width;
         
         // Center the glyph within its cell(s) for better visual alignment
         // This prevents glyphs from appearing too far left or right
@@ -1749,10 +1735,9 @@ static void render_characters(
                 // With UTF-16, we can directly iterate through characters
                 CGFloat expected_x = batch.x;
                 for (size_t i = 0; i < batch.text.length(); ++i) {
-                    char16_t ch = batch.text[i];
-                    
                     // Add width (double for wide characters)
-                    if (is_wide_character(ch)) {
+                    bool char_is_wide = (i < batch.is_wide.size()) ? batch.is_wide[i] : false;
+                    if (char_is_wide) {
                         expected_x += char_width * 2.0f;
                     } else {
                         expected_x += char_width;
@@ -1778,6 +1763,7 @@ static void render_characters(
             if (can_extend) {
                 // Extend current batch
                 current_batch.value().text += cell.character;
+                current_batch.value().is_wide.push_back(cell.is_wide);  // Add is_wide flag
             } else {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
@@ -1787,6 +1773,7 @@ static void render_characters(
                 // Start new batch
                 CharacterBatch new_batch;
                 new_batch.text = cell.character;
+                new_batch.is_wide.push_back(cell.is_wide);  // Add is_wide flag
                 new_batch.font_attributes = font_attributes;
                 new_batch.fg_rgb = fg_rgb;
                 new_batch.underline = underline;
@@ -1797,7 +1784,7 @@ static void render_characters(
             }
             
             // If this is a wide character, skip the next column (placeholder cell)
-            if (!cell.character.empty() && is_wide_character(cell.character[0])) {
+            if (!cell.character.empty() && cell.is_wide) {
                 // The next column should be a placeholder, so we'll skip it
                 // in the next iteration
             }

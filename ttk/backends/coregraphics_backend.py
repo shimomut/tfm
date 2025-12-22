@@ -479,9 +479,9 @@ class CoreGraphicsBackend(Renderer):
         and no attributes.
         """
         # Create 2D grid initialized with empty cells
-        # Each cell is (char, color_pair, attributes)
+        # Each cell is (char, color_pair, attributes, is_wide)
         self.grid = [
-            [(' ', 0, 0) for _ in range(self.cols)]
+            [(' ', 0, 0, False) for _ in range(self.cols)]
             for _ in range(self.rows)
         ]
     
@@ -844,7 +844,7 @@ class CoreGraphicsBackend(Renderer):
             # Reset all cells to space with default color pair and no attributes
             for row in range(self.rows):
                 for col in range(self.cols):
-                    self.grid[row][col] = (' ', 0, 0)
+                    self.grid[row][col] = (' ', 0, 0, False)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: clear failed: {e}")
@@ -874,7 +874,7 @@ class CoreGraphicsBackend(Renderer):
             # Clear cells in the specified region
             for r in range(start_row, end_row):
                 for c in range(start_col, end_col):
-                    self.grid[r][c] = (' ', 0, 0)
+                    self.grid[r][c] = (' ', 0, 0, False)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: clear_region failed at ({row}, {col}, {height}, {width}): {e}")
@@ -910,16 +910,19 @@ class CoreGraphicsBackend(Renderer):
                 if current_col >= self.cols:
                     break
                 
-                # Update the grid cell with the character, color pair, and attributes
-                self.grid[row][current_col] = (char, color_pair, attributes)
+                # Check if this is a wide character (occupies 2 cells)
+                is_wide = _is_wide_character(char)
+                
+                # Update the grid cell with the character, color pair, attributes, and is_wide flag
+                self.grid[row][current_col] = (char, color_pair, attributes, is_wide)
                 
                 # Check if this is a wide character (occupies 2 cells)
-                if _is_wide_character(char):
+                if is_wide:
                     # Move to next column and store empty placeholder
                     current_col += 1
                     if current_col < self.cols:
                         # Store empty string as placeholder for the second cell of wide char
-                        self.grid[row][current_col] = ('', color_pair, attributes)
+                        self.grid[row][current_col] = ('', color_pair, attributes, False)
                 
                 # Move to next column
                 current_col += 1
@@ -956,8 +959,9 @@ class CoreGraphicsBackend(Renderer):
             end_col = min(col + length, self.cols)
             
             # Draw the horizontal line
+            is_wide = _is_wide_character(char)
             for c in range(start_col, end_col):
-                self.grid[row][c] = (char, color_pair, 0)
+                self.grid[row][c] = (char, color_pair, 0, is_wide)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: draw_hline failed at ({row}, {col}): {e}")
@@ -991,8 +995,9 @@ class CoreGraphicsBackend(Renderer):
             end_row = min(row + length, self.rows)
             
             # Draw the vertical line
+            is_wide = _is_wide_character(char)
             for r in range(start_row, end_row):
-                self.grid[r][col] = (char, color_pair, 0)
+                self.grid[r][col] = (char, color_pair, 0, is_wide)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: draw_vline failed at ({row}, {col}): {e}")
@@ -1048,7 +1053,7 @@ class CoreGraphicsBackend(Renderer):
                 # The background color from the color pair will show through
                 for r in range(start_row, end_row):
                     for c in range(start_col, end_col):
-                        self.grid[r][c] = (' ', color_pair, 0)
+                        self.grid[r][c] = (' ', color_pair, 0, False)
             else:
                 # Draw outlined rectangle using box-drawing characters
                 # For rectangles with height or width of 1 or 2, we need special handling
@@ -1056,43 +1061,43 @@ class CoreGraphicsBackend(Renderer):
                 if actual_height == 1:
                     # Single row rectangle - just draw horizontal line
                     for c in range(start_col, end_col):
-                        self.grid[start_row][c] = ('─', color_pair, 0)
+                        self.grid[start_row][c] = ('─', color_pair, 0, False)
                 elif actual_width == 1:
                     # Single column rectangle - just draw vertical line
                     for r in range(start_row, end_row):
-                        self.grid[r][start_col] = ('│', color_pair, 0)
+                        self.grid[r][start_col] = ('│', color_pair, 0, False)
                 else:
                     # Normal rectangle with at least 2x2 dimensions
                     
                     # Draw top edge
                     # Top-left corner
-                    self.grid[start_row][start_col] = ('┌', color_pair, 0)
+                    self.grid[start_row][start_col] = ('┌', color_pair, 0, False)
                     
                     # Top edge
                     for c in range(start_col + 1, end_col - 1):
-                        self.grid[start_row][c] = ('─', color_pair, 0)
+                        self.grid[start_row][c] = ('─', color_pair, 0, False)
                     
                     # Top-right corner
-                    self.grid[start_row][end_col - 1] = ('┐', color_pair, 0)
+                    self.grid[start_row][end_col - 1] = ('┐', color_pair, 0, False)
                     
                     # Draw left and right edges (if there are rows between top and bottom)
                     for r in range(start_row + 1, end_row - 1):
                         # Left edge
-                        self.grid[r][start_col] = ('│', color_pair, 0)
+                        self.grid[r][start_col] = ('│', color_pair, 0, False)
                         
                         # Right edge
-                        self.grid[r][end_col - 1] = ('│', color_pair, 0)
+                        self.grid[r][end_col - 1] = ('│', color_pair, 0, False)
                     
                     # Draw bottom edge
                     # Bottom-left corner
-                    self.grid[end_row - 1][start_col] = ('└', color_pair, 0)
+                    self.grid[end_row - 1][start_col] = ('└', color_pair, 0, False)
                     
                     # Bottom edge
                     for c in range(start_col + 1, end_col - 1):
-                        self.grid[end_row - 1][c] = ('─', color_pair, 0)
+                        self.grid[end_row - 1][c] = ('─', color_pair, 0, False)
                     
                     # Bottom-right corner
-                    self.grid[end_row - 1][end_col - 1] = ('┘', color_pair, 0)
+                    self.grid[end_row - 1][end_col - 1] = ('┘', color_pair, 0, False)
         except Exception as e:
             # Log warning but continue execution without crashing
             print(f"Warning: draw_rect failed at ({row}, {col}, {height}, {width}): {e}")
