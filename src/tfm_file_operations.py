@@ -716,7 +716,7 @@ class FileOperationsUI:
             
             # Refresh both panes to show the copied files
             self.file_manager.refresh_files()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             
             # Clear selections after successful copy
             if copied_count > 0:
@@ -1016,7 +1016,7 @@ class FileOperationsUI:
                 
                 # Refresh both panes to show the moved files
                 self.file_manager.refresh_files()
-                self.file_manager.needs_full_redraw = True
+                self.file_manager.mark_dirty()
                 
                 # Clear selections after successful move
                 if moved_count > 0:
@@ -1215,7 +1215,7 @@ class FileOperationsUI:
                 
                 # Refresh current pane to show the changes
                 self.file_manager.refresh_files(self.file_manager.get_current_pane())
-                self.file_manager.needs_full_redraw = True
+                self.file_manager.mark_dirty()
                 
                 # Clear selections after delete operation
                 current_pane = self.file_manager.get_current_pane()
@@ -1275,7 +1275,7 @@ class FileOperationsUI:
         """
         # Set flag to trigger redraw in main loop (thread-safe)
         # This is safe because it's just setting a boolean flag
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
     
     def _animation_refresh_loop(self, stop_event):
         """Background loop to refresh animation periodically
@@ -1819,14 +1819,14 @@ class FileOperationsUI:
         )
         self.file_manager.quick_edit_bar.callback = self._on_copy_rename_confirm
         self.file_manager.quick_edit_bar.cancel_callback = self._on_copy_rename_cancel
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
     
     def _on_copy_rename_confirm(self, new_name):
         """Handle copy rename confirmation"""
         if not new_name or new_name.strip() == "":
             print("Copy cancelled: empty filename")
             self.file_manager.quick_edit_bar.hide()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             return
         
         context = self.file_manager._copy_rename_context
@@ -1837,7 +1837,7 @@ class FileOperationsUI:
         
         # Hide the dialog first
         self.file_manager.quick_edit_bar.hide()
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
         
         # Check if the new name also conflicts
         if new_dest_path.exists():
@@ -1886,7 +1886,7 @@ class FileOperationsUI:
         """Handle copy rename cancellation"""
         print("Copy operation cancelled")
         self.file_manager.quick_edit_bar.hide()
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
     
     def _handle_move_rename_batch(self, files_to_move, destination_dir, conflicts):
         """Handle rename operation for multiple file conflicts - process one by one"""
@@ -1983,14 +1983,14 @@ class FileOperationsUI:
         )
         self.file_manager.quick_edit_bar.callback = self._on_move_rename_confirm
         self.file_manager.quick_edit_bar.cancel_callback = self._on_move_rename_cancel
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
     
     def _on_move_rename_confirm(self, new_name):
         """Handle move rename confirmation"""
         if not new_name or new_name.strip() == "":
             print("Move cancelled: empty filename")
             self.file_manager.quick_edit_bar.hide()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             return
         
         context = self.file_manager._move_rename_context
@@ -2001,7 +2001,7 @@ class FileOperationsUI:
         
         # Hide the dialog first
         self.file_manager.quick_edit_bar.hide()
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
         
         # Check if the new name also conflicts
         if new_dest_path.exists():
@@ -2050,7 +2050,7 @@ class FileOperationsUI:
         """Handle move rename cancellation"""
         print("Move operation cancelled")
         self.file_manager.quick_edit_bar.hide()
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
     
     def _perform_single_copy(self, source_file, dest_path, overwrite=False):
         """Perform copy operation for a single file"""
@@ -2073,7 +2073,7 @@ class FileOperationsUI:
             
             # Refresh both panes
             self.file_manager.refresh_files()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             
             # Clear selections
             current_pane = self.file_manager.get_current_pane()
@@ -2120,7 +2120,7 @@ class FileOperationsUI:
             
             # Refresh both panes
             self.file_manager.refresh_files()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             
             # Clear selections
             current_pane = self.file_manager.get_current_pane()

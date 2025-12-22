@@ -89,10 +89,7 @@ class TFMEventCallback(EventCallback):
         self.file_manager.adaptive_fps.mark_activity()
         
         # Route to UI layer stack
-        consumed = self.file_manager.ui_layer_stack.handle_key_event(event)
-        if consumed:
-            self.file_manager.needs_full_redraw = True
-        return consumed
+        return self.file_manager.ui_layer_stack.handle_key_event(event)
     
     def on_char_event(self, event: CharEvent) -> bool:
         """
@@ -108,10 +105,7 @@ class TFMEventCallback(EventCallback):
         self.file_manager.adaptive_fps.mark_activity()
         
         # Route to UI layer stack
-        consumed = self.file_manager.ui_layer_stack.handle_char_event(event)
-        if consumed:
-            self.file_manager.needs_full_redraw = True
-        return consumed
+        return self.file_manager.ui_layer_stack.handle_char_event(event)
     
     def on_system_event(self, event: SystemEvent) -> bool:
         """
@@ -233,7 +227,6 @@ class FileManager(UILayer):
         
         # Layout settings
         self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
-        self.needs_full_redraw = True  # Flag to control when to redraw everything
         
         # Isearch mode state
         self.isearch_mode = False
@@ -348,8 +341,7 @@ class FileManager(UILayer):
         if event.is_resize():
             # Handle window resize
             self.clear_screen_with_background()
-            self.needs_full_redraw = True
-            self._dirty = True
+            self.mark_dirty()
             return True
         elif event.is_close():
             # Handle window close request
@@ -414,14 +406,10 @@ class FileManager(UILayer):
         """
         Query if this layer needs redrawing.
         
-        The layer needs redrawing if either:
-        - Its internal dirty flag is set
-        - The FileManager's needs_full_redraw flag is set
-        
         Returns:
             True if the layer needs redrawing, False otherwise
         """
-        return self._dirty or self.needs_full_redraw
+        return self._dirty
     
     def mark_dirty(self) -> None:
         """
@@ -436,12 +424,9 @@ class FileManager(UILayer):
         """
         Clear the dirty flag after rendering.
         
-        This is called by the layer stack after successfully rendering this
-        layer. It clears both the layer's internal dirty flag and the
-        FileManager's needs_full_redraw flag.
+        This is called by the layer stack after successfully rendering this layer.
         """
         self._dirty = False
-        self.needs_full_redraw = False
     
     def should_close(self) -> bool:
         """
@@ -633,7 +618,7 @@ class FileManager(UILayer):
         self.log_manager.add_message("INFO", "")
         
         # Trigger redraw to show the messages
-        self.needs_full_redraw = True
+        self.mark_dirty()
         return True
     
     def _action_create_file(self):
@@ -690,7 +675,7 @@ class FileManager(UILayer):
         """Toggle showing hidden files."""
         self.file_operations.show_hidden = not self.file_operations.show_hidden
         self.refresh_files()
-        self.needs_full_redraw = True
+        self.mark_dirty()
         status = "showing" if self.file_operations.show_hidden else "hiding"
         print(f"Now {status} hidden files")
         return True
@@ -704,14 +689,14 @@ class FileManager(UILayer):
         current_pane = self.get_current_pane()
         current_pane['sort_mode'] = sort_type
         self.refresh_files(current_pane)
-        self.needs_full_redraw = True
+        self.mark_dirty()
         print(f"Sorted by {sort_type}")
         return True
     
     def _action_refresh(self):
         """Refresh file list."""
         self.refresh_files()
-        self.needs_full_redraw = True
+        self.mark_dirty()
         print("Refreshed file list")
         return True
     
@@ -747,7 +732,7 @@ class FileManager(UILayer):
             current_pane['selected_files'].clear()
             self.refresh_files(current_pane)
             self.restore_cursor_position(current_pane)
-            self.needs_full_redraw = True
+            self.mark_dirty()
         return True
     
     def _action_go_home(self):
@@ -762,7 +747,7 @@ class FileManager(UILayer):
             current_pane['selected_files'].clear()
             self.refresh_files(current_pane)
             self.restore_cursor_position(current_pane)
-            self.needs_full_redraw = True
+            self.mark_dirty()
         return True
     
     def _action_show_favorites(self):
@@ -786,7 +771,7 @@ class FileManager(UILayer):
         except Exception as e:
             self.log_manager.add_message("ERROR", f"Failed to open browser: {e}")
             self.log_manager.add_message("INFO", f"Please visit: {GITHUB_URL}/issues")
-        self.needs_full_redraw = True
+        self.mark_dirty()
         return True
         
     def safe_addstr(self, y, x, text, attr=None):
@@ -924,7 +909,7 @@ class FileManager(UILayer):
         success, message = self.file_operations.toggle_all_files_selection(current_pane)
         if success:
             print(message)
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def toggle_all_items_selection(self):
         """Toggle selection status of all items (files and directories) in current pane"""
@@ -932,7 +917,7 @@ class FileManager(UILayer):
         success, message = self.file_operations.toggle_all_items_selection(current_pane)
         if success:
             print(message)
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def unselect_all(self):
         """Unselect all items in current pane"""
@@ -940,7 +925,7 @@ class FileManager(UILayer):
         if current_pane['selected_files']:
             current_pane['selected_files'].clear()
             print("Unselected all items")
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def select_all(self):
         """Select all items (files and directories) in current pane"""
@@ -953,7 +938,7 @@ class FileManager(UILayer):
         
         if selected_count > 0:
             print(f"Selected all {len(current_pane['selected_files'])} items")
-            self.needs_full_redraw = True
+            self.mark_dirty()
         elif current_pane['selected_files']:
             print(f"All {len(current_pane['selected_files'])} items already selected")
     
@@ -973,7 +958,7 @@ class FileManager(UILayer):
                 display_height = height - log_height - 3
                 
                 self.pane_manager.adjust_scroll_for_focus(current_pane, display_height)
-                self.needs_full_redraw = True
+                self.mark_dirty()
         else:
             # Different directories, sync directory
             if self.pane_manager.sync_current_to_other(print):
@@ -990,7 +975,7 @@ class FileManager(UILayer):
                     current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                 
-                self.needs_full_redraw = True
+                self.mark_dirty()
     
     def sync_other_to_current(self):
         """Change other pane's directory to match the current pane's directory, or sync cursor if already same directory"""
@@ -1008,7 +993,7 @@ class FileManager(UILayer):
                 display_height = height - log_height - 3
                 
                 self.pane_manager.adjust_scroll_for_focus(other_pane, display_height)
-                self.needs_full_redraw = True
+                self.mark_dirty()
         else:
             # Different directories, sync directory
             if self.pane_manager.sync_other_to_current(print):
@@ -1025,7 +1010,7 @@ class FileManager(UILayer):
                     other_pane['focused_index'] = 0
                     other_pane['scroll_offset'] = 0
                 
-                self.needs_full_redraw = True
+                self.mark_dirty()
     
     def sync_cursor_to_other_pane(self):
         """Move cursor in current pane to the same filename as the other pane's cursor"""
@@ -1038,7 +1023,7 @@ class FileManager(UILayer):
             display_height = height - log_height - 3
             
             self.pane_manager.adjust_scroll_for_focus(current_pane, display_height)
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def sync_cursor_from_current_pane(self):
         """Move cursor in other pane to the same filename as the current pane's cursor"""
@@ -1051,7 +1036,7 @@ class FileManager(UILayer):
             display_height = height - log_height - 3
             
             self.pane_manager.adjust_scroll_for_focus(other_pane, display_height)
-            self.needs_full_redraw = True
+            self.mark_dirty()
         
     def restore_cursor_position(self, pane_data):
         """Restore cursor position from history - wrapper for pane_manager method"""
@@ -1159,7 +1144,7 @@ class FileManager(UILayer):
             print(f"Applied filter '{filter_pattern}' to {pane_name} pane")
             print(f"Showing {count} items")
         
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def clear_filter(self):
         """Clear filter - wrapper for file_operations method"""
@@ -1171,7 +1156,7 @@ class FileManager(UILayer):
             
             print(f"Cleared filter from {pane_name} pane")
             
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
@@ -1212,12 +1197,12 @@ class FileManager(UILayer):
             
             # Check for startup redraw trigger
             if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.033:
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 delattr(self, 'startup_time')
             
             # Check for log updates
             if self.log_manager.has_log_updates():
-                self.needs_full_redraw = True
+                self.mark_dirty()
             
             # Update menu states if needed
             if self.is_desktop_mode():
@@ -1241,7 +1226,7 @@ class FileManager(UILayer):
             # This must be done after event processing but before drawing
             # to handle layers that want to close due to system events
             if self.ui_layer_stack.check_and_close_top_layer():
-                self.needs_full_redraw = True
+                self.mark_dirty()
             
             # Draw interface after event processing
             self.draw_interface()
@@ -1742,7 +1727,7 @@ class FileManager(UILayer):
                     current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                 
-                self.needs_full_redraw = True
+                self.mark_dirty()
             except PermissionError:
                 print("ERROR: Permission denied")
         elif self.archive_operations.is_archive(focused_file):
@@ -1772,7 +1757,7 @@ class FileManager(UILayer):
                 current_pane['focused_index'] = 0
                 current_pane['scroll_offset'] = 0
                 
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 self.log_manager.add_message("INFO", f"Entered archive: {focused_file.name}")
             except FileNotFoundError as e:
                 # Archive file doesn't exist
@@ -1819,13 +1804,13 @@ class FileManager(UILayer):
                     else:
                         print(f"Program exited with code {result.returncode}")
                     
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
                     
                 except Exception as e:
                     # Resume curses even if there's an error
                     self.external_program_manager.resume_curses()
                     print(f"Error opening file: {e}")
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
             elif is_text_file(focused_file):
                 # Fallback to text viewer for text files without association
                 viewer = create_text_viewer(self.renderer, focused_file)
@@ -1833,7 +1818,7 @@ class FileManager(UILayer):
                     # Push viewer onto layer stack
                     self.push_layer(viewer)
                     self.renderer.set_cursor_visibility(False)
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
                     print(f"Viewing file: {focused_file.name}")
                 else:
                     print(f"File: {focused_file.name}")
@@ -1897,7 +1882,7 @@ class FileManager(UILayer):
         self.isearch_pattern = ""
         self.isearch_matches = []
         self.isearch_match_index = 0
-        self.needs_full_redraw = True
+        self.mark_dirty()
         
     def exit_isearch_mode(self):
         """Exit isearch mode"""
@@ -1905,7 +1890,7 @@ class FileManager(UILayer):
         self.isearch_pattern = ""
         self.isearch_matches = []
         self.isearch_match_index = 0
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def enter_filter_mode(self):
         """Enter filename filter mode"""
@@ -1913,7 +1898,7 @@ class FileManager(UILayer):
         QuickEditBarHelpers.create_filter_dialog(self.quick_edit_bar, current_pane['filter_pattern'])
         self.quick_edit_bar.callback = self.on_filter_confirm
         self.quick_edit_bar.cancel_callback = self.on_filter_cancel
-        self.needs_full_redraw = True
+        self.mark_dirty()
         
     def on_filter_confirm(self, filter_text):
         """Handle filter confirmation"""
@@ -1928,12 +1913,12 @@ class FileManager(UILayer):
             print(f"Showing {count} items")
         
         self.quick_edit_bar.hide()
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def on_filter_cancel(self):
         """Handle filter cancellation"""
         self.quick_edit_bar.hide()
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def apply_filter(self):
         """Apply the current filter pattern to the active pane"""
@@ -1951,7 +1936,7 @@ class FileManager(UILayer):
         else:
             print(f"Cleared filter from {pane_name} pane")
         
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def clear_filter(self):
         """Clear the filter from the active pane"""
@@ -1965,7 +1950,7 @@ class FileManager(UILayer):
         pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         print(f"Cleared filter from {pane_name} pane")
         
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def enter_rename_mode(self):
         """Enter rename mode for the current file or batch rename for multiple files"""
@@ -2000,7 +1985,7 @@ class FileManager(UILayer):
         QuickEditBarHelpers.create_rename_dialog(self.quick_edit_bar, focused_file.name, focused_file.name)
         self.quick_edit_bar.callback = self.on_rename_confirm
         self.quick_edit_bar.cancel_callback = self.on_rename_cancel
-        self.needs_full_redraw = True
+        self.mark_dirty()
         print(f"Renaming: {focused_file.name}")
     
     def on_rename_confirm(self, new_name):
@@ -2009,7 +1994,7 @@ class FileManager(UILayer):
             print("Invalid rename operation")
             self.quick_edit_bar.hide()
             self.rename_file_path = None
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return
         
         original_name = self.rename_file_path.name
@@ -2018,7 +2003,7 @@ class FileManager(UILayer):
             print("Name unchanged")
             self.quick_edit_bar.hide()
             self.rename_file_path = None
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return
         
         try:
@@ -2030,7 +2015,7 @@ class FileManager(UILayer):
                 print(f"File '{new_name}' already exists")
                 self.quick_edit_bar.hide()
                 self.rename_file_path = None
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 return
             
             # Perform the rename
@@ -2050,25 +2035,25 @@ class FileManager(UILayer):
             
             self.quick_edit_bar.hide()
             self.rename_file_path = None
-            self.needs_full_redraw = True
+            self.mark_dirty()
             
         except PermissionError:
             print(f"Permission denied: Cannot rename '{original_name}'")
             self.quick_edit_bar.hide()
             self.rename_file_path = None
-            self.needs_full_redraw = True
+            self.mark_dirty()
         except OSError as e:
             print(f"Error renaming file: {e}")
             self.quick_edit_bar.hide()
             self.rename_file_path = None
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def on_rename_cancel(self):
         """Handle rename cancellation"""
         print("Rename cancelled")
         self.quick_edit_bar.hide()
         self.rename_file_path = None
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def enter_create_directory_mode(self):
         """Enter create directory mode"""
@@ -2083,7 +2068,7 @@ class FileManager(UILayer):
         QuickEditBarHelpers.create_create_directory_dialog(self.quick_edit_bar)
         self.quick_edit_bar.callback = self.on_create_directory_confirm
         self.quick_edit_bar.cancel_callback = self.on_create_directory_cancel
-        self.needs_full_redraw = True
+        self.mark_dirty()
         print("Creating new directory...")
     
     def on_create_directory_confirm(self, dir_name):
@@ -2091,7 +2076,7 @@ class FileManager(UILayer):
         if not dir_name.strip():
             print("Invalid directory name")
             self.quick_edit_bar.hide()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return
         
         current_pane = self.get_current_pane()
@@ -2102,7 +2087,7 @@ class FileManager(UILayer):
         if new_dir_path.exists():
             print(f"Directory '{new_dir_name}' already exists")
             self.quick_edit_bar.hide()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return
         
         try:
@@ -2124,18 +2109,18 @@ class FileManager(UILayer):
                     break
             
             self.quick_edit_bar.hide()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             
         except OSError as e:
             print(f"Failed to create directory '{new_dir_name}': {e}")
             self.quick_edit_bar.hide()
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def on_create_directory_cancel(self):
         """Handle create directory cancellation"""
         print("Directory creation cancelled")
         self.quick_edit_bar.hide()
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def enter_create_file_mode(self):
         """Enter create file mode"""
@@ -2150,7 +2135,7 @@ class FileManager(UILayer):
         QuickEditBarHelpers.create_create_file_dialog(self.quick_edit_bar)
         self.quick_edit_bar.callback = self.on_create_file_confirm
         self.quick_edit_bar.cancel_callback = self.on_create_file_cancel
-        self.needs_full_redraw = True
+        self.mark_dirty()
         print("Creating new text file...")
     
     def on_create_file_confirm(self, file_name):
@@ -2158,7 +2143,7 @@ class FileManager(UILayer):
         if not file_name.strip():
             print("Invalid file name")
             self.quick_edit_bar.hide()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return
         
         current_pane = self.get_current_pane()
@@ -2169,7 +2154,7 @@ class FileManager(UILayer):
         if new_file_path.exists():
             print(f"File '{new_file_name}' already exists")
             self.quick_edit_bar.hide()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return
         
         try:
@@ -2195,18 +2180,18 @@ class FileManager(UILayer):
                 self.edit_selected_file()
             
             self.quick_edit_bar.hide()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             
         except OSError as e:
             print(f"Failed to create file '{new_file_name}': {e}")
             self.quick_edit_bar.hide()
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def on_create_file_cancel(self):
         """Handle create file cancellation"""
         print("File creation cancelled")
         self.quick_edit_bar.hide()
-        self.needs_full_redraw = True
+        self.mark_dirty()
 
     def enter_batch_rename_mode(self):
         """Enter batch rename mode for multiple selected files"""
@@ -2236,7 +2221,7 @@ class FileManager(UILayer):
     def exit_batch_rename_mode(self):
         """Exit batch rename mode - wrapper for batch rename dialog component"""
         self.batch_rename_dialog.exit()
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def show_dialog(self, message, choices, callback):
         """Show quick choice dialog - wrapper for quick choice bar component
@@ -2250,17 +2235,17 @@ class FileManager(UILayer):
             callback: Function to call with the selected choice's value
         """
         self.quick_choice_bar.show(message, choices, callback)
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def show_confirmation(self, message, callback):
         """Show confirmation dialog with Yes/No/Cancel options (backward compatibility)"""
         QuickChoiceBarHelpers.show_confirmation(self.quick_choice_bar, message, callback)
-        self.needs_full_redraw = True
+        self.mark_dirty()
         
     def exit_quick_choice_mode(self):
         """Exit quick choice mode - wrapper for quick choice bar component"""
         self.quick_choice_bar.exit()
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def exit_confirmation_mode(self):
         """Exit confirmation mode (backward compatibility)"""
@@ -2271,7 +2256,7 @@ class FileManager(UILayer):
         result = self.quick_choice_bar.handle_input(key)
         
         if result == True:
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif isinstance(result, tuple):
             action, data = result
@@ -2279,7 +2264,7 @@ class FileManager(UILayer):
                 self.exit_quick_choice_mode()
                 return True
             elif action == 'selection_changed':
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 return True
             elif action == 'execute':
                 # Store callback before exiting mode
@@ -2322,7 +2307,7 @@ class FileManager(UILayer):
             layer: UILayer instance to push onto the stack
         """
         self.ui_layer_stack.push(layer)
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def pop_layer(self):
         """
@@ -2335,7 +2320,7 @@ class FileManager(UILayer):
             The popped layer, or None if the operation was rejected
         """
         layer = self.ui_layer_stack.pop()
-        self.needs_full_redraw = True
+        self.mark_dirty()
         return layer
     
     def check_and_close_top_layer(self):
@@ -2370,14 +2355,14 @@ class FileManager(UILayer):
         # Create a wrapper print function that also triggers redraw
         def print_with_redraw(message):
             print(message)
-            self.needs_full_redraw = True
+            self.mark_dirty()
             
         ListDialogHelpers.show_favorite_directories(
             self.list_dialog, self.pane_manager, print_with_redraw
         )
         # Push dialog onto layer stack
         self.push_layer(self.list_dialog)
-        self.needs_full_redraw = True
+        self.mark_dirty()
         self._force_immediate_redraw()
     
     def show_history(self):
@@ -2422,7 +2407,7 @@ class FileManager(UILayer):
                 # Exit current dialog and show the other pane's history
                 self.list_dialog.exit()
                 self._show_history_for_pane(other_pane)
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 self._force_immediate_redraw()
                 return True
             return False
@@ -2434,7 +2419,7 @@ class FileManager(UILayer):
         self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys, help_text)
         # Push dialog onto layer stack
         self.push_layer(self.list_dialog)
-        self.needs_full_redraw = True
+        self.mark_dirty()
         self._force_immediate_redraw()
     
     def navigate_to_history_path(self, selected_path):
@@ -2481,7 +2466,7 @@ class FileManager(UILayer):
             else:
                 print(f"Navigated {pane_name} pane: {old_path} → {target_path}")
             
-            self.needs_full_redraw = True
+            self.mark_dirty()
             
         except Exception as e:
             print(f"Error navigating to {selected_path}: {e}")
@@ -2492,14 +2477,14 @@ class FileManager(UILayer):
             self.external_program_manager.execute_external_program(
                 self.pane_manager, program
             )
-            self.needs_full_redraw = True
+            self.mark_dirty()
         
         ListDialogHelpers.show_programs_dialog(
             self.list_dialog, execute_program_wrapper, print
         )
         # Push dialog onto layer stack
         self.push_layer(self.list_dialog)
-        self.needs_full_redraw = True
+        self.mark_dirty()
         self._force_immediate_redraw()
     
     def show_compare_selection_dialog(self):
@@ -2510,14 +2495,14 @@ class FileManager(UILayer):
         # Create a wrapper print function that also triggers redraw
         def print_with_redraw(message):
             print(message)
-            self.needs_full_redraw = True
+            self.mark_dirty()
         
         ListDialogHelpers.show_compare_selection(
             self.list_dialog, current_pane, other_pane, print_with_redraw
         )
         # Push dialog onto layer stack
         self.push_layer(self.list_dialog)
-        self.needs_full_redraw = True
+        self.mark_dirty()
         self._force_immediate_redraw()
     
     def show_view_options(self):
@@ -2537,7 +2522,7 @@ class FileManager(UILayer):
                 self.pane_manager.right_pane['focused_index'] = 0
                 self.pane_manager.right_pane['scroll_offset'] = 0
                 print(f"Hidden files: {'shown' if new_state else 'hidden'}")
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 
             elif option == "Toggle color scheme (dark/light)":
                 from tfm_colors import toggle_color_scheme, init_colors
@@ -2547,7 +2532,7 @@ class FileManager(UILayer):
                 self.print_color_scheme_info()
                 # Clear screen to apply new background color immediately
                 self.clear_screen_with_background()
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 
             elif option == "Toggle fallback color scheme":
                 from tfm_colors import toggle_fallback_mode, init_colors, is_fallback_mode, get_current_color_scheme
@@ -2559,7 +2544,7 @@ class FileManager(UILayer):
                 print(f"Fallback color mode: {status}")
                 # Clear screen to apply new background color immediately
                 self.clear_screen_with_background()
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 
             elif option == "Cycle date format":
                 from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
@@ -2576,7 +2561,7 @@ class FileManager(UILayer):
                 # Update config
                 self.config.DATE_FORMAT = new_format
                 print(f"Date format: {format_name}")
-                self.needs_full_redraw = True
+                self.mark_dirty()
         
         # Define the view options
         options = [
@@ -2628,7 +2613,7 @@ class FileManager(UILayer):
                     else:
                         print(f"Editor exited with code {result.returncode}")
                     
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
                     
                 except FileNotFoundError:
                     # Resume curses even if editor not found
@@ -2668,7 +2653,7 @@ class FileManager(UILayer):
                         print(f"Log height ratio: {self.config.DEFAULT_LOG_HEIGHT_RATIO}")
                     
                     print("Configuration reloaded successfully")
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
                     
                 except Exception as e:
                     print(f"Error reloading configuration: {e}")
@@ -2729,7 +2714,7 @@ class FileManager(UILayer):
             
             # Refresh the file list after sorting
             self.refresh_files(current_pane)
-            self.needs_full_redraw = True
+            self.mark_dirty()
         
         # Show the dialog
         pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
@@ -2754,7 +2739,7 @@ class FileManager(UILayer):
         
         # Refresh the file list
         self.refresh_files(current_pane)
-        self.needs_full_redraw = True
+        self.mark_dirty()
 
     def show_file_details(self):
         """Show detailed information about selected files or current file"""
@@ -2790,7 +2775,7 @@ class FileManager(UILayer):
         InfoDialogHelpers.show_file_details(self.info_dialog, files_to_show, current_pane)
         # Push dialog onto layer stack
         self.push_layer(self.info_dialog)
-        self.needs_full_redraw = True
+        self.mark_dirty()
         self._force_immediate_redraw()
     
     def print_color_scheme_info(self):
@@ -2833,14 +2818,14 @@ class FileManager(UILayer):
         self.print_color_scheme_info()
         # Clear screen to apply new background color immediately
         self.clear_screen_with_background()
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
     def show_help_dialog(self):
         """Show help dialog with key bindings and usage information"""
         InfoDialogHelpers.show_help_dialog(self.info_dialog)
         # Push dialog onto layer stack
         self.push_layer(self.info_dialog)
-        self.needs_full_redraw = True
+        self.mark_dirty()
         self._force_immediate_redraw()
     
     def view_selected_file(self):
@@ -2879,13 +2864,13 @@ class FileManager(UILayer):
                 else:
                     print(f"Viewer exited with code {result.returncode}")
                 
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 
             except Exception as e:
                 # Resume curses even if there's an error
                 self.external_program_manager.resume_curses()
                 print(f"Error viewing file: {e}")
-                self.needs_full_redraw = True
+                self.mark_dirty()
         else:
             # No file association found - check if it's a text file
             if is_text_file(focused_file):
@@ -2896,14 +2881,14 @@ class FileManager(UILayer):
                         # Push viewer onto layer stack
                         self.push_layer(viewer)
                         self.renderer.set_cursor_visibility(False)
-                        self.needs_full_redraw = True
+                        self.mark_dirty()
                         print(f"Viewing text file: {focused_file.name}")
                     else:
                         print(f"Failed to view file: {focused_file.name}")
                     
                 except Exception as e:
                     print(f"Error viewing file: {str(e)}")
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
             else:
                 # Not a text file and no viewer configured
                 print(f"No viewer configured for '{focused_file.name}' (not a text file)")
@@ -2950,17 +2935,17 @@ class FileManager(UILayer):
                 # Push viewer onto layer stack
                 self.push_layer(viewer)
                 self.renderer.set_cursor_visibility(False)
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 print(f"Comparing: {file1.name} <-> {file2.name}")
             else:
                 print(f"Failed to compare files")
         except Exception as e:
             print(f"Error creating diff viewer: {e}")
-            self.needs_full_redraw = True
+            self.mark_dirty()
             
         except Exception as e:
             print(f"Error viewing diff: {e}")
-            self.needs_full_redraw = True
+            self.mark_dirty()
     
     def edit_selected_file(self):
         """Edit the selected file using configured editor from file associations"""
@@ -3105,7 +3090,7 @@ class FileManager(UILayer):
         # Note: Don't call renderer.refresh() here - UILayerStack will do it
         try:
             self.draw_status()
-            self.needs_full_redraw = True
+            self.mark_dirty()
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     
@@ -3185,7 +3170,7 @@ class FileManager(UILayer):
             if self.isearch_pattern:
                 self.isearch_pattern = self.isearch_pattern[:-1]
                 self.update_isearch_matches()
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
             # Up arrow - go to previous match
@@ -3193,7 +3178,7 @@ class FileManager(UILayer):
                 self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
                 current_pane['focused_index'] = self.isearch_matches[self.isearch_match_index]
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
             # Down arrow - go to next match
@@ -3201,14 +3186,14 @@ class FileManager(UILayer):
                 self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
                 current_pane['focused_index'] = self.isearch_matches[self.isearch_match_index]
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         
         # Handle CharEvent - text input for search pattern
         if isinstance(event, CharEvent):
             self.isearch_pattern += event.char
             self.update_isearch_matches()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         
         # Handle KeyEvent with printable character (for backward compatibility)
@@ -3216,7 +3201,7 @@ class FileManager(UILayer):
             # Add character to isearch pattern
             self.isearch_pattern += event.char
             self.update_isearch_matches()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         
         # In isearch mode, capture most other keys to prevent unintended actions
@@ -3230,7 +3215,7 @@ class FileManager(UILayer):
     def switch_batch_rename_field(self, field):
         """Switch the active field in batch rename mode"""
         self.batch_rename_dialog.switch_field(field)
-        self.needs_full_redraw = True
+        self.mark_dirty()
 
     def adjust_pane_boundary(self, direction):
         """Adjust the boundary between left and right panes"""
@@ -3242,7 +3227,7 @@ class FileManager(UILayer):
             self.pane_manager.left_pane_ratio = min(MAX_PANE_RATIO, self.pane_manager.left_pane_ratio + PANE_ADJUST_STEP)
             
         # Trigger a full redraw for the new pane layout
-        self.needs_full_redraw = True
+        self.mark_dirty()
         
         # Show immediate feedback in log pane
         left_percent = int(self.pane_manager.left_pane_ratio * 100)
@@ -3258,7 +3243,7 @@ class FileManager(UILayer):
             self.log_height_ratio = max(MIN_LOG_HEIGHT_RATIO, self.log_height_ratio - LOG_HEIGHT_ADJUST_STEP)
             
         # Trigger a full redraw for the new layout
-        self.needs_full_redraw = True
+        self.mark_dirty()
         
         # Show immediate feedback in log pane
         log_percent = int(self.log_height_ratio * 100)
@@ -3300,7 +3285,7 @@ class FileManager(UILayer):
         display_height = height - log_height - 3
         
         SearchDialogHelpers.adjust_scroll_for_display_height(current_pane, display_height)
-        # needs_full_redraw will be set when dialog exits
+        # Dirty flag will be set when dialog exits
 
     def enter_jump_to_path_mode(self):
         """Enter jump to path mode using QuickEditBar"""
@@ -3344,7 +3329,7 @@ class FileManager(UILayer):
                     current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                 
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 print(f"Jumped to: {target_path}")
                 
             except Exception as e:
@@ -3362,7 +3347,7 @@ class FileManager(UILayer):
             callback=on_confirm,
             cancel_callback=on_cancel
         )
-        self.needs_full_redraw = True
+        self.mark_dirty()
     
 
     def show_drives_dialog(self):
@@ -3382,7 +3367,7 @@ class FileManager(UILayer):
                     if drive_entry.drive_type == 'local':
                         if not drive_path.exists() or not drive_path.is_dir():
                             print(f"Error: Drive path no longer exists or is not accessible: {drive_entry.path}")
-                            self.needs_full_redraw = True
+                            self.mark_dirty()
                             return
                     
                     # Update the current pane
@@ -3397,15 +3382,15 @@ class FileManager(UILayer):
                     
                     pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
                     print(f"Switched to {drive_entry.name}: {drive_entry.path}")
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
                     
                 except Exception as e:
                     print(f"Error: Failed to navigate to drive: {e}")
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
             else:
                 # Cancelled or no selection
                 print("Drive selection cancelled")
-                self.needs_full_redraw = True
+                self.mark_dirty()
         
         self.drives_dialog.show(drive_callback)
         # Push dialog onto layer stack
@@ -3437,21 +3422,21 @@ class FileManager(UILayer):
         # Handle Shift+Arrow keys for log scrolling (only when no dialogs are active)
         if event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
             if self.log_manager.scroll_log_up(1):
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         elif event.key_code == KeyCode.DOWN and event.modifiers & ModifierKey.SHIFT:  # Shift+Down
             if self.log_manager.scroll_log_down(1):
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         elif event.key_code == KeyCode.LEFT and event.modifiers & ModifierKey.SHIFT:  # Shift+Left - fast scroll to older messages
             log_height = self._get_log_pane_height()
             if self.log_manager.scroll_log_up(max(1, log_height)):
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         elif event.key_code == KeyCode.RIGHT and event.modifiers & ModifierKey.SHIFT:  # Shift+Right - fast scroll to newer messages
             log_height = self._get_log_pane_height()
             if self.log_manager.scroll_log_down(max(1, log_height)):
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         
         if self.is_key_for_action(event, 'quit'):
@@ -3469,21 +3454,21 @@ class FileManager(UILayer):
 
         elif event.key_code == KeyCode.TAB:  # Tab key - switch panes
             self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['focused_index'] > 0:
                 current_pane['focused_index'] -= 1
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['focused_index'] < len(current_pane['files']) - 1:
                 current_pane['focused_index'] += 1
-                self.needs_full_redraw = True
+                self.mark_dirty()
             return True
         elif event.key_code == KeyCode.ENTER:
             self.handle_enter()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif self.is_key_for_action(event, 'toggle_hidden'):
             self.file_operations.toggle_hidden_files()
@@ -3494,7 +3479,7 @@ class FileManager(UILayer):
             self.pane_manager.left_pane['scroll_offset'] = 0
             self.pane_manager.right_pane['focused_index'] = 0
             self.pane_manager.right_pane['scroll_offset'] = 0
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif self.is_key_for_action(event, 'toggle_color_scheme'):
             # Toggle between dark and light color schemes
@@ -3506,7 +3491,7 @@ class FileManager(UILayer):
             self.print_color_scheme_info()
             # Clear screen to apply new background color immediately
             self.clear_screen_with_background()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif self.is_key_for_action(event, 'select_all'):
             self.select_all()
@@ -3516,11 +3501,11 @@ class FileManager(UILayer):
             return True
         elif event.key_code == KeyCode.PAGE_UP:  # Page Up - file navigation only
             current_pane['focused_index'] = max(0, current_pane['focused_index'] - 10)
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif event.key_code == KeyCode.PAGE_DOWN:  # Page Down - file navigation only
             current_pane['focused_index'] = min(len(current_pane['files']) - 1, current_pane['focused_index'] + 10)
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif event.key_code == KeyCode.BACKSPACE:  # Backspace - go to parent directory
             # Check if we're at the root of an archive
@@ -3560,11 +3545,11 @@ class FileManager(UILayer):
                         current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
                     self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
                 except Exception as e:
                     self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
             elif current_pane['path'] != current_pane['path'].parent:
                 try:
                     # Save current cursor position before changing directory
@@ -3598,7 +3583,7 @@ class FileManager(UILayer):
                     self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
                 except Exception as e:
                     self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
             return True
         elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
             if current_pane['path'] != current_pane['path'].parent:
@@ -3618,7 +3603,7 @@ class FileManager(UILayer):
                         current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
                 except PermissionError:
                     self.log_manager.add_message("ERROR", "Permission denied")
             return True
@@ -3640,21 +3625,21 @@ class FileManager(UILayer):
                         current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
-                    self.needs_full_redraw = True
+                    self.mark_dirty()
                 except PermissionError:
                     self.log_manager.add_message("ERROR", "Permission denied")
             return True
         elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left' and not (event.modifiers & ModifierKey.SHIFT):  # Right arrow in left pane - switch to right pane
             self.pane_manager.active_pane = 'right'
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'right' and not (event.modifiers & ModifierKey.SHIFT):  # Left arrow in right pane - switch to left pane
             self.pane_manager.active_pane = 'left'
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif self.is_key_for_action(event, 'select_file'):  # Toggle file selection
             self.toggle_selection()
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         elif event.key_code == KeyCode.ESCAPE:  # ESC key
             # In callback mode, we can't peek at the next event
@@ -3782,19 +3767,19 @@ class FileManager(UILayer):
             return True
         elif self.is_key_for_action(event, 'reset_log_height'):  # Reset log pane height
             self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
-            self.needs_full_redraw = True
+            self.mark_dirty()
             print(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
             return True
         elif event.key_code == ord('-'):  # '-' key - reset pane ratio to 50/50
             self.pane_manager.left_pane_ratio = 0.5
-            self.needs_full_redraw = True
+            self.mark_dirty()
             print("Pane split reset to 50% | 50%")
             return True
         elif self.is_key_for_action(event, 'subshell'):  # Sub-shell mode
             self.external_program_manager.enter_subshell_mode(
                 self.pane_manager
             )
-            self.needs_full_redraw = True
+            self.mark_dirty()
             return True
         else:
             return False  # Key was not handled
@@ -3822,7 +3807,6 @@ class FileManager(UILayer):
             result = self.handle_isearch_input(event)
             if result:
                 self.mark_dirty()
-                self.needs_full_redraw = True
             return result
         
         # Handle quick_edit_bar input (FileManager-specific, not part of layer stack)
@@ -3830,7 +3814,6 @@ class FileManager(UILayer):
             result = self.quick_edit_bar.handle_input(event)
             if result:
                 self.mark_dirty()
-                self.needs_full_redraw = True
             return result
         
         # Handle quick_choice_bar input (FileManager-specific, not part of layer stack, KeyEvent only)
@@ -3838,7 +3821,6 @@ class FileManager(UILayer):
             result = self.handle_quick_choice_input(event)
             if result:
                 self.mark_dirty()
-                self.needs_full_redraw = True
             return result
         
         # Handle main screen key events
@@ -3940,7 +3922,7 @@ class FileManager(UILayer):
             
             # If either cursor was restored, trigger a redraw
             if left_restored or right_restored:
-                self.needs_full_redraw = True
+                self.mark_dirty()
                 
         except Exception as e:
             print(f"Warning: Could not restore startup cursor positions: {e}")

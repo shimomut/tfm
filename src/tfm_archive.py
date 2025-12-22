@@ -2546,7 +2546,7 @@ class ArchiveUI:
             callback=self.on_create_archive_confirm,
             cancel_callback=self.on_create_archive_cancel
         )
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
         
         # Log what we're about to archive
         if len(files_to_archive) == 1:
@@ -2560,7 +2560,7 @@ class ArchiveUI:
         if not archive_name.strip():
             print("Invalid archive name")
             self.file_manager.quick_edit_bar.hide()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             return
         
         current_pane = self.file_manager.get_current_pane()
@@ -2584,7 +2584,7 @@ class ArchiveUI:
         if not files_to_archive:
             print("No files to archive")
             self.file_manager.quick_edit_bar.hide()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             return
         
         archive_filename = archive_name.strip()
@@ -2594,7 +2594,7 @@ class ArchiveUI:
         if archive_path.exists():
             print(f"Archive '{archive_filename}' already exists")
             self.file_manager.quick_edit_bar.hide()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             return
         
         try:
@@ -2604,7 +2604,7 @@ class ArchiveUI:
             if not format_type:
                 print(f"Unsupported archive format. Supported: .zip, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .txz")
                 self.file_manager.quick_edit_bar.hide()
-                self.file_manager.needs_full_redraw = True
+                self.file_manager.mark_dirty()
                 return
             
             # Start progress tracking
@@ -2639,19 +2639,19 @@ class ArchiveUI:
                 self.progress_manager.finish_operation()
             
             self.file_manager.quick_edit_bar.hide()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             
         except Exception as e:
             print(f"Error creating archive: {e}")
             self.progress_manager.finish_operation()
             self.file_manager.quick_edit_bar.hide()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
     
     def on_create_archive_cancel(self):
         """Handle create archive cancellation"""
         print("Archive creation cancelled")
         self.file_manager.quick_edit_bar.hide()
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
     
     def extract_selected_archive(self):
         """Extract the selected archive file to the other pane"""
@@ -2739,7 +2739,7 @@ class ArchiveUI:
                     
                     # Refresh the other pane to show the extracted contents
                     self.file_manager.refresh_files(other_pane)
-                    self.file_manager.needs_full_redraw = True
+                    self.file_manager.mark_dirty()
                 else:
                     print(f"Failed to extract archive: {archive_file.name}")
                     
@@ -2798,14 +2798,14 @@ class ArchiveUI:
         )
         self.file_manager.quick_edit_bar.callback = self._on_extraction_rename_confirm
         self.file_manager.quick_edit_bar.cancel_callback = self._on_extraction_rename_cancel
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
     
     def _on_extraction_rename_confirm(self, new_name):
         """Handle extraction rename confirmation"""
         if not new_name or new_name.strip() == "":
             print("Extraction cancelled: empty directory name")
             self.file_manager.quick_edit_bar.hide()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
             return
         
         context = self.file_manager._extraction_rename_context
@@ -2817,7 +2817,7 @@ class ArchiveUI:
         
         # Hide the dialog first
         self.file_manager.quick_edit_bar.hide()
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
         
         # Check if the new name also conflicts
         if new_extract_dir.exists():
@@ -2850,7 +2850,7 @@ class ArchiveUI:
         """Handle extraction rename cancellation"""
         print("Extraction cancelled")
         self.file_manager.quick_edit_bar.hide()
-        self.file_manager.needs_full_redraw = True
+        self.file_manager.mark_dirty()
     
     def _get_archive_format_from_filename(self, filename):
         """Get archive format string for the archive operations"""
@@ -2895,7 +2895,7 @@ class ArchiveUI:
         # Note: Don't call renderer.refresh() here - UILayerStack will do it
         try:
             self.file_manager.draw_status()
-            self.file_manager.needs_full_redraw = True
+            self.file_manager.mark_dirty()
         except Exception as e:
             print(f"Warning: Progress callback display update failed: {e}")
     
