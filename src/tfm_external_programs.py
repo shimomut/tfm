@@ -83,7 +83,7 @@ def get_selected_or_cursor_files(pane_data):
     if not selected and pane_data['files'] and pane_data['focused_index'] < len(pane_data['files']):
         # No files selected, use focused file
         focused_file = pane_data['files'][pane_data['focused_index']]
-        selected = [cursor_file.name]
+        selected = [focused_file.name]
     return selected
 
 class ExternalProgramManager:
