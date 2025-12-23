@@ -622,8 +622,10 @@ class TextViewer(UILayer):
         else:
             file_info = f"File: {display_title}"
             
-        if len(file_info) > width - 4:
-            file_info = "…" + file_info[-(width-5):]
+        # Truncate using display width (accounts for wide characters)
+        max_width = width - 4
+        if get_display_width(file_info) > max_width:
+            file_info = truncate_to_width(file_info, max_width, ellipsis="…")
         
         self.renderer.draw_text(0, 2, file_info, header_color_pair, header_attrs)
         

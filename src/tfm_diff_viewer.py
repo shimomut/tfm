@@ -500,11 +500,12 @@ class DiffViewer(UILayer):
         # Calculate column width for each file
         pane_width = width // 2
         
-        # Truncate file names if needed
-        if len(file1_display) > pane_width - 4:
-            file1_display = "…" + file1_display[-(pane_width - 5):]
-        if len(file2_display) > pane_width - 4:
-            file2_display = "…" + file2_display[-(pane_width - 5):]
+        # Truncate file names if needed (using display width for wide characters)
+        max_width = pane_width - 4
+        if get_display_width(file1_display) > max_width:
+            file1_display = truncate_to_width(file1_display, max_width, ellipsis="…")
+        if get_display_width(file2_display) > max_width:
+            file2_display = truncate_to_width(file2_display, max_width, ellipsis="…")
         
         # Draw file names
         self.renderer.draw_text(0, 2, file1_display, header_color_pair, header_attrs)
