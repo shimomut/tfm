@@ -445,9 +445,28 @@ class DiffEngine:
         """
         # Root node is special - classify based on children
         if node.depth == 0:
-            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+            # Apply same logic as regular directories
+            has_difference = False
+            has_pending = False
+            
+            for child in node.children:
+                if child.difference_type == DifferenceType.PENDING:
+                    has_pending = True
+                elif child.difference_type != DifferenceType.IDENTICAL:
+                    # Found a real difference
+                    has_difference = True
+                    break
+            
+            # If any real difference found, mark as CONTAINS_DIFFERENCE immediately
+            if has_difference:
                 return DifferenceType.CONTAINS_DIFFERENCE
-            return DifferenceType.IDENTICAL
+            
+            # If all children are identical, mark as IDENTICAL
+            if not has_pending:
+                return DifferenceType.IDENTICAL
+            
+            # Otherwise, still have pending children and no differences found yet
+            return DifferenceType.PENDING
         
         # Check if node exists on both sides
         exists_left = node.left_path is not None
@@ -464,9 +483,28 @@ class DiffEngine:
         # Exists on both sides
         if node.is_directory:
             # For directories, check if any children have differences
-            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+            # Check for actual differences (not just pending)
+            has_difference = False
+            has_pending = False
+            
+            for child in node.children:
+                if child.difference_type == DifferenceType.PENDING:
+                    has_pending = True
+                elif child.difference_type != DifferenceType.IDENTICAL:
+                    # Found a real difference
+                    has_difference = True
+                    break
+            
+            # If any real difference found, mark as CONTAINS_DIFFERENCE immediately
+            if has_difference:
                 return DifferenceType.CONTAINS_DIFFERENCE
-            return DifferenceType.IDENTICAL
+            
+            # If all children are identical, mark as IDENTICAL
+            if not has_pending:
+                return DifferenceType.IDENTICAL
+            
+            # Otherwise, still have pending children and no differences found yet
+            return DifferenceType.PENDING
         else:
             # For files, compare content
             if self.compare_file_content(node.left_path, node.right_path):
@@ -2653,9 +2691,11 @@ class DirectoryDiffViewer(UILayer):
             # Get all unique child names from both sides
             all_child_names = set(left_children.keys()) | set(right_children.keys())
             
-            # Create child nodes for each unique name
-            new_children = []
-            for child_name in sorted(all_child_names):
+            # Create a map of existing children by name
+            existing_children_map = {child.name: child for child in target_node.children}
+            
+            # Update existing children and create new ones as needed
+            for child_name in all_child_names:
                 left_info = left_children.get(child_name)
                 right_info = right_children.get(child_name)
                 
@@ -2663,26 +2703,34 @@ class DirectoryDiffViewer(UILayer):
                 is_directory = (left_info and left_info.is_directory) or \
                               (right_info and right_info.is_directory)
                 
-                # Create child node
-                child_node = TreeNode(
-                    name=child_name,
-                    left_path=left_info.path if left_info else None,
-                    right_path=right_info.path if right_info else None,
-                    is_directory=is_directory,
-                    difference_type=DifferenceType.PENDING,  # Will be classified later
-                    depth=target_node.depth + 1,
-                    is_expanded=False,
-                    children=[],
-                    parent=target_node,
-                    children_scanned=False,
-                    content_compared=False,
-                    scan_in_progress=False
-                )
+                # Check if this child already exists
+                existing_child = existing_children_map.get(child_name)
                 
-                new_children.append(child_node)
-            
-            # Replace node's children with new children
-            target_node.children = new_children
+                if existing_child:
+                    # Update existing child node (preserve its classification and state)
+                    if left_info:
+                        existing_child.left_path = left_info.path
+                    if right_info:
+                        existing_child.right_path = right_info.path
+                    # Don't reset children_scanned, difference_type, or other state
+                else:
+                    # Create new child node only if it doesn't exist
+                    child_node = TreeNode(
+                        name=child_name,
+                        left_path=left_info.path if left_info else None,
+                        right_path=right_info.path if right_info else None,
+                        is_directory=is_directory,
+                        difference_type=DifferenceType.PENDING,  # Will be classified later
+                        depth=target_node.depth + 1,
+                        is_expanded=False,
+                        children=[],
+                        parent=target_node,
+                        children_scanned=False,
+                        content_compared=False,
+                        scan_in_progress=False
+                    )
+                    # Add new child to the list
+                    target_node.children.append(child_node)
             
             # Sort children: directories first, then files, alphabetically
             target_node.children.sort(key=lambda child: (
@@ -2690,8 +2738,14 @@ class DirectoryDiffViewer(UILayer):
                 child.name.lower()       # Case-insensitive alphabetical order
             ))
             
+            # Queue file comparison tasks for any new files
+            self._queue_file_comparisons_for_node(target_node)
+            
             # Classify the updated node and its children
             self._classify_node_and_children(target_node)
+            
+            # Update parent classifications to propagate changes upward
+            self._update_parent_classifications(target_node)
             
             # Update visible nodes if this node is expanded
             if target_node.is_expanded:
@@ -2760,9 +2814,28 @@ class DirectoryDiffViewer(UILayer):
         """
         # Root node is special - classify based on children
         if node.depth == 0:
-            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+            # Apply same logic as regular directories
+            has_difference = False
+            has_pending = False
+            
+            for child in node.children:
+                if child.difference_type == DifferenceType.PENDING:
+                    has_pending = True
+                elif child.difference_type != DifferenceType.IDENTICAL:
+                    # Found a real difference
+                    has_difference = True
+                    break
+            
+            # If any real difference found, mark as CONTAINS_DIFFERENCE immediately
+            if has_difference:
                 return DifferenceType.CONTAINS_DIFFERENCE
-            return DifferenceType.IDENTICAL
+            
+            # If all children are identical, mark as IDENTICAL
+            if not has_pending:
+                return DifferenceType.IDENTICAL
+            
+            # Otherwise, still have pending children and no differences found yet
+            return DifferenceType.PENDING
         
         # Check if node exists on both sides
         exists_left = node.left_path is not None
@@ -2779,13 +2852,33 @@ class DirectoryDiffViewer(UILayer):
         # Exists on both sides
         if node.is_directory:
             # For directories, check if any children have differences
-            if not node.children_scanned:
-                # Not yet scanned
+            # If directory has no children yet (not scanned), mark as PENDING
+            if not node.children_scanned and len(node.children) == 0:
+                # Not yet scanned and no children
                 return DifferenceType.PENDING
             
-            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+            # Check for actual differences (not just pending)
+            has_difference = False
+            has_pending = False
+            
+            for child in node.children:
+                if child.difference_type == DifferenceType.PENDING:
+                    has_pending = True
+                elif child.difference_type != DifferenceType.IDENTICAL:
+                    # Found a real difference (ONLY_LEFT, ONLY_RIGHT, CONTENT_DIFFERENT, CONTAINS_DIFFERENCE)
+                    has_difference = True
+                    break  # Can immediately mark as CONTAINS_DIFFERENCE
+            
+            # If any real difference found, mark as CONTAINS_DIFFERENCE immediately
+            if has_difference:
                 return DifferenceType.CONTAINS_DIFFERENCE
-            return DifferenceType.IDENTICAL
+            
+            # If all children are identical, mark as IDENTICAL
+            if not has_pending:
+                return DifferenceType.IDENTICAL
+            
+            # Otherwise, still have pending children and no differences found yet
+            return DifferenceType.PENDING
         else:
             # For files, compare content
             if not node.content_compared:
@@ -3300,336 +3393,6 @@ class DirectoryDiffViewer(UILayer):
         for index, node in enumerate(self.visible_nodes):
             self.node_index_map[id(node)] = index
     
-    # ========================================================================
-    # Directory Scanner Worker Thread (Task 5)
-    # ========================================================================
-    
-    def _directory_scanner_worker(self) -> None:
-        """
-        Worker thread that processes directory scanning tasks from the scan queue.
-        
-        This method runs in a background thread, continuously processing scan tasks
-        from the scan_queue. For each task, it:
-        1. Scans the directory's immediate children (single level)
-        2. Updates file dictionaries with thread-safe locking
-        3. Updates tree structure to include new children
-        4. Adds child directories to scan_queue (breadth-first)
-        5. Marks tree as dirty to trigger UI update
-        
-        The worker checks the cancelled flag periodically to support graceful shutdown.
-        """
-        while not self.cancelled:
-            try:
-                # Get next scan task from queue (with timeout to check cancelled flag)
-                try:
-                    task = self.scan_queue.get(timeout=0.1)
-                except queue.Empty:
-                    # No tasks available, check cancelled flag and continue
-                    continue
-                
-                # Process the scan task
-                try:
-                    # Scan left directory if it exists
-                    left_children = {}
-                    if task.left_path:
-                        left_children = self._scan_single_level(task.left_path)
-                    
-                    # Scan right directory if it exists
-                    right_children = {}
-                    if task.right_path:
-                        right_children = self._scan_single_level(task.right_path)
-                    
-                    # Update file dictionaries with thread-safe locking
-                    with self.data_lock:
-                        # Add scanned children to file dictionaries
-                        # Keys need to include the parent path
-                        for filename, file_info in left_children.items():
-                            if task.relative_path:
-                                full_relative_path = f"{task.relative_path}/{filename}"
-                            else:
-                                full_relative_path = filename
-                            file_info.relative_path = full_relative_path
-                            self.left_files[full_relative_path] = file_info
-                        
-                        for filename, file_info in right_children.items():
-                            if task.relative_path:
-                                full_relative_path = f"{task.relative_path}/{filename}"
-                            else:
-                                full_relative_path = filename
-                            file_info.relative_path = full_relative_path
-                            self.right_files[full_relative_path] = file_info
-                    
-                    # Update tree structure to include new children
-                    # Find the node in the tree that corresponds to this scan task
-                    with self.tree_lock:
-                        if self.root_node:
-                            # Find the node by relative path
-                            target_node = self._find_node_by_path(self.root_node, task.relative_path)
-                            if target_node:
-                                # Update the node with scanned children
-                                self._update_tree_node(target_node, left_children, right_children)
-                    
-                    # Add child directories to scan_queue (breadth-first)
-                    # Collect all unique child directory names from both sides
-                    child_dirs = set()
-                    for filename, file_info in left_children.items():
-                        if file_info.is_directory:
-                            child_dirs.add(filename)
-                    for filename, file_info in right_children.items():
-                        if file_info.is_directory:
-                            child_dirs.add(filename)
-                    
-                    # Create scan tasks for child directories
-                    for child_dir_name in child_dirs:
-                        # Build paths for child directory
-                        child_left_path = None
-                        child_right_path = None
-                        
-                        if task.left_path and child_dir_name in left_children:
-                            child_left_path = task.left_path / child_dir_name
-                        if task.right_path and child_dir_name in right_children:
-                            child_right_path = task.right_path / child_dir_name
-                        
-                        # Build relative path for child
-                        if task.relative_path:
-                            child_relative_path = f"{task.relative_path}/{child_dir_name}"
-                        else:
-                            child_relative_path = child_dir_name
-                        
-                        # Task 10.1: Skip one-sided directories (lazy scanning)
-                        # Check if directory exists on both sides
-                        exists_on_both_sides = (child_left_path is not None and 
-                                               child_right_path is not None)
-                        
-                        # Only add to scan queue if directory exists on both sides
-                        # One-sided directories will be marked as PENDING with low priority
-                        # and will only be scanned when user explicitly expands them
-                        if exists_on_both_sides:
-                            # Create scan task for child directory
-                            child_task = ScanTask(
-                                left_path=child_left_path,
-                                right_path=child_right_path,
-                                relative_path=child_relative_path,
-                                priority=task.priority,  # Inherit priority from parent
-                                is_visible=False  # Child directories start as not visible
-                            )
-                            
-                            # Add to scan queue
-                            with self.queue_lock:
-                                self.scan_queue.put(child_task)
-                        # else: One-sided directory - don't add to scan queue
-                        # It will remain PENDING and will be scanned on-demand when user expands it
-                    
-                    # Mark tree as dirty to trigger UI update
-                    self.mark_dirty()
-                    
-                except Exception as e:
-                    # Log error but continue processing other tasks
-                    print(f"Error processing scan task for {task.relative_path}: {e}", 
-                          file=__import__('sys').stderr)
-                
-                finally:
-                    # Mark task as done
-                    self.scan_queue.task_done()
-                    
-            except Exception as e:
-                # Unexpected error in worker loop
-                print(f"Unexpected error in directory scanner worker: {e}", 
-                      file=__import__('sys').stderr)
-                # Continue running unless cancelled
-    
-    def _start_directory_scanner_worker(self) -> None:
-        """
-        Create and start the directory scanner worker thread.
-        
-        This method initializes the scanner_thread and starts it running
-        the _directory_scanner_worker method. The thread is marked as a
-        daemon thread so it won't prevent the program from exiting.
-        """
-        # Only start if not already running
-        if self.scanner_thread and self.scanner_thread.is_alive():
-            return
-        
-        # Reset cancelled flag
-        self.cancelled = False
-        
-        # Create and start scanner thread
-        self.scanner_thread = threading.Thread(
-            target=self._directory_scanner_worker,
-            daemon=True,
-            name="DirectoryScanner"
-        )
-        self.scanner_thread.start()
-    
-    def _start_file_comparator_worker(self) -> None:
-        """
-        Create and start the file comparator worker thread.
-        
-        This method initializes the comparator_thread and starts it running
-        the _file_comparator_worker method. The thread is marked as a
-        daemon thread so it won't prevent the program from exiting.
-        """
-        # Only start if not already running
-        if self.comparator_thread and self.comparator_thread.is_alive():
-            return
-        
-        # Reset cancelled flag (if not already reset by scanner worker)
-        self.cancelled = False
-        
-        # Create and start comparator thread
-        self.comparator_thread = threading.Thread(
-            target=self._file_comparator_worker,
-            daemon=True,
-            name="FileComparator"
-        )
-        self.comparator_thread.start()
-    
-    def _update_tree_node(self, node: TreeNode, left_children: Dict[str, FileInfo], 
-                         right_children: Dict[str, FileInfo]) -> None:
-        """
-        Update a tree node with newly scanned children.
-        
-        This method is called after scanning a directory to add its children
-        to the tree structure. It uses tree_lock for thread-safe updates.
-        
-        For files that exist on both sides, instead of comparing them immediately,
-        this method queues them for background comparison by the file comparator worker.
-        
-        Args:
-            node: TreeNode to update with children
-            left_children: Dictionary of children from left directory (filename -> FileInfo)
-            right_children: Dictionary of children from right directory (filename -> FileInfo)
-        """
-        # This method should be called with tree_lock already held
-        # but we'll be defensive and check
-        
-        # Get all unique child names from both sides
-        all_child_names = set(left_children.keys()) | set(right_children.keys())
-        
-        # Create TreeNode for each child
-        new_children = []
-        for child_name in sorted(all_child_names):
-            left_info = left_children.get(child_name)
-            right_info = right_children.get(child_name)
-            
-            # Determine if this is a directory
-            is_directory = (left_info and left_info.is_directory) or \
-                          (right_info and right_info.is_directory)
-            
-            # Determine difference type and content_compared status
-            if left_info and not right_info:
-                diff_type = DifferenceType.ONLY_LEFT
-                content_compared = True  # One-sided files don't need comparison
-            elif right_info and not left_info:
-                diff_type = DifferenceType.ONLY_RIGHT
-                content_compared = True  # One-sided files don't need comparison
-            else:
-                diff_type = DifferenceType.PENDING  # Will be classified later
-                content_compared = False  # Not yet compared
-            
-            # Create child node
-            child_node = TreeNode(
-                name=child_name,
-                left_path=left_info.path if left_info else None,
-                right_path=right_info.path if right_info else None,
-                is_directory=is_directory,
-                difference_type=diff_type,
-                depth=node.depth + 1,
-                is_expanded=False,
-                children=[],
-                parent=node,
-                children_scanned=False,  # Not yet scanned
-                content_compared=content_compared,  # One-sided files already "compared"
-                scan_in_progress=False
-            )
-            
-            new_children.append(child_node)
-            
-            # Queue file comparison for files that exist on both sides
-            if not is_directory and left_info and right_info:
-                # Build relative path for this file
-                if node.depth == 0:
-                    # Direct child of root
-                    file_relative_path = child_name
-                else:
-                    # Build full relative path by traversing up to root
-                    path_parts = [child_name]
-                    current = node
-                    while current and current.depth > 0:
-                        path_parts.insert(0, current.name)
-                        current = current.parent
-                    file_relative_path = "/".join(path_parts)
-                
-                # Create comparison task
-                comparison_task = ComparisonTask(
-                    left_path=left_info.path,
-                    right_path=right_info.path,
-                    relative_path=file_relative_path,
-                    priority=10,  # Normal priority (will be updated by priority system)
-                    is_visible=False  # Will be updated by priority system
-                )
-                
-                # Add to comparison queue
-                with self.queue_lock:
-                    self.comparison_queue.put(comparison_task)
-        
-        # Sort children: directories first, then files, alphabetically within each group
-        new_children.sort(key=lambda child: (
-            not child.is_directory,  # False (directories) sorts before True (files)
-            child.name.lower()       # Case-insensitive alphabetical order
-        ))
-        
-        # Update node's children
-        node.children = new_children
-        node.children_scanned = True
-        node.scan_in_progress = False
-        
-        # Classify the new children (quick classification without file content comparison)
-        for child in new_children:
-            child.difference_type = self._classify_node_quick(child)
-        
-        # Update parent node's difference type based on children
-        node.difference_type = self._classify_node_quick(node)
-        
-        # Update visible nodes if this node is expanded
-        if node.is_expanded:
-            self._update_visible_nodes()
-    
-    def _find_node_by_path(self, node: TreeNode, relative_path: str) -> Optional[TreeNode]:
-        """
-        Find a node in the tree by its relative path.
-        
-        Args:
-            node: Root node to start search from
-            relative_path: Relative path to find (e.g., "dir1/dir2")
-            
-        Returns:
-            TreeNode if found, None otherwise
-        """
-        # Empty path means root node
-        if not relative_path:
-            return node
-        
-        # Split path into components
-        parts = relative_path.split('/')
-        
-        # Traverse tree following path components
-        current = node
-        for part in parts:
-            # Find child with matching name
-            found = False
-            for child in current.children:
-                if child.name == part:
-                    current = child
-                    found = True
-                    break
-            
-            if not found:
-                # Path not found in tree
-                return None
-        
-        return current
-    
     def _classify_node_quick(self, node: TreeNode) -> DifferenceType:
         """
         Quickly classify a node's difference type without deep comparison.
@@ -3646,9 +3409,28 @@ class DirectoryDiffViewer(UILayer):
         """
         # Root node is special - classify based on children
         if node.depth == 0:
-            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+            # Apply same logic as regular directories
+            has_difference = False
+            has_pending = False
+            
+            for child in node.children:
+                if child.difference_type == DifferenceType.PENDING:
+                    has_pending = True
+                elif child.difference_type != DifferenceType.IDENTICAL:
+                    # Found a real difference
+                    has_difference = True
+                    break
+            
+            # If any real difference found, mark as CONTAINS_DIFFERENCE immediately
+            if has_difference:
                 return DifferenceType.CONTAINS_DIFFERENCE
-            return DifferenceType.IDENTICAL
+            
+            # If all children are identical, mark as IDENTICAL
+            if not has_pending:
+                return DifferenceType.IDENTICAL
+            
+            # Otherwise, still have pending children and no differences found yet
+            return DifferenceType.PENDING
         
         # Check if node exists on both sides
         exists_left = node.left_path is not None
@@ -3665,13 +3447,33 @@ class DirectoryDiffViewer(UILayer):
         # Exists on both sides
         if node.is_directory:
             # For directories, check if any children have differences
-            if not node.children_scanned:
-                # Not yet scanned
+            # If directory has no children yet (not scanned), mark as PENDING
+            if not node.children_scanned and len(node.children) == 0:
+                # Not yet scanned and no children
                 return DifferenceType.PENDING
             
-            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+            # Check for actual differences (not just pending)
+            has_difference = False
+            has_pending = False
+            
+            for child in node.children:
+                if child.difference_type == DifferenceType.PENDING:
+                    has_pending = True
+                elif child.difference_type != DifferenceType.IDENTICAL:
+                    # Found a real difference (ONLY_LEFT, ONLY_RIGHT, CONTENT_DIFFERENT, CONTAINS_DIFFERENCE)
+                    has_difference = True
+                    break  # Can immediately mark as CONTAINS_DIFFERENCE
+            
+            # If any real difference found, mark as CONTAINS_DIFFERENCE immediately
+            if has_difference:
                 return DifferenceType.CONTAINS_DIFFERENCE
-            return DifferenceType.IDENTICAL
+            
+            # If all children are identical, mark as IDENTICAL
+            if not has_pending:
+                return DifferenceType.IDENTICAL
+            
+            # Otherwise, still have pending children and no differences found yet
+            return DifferenceType.PENDING
         else:
             # For files, mark as PENDING (will be compared by file comparator worker)
             if not node.content_compared:
@@ -3783,8 +3585,11 @@ class DirectoryDiffViewer(UILayer):
             old_type = current.difference_type
             current.difference_type = self._classify_node_quick(current)
             
-            # If classification didn't change, we can stop (optimization)
-            if old_type == current.difference_type:
+            # Optimization: If classification didn't change AND it's already CONTAINS_DIFFERENCE,
+            # we can stop (no need to propagate further)
+            # However, if it changed from PENDING to CONTAINS_DIFFERENCE, we must continue
+            # propagating up the tree
+            if old_type == current.difference_type and old_type == DifferenceType.CONTAINS_DIFFERENCE:
                 break
             
             # Move to next parent
