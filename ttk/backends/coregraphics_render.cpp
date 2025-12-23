@@ -1450,6 +1450,7 @@ static int get_font_index_for_character(
             
             // Try to get glyph with this cascade font
             if (CTFontGetGlyphsForCharacters(cascade_font, &uni_char, &glyph, 1)) {
+                g_font_cache_hits++;  // Cascade font hit
                 result_index = static_cast<int>(i);
                 CFRelease(cascade_font);
                 break;  // Found a font that can render this character
@@ -2468,32 +2469,19 @@ static void initialize_caches(PyObject* font_names_obj, double font_size_val = 1
     }
     
     // Create font with descriptor (includes cascade list if available)
-    g_base_font = CTFontCreateWithName(font_name, font_size, nullptr);
+    if (descriptor != nullptr) {
+        // Use descriptor to create font with cascade list
+        g_base_font = CTFontCreateWithFontDescriptor(descriptor, font_size, nullptr);
+        CFRelease(descriptor);
+    } else {
+        // No cascade list, create font directly
+        g_base_font = CTFontCreateWithName(font_name, font_size, nullptr);
+    }
+    
     CFRelease(font_name);  // Release the CFString we created
     
     if (g_base_font == nullptr) {
-        if (descriptor != nullptr) {
-            CFRelease(descriptor);
-        }
         throw std::runtime_error("Failed to create base font");
-    }
-    
-    // Apply descriptor to font to enable cascade list (if we have one)
-    if (descriptor != nullptr) {
-        CTFontRef font_with_cascade = CTFontCreateCopyWithAttributes(
-            g_base_font,
-            font_size,
-            nullptr,
-            descriptor
-        );
-        
-        CFRelease(descriptor);
-        
-        if (font_with_cascade != nullptr) {
-            CFRelease(g_base_font);
-            g_base_font = font_with_cascade;
-        }
-        // If cascade application fails, continue with base font
     }
     
     // Create caches
