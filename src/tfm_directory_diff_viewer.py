@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, List, Dict
 import threading
+import time
 from tfm_path import Path
 from tfm_ui_layer import UILayer
 from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent, SystemEvent, TextAttribute
@@ -29,6 +30,7 @@ from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_diff_viewer import DiffViewer
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_info_dialog import InfoDialog
+from tfm_progress_animator import ProgressAnimatorFactory
 
 
 class DifferenceType(Enum):
@@ -552,6 +554,18 @@ class DirectoryDiffViewer(UILayer):
         self.scan_error: Optional[str] = None
         self.comparison_errors: Dict[str, str] = {}  # File comparison errors
         
+        # Progressive tree building
+        self.tree_lock = threading.Lock()  # Protect tree during updates
+        self.last_tree_update = 0.0  # Time of last tree rebuild
+        self.tree_update_interval = 0.5  # Rebuild tree every 0.5 seconds during scan
+        
+        # Progress animator
+        # Create minimal config for animator
+        class MinimalConfig:
+            PROGRESS_ANIMATION_PATTERN = 'spinner'
+            PROGRESS_ANIMATION_SPEED = 0.08
+        self.progress_animator = ProgressAnimatorFactory.create_loading_animator(MinimalConfig())
+        
         # Help dialog
         self.info_dialog = InfoDialog(None, renderer)
         
@@ -580,20 +594,42 @@ class DirectoryDiffViewer(UILayer):
         if not isinstance(event, KeyEvent) or event is None:
             return False
         
-        # If scan is in progress, only allow cancellation
-        if self.scan_in_progress:
-            if event.key_code == KeyCode.ESCAPE:
+        # Allow ESC to cancel scan or close viewer
+        if event.key_code == KeyCode.ESCAPE:
+            if self.scan_in_progress:
                 # Cancel scan
                 if self.scanner and not self.scan_cancelled:
                     self.scanner.cancel()
                     self.scan_cancelled = True
                     self.scan_status = "Cancelling scan..."
                     self.mark_dirty()
-                    # Close viewer after cancellation
-                    self._should_close = True
                 return True
-            # Ignore other keys during scan
+            else:
+                # Close viewer
+                self._should_close = True
+                self.mark_dirty()
+                return True
+        
+        # Allow 'q' to quit even during scan
+        if event.char and event.char.lower() == 'q':
+            if self.scan_in_progress:
+                # Cancel scan first
+                if self.scanner and not self.scan_cancelled:
+                    self.scanner.cancel()
+                    self.scan_cancelled = True
+                    self.scan_status = "Cancelling scan..."
+            # Close viewer
+            self._should_close = True
+            self.mark_dirty()
             return True
+        
+        # Allow help dialog even during scan
+        if event.char and event.char == '?':
+            self._show_help_dialog()
+            return True
+        
+        # Allow navigation and other controls even during scan
+        # (tree will show partial results)
         
         # Get display dimensions for scrolling calculations
         height, width = self.renderer.get_dimensions()
@@ -792,28 +828,29 @@ class DirectoryDiffViewer(UILayer):
         # Clear screen
         renderer.clear()
         
-        # If scan is in progress, show progress screen
-        if self.scan_in_progress:
-            # Check if cancelling
-            if self.scan_cancelled:
-                self._render_cancellation_screen(renderer, width, height)
-            else:
-                self._render_progress_screen(renderer, width, height)
-            return
-        
         # If scan error occurred, show error screen
         if self.scan_error:
             self._render_error_screen(renderer, width, height)
             return
         
-        # If no tree yet, show loading message
-        if not self.root_node or not self.visible_nodes:
-            self._render_loading_screen(renderer, width, height)
-            return
-        
-        # Render normal view
+        # Always render normal dual-pane view (even during scanning)
         self._render_header(renderer, width)
+        
+        # If scan is in progress or no tree yet, show what we have so far
+        if self.scan_in_progress or not self.root_node or not self.visible_nodes:
+            # Try to build/update tree with current data
+            with self.tree_lock:
+                if self.left_files or self.right_files:
+                    current_time = time.time()
+                    # Rebuild tree periodically during scan
+                    if current_time - self.last_tree_update >= self.tree_update_interval:
+                        self._build_tree()
+                        self.last_tree_update = current_time
+        
+        # Render content (will show partial results during scan)
         self._render_content(renderer, width, height)
+        
+        # Render status bar with progress indicator if scanning
         self._render_status_bar(renderer, width, height)
     
     def _render_header(self, renderer, width: int) -> None:
@@ -1005,10 +1042,16 @@ class DirectoryDiffViewer(UILayer):
         content_start_y = 1
         content_height = height - 2
         
-        # Check if directories are empty or identical
-        if not self.visible_nodes or len(self.visible_nodes) == 0:
+        # Check if directories are empty or identical (but not during scanning)
+        if not self.scan_in_progress and (not self.visible_nodes or len(self.visible_nodes) == 0):
             # No visible nodes - directories are empty or all identical (with filter on)
             self._render_empty_or_identical_message(renderer, width, height, content_start_y, content_height)
+            return
+        
+        # During scanning or when we have nodes, show the tree view
+        # If no nodes yet during scan, just show empty tree (will fill in as scan progresses)
+        if not self.visible_nodes:
+            # Show empty tree area during scan
             return
         
         # Calculate scrollbar width
@@ -1322,8 +1365,16 @@ class DirectoryDiffViewer(UILayer):
             )
         
         # Build status text
-        # Left side: navigation hints
-        left_status = " ?:help  q:quit  i:toggle-identical "
+        # Left side: navigation hints (or progress during scan)
+        if self.scan_in_progress:
+            # Show progress animator and status during scan
+            animator_frame = self.progress_animator.get_current_frame()
+            left_status = f" {animator_frame} {self.scan_status} "
+            if self.scan_total > 0:
+                left_status += f"({self.scan_current}/{self.scan_total}) "
+        else:
+            # Normal navigation hints
+            left_status = " ?:help  q:quit  i:toggle-identical "
         
         # Right side: filter status and statistics
         right_parts = []
@@ -1343,14 +1394,14 @@ class DirectoryDiffViewer(UILayer):
         
         if stats_parts:
             right_parts.append(" ".join(stats_parts))
-        else:
+        elif not self.scan_in_progress:
             right_parts.append("No differences")
         
         # Add error count if any
         if error_count > 0:
             right_parts.append(f"Errors:{error_count}")
         
-        right_status = " " + "  ".join(right_parts) + " "
+        right_status = " " + "  ".join(right_parts) + " " if right_parts else " "
         
         # Draw left status
         renderer.draw_text(status_y, 0, left_status, status_color_pair, status_attrs)
@@ -1705,7 +1756,7 @@ class DirectoryDiffViewer(UILayer):
         self.scan_total = total
         self.scan_status = status
         
-        # Mark dirty to trigger redraw
+        # Mark dirty to trigger redraw (which will update tree if needed)
         self.mark_dirty()
     
     def _build_tree(self) -> None:
@@ -1714,19 +1765,28 @@ class DirectoryDiffViewer(UILayer):
         
         This method uses DiffEngine to construct the unified tree and
         initializes the visible nodes list for rendering.
+        Thread-safe: Can be called during scanning to show progressive results.
         """
+        # Skip if no data yet
+        if not self.left_files and not self.right_files:
+            return
+        
         # Create diff engine
         engine = DiffEngine(self.left_files, self.right_files)
         
         # Build tree
-        self.root_node = engine.build_tree()
+        new_root = engine.build_tree()
         
         # Store comparison errors for display
         self.comparison_errors = engine.comparison_errors
         
+        # Update root node (thread-safe)
+        self.root_node = new_root
+        
         # Initialize visible nodes (start with root expanded)
-        self.root_node.is_expanded = True
-        self._update_visible_nodes()
+        if self.root_node:
+            self.root_node.is_expanded = True
+            self._update_visible_nodes()
     
     def _update_visible_nodes(self) -> None:
         """
