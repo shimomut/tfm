@@ -1372,6 +1372,7 @@ static size_t g_total_batch_splits = 0;
 static size_t g_font_lookups = 0;
 static size_t g_font_cache_hits = 0;
 static bool g_enable_perf_logging = false;
+static char16_t g_last_failed_char = 0;  // Last character that failed font lookup
 
 /**
  * Determine which font from the cascade list can render a character.
@@ -1461,6 +1462,12 @@ static int get_font_index_for_character(
     }
     
     CFRelease(cascade_list);
+    
+    // Track failed lookups for debugging
+    if (result_index == -2) {
+        g_last_failed_char = character;
+    }
+    
     return result_index;
 }
 
@@ -2823,12 +2830,20 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             double font_hit_rate = g_font_lookups > 0 ? 
                 (g_font_cache_hits * 100.0 / g_font_lookups) : 0.0;
             
+            // Log performance metrics
             fprintf(stderr, 
                 "[C++ Renderer] Frame %zu: %.2fms | Batches: %.1f | Chars: %.1f | "
-                "Splits: %.1f | Font hits: %.1f%%\n",
+                "Splits: %.1f | Font hits: %.1f%%",
                 g_frames_rendered, avg_render_time, avg_batches, avg_chars, 
                 avg_splits, font_hit_rate
             );
+            
+            // Include last failed character if any lookups failed
+            if (g_last_failed_char != 0) {
+                fprintf(stderr, " | Last fail: U+%04X", static_cast<unsigned int>(g_last_failed_char));
+            }
+            
+            fprintf(stderr, "\n");
             
             // Reset cumulative metrics for next logging period
             // This ensures each log shows averages for the last 60 frames only
@@ -2838,6 +2853,7 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
             g_total_batch_splits = 0;
             g_font_lookups = 0;
             g_font_cache_hits = 0;
+            g_last_failed_char = 0;  // Reset failed character tracking
         }
         
         // Success - return None
@@ -3028,6 +3044,7 @@ static PyObject* reset_metrics(PyObject* self, PyObject* args) {
         g_total_batch_splits = 0;
         g_font_lookups = 0;
         g_font_cache_hits = 0;
+        g_last_failed_char = 0;
         
         // Reset cache metrics
         if (g_attr_dict_cache != nullptr) {
