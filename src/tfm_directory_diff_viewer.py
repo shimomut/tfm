@@ -913,6 +913,9 @@ class DirectoryDiffViewer(UILayer):
         # Render content (will show partial results during scan)
         self._render_content(renderer, width, height)
         
+        # Render details pane for focused item
+        self._render_details_pane(renderer, width, height)
+        
         # Render status bar with progress indicator if scanning
         self._render_status_bar(renderer, width, height)
     
@@ -1101,9 +1104,9 @@ class DirectoryDiffViewer(UILayer):
             width: Terminal width
             height: Terminal height
         """
-        # Calculate content area (header is 1 line, status bar is 1 line)
+        # Calculate content area (header is 1 line, details pane is 3 lines, status bar is 1 line)
         content_start_y = 1
-        content_height = height - 2
+        content_height = height - 5  # Reserve space for header, details pane (3 lines), and status bar
         
         # Check if directories are empty or identical (but not during scanning)
         if not self.scan_in_progress and (not self.visible_nodes or len(self.visible_nodes) == 0):
@@ -1426,6 +1429,141 @@ class DirectoryDiffViewer(UILayer):
         if self.layer_stack:
             self.layer_stack.push(self.info_dialog)
         self.mark_dirty()
+    
+    def _render_details_pane(self, renderer, width: int, height: int) -> None:
+        """
+        Render the details pane showing information about focused files.
+        
+        Args:
+            renderer: TTK renderer instance
+            width: Terminal width
+            height: Terminal height
+        """
+        import stat
+        import time
+        
+        # Details pane occupies 3 lines above the status bar
+        details_start_y = height - 4
+        details_height = 3
+        
+        # Get status color for the pane background
+        status_color_pair, status_attrs = get_status_color()
+        
+        # Clear the details pane area with colored background
+        for i in range(details_height):
+            renderer.draw_text(details_start_y + i, 0, " " * width, status_color_pair, status_attrs)
+        
+        # If no nodes or no focused node, show empty pane
+        if not self.visible_nodes or self.cursor_position >= len(self.visible_nodes):
+            return
+        
+        # Get the focused node
+        focused_node = self.visible_nodes[self.cursor_position]
+        relative_path = self._get_relative_path(focused_node)
+        
+        # Get file info for both sides
+        left_info = self.left_files.get(relative_path) if relative_path else None
+        right_info = self.right_files.get(relative_path) if relative_path else None
+        
+        # Helper function to format file details
+        def format_details(file_info: Optional[FileInfo], side_label: str) -> List[str]:
+            """Format file details for display."""
+            if not file_info:
+                return [
+                    f"{side_label} Path: (not present)",
+                    f"{side_label} Type: -",
+                    f"{side_label} Size: -  Permission: -  Modified: -"
+                ]
+            
+            # Full filepath
+            filepath_line = f"{side_label} Path: {file_info.path}"
+            
+            # Type
+            if file_info.is_directory:
+                file_type = "Directory"
+            else:
+                file_type = "File"
+            type_line = f"{side_label} Type: {file_type}"
+            
+            # Size, Permission, Timestamp
+            if file_info.is_accessible:
+                # Format size
+                if file_info.is_directory:
+                    size_str = "-"
+                else:
+                    size = file_info.size
+                    if size < 1024:
+                        size_str = f"{size}B"
+                    elif size < 1024 * 1024:
+                        size_str = f"{size / 1024:.1f}KB"
+                    elif size < 1024 * 1024 * 1024:
+                        size_str = f"{size / (1024 * 1024):.1f}MB"
+                    else:
+                        size_str = f"{size / (1024 * 1024 * 1024):.1f}GB"
+                
+                # Format permission
+                try:
+                    st = file_info.path.stat()
+                    mode = st.st_mode
+                    perm_str = stat.filemode(mode)
+                except (OSError, AttributeError):
+                    perm_str = "?"
+                
+                # Format timestamp
+                try:
+                    mtime_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(file_info.mtime))
+                except (OSError, ValueError):
+                    mtime_str = "?"
+                
+                details_line = f"{side_label} Size: {size_str}  Permission: {perm_str}  Modified: {mtime_str}"
+            else:
+                # File is not accessible
+                details_line = f"{side_label} Size: -  Permission: -  Modified: - (Error: {file_info.error_message})"
+            
+            return [filepath_line, type_line, details_line]
+        
+        # Format details for left side
+        left_details = format_details(left_info, "L")
+        
+        # Format details for right side
+        right_details = format_details(right_info, "R")
+        
+        # Render details line by line
+        # Line 1: Left path
+        line1 = left_details[0]
+        if len(line1) > width:
+            line1 = line1[:width-1] + "…"
+        renderer.draw_text(details_start_y, 0, line1, status_color_pair, status_attrs)
+        
+        # Line 2: Right path
+        line2 = right_details[0]
+        if len(line2) > width:
+            line2 = line2[:width-1] + "…"
+        renderer.draw_text(details_start_y + 1, 0, line2, status_color_pair, status_attrs)
+        
+        # Line 3: Combined type and details
+        # Format: "L Type: X  Size: Y  Permission: Z  Modified: W | R Type: X  Size: Y  Permission: Z  Modified: W"
+        left_type_and_details = left_details[1] + "  " + left_details[2].replace(f"L Size:", "Size:")
+        right_type_and_details = right_details[1] + "  " + right_details[2].replace(f"R Size:", "Size:")
+        
+        # Calculate available space for each side
+        separator = " | "
+        available_width = width - len(separator)
+        left_width = available_width // 2
+        right_width = available_width - left_width
+        
+        # Truncate if needed
+        if len(left_type_and_details) > left_width:
+            left_type_and_details = left_type_and_details[:left_width-1] + "…"
+        if len(right_type_and_details) > right_width:
+            right_type_and_details = right_type_and_details[:right_width-1] + "…"
+        
+        # Pad to exact widths
+        left_type_and_details = left_type_and_details.ljust(left_width)
+        right_type_and_details = right_type_and_details.ljust(right_width)
+        
+        line3 = left_type_and_details + separator + right_type_and_details
+        renderer.draw_text(details_start_y + 2, 0, line3, status_color_pair, status_attrs)
     
     def _render_status_bar(self, renderer, width: int, height: int) -> None:
         """
