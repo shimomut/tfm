@@ -899,15 +899,14 @@ class DirectoryDiffViewer(UILayer):
         self._render_header(renderer, width)
         
         # If scan is in progress or no tree yet, show what we have so far
-        if self.scan_in_progress or not self.root_node or not self.visible_nodes:
-            # Try to build/update tree with current data
+        # Note: With progressive scanning, the tree is built incrementally by worker threads
+        # We should NOT rebuild it here as that would lose expansion state and undo progressive updates
+        if not self.root_node or not self.visible_nodes:
+            # Only build initial tree if we don't have one yet
             with self.tree_lock:
-                if self.left_files or self.right_files:
-                    current_time = time.time()
-                    # Rebuild tree periodically during scan
-                    if current_time - self.last_tree_update >= self.tree_update_interval:
-                        self._build_tree()
-                        self.last_tree_update = current_time
+                if (self.left_files or self.right_files) and not self.root_node:
+                    # Build initial tree structure (this should only happen once)
+                    self._build_tree_with_pending()
         
         # Render content (will show partial results during scan)
         self._render_content(renderer, width, height)
