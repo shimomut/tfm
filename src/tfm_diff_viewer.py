@@ -525,35 +525,11 @@ class DiffViewer(UILayer):
         # Clear status bar
         self.renderer.draw_text(status_y, 0, " " * width, status_color_pair, status_attrs)
         
-        # Calculate statistics
-        if self.wrap_lines:
-            # Get wrapped lines for accurate count
-            pane_width = (width - 1) // 2
-            line_num_width = self.line_number_width if self.show_line_numbers else 0
-            scroll_bar_width = calculate_scrollbar_width(len(self.diff_lines), height - 3)
-            content_width = pane_width - scroll_bar_width - line_num_width
-            display_lines = self._get_wrapped_diff_lines(content_width)
-            total_lines = len(display_lines)
-        else:
-            total_lines = len(self.diff_lines)
+        # Left side: navigation hints
+        left_status = " ?:help  q:quit "
         
-        equal_lines = sum(1 for item in self.diff_lines if item[2] == 'equal')
-        changed_lines = sum(1 for item in self.diff_lines if item[2] in ('replace', 'delete', 'insert'))
-        
-        current_line = self.scroll_offset + 1
-        scroll_percent = min(100, int((current_line / max(1, total_lines)) * 100)) if total_lines > 0 else 100
-        
-        # Status text with diff navigation info
-        diff_nav_info = ""
-        if self.diff_indices and self.current_diff_index >= 0:
-            diff_nav_info = f" Diff {self.current_diff_index + 1}/{len(self.diff_indices)} "
-        
-        left_status = f" Line {current_line}/{total_lines} ({scroll_percent}%){diff_nav_info}"
-        
-        # Build right status with options
+        # Right side: options
         right_parts = []
-        right_parts.append(f"Equal: {equal_lines}")
-        right_parts.append(f"Changed: {changed_lines}")
         
         # Show active options
         options = []
@@ -572,10 +548,12 @@ class DiffViewer(UILayer):
         
         right_status = f" {' | '.join(right_parts)} "
         
+        # Draw left status
         self.renderer.draw_text(status_y, 0, left_status, status_color_pair, status_attrs)
         
-        right_x = max(len(left_status) + 2, width - len(right_status))
-        if right_x < width:
+        # Draw right status (right-aligned)
+        right_x = width - len(right_status)
+        if right_x > len(left_status):
             self.renderer.draw_text(status_y, right_x, right_status, status_color_pair, status_attrs)
     
     def draw_content(self):

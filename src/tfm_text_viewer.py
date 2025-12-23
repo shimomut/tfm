@@ -655,64 +655,8 @@ class TextViewer(UILayer):
         # Clear status bar area with colored background - fill entire width
         self.renderer.draw_text(status_y, 0, " " * width, status_color_pair, status_attrs)
         
-        # Calculate current position info
-        if self.wrap_lines:
-            # When wrapping is enabled, show display line position
-            display_lines, line_mapping = self.get_wrapped_lines_with_mapping()
-            current_line = self.scroll_offset + 1  # 1-based display line number
-            total_lines = len(display_lines)
-            original_line = line_mapping[self.scroll_offset] if self.scroll_offset < len(line_mapping) else 1
-        else:
-            # Normal mode - show original line numbers
-            current_line = self.scroll_offset + 1  # 1-based line number
-            total_lines = len(self.lines)
-            original_line = current_line
-        
-        # Calculate scroll percentage
-        if total_lines <= 1:
-            scroll_percent = 100
-        else:
-            scroll_percent = min(100, int((current_line / total_lines) * 100))
-        
-        # Get file size
-        try:
-            file_size = self.file_path.stat().st_size
-            if file_size < 1024:
-                size_str = f"{file_size}B"
-            elif file_size < 1024 * 1024:
-                size_str = f"{file_size / 1024:.1f}K"
-            elif file_size < 1024 * 1024 * 1024:
-                size_str = f"{file_size / (1024 * 1024):.1f}M"
-            else:
-                size_str = f"{file_size / (1024 * 1024 * 1024):.1f}G"
-        except FileNotFoundError:
-            print(f"Warning: File not found for size calculation: {self.file_path}")
-            size_str = "---"
-        except PermissionError:
-            print(f"Warning: Permission denied for size calculation: {self.file_path}")
-            size_str = "---"
-        except (OSError, AttributeError) as e:
-            print(f"Warning: Could not get file size for {self.file_path}: {e}")
-            size_str = "---"
-        except Exception as e:
-            print(f"Warning: Unexpected error getting file size: {e}")
-            size_str = "---"
-        
-        # Build status components
-        if self.wrap_lines and total_lines != len(self.lines):
-            # Show both display line and original line when wrapping
-            position_info = f"Line {current_line}/{total_lines} (orig: {original_line}/{len(self.lines)}) ({scroll_percent}%)"
-        else:
-            position_info = f"Line {current_line}/{total_lines} ({scroll_percent}%)"
-        
-        file_info = f"{size_str}"
-        
-        # Add horizontal scroll info if applicable (only when not wrapping)
-        if self.horizontal_offset > 0 and not self.wrap_lines:
-            position_info += f" | Col {self.horizontal_offset + 1}"
-        
-        # Left side: position and file info
-        left_status = f" {position_info} | {file_info} "
+        # Left side: navigation hints
+        left_status = " ?:help  q:quit "
         
         # Right side: file type and options status
         right_parts = []
@@ -743,8 +687,8 @@ class TextViewer(UILayer):
         self.renderer.draw_text(status_y, 0, left_status, status_color_pair, status_attrs)
         
         # Draw right status (right-aligned)
-        right_x = max(len(left_status) + 2, width - len(right_status))
-        if right_x < width:
+        right_x = width - len(right_status)
+        if right_x > len(left_status):
             self.renderer.draw_text(status_y, right_x, right_status, status_color_pair, status_attrs)
     
     def draw_content(self):

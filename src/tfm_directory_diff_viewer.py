@@ -1298,6 +1298,9 @@ class DirectoryDiffViewer(UILayer):
         status_y = height - 1
         status_color_pair, status_attrs = get_status_color()
         
+        # Clear status bar area with colored background - fill entire width
+        renderer.draw_text(status_y, 0, " " * width, status_color_pair, status_attrs)
+        
         # Calculate statistics
         total_nodes = len(self.visible_nodes)
         current_pos = self.cursor_position + 1 if total_nodes > 0 else 0
@@ -1319,12 +1322,15 @@ class DirectoryDiffViewer(UILayer):
             )
         
         # Build status text
-        # Left side: position and filter status
-        left_status = f"Item {current_pos}/{total_nodes}"
-        if not self.show_identical:
-            left_status += " [Identical Hidden]"
+        # Left side: navigation hints
+        left_status = " ?:help  q:quit  i:toggle-identical "
         
-        # Right side: statistics
+        # Right side: filter status and statistics
+        right_parts = []
+        if not self.show_identical:
+            right_parts.append("[Identical Hidden]")
+        
+        # Add statistics
         stats_parts = []
         if only_left_count > 0:
             stats_parts.append(f"Left:{only_left_count}")
@@ -1335,29 +1341,24 @@ class DirectoryDiffViewer(UILayer):
         if identical_count > 0:
             stats_parts.append(f"Same:{identical_count}")
         
-        right_status = " ".join(stats_parts) if stats_parts else "No differences"
+        if stats_parts:
+            right_parts.append(" ".join(stats_parts))
+        else:
+            right_parts.append("No differences")
         
         # Add error count if any
         if error_count > 0:
-            right_status += f" Errors:{error_count}"
+            right_parts.append(f"Errors:{error_count}")
         
-        # Combine left and right status
-        # Calculate spacing to right-align the right status
-        spacing = width - len(left_status) - len(right_status) - 2
-        if spacing < 1:
-            # Not enough space, truncate right status
-            available = width - len(left_status) - 2
-            if available > 0:
-                right_status = right_status[:available]
-                spacing = 1
-            else:
-                right_status = ""
-                spacing = 0
+        right_status = " " + "  ".join(right_parts) + " "
         
-        status_line = left_status + " " * spacing + right_status
-        status_line = status_line[:width].ljust(width)
+        # Draw left status
+        renderer.draw_text(status_y, 0, left_status, status_color_pair, status_attrs)
         
-        renderer.draw_text(status_y, 0, status_line, status_color_pair, status_attrs)
+        # Draw right status (right-aligned)
+        right_x = width - len(right_status)
+        if right_x > len(left_status):
+            renderer.draw_text(status_y, right_x, right_status, status_color_pair, status_attrs)
     
     def _count_differences(self, node: TreeNode, only_left: int, only_right: int,
                           different: int, identical: int, contains_diff: int,
