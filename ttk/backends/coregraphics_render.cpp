@@ -1761,11 +1761,15 @@ static void draw_character_batch(
     }
     
     // Draw glyphs at exact positions
-    CGContextShowGlyphsAtPositions(
-        context,
+    // Use CTFontDrawGlyphs instead of CGContextShowGlyphsAtPositions
+    // CTFontDrawGlyphs properly renders color emoji, while CGContextShowGlyphsAtPositions
+    // only renders glyph outlines (causing emoji to appear in grayscale)
+    CTFontDrawGlyphs(
+        font_to_use,
         glyphs.data(),
         positions.data(),
-        length
+        length,
+        context
     );
     
     // Draw underline if needed
