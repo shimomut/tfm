@@ -14,6 +14,7 @@ from tfm_colors import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_ui_layer import UILayer
+from tfm_info_dialog import InfoDialog
 
 # Try to import pygments for syntax highlighting
 try:
@@ -29,10 +30,11 @@ except ImportError:
 class DiffViewer(UILayer):
     """Side-by-side text diff viewer that implements UILayer interface"""
     
-    def __init__(self, renderer, file1_path: Path, file2_path: Path):
+    def __init__(self, renderer, file1_path: Path, file2_path: Path, layer_stack=None):
         self.renderer = renderer
         self.file1_path = file1_path
         self.file2_path = file2_path
+        self.layer_stack = layer_stack
         self.file1_lines = []
         self.file2_lines = []
         self.file1_original_lines = []  # Original lines with tabs preserved
@@ -52,6 +54,9 @@ class DiffViewer(UILayer):
         self.wrap_lines = False  # Whether to wrap long lines
         self._should_close = False  # Flag to indicate viewer wants to close (UILayer interface)
         self._dirty = True  # Flag to indicate layer needs redraw (UILayer interface)
+        
+        # Help dialog
+        self.info_dialog = InfoDialog(None, renderer)
         
         # Load files and compute diff
         self.load_files()
@@ -439,9 +444,9 @@ class DiffViewer(UILayer):
             if not isinstance(height, int) or not isinstance(width, int):
                 height, width = 24, 80
             
-            # Reserve space for header (2 lines) and status bar (1 line)
-            start_y = 2
-            display_height = max(1, height - 3)
+            # Reserve space for header (1 line) and status bar (1 line)
+            start_y = 1
+            display_height = max(1, height - 2)
             start_x = 0
             display_width = max(1, width)
             
@@ -449,7 +454,35 @@ class DiffViewer(UILayer):
             
         except Exception as e:
             print(f"Error in get_display_dimensions: {e}")
-            return 2, 0, 21, 80
+            return 1, 0, 22, 80
+    
+    def _show_help_dialog(self) -> None:
+        """Show help dialog with keyboard shortcuts."""
+        title = "Diff Viewer - Help"
+        help_lines = [
+            "NAVIGATION",
+            "  ↑/↓           Scroll up/down one line",
+            "  Shift+↑/↓     Jump to previous/next difference",
+            "  ←/→           Scroll left/right (when not wrapping)",
+            "  PgUp/PgDn     Scroll one page up/down",
+            "  Home/End      Jump to beginning/end of file",
+            "",
+            "DISPLAY OPTIONS",
+            "  n             Toggle line numbers",
+            "  w             Toggle line wrapping",
+            "  s             Toggle syntax highlighting",
+            "  t             Cycle tab width (2/4/8 spaces)",
+            "  i             Toggle ignore whitespace",
+            "",
+            "GENERAL",
+            "  ?             Show this help",
+            "  q/ESC         Close viewer",
+        ]
+        
+        self.info_dialog.show(title, help_lines)
+        if self.layer_stack:
+            self.layer_stack.push(self.info_dialog)
+        self._dirty = True
     
     def draw_header(self):
         """Draw the viewer header"""
@@ -457,9 +490,8 @@ class DiffViewer(UILayer):
         
         header_color_pair, header_attrs = get_header_color()
         
-        # Clear header area
+        # Clear header area (only 1 line now)
         self.renderer.draw_text(0, 0, " " * width, header_color_pair, header_attrs)
-        self.renderer.draw_text(1, 0, " " * width, header_color_pair, header_attrs)
         
         # File names
         file1_display = self.file1_path.get_display_title()
@@ -482,17 +514,6 @@ class DiffViewer(UILayer):
         separator_x = pane_width
         for y in range(height - 1):
             self.renderer.draw_text(y, separator_x, "│", header_color_pair, header_attrs)
-        
-        # Controls
-        controls = "Enter/ESC:quit ↑↓:scroll ←→:h-scroll Shift-↑↓:prev/next diff PgUp/PgDn:page n:line-num s:syntax t:tab i:ignore-ws w:wrap"
-        status_color_pair, status_attrs = get_status_color()
-        
-        if len(controls) + 4 < width:
-            controls_x = (width - len(controls)) // 2
-        else:
-            controls_x = 2
-        
-        self.renderer.draw_text(1, controls_x, controls[:width - 4], status_color_pair, status_attrs)
     
     def draw_status_bar(self):
         """Draw the status bar"""
@@ -1069,7 +1090,11 @@ class DiffViewer(UILayer):
         # Check for character-based commands (only from KeyEvent)
         if event.char:
             char_lower = event.char.lower()
-            if char_lower == 'n':
+            if event.char == '?':
+                # Show help dialog
+                self._show_help_dialog()
+                return True
+            elif char_lower == 'n':
                 # Toggle line numbers
                 self.show_line_numbers = not self.show_line_numbers
                 self._dirty = True
@@ -1344,7 +1369,7 @@ class DiffViewer(UILayer):
         pass
 
 
-def create_diff_viewer(renderer, file1_path: Path, file2_path: Path):
+def create_diff_viewer(renderer, file1_path: Path, file2_path: Path, layer_stack=None):
     """
     Create a diff viewer instance
     
@@ -1352,6 +1377,7 @@ def create_diff_viewer(renderer, file1_path: Path, file2_path: Path):
         renderer: TTK renderer object
         file1_path: Path to the first file
         file2_path: Path to the second file
+        layer_stack: Optional UILayerStack for pushing dialogs
         
     Returns:
         DiffViewer instance or None if files cannot be viewed
@@ -1365,7 +1391,7 @@ def create_diff_viewer(renderer, file1_path: Path, file2_path: Path):
         return None
     
     try:
-        return DiffViewer(renderer, file1_path, file2_path)
+        return DiffViewer(renderer, file1_path, file2_path, layer_stack)
     except (OSError, IOError) as e:
         print(f"Error: Could not open files for diff: {e}")
         return None

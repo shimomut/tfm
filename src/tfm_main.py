@@ -1813,7 +1813,7 @@ class FileManager(UILayer):
                     self.mark_dirty()
             elif is_text_file(focused_file):
                 # Fallback to text viewer for text files without association
-                viewer = create_text_viewer(self.renderer, focused_file)
+                viewer = create_text_viewer(self.renderer, focused_file, self.ui_layer_stack)
                 if viewer:
                     # Push viewer onto layer stack
                     self.push_layer(viewer)
@@ -2876,7 +2876,7 @@ class FileManager(UILayer):
             if is_text_file(focused_file):
                 # Fallback to built-in text viewer for text files
                 try:
-                    viewer = create_text_viewer(self.renderer, focused_file)
+                    viewer = create_text_viewer(self.renderer, focused_file, self.ui_layer_stack)
                     if viewer:
                         # Push viewer onto layer stack
                         self.push_layer(viewer)
@@ -2930,7 +2930,7 @@ class FileManager(UILayer):
         
         # Launch diff viewer
         try:
-            viewer = create_diff_viewer(self.renderer, file1, file2)
+            viewer = create_diff_viewer(self.renderer, file1, file2, self.ui_layer_stack)
             if viewer:
                 # Push viewer onto layer stack
                 self.push_layer(viewer)

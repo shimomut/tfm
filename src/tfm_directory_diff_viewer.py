@@ -2035,7 +2035,7 @@ class DirectoryDiffViewer(UILayer):
         
         # Create DiffViewer instance
         try:
-            diff_viewer = DiffViewer(self.renderer, node.left_path, node.right_path)
+            diff_viewer = DiffViewer(self.renderer, node.left_path, node.right_path, self.layer_stack)
             
             # Push onto UI layer stack
             self.layer_stack.push(diff_viewer)
