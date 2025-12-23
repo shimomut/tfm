@@ -102,7 +102,7 @@ class QuickChoiceBar:
         status_color_pair, status_attributes = get_status_color()
         
         # Fill entire status line with background color
-        status_line = " " * (width - 1)
+        status_line = " " * width
         self.renderer.draw_text(status_y, 0, status_line, status_color_pair, status_attributes)
         
         # Show dialog message
