@@ -1926,6 +1926,7 @@ static void render_characters(
             // For proper font lookup, we need to pass them together
             std::u16string combined_char = cell.character;
             int cols_to_skip = 0;
+            bool has_variation_selector = false;
             
             if (col + 1 < dirty_cells.end_col && col + 1 < cols) {
                 const Cell& next_cell = grid[row][col + 1];
@@ -1935,6 +1936,7 @@ static void render_characters(
                         // Next cell is a variation selector - combine it
                         combined_char += next_cell.character;
                         cols_to_skip = 1;  // Skip the variation selector cell in next iteration
+                        has_variation_selector = true;  // Track that we combined with variation selector
                         
                         if (g_enable_perf_logging) {
                             std::cout << "[DEBUG] Combining variation selector at row=" << row 
@@ -2052,7 +2054,9 @@ static void render_characters(
             if (can_extend) {
                 // Extend current batch
                 current_batch.value().text += combined_char;
-                current_batch.value().is_wide.push_back(cell.is_wide);  // Add is_wide flag
+                // If we combined with variation selector, treat as wide (occupies 2 cells)
+                // Otherwise use the cell's is_wide flag
+                current_batch.value().is_wide.push_back(has_variation_selector ? true : cell.is_wide);
                 g_total_characters++;
                 
                 // DEBUG: Log emoji characters being added to batch
@@ -2080,7 +2084,9 @@ static void render_characters(
                 // Start new batch
                 CharacterBatch new_batch;
                 new_batch.text = combined_char;
-                new_batch.is_wide.push_back(cell.is_wide);  // Add is_wide flag
+                // If we combined with variation selector, treat as wide (occupies 2 cells)
+                // Otherwise use the cell's is_wide flag
+                new_batch.is_wide.push_back(has_variation_selector ? true : cell.is_wide);
                 new_batch.font_attributes = font_attributes;
                 new_batch.fg_rgb = fg_rgb;
                 new_batch.underline = underline;
