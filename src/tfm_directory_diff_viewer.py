@@ -1457,67 +1457,59 @@ class DirectoryDiffViewer(UILayer):
         
         # Build status text
         # Left side: navigation hints (or progress during scan)
-        if self.scan_in_progress:
-            # Show progress animator and status during scan
+        # Check if any node is currently being scanned on-demand (Task 9.2)
+        scanning_nodes = []
+        if self.root_node:
+            self._find_scanning_nodes(self.root_node, scanning_nodes)
+        
+        # Check queue sizes for background scanning (Task 12.2)
+        scan_queue_size = self.scan_queue.qsize()
+        comparison_queue_size = self.comparison_queue.qsize()
+        
+        # Task 16.2: Calculate total pending work for percentage
+        total_pending = scan_queue_size + comparison_queue_size
+        
+        # Determine scan status and update scan_in_progress flag
+        if scanning_nodes:
+            # Show on-demand scanning status
             animator_frame = self.progress_animator.get_current_frame()
-            left_status = f" {animator_frame} {self.scan_status} "
-            if self.scan_total > 0:
-                # Task 16.2: Show progress percentage
-                percentage = int((self.scan_current / self.scan_total) * 100)
-                left_status += f"({self.scan_current}/{self.scan_total} - {percentage}%) "
-        else:
-            # Check if any node is currently being scanned on-demand (Task 9.2)
-            scanning_nodes = []
-            if self.root_node:
-                self._find_scanning_nodes(self.root_node, scanning_nodes)
-            
-            # Check queue sizes for background scanning (Task 12.2)
-            scan_queue_size = self.scan_queue.qsize()
-            comparison_queue_size = self.comparison_queue.qsize()
-            
-            # Task 16.2: Calculate total pending work for percentage
-            total_pending = scan_queue_size + comparison_queue_size
-            
-            if scanning_nodes:
-                # Show on-demand scanning status
-                animator_frame = self.progress_animator.get_current_frame()
-                left_status = f" {animator_frame} Scanning directory... "
-            elif scan_queue_size > 0:
-                # Show background scanning progress (Task 12.2)
-                animator_frame = self.progress_animator.get_current_frame()
-                # Task 16.2: Show percentage if we can estimate total work
-                if hasattr(self, '_initial_scan_queue_size') and self._initial_scan_queue_size > 0:
-                    completed = self._initial_scan_queue_size - scan_queue_size
-                    percentage = int((completed / self._initial_scan_queue_size) * 100)
-                    left_status = f" {animator_frame} Scanning... ({scan_queue_size} pending - {percentage}%) "
-                else:
-                    left_status = f" {animator_frame} Scanning... ({scan_queue_size} pending) "
-            elif comparison_queue_size > 0:
-                # Show file comparison progress (Task 12.2)
-                animator_frame = self.progress_animator.get_current_frame()
-                # Task 16.2: Show percentage if we can estimate total work
-                if hasattr(self, '_initial_comparison_queue_size') and self._initial_comparison_queue_size > 0:
-                    completed = self._initial_comparison_queue_size - comparison_queue_size
-                    percentage = int((completed / self._initial_comparison_queue_size) * 100)
-                    left_status = f" {animator_frame} Comparing... ({comparison_queue_size} pending - {percentage}%) "
-                else:
-                    left_status = f" {animator_frame} Comparing... ({comparison_queue_size} pending) "
-            elif self.scan_in_progress:
-                # Both queues empty and no scanning nodes - scanning is complete
-                self.scan_in_progress = False
-                self.scan_status = "Scan complete"
-                if not hasattr(self, '_scan_complete_shown'):
-                    self._scan_complete_shown = False
-                # Show scan complete message
-                left_status = " ✓ Scan complete "
-                self._scan_complete_shown = True
-            elif hasattr(self, '_scan_complete_shown') and not self._scan_complete_shown:
-                # Show scan complete message briefly (Task 12.2)
-                left_status = " ✓ Scan complete "
-                self._scan_complete_shown = True
+            left_status = f" {animator_frame} Scanning directory... "
+        elif scan_queue_size > 0:
+            # Show background scanning progress (Task 12.2)
+            animator_frame = self.progress_animator.get_current_frame()
+            # Task 16.2: Show percentage if we can estimate total work
+            if hasattr(self, '_initial_scan_queue_size') and self._initial_scan_queue_size > 0:
+                completed = self._initial_scan_queue_size - scan_queue_size
+                percentage = int((completed / self._initial_scan_queue_size) * 100)
+                left_status = f" {animator_frame} Scanning... ({scan_queue_size} pending - {percentage}%) "
             else:
-                # Normal navigation hints
-                left_status = " ?:help  q:quit  i:toggle-identical "
+                left_status = f" {animator_frame} Scanning... ({scan_queue_size} pending) "
+        elif comparison_queue_size > 0:
+            # Show file comparison progress (Task 12.2)
+            animator_frame = self.progress_animator.get_current_frame()
+            # Task 16.2: Show percentage if we can estimate total work
+            if hasattr(self, '_initial_comparison_queue_size') and self._initial_comparison_queue_size > 0:
+                completed = self._initial_comparison_queue_size - comparison_queue_size
+                percentage = int((completed / self._initial_comparison_queue_size) * 100)
+                left_status = f" {animator_frame} Comparing... ({comparison_queue_size} pending - {percentage}%) "
+            else:
+                left_status = f" {animator_frame} Comparing... ({comparison_queue_size} pending) "
+        elif self.scan_in_progress:
+            # Both queues empty and no scanning nodes - scanning is complete
+            self.scan_in_progress = False
+            self.scan_status = "Scan complete"
+            if not hasattr(self, '_scan_complete_shown'):
+                self._scan_complete_shown = False
+            # Show scan complete message
+            left_status = " ✓ Scan complete "
+            self._scan_complete_shown = True
+        elif hasattr(self, '_scan_complete_shown') and not self._scan_complete_shown:
+            # Show scan complete message briefly (Task 12.2)
+            left_status = " ✓ Scan complete "
+            self._scan_complete_shown = True
+        else:
+            # Normal navigation hints
+            left_status = " ?:help  q:quit  i:toggle-identical "
         
         # Right side: filter status and statistics
         right_parts = []
@@ -2255,18 +2247,33 @@ class DirectoryDiffViewer(UILayer):
         """
         Queue initial scan tasks for subdirectories in the root.
         
-        This method examines the root node's children and queues any
-        directories for scanning. This kicks off the progressive scanning
-        process after the initial top-level display.
+        This method examines the root node's children and queues directories
+        that exist on BOTH sides for automatic background scanning. One-sided
+        directories (only on left or right) are NOT queued - they will be
+        scanned lazily when the user expands them (Task 10.1).
+        
+        This provides a balance between:
+        - Automatic scanning of both-sided directories (to detect differences)
+        - Lazy scanning of one-sided directories (to avoid unnecessary work)
         """
         if not self.root_node:
             return
         
-        # Queue scan tasks for all subdirectories in root
+        # Queue scan tasks for subdirectories that exist on both sides
         with self.tree_lock:
             for child in self.root_node.children:
                 if child.is_directory and not child.children_scanned:
-                    # Create scan task for this directory
+                    # Check if directory exists on both sides (Task 10.1)
+                    exists_left = child.left_path is not None
+                    exists_right = child.right_path is not None
+                    
+                    # Only queue if exists on BOTH sides
+                    if not (exists_left and exists_right):
+                        # One-sided directory - skip automatic scanning
+                        # Will be scanned on-demand when user expands it
+                        continue
+                    
+                    # Create scan task for this both-sided directory
                     scan_task = ScanTask(
                         left_path=child.left_path,
                         right_path=child.right_path,
@@ -2361,8 +2368,9 @@ class DirectoryDiffViewer(UILayer):
                 # Find the node corresponding to this task and update it
                 self._update_tree_node(task.relative_path, left_children, right_children)
                 
-                # Add child directories to scan_queue for breadth-first traversal
-                # Combine all unique child directory names from both sides
+                # Queue child directories for background scanning (Task 10.1)
+                # Only queue directories that exist on BOTH sides for automatic scanning.
+                # One-sided directories are scanned lazily when user expands them.
                 all_child_dirs = set()
                 for filename, file_info in left_children.items():
                     if file_info.is_directory:
@@ -2371,16 +2379,21 @@ class DirectoryDiffViewer(UILayer):
                     if file_info.is_directory:
                         all_child_dirs.add(filename)
                 
-                # Create scan tasks for child directories
+                # Create scan tasks for child directories that exist on both sides
                 for child_dir_name in all_child_dirs:
-                    # Build paths for child directory
-                    child_left_path = None
-                    child_right_path = None
+                    # Check if directory exists on both sides
+                    exists_left = child_dir_name in left_children
+                    exists_right = child_dir_name in right_children
                     
-                    if child_dir_name in left_children:
-                        child_left_path = left_children[child_dir_name].path
-                    if child_dir_name in right_children:
-                        child_right_path = right_children[child_dir_name].path
+                    # Only queue if exists on BOTH sides (Task 10.1)
+                    if not (exists_left and exists_right):
+                        # One-sided directory - skip automatic scanning
+                        # Will be scanned on-demand when user expands it
+                        continue
+                    
+                    # Build paths for child directory
+                    child_left_path = left_children[child_dir_name].path
+                    child_right_path = right_children[child_dir_name].path
                     
                     # Build relative path for child
                     if task.relative_path:
