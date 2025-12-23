@@ -195,7 +195,8 @@ class CoreGraphicsBackend(Renderer):
                  font_size: int = 12,
                  rows: int = 24, cols: int = 80,
                  frame_autosave_name: Optional[str] = None,
-                 font_names: Optional[list] = None):
+                 font_names: Optional[list] = None,
+                 enable_perf_logging: bool = False):
         """
         Initialize the CoreGraphics backend.
         
@@ -210,6 +211,9 @@ class CoreGraphicsBackend(Renderer):
             font_names: List of font names for cascade fallback (default: ['Menlo']).
                        First font is primary, remaining fonts are cascade fonts.
                        Used by C++ renderer for automatic character fallback.
+            enable_perf_logging: Enable C++ renderer performance logging to stderr.
+                                When enabled, logs metrics every 60 frames including
+                                render time, batching stats, and font cache hit rate.
         
         Raises:
             RuntimeError: If PyObjC is not installed
@@ -222,6 +226,7 @@ class CoreGraphicsBackend(Renderer):
         
         self.window_title = window_title
         self.font_names = font_names if font_names is not None else ['Menlo']
+        self.enable_perf_logging = enable_perf_logging
         
         # Set font size first (needed by monospace fallback)
         self.font_size = font_size
@@ -230,9 +235,16 @@ class CoreGraphicsBackend(Renderer):
         # This ensures there's always a font available for any character
         self._add_system_monospace_fallback()
         
-        # Automatically add system emoji font as final fallback
-        # This ensures emoji characters can be rendered
+        # Automatically add system emoji font BEFORE Apple Symbols
+        # This ensures emoji characters use color emoji, not grayscale symbols
+        # Apple Symbols has grayscale versions of some emoji, so we need to
+        # check Apple Color Emoji first
         self._add_system_emoji_fallback()
+        
+        # Automatically add Apple Symbols font for special Unicode characters
+        # This provides coverage for Braille, mathematical symbols, etc.
+        # Placed after emoji font to avoid grayscale emoji rendering
+        self._add_system_symbols_fallback()
         
         self.rows = rows
         self.cols = cols
@@ -308,6 +320,26 @@ class CoreGraphicsBackend(Renderer):
         except Exception as e:
             print(f"Warning: Could not add system emoji font to cascade: {e}")
     
+    def _add_system_symbols_fallback(self) -> None:
+        """
+        Add Apple Symbols font as fallback in cascade list.
+        
+        This ensures special Unicode characters (like Braille, mathematical symbols,
+        etc.) can be rendered. Apple Symbols has broad Unicode coverage including
+        characters not typically found in monospace fonts.
+        
+        The symbols font is only added if it's not already in the list.
+        """
+        try:
+            # macOS system symbols font name
+            symbols_font_name = "Apple Symbols"
+            
+            # Only add if not already in the list
+            if symbols_font_name not in self.font_names:
+                self.font_names.append(symbols_font_name)
+        except Exception as e:
+            print(f"Warning: Could not add system symbols font to cascade: {e}")
+    
     def initialize(self) -> None:
         """
         Initialize the rendering backend and create the window.
@@ -344,6 +376,11 @@ class CoreGraphicsBackend(Renderer):
             import ttk_coregraphics_render
             self._cpp_renderer = ttk_coregraphics_render
             print("CoreGraphicsBackend: Using C++ rendering implementation")
+            
+            # Enable performance logging if requested
+            if self.enable_perf_logging:
+                self._cpp_renderer.enable_perf_logging(True)
+                print("CoreGraphicsBackend: C++ performance logging enabled")
         except ImportError as e:
             print(f"CoreGraphicsBackend: C++ renderer module not available: {e}")
             print("CoreGraphicsBackend: Falling back to PyObjC rendering")

@@ -202,6 +202,9 @@ def _get_backend_options(backend_name, args):
         cols = int(window_width / char_width)
         rows = int(window_height / char_height)
         
+        # Check if performance logging is enabled via command-line argument
+        enable_perf_logging = getattr(args, 'perf_logging', False)
+        
         # Return options that match CoreGraphicsBackend.__init__ parameters
         return {
             'window_title': 'TFM - TUI File Manager',
@@ -210,6 +213,7 @@ def _get_backend_options(backend_name, args):
             'rows': rows,
             'cols': cols,
             'frame_autosave_name': 'TFMMainWindow',
+            'enable_perf_logging': enable_perf_logging,
         }
     
     # Curses backend needs no special options

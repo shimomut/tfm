@@ -17,6 +17,7 @@
 #include <chrono>
 #include <locale>
 #include <codecvt>
+#include <iostream>
 
 // Module version
 #define CPP_RENDERER_VERSION "1.0.0"
@@ -801,6 +802,7 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs);
 static PyObject* clear_caches(PyObject* self, PyObject* args);
 static PyObject* get_performance_metrics(PyObject* self, PyObject* args);
 static PyObject* reset_metrics(PyObject* self, PyObject* args);
+static PyObject* enable_perf_logging(PyObject* self, PyObject* args);
 
 //=============================================================================
 // Module Method Definitions
@@ -850,6 +852,20 @@ static PyMethodDef CppRendererMethods[] = {
         reset_metrics,
         METH_NOARGS,
         "Reset performance metrics counters to zero."
+    },
+    {
+        "enable_perf_logging",
+        enable_perf_logging,
+        METH_VARARGS,
+        "Enable or disable performance logging to stderr.\n\n"
+        "Parameters:\n"
+        "  enable: Boolean - True to enable, False to disable\n\n"
+        "When enabled, logs performance metrics every 60 frames including:\n"
+        "  - Render time per frame\n"
+        "  - Average batches per frame\n"
+        "  - Average characters per frame\n"
+        "  - Average batch splits per frame\n"
+        "  - Font cache hit rate\n"
     },
     {nullptr, nullptr, 0, nullptr}  // Sentinel
 };
@@ -1207,6 +1223,22 @@ static void render_backgrounds(
             // Get cell from grid
             const Cell& cell = grid[row][col];
             
+            // Skip empty cells (placeholders for wide characters)
+            // These cells should not have backgrounds drawn
+            if (cell.character.empty()) {
+                continue;
+            }
+            
+            // Skip variation selectors (U+FE00-U+FE0F) backgrounds
+            // Variation selectors modify the preceding character's appearance
+            // but should not have their own background drawn
+            if (cell.character.length() == 1) {
+                char16_t ch = cell.character[0];
+                if (ch >= 0xFE00 && ch <= 0xFE0F) {
+                    continue;
+                }
+            }
+            
             // Get color pair for this cell
             auto color_it = color_pairs.find(cell.color_pair);
             if (color_it == color_pairs.end()) {
@@ -1342,7 +1374,130 @@ struct CharacterBatch {
     bool underline;                // Underline flag
     CGFloat x;                     // Starting x position
     CGFloat y;                     // Starting y position
+    int font_index;                // Index of font in cascade list (-1 = primary, 0+ = cascade)
 };
+
+//=============================================================================
+// Performance Metrics (declared early for use in rendering functions)
+//=============================================================================
+
+static size_t g_frames_rendered = 0;
+static double g_total_render_time_ms = 0.0;
+static size_t g_total_batches = 0;
+static size_t g_total_characters = 0;
+static size_t g_total_batch_splits = 0;
+static size_t g_font_lookups = 0;
+static size_t g_font_cache_hits = 0;
+static bool g_enable_perf_logging = false;
+static char16_t g_last_failed_char = 0;  // Last character that failed font lookup
+
+/**
+ * Determine which font from the cascade list can render a character.
+ * Returns the font index that can render the character.
+ * Handles both single characters and surrogate pairs (e.g., emoji).
+ * 
+ * @param character Pointer to UTF-16 character data (may be surrogate pair)
+ * @param char_length Length of character data (1 for BMP, 2 for surrogate pairs)
+ * @param base_font Primary font to try first
+ * @param font_attributes Font attributes (for bold trait)
+ * @return Font index: -1 for primary font, 0+ for cascade font index, -2 if no font found
+ */
+static int get_font_index_for_character(
+    const char16_t* character,
+    size_t char_length,
+    CTFontRef base_font,
+    int font_attributes
+) {
+    // Track font lookups for performance metrics
+    g_font_lookups++;
+    
+    // Handle empty character
+    if (character == nullptr || char_length == 0) {
+        return -2;  // No font found
+    }
+    
+    // Convert character(s) to UniChar array for CoreText
+    // This handles both single characters and surrogate pairs
+    std::vector<UniChar> uni_chars(char_length);
+    for (size_t i = 0; i < char_length; ++i) {
+        uni_chars[i] = static_cast<UniChar>(character[i]);
+    }
+    
+    // Allocate glyph array (same size as character array)
+    std::vector<CGGlyph> glyphs(char_length);
+    
+    // Try primary font first
+    // CTFontGetGlyphsForCharacters handles surrogate pairs correctly
+    if (CTFontGetGlyphsForCharacters(base_font, uni_chars.data(), glyphs.data(), char_length)) {
+        g_font_cache_hits++;  // Primary font hit
+        return -1;  // Primary font can render this character
+    }
+    
+    // Try cascade list fonts
+    CTFontDescriptorRef descriptor = CTFontCopyFontDescriptor(base_font);
+    if (descriptor == nullptr) {
+        return -2;  // No font found
+    }
+    
+    CFArrayRef cascade_list = (CFArrayRef)CTFontDescriptorCopyAttribute(
+        descriptor,
+        kCTFontCascadeListAttribute
+    );
+    CFRelease(descriptor);
+    
+    if (cascade_list == nullptr) {
+        return -2;  // No cascade list
+    }
+    
+    CFIndex cascade_count = CFArrayGetCount(cascade_list);
+    int result_index = -2;  // Default: no font found
+    
+    // Try each font in the cascade list
+    for (CFIndex i = 0; i < cascade_count; ++i) {
+        CTFontDescriptorRef cascade_desc = (CTFontDescriptorRef)CFArrayGetValueAtIndex(cascade_list, i);
+        
+        // Create font from descriptor with same size as base font
+        CGFloat font_size = CTFontGetSize(base_font);
+        CTFontRef cascade_font = CTFontCreateWithFontDescriptor(
+            cascade_desc,
+            font_size,
+            nullptr
+        );
+        
+        if (cascade_font != nullptr) {
+            // Apply bold trait if needed
+            if (font_attributes & 1) {
+                CTFontRef bold_cascade = CTFontCreateCopyWithSymbolicTraits(
+                    cascade_font,
+                    0.0,
+                    nullptr,
+                    kCTFontBoldTrait,
+                    kCTFontBoldTrait
+                );
+                
+                if (bold_cascade != nullptr) {
+                    CFRelease(cascade_font);
+                    cascade_font = bold_cascade;
+                }
+            }
+            
+            // Try to get glyph with this cascade font
+            // CTFontGetGlyphsForCharacters handles surrogate pairs correctly
+            if (CTFontGetGlyphsForCharacters(cascade_font, uni_chars.data(), glyphs.data(), char_length)) {
+                g_font_cache_hits++;  // Cascade font hit
+                result_index = static_cast<int>(i);
+                CFRelease(cascade_font);
+                break;  // Found a font that can render this character
+            }
+            
+            CFRelease(cascade_font);
+        }
+    }
+    
+    CFRelease(cascade_list);
+    
+    return result_index;
+}
 
 /**
  * Render characters for cells in the dirty region.
@@ -1418,13 +1573,13 @@ static void draw_character_batch(
         return;
     }
     
-    // Extract font from attributes
-    CTFontRef font = (CTFontRef)CFDictionaryGetValue(
+    // Extract base font from attributes
+    CTFontRef base_font = (CTFontRef)CFDictionaryGetValue(
         attributes, 
         kCTFontAttributeName
     );
     
-    if (font == nullptr) {
+    if (base_font == nullptr) {
         return;
     }
     
@@ -1455,16 +1610,16 @@ static void draw_character_batch(
         characters[i] = static_cast<UniChar>(batch.text[i]);
     }
     
-    // Get glyphs for characters
-    // First try with the primary font
-    bool all_glyphs_found = CTFontGetGlyphsForCharacters(font, characters.data(), glyphs.data(), length);
+    // Determine which font to use based on batch.font_index
+    CTFontRef font_to_use = base_font;
+    CTFontRef allocated_font = nullptr;
     
-    CTFontRef font_to_use = font;
-    CTFontRef fallback_font = nullptr;
-    
-    if (!all_glyphs_found) {
-        // Some glyphs are missing - try cascade list fonts
-        CTFontDescriptorRef descriptor = CTFontCopyFontDescriptor(font);
+    if (batch.font_index == -1) {
+        // Use primary font
+        font_to_use = base_font;
+    } else if (batch.font_index >= 0) {
+        // Use cascade font at specified index
+        CTFontDescriptorRef descriptor = CTFontCopyFontDescriptor(base_font);
         if (descriptor != nullptr) {
             CFArrayRef cascade_list = (CFArrayRef)CTFontDescriptorCopyAttribute(
                 descriptor,
@@ -1475,12 +1630,14 @@ static void draw_character_batch(
             if (cascade_list != nullptr) {
                 CFIndex cascade_count = CFArrayGetCount(cascade_list);
                 
-                // Try each font in the cascade list
-                for (CFIndex i = 0; i < cascade_count && !all_glyphs_found; ++i) {
-                    CTFontDescriptorRef cascade_desc = (CTFontDescriptorRef)CFArrayGetValueAtIndex(cascade_list, i);
+                if (batch.font_index < cascade_count) {
+                    CTFontDescriptorRef cascade_desc = (CTFontDescriptorRef)CFArrayGetValueAtIndex(
+                        cascade_list, 
+                        batch.font_index
+                    );
                     
-                    // Create font from descriptor with same size and traits as original
-                    CGFloat font_size = CTFontGetSize(font);
+                    // Create font from descriptor with same size as base font
+                    CGFloat font_size = CTFontGetSize(base_font);
                     CTFontRef cascade_font = CTFontCreateWithFontDescriptor(
                         cascade_desc,
                         font_size,
@@ -1488,9 +1645,9 @@ static void draw_character_batch(
                     );
                     
                     if (cascade_font != nullptr) {
-                        // Check if original font has bold trait and apply it
-                        CTFontSymbolicTraits original_traits = CTFontGetSymbolicTraits(font);
-                        if (original_traits & kCTFontBoldTrait) {
+                        // Apply bold trait if needed
+                        CTFontSymbolicTraits base_traits = CTFontGetSymbolicTraits(base_font);
+                        if (base_traits & kCTFontBoldTrait) {
                             CTFontRef bold_cascade = CTFontCreateCopyWithSymbolicTraits(
                                 cascade_font,
                                 0.0,
@@ -1503,29 +1660,50 @@ static void draw_character_batch(
                                 CFRelease(cascade_font);
                                 cascade_font = bold_cascade;
                             }
-                            // If bold trait creation fails, the font doesn't support it
-                            // We'll use synthetic bold via stroke width during rendering
                         }
                         
-                        // Try to get glyphs with this cascade font
-                        if (CTFontGetGlyphsForCharacters(cascade_font, characters.data(), glyphs.data(), length)) {
-                            all_glyphs_found = true;
-                            fallback_font = cascade_font;
-                            font_to_use = fallback_font;
-                        } else {
-                            CFRelease(cascade_font);
-                        }
+                        allocated_font = cascade_font;
+                        font_to_use = cascade_font;
                     }
                 }
                 
                 CFRelease(cascade_list);
             }
         }
-        
-        // If still not found, skip rendering
-        if (!all_glyphs_found) {
-            return;
+    }
+    
+    // Get glyphs for characters using the selected font
+    bool all_glyphs_found = CTFontGetGlyphsForCharacters(
+        font_to_use, 
+        characters.data(), 
+        glyphs.data(), 
+        length
+    );
+    
+    // If glyphs not found with selected font, skip rendering
+    if (!all_glyphs_found) {
+        if (allocated_font != nullptr) {
+            CFRelease(allocated_font);
         }
+        return;
+    }
+    
+    // Count actual glyphs (surrogate pairs become single glyphs)
+    // CTFontGetGlyphsForCharacters converts surrogate pairs to single glyphs,
+    // leaving 0 in the second position
+    CFIndex actual_glyph_count = 0;
+    for (CFIndex i = 0; i < length; ++i) {
+        if (glyphs[i] != 0) {
+            actual_glyph_count++;
+        }
+    }
+    
+    // If no valid glyphs, skip rendering
+    if (actual_glyph_count == 0) {
+        if (allocated_font != nullptr) {
+            CFRelease(allocated_font);
+        }
+        return;
     }
     
     // Calculate baseline position
@@ -1533,6 +1711,7 @@ static void draw_character_batch(
     
     // Get actual glyph advances from the font
     // This is critical for proper character spacing
+    // Note: We get advances for all positions, but only use the valid ones
     std::vector<CGSize> advances(length);
     CTFontGetAdvancesForGlyphs(
         font_to_use,
@@ -1542,40 +1721,55 @@ static void draw_character_batch(
         length
     );
     
-    // Calculate position for each glyph using actual advances
-    // For monospace rendering, we need to center each glyph within its cell
+    // Build arrays of valid glyphs and their positions
+    std::vector<CGGlyph> valid_glyphs;
+    std::vector<CGPoint> valid_positions;
+    valid_glyphs.reserve(actual_glyph_count);
+    valid_positions.reserve(actual_glyph_count);
+    
+    // Calculate position for each valid glyph
     CGFloat x = batch.x;
+    size_t is_wide_index = 0;
     
     for (CFIndex i = 0; i < length; ++i) {
+        // Skip invalid glyphs (0 means no glyph, typically second half of surrogate pair)
+        if (glyphs[i] == 0) {
+            continue;
+        }
+        
         // Get the actual glyph advance width
         CGFloat glyph_advance = advances[i].width;
         
         // Check if this character is wide (occupies 2 cells)
-        bool char_is_wide = (i < batch.is_wide.size()) ? batch.is_wide[i] : false;
+        bool char_is_wide = (is_wide_index < batch.is_wide.size()) ? batch.is_wide[is_wide_index] : false;
         CGFloat cell_width = char_is_wide ? (char_width * 2.0f) : char_width;
         
         // Center the glyph within its cell(s) for better visual alignment
-        // This prevents glyphs from appearing too far left or right
         CGFloat centering_offset = (cell_width - glyph_advance) / 2.0f;
         
-        positions[i].x = x + centering_offset;
-        positions[i].y = baseline_y;
+        CGPoint pos;
+        pos.x = x + centering_offset;
+        pos.y = baseline_y;
+        
+        valid_glyphs.push_back(glyphs[i]);
+        valid_positions.push_back(pos);
         
         // Advance by the cell width (not glyph advance) to maintain grid alignment
         x += cell_width;
+        is_wide_index++;
     }
     
     // Set fill color for text
     CGContextSetFillColorWithColor(context, color);
     
-    // Check if we need synthetic bold (fallback font with bold attribute)
+    // Check if we need synthetic bold (cascade font with bold attribute)
     bool use_synthetic_bold = false;
-    if (fallback_font != nullptr && (batch.font_attributes & 1)) {
-        // We're using a fallback font and bold was requested
-        // Check if the fallback font actually has the bold trait
-        CTFontSymbolicTraits fallback_traits = CTFontGetSymbolicTraits(font_to_use);
-        if (!(fallback_traits & kCTFontBoldTrait)) {
-            // Fallback font doesn't have bold trait, use synthetic bold
+    if (allocated_font != nullptr && (batch.font_attributes & 1)) {
+        // We're using a cascade font and bold was requested
+        // Check if the cascade font actually has the bold trait
+        CTFontSymbolicTraits cascade_traits = CTFontGetSymbolicTraits(font_to_use);
+        if (!(cascade_traits & kCTFontBoldTrait)) {
+            // Cascade font doesn't have bold trait, use synthetic bold
             use_synthetic_bold = true;
         }
     }
@@ -1591,11 +1785,7 @@ static void draw_character_batch(
         CGContextSetTextDrawingMode(context, kCGTextFill);
     }
     
-    // Save graphics state
-    CGContextSaveGState(context);
-    
-    // Disable anti-aliasing for pixel-perfect rendering
-    // This matches the behavior when using monospace fonts at exact grid positions
+    // Enable anti-aliasing for smooth rendering
     CGContextSetShouldAntialias(context, true);
     CGContextSetShouldSmoothFonts(context, true);
     
@@ -1606,18 +1796,23 @@ static void draw_character_batch(
         CGContextSetFontSize(context, CTFontGetSize(font_to_use));
         CFRelease(cg_font);
     } else {
-        if (fallback_font != nullptr) {
-            CFRelease(fallback_font);
+        if (allocated_font != nullptr) {
+            CFRelease(allocated_font);
         }
         return;
     }
     
     // Draw glyphs at exact positions
-    CGContextShowGlyphsAtPositions(
-        context,
-        glyphs.data(),
-        positions.data(),
-        length
+    // Use CTFontDrawGlyphs instead of CGContextShowGlyphsAtPositions
+    // CTFontDrawGlyphs properly renders color emoji, while CGContextShowGlyphsAtPositions
+    // only renders glyph outlines (causing emoji to appear in grayscale)
+    // CRITICAL: Use valid_glyphs and valid_positions (filtered to remove 0 glyphs from surrogate pairs)
+    CTFontDrawGlyphs(
+        font_to_use,
+        valid_glyphs.data(),
+        valid_positions.data(),
+        actual_glyph_count,
+        context
     );
     
     // Draw underline if needed
@@ -1627,19 +1822,20 @@ static void draw_character_batch(
         CGFloat underline_thickness = CTFontGetUnderlineThickness(font_to_use);
         
         // Draw underline as a filled rectangle
-        CGFloat underline_width = char_width * length;
+        // Use the actual batch width (sum of cell widths) for underline
+        CGFloat underline_width = 0;
+        for (size_t i = 0; i < batch.is_wide.size(); ++i) {
+            underline_width += batch.is_wide[i] ? (char_width * 2.0f) : char_width;
+        }
         CGContextFillRect(
             context,
             CGRectMake(batch.x, underline_position, underline_width, underline_thickness)
         );
     }
     
-    // Restore graphics state
-    CGContextRestoreGState(context);
-    
-    // Clean up fallback font if we created one
-    if (fallback_font != nullptr) {
-        CFRelease(fallback_font);
+    // Clean up allocated font if we created one
+    if (allocated_font != nullptr) {
+        CFRelease(allocated_font);
     }
 }
 
@@ -1670,8 +1866,8 @@ static void render_characters(
             // Get cell from grid
             const Cell& cell = grid[row][col];
             
-            // Skip spaces - backgrounds already rendered
-            if (cell.character.empty() || (cell.character.length() == 1 && cell.character[0] == u' ')) {
+            // Skip empty cells (placeholders for wide characters) and spaces
+            if (cell.character.empty()) {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
@@ -1680,15 +1876,34 @@ static void render_characters(
                 continue;
             }
             
-            // Check if this is a placeholder cell for a wide character
-            // Placeholder cells have empty strings and should be skipped
-            if (cell.character.empty()) {
+            // Skip spaces - backgrounds already rendered
+            if (cell.character.length() == 1 && cell.character[0] == u' ') {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
                 continue;
+            }
+            
+            // Check if next cell is a variation selector and combine them
+            // Variation selectors (U+FE00-U+FE0F) modify the preceding character
+            // For proper font lookup, we need to pass them together
+            std::u16string combined_char = cell.character;
+            int cols_to_skip = 0;
+            bool has_variation_selector = false;
+            
+            if (col + 1 < dirty_cells.end_col && col + 1 < cols) {
+                const Cell& next_cell = grid[row][col + 1];
+                if (next_cell.character.length() == 1) {
+                    char16_t next_ch = next_cell.character[0];
+                    if (next_ch >= 0xFE00 && next_ch <= 0xFE0F) {
+                        // Next cell is a variation selector - combine it
+                        combined_char += next_cell.character;
+                        cols_to_skip = 1;  // Skip the variation selector cell in next iteration
+                        has_variation_selector = true;  // Track that we combined with variation selector
+                    }
+                }
             }
             
             // Get color pair for this cell
@@ -1721,6 +1936,44 @@ static void render_characters(
             CGFloat y = ttk_to_cg_y(row, rows, char_height) + offset_y;
             CGFloat x = static_cast<CGFloat>(col) * char_width + offset_x;
             
+            // Determine which font can render this character
+            // Get base font from attribute cache
+            CFDictionaryRef attributes = attr_dict_cache.get_attributes(
+                font_attributes,
+                fg_rgb,
+                false  // underline doesn't affect font selection
+            );
+            
+            CTFontRef base_font = nullptr;
+            if (attributes != nullptr) {
+                base_font = (CTFontRef)CFDictionaryGetValue(
+                    attributes,
+                    kCTFontAttributeName
+                );
+            }
+            
+            int font_index = -2;  // Default: no font found
+            if (base_font != nullptr && !combined_char.empty()) {
+                font_index = get_font_index_for_character(
+                    combined_char.data(),
+                    combined_char.length(),
+                    base_font,
+                    font_attributes
+                );
+            }
+            
+            // Skip character if no font can render it
+            if (font_index == -2) {
+                // Finish current batch if any
+                if (current_batch.has_value()) {
+                    draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
+                    current_batch = std::nullopt;
+                }
+                // Skip the variation selector cell if we combined it
+                col += cols_to_skip;
+                continue;
+            }
+            
             // Check if we can extend the current batch
             bool can_extend = false;
             if (current_batch.has_value()) {
@@ -1730,7 +1983,7 @@ static void render_characters(
                 // 1. Same row (y coordinate matches)
                 // 2. Same attributes (font, color, underline)
                 // 3. Adjacent position (x is at the right edge of current batch)
-                // 4. Same character type (don't mix ASCII with non-ASCII to avoid font mixing)
+                // 4. Same font index (same font from cascade list)
                 bool same_row = (std::abs(batch.y - y) < 0.01f);
                 bool same_attributes = (batch.font_attributes == font_attributes &&
                                        batch.fg_rgb == fg_rgb &&
@@ -1751,53 +2004,62 @@ static void render_characters(
                 
                 bool adjacent = (std::abs(expected_x - x) < 0.01f);
                 
-                // Check if character types match (ASCII vs non-ASCII)
-                // This prevents mixing fonts in a single batch
-                bool same_char_type = true;
-                if (!cell.character.empty() && !batch.text.empty()) {
-                    char16_t new_ch = cell.character[0];
-                    char16_t batch_ch = batch.text[0];
-                    bool new_is_ascii = (new_ch < 0x80);
-                    bool batch_is_ascii = (batch_ch < 0x80);
-                    same_char_type = (new_is_ascii == batch_is_ascii);
-                }
+                // Check if font index matches (same font from cascade)
+                bool same_font = (batch.font_index == font_index);
                 
-                can_extend = same_row && same_attributes && adjacent && same_char_type;
+                can_extend = same_row && same_attributes && adjacent && same_font;
             }
             
             if (can_extend) {
                 // Extend current batch
-                current_batch.value().text += cell.character;
-                current_batch.value().is_wide.push_back(cell.is_wide);  // Add is_wide flag
+                current_batch.value().text += combined_char;
+                // If we combined with variation selector, treat as wide (occupies 2 cells)
+                // Otherwise use the cell's is_wide flag
+                current_batch.value().is_wide.push_back(has_variation_selector ? true : cell.is_wide);
+                g_total_characters++;
             } else {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
+                    g_total_batches++;
+                    
+                    // Track batch split if we're starting a new batch (not just finishing at row end)
+                    if (!combined_char.empty()) {
+                        g_total_batch_splits++;
+                    }
                 }
                 
                 // Start new batch
                 CharacterBatch new_batch;
-                new_batch.text = cell.character;
-                new_batch.is_wide.push_back(cell.is_wide);  // Add is_wide flag
+                new_batch.text = combined_char;
+                // If we combined with variation selector, treat as wide (occupies 2 cells)
+                // Otherwise use the cell's is_wide flag
+                new_batch.is_wide.push_back(has_variation_selector ? true : cell.is_wide);
                 new_batch.font_attributes = font_attributes;
                 new_batch.fg_rgb = fg_rgb;
                 new_batch.underline = underline;
                 new_batch.x = x;
                 new_batch.y = y;
+                new_batch.font_index = font_index;  // Store which font to use
                 
                 current_batch = new_batch;
+                g_total_characters++;
             }
             
+            // Skip the variation selector cell if we combined it
+            col += cols_to_skip;
+            
             // If this is a wide character, skip the next column (placeholder cell)
+            // The next column should be a placeholder, so we'll skip it in the next iteration
             if (!cell.character.empty() && cell.is_wide) {
-                // The next column should be a placeholder, so we'll skip it
-                // in the next iteration
+                // Wide character handling - placeholder will be skipped automatically
             }
         }
         
         // Finish batch at end of row
         if (current_batch.has_value()) {
             draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
+            g_total_batches++;
             current_batch = std::nullopt;
         }
     }
@@ -1805,6 +2067,7 @@ static void render_characters(
     // Finish any remaining batch
     if (current_batch.has_value()) {
         draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
+        g_total_batches++;
     }
 }
 
@@ -2142,11 +2405,6 @@ static FontCache* g_font_cache = nullptr;
 static AttributeDictCache* g_attr_dict_cache = nullptr;
 static CTFontRef g_base_font = nullptr;
 
-// Performance metrics
-static size_t g_frames_rendered = 0;
-static double g_total_render_time_ms = 0.0;
-static size_t g_total_batches = 0;
-
 /**
  * Initialize global caches if not already initialized.
  * Creates the base font and all cache objects.
@@ -2287,56 +2545,57 @@ static void initialize_caches(PyObject* font_names_obj, double font_size_val = 1
     CTFontDescriptorRef descriptor = nullptr;
     
     if (cascade_descriptors != nullptr && CFArrayGetCount(cascade_descriptors) > 0) {
-        CFStringRef keys[] = { kCTFontCascadeListAttribute };
-        CFTypeRef values[] = { cascade_descriptors };
+        // First create the primary font by name
+        CTFontRef primary_font = CTFontCreateWithName(font_name, font_size, nullptr);
         
-        CFDictionaryRef attributes = CFDictionaryCreate(
-        kCFAllocatorDefault,
-        (const void**)keys,
-        (const void**)values,
-        1,
-        &kCFTypeDictionaryKeyCallBacks,
-        &kCFTypeDictionaryValueCallBacks
-    );
-    
-    CFRelease(cascade_descriptors);
-    
-    if (attributes != nullptr) {
-        descriptor = CTFontDescriptorCreateWithAttributes(attributes);
-        CFRelease(attributes);
-    }
+        if (primary_font != nullptr) {
+            // Get the primary font's descriptor
+            CTFontDescriptorRef primary_descriptor = CTFontCopyFontDescriptor(primary_font);
+            CFRelease(primary_font);
+            
+            if (primary_descriptor != nullptr) {
+                // Create a new descriptor by adding the cascade list to the primary font's descriptor
+                CFStringRef keys[] = { kCTFontCascadeListAttribute };
+                CFTypeRef values[] = { cascade_descriptors };
+                
+                CFDictionaryRef attributes = CFDictionaryCreate(
+                    kCFAllocatorDefault,
+                    (const void**)keys,
+                    (const void**)values,
+                    1,
+                    &kCFTypeDictionaryKeyCallBacks,
+                    &kCFTypeDictionaryValueCallBacks
+                );
+                
+                if (attributes != nullptr) {
+                    descriptor = CTFontDescriptorCreateCopyWithAttributes(primary_descriptor, attributes);
+                    CFRelease(attributes);
+                }
+                
+                CFRelease(primary_descriptor);
+            }
+        }
+        
+        CFRelease(cascade_descriptors);
     } else if (cascade_descriptors != nullptr) {
         // Clean up empty cascade descriptors
         CFRelease(cascade_descriptors);
     }
     
     // Create font with descriptor (includes cascade list if available)
-    g_base_font = CTFontCreateWithName(font_name, font_size, nullptr);
+    if (descriptor != nullptr) {
+        // Use descriptor to create font with cascade list
+        g_base_font = CTFontCreateWithFontDescriptor(descriptor, font_size, nullptr);
+        CFRelease(descriptor);
+    } else {
+        // No cascade list, create font directly
+        g_base_font = CTFontCreateWithName(font_name, font_size, nullptr);
+    }
+    
     CFRelease(font_name);  // Release the CFString we created
     
     if (g_base_font == nullptr) {
-        if (descriptor != nullptr) {
-            CFRelease(descriptor);
-        }
         throw std::runtime_error("Failed to create base font");
-    }
-    
-    // Apply descriptor to font to enable cascade list (if we have one)
-    if (descriptor != nullptr) {
-        CTFontRef font_with_cascade = CTFontCreateCopyWithAttributes(
-            g_base_font,
-            font_size,
-            nullptr,
-            descriptor
-        );
-        
-        CFRelease(descriptor);
-        
-        if (font_with_cascade != nullptr) {
-            CFRelease(g_base_font);
-            g_base_font = font_with_cascade;
-        }
-        // If cascade application fails, continue with base font
     }
     
     // Create caches
@@ -2667,6 +2926,43 @@ static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) 
         g_frames_rendered++;
         g_total_render_time_ms += render_time_ms;
         
+        // Performance logging (if enabled)
+        if (g_enable_perf_logging && g_frames_rendered % 60 == 0) {
+            // Log every 60 frames (approximately once per second at 60fps)
+            // Calculate averages over the last 60 frames
+            double avg_render_time = g_total_render_time_ms / 60.0;
+            double avg_batches = g_total_batches / 60.0;
+            double avg_chars = g_total_characters / 60.0;
+            double avg_splits = g_total_batch_splits / 60.0;
+            double font_hit_rate = g_font_lookups > 0 ? 
+                (g_font_cache_hits * 100.0 / g_font_lookups) : 0.0;
+            
+            // Log performance metrics
+            fprintf(stderr, 
+                "[C++ Renderer] Frame %zu: %.2fms | Batches: %.1f | Chars: %.1f | "
+                "Splits: %.1f | Font hits: %.1f%%",
+                g_frames_rendered, avg_render_time, avg_batches, avg_chars, 
+                avg_splits, font_hit_rate
+            );
+            
+            // Include last failed character if any lookups failed
+            if (g_last_failed_char != 0) {
+                fprintf(stderr, " | Last fail: U+%04X", static_cast<unsigned int>(g_last_failed_char));
+            }
+            
+            fprintf(stderr, "\n");
+            
+            // Reset cumulative metrics for next logging period
+            // This ensures each log shows averages for the last 60 frames only
+            g_total_render_time_ms = 0.0;
+            g_total_batches = 0;
+            g_total_characters = 0;
+            g_total_batch_splits = 0;
+            g_font_lookups = 0;
+            g_font_cache_hits = 0;
+            g_last_failed_char = 0;  // Reset failed character tracking
+        }
+        
         // Success - return None
         Py_RETURN_NONE;
         
@@ -2790,6 +3086,38 @@ static PyObject* get_performance_metrics(PyObject* self, PyObject* args) {
                             PyLong_FromSize_t(g_total_batches));
         PyDict_SetItemString(metrics, "avg_batches_per_frame", 
                             PyFloat_FromDouble(avg_batches_per_frame));
+        
+        // Add new batching metrics
+        double avg_chars_per_frame = g_frames_rendered > 0 ? 
+            static_cast<double>(g_total_characters) / g_frames_rendered : 0.0;
+        double avg_splits_per_frame = g_frames_rendered > 0 ?
+            static_cast<double>(g_total_batch_splits) / g_frames_rendered : 0.0;
+        double avg_chars_per_batch = g_total_batches > 0 ?
+            static_cast<double>(g_total_characters) / g_total_batches : 0.0;
+        
+        PyDict_SetItemString(metrics, "total_characters",
+                            PyLong_FromSize_t(g_total_characters));
+        PyDict_SetItemString(metrics, "avg_chars_per_frame",
+                            PyFloat_FromDouble(avg_chars_per_frame));
+        PyDict_SetItemString(metrics, "avg_chars_per_batch",
+                            PyFloat_FromDouble(avg_chars_per_batch));
+        PyDict_SetItemString(metrics, "total_batch_splits",
+                            PyLong_FromSize_t(g_total_batch_splits));
+        PyDict_SetItemString(metrics, "avg_splits_per_frame",
+                            PyFloat_FromDouble(avg_splits_per_frame));
+        
+        // Add font lookup metrics
+        double font_hit_rate = g_font_lookups > 0 ?
+            (static_cast<double>(g_font_cache_hits) / g_font_lookups) * 100.0 : 0.0;
+        
+        PyDict_SetItemString(metrics, "font_lookups",
+                            PyLong_FromSize_t(g_font_lookups));
+        PyDict_SetItemString(metrics, "font_cache_hits",
+                            PyLong_FromSize_t(g_font_cache_hits));
+        PyDict_SetItemString(metrics, "font_hit_rate_percent",
+                            PyFloat_FromDouble(font_hit_rate));
+        
+        // Add attribute dictionary cache metrics
         PyDict_SetItemString(metrics, "attr_dict_cache_hits", 
                             PyLong_FromSize_t(attr_dict_hits));
         PyDict_SetItemString(metrics, "attr_dict_cache_misses", 
@@ -2819,6 +3147,11 @@ static PyObject* reset_metrics(PyObject* self, PyObject* args) {
         g_frames_rendered = 0;
         g_total_render_time_ms = 0.0;
         g_total_batches = 0;
+        g_total_characters = 0;
+        g_total_batch_splits = 0;
+        g_font_lookups = 0;
+        g_font_cache_hits = 0;
+        g_last_failed_char = 0;
         
         // Reset cache metrics
         if (g_attr_dict_cache != nullptr) {
@@ -2831,4 +3164,30 @@ static PyObject* reset_metrics(PyObject* self, PyObject* args) {
         PyErr_SetString(PyExc_RuntimeError, e.what());
         return nullptr;
     }
+}
+
+/**
+ * Enable or disable performance logging.
+ * When enabled, logs performance metrics to stderr every 60 frames.
+ * 
+ * @param self Module object (unused)
+ * @param args Arguments tuple containing a boolean (enable/disable)
+ * @return None
+ */
+static PyObject* enable_perf_logging(PyObject* self, PyObject* args) {
+    int enable = 0;
+    
+    if (!PyArg_ParseTuple(args, "p", &enable)) {
+        return nullptr;
+    }
+    
+    g_enable_perf_logging = (enable != 0);
+    
+    if (g_enable_perf_logging) {
+        fprintf(stderr, "[C++ Renderer] Performance logging enabled\n");
+    } else {
+        fprintf(stderr, "[C++ Renderer] Performance logging disabled\n");
+    }
+    
+    Py_RETURN_NONE;
 }
