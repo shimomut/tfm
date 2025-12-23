@@ -18,6 +18,7 @@ from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent, SystemEvent, TextAttr
 from tfm_colors import (
     get_color_with_attrs,
     get_status_color,
+    get_log_color,
     COLOR_DIFF_ONLY_ONE_SIDE,
     COLOR_DIFF_CHANGE,
     COLOR_DIFF_BLANK,
@@ -689,8 +690,8 @@ class DirectoryDiffViewer(UILayer):
         
         # Get display dimensions for scrolling calculations
         height, width = self.renderer.get_dimensions()
-        # Reserve space for header (1 line) and status bar (1 line)
-        display_height = height - 2
+        # Reserve space for header (1 line), divider (1 line), details pane (4 lines), and status bar (1 line)
+        display_height = height - 7
         
         # Handle character-based commands (only from KeyEvent)
         if event.char:
@@ -1104,9 +1105,9 @@ class DirectoryDiffViewer(UILayer):
             width: Terminal width
             height: Terminal height
         """
-        # Calculate content area (header is 1 line, details pane is 3 lines, status bar is 1 line)
+        # Calculate content area (header is 1 line, divider is 1 line, details pane is 4 lines, status bar is 1 line)
         content_start_y = 1
-        content_height = height - 5  # Reserve space for header, details pane (3 lines), and status bar
+        content_height = height - 7  # Reserve space for header, divider, details pane (4 lines), and status bar
         
         # Check if directories are empty or identical (but not during scanning)
         if not self.scan_in_progress and (not self.visible_nodes or len(self.visible_nodes) == 0):
@@ -1127,16 +1128,20 @@ class DirectoryDiffViewer(UILayer):
         # when tree expands/collapses and scrollbar appears/disappears
         reserved_scrollbar_width = 1  # Always reserve at least 1 column for scrollbar
         
+        # Add 1-character left padding for each pane
+        left_padding = 1
+        right_padding = 1
+        
         # Calculate column widths for side-by-side layout
-        # Format: [indent][expand][name] | [indent][expand][name] [scrollbar]
+        # Format: [padding][indent][expand][name] | [padding][indent][expand][name] [scrollbar]
         # Use the same separator as the header for alignment
-        available_width = width - self.separator_width - reserved_scrollbar_width
+        available_width = width - left_padding - right_padding - self.separator_width - reserved_scrollbar_width
         # Split evenly, giving any extra character to the left side (same as header)
         right_column_width = available_width // 2
         left_column_width = available_width - right_column_width  # Left gets any extra character
-        left_column_x = 0
-        separator_x = left_column_width
-        right_column_x = left_column_width + self.separator_width
+        left_column_x = left_padding
+        separator_x = left_padding + left_column_width
+        right_column_x = left_padding + left_column_width + self.separator_width + right_padding
         scrollbar_x = width - scrollbar_width if scrollbar_width > 0 else width
         
         # Render visible nodes
@@ -1152,6 +1157,8 @@ class DirectoryDiffViewer(UILayer):
                 # Render remaining empty rows
                 for j in range(i, content_height):
                     empty_y_pos = content_start_y + j
+                    # Left padding
+                    renderer.draw_text(empty_y_pos, 0, " " * left_padding, 0, 0)
                     # Empty left column
                     renderer.draw_text(empty_y_pos, left_column_x, " " * left_column_width, 0, 0)
                     # Separator bar
@@ -1235,6 +1242,9 @@ class DirectoryDiffViewer(UILayer):
                 separator = self.separator_contains_diff
             else:
                 separator = self.separator_different
+            
+            # Render left padding
+            renderer.draw_text(y_pos, 0, " " * left_padding, 0, 0)
             
             # Render left column
             if node.left_path:
@@ -1442,16 +1452,21 @@ class DirectoryDiffViewer(UILayer):
         import stat
         import time
         
-        # Details pane occupies 3 lines above the status bar
-        details_start_y = height - 4
-        details_height = 3
+        # Details pane occupies 4 lines above the status bar, plus 1 line for divider
+        divider_y = height - 6
+        details_start_y = height - 5
+        details_height = 4
         
-        # Get status color for the pane background
+        # Draw horizontal divider above the details pane
+        # Use status bar color for the divider
         status_color_pair, status_attrs = get_status_color()
+        divider_line = "─" * width
+        renderer.draw_text(divider_y, 0, divider_line, status_color_pair, status_attrs)
         
-        # Clear the details pane area with colored background
+        # Clear the details pane area with log color
+        log_color_pair, log_attrs = get_log_color("STDOUT")
         for i in range(details_height):
-            renderer.draw_text(details_start_y + i, 0, " " * width, status_color_pair, status_attrs)
+            renderer.draw_text(details_start_y + i, 0, " " * width, log_color_pair, log_attrs)
         
         # If no nodes or no focused node, show empty pane
         if not self.visible_nodes or self.cursor_position >= len(self.visible_nodes):
@@ -1465,105 +1480,90 @@ class DirectoryDiffViewer(UILayer):
         left_info = self.left_files.get(relative_path) if relative_path else None
         right_info = self.right_files.get(relative_path) if relative_path else None
         
-        # Helper function to format file details
-        def format_details(file_info: Optional[FileInfo], side_label: str) -> List[str]:
-            """Format file details for display."""
+        # Helper function to format individual fields
+        def format_field_value(file_info: Optional[FileInfo], field: str) -> str:
+            """Format a specific field value."""
             if not file_info:
-                return [
-                    f"{side_label} Path: (not present)",
-                    f"{side_label} Type: -",
-                    f"{side_label} Size: -  Permission: -  Modified: -"
-                ]
+                if field == "path":
+                    return "(not present)"
+                return "-"
             
-            # Full filepath
-            filepath_line = f"{side_label} Path: {file_info.path}"
-            
-            # Type
-            if file_info.is_directory:
-                file_type = "Directory"
-            else:
-                file_type = "File"
-            type_line = f"{side_label} Type: {file_type}"
-            
-            # Size, Permission, Timestamp
-            if file_info.is_accessible:
-                # Format size
+            if field == "path":
+                return str(file_info.path)
+            elif field == "type":
+                return "Directory" if file_info.is_directory else "File"
+            elif field == "size":
+                if not file_info.is_accessible:
+                    return "-"
                 if file_info.is_directory:
-                    size_str = "-"
+                    return "-"
+                size = file_info.size
+                if size < 1024:
+                    return f"{size}B"
+                elif size < 1024 * 1024:
+                    return f"{size / 1024:.1f}KB"
+                elif size < 1024 * 1024 * 1024:
+                    return f"{size / (1024 * 1024):.1f}MB"
                 else:
-                    size = file_info.size
-                    if size < 1024:
-                        size_str = f"{size}B"
-                    elif size < 1024 * 1024:
-                        size_str = f"{size / 1024:.1f}KB"
-                    elif size < 1024 * 1024 * 1024:
-                        size_str = f"{size / (1024 * 1024):.1f}MB"
-                    else:
-                        size_str = f"{size / (1024 * 1024 * 1024):.1f}GB"
-                
-                # Format permission
+                    return f"{size / (1024 * 1024 * 1024):.1f}GB"
+            elif field == "permission":
+                if not file_info.is_accessible:
+                    return "-"
                 try:
                     st = file_info.path.stat()
                     mode = st.st_mode
-                    perm_str = stat.filemode(mode)
+                    return stat.filemode(mode)
                 except (OSError, AttributeError):
-                    perm_str = "?"
-                
-                # Format timestamp
+                    return "?"
+            elif field == "modified":
+                if not file_info.is_accessible:
+                    return "-"
                 try:
-                    mtime_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(file_info.mtime))
+                    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(file_info.mtime))
                 except (OSError, ValueError):
-                    mtime_str = "?"
-                
-                details_line = f"{side_label} Size: {size_str}  Permission: {perm_str}  Modified: {mtime_str}"
-            else:
-                # File is not accessible
-                details_line = f"{side_label} Size: -  Permission: -  Modified: - (Error: {file_info.error_message})"
-            
-            return [filepath_line, type_line, details_line]
+                    return "?"
+            return "-"
         
-        # Format details for left side
-        left_details = format_details(left_info, "L")
+        # Add 1-character left padding for details pane
+        details_padding = 1
+        details_content_width = width - details_padding
         
-        # Format details for right side
-        right_details = format_details(right_info, "R")
+        # Line 0: Left path
+        left_path_str = f"L Path: {format_field_value(left_info, 'path')}"
+        if len(left_path_str) > details_content_width:
+            left_path_str = left_path_str[:details_content_width-1] + "…"
+        renderer.draw_text(details_start_y, details_padding, left_path_str, log_color_pair, log_attrs)
         
-        # Render details line by line
-        # Line 1: Left path
-        line1 = left_details[0]
-        if len(line1) > width:
-            line1 = line1[:width-1] + "…"
-        renderer.draw_text(details_start_y, 0, line1, status_color_pair, status_attrs)
+        # Line 1: Left details - Type, Size, Permission, Modified (aligned columns)
+        left_type = format_field_value(left_info, "type")
+        left_size = format_field_value(left_info, "size")
+        left_perm = format_field_value(left_info, "permission")
+        left_modified = format_field_value(left_info, "modified")
+        
+        # Build left line with fixed column positions
+        # Format: "L Type: File      Size: 1.2MB    Permission: -rw-r--r--  Modified: 2025-12-22 10:30:45"
+        left_line = f"L Type: {left_type:<10} Size: {left_size:<10} Permission: {left_perm:<12} Modified: {left_modified}"
+        if len(left_line) > details_content_width:
+            left_line = left_line[:details_content_width-1] + "…"
+        renderer.draw_text(details_start_y + 1, details_padding, left_line, log_color_pair, log_attrs)
         
         # Line 2: Right path
-        line2 = right_details[0]
-        if len(line2) > width:
-            line2 = line2[:width-1] + "…"
-        renderer.draw_text(details_start_y + 1, 0, line2, status_color_pair, status_attrs)
+        right_path_str = f"R Path: {format_field_value(right_info, 'path')}"
+        if len(right_path_str) > details_content_width:
+            right_path_str = right_path_str[:details_content_width-1] + "…"
+        renderer.draw_text(details_start_y + 2, details_padding, right_path_str, log_color_pair, log_attrs)
         
-        # Line 3: Combined type and details
-        # Format: "L Type: X  Size: Y  Permission: Z  Modified: W | R Type: X  Size: Y  Permission: Z  Modified: W"
-        left_type_and_details = left_details[1] + "  " + left_details[2].replace(f"L Size:", "Size:")
-        right_type_and_details = right_details[1] + "  " + right_details[2].replace(f"R Size:", "Size:")
+        # Line 3: Right details - Type, Size, Permission, Modified (aligned columns)
+        right_type = format_field_value(right_info, "type")
+        right_size = format_field_value(right_info, "size")
+        right_perm = format_field_value(right_info, "permission")
+        right_modified = format_field_value(right_info, "modified")
         
-        # Calculate available space for each side
-        separator = " | "
-        available_width = width - len(separator)
-        left_width = available_width // 2
-        right_width = available_width - left_width
-        
-        # Truncate if needed
-        if len(left_type_and_details) > left_width:
-            left_type_and_details = left_type_and_details[:left_width-1] + "…"
-        if len(right_type_and_details) > right_width:
-            right_type_and_details = right_type_and_details[:right_width-1] + "…"
-        
-        # Pad to exact widths
-        left_type_and_details = left_type_and_details.ljust(left_width)
-        right_type_and_details = right_type_and_details.ljust(right_width)
-        
-        line3 = left_type_and_details + separator + right_type_and_details
-        renderer.draw_text(details_start_y + 2, 0, line3, status_color_pair, status_attrs)
+        # Build right line with same column positions as left for alignment
+        right_line = f"R Type: {right_type:<10} Size: {right_size:<10} Permission: {right_perm:<12} Modified: {right_modified}"
+        if len(right_line) > details_content_width:
+            right_line = right_line[:details_content_width-1] + "…"
+        renderer.draw_text(details_start_y + 3, details_padding, right_line, log_color_pair, log_attrs)
     
     def _render_status_bar(self, renderer, width: int, height: int) -> None:
         """
@@ -3146,7 +3146,7 @@ class DirectoryDiffViewer(UILayer):
         
         # Ensure scroll position keeps the cursor visible
         height, width = self.renderer.get_dimensions()
-        display_height = height - 3
+        display_height = height - 7
         
         # If cursor is below visible area, adjust scroll
         if self.cursor_position >= self.scroll_offset + display_height:
@@ -3224,7 +3224,7 @@ class DirectoryDiffViewer(UILayer):
         
         # Ensure cursor is visible in scroll area
         height, width = self.renderer.get_dimensions()
-        display_height = height - 3
+        display_height = height - 7
         
         # If cursor is above visible area, adjust scroll
         if self.cursor_position < self.scroll_offset:
@@ -3793,8 +3793,8 @@ class DirectoryDiffViewer(UILayer):
         """
         # Get display dimensions
         height, width = self.renderer.get_dimensions()
-        # Reserve space for header (1 line) and status bar (1 line)
-        display_height = height - 2
+        # Reserve space for header (1 line), divider (1 line), details pane (4 lines), and status bar (1 line)
+        display_height = height - 7
         
         # Calculate visible range
         start_index = self.scroll_offset
