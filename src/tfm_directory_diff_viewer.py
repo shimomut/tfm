@@ -1261,9 +1261,9 @@ class DirectoryDiffViewer(UILayer):
                 separator_attrs = TextAttribute.NORMAL
             elif separator == " ? ":
                 # Neutral color for pending separator (Task 12.3)
-                # Use status bar color with DIM attribute
+                # Use status bar color with NORMAL attribute
                 separator_color_pair, _ = get_status_color()
-                separator_attrs = TextAttribute.DIM
+                separator_attrs = TextAttribute.NORMAL
             else:
                 # Status bar color for identical separator
                 separator_color_pair, separator_attrs = get_status_color()
@@ -1364,10 +1364,10 @@ class DirectoryDiffViewer(UILayer):
             # Use regular file/directory color with DIM attribute to distinguish from IDENTICAL
             if node.is_directory:
                 color_pair, _ = get_color_with_attrs(COLOR_DIRECTORIES)
-                return (color_pair, TextAttribute.DIM)
+                return (color_pair, TextAttribute.NORMAL)
             else:
                 color_pair, _ = get_color_with_attrs(COLOR_REGULAR_FILE)
-                return (color_pair, TextAttribute.DIM)
+                return (color_pair, TextAttribute.NORMAL)
         elif node.difference_type == DifferenceType.ONLY_LEFT or \
            node.difference_type == DifferenceType.ONLY_RIGHT:
             # Use error color (red foreground) for items only on one side
@@ -2052,22 +2052,14 @@ class DirectoryDiffViewer(UILayer):
             self.mark_dirty()
             
             # Step 4: Start worker threads for background scanning
-            # TODO: In future tasks, start directory scanner and file comparator workers here
-            # For now, we'll continue with the old full-scan approach in background
+            # Start directory scanner worker for progressive scanning
+            self._start_scanner_worker()
             
-            # Create scanner with progress callback for deeper scanning
-            self.scanner = DirectoryScanner(
-                self.left_path,
-                self.right_path,
-                self._on_scan_progress
-            )
+            # Start file comparator worker for background file comparison
+            self._start_comparator_worker()
             
-            # Launch full scan in worker thread (will be replaced with progressive scanning)
-            self.scanner_thread = threading.Thread(
-                target=self._scan_worker,
-                daemon=True
-            )
-            self.scanner_thread.start()
+            # Queue initial scan tasks for subdirectories
+            self._queue_initial_scan_tasks()
             
         except Exception as e:
             # Handle errors during initial scan
@@ -2098,6 +2090,9 @@ class DirectoryDiffViewer(UILayer):
         # and set children_scanned = False
         self._mark_directories_pending(new_root)
         
+        # Queue file comparisons for top-level files
+        self._queue_file_comparisons_for_node(new_root)
+        
         # Store comparison errors for display
         self.comparison_errors = engine.comparison_errors
         
@@ -2110,9 +2105,122 @@ class DirectoryDiffViewer(UILayer):
                 self.root_node.is_expanded = True
                 self._update_visible_nodes()
     
+    def _queue_file_comparisons_for_node(self, node: TreeNode) -> None:
+        """
+        Queue file comparison tasks for all files in a node's children.
+        
+        This method examines a node's children and queues comparison tasks
+        for any files that exist on both sides.
+        
+        Args:
+            node: The node whose children should be queued for comparison
+        """
+        for child in node.children:
+            # Only queue files (not directories) that exist on both sides
+            if not child.is_directory and child.left_path and child.right_path:
+                # Build relative path for this file
+                if node.depth == 0:
+                    # Direct child of root
+                    file_relative_path = child.name
+                else:
+                    # Build full relative path by traversing up to root
+                    path_parts = [child.name]
+                    current = node
+                    while current and current.depth > 0:
+                        path_parts.insert(0, current.name)
+                        current = current.parent
+                    file_relative_path = "/".join(path_parts)
+                
+                # Create comparison task
+                comparison_task = ComparisonTask(
+                    left_path=child.left_path,
+                    right_path=child.right_path,
+                    relative_path=file_relative_path,
+                    priority=10,  # Normal priority
+                    is_visible=False  # Will be updated by priority system
+                )
+                
+                # Add to comparison queue
+                with self.queue_lock:
+                    self.comparison_queue.put(comparison_task)
+    
     # ========================================================================
     # Progressive Scanning Worker Threads (Task 5)
     # ========================================================================
+    
+    def _start_scanner_worker(self) -> None:
+        """
+        Create and start the directory scanner worker thread.
+        
+        This method initializes the scanner_thread and starts it running
+        the _directory_scanner_worker method. The thread is marked as a
+        daemon thread so it won't prevent the program from exiting.
+        """
+        # Only start if not already running
+        if self.scanner_thread and self.scanner_thread.is_alive():
+            return
+        
+        # Reset cancelled flag
+        self.cancelled = False
+        
+        # Create and start scanner thread
+        self.scanner_thread = threading.Thread(
+            target=self._directory_scanner_worker,
+            daemon=True,
+            name="DirectoryScanner"
+        )
+        self.scanner_thread.start()
+    
+    def _start_comparator_worker(self) -> None:
+        """
+        Create and start the file comparator worker thread.
+        
+        This method initializes the comparator_thread and starts it running
+        the _file_comparator_worker method. The thread is marked as a
+        daemon thread so it won't prevent the program from exiting.
+        """
+        # Only start if not already running
+        if self.comparator_thread and self.comparator_thread.is_alive():
+            return
+        
+        # Reset cancelled flag (if not already reset by scanner worker)
+        self.cancelled = False
+        
+        # Create and start comparator thread
+        self.comparator_thread = threading.Thread(
+            target=self._file_comparator_worker,
+            daemon=True,
+            name="FileComparator"
+        )
+        self.comparator_thread.start()
+    
+    def _queue_initial_scan_tasks(self) -> None:
+        """
+        Queue initial scan tasks for subdirectories in the root.
+        
+        This method examines the root node's children and queues any
+        directories for scanning. This kicks off the progressive scanning
+        process after the initial top-level display.
+        """
+        if not self.root_node:
+            return
+        
+        # Queue scan tasks for all subdirectories in root
+        with self.tree_lock:
+            for child in self.root_node.children:
+                if child.is_directory and not child.children_scanned:
+                    # Create scan task for this directory
+                    scan_task = ScanTask(
+                        left_path=child.left_path,
+                        right_path=child.right_path,
+                        relative_path=child.name,
+                        priority=10,  # Normal priority
+                        is_visible=False  # Will be updated by priority system
+                    )
+                    
+                    # Add to scan queue
+                    with self.queue_lock:
+                        self.scan_queue.put(scan_task)
     
     def _directory_scanner_worker(self) -> None:
         """
