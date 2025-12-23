@@ -623,7 +623,7 @@ class TextViewer(UILayer):
             file_info = f"File: {display_title}"
             
         if len(file_info) > width - 4:
-            file_info = "..." + file_info[-(width-7):]
+            file_info = "…" + file_info[-(width-5):]
         
         self.renderer.draw_text(0, 2, file_info, header_color_pair, header_attrs)
         

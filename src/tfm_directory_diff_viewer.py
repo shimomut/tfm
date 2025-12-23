@@ -844,11 +844,11 @@ class DirectoryDiffViewer(UILayer):
         # Truncate paths if needed using wide-char aware functions
         left_display_width = get_display_width(left_label)
         if left_display_width > left_width:
-            left_label = truncate_to_width(left_label, left_width, ellipsis="...")
+            left_label = truncate_to_width(left_label, left_width, ellipsis="…")
         
         right_display_width = get_display_width(right_label)
         if right_display_width > right_width:
-            right_label = truncate_to_width(right_label, right_width, ellipsis="...")
+            right_label = truncate_to_width(right_label, right_width, ellipsis="…")
         
         # Pad labels to exact widths using spaces
         left_actual_width = get_display_width(left_label)

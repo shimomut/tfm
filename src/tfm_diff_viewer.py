@@ -502,9 +502,9 @@ class DiffViewer(UILayer):
         
         # Truncate file names if needed
         if len(file1_display) > pane_width - 4:
-            file1_display = "..." + file1_display[-(pane_width - 7):]
+            file1_display = "…" + file1_display[-(pane_width - 5):]
         if len(file2_display) > pane_width - 4:
-            file2_display = "..." + file2_display[-(pane_width - 7):]
+            file2_display = "…" + file2_display[-(pane_width - 5):]
         
         # Draw file names
         self.renderer.draw_text(0, 2, file1_display, header_color_pair, header_attrs)
