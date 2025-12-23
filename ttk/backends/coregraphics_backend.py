@@ -223,11 +223,17 @@ class CoreGraphicsBackend(Renderer):
         self.window_title = window_title
         self.font_names = font_names if font_names is not None else ['Menlo']
         
+        # Set font size first (needed by monospace fallback)
+        self.font_size = font_size
+        
         # Automatically add system default monospace font as final fallback
         # This ensures there's always a font available for any character
         self._add_system_monospace_fallback()
         
-        self.font_size = font_size
+        # Automatically add system emoji font as final fallback
+        # This ensures emoji characters can be rendered
+        self._add_system_emoji_fallback()
+        
         self.rows = rows
         self.cols = cols
         
@@ -282,6 +288,25 @@ class CoreGraphicsBackend(Renderer):
             # If we can't get system font, just continue with user-specified fonts
             # This is non-critical - user fonts should work for most cases
             print(f"Warning: Could not add system monospace font to cascade: {e}")
+    
+    def _add_system_emoji_fallback(self) -> None:
+        """
+        Add system emoji font as final fallback in cascade list.
+        
+        This ensures emoji characters can be rendered even if user-specified
+        fonts don't include emoji glyphs. On macOS, this is "Apple Color Emoji".
+        
+        The emoji font is only added if it's not already in the list.
+        """
+        try:
+            # macOS system emoji font name
+            emoji_font_name = "Apple Color Emoji"
+            
+            # Only add if not already in the list
+            if emoji_font_name not in self.font_names:
+                self.font_names.append(emoji_font_name)
+        except Exception as e:
+            print(f"Warning: Could not add system emoji font to cascade: {e}")
     
     def initialize(self) -> None:
         """

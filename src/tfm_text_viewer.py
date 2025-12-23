@@ -29,14 +29,16 @@ from tfm_const import *
 from tfm_wide_char_utils import get_display_width, truncate_to_width, split_at_width, safe_get_display_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_ui_layer import UILayer
+from tfm_info_dialog import InfoDialog
 
 
 class TextViewer(UILayer):
     """Text file viewer with syntax highlighting support"""
     
-    def __init__(self, renderer, file_path: Path):
+    def __init__(self, renderer, file_path: Path, layer_stack=None):
         self.renderer = renderer
         self.file_path = file_path
+        self.layer_stack = layer_stack
         self.original_lines = []  # Original lines with tabs preserved
         self.lines = []  # List of strings (plain text lines with tabs expanded)
         self.highlighted_lines = []  # List of lists of (text, color) tuples
@@ -54,6 +56,9 @@ class TextViewer(UILayer):
         self.isearch_pattern = ""
         self.isearch_matches = []  # List of line indices that match
         self.isearch_match_index = 0  # Current match index
+        
+        # Help dialog
+        self.info_dialog = InfoDialog(None, renderer)
         
         # Load file content
         self.load_file()
@@ -468,6 +473,7 @@ class TextViewer(UILayer):
         self.isearch_pattern = ""
         self.isearch_matches = []
         self.isearch_match_index = 0
+        self.mark_dirty()  # Redraw to show isearch interface
     
     def exit_isearch_mode(self):
         """Exit isearch mode"""
@@ -475,6 +481,38 @@ class TextViewer(UILayer):
         self.isearch_pattern = ""
         self.isearch_matches = []
         self.isearch_match_index = 0
+        self.mark_dirty()  # Redraw to remove isearch interface
+    
+    def _show_help_dialog(self) -> None:
+        """Show help dialog with keyboard shortcuts."""
+        title = "Text Viewer - Help"
+        help_lines = [
+            "NAVIGATION",
+            "  ↑/↓           Scroll up/down one line",
+            "  ←/→           Scroll left/right (when not wrapping)",
+            "  PgUp/PgDn     Scroll one page up/down",
+            "  Home/End      Jump to beginning/end of file",
+            "",
+            "SEARCH",
+            "  f             Enter incremental search mode",
+            "  (in search)   Type to search, ↑/↓ to navigate matches",
+            "  (in search)   ESC or Enter to exit search",
+            "",
+            "DISPLAY OPTIONS",
+            "  n             Toggle line numbers",
+            "  w             Toggle line wrapping",
+            "  s             Toggle syntax highlighting",
+            "  t             Cycle tab width (2/4/8 spaces)",
+            "",
+            "GENERAL",
+            "  ?             Show this help",
+            "  q/ESC/Enter   Close viewer",
+        ]
+        
+        self.info_dialog.show(title, help_lines)
+        if self.layer_stack:
+            self.layer_stack.push(self.info_dialog)
+        self._dirty = True
     
     def handle_isearch_input(self, event: KeyEvent) -> bool:
         """Handle input while in isearch mode. Returns True if key was handled."""
@@ -539,9 +577,11 @@ class TextViewer(UILayer):
                 print(f"Warning: get_dimensions() returned non-integer values: height={height} (type: {type(height)}), width={width} (type: {type(width)})")
                 height, width = 24, 80
             
-            # Reserve space for header (2 lines) and status bar (1 line)
-            start_y = 2
-            display_height = max(1, height - 3)  # Header (2) + status bar (1), ensure at least 1
+            # Reserve space for header (1 line) and status bar (1 line)
+            # When isearch is active, it uses a 2nd header line temporarily
+            header_lines = 2 if self.isearch_mode else 1
+            start_y = header_lines
+            display_height = max(1, height - header_lines - 1)  # Header + status bar, ensure at least 1
             start_x = 0
             display_width = max(1, width)  # Ensure at least 1
             
@@ -556,8 +596,11 @@ class TextViewer(UILayer):
         except Exception as e:
             print(f"Error in get_display_dimensions: {e}")
             traceback.print_exc()
-            # Return safe defaults
-            return 2, 0, 21, 80
+            # Return safe defaults based on isearch mode
+            if self.isearch_mode:
+                return 2, 0, 21, 80
+            else:
+                return 1, 0, 22, 80
     
     def draw_header(self):
         """Draw the viewer header"""
@@ -566,9 +609,8 @@ class TextViewer(UILayer):
         # Get header color
         header_color_pair, header_attrs = get_header_color()
         
-        # Clear header area with colored background - fill entire width
+        # Clear header area with colored background - only 1 line normally
         self.renderer.draw_text(0, 0, " " * width, header_color_pair, header_attrs)
-        self.renderer.draw_text(1, 0, " " * width, header_color_pair, header_attrs)
         
         # File path and info - use polymorphic display methods
         display_prefix = self.file_path.get_display_prefix()
@@ -580,13 +622,18 @@ class TextViewer(UILayer):
         else:
             file_info = f"File: {display_title}"
             
-        if len(file_info) > width - 4:
-            file_info = "..." + file_info[-(width-7):]
+        # Truncate using display width (accounts for wide characters)
+        max_width = width - 4
+        if get_display_width(file_info) > max_width:
+            file_info = truncate_to_width(file_info, max_width, ellipsis="…")
         
         self.renderer.draw_text(0, 2, file_info, header_color_pair, header_attrs)
         
-        # Controls line or isearch interface
+        # Show isearch interface on 2nd line when active
         if self.isearch_mode:
+            # Clear 2nd line
+            self.renderer.draw_text(1, 0, " " * width, header_color_pair, header_attrs)
+            
             # Show isearch interface
             isearch_prompt = f"Isearch: {self.isearch_pattern}"
             if self.isearch_matches:
@@ -596,18 +643,6 @@ class TextViewer(UILayer):
             
             search_color_pair, search_attrs = get_search_color()
             self.renderer.draw_text(1, 2, isearch_prompt[:width-4], search_color_pair, search_attrs)
-        else:
-            # Show normal controls
-            controls = "Enter/ESC:quit ↑↓:scroll ←→:h-scroll PgUp/PgDn:page f:isearch n:line-num w:wrap s:syntax t:tab-width"
-            
-            # Center the controls or left-align if too long
-            if len(controls) + 4 < width:
-                controls_x = (width - len(controls)) // 2
-            else:
-                controls_x = 2
-            
-            status_color_pair, status_attrs = get_status_color()
-            self.renderer.draw_text(1, controls_x, controls[:width-4], status_color_pair, status_attrs)
     
     def draw_status_bar(self):
         """Draw the status bar at the bottom of the viewer"""
@@ -620,64 +655,8 @@ class TextViewer(UILayer):
         # Clear status bar area with colored background - fill entire width
         self.renderer.draw_text(status_y, 0, " " * width, status_color_pair, status_attrs)
         
-        # Calculate current position info
-        if self.wrap_lines:
-            # When wrapping is enabled, show display line position
-            display_lines, line_mapping = self.get_wrapped_lines_with_mapping()
-            current_line = self.scroll_offset + 1  # 1-based display line number
-            total_lines = len(display_lines)
-            original_line = line_mapping[self.scroll_offset] if self.scroll_offset < len(line_mapping) else 1
-        else:
-            # Normal mode - show original line numbers
-            current_line = self.scroll_offset + 1  # 1-based line number
-            total_lines = len(self.lines)
-            original_line = current_line
-        
-        # Calculate scroll percentage
-        if total_lines <= 1:
-            scroll_percent = 100
-        else:
-            scroll_percent = min(100, int((current_line / total_lines) * 100))
-        
-        # Get file size
-        try:
-            file_size = self.file_path.stat().st_size
-            if file_size < 1024:
-                size_str = f"{file_size}B"
-            elif file_size < 1024 * 1024:
-                size_str = f"{file_size / 1024:.1f}K"
-            elif file_size < 1024 * 1024 * 1024:
-                size_str = f"{file_size / (1024 * 1024):.1f}M"
-            else:
-                size_str = f"{file_size / (1024 * 1024 * 1024):.1f}G"
-        except FileNotFoundError:
-            print(f"Warning: File not found for size calculation: {self.file_path}")
-            size_str = "---"
-        except PermissionError:
-            print(f"Warning: Permission denied for size calculation: {self.file_path}")
-            size_str = "---"
-        except (OSError, AttributeError) as e:
-            print(f"Warning: Could not get file size for {self.file_path}: {e}")
-            size_str = "---"
-        except Exception as e:
-            print(f"Warning: Unexpected error getting file size: {e}")
-            size_str = "---"
-        
-        # Build status components
-        if self.wrap_lines and total_lines != len(self.lines):
-            # Show both display line and original line when wrapping
-            position_info = f"Line {current_line}/{total_lines} (orig: {original_line}/{len(self.lines)}) ({scroll_percent}%)"
-        else:
-            position_info = f"Line {current_line}/{total_lines} ({scroll_percent}%)"
-        
-        file_info = f"{size_str}"
-        
-        # Add horizontal scroll info if applicable (only when not wrapping)
-        if self.horizontal_offset > 0 and not self.wrap_lines:
-            position_info += f" | Col {self.horizontal_offset + 1}"
-        
-        # Left side: position and file info
-        left_status = f" {position_info} | {file_info} "
+        # Left side: navigation hints
+        left_status = " ?:help  q:quit "
         
         # Right side: file type and options status
         right_parts = []
@@ -708,8 +687,8 @@ class TextViewer(UILayer):
         self.renderer.draw_text(status_y, 0, left_status, status_color_pair, status_attrs)
         
         # Draw right status (right-aligned)
-        right_x = max(len(left_status) + 2, width - len(right_status))
-        if right_x < width:
+        right_x = width - len(right_status)
+        if right_x > len(left_status):
             self.renderer.draw_text(status_y, right_x, right_status, status_color_pair, status_attrs)
     
     def draw_content(self):
@@ -918,6 +897,10 @@ class TextViewer(UILayer):
                 # Quit viewer
                 self._should_close = True
                 self._dirty = True
+                return True
+            elif event.char == '?':
+                # Show help dialog
+                self._show_help_dialog()
                 return True
             elif char_lower == 'n':
                 self.show_line_numbers = not self.show_line_numbers
@@ -1208,13 +1191,14 @@ def is_text_file(file_path: Path) -> bool:
         return False
 
 
-def create_text_viewer(renderer, file_path: Path):
+def create_text_viewer(renderer, file_path: Path, layer_stack=None):
     """
     Create a text viewer instance
     
     Args:
         renderer: TTK renderer object
         file_path: Path to the file to view
+        layer_stack: Optional UILayerStack for pushing dialogs
         
     Returns:
         TextViewer instance or None if file cannot be viewed
@@ -1226,7 +1210,7 @@ def create_text_viewer(renderer, file_path: Path):
         return None
     
     try:
-        return TextViewer(renderer, file_path)
+        return TextViewer(renderer, file_path, layer_stack)
     except (OSError, IOError) as e:
         print(f"Error: Could not open text file {file_path}: {e}")
         return None

@@ -33,6 +33,7 @@ from tfm_colors import *
 from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, is_special_key_bound_to_with_selection, is_input_event_bound_to, is_input_event_bound_to_with_selection, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
 from tfm_text_viewer import create_text_viewer, is_text_file
 from tfm_diff_viewer import create_diff_viewer
+from tfm_directory_diff_viewer import DirectoryDiffViewer
 
 # Import new modular components
 from tfm_log_manager import LogManager
@@ -1812,7 +1813,7 @@ class FileManager(UILayer):
                     self.mark_dirty()
             elif is_text_file(focused_file):
                 # Fallback to text viewer for text files without association
-                viewer = create_text_viewer(self.renderer, focused_file)
+                viewer = create_text_viewer(self.renderer, focused_file, self.ui_layer_stack)
                 if viewer:
                     # Push viewer onto layer stack
                     self.push_layer(viewer)
@@ -2875,7 +2876,7 @@ class FileManager(UILayer):
             if is_text_file(focused_file):
                 # Fallback to built-in text viewer for text files
                 try:
-                    viewer = create_text_viewer(self.renderer, focused_file)
+                    viewer = create_text_viewer(self.renderer, focused_file, self.ui_layer_stack)
                     if viewer:
                         # Push viewer onto layer stack
                         self.push_layer(viewer)
@@ -2929,7 +2930,7 @@ class FileManager(UILayer):
         
         # Launch diff viewer
         try:
-            viewer = create_diff_viewer(self.renderer, file1, file2)
+            viewer = create_diff_viewer(self.renderer, file1, file2, self.ui_layer_stack)
             if viewer:
                 # Push viewer onto layer stack
                 self.push_layer(viewer)
@@ -2944,6 +2945,44 @@ class FileManager(UILayer):
             
         except Exception as e:
             print(f"Error viewing diff: {e}")
+            self.mark_dirty()
+    
+    def show_directory_diff(self):
+        """Show directory diff viewer comparing left and right pane directories"""
+        # Get paths from both panes
+        left_path = self.pane_manager.left_pane['path']
+        right_path = self.pane_manager.right_pane['path']
+        
+        # Validate that both paths are directories
+        if not left_path.exists():
+            print(f"Left pane path does not exist: {left_path}")
+            return
+        
+        if not right_path.exists():
+            print(f"Right pane path does not exist: {right_path}")
+            return
+        
+        if not left_path.is_dir():
+            print(f"Left pane path is not a directory: {left_path}")
+            return
+        
+        if not right_path.is_dir():
+            print(f"Right pane path is not a directory: {right_path}")
+            return
+        
+        # Create and launch directory diff viewer
+        try:
+            viewer = DirectoryDiffViewer(self.renderer, left_path, right_path, self.ui_layer_stack, self.file_operations)
+            if viewer:
+                # Push viewer onto layer stack
+                self.push_layer(viewer)
+                self.renderer.set_cursor_visibility(False)
+                self.mark_dirty()
+                print(f"Comparing directories: {left_path} <-> {right_path}")
+            else:
+                print(f"Failed to create directory diff viewer")
+        except Exception as e:
+            print(f"Error creating directory diff viewer: {e}")
             self.mark_dirty()
     
     def edit_selected_file(self):
@@ -3718,6 +3757,9 @@ class FileManager(UILayer):
             return True
         elif self.is_key_for_action(event, 'diff_files'):  # Diff two selected files
             self.diff_selected_files()
+            return True
+        elif self.is_key_for_action(event, 'directory_diff'):  # Compare directories recursively
+            self.show_directory_diff()
             return True
         elif self.is_key_for_action(event, 'copy_files'):  # Copy selected files
             self.copy_selected_files()

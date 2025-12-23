@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug TFM (Curses)",
+            "name": "TFM-Terminal",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/tfm.py",
@@ -13,11 +13,11 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug TFM (CoreGraphics)",
+            "name": "TFM-Desktop",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/tfm.py",
-            "args": ["--backend", "coregraphics"],
+            "args": ["--backend", "coregraphics", "--debug"],
             "console": "integratedTerminal"
         }
     ]
