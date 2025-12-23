@@ -1377,26 +1377,41 @@ static char16_t g_last_failed_char = 0;  // Last character that failed font look
 /**
  * Determine which font from the cascade list can render a character.
  * Returns the font index that can render the character.
+ * Handles both single characters and surrogate pairs (e.g., emoji).
  * 
- * @param character UTF-16 character to check
+ * @param character Pointer to UTF-16 character data (may be surrogate pair)
+ * @param char_length Length of character data (1 for BMP, 2 for surrogate pairs)
  * @param base_font Primary font to try first
  * @param font_attributes Font attributes (for bold trait)
  * @return Font index: -1 for primary font, 0+ for cascade font index, -2 if no font found
  */
 static int get_font_index_for_character(
-    char16_t character,
+    const char16_t* character,
+    size_t char_length,
     CTFontRef base_font,
     int font_attributes
 ) {
     // Track font lookups for performance metrics
     g_font_lookups++;
     
-    // Convert character to UniChar for CoreText
-    UniChar uni_char = static_cast<UniChar>(character);
-    CGGlyph glyph;
+    // Handle empty character
+    if (character == nullptr || char_length == 0) {
+        return -2;  // No font found
+    }
+    
+    // Convert character(s) to UniChar array for CoreText
+    // This handles both single characters and surrogate pairs
+    std::vector<UniChar> uni_chars(char_length);
+    for (size_t i = 0; i < char_length; ++i) {
+        uni_chars[i] = static_cast<UniChar>(character[i]);
+    }
+    
+    // Allocate glyph array (same size as character array)
+    std::vector<CGGlyph> glyphs(char_length);
     
     // Try primary font first
-    if (CTFontGetGlyphsForCharacters(base_font, &uni_char, &glyph, 1)) {
+    // CTFontGetGlyphsForCharacters handles surrogate pairs correctly
+    if (CTFontGetGlyphsForCharacters(base_font, uni_chars.data(), glyphs.data(), char_length)) {
         g_font_cache_hits++;  // Primary font hit
         return -1;  // Primary font can render this character
     }
@@ -1450,7 +1465,8 @@ static int get_font_index_for_character(
             }
             
             // Try to get glyph with this cascade font
-            if (CTFontGetGlyphsForCharacters(cascade_font, &uni_char, &glyph, 1)) {
+            // CTFontGetGlyphsForCharacters handles surrogate pairs correctly
+            if (CTFontGetGlyphsForCharacters(cascade_font, uni_chars.data(), glyphs.data(), char_length)) {
                 g_font_cache_hits++;  // Cascade font hit
                 result_index = static_cast<int>(i);
                 CFRelease(cascade_font);
@@ -1464,8 +1480,8 @@ static int get_font_index_for_character(
     CFRelease(cascade_list);
     
     // Track failed lookups for debugging
-    if (result_index == -2) {
-        g_last_failed_char = character;
+    if (result_index == -2 && char_length > 0) {
+        g_last_failed_char = character[0];
     }
     
     return result_index;
@@ -1872,7 +1888,8 @@ static void render_characters(
             int font_index = -2;  // Default: no font found
             if (base_font != nullptr && !cell.character.empty()) {
                 font_index = get_font_index_for_character(
-                    cell.character[0],
+                    cell.character.data(),
+                    cell.character.length(),
                     base_font,
                     font_attributes
                 );
@@ -2452,24 +2469,38 @@ static void initialize_caches(PyObject* font_names_obj, double font_size_val = 1
     CTFontDescriptorRef descriptor = nullptr;
     
     if (cascade_descriptors != nullptr && CFArrayGetCount(cascade_descriptors) > 0) {
-        CFStringRef keys[] = { kCTFontCascadeListAttribute };
-        CFTypeRef values[] = { cascade_descriptors };
+        // First create the primary font by name
+        CTFontRef primary_font = CTFontCreateWithName(font_name, font_size, nullptr);
         
-        CFDictionaryRef attributes = CFDictionaryCreate(
-        kCFAllocatorDefault,
-        (const void**)keys,
-        (const void**)values,
-        1,
-        &kCFTypeDictionaryKeyCallBacks,
-        &kCFTypeDictionaryValueCallBacks
-    );
-    
-    CFRelease(cascade_descriptors);
-    
-    if (attributes != nullptr) {
-        descriptor = CTFontDescriptorCreateWithAttributes(attributes);
-        CFRelease(attributes);
-    }
+        if (primary_font != nullptr) {
+            // Get the primary font's descriptor
+            CTFontDescriptorRef primary_descriptor = CTFontCopyFontDescriptor(primary_font);
+            CFRelease(primary_font);
+            
+            if (primary_descriptor != nullptr) {
+                // Create a new descriptor by adding the cascade list to the primary font's descriptor
+                CFStringRef keys[] = { kCTFontCascadeListAttribute };
+                CFTypeRef values[] = { cascade_descriptors };
+                
+                CFDictionaryRef attributes = CFDictionaryCreate(
+                    kCFAllocatorDefault,
+                    (const void**)keys,
+                    (const void**)values,
+                    1,
+                    &kCFTypeDictionaryKeyCallBacks,
+                    &kCFTypeDictionaryValueCallBacks
+                );
+                
+                if (attributes != nullptr) {
+                    descriptor = CTFontDescriptorCreateCopyWithAttributes(primary_descriptor, attributes);
+                    CFRelease(attributes);
+                }
+                
+                CFRelease(primary_descriptor);
+            }
+        }
+        
+        CFRelease(cascade_descriptors);
     } else if (cascade_descriptors != nullptr) {
         // Clean up empty cascade descriptors
         CFRelease(cascade_descriptors);
