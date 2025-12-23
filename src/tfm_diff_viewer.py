@@ -497,8 +497,9 @@ class DiffViewer(UILayer):
         file1_display = self.file1_path.get_display_title()
         file2_display = self.file2_path.get_display_title()
         
-        # Calculate column width for each file
-        pane_width = width // 2
+        # Calculate column width for each file (same as content area)
+        pane_width = (width - 1) // 2
+        separator_x = pane_width
         
         # Truncate file names if needed (using display width for wide characters)
         max_width = pane_width - 4
@@ -509,12 +510,10 @@ class DiffViewer(UILayer):
         
         # Draw file names
         self.renderer.draw_text(0, 2, file1_display, header_color_pair, header_attrs)
-        self.renderer.draw_text(0, pane_width + 2, file2_display, header_color_pair, header_attrs)
+        self.renderer.draw_text(0, separator_x + 2, file2_display, header_color_pair, header_attrs)
         
-        # Draw separator
-        separator_x = pane_width
-        for y in range(height - 1):
-            self.renderer.draw_text(y, separator_x, "│", header_color_pair, header_attrs)
+        # Draw separator on header line only (content area draws it for other lines)
+        self.renderer.draw_text(0, separator_x, "│", header_color_pair, header_attrs)
     
     def draw_status_bar(self):
         """Draw the status bar"""
@@ -614,6 +613,10 @@ class DiffViewer(UILayer):
             # Fill entire line with background
             self.renderer.draw_text(y_pos, start_x, ' ' * display_width, bg_color_pair, bg_attrs)
             
+            # Always draw separator, even for empty lines
+            header_color_pair, header_attrs = get_header_color()
+            self.renderer.draw_text(y_pos, separator_x, "│", header_color_pair, header_attrs)
+            
             if line_index >= len(display_lines):
                 continue
             
@@ -695,10 +698,6 @@ class DiffViewer(UILayer):
             else:
                 # Draw blank line with gray background for alignment (dummy line)
                 self.renderer.draw_text(y_pos, content_start_x, ' ' * content_width, blank_color_pair, blank_attrs)
-            
-            # Draw separator
-            header_color_pair, header_attrs = get_header_color()
-            self.renderer.draw_text(y_pos, separator_x, "│", header_color_pair, header_attrs)
             
             # Draw right pane line number if enabled
             content_start_x2 = separator_x + 1
