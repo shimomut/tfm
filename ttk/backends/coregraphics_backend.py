@@ -235,13 +235,16 @@ class CoreGraphicsBackend(Renderer):
         # This ensures there's always a font available for any character
         self._add_system_monospace_fallback()
         
+        # Automatically add system emoji font BEFORE Apple Symbols
+        # This ensures emoji characters use color emoji, not grayscale symbols
+        # Apple Symbols has grayscale versions of some emoji, so we need to
+        # check Apple Color Emoji first
+        self._add_system_emoji_fallback()
+        
         # Automatically add Apple Symbols font for special Unicode characters
         # This provides coverage for Braille, mathematical symbols, etc.
+        # Placed after emoji font to avoid grayscale emoji rendering
         self._add_system_symbols_fallback()
-        
-        # Automatically add system emoji font as final fallback
-        # This ensures emoji characters can be rendered
-        self._add_system_emoji_fallback()
         
         self.rows = rows
         self.cols = cols

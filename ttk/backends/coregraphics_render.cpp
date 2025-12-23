@@ -17,6 +17,7 @@
 #include <chrono>
 #include <locale>
 #include <codecvt>
+#include <iostream>
 
 // Module version
 #define CPP_RENDERER_VERSION "1.0.0"
@@ -1222,6 +1223,22 @@ static void render_backgrounds(
             // Get cell from grid
             const Cell& cell = grid[row][col];
             
+            // Skip empty cells (placeholders for wide characters)
+            // These cells should not have backgrounds drawn
+            if (cell.character.empty()) {
+                continue;
+            }
+            
+            // Skip variation selectors (U+FE00-U+FE0F) backgrounds
+            // Variation selectors modify the preceding character's appearance
+            // but should not have their own background drawn
+            if (cell.character.length() == 1) {
+                char16_t ch = cell.character[0];
+                if (ch >= 0xFE00 && ch <= 0xFE0F) {
+                    continue;
+                }
+            }
+            
             // Get color pair for this cell
             auto color_it = color_pairs.find(cell.color_pair);
             if (color_it == color_pairs.end()) {
@@ -1373,6 +1390,7 @@ static size_t g_font_lookups = 0;
 static size_t g_font_cache_hits = 0;
 static bool g_enable_perf_logging = false;
 static char16_t g_last_failed_char = 0;  // Last character that failed font lookup
+static size_t g_debug_log_counter = 0;  // Counter for debug logging
 
 /**
  * Determine which font from the cascade list can render a character.
@@ -1813,6 +1831,14 @@ static void render_characters(
     CGFloat font_ascent,
     AttributeDictCache& attr_dict_cache
 ) {
+    // DEBUG: Log when render_characters is called
+    if (g_enable_perf_logging) {
+        fprintf(stderr, "[DEBUG] render_characters called: dirty region rows=%d-%d cols=%d-%d\n",
+                dirty_cells.start_row, dirty_cells.end_row, 
+                dirty_cells.start_col, dirty_cells.end_col);
+        fflush(stderr);
+    }
+    
     // Current batch being accumulated
     std::optional<CharacterBatch> current_batch;
     
@@ -1822,8 +1848,29 @@ static void render_characters(
             // Get cell from grid
             const Cell& cell = grid[row][col];
             
-            // Skip spaces - backgrounds already rendered
-            if (cell.character.empty() || (cell.character.length() == 1 && cell.character[0] == u' ')) {
+            // DEBUG: Log all cells in rows with emoji to see what we're processing
+            // This must be BEFORE any skip logic so we can see what's being skipped
+            // Emoji are at column 3, so check columns 3-8 to see emoji and what follows
+            if (g_enable_perf_logging && row >= 1 && row <= 6 && col >= 3 && col <= 8) {
+                if (!cell.character.empty()) {
+                    char16_t first_char = cell.character[0];
+                    std::cout << "[DEBUG] Cell[" << row << "][" << col << "]: U+" 
+                              << std::hex << (int)first_char << std::dec 
+                              << " len=" << cell.character.length()
+                              << " is_wide=" << (cell.is_wide ? "true" : "false") << std::endl;
+                } else {
+                    std::cout << "[DEBUG] Cell[" << row << "][" << col << "]: EMPTY"
+                              << " is_wide=" << (cell.is_wide ? "true" : "false") << std::endl;
+                }
+            }
+            
+            // Skip empty cells (placeholders for wide characters) and spaces
+            if (cell.character.empty()) {
+                // DEBUG: Log placeholder cells
+                if (g_enable_perf_logging && row >= 1 && row <= 6 && col >= 3 && col <= 8) {
+                    std::cout << "[DEBUG] Skipping empty/placeholder cell at row=" << row 
+                              << " col=" << col << std::endl;
+                }
                 // Finish current batch if any
                 if (current_batch.has_value()) {
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
@@ -1832,15 +1879,38 @@ static void render_characters(
                 continue;
             }
             
-            // Check if this is a placeholder cell for a wide character
-            // Placeholder cells have empty strings and should be skipped
-            if (cell.character.empty()) {
+            // Skip spaces - backgrounds already rendered
+            if (cell.character.length() == 1 && cell.character[0] == u' ') {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
                 continue;
+            }
+            
+            // Check if next cell is a variation selector and combine them
+            // Variation selectors (U+FE00-U+FE0F) modify the preceding character
+            // For proper font lookup, we need to pass them together
+            std::u16string combined_char = cell.character;
+            int cols_to_skip = 0;
+            
+            if (col + 1 < dirty_cells.end_col && col + 1 < cols) {
+                const Cell& next_cell = grid[row][col + 1];
+                if (next_cell.character.length() == 1) {
+                    char16_t next_ch = next_cell.character[0];
+                    if (next_ch >= 0xFE00 && next_ch <= 0xFE0F) {
+                        // Next cell is a variation selector - combine it
+                        combined_char += next_cell.character;
+                        cols_to_skip = 1;  // Skip the variation selector cell in next iteration
+                        
+                        if (g_enable_perf_logging) {
+                            std::cout << "[DEBUG] Combining variation selector at row=" << row 
+                                      << " col=" << (col + 1) << " U+" << std::hex << (int)next_ch << std::dec 
+                                      << " with preceding char" << std::endl;
+                        }
+                    }
+                }
             }
             
             // Get color pair for this cell
@@ -1890,10 +1960,10 @@ static void render_characters(
             }
             
             int font_index = -2;  // Default: no font found
-            if (base_font != nullptr && !cell.character.empty()) {
+            if (base_font != nullptr && !combined_char.empty()) {
                 font_index = get_font_index_for_character(
-                    cell.character.data(),
-                    cell.character.length(),
+                    combined_char.data(),
+                    combined_char.length(),
                     base_font,
                     font_attributes
                 );
@@ -1906,6 +1976,8 @@ static void render_characters(
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
                     current_batch = std::nullopt;
                 }
+                // Skip the variation selector cell if we combined it
+                col += cols_to_skip;
                 continue;
             }
             
@@ -1947,9 +2019,20 @@ static void render_characters(
             
             if (can_extend) {
                 // Extend current batch
-                current_batch.value().text += cell.character;
+                current_batch.value().text += combined_char;
                 current_batch.value().is_wide.push_back(cell.is_wide);  // Add is_wide flag
                 g_total_characters++;
+                
+                // DEBUG: Log emoji characters being added to batch
+                if (g_enable_perf_logging && !combined_char.empty()) {
+                    char16_t first_char = combined_char[0];
+                    // Check if this is an emoji range (simplified check)
+                    if (first_char >= 0x2600 || (first_char >= 0xD800 && first_char <= 0xDFFF)) {
+                        std::cout << "[DEBUG] Extending batch with char at row=" << row 
+                                  << " col=" << col << " U+" << std::hex << (int)first_char << std::dec 
+                                  << " len=" << combined_char.length() << std::endl;
+                    }
+                }
             } else {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
@@ -1957,14 +2040,14 @@ static void render_characters(
                     g_total_batches++;
                     
                     // Track batch split if we're starting a new batch (not just finishing at row end)
-                    if (!cell.character.empty()) {
+                    if (!combined_char.empty()) {
                         g_total_batch_splits++;
                     }
                 }
                 
                 // Start new batch
                 CharacterBatch new_batch;
-                new_batch.text = cell.character;
+                new_batch.text = combined_char;
                 new_batch.is_wide.push_back(cell.is_wide);  // Add is_wide flag
                 new_batch.font_attributes = font_attributes;
                 new_batch.fg_rgb = fg_rgb;
@@ -1975,10 +2058,31 @@ static void render_characters(
                 
                 current_batch = new_batch;
                 g_total_characters++;
+                
+                // DEBUG: Log emoji characters starting new batch
+                if (g_enable_perf_logging && !combined_char.empty()) {
+                    char16_t first_char = combined_char[0];
+                    // Check if this is an emoji range (simplified check)
+                    if (first_char >= 0x2600 || (first_char >= 0xD800 && first_char <= 0xDFFF)) {
+                        std::cout << "[DEBUG] Starting new batch with char at row=" << row 
+                                  << " col=" << col << " U+" << std::hex << (int)first_char << std::dec 
+                                  << " len=" << combined_char.length() << std::endl;
+                    }
+                }
             }
+            
+            // Skip the variation selector cell if we combined it
+            col += cols_to_skip;
             
             // If this is a wide character, skip the next column (placeholder cell)
             if (!cell.character.empty() && cell.is_wide) {
+                // DEBUG: Log wide characters
+                if (g_enable_perf_logging && row == 0 && col < 20) {
+                    char16_t first_char = cell.character[0];
+                    fprintf(stderr, "[DEBUG] Wide character at row=%d col=%d U+%04X (next col will be placeholder)\n", 
+                            row, col, (int)first_char);
+                    fflush(stderr);
+                }
                 // The next column should be a placeholder, so we'll skip it
                 // in the next iteration
             }
@@ -2574,6 +2678,12 @@ static void initialize_caches(PyObject* font_names_obj, double font_size_val = 1
 static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) {
     // Start timing for performance metrics
     auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // DEBUG: Log that render_frame was called
+    if (g_enable_perf_logging) {
+        fprintf(stderr, "[DEBUG] render_frame called\n");
+        fflush(stderr);
+    }
     
     try {
         //=====================================================================

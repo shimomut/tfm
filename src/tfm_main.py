@@ -4204,6 +4204,15 @@ def cli_main():
         elif backend_name == 'coregraphics':
             from ttk.backends.coregraphics_backend import CoreGraphicsBackend
             renderer = CoreGraphicsBackend(**backend_options)
+            
+            # Enable C++ performance logging if requested via environment variable
+            if os.environ.get('TFM_PERF_LOGGING', '').lower() in ('1', 'true', 'yes'):
+                try:
+                    import ttk_coregraphics_render
+                    ttk_coregraphics_render.enable_perf_logging(1)
+                    print("TFM: C++ performance logging enabled", file=sys.stderr)
+                except Exception as e:
+                    print(f"TFM: Failed to enable C++ performance logging: {e}", file=sys.stderr)
         else:
             raise ValueError(f"Unknown backend: {backend_name}")
         
