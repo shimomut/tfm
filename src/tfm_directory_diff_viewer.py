@@ -1948,17 +1948,31 @@ class DirectoryDiffViewer(UILayer):
         Returns:
             True if layer needs redraw, False otherwise
         """
-        # Always redraw when scanning to animate progress indicator (Task 16.1)
+        # Check if scanning is complete (queues empty and no active scanning)
+        # This prevents the circular dependency where scan_in_progress is cleared during render
+        if self.scan_in_progress:
+            # Check if all work is actually done
+            scanning_nodes = []
+            if self.root_node:
+                self._find_scanning_nodes(self.root_node, scanning_nodes)
+            
+            scan_queue_empty = self.scan_queue.empty()
+            comparison_queue_empty = self.comparison_queue.empty()
+            
+            # If no active work, clear the flag
+            if not scanning_nodes and scan_queue_empty and comparison_queue_empty:
+                self.scan_in_progress = False
+                self.scan_status = "Scan complete"
+                # Mark dirty one final time to show completion, but only if not already dirty
+                if not self._dirty:
+                    self._dirty = True
+                    return True
+        
+        # Return True if scanning or if there's pending work
         if self.scan_in_progress:
             return True
         
-        # Also redraw when background workers are active (Task 16.1)
-        if self.scanner_thread and self.scanner_thread.is_alive():
-            return True
-        if self.comparator_thread and self.comparator_thread.is_alive():
-            return True
-        
-        # Check if any queues have pending work (Task 16.1)
+        # Check if any queues have pending work
         if not self.scan_queue.empty() or not self.comparison_queue.empty():
             return True
         
