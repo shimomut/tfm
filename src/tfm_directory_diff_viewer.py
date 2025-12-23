@@ -1199,7 +1199,15 @@ class DirectoryDiffViewer(UILayer):
                 node_content = icon + error_indicator + node.name + " [scanning...]"
             elif not node.children_scanned and node.is_directory:
                 # Directory not yet scanned - show ellipsis indicator (Task 12.1)
-                node_content = icon + error_indicator + node.name + " ..."
+                # BUT: Don't show "..." for one-sided directories since their result is deterministic
+                exists_left = node.left_path is not None
+                exists_right = node.right_path is not None
+                if exists_left and exists_right:
+                    # Both-sided directory - show "..." since we need to scan to find differences
+                    node_content = icon + error_indicator + node.name + " ..."
+                else:
+                    # One-sided directory - no "..." needed, result is deterministic
+                    node_content = icon + error_indicator + node.name
             elif not node.content_compared and not node.is_directory:
                 # File not yet compared - show pending indicator (Task 12.1)
                 node_content = icon + error_indicator + node.name + " [pending]"
