@@ -2922,19 +2922,30 @@ class DirectoryDiffViewer(UILayer):
                     is_directory = (left_info and left_info.is_directory) or \
                                   (right_info and right_info.is_directory)
                     
+                    # Determine difference type and content_compared status
+                    if left_info and not right_info:
+                        diff_type = DifferenceType.ONLY_LEFT
+                        content_compared = True  # One-sided files don't need comparison
+                    elif right_info and not left_info:
+                        diff_type = DifferenceType.ONLY_RIGHT
+                        content_compared = True  # One-sided files don't need comparison
+                    else:
+                        diff_type = DifferenceType.PENDING  # Will be classified later
+                        content_compared = False
+                    
                     # Create child node
                     child_node = TreeNode(
                         name=child_name,
                         left_path=left_info.path if left_info else None,
                         right_path=right_info.path if right_info else None,
                         is_directory=is_directory,
-                        difference_type=DifferenceType.PENDING,  # Will be classified later
+                        difference_type=diff_type,
                         depth=node.depth + 1,
                         is_expanded=False,
                         children=[],
                         parent=node,
                         children_scanned=False,
-                        content_compared=False,
+                        content_compared=content_compared,
                         scan_in_progress=False
                     )
                     
