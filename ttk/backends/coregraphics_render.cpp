@@ -1390,7 +1390,6 @@ static size_t g_font_lookups = 0;
 static size_t g_font_cache_hits = 0;
 static bool g_enable_perf_logging = false;
 static char16_t g_last_failed_char = 0;  // Last character that failed font lookup
-static size_t g_debug_log_counter = 0;  // Counter for debug logging
 
 /**
  * Determine which font from the cascade list can render a character.
@@ -1496,11 +1495,6 @@ static int get_font_index_for_character(
     }
     
     CFRelease(cascade_list);
-    
-    // Track failed lookups for debugging
-    if (result_index == -2 && char_length > 0) {
-        g_last_failed_char = character[0];
-    }
     
     return result_index;
 }
@@ -1863,14 +1857,6 @@ static void render_characters(
     CGFloat font_ascent,
     AttributeDictCache& attr_dict_cache
 ) {
-    // DEBUG: Log when render_characters is called
-    if (g_enable_perf_logging) {
-        fprintf(stderr, "[DEBUG] render_characters called: dirty region rows=%d-%d cols=%d-%d\n",
-                dirty_cells.start_row, dirty_cells.end_row, 
-                dirty_cells.start_col, dirty_cells.end_col);
-        fflush(stderr);
-    }
-    
     // Current batch being accumulated
     std::optional<CharacterBatch> current_batch;
     
@@ -1880,29 +1866,8 @@ static void render_characters(
             // Get cell from grid
             const Cell& cell = grid[row][col];
             
-            // DEBUG: Log all cells in rows with emoji to see what we're processing
-            // This must be BEFORE any skip logic so we can see what's being skipped
-            // Emoji are at column 3, so check columns 3-8 to see emoji and what follows
-            if (g_enable_perf_logging && row >= 1 && row <= 6 && col >= 3 && col <= 8) {
-                if (!cell.character.empty()) {
-                    char16_t first_char = cell.character[0];
-                    std::cout << "[DEBUG] Cell[" << row << "][" << col << "]: U+" 
-                              << std::hex << (int)first_char << std::dec 
-                              << " len=" << cell.character.length()
-                              << " is_wide=" << (cell.is_wide ? "true" : "false") << std::endl;
-                } else {
-                    std::cout << "[DEBUG] Cell[" << row << "][" << col << "]: EMPTY"
-                              << " is_wide=" << (cell.is_wide ? "true" : "false") << std::endl;
-                }
-            }
-            
             // Skip empty cells (placeholders for wide characters) and spaces
             if (cell.character.empty()) {
-                // DEBUG: Log placeholder cells
-                if (g_enable_perf_logging && row >= 1 && row <= 6 && col >= 3 && col <= 8) {
-                    std::cout << "[DEBUG] Skipping empty/placeholder cell at row=" << row 
-                              << " col=" << col << std::endl;
-                }
                 // Finish current batch if any
                 if (current_batch.has_value()) {
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
@@ -1937,12 +1902,6 @@ static void render_characters(
                         combined_char += next_cell.character;
                         cols_to_skip = 1;  // Skip the variation selector cell in next iteration
                         has_variation_selector = true;  // Track that we combined with variation selector
-                        
-                        if (g_enable_perf_logging) {
-                            std::cout << "[DEBUG] Combining variation selector at row=" << row 
-                                      << " col=" << (col + 1) << " U+" << std::hex << (int)next_ch << std::dec 
-                                      << " with preceding char" << std::endl;
-                        }
                     }
                 }
             }
@@ -2058,17 +2017,6 @@ static void render_characters(
                 // Otherwise use the cell's is_wide flag
                 current_batch.value().is_wide.push_back(has_variation_selector ? true : cell.is_wide);
                 g_total_characters++;
-                
-                // DEBUG: Log emoji characters being added to batch
-                if (g_enable_perf_logging && !combined_char.empty()) {
-                    char16_t first_char = combined_char[0];
-                    // Check if this is an emoji range (simplified check)
-                    if (first_char >= 0x2600 || (first_char >= 0xD800 && first_char <= 0xDFFF)) {
-                        std::cout << "[DEBUG] Extending batch with char at row=" << row 
-                                  << " col=" << col << " U+" << std::hex << (int)first_char << std::dec 
-                                  << " len=" << combined_char.length() << std::endl;
-                    }
-                }
             } else {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
@@ -2096,33 +2044,15 @@ static void render_characters(
                 
                 current_batch = new_batch;
                 g_total_characters++;
-                
-                // DEBUG: Log emoji characters starting new batch
-                if (g_enable_perf_logging && !combined_char.empty()) {
-                    char16_t first_char = combined_char[0];
-                    // Check if this is an emoji range (simplified check)
-                    if (first_char >= 0x2600 || (first_char >= 0xD800 && first_char <= 0xDFFF)) {
-                        std::cout << "[DEBUG] Starting new batch with char at row=" << row 
-                                  << " col=" << col << " U+" << std::hex << (int)first_char << std::dec 
-                                  << " len=" << combined_char.length() << std::endl;
-                    }
-                }
             }
             
             // Skip the variation selector cell if we combined it
             col += cols_to_skip;
             
             // If this is a wide character, skip the next column (placeholder cell)
+            // The next column should be a placeholder, so we'll skip it in the next iteration
             if (!cell.character.empty() && cell.is_wide) {
-                // DEBUG: Log wide characters
-                if (g_enable_perf_logging && row == 0 && col < 20) {
-                    char16_t first_char = cell.character[0];
-                    fprintf(stderr, "[DEBUG] Wide character at row=%d col=%d U+%04X (next col will be placeholder)\n", 
-                            row, col, (int)first_char);
-                    fflush(stderr);
-                }
-                // The next column should be a placeholder, so we'll skip it
-                // in the next iteration
+                // Wide character handling - placeholder will be skipped automatically
             }
         }
         
@@ -2716,12 +2646,6 @@ static void initialize_caches(PyObject* font_names_obj, double font_size_val = 1
 static PyObject* render_frame(PyObject* self, PyObject* args, PyObject* kwargs) {
     // Start timing for performance metrics
     auto start_time = std::chrono::high_resolution_clock::now();
-    
-    // DEBUG: Log that render_frame was called
-    if (g_enable_perf_logging) {
-        fprintf(stderr, "[DEBUG] render_frame called\n");
-        fflush(stderr);
-    }
     
     try {
         //=====================================================================
