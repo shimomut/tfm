@@ -7,9 +7,11 @@ displaying differences in an expandable/collapsible tree structure with visual h
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 import threading
+import queue
 import time
+from threading import Thread
 from tfm_path import Path
 from tfm_ui_layer import UILayer
 from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent, SystemEvent, TextAttribute
@@ -40,6 +42,16 @@ class DifferenceType(Enum):
     ONLY_RIGHT = "only_right"
     CONTENT_DIFFERENT = "content_different"
     CONTAINS_DIFFERENCE = "contains_difference"
+    PENDING = "pending"  # Not yet scanned or compared
+
+
+class ScanPriority:
+    """Priority levels for progressive scanning tasks."""
+    IMMEDIATE = 1000  # User just expanded this node
+    VISIBLE = 100     # Currently visible in viewport
+    EXPANDED = 50     # Expanded but scrolled off screen
+    NORMAL = 10       # Not visible, not expanded
+    LOW = 1           # One-sided directories (only on left or right)
 
 
 @dataclass
@@ -55,6 +67,26 @@ class FileInfo:
 
 
 @dataclass
+class ScanTask:
+    """Task for queuing directory scan operations."""
+    left_path: Optional[Path]
+    right_path: Optional[Path]
+    relative_path: str
+    priority: int
+    is_visible: bool
+
+
+@dataclass
+class ComparisonTask:
+    """Task for queuing file comparison operations."""
+    left_path: Optional[Path]
+    right_path: Optional[Path]
+    relative_path: str
+    priority: int
+    is_visible: bool
+
+
+@dataclass
 class TreeNode:
     """Represents a single node in the directory tree."""
     name: str
@@ -66,6 +98,10 @@ class TreeNode:
     is_expanded: bool
     children: List['TreeNode']
     parent: Optional['TreeNode'] = None
+    # Progressive scanning state fields
+    children_scanned: bool = False  # True if directory contents have been listed
+    content_compared: bool = False  # True if file content has been compared
+    scan_in_progress: bool = False  # True if currently being scanned
 
 
 class DirectoryScanner:
@@ -544,7 +580,6 @@ class DirectoryDiffViewer(UILayer):
         self.scan_current = 0
         self.scan_total = 0
         self.scan_status = ""
-        self.scan_thread: Optional[threading.Thread] = None
         self.scan_cancelled = False
         self.scanner: Optional[DirectoryScanner] = None
         
@@ -559,12 +594,31 @@ class DirectoryDiffViewer(UILayer):
         self.last_tree_update = 0.0  # Time of last tree rebuild
         self.tree_update_interval = 0.5  # Rebuild tree every 0.5 seconds during scan
         
+        # Thread synchronization primitives
+        self.data_lock = threading.RLock()  # Protect file dictionaries
+        self.queue_lock = threading.Lock()  # Protect work queues
+        
+        # Work queues for progressive scanning
+        self.scan_queue: queue.Queue = queue.Queue()  # Directory scanning tasks
+        self.priority_queue: queue.PriorityQueue = queue.PriorityQueue()  # High-priority scans
+        self.comparison_queue: queue.Queue = queue.Queue()  # File comparison tasks
+        self.priority_counter = 0  # Counter to make priority queue items unique
+        
+        # Worker thread management
+        self.scanner_thread: Optional[Thread] = None  # Directory scanner worker thread
+        self.comparator_thread: Optional[Thread] = None  # File comparator worker thread
+        self.cancelled: bool = False  # Shutdown flag for worker threads
+        self.worker_error: Optional[str] = None  # Error flag to notify main thread of worker exceptions
+        
         # Progress animator
         # Create minimal config for animator
         class MinimalConfig:
             PROGRESS_ANIMATION_PATTERN = 'spinner'
             PROGRESS_ANIMATION_SPEED = 0.08
         self.progress_animator = ProgressAnimatorFactory.create_loading_animator(MinimalConfig())
+        
+        # Status bar state (Task 12.2)
+        self._scan_complete_shown = False  # Track if scan complete message has been shown
         
         # Help dialog
         self.info_dialog = InfoDialog(None, renderer)
@@ -677,6 +731,8 @@ class DirectoryDiffViewer(UILayer):
                     if self.cursor_position < self.scroll_offset:
                         self.scroll_offset = self.cursor_position
                     self.mark_dirty()
+                    # Update priorities when viewport changes
+                    self._update_priorities()
             return True
         
         elif event.key_code == KeyCode.DOWN:
@@ -691,6 +747,8 @@ class DirectoryDiffViewer(UILayer):
                     if self.cursor_position >= self.scroll_offset + display_height:
                         self.scroll_offset = self.cursor_position - display_height + 1
                     self.mark_dirty()
+                    # Update priorities when viewport changes
+                    self._update_priorities()
             return True
         
         elif event.key_code == KeyCode.PAGE_UP:
@@ -699,6 +757,8 @@ class DirectoryDiffViewer(UILayer):
                 self.cursor_position = max(0, self.cursor_position - display_height)
                 self.scroll_offset = max(0, self.scroll_offset - display_height)
                 self.mark_dirty()
+                # Update priorities when viewport changes
+                self._update_priorities()
             return True
         
         elif event.key_code == KeyCode.PAGE_DOWN:
@@ -711,6 +771,8 @@ class DirectoryDiffViewer(UILayer):
                 max_scroll = max(0, len(self.visible_nodes) - display_height)
                 self.scroll_offset = min(max_scroll, self.scroll_offset + display_height)
                 self.mark_dirty()
+                # Update priorities when viewport changes
+                self._update_priorities()
             return True
         
         elif event.key_code == KeyCode.HOME:
@@ -1133,11 +1195,24 @@ class DirectoryDiffViewer(UILayer):
                 error_indicator = "⚠ "
             
             # Build node text without tree lines (we'll render them separately in gray)
-            node_content = icon + error_indicator + node.name
+            # Add scanning indicator if scan is in progress (Task 9.2)
+            if node.scan_in_progress:
+                node_content = icon + error_indicator + node.name + " [scanning...]"
+            elif not node.children_scanned and node.is_directory:
+                # Directory not yet scanned - show ellipsis indicator (Task 12.1)
+                node_content = icon + error_indicator + node.name + " ..."
+            elif not node.content_compared and not node.is_directory:
+                # File not yet compared - show pending indicator (Task 12.1)
+                node_content = icon + error_indicator + node.name + " [pending]"
+            else:
+                node_content = icon + error_indicator + node.name
             
             # Choose separator based on difference type
             if node.difference_type == DifferenceType.IDENTICAL:
                 separator = self.separator_identical
+            elif node.difference_type == DifferenceType.PENDING:
+                # Use neutral separator for pending items (Task 12.3)
+                separator = " ? "  # Question mark to indicate unknown status
             elif node.difference_type == DifferenceType.ONLY_LEFT:
                 separator = self.separator_only_left
             elif node.difference_type == DifferenceType.ONLY_RIGHT:
@@ -1184,6 +1259,11 @@ class DirectoryDiffViewer(UILayer):
                 # Red foreground with status bar background for differences
                 separator_color_pair = COLOR_DIFF_SEPARATOR_RED
                 separator_attrs = TextAttribute.NORMAL
+            elif separator == " ? ":
+                # Neutral color for pending separator (Task 12.3)
+                # Use status bar color with DIM attribute
+                separator_color_pair, _ = get_status_color()
+                separator_attrs = TextAttribute.DIM
             else:
                 # Status bar color for identical separator
                 separator_color_pair, separator_attrs = get_status_color()
@@ -1279,7 +1359,16 @@ class DirectoryDiffViewer(UILayer):
         
         # Non-focused nodes: use regular colors without background
         # Differences are indicated by separator symbols and foreground colors
-        if node.difference_type == DifferenceType.ONLY_LEFT or \
+        if node.difference_type == DifferenceType.PENDING:
+            # Use neutral color for pending items (Task 12.3)
+            # Use regular file/directory color with DIM attribute to distinguish from IDENTICAL
+            if node.is_directory:
+                color_pair, _ = get_color_with_attrs(COLOR_DIRECTORIES)
+                return (color_pair, TextAttribute.DIM)
+            else:
+                color_pair, _ = get_color_with_attrs(COLOR_REGULAR_FILE)
+                return (color_pair, TextAttribute.DIM)
+        elif node.difference_type == DifferenceType.ONLY_LEFT or \
            node.difference_type == DifferenceType.ONLY_RIGHT:
             # Use error color (red foreground) for items only on one side
             return (COLOR_ERROR, TextAttribute.NORMAL)
@@ -1355,14 +1444,17 @@ class DirectoryDiffViewer(UILayer):
         identical_count = 0
         contains_diff_count = 0
         error_count = 0
+        pending_count = 0  # Task 15.2: Count PENDING items separately
         
         # Count from all nodes in tree (not just visible)
         if self.root_node:
-            self._count_differences(
-                self.root_node,
-                only_left_count, only_right_count, different_count,
-                identical_count, contains_diff_count, error_count
-            )
+            only_left_count, only_right_count, different_count, \
+            identical_count, contains_diff_count, error_count, pending_count = \
+                self._count_differences(
+                    self.root_node,
+                    only_left_count, only_right_count, different_count,
+                    identical_count, contains_diff_count, error_count, pending_count
+                )
         
         # Build status text
         # Left side: navigation hints (or progress during scan)
@@ -1371,10 +1463,57 @@ class DirectoryDiffViewer(UILayer):
             animator_frame = self.progress_animator.get_current_frame()
             left_status = f" {animator_frame} {self.scan_status} "
             if self.scan_total > 0:
-                left_status += f"({self.scan_current}/{self.scan_total}) "
+                # Task 16.2: Show progress percentage
+                percentage = int((self.scan_current / self.scan_total) * 100)
+                left_status += f"({self.scan_current}/{self.scan_total} - {percentage}%) "
         else:
-            # Normal navigation hints
-            left_status = " ?:help  q:quit  i:toggle-identical "
+            # Check if any node is currently being scanned on-demand (Task 9.2)
+            scanning_nodes = []
+            if self.root_node:
+                self._find_scanning_nodes(self.root_node, scanning_nodes)
+            
+            # Check queue sizes for background scanning (Task 12.2)
+            scan_queue_size = self.scan_queue.qsize()
+            comparison_queue_size = self.comparison_queue.qsize()
+            
+            # Task 16.2: Calculate total pending work for percentage
+            total_pending = scan_queue_size + comparison_queue_size
+            
+            if scanning_nodes:
+                # Show on-demand scanning status
+                animator_frame = self.progress_animator.get_current_frame()
+                left_status = f" {animator_frame} Scanning directory... "
+            elif scan_queue_size > 0:
+                # Show background scanning progress (Task 12.2)
+                animator_frame = self.progress_animator.get_current_frame()
+                # Task 16.2: Show percentage if we can estimate total work
+                if hasattr(self, '_initial_scan_queue_size') and self._initial_scan_queue_size > 0:
+                    completed = self._initial_scan_queue_size - scan_queue_size
+                    percentage = int((completed / self._initial_scan_queue_size) * 100)
+                    left_status = f" {animator_frame} Scanning... ({scan_queue_size} pending - {percentage}%) "
+                else:
+                    left_status = f" {animator_frame} Scanning... ({scan_queue_size} pending) "
+            elif comparison_queue_size > 0:
+                # Show file comparison progress (Task 12.2)
+                animator_frame = self.progress_animator.get_current_frame()
+                # Task 16.2: Show percentage if we can estimate total work
+                if hasattr(self, '_initial_comparison_queue_size') and self._initial_comparison_queue_size > 0:
+                    completed = self._initial_comparison_queue_size - comparison_queue_size
+                    percentage = int((completed / self._initial_comparison_queue_size) * 100)
+                    left_status = f" {animator_frame} Comparing... ({comparison_queue_size} pending - {percentage}%) "
+                else:
+                    left_status = f" {animator_frame} Comparing... ({comparison_queue_size} pending) "
+            elif self.scanner_thread and self.scanner_thread.is_alive():
+                # Threads still running but queues empty - finishing up
+                animator_frame = self.progress_animator.get_current_frame()
+                left_status = f" {animator_frame} Finishing scan... "
+            elif hasattr(self, '_scan_complete_shown') and not self._scan_complete_shown:
+                # Show scan complete message briefly (Task 12.2)
+                left_status = " ✓ Scan complete "
+                self._scan_complete_shown = True
+            else:
+                # Normal navigation hints
+                left_status = " ?:help  q:quit  i:toggle-identical "
         
         # Right side: filter status and statistics
         right_parts = []
@@ -1391,6 +1530,9 @@ class DirectoryDiffViewer(UILayer):
             stats_parts.append(f"Diff:{different_count}")
         if identical_count > 0:
             stats_parts.append(f"Same:{identical_count}")
+        # Task 15.2: Show pending count in status bar
+        if pending_count > 0:
+            stats_parts.append(f"Pending:{pending_count}")
         
         if stats_parts:
             right_parts.append(" ".join(stats_parts))
@@ -1413,7 +1555,7 @@ class DirectoryDiffViewer(UILayer):
     
     def _count_differences(self, node: TreeNode, only_left: int, only_right: int,
                           different: int, identical: int, contains_diff: int,
-                          errors: int) -> tuple:
+                          errors: int, pending: int) -> tuple:
         """
         Recursively count differences in the tree.
         
@@ -1429,6 +1571,7 @@ class DirectoryDiffViewer(UILayer):
             identical: Current count of identical nodes
             contains_diff: Current count of contains-difference nodes
             errors: Current count of error nodes
+            pending: Current count of pending nodes (Task 15.2)
             
         Returns:
             Tuple of updated counts
@@ -1445,6 +1588,9 @@ class DirectoryDiffViewer(UILayer):
                 identical += 1
             elif node.difference_type == DifferenceType.CONTAINS_DIFFERENCE:
                 contains_diff += 1
+            elif node.difference_type == DifferenceType.PENDING:
+                # Task 15.2: Count PENDING items separately
+                pending += 1
             
             # Check for errors (permission errors or comparison errors)
             relative_path = self._get_relative_path(node)
@@ -1466,11 +1612,30 @@ class DirectoryDiffViewer(UILayer):
         
         # Count children recursively
         for child in node.children:
-            only_left, only_right, different, identical, contains_diff, errors = \
+            only_left, only_right, different, identical, contains_diff, errors, pending = \
                 self._count_differences(child, only_left, only_right, different,
-                                      identical, contains_diff, errors)
+                                      identical, contains_diff, errors, pending)
         
-        return only_left, only_right, different, identical, contains_diff, errors
+        return only_left, only_right, different, identical, contains_diff, errors, pending
+    
+    def _find_scanning_nodes(self, node: TreeNode, scanning_nodes: List[TreeNode]) -> None:
+        """
+        Recursively find nodes that are currently being scanned.
+        
+        This helper method traverses the tree and collects all nodes
+        with scan_in_progress flag set to True.
+        
+        Args:
+            node: Node to check (along with its children)
+            scanning_nodes: List to append scanning nodes to
+        """
+        # Check if this node is being scanned
+        if node.scan_in_progress:
+            scanning_nodes.append(node)
+        
+        # Check children recursively
+        for child in node.children:
+            self._find_scanning_nodes(child, scanning_nodes)
     
     def _get_relative_path(self, node: TreeNode) -> str:
         """
@@ -1492,6 +1657,26 @@ class DirectoryDiffViewer(UILayer):
             current = current.parent
         
         return "/".join(parts)
+    
+    def _propagate_difference_to_parents(self, node: TreeNode) -> None:
+        """
+        Propagate difference status to parent directories.
+        
+        When a file is found to be different, all parent directories should
+        be marked as CONTAINS_DIFFERENCE.
+        
+        Task 15.3: Helper method for updating parent directories when a file
+        comparison reveals a difference.
+        
+        Args:
+            node: Node whose difference should be propagated to parents
+        """
+        current = node.parent
+        while current and current.depth > 0:
+            # Update parent to CONTAINS_DIFFERENCE if it's not already marked as such
+            if current.difference_type != DifferenceType.CONTAINS_DIFFERENCE:
+                current.difference_type = DifferenceType.CONTAINS_DIFFERENCE
+            current = current.parent
     
     def _build_tree_lines(self, node: TreeNode) -> str:
         """
@@ -1619,6 +1804,20 @@ class DirectoryDiffViewer(UILayer):
         Returns:
             True if layer needs redraw, False otherwise
         """
+        # Always redraw when scanning to animate progress indicator (Task 16.1)
+        if self.scan_in_progress:
+            return True
+        
+        # Also redraw when background workers are active (Task 16.1)
+        if self.scanner_thread and self.scanner_thread.is_alive():
+            return True
+        if self.comparator_thread and self.comparator_thread.is_alive():
+            return True
+        
+        # Check if any queues have pending work (Task 16.1)
+        if not self.scan_queue.empty() or not self.comparison_queue.empty():
+            return True
+        
         return self._dirty
     
     def mark_dirty(self) -> None:
@@ -1629,13 +1828,92 @@ class DirectoryDiffViewer(UILayer):
         """Clear the dirty flag after rendering."""
         self._dirty = False
     
+    def _stop_worker_threads(self) -> None:
+        """
+        Stop all worker threads gracefully.
+        
+        This method sets the cancellation flag and waits for all worker threads
+        to finish with a timeout. It ensures proper cleanup of resources before
+        the viewer closes.
+        
+        Thread cleanup order:
+        1. Set self.cancelled = True to signal threads to stop
+        2. Join scanner_thread with timeout
+        3. Join comparator_thread with timeout
+        4. Clean up any remaining resources
+        """
+        # Set cancellation flag to signal all worker threads to stop
+        self.cancelled = True
+        
+        # Wait for scanner thread to finish (with timeout)
+        if self.scanner_thread and self.scanner_thread.is_alive():
+            try:
+                self.scanner_thread.join(timeout=2.0)
+                if self.scanner_thread.is_alive():
+                    # Thread didn't stop in time - log warning
+                    print("Warning: Scanner thread did not stop within timeout", 
+                          file=__import__('sys').stderr)
+            except Exception as e:
+                # Handle any exceptions during thread join
+                print(f"Error stopping scanner thread: {e}", 
+                      file=__import__('sys').stderr)
+        
+        # Wait for comparator thread to finish (with timeout)
+        if self.comparator_thread and self.comparator_thread.is_alive():
+            try:
+                self.comparator_thread.join(timeout=2.0)
+                if self.comparator_thread.is_alive():
+                    # Thread didn't stop in time - log warning
+                    print("Warning: Comparator thread did not stop within timeout", 
+                          file=__import__('sys').stderr)
+            except Exception as e:
+                # Handle any exceptions during thread join
+                print(f"Error stopping comparator thread: {e}", 
+                      file=__import__('sys').stderr)
+        
+        # Clean up resources
+        # Clear queues to release any blocked threads
+        try:
+            while not self.scan_queue.empty():
+                try:
+                    self.scan_queue.get_nowait()
+                except queue.Empty:
+                    break
+        except Exception:
+            pass
+        
+        try:
+            while not self.priority_queue.empty():
+                try:
+                    self.priority_queue.get_nowait()
+                except queue.Empty:
+                    break
+        except Exception:
+            pass
+        
+        try:
+            while not self.comparison_queue.empty():
+                try:
+                    self.comparison_queue.get_nowait()
+                except queue.Empty:
+                    break
+        except Exception:
+            pass
+    
     def should_close(self) -> bool:
         """
         Query if this layer wants to close.
         
+        Ensures threads are stopped before closing the viewer.
+        Handles timeout gracefully by logging warnings if threads don't stop in time.
+        
         Returns:
             True if layer should be closed, False otherwise
         """
+        # If we're about to close, stop all worker threads first
+        if self._should_close:
+            self._stop_worker_threads()
+        
         return self._should_close
     
     def on_activate(self) -> None:
@@ -1650,43 +1928,556 @@ class DirectoryDiffViewer(UILayer):
             self.scan_cancelled = True
         
         # Wait for scan thread to finish (with timeout)
-        if self.scan_thread and self.scan_thread.is_alive():
-            self.scan_thread.join(timeout=1.0)
+        if self.scanner_thread and self.scanner_thread.is_alive():
+            self.scanner_thread.join(timeout=1.0)
     
     # ========================================================================
     # Scanning Implementation (Task 5.2)
     # ========================================================================
     
+    def _scan_single_level(self, directory_path: Path) -> Dict[str, FileInfo]:
+        """
+        Scan only the immediate children of a directory (non-recursive).
+        
+        This method scans a single directory level, returning metadata for all
+        immediate children without recursing into subdirectories. This enables
+        progressive scanning where we can display top-level items immediately
+        and scan deeper levels on demand.
+        
+        Args:
+            directory_path: Path to directory to scan
+            
+        Returns:
+            Dictionary mapping relative paths to FileInfo objects for immediate children.
+            Keys are simple filenames (not full paths) since this is single-level.
+            
+        Raises:
+            OSError: If the directory cannot be accessed
+        """
+        files = {}
+        
+        try:
+            # Iterate over immediate children only (no recursion)
+            for child_path in directory_path.iterdir():
+                try:
+                    # Get file stats
+                    stat_info = child_path.stat()
+                    is_accessible = True
+                    error_message = None
+                except (OSError, PermissionError) as e:
+                    # Mark as inaccessible but continue
+                    is_accessible = False
+                    error_message = str(e)
+                    stat_info = None
+                
+                # Get just the filename (not full path) for relative_path
+                # since this is single-level scanning
+                filename = child_path.name
+                
+                # Create FileInfo
+                if stat_info:
+                    file_info = FileInfo(
+                        path=child_path,
+                        relative_path=filename,
+                        is_directory=child_path.is_dir(),
+                        size=stat_info.st_size if not child_path.is_dir() else 0,
+                        mtime=stat_info.st_mtime,
+                        is_accessible=is_accessible,
+                        error_message=error_message
+                    )
+                else:
+                    # Create FileInfo for inaccessible items
+                    file_info = FileInfo(
+                        path=child_path,
+                        relative_path=filename,
+                        is_directory=False,  # Unknown, assume file
+                        size=0,
+                        mtime=0.0,
+                        is_accessible=is_accessible,
+                        error_message=error_message
+                    )
+                
+                # Store in dictionary using filename as key
+                files[filename] = file_info
+                
+        except (OSError, PermissionError) as e:
+            # Cannot read directory contents - this is a fatal error for this directory
+            # Log the error but don't raise - caller will handle empty result
+            print(f"Error scanning directory {directory_path}: {e}", file=__import__('sys').stderr)
+        
+        return files
+    
     def start_scan(self) -> None:
         """
-        Start scanning both directories in a worker thread.
+        Start scanning both directories with progressive, top-level-first approach.
         
-        This method launches DirectoryScanner in a background thread to avoid
-        blocking the UI. Progress updates are received through a callback and
-        trigger UI redraws.
+        This method performs an initial single-level scan of both root directories
+        to enable immediate display (< 100ms), then starts worker threads for
+        deeper scanning in the background.
+        
+        Progressive scanning workflow:
+        1. Scan only top-level items from both directories (synchronous, fast)
+        2. Build initial tree with PENDING status for subdirectories
+        3. Mark tree as dirty to trigger immediate display
+        4. Start worker threads for background scanning of deeper levels
         """
         self.scan_in_progress = True
         self.scan_progress = 0.0
         self.scan_current = 0
         self.scan_total = 0
-        self.scan_status = "Starting scan..."
+        self.scan_status = "Scanning top level..."
         self.scan_cancelled = False
         self.scan_error = None
         self.mark_dirty()
         
-        # Create scanner with progress callback
-        self.scanner = DirectoryScanner(
-            self.left_path,
-            self.right_path,
-            self._on_scan_progress
-        )
+        try:
+            # Step 1: Scan only top-level items from both directories (synchronous)
+            # This should complete in < 100ms for typical directories
+            left_top_level = self._scan_single_level(self.left_path)
+            right_top_level = self._scan_single_level(self.right_path)
+            
+            # Store top-level results
+            with self.data_lock:
+                self.left_files = left_top_level
+                self.right_files = right_top_level
+            
+            # Step 2: Build initial tree with PENDING status for subdirectories
+            # This creates the tree structure but marks unscanned directories as PENDING
+            self.scan_status = "Building initial tree..."
+            self._build_tree_with_pending()
+            
+            # Step 3: Mark tree as dirty to trigger immediate display
+            self.scan_current = len(left_top_level) + len(right_top_level)
+            self.scan_status = f"Displaying {self.scan_current} top-level items..."
+            self.mark_dirty()
+            
+            # Step 4: Start worker threads for background scanning
+            # TODO: In future tasks, start directory scanner and file comparator workers here
+            # For now, we'll continue with the old full-scan approach in background
+            
+            # Create scanner with progress callback for deeper scanning
+            self.scanner = DirectoryScanner(
+                self.left_path,
+                self.right_path,
+                self._on_scan_progress
+            )
+            
+            # Launch full scan in worker thread (will be replaced with progressive scanning)
+            self.scanner_thread = threading.Thread(
+                target=self._scan_worker,
+                daemon=True
+            )
+            self.scanner_thread.start()
+            
+        except Exception as e:
+            # Handle errors during initial scan
+            self.scan_in_progress = False
+            self.scan_error = str(e)
+            self.scan_status = "Initial scan failed"
+            self.mark_dirty()
+    
+    def _build_tree_with_pending(self) -> None:
+        """
+        Build initial tree structure with PENDING status for unscanned items.
         
-        # Launch scan in worker thread
-        self.scan_thread = threading.Thread(
-            target=self._scan_worker,
+        This method builds a tree from the currently scanned files (top-level only),
+        marking subdirectories as PENDING since their contents haven't been scanned yet.
+        This allows immediate display while deeper scanning continues in background.
+        """
+        # Skip if no data yet
+        if not self.left_files and not self.right_files:
+            return
+        
+        # Create diff engine with current data
+        engine = DiffEngine(self.left_files, self.right_files)
+        
+        # Build tree
+        new_root = engine.build_tree()
+        
+        # Mark all directory nodes as PENDING (not yet fully scanned)
+        # and set children_scanned = False
+        self._mark_directories_pending(new_root)
+        
+        # Store comparison errors for display
+        self.comparison_errors = engine.comparison_errors
+        
+        # Update root node (thread-safe)
+        with self.tree_lock:
+            self.root_node = new_root
+            
+            # Initialize visible nodes (start with root expanded)
+            if self.root_node:
+                self.root_node.is_expanded = True
+                self._update_visible_nodes()
+    
+    # ========================================================================
+    # Progressive Scanning Worker Threads (Task 5)
+    # ========================================================================
+    
+    def _directory_scanner_worker(self) -> None:
+        """
+        Worker thread that progressively scans directories breadth-first.
+        
+        This method runs in a background thread, continuously pulling scan tasks
+        from the scan_queue and processing them. For each directory:
+        1. Scans only immediate children (single level)
+        2. Updates file dictionaries with thread-safe locking
+        3. Updates tree structure to include new children
+        4. Adds child directories to scan_queue for breadth-first traversal
+        5. Marks tree as dirty to trigger UI update
+        
+        The worker checks the cancelled flag periodically to support graceful shutdown.
+        """
+        try:
+            while not self.cancelled:
+                try:
+                    # Get next scan task from queue (with timeout to check cancelled flag)
+                    task = self.scan_queue.get(timeout=0.1)
+                except queue.Empty:
+                    # No tasks available, check cancelled flag and continue
+                    continue
+                
+                # Check if cancelled before processing
+                if self.cancelled:
+                    break
+                
+                # Scan both sides (if they exist)
+                left_children = {}
+                right_children = {}
+                
+                # Scan left side
+                if task.left_path:
+                    try:
+                        left_children = self._scan_single_level(task.left_path)
+                    except Exception as e:
+                        # Log error but continue
+                        print(f"Error scanning left path {task.left_path}: {e}", 
+                              file=__import__('sys').stderr)
+                
+                # Scan right side
+                if task.right_path:
+                    try:
+                        right_children = self._scan_single_level(task.right_path)
+                    except Exception as e:
+                        # Log error but continue
+                        print(f"Error scanning right path {task.right_path}: {e}", 
+                              file=__import__('sys').stderr)
+                
+                # Update file dictionaries with thread-safe locking
+                with self.data_lock:
+                    # Add children to file dictionaries with proper relative paths
+                    for filename, file_info in left_children.items():
+                        # Build full relative path
+                        if task.relative_path:
+                            full_relative_path = f"{task.relative_path}/{filename}"
+                        else:
+                            full_relative_path = filename
+                        
+                        # Update file_info with correct relative path
+                        file_info.relative_path = full_relative_path
+                        
+                        # Add to dictionary
+                        self.left_files[full_relative_path] = file_info
+                    
+                    for filename, file_info in right_children.items():
+                        # Build full relative path
+                        if task.relative_path:
+                            full_relative_path = f"{task.relative_path}/{filename}"
+                        else:
+                            full_relative_path = filename
+                        
+                        # Update file_info with correct relative path
+                        file_info.relative_path = full_relative_path
+                        
+                        # Add to dictionary
+                        self.right_files[full_relative_path] = file_info
+                
+                # Update tree structure to include new children
+                # Find the node corresponding to this task and update it
+                self._update_tree_node(task.relative_path, left_children, right_children)
+                
+                # Add child directories to scan_queue for breadth-first traversal
+                # Combine all unique child directory names from both sides
+                all_child_dirs = set()
+                for filename, file_info in left_children.items():
+                    if file_info.is_directory:
+                        all_child_dirs.add(filename)
+                for filename, file_info in right_children.items():
+                    if file_info.is_directory:
+                        all_child_dirs.add(filename)
+                
+                # Create scan tasks for child directories
+                for child_dir_name in all_child_dirs:
+                    # Build paths for child directory
+                    child_left_path = None
+                    child_right_path = None
+                    
+                    if child_dir_name in left_children:
+                        child_left_path = left_children[child_dir_name].path
+                    if child_dir_name in right_children:
+                        child_right_path = right_children[child_dir_name].path
+                    
+                    # Build relative path for child
+                    if task.relative_path:
+                        child_relative_path = f"{task.relative_path}/{child_dir_name}"
+                    else:
+                        child_relative_path = child_dir_name
+                    
+                    # Create scan task for child directory
+                    child_task = ScanTask(
+                        left_path=child_left_path,
+                        right_path=child_right_path,
+                        relative_path=child_relative_path,
+                        priority=task.priority,  # Inherit priority from parent
+                        is_visible=False  # Will be updated by priority system
+                    )
+                    
+                    # Add to scan queue
+                    with self.queue_lock:
+                        self.scan_queue.put(child_task)
+                
+                # Mark tree as dirty to trigger UI update
+                self.mark_dirty()
+                
+                # Mark task as done
+                self.scan_queue.task_done()
+                
+        except Exception as e:
+            # Log unexpected errors and set error flag to notify main thread
+            error_msg = f"Directory scanner worker error: {e}"
+            print(error_msg, file=__import__('sys').stderr)
+            import traceback
+            traceback.print_exc()
+            
+            # Set error flag to notify main thread
+            self.worker_error = error_msg
+            self.mark_dirty()  # Trigger UI update to show error
+    
+    def _start_directory_scanner_worker(self) -> None:
+        """
+        Create and start the directory scanner worker thread.
+        
+        This method initializes the scanner thread that will process scan tasks
+        from the scan_queue in the background. The thread is marked as a daemon
+        so it won't prevent the application from exiting.
+        """
+        # Create scanner thread
+        self.scanner_thread = threading.Thread(
+            target=self._directory_scanner_worker,
+            name="DirectoryScanner",
             daemon=True
         )
-        self.scan_thread.start()
+        
+        # Start the thread
+        self.scanner_thread.start()
+    
+    def _update_tree_node(self, relative_path: str, 
+                         left_children: Dict[str, FileInfo],
+                         right_children: Dict[str, FileInfo]) -> None:
+        """
+        Update a tree node with newly scanned children (thread-safe).
+        
+        This method finds the node corresponding to the given relative path,
+        updates its children_scanned flag, and adds new child nodes to the tree.
+        All tree modifications are protected by tree_lock for thread safety.
+        
+        Args:
+            relative_path: Relative path of the node to update (empty string for root)
+            left_children: Dictionary of children from left directory
+            right_children: Dictionary of children from right directory
+        """
+        with self.tree_lock:
+            # Find the node to update
+            if not relative_path:
+                # Updating root node
+                target_node = self.root_node
+            else:
+                # Find node by traversing tree
+                target_node = self._find_node_by_path(self.root_node, relative_path)
+            
+            if not target_node:
+                # Node not found - this shouldn't happen but handle gracefully
+                print(f"Warning: Could not find node for path '{relative_path}'", 
+                      file=__import__('sys').stderr)
+                return
+            
+            # Mark node as scanned
+            target_node.children_scanned = True
+            target_node.scan_in_progress = False
+            
+            # Get all unique child names from both sides
+            all_child_names = set(left_children.keys()) | set(right_children.keys())
+            
+            # Create child nodes for each unique name
+            new_children = []
+            for child_name in sorted(all_child_names):
+                left_info = left_children.get(child_name)
+                right_info = right_children.get(child_name)
+                
+                # Determine if this is a directory
+                is_directory = (left_info and left_info.is_directory) or \
+                              (right_info and right_info.is_directory)
+                
+                # Create child node
+                child_node = TreeNode(
+                    name=child_name,
+                    left_path=left_info.path if left_info else None,
+                    right_path=right_info.path if right_info else None,
+                    is_directory=is_directory,
+                    difference_type=DifferenceType.PENDING,  # Will be classified later
+                    depth=target_node.depth + 1,
+                    is_expanded=False,
+                    children=[],
+                    parent=target_node,
+                    children_scanned=False,
+                    content_compared=False,
+                    scan_in_progress=False
+                )
+                
+                new_children.append(child_node)
+            
+            # Replace node's children with new children
+            target_node.children = new_children
+            
+            # Sort children: directories first, then files, alphabetically
+            target_node.children.sort(key=lambda child: (
+                not child.is_directory,  # False (directories) sorts before True (files)
+                child.name.lower()       # Case-insensitive alphabetical order
+            ))
+            
+            # Classify the updated node and its children
+            self._classify_node_and_children(target_node)
+            
+            # Update visible nodes if this node is expanded
+            if target_node.is_expanded:
+                self._update_visible_nodes()
+    
+    def _find_node_by_path(self, root: TreeNode, relative_path: str) -> Optional[TreeNode]:
+        """
+        Find a node in the tree by its relative path.
+        
+        Args:
+            root: Root node to start search from
+            relative_path: Relative path to find (e.g., "dir1/dir2/file.txt")
+            
+        Returns:
+            TreeNode if found, None otherwise
+        """
+        if not relative_path:
+            return root
+        
+        # Split path into components
+        parts = relative_path.split('/')
+        
+        # Traverse tree following path components
+        current_node = root
+        for part in parts:
+            # Find child with matching name
+            found = False
+            for child in current_node.children:
+                if child.name == part:
+                    current_node = child
+                    found = True
+                    break
+            
+            if not found:
+                # Path component not found
+                return None
+        
+        return current_node
+    
+    def _classify_node_and_children(self, node: TreeNode) -> None:
+        """
+        Classify a node and its children based on their difference types.
+        
+        This is similar to DiffEngine.classify_node but works on a single node
+        and its immediate children, used during progressive tree updates.
+        
+        Args:
+            node: Node to classify (along with its children)
+        """
+        # First classify all children
+        for child in node.children:
+            child.difference_type = self._classify_single_node(child)
+        
+        # Then classify the parent node
+        node.difference_type = self._classify_single_node(node)
+    
+    def _classify_single_node(self, node: TreeNode) -> DifferenceType:
+        """
+        Classify a single node's difference type.
+        
+        Args:
+            node: Node to classify
+            
+        Returns:
+            DifferenceType classification
+        """
+        # Root node is special - classify based on children
+        if node.depth == 0:
+            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+                return DifferenceType.CONTAINS_DIFFERENCE
+            return DifferenceType.IDENTICAL
+        
+        # Check if node exists on both sides
+        exists_left = node.left_path is not None
+        exists_right = node.right_path is not None
+        
+        # Only on left side
+        if exists_left and not exists_right:
+            return DifferenceType.ONLY_LEFT
+        
+        # Only on right side
+        if exists_right and not exists_left:
+            return DifferenceType.ONLY_RIGHT
+        
+        # Exists on both sides
+        if node.is_directory:
+            # For directories, check if any children have differences
+            if not node.children_scanned:
+                # Not yet scanned
+                return DifferenceType.PENDING
+            
+            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+                return DifferenceType.CONTAINS_DIFFERENCE
+            return DifferenceType.IDENTICAL
+        else:
+            # For files, compare content
+            if not node.content_compared:
+                # Not yet compared
+                return DifferenceType.PENDING
+            
+            # Use DiffEngine to compare file content
+            engine = DiffEngine(self.left_files, self.right_files)
+            if engine.compare_file_content(node.left_path, node.right_path):
+                return DifferenceType.IDENTICAL
+            else:
+                return DifferenceType.CONTENT_DIFFERENT
+    
+    def _mark_directories_pending(self, node: TreeNode) -> None:
+        """
+        Recursively mark directory nodes as PENDING and set children_scanned = False.
+        
+        This indicates that the directory exists but its contents haven't been
+        fully scanned yet. Files are left with their current classification.
+        
+        Args:
+            node: Node to process (along with its children)
+        """
+        # Process children first (post-order traversal)
+        for child in node.children:
+            self._mark_directories_pending(child)
+        
+        # Mark directories as PENDING if they haven't been scanned
+        if node.is_directory and node.depth > 0:  # Don't mark root as PENDING
+            # Directory hasn't been scanned yet
+            node.difference_type = DifferenceType.PENDING
+            node.children_scanned = False
+        
+        # Files keep their current classification (IDENTICAL, CONTENT_DIFFERENT, etc.)
+        # but mark as not yet compared
+        if not node.is_directory:
+            node.content_compared = False
     
     def _scan_worker(self) -> None:
         """
@@ -1726,10 +2517,11 @@ class DirectoryDiffViewer(UILayer):
             self.mark_dirty()
             
         except Exception as e:
-            # Handle scan errors
+            # Handle scan errors and set error flag to notify main thread
             self.scan_in_progress = False
             self.scan_error = str(e)
             self.scan_status = "Scan failed"
+            self.worker_error = f"Scan worker error: {e}"
             self.mark_dirty()
     
     def _on_scan_progress(self, current: int, total: int, status: str) -> None:
@@ -1787,6 +2579,13 @@ class DirectoryDiffViewer(UILayer):
         if self.root_node:
             self.root_node.is_expanded = True
             self._update_visible_nodes()
+        
+        # Task 16.2: Track initial queue sizes for percentage calculation
+        # Only set these once at the start of scanning
+        if not hasattr(self, '_initial_scan_queue_size'):
+            self._initial_scan_queue_size = self.scan_queue.qsize()
+        if not hasattr(self, '_initial_comparison_queue_size'):
+            self._initial_comparison_queue_size = self.comparison_queue.qsize()
     
     def _update_visible_nodes(self) -> None:
         """
@@ -1812,6 +2611,8 @@ class DirectoryDiffViewer(UILayer):
         # Don't add root node itself to visible list
         if node.depth > 0:
             # Apply show_identical filter
+            # Task 15.1: Don't hide PENDING files (they might become different)
+            # When hiding identical files, also consider PENDING but don't hide them
             if self.show_identical or node.difference_type != DifferenceType.IDENTICAL:
                 index = len(self.visible_nodes)
                 self.visible_nodes.append(node)
@@ -1883,8 +2684,8 @@ class DirectoryDiffViewer(UILayer):
         Expand a directory node to show its children.
         
         This method updates the visible_nodes list to include the children
-        of the specified node. The cursor position is adjusted to stay on
-        the same node after expansion.
+        of the specified node. If the node hasn't been scanned yet, it performs
+        an immediate on-demand scan in the main thread to provide instant feedback.
         
         Args:
             node_index: Index of the node to expand in visible_nodes list
@@ -1897,6 +2698,85 @@ class DirectoryDiffViewer(UILayer):
         # Only expand directories that aren't already expanded
         if not node.is_directory or node.is_expanded:
             return
+        
+        # Check if node hasn't been scanned yet (Task 9.1)
+        if not node.children_scanned:
+            # Set scan_in_progress flag to show loading indicator
+            node.scan_in_progress = True
+            self.mark_dirty()  # Trigger redraw to show "scanning..." indicator
+            
+            # Force immediate render to show the indicator
+            if self.renderer:
+                self.render(self.renderer)
+            
+            # Perform immediate single-level scan in main thread
+            left_children = {}
+            right_children = {}
+            
+            # Scan left directory if it exists
+            if node.left_path and node.left_path.is_dir():
+                try:
+                    left_children = self._scan_single_level(node.left_path)
+                except Exception as e:
+                    print(f"Error scanning left directory {node.left_path}: {e}", 
+                          file=__import__('sys').stderr)
+            
+            # Scan right directory if it exists
+            if node.right_path and node.right_path.is_dir():
+                try:
+                    right_children = self._scan_single_level(node.right_path)
+                except Exception as e:
+                    print(f"Error scanning right directory {node.right_path}: {e}", 
+                          file=__import__('sys').stderr)
+            
+            # Update tree with new children (thread-safe)
+            with self.tree_lock:
+                # Get all unique child names from both sides
+                all_child_names = set(left_children.keys()) | set(right_children.keys())
+                
+                # Create child nodes for each unique name
+                new_children = []
+                for child_name in sorted(all_child_names):
+                    left_info = left_children.get(child_name)
+                    right_info = right_children.get(child_name)
+                    
+                    # Determine if this is a directory
+                    is_directory = (left_info and left_info.is_directory) or \
+                                  (right_info and right_info.is_directory)
+                    
+                    # Create child node
+                    child_node = TreeNode(
+                        name=child_name,
+                        left_path=left_info.path if left_info else None,
+                        right_path=right_info.path if right_info else None,
+                        is_directory=is_directory,
+                        difference_type=DifferenceType.PENDING,  # Will be classified later
+                        depth=node.depth + 1,
+                        is_expanded=False,
+                        children=[],
+                        parent=node,
+                        children_scanned=False,
+                        content_compared=False,
+                        scan_in_progress=False
+                    )
+                    
+                    new_children.append(child_node)
+                
+                # Replace node's children with new children
+                node.children = new_children
+                
+                # Sort children: directories first, then files, alphabetically
+                node.children.sort(key=lambda child: (
+                    not child.is_directory,  # False (directories) sorts before True (files)
+                    child.name.lower()       # Case-insensitive alphabetical order
+                ))
+                
+                # Mark node as scanned and no longer in progress
+                node.children_scanned = True
+                node.scan_in_progress = False
+                
+                # Classify the updated node and its children
+                self._classify_node_and_children(node)
         
         # Remember the node we're expanding (by identity, not index)
         expanding_node_id = id(node)
@@ -1932,6 +2812,9 @@ class DirectoryDiffViewer(UILayer):
         
         # Mark dirty to trigger redraw
         self.mark_dirty()
+        
+        # Update priorities when viewport changes due to expansion
+        self._update_priorities()
     
     def collapse_node(self, node_index: int) -> None:
         """
@@ -2010,6 +2893,9 @@ class DirectoryDiffViewer(UILayer):
         
         # Mark dirty to trigger redraw
         self.mark_dirty()
+        
+        # Update priorities when viewport changes due to collapse
+        self._update_priorities()
     
     def _collect_visible_children(self, node: TreeNode, result: List[TreeNode]) -> None:
         """
@@ -2059,6 +2945,603 @@ class DirectoryDiffViewer(UILayer):
             self.node_index_map[id(node)] = index
     
     # ========================================================================
+    # Directory Scanner Worker Thread (Task 5)
+    # ========================================================================
+    
+    def _directory_scanner_worker(self) -> None:
+        """
+        Worker thread that processes directory scanning tasks from the scan queue.
+        
+        This method runs in a background thread, continuously processing scan tasks
+        from the scan_queue. For each task, it:
+        1. Scans the directory's immediate children (single level)
+        2. Updates file dictionaries with thread-safe locking
+        3. Updates tree structure to include new children
+        4. Adds child directories to scan_queue (breadth-first)
+        5. Marks tree as dirty to trigger UI update
+        
+        The worker checks the cancelled flag periodically to support graceful shutdown.
+        """
+        while not self.cancelled:
+            try:
+                # Get next scan task from queue (with timeout to check cancelled flag)
+                try:
+                    task = self.scan_queue.get(timeout=0.1)
+                except queue.Empty:
+                    # No tasks available, check cancelled flag and continue
+                    continue
+                
+                # Process the scan task
+                try:
+                    # Scan left directory if it exists
+                    left_children = {}
+                    if task.left_path:
+                        left_children = self._scan_single_level(task.left_path)
+                    
+                    # Scan right directory if it exists
+                    right_children = {}
+                    if task.right_path:
+                        right_children = self._scan_single_level(task.right_path)
+                    
+                    # Update file dictionaries with thread-safe locking
+                    with self.data_lock:
+                        # Add scanned children to file dictionaries
+                        # Keys need to include the parent path
+                        for filename, file_info in left_children.items():
+                            if task.relative_path:
+                                full_relative_path = f"{task.relative_path}/{filename}"
+                            else:
+                                full_relative_path = filename
+                            file_info.relative_path = full_relative_path
+                            self.left_files[full_relative_path] = file_info
+                        
+                        for filename, file_info in right_children.items():
+                            if task.relative_path:
+                                full_relative_path = f"{task.relative_path}/{filename}"
+                            else:
+                                full_relative_path = filename
+                            file_info.relative_path = full_relative_path
+                            self.right_files[full_relative_path] = file_info
+                    
+                    # Update tree structure to include new children
+                    # Find the node in the tree that corresponds to this scan task
+                    with self.tree_lock:
+                        if self.root_node:
+                            # Find the node by relative path
+                            target_node = self._find_node_by_path(self.root_node, task.relative_path)
+                            if target_node:
+                                # Update the node with scanned children
+                                self._update_tree_node(target_node, left_children, right_children)
+                    
+                    # Add child directories to scan_queue (breadth-first)
+                    # Collect all unique child directory names from both sides
+                    child_dirs = set()
+                    for filename, file_info in left_children.items():
+                        if file_info.is_directory:
+                            child_dirs.add(filename)
+                    for filename, file_info in right_children.items():
+                        if file_info.is_directory:
+                            child_dirs.add(filename)
+                    
+                    # Create scan tasks for child directories
+                    for child_dir_name in child_dirs:
+                        # Build paths for child directory
+                        child_left_path = None
+                        child_right_path = None
+                        
+                        if task.left_path and child_dir_name in left_children:
+                            child_left_path = task.left_path / child_dir_name
+                        if task.right_path and child_dir_name in right_children:
+                            child_right_path = task.right_path / child_dir_name
+                        
+                        # Build relative path for child
+                        if task.relative_path:
+                            child_relative_path = f"{task.relative_path}/{child_dir_name}"
+                        else:
+                            child_relative_path = child_dir_name
+                        
+                        # Task 10.1: Skip one-sided directories (lazy scanning)
+                        # Check if directory exists on both sides
+                        exists_on_both_sides = (child_left_path is not None and 
+                                               child_right_path is not None)
+                        
+                        # Only add to scan queue if directory exists on both sides
+                        # One-sided directories will be marked as PENDING with low priority
+                        # and will only be scanned when user explicitly expands them
+                        if exists_on_both_sides:
+                            # Create scan task for child directory
+                            child_task = ScanTask(
+                                left_path=child_left_path,
+                                right_path=child_right_path,
+                                relative_path=child_relative_path,
+                                priority=task.priority,  # Inherit priority from parent
+                                is_visible=False  # Child directories start as not visible
+                            )
+                            
+                            # Add to scan queue
+                            with self.queue_lock:
+                                self.scan_queue.put(child_task)
+                        # else: One-sided directory - don't add to scan queue
+                        # It will remain PENDING and will be scanned on-demand when user expands it
+                    
+                    # Mark tree as dirty to trigger UI update
+                    self.mark_dirty()
+                    
+                except Exception as e:
+                    # Log error but continue processing other tasks
+                    print(f"Error processing scan task for {task.relative_path}: {e}", 
+                          file=__import__('sys').stderr)
+                
+                finally:
+                    # Mark task as done
+                    self.scan_queue.task_done()
+                    
+            except Exception as e:
+                # Unexpected error in worker loop
+                print(f"Unexpected error in directory scanner worker: {e}", 
+                      file=__import__('sys').stderr)
+                # Continue running unless cancelled
+    
+    def _start_directory_scanner_worker(self) -> None:
+        """
+        Create and start the directory scanner worker thread.
+        
+        This method initializes the scanner_thread and starts it running
+        the _directory_scanner_worker method. The thread is marked as a
+        daemon thread so it won't prevent the program from exiting.
+        """
+        # Only start if not already running
+        if self.scanner_thread and self.scanner_thread.is_alive():
+            return
+        
+        # Reset cancelled flag
+        self.cancelled = False
+        
+        # Create and start scanner thread
+        self.scanner_thread = threading.Thread(
+            target=self._directory_scanner_worker,
+            daemon=True,
+            name="DirectoryScanner"
+        )
+        self.scanner_thread.start()
+    
+    def _start_file_comparator_worker(self) -> None:
+        """
+        Create and start the file comparator worker thread.
+        
+        This method initializes the comparator_thread and starts it running
+        the _file_comparator_worker method. The thread is marked as a
+        daemon thread so it won't prevent the program from exiting.
+        """
+        # Only start if not already running
+        if self.comparator_thread and self.comparator_thread.is_alive():
+            return
+        
+        # Reset cancelled flag (if not already reset by scanner worker)
+        self.cancelled = False
+        
+        # Create and start comparator thread
+        self.comparator_thread = threading.Thread(
+            target=self._file_comparator_worker,
+            daemon=True,
+            name="FileComparator"
+        )
+        self.comparator_thread.start()
+    
+    def _update_tree_node(self, node: TreeNode, left_children: Dict[str, FileInfo], 
+                         right_children: Dict[str, FileInfo]) -> None:
+        """
+        Update a tree node with newly scanned children.
+        
+        This method is called after scanning a directory to add its children
+        to the tree structure. It uses tree_lock for thread-safe updates.
+        
+        For files that exist on both sides, instead of comparing them immediately,
+        this method queues them for background comparison by the file comparator worker.
+        
+        Args:
+            node: TreeNode to update with children
+            left_children: Dictionary of children from left directory (filename -> FileInfo)
+            right_children: Dictionary of children from right directory (filename -> FileInfo)
+        """
+        # This method should be called with tree_lock already held
+        # but we'll be defensive and check
+        
+        # Get all unique child names from both sides
+        all_child_names = set(left_children.keys()) | set(right_children.keys())
+        
+        # Create TreeNode for each child
+        new_children = []
+        for child_name in sorted(all_child_names):
+            left_info = left_children.get(child_name)
+            right_info = right_children.get(child_name)
+            
+            # Determine if this is a directory
+            is_directory = (left_info and left_info.is_directory) or \
+                          (right_info and right_info.is_directory)
+            
+            # Create child node
+            child_node = TreeNode(
+                name=child_name,
+                left_path=left_info.path if left_info else None,
+                right_path=right_info.path if right_info else None,
+                is_directory=is_directory,
+                difference_type=DifferenceType.PENDING,  # Will be classified later
+                depth=node.depth + 1,
+                is_expanded=False,
+                children=[],
+                parent=node,
+                children_scanned=False,  # Not yet scanned
+                content_compared=False,  # Not yet compared
+                scan_in_progress=False
+            )
+            
+            new_children.append(child_node)
+            
+            # Queue file comparison for files that exist on both sides
+            if not is_directory and left_info and right_info:
+                # Build relative path for this file
+                if node.depth == 0:
+                    # Direct child of root
+                    file_relative_path = child_name
+                else:
+                    # Build full relative path by traversing up to root
+                    path_parts = [child_name]
+                    current = node
+                    while current and current.depth > 0:
+                        path_parts.insert(0, current.name)
+                        current = current.parent
+                    file_relative_path = "/".join(path_parts)
+                
+                # Create comparison task
+                comparison_task = ComparisonTask(
+                    left_path=left_info.path,
+                    right_path=right_info.path,
+                    relative_path=file_relative_path,
+                    priority=10,  # Normal priority (will be updated by priority system)
+                    is_visible=False  # Will be updated by priority system
+                )
+                
+                # Add to comparison queue
+                with self.queue_lock:
+                    self.comparison_queue.put(comparison_task)
+        
+        # Sort children: directories first, then files, alphabetically within each group
+        new_children.sort(key=lambda child: (
+            not child.is_directory,  # False (directories) sorts before True (files)
+            child.name.lower()       # Case-insensitive alphabetical order
+        ))
+        
+        # Update node's children
+        node.children = new_children
+        node.children_scanned = True
+        node.scan_in_progress = False
+        
+        # Classify the new children (quick classification without file content comparison)
+        for child in new_children:
+            child.difference_type = self._classify_node_quick(child)
+        
+        # Update parent node's difference type based on children
+        node.difference_type = self._classify_node_quick(node)
+        
+        # Update visible nodes if this node is expanded
+        if node.is_expanded:
+            self._update_visible_nodes()
+    
+    def _find_node_by_path(self, node: TreeNode, relative_path: str) -> Optional[TreeNode]:
+        """
+        Find a node in the tree by its relative path.
+        
+        Args:
+            node: Root node to start search from
+            relative_path: Relative path to find (e.g., "dir1/dir2")
+            
+        Returns:
+            TreeNode if found, None otherwise
+        """
+        # Empty path means root node
+        if not relative_path:
+            return node
+        
+        # Split path into components
+        parts = relative_path.split('/')
+        
+        # Traverse tree following path components
+        current = node
+        for part in parts:
+            # Find child with matching name
+            found = False
+            for child in current.children:
+                if child.name == part:
+                    current = child
+                    found = True
+                    break
+            
+            if not found:
+                # Path not found in tree
+                return None
+        
+        return current
+    
+    def _classify_node_quick(self, node: TreeNode) -> DifferenceType:
+        """
+        Quickly classify a node's difference type without deep comparison.
+        
+        This is a lightweight version of classify_node that doesn't perform
+        file content comparison. It's used during progressive scanning to
+        provide quick visual feedback.
+        
+        Args:
+            node: TreeNode to classify
+            
+        Returns:
+            DifferenceType classification
+        """
+        # Root node is special - classify based on children
+        if node.depth == 0:
+            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+                return DifferenceType.CONTAINS_DIFFERENCE
+            return DifferenceType.IDENTICAL
+        
+        # Check if node exists on both sides
+        exists_left = node.left_path is not None
+        exists_right = node.right_path is not None
+        
+        # Only on left side
+        if exists_left and not exists_right:
+            return DifferenceType.ONLY_LEFT
+        
+        # Only on right side
+        if exists_right and not exists_left:
+            return DifferenceType.ONLY_RIGHT
+        
+        # Exists on both sides
+        if node.is_directory:
+            # For directories, check if any children have differences
+            if not node.children_scanned:
+                # Not yet scanned
+                return DifferenceType.PENDING
+            
+            if any(child.difference_type != DifferenceType.IDENTICAL for child in node.children):
+                return DifferenceType.CONTAINS_DIFFERENCE
+            return DifferenceType.IDENTICAL
+        else:
+            # For files, mark as PENDING (will be compared by file comparator worker)
+            if not node.content_compared:
+                return DifferenceType.PENDING
+            
+            # If already compared, return current classification
+            return node.difference_type
+    
+    # ========================================================================
+    # File Comparator Worker Thread (Task 6)
+    # ========================================================================
+    
+    def _file_comparator_worker(self) -> None:
+        """
+        Worker thread that processes file comparison tasks from the comparison queue.
+        
+        This method runs in a background thread, continuously processing comparison tasks
+        from the comparison_queue. For each task, it:
+        1. Gets a comparison task from the queue
+        2. Calls compare_file_content() for the task paths
+        3. Updates the tree node's difference_type
+        4. Updates the node's content_compared flag
+        5. Marks tree as dirty to trigger UI update
+        
+        The worker checks the cancelled flag periodically to support graceful shutdown.
+        """
+        while not self.cancelled:
+            try:
+                # Get next comparison task from queue (with timeout to check cancelled flag)
+                try:
+                    task = self.comparison_queue.get(timeout=0.1)
+                except queue.Empty:
+                    # No tasks available, check cancelled flag and continue
+                    continue
+                
+                # Process the comparison task
+                try:
+                    # Both paths must exist for comparison
+                    if not task.left_path or not task.right_path:
+                        # Mark task as done and skip
+                        self.comparison_queue.task_done()
+                        continue
+                    
+                    # Create a DiffEngine instance to use its compare_file_content method
+                    engine = DiffEngine(self.left_files, self.right_files)
+                    
+                    # Compare file content
+                    files_identical = engine.compare_file_content(task.left_path, task.right_path)
+                    
+                    # Update tree node with comparison result
+                    with self.tree_lock:
+                        if self.root_node:
+                            # Find the node by relative path
+                            target_node = self._find_node_by_path(self.root_node, task.relative_path)
+                            if target_node:
+                                # Update node's difference_type based on comparison result
+                                if files_identical:
+                                    target_node.difference_type = DifferenceType.IDENTICAL
+                                else:
+                                    target_node.difference_type = DifferenceType.CONTENT_DIFFERENT
+                                
+                                # Mark as compared
+                                target_node.content_compared = True
+                                
+                                # Update parent directories to reflect changes
+                                self._update_parent_classifications(target_node)
+                    
+                    # Store any comparison errors
+                    if engine.comparison_errors:
+                        self.comparison_errors.update(engine.comparison_errors)
+                    
+                    # Mark tree as dirty to trigger UI update
+                    self.mark_dirty()
+                    
+                except Exception as e:
+                    # Log error but continue processing other tasks
+                    print(f"Error processing comparison task for {task.relative_path}: {e}", 
+                          file=__import__('sys').stderr)
+                
+                finally:
+                    # Mark task as done
+                    self.comparison_queue.task_done()
+                    
+            except Exception as e:
+                # Unexpected error in worker loop - log and set error flag
+                error_msg = f"Unexpected error in file comparator worker: {e}"
+                print(error_msg, file=__import__('sys').stderr)
+                
+                # Set error flag to notify main thread
+                self.worker_error = error_msg
+                self.mark_dirty()  # Trigger UI update to show error
+                
+                # Continue running unless cancelled
+    
+    def _update_parent_classifications(self, node: TreeNode) -> None:
+        """
+        Update parent directory classifications after a child node changes.
+        
+        When a file's comparison result changes, parent directories may need
+        to be reclassified from IDENTICAL to CONTAINS_DIFFERENCE.
+        
+        Args:
+            node: Child node whose classification changed
+        """
+        # Walk up the tree updating parent classifications
+        current = node.parent
+        while current and current.depth >= 0:
+            # Reclassify parent based on its children
+            old_type = current.difference_type
+            current.difference_type = self._classify_node_quick(current)
+            
+            # If classification didn't change, we can stop (optimization)
+            if old_type == current.difference_type:
+                break
+            
+            # Move to next parent
+            current = current.parent
+    
+    # ========================================================================
+    # Priority System (Task 8)
+    # ========================================================================
+    
+    def _get_visible_nodes_range(self) -> List[TreeNode]:
+        """
+        Calculate which nodes are currently visible in the viewport.
+        
+        This method determines which tree nodes are currently displayed on screen
+        based on the scroll_offset and display height. These nodes should be
+        prioritized for scanning and comparison.
+        
+        Returns:
+            List of TreeNodes that are currently visible in the viewport
+        """
+        # Get display dimensions
+        height, width = self.renderer.get_dimensions()
+        # Reserve space for header (1 line) and status bar (1 line)
+        display_height = height - 2
+        
+        # Calculate visible range
+        start_index = self.scroll_offset
+        end_index = min(self.scroll_offset + display_height, len(self.visible_nodes))
+        
+        # Return visible nodes
+        return self.visible_nodes[start_index:end_index]
+    
+    def _update_priorities(self) -> None:
+        """
+        Update scan priorities based on current viewport and expansion state.
+        
+        This method is called when the viewport changes (scroll, expand, collapse)
+        to ensure visible items are scanned first. It:
+        1. Gets currently visible nodes
+        2. For each unscanned visible directory, creates a high-priority scan task
+        3. Adds these tasks to the priority_queue for immediate processing
+        
+        The priority_handler_worker will move these tasks to the front of the
+        scan_queue to ensure visible items are scanned before hidden ones.
+        """
+        # Get visible nodes
+        visible_nodes = self._get_visible_nodes_range()
+        
+        # Process each visible node
+        for node in visible_nodes:
+            # Only prioritize directories that haven't been scanned yet
+            if node.is_directory and not node.children_scanned and not node.scan_in_progress:
+                # Build relative path for this node
+                relative_path = self._get_relative_path(node)
+                
+                # Create high-priority scan task
+                priority_task = ScanTask(
+                    left_path=node.left_path,
+                    right_path=node.right_path,
+                    relative_path=relative_path,
+                    priority=ScanPriority.VISIBLE,  # High priority for visible items
+                    is_visible=True
+                )
+                
+                # Add to priority queue
+                # Use negative priority so higher values come first (PriorityQueue uses min-heap)
+                # Include counter to make items unique and avoid comparison of ScanTask objects
+                with self.queue_lock:
+                    self.priority_queue.put((-priority_task.priority, self.priority_counter, priority_task))
+                    self.priority_counter += 1
+    
+    def _priority_handler_worker(self) -> None:
+        """
+        Worker thread that processes high-priority scan tasks.
+        
+        This method runs in a background thread, continuously pulling high-priority
+        tasks from the priority_queue and moving them to the front of the scan_queue.
+        This ensures that visible items are scanned before hidden ones.
+        
+        The worker checks the cancelled flag periodically to support graceful shutdown.
+        """
+        try:
+            while not self.cancelled:
+                try:
+                    # Get next priority task from queue (with timeout to check cancelled flag)
+                    # priority_queue returns (priority, counter, task) tuples
+                    priority_item = self.priority_queue.get(timeout=0.1)
+                except queue.Empty:
+                    # No tasks available, check cancelled flag and continue
+                    continue
+                
+                # Check if cancelled before processing
+                if self.cancelled:
+                    break
+                
+                # Extract task from priority tuple (priority was negated for min-heap)
+                _, _, task = priority_item
+                
+                # Move task to front of scan_queue by putting it there immediately
+                # The scan_queue is a regular Queue (FIFO), so we can't truly move
+                # items to the front. Instead, we'll put the priority task directly
+                # into the scan_queue, and it will be processed before older tasks
+                # that are still waiting.
+                with self.queue_lock:
+                    # Put the high-priority task into the scan_queue
+                    # Since we're processing priority tasks immediately, they'll
+                    # be picked up by the scanner worker before older normal-priority tasks
+                    self.scan_queue.put(task)
+                
+                # Mark priority task as done
+                self.priority_queue.task_done()
+                
+        except Exception as e:
+            # Log unexpected errors and set error flag to notify main thread
+            error_msg = f"Priority handler worker error: {e}"
+            print(error_msg, file=__import__('sys').stderr)
+            import traceback
+            traceback.print_exc()
+            
+            # Set error flag to notify main thread
+            self.worker_error = error_msg
+            self.mark_dirty()  # Trigger UI update to show error
+    
+    # ========================================================================
     # File Diff Viewer Integration (Task 13.1)
     # ========================================================================
     
@@ -2069,6 +3552,9 @@ class DirectoryDiffViewer(UILayer):
         This method checks if the cursor is on a file node that exists on both sides,
         and if so, creates a DiffViewer instance with both file paths and pushes it
         onto the UI layer stack.
+        
+        Task 15.3: If file content has not been compared yet (PENDING), compare it
+        immediately before opening the diff viewer.
         
         Args:
             node_index: Index of the node in visible_nodes list
@@ -2087,6 +3573,31 @@ class DirectoryDiffViewer(UILayer):
         if not node.left_path or not node.right_path:
             # File only exists on one side, cannot open diff viewer
             return
+        
+        # Task 15.3: If file content has not been compared yet, compare it now
+        if not node.content_compared:
+            # Create a DiffEngine instance to compare the file
+            diff_engine = DiffEngine(self.left_files, self.right_files)
+            
+            # Compare file content
+            files_identical = diff_engine.compare_file_content(node.left_path, node.right_path)
+            
+            # Update node's difference type based on comparison
+            with self.tree_lock:
+                if files_identical:
+                    node.difference_type = DifferenceType.IDENTICAL
+                else:
+                    node.difference_type = DifferenceType.CONTENT_DIFFERENT
+                
+                # Mark as compared
+                node.content_compared = True
+                
+                # Propagate difference to parent directories if needed
+                if not files_identical:
+                    self._propagate_difference_to_parents(node)
+            
+            # Mark tree as dirty to update display
+            self.mark_dirty()
         
         # Check if layer_stack is available
         if not self.layer_stack:

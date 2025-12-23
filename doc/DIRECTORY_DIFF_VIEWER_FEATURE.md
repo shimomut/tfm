@@ -16,7 +16,12 @@ To compare two directories:
 1. Navigate to the directories you want to compare using the left and right panes
 2. Press **Ctrl+D** to open the Directory Diff Viewer
 
-The viewer will scan both directories recursively and display a unified tree structure showing all files and subdirectories.
+The viewer uses **progressive scanning** to provide immediate feedback:
+
+- **Instant Display**: Top-level items appear within 100ms
+- **Background Scanning**: Subdirectories are scanned progressively in the background
+- **Responsive UI**: You can navigate and explore while scanning continues
+- **Smart Prioritization**: Visible items are scanned before hidden ones
 
 ## Understanding the Display
 
@@ -46,6 +51,17 @@ Different types of differences are highlighted with distinct background colors:
 - **Content Different** (red): File exists in both locations but content differs
 - **Contains Difference** (blue): Directory contains descendant differences
 - **Identical** (default): Item is the same in both locations
+- **Pending** (neutral): Item has not been scanned or compared yet
+
+### Pending Status Indicators
+
+During progressive scanning, you may see pending status indicators:
+
+- **`...`** after directory names: Directory contents not yet scanned
+- **`[scanning...]`**: Directory is currently being scanned
+- **`[pending]`** for files: File content not yet compared
+
+These indicators disappear as scanning progresses. You can expand directories marked with `...` to trigger immediate scanning.
 
 ## Navigation and Controls
 
@@ -59,6 +75,8 @@ Different types of differences are highlighted with distinct background colors:
 ### Expanding and Collapsing
 
 - **Right Arrow** or **Enter**: Expand a collapsed directory
+  - If directory is not yet scanned, it will be scanned immediately (on-demand scanning)
+  - Scanning happens in the main thread for instant feedback
 - **Left Arrow**: Collapse an expanded directory
 
 ### Viewing File Differences
@@ -80,21 +98,33 @@ When the cursor is on a file marked as "Content Different":
 
 ## Progress Feedback
 
+### Progressive Scanning
+
+The Directory Diff Viewer uses progressive scanning for optimal performance:
+
+1. **Immediate Display**: Top-level items appear instantly (< 100ms)
+2. **Background Processing**: Subdirectories are scanned in worker threads
+3. **Priority System**: Visible items are scanned before off-screen items
+4. **On-Demand Scanning**: Expanding unscanned directories triggers immediate scanning
+
 ### During Scanning
 
-While directories are being scanned:
+While directories are being scanned in the background:
 
-- A progress indicator shows scanning status
-- Current operation is displayed in the status bar
-- Press **Escape** to cancel the scan
+- A progress indicator shows scanning status with animation
+- Status bar displays "Scanning... (N pending)" or "Comparing... (N pending)"
+- Tree updates progressively as new items are discovered
+- You can navigate and explore already-scanned portions
+- Press **Escape** to cancel the scan and close the viewer
 
 ### After Scanning
 
 Once scanning completes:
 
-- The tree structure is displayed
-- Status bar shows statistics (total files, differences, errors)
-- You can navigate and explore the results
+- Status bar shows "Scan complete"
+- All pending indicators are resolved
+- Statistics show total files, differences, and errors
+- You can navigate and explore the complete results
 
 ## Status Bar Information
 
@@ -102,8 +132,10 @@ The status bar at the bottom displays:
 
 - **Current position**: Line number and total lines
 - **Statistics**: Number of files scanned, differences found
+- **Scanning status**: "Scanning... (N pending)" or "Comparing... (N pending)" during background operations
 - **Filter state**: Whether identical files are hidden
 - **Error count**: Number of inaccessible files or directories (if any)
+- **Completion status**: "Scan complete" when all scanning is finished
 
 ## Error Handling
 
@@ -133,7 +165,28 @@ If both directories are empty or completely identical:
 
 ## Examples
 
-### Example 1: Comparing Backup Directories
+### Example 1: Progressive Scanning in Action
+
+```
+Opening viewer with large directories...
+
+Initial display (< 100ms):
+[+] documents/          documents/          (Contains Difference)
+[+] images/             images/             ...
+[+] videos/             videos/             ...
+
+Status: Scanning... (15 pending)
+
+After expanding documents/:
+[-] documents/
+    [+] projects/       projects/           (Contains Difference)
+    report.txt          report.txt          (Content Different)
+    [+] archive/        archive/            ...
+
+Status: Scanning... (12 pending)
+```
+
+### Example 2: Comparing Backup Directories
 
 ```
 Left: /home/user/documents
@@ -148,7 +201,7 @@ Result:
         [blank]             old_file.txt        (Only in Right)
 ```
 
-### Example 2: Verifying Synchronization
+### Example 3: Verifying Synchronization
 
 ```
 Left: /source/code
@@ -159,28 +212,68 @@ Status: 1,234 files scanned, 5 differences found
 Navigate to differences using arrow keys, press Enter to view file diffs.
 ```
 
+## Performance Improvements
+
+The progressive scanning architecture provides significant performance benefits:
+
+### Time to First Display
+
+- **< 100ms**: Initial tree display with top-level items
+- **No waiting**: Start navigating immediately
+- **Responsive UI**: Never blocks during scanning
+
+### Memory Efficiency
+
+- **Lazy loading**: Only scans directories when needed
+- **Smart prioritization**: Visible items loaded first
+- **One-sided optimization**: Deep one-sided trees scanned on-demand
+
+### Large Directory Handling
+
+- **10,000+ files**: Handles efficiently with progressive scanning
+- **Background threads**: Scanning doesn't block UI
+- **Incremental updates**: Tree updates as items are discovered
+
+### User Experience
+
+- **Instant feedback**: See results immediately
+- **Explore while scanning**: Navigate already-scanned portions
+- **Priority-based**: What you see is scanned first
+- **On-demand expansion**: Expand directories for instant scanning
+
 ## Tips and Best Practices
 
-1. **Use filtering**: Hide identical files to focus on differences
-2. **Check error count**: Review the status bar for permission or I/O errors
-3. **Navigate efficiently**: Use Page Up/Down for large directory trees
-4. **Verify changes**: Open file diff viewer for content-different files to see exact changes
-5. **Cancel long scans**: Press Escape if scanning takes too long
+1. **Instant feedback**: Start navigating immediately - no need to wait for full scan
+2. **Use filtering**: Hide identical files to focus on differences
+3. **On-demand exploration**: Expand directories as needed - they'll scan instantly
+4. **Check error count**: Review the status bar for permission or I/O errors
+5. **Navigate efficiently**: Use Page Up/Down for large directory trees
+6. **Verify changes**: Open file diff viewer for content-different files to see exact changes
+7. **Smart prioritization**: Scroll to areas of interest - they'll be scanned first
+8. **Cancel if needed**: Press Escape during scanning to close the viewer
 
 ## Limitations
 
-- Very large directories (10,000+ files) may take time to scan
 - Binary file comparison is byte-by-byte (no semantic diff)
 - Symbolic links are followed (may cause issues with circular links)
 - Remote directories may be slower to scan depending on connection speed
+- Very deep one-sided directory trees are scanned lazily (only when expanded)
 
 ## Troubleshooting
 
-### Viewer is slow to open
+### Viewer opens instantly but shows pending items
 
-- Large directories take time to scan recursively
-- Check the progress indicator for status
-- Consider canceling and comparing smaller subdirectories
+- This is normal behavior with progressive scanning
+- Background threads are scanning subdirectories
+- Navigate to pending items to trigger immediate scanning
+- Wait for "Scan complete" message for full results
+
+### Some directories show "..." indicator
+
+- Directory contents have not been scanned yet
+- Expand the directory to trigger immediate scanning
+- Background scanning will eventually scan all directories
+- One-sided directories are scanned lazily (only when expanded)
 
 ### Some files show as different but appear identical
 
