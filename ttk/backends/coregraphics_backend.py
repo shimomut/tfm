@@ -235,6 +235,10 @@ class CoreGraphicsBackend(Renderer):
         # This ensures there's always a font available for any character
         self._add_system_monospace_fallback()
         
+        # Automatically add Apple Symbols font for special Unicode characters
+        # This provides coverage for Braille, mathematical symbols, etc.
+        self._add_system_symbols_fallback()
+        
         # Automatically add system emoji font as final fallback
         # This ensures emoji characters can be rendered
         self._add_system_emoji_fallback()
@@ -312,6 +316,26 @@ class CoreGraphicsBackend(Renderer):
                 self.font_names.append(emoji_font_name)
         except Exception as e:
             print(f"Warning: Could not add system emoji font to cascade: {e}")
+    
+    def _add_system_symbols_fallback(self) -> None:
+        """
+        Add Apple Symbols font as fallback in cascade list.
+        
+        This ensures special Unicode characters (like Braille, mathematical symbols,
+        etc.) can be rendered. Apple Symbols has broad Unicode coverage including
+        characters not typically found in monospace fonts.
+        
+        The symbols font is only added if it's not already in the list.
+        """
+        try:
+            # macOS system symbols font name
+            symbols_font_name = "Apple Symbols"
+            
+            # Only add if not already in the list
+            if symbols_font_name not in self.font_names:
+                self.font_names.append(symbols_font_name)
+        except Exception as e:
+            print(f"Warning: Could not add system symbols font to cascade: {e}")
     
     def initialize(self) -> None:
         """
