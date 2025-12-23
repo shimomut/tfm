@@ -4159,6 +4159,12 @@ def create_parser():
         help='Enable performance profiling mode (collects FPS data and generates profiling files)'
     )
     
+    parser.add_argument(
+        '--perf-logging',
+        action='store_true',
+        help='Enable C++ renderer performance logging (CoreGraphics backend only, logs metrics every 60 frames)'
+    )
+    
     return parser
 
 def cli_main():
