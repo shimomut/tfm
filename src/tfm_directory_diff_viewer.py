@@ -1503,10 +1503,15 @@ class DirectoryDiffViewer(UILayer):
                     left_status = f" {animator_frame} Comparing... ({comparison_queue_size} pending - {percentage}%) "
                 else:
                     left_status = f" {animator_frame} Comparing... ({comparison_queue_size} pending) "
-            elif self.scanner_thread and self.scanner_thread.is_alive():
-                # Threads still running but queues empty - finishing up
-                animator_frame = self.progress_animator.get_current_frame()
-                left_status = f" {animator_frame} Finishing scan... "
+            elif self.scan_in_progress:
+                # Both queues empty and no scanning nodes - scanning is complete
+                self.scan_in_progress = False
+                self.scan_status = "Scan complete"
+                if not hasattr(self, '_scan_complete_shown'):
+                    self._scan_complete_shown = False
+                # Show scan complete message
+                left_status = " ✓ Scan complete "
+                self._scan_complete_shown = True
             elif hasattr(self, '_scan_complete_shown') and not self._scan_complete_shown:
                 # Show scan complete message briefly (Task 12.2)
                 left_status = " ✓ Scan complete "
@@ -2080,21 +2085,70 @@ class DirectoryDiffViewer(UILayer):
         if not self.left_files and not self.right_files:
             return
         
-        # Create diff engine with current data
-        engine = DiffEngine(self.left_files, self.right_files)
+        # Create root node
+        new_root = TreeNode(
+            name="",
+            left_path=str(self.left_path),
+            right_path=str(self.right_path),
+            is_directory=True,
+            difference_type=DifferenceType.PENDING,
+            depth=0,
+            is_expanded=True,
+            children=[],
+            parent=None,
+            children_scanned=True,  # Root level is scanned
+            content_compared=False,
+            scan_in_progress=False
+        )
         
-        # Build tree
-        new_root = engine.build_tree()
+        # Get all unique child names from both sides
+        all_child_names = set(self.left_files.keys()) | set(self.right_files.keys())
         
-        # Mark all directory nodes as PENDING (not yet fully scanned)
-        # and set children_scanned = False
-        self._mark_directories_pending(new_root)
+        # Create TreeNode for each child
+        for child_name in sorted(all_child_names):
+            left_info = self.left_files.get(child_name)
+            right_info = self.right_files.get(child_name)
+            
+            # Determine if this is a directory
+            is_directory = (left_info and left_info.is_directory) or \
+                          (right_info and right_info.is_directory)
+            
+            # Determine difference type
+            if left_info and not right_info:
+                diff_type = DifferenceType.ONLY_LEFT
+            elif right_info and not left_info:
+                diff_type = DifferenceType.ONLY_RIGHT
+            elif is_directory:
+                diff_type = DifferenceType.PENDING  # Directory not yet scanned
+            else:
+                diff_type = DifferenceType.PENDING  # File not yet compared
+            
+            # Create child node
+            child_node = TreeNode(
+                name=child_name,
+                left_path=left_info.path if left_info else None,
+                right_path=right_info.path if right_info else None,
+                is_directory=is_directory,
+                difference_type=diff_type,
+                depth=1,
+                is_expanded=False,
+                children=[],
+                parent=new_root,
+                children_scanned=False,  # Subdirectories not yet scanned
+                content_compared=False,  # Files not yet compared
+                scan_in_progress=False
+            )
+            
+            new_root.children.append(child_node)
+        
+        # Sort children: directories first, then files
+        new_root.children.sort(key=lambda child: (
+            not child.is_directory,
+            child.name.lower()
+        ))
         
         # Queue file comparisons for top-level files
         self._queue_file_comparisons_for_node(new_root)
-        
-        # Store comparison errors for display
-        self.comparison_errors = engine.comparison_errors
         
         # Update root node (thread-safe)
         with self.tree_lock:
