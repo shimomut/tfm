@@ -2972,7 +2972,7 @@ class FileManager(UILayer):
         
         # Create and launch directory diff viewer
         try:
-            viewer = DirectoryDiffViewer(self.renderer, left_path, right_path, self.ui_layer_stack)
+            viewer = DirectoryDiffViewer(self.renderer, left_path, right_path, self.ui_layer_stack, self.file_operations)
             if viewer:
                 # Push viewer onto layer stack
                 self.push_layer(viewer)
