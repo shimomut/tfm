@@ -1694,11 +1694,30 @@ static void draw_character_batch(
         return;
     }
     
+    // Count actual glyphs (surrogate pairs become single glyphs)
+    // CTFontGetGlyphsForCharacters converts surrogate pairs to single glyphs,
+    // leaving 0 in the second position
+    CFIndex actual_glyph_count = 0;
+    for (CFIndex i = 0; i < length; ++i) {
+        if (glyphs[i] != 0) {
+            actual_glyph_count++;
+        }
+    }
+    
+    // If no valid glyphs, skip rendering
+    if (actual_glyph_count == 0) {
+        if (allocated_font != nullptr) {
+            CFRelease(allocated_font);
+        }
+        return;
+    }
+    
     // Calculate baseline position
     CGFloat baseline_y = batch.y + (char_height - font_ascent);
     
     // Get actual glyph advances from the font
     // This is critical for proper character spacing
+    // Note: We get advances for all positions, but only use the valid ones
     std::vector<CGSize> advances(length);
     CTFontGetAdvancesForGlyphs(
         font_to_use,
@@ -1708,27 +1727,42 @@ static void draw_character_batch(
         length
     );
     
-    // Calculate position for each glyph using actual advances
-    // For monospace rendering, we need to center each glyph within its cell
+    // Build arrays of valid glyphs and their positions
+    std::vector<CGGlyph> valid_glyphs;
+    std::vector<CGPoint> valid_positions;
+    valid_glyphs.reserve(actual_glyph_count);
+    valid_positions.reserve(actual_glyph_count);
+    
+    // Calculate position for each valid glyph
     CGFloat x = batch.x;
+    size_t is_wide_index = 0;
     
     for (CFIndex i = 0; i < length; ++i) {
+        // Skip invalid glyphs (0 means no glyph, typically second half of surrogate pair)
+        if (glyphs[i] == 0) {
+            continue;
+        }
+        
         // Get the actual glyph advance width
         CGFloat glyph_advance = advances[i].width;
         
         // Check if this character is wide (occupies 2 cells)
-        bool char_is_wide = (i < batch.is_wide.size()) ? batch.is_wide[i] : false;
+        bool char_is_wide = (is_wide_index < batch.is_wide.size()) ? batch.is_wide[is_wide_index] : false;
         CGFloat cell_width = char_is_wide ? (char_width * 2.0f) : char_width;
         
         // Center the glyph within its cell(s) for better visual alignment
-        // This prevents glyphs from appearing too far left or right
         CGFloat centering_offset = (cell_width - glyph_advance) / 2.0f;
         
-        positions[i].x = x + centering_offset;
-        positions[i].y = baseline_y;
+        CGPoint pos;
+        pos.x = x + centering_offset;
+        pos.y = baseline_y;
+        
+        valid_glyphs.push_back(glyphs[i]);
+        valid_positions.push_back(pos);
         
         // Advance by the cell width (not glyph advance) to maintain grid alignment
         x += cell_width;
+        is_wide_index++;
     }
     
     // Set fill color for text
@@ -1757,9 +1791,6 @@ static void draw_character_batch(
         CGContextSetTextDrawingMode(context, kCGTextFill);
     }
     
-    // Save graphics state
-    CGContextSaveGState(context);
-    
     // Enable anti-aliasing for smooth rendering
     CGContextSetShouldAntialias(context, true);
     CGContextSetShouldSmoothFonts(context, true);
@@ -1774,7 +1805,6 @@ static void draw_character_batch(
         if (allocated_font != nullptr) {
             CFRelease(allocated_font);
         }
-        CGContextRestoreGState(context);
         return;
     }
     
@@ -1782,11 +1812,12 @@ static void draw_character_batch(
     // Use CTFontDrawGlyphs instead of CGContextShowGlyphsAtPositions
     // CTFontDrawGlyphs properly renders color emoji, while CGContextShowGlyphsAtPositions
     // only renders glyph outlines (causing emoji to appear in grayscale)
+    // CRITICAL: Use valid_glyphs and valid_positions (filtered to remove 0 glyphs from surrogate pairs)
     CTFontDrawGlyphs(
         font_to_use,
-        glyphs.data(),
-        positions.data(),
-        length,
+        valid_glyphs.data(),
+        valid_positions.data(),
+        actual_glyph_count,
         context
     );
     
@@ -1797,15 +1828,16 @@ static void draw_character_batch(
         CGFloat underline_thickness = CTFontGetUnderlineThickness(font_to_use);
         
         // Draw underline as a filled rectangle
-        CGFloat underline_width = char_width * length;
+        // Use the actual batch width (sum of cell widths) for underline
+        CGFloat underline_width = 0;
+        for (size_t i = 0; i < batch.is_wide.size(); ++i) {
+            underline_width += batch.is_wide[i] ? (char_width * 2.0f) : char_width;
+        }
         CGContextFillRect(
             context,
             CGRectMake(batch.x, underline_position, underline_width, underline_thickness)
         );
     }
-    
-    // Restore graphics state
-    CGContextRestoreGState(context);
     
     // Clean up allocated font if we created one
     if (allocated_font != nullptr) {
