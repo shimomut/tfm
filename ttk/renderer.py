@@ -669,3 +669,31 @@ class Renderer(ABC):
             renderer.refresh()  # Caret position is automatically restored
         """
         pass
+    
+    def is_desktop_mode(self) -> bool:
+        """
+        Check if the renderer is running in desktop mode.
+        
+        Desktop mode typically means a native GUI window (e.g., CoreGraphics on macOS)
+        rather than a terminal-based interface (e.g., curses). This affects various
+        behaviors such as:
+        - Whether to write logs to stdout/stderr (desktop: yes, terminal: no)
+        - Whether native menus are available
+        - Whether the application can safely write to console streams
+        
+        Returns:
+            bool: True if running in desktop mode (GUI window),
+                  False if running in terminal mode (curses)
+        
+        Note: The default implementation returns False (terminal mode).
+        Desktop backends should override this to return True.
+        
+        Example:
+            if renderer.is_desktop_mode():
+                # Safe to write to stdout in desktop mode
+                print("Debug output")
+            else:
+                # Terminal mode - writing to stdout would interfere with curses
+                pass
+        """
+        return False

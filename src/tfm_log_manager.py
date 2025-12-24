@@ -47,18 +47,18 @@ class LoggingConfig:
 
 class LogCapture:
     """Capture stdout/stderr and redirect to log pane"""
-    def __init__(self, log_messages, source, remote_callback=None, update_callback=None, original_stream=None, debug_mode=False, logger=None):
+    def __init__(self, log_messages, source, remote_callback=None, update_callback=None, original_stream=None, is_desktop_mode=False, logger=None):
         self.log_messages = log_messages
         self.source = source
         self.remote_callback = remote_callback
         self.update_callback = update_callback
         self.original_stream = original_stream
-        self.debug_mode = debug_mode
+        self.is_desktop_mode = is_desktop_mode  # Only write to original streams in desktop mode
         self.logger = logger  # Logger instance for routing through handler pipeline
         
     def write(self, text):
-        # In debug mode, always write to original stream (preserves all output including newlines)
-        if self.debug_mode and self.original_stream:
+        # Only write to original stream in desktop mode (to avoid conflicting with curses in terminal mode)
+        if self.is_desktop_mode and self.original_stream:
             try:
                 self.original_stream.write(text)
                 self.original_stream.flush()
@@ -110,8 +110,8 @@ class LogCapture:
                     self.remote_callback(log_entry)
     
     def flush(self):
-        # In debug mode, also flush original stream
-        if self.debug_mode and self.original_stream:
+        # Only flush original stream in desktop mode
+        if self.is_desktop_mode and self.original_stream:
             try:
                 self.original_stream.flush()
             except (OSError, IOError):
@@ -121,7 +121,7 @@ class LogCapture:
 class LogManager:
     """Manages logging system and log display"""
     
-    def __init__(self, config, remote_port=None, debug_mode=False):
+    def __init__(self, config, remote_port=None, is_desktop_mode=False):
         # Log pane setup
         max_log_messages = getattr(config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
         self.log_messages = deque(maxlen=max_log_messages)
@@ -145,7 +145,8 @@ class LogManager:
         self._config.max_log_messages = max_log_messages
         self._config.remote_monitoring_enabled = remote_port is not None
         self._config.remote_monitoring_port = remote_port
-        self._config.stream_output_enabled = debug_mode  # debug_mode enables stream output
+        # Enable stream output in desktop mode, disable in terminal mode
+        self._config.stream_output_enabled = is_desktop_mode
         
         # Log level configuration
         # Global default level (defaults to INFO)
@@ -165,8 +166,8 @@ class LogManager:
         self.server_thread = None
         self.running = True
         
-        # Store debug mode flag
-        self.debug_mode = debug_mode
+        # Store desktop mode flag
+        self.is_desktop_mode = is_desktop_mode
         
         # Store original streams
         self.original_stdout = sys.stdout
@@ -181,9 +182,9 @@ class LogManager:
         remote_callback = self._broadcast_to_clients if self.remote_port else None
         update_callback = self._on_message_added
         sys.stdout = LogCapture(self.log_messages, "STDOUT", remote_callback, update_callback, 
-                               self.original_stdout, debug_mode, logger=self._stream_logger)
+                               self.original_stdout, is_desktop_mode, logger=self._stream_logger)
         sys.stderr = LogCapture(self.log_messages, "STDERR", remote_callback, update_callback,
-                               self.original_stderr, debug_mode, logger=self._stream_logger)
+                               self.original_stderr, is_desktop_mode, logger=self._stream_logger)
         
         # Initialize handlers based on configuration
         # This creates the LogPaneHandler by default (log_pane_enabled=True by default)

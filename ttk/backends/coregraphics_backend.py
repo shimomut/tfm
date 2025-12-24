@@ -1801,6 +1801,17 @@ class CoreGraphicsBackend(Renderer):
         # Update cursor position for IME
         # Note: x is column, y is row in TTK convention
         self.set_cursor_position(y, x)
+    
+    def is_desktop_mode(self) -> bool:
+        """
+        Check if the renderer is running in desktop mode.
+        
+        CoreGraphics backend always runs in desktop mode (native GUI window).
+        
+        Returns:
+            bool: Always True for CoreGraphics backend
+        """
+        return True
 
 
 # Define TTKWindowDelegate class for handling window events

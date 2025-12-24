@@ -176,11 +176,11 @@ class FileManager(UILayer):
         color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
         init_colors(renderer, color_scheme)
         
-        # Check if debug mode is enabled
-        debug_mode = os.environ.get('TFM_DEBUG') == '1'
-        
         # Initialize modular components
-        self.log_manager = LogManager(self.config, remote_port=remote_log_port, debug_mode=debug_mode)
+        # Enable stream output in desktop mode (CoreGraphics), disable in terminal mode (Curses)
+        is_desktop = renderer.is_desktop_mode()
+        self.log_manager = LogManager(self.config, remote_port=remote_log_port, 
+                                     is_desktop_mode=is_desktop)
         
         # Create logger for main application
         self.logger = self.log_manager.getLogger("Main")
