@@ -4183,7 +4183,7 @@ def cli_main():
         # Store debug mode in environment for access by other modules
         if args.debug:
             os.environ['TFM_DEBUG'] = '1'
-            print("Debug mode enabled - logs will be written to both terminal and log pane", file=sys.stderr)
+            print("Debug mode enabled - full stack traces will be shown for uncaught exceptions", file=sys.stderr)
         
         # Handle color testing mode
         if args.color_test:
