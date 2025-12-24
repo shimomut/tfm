@@ -4,10 +4,7 @@ TFM Log Manager - Handles logging and log display functionality
 """
 
 import sys
-import socket
 import threading
-import json
-import time
 import logging
 from datetime import datetime
 from collections import deque
@@ -47,11 +44,9 @@ class LoggingConfig:
 
 class LogCapture:
     """Capture stdout/stderr and redirect to log pane with line buffering"""
-    def __init__(self, log_messages, source, remote_callback=None, update_callback=None, original_stream=None, is_desktop_mode=False, logger=None):
+    def __init__(self, log_messages, source, original_stream=None, is_desktop_mode=False, logger=None):
         self.log_messages = log_messages
         self.source = source
-        self.remote_callback = remote_callback
-        self.update_callback = update_callback
         self.original_stream = original_stream
         self.is_desktop_mode = is_desktop_mode  # Only write to original streams in desktop mode
         self.logger = logger  # Logger instance for routing through handler pipeline
@@ -67,9 +62,8 @@ class LogCapture:
             while '\n' in self.buffer:
                 line, self.buffer = self.buffer.split('\n', 1)
                 
-                # Only log non-empty lines to the log pane
-                if line.strip():
-                    self._emit_log_record(line)
+                # Emit all lines, including empty ones (empty lines are meaningful output)
+                self._emit_log_record(line)
     
     def _emit_log_record(self, text):
         """Emit a single log record for the given text"""
@@ -106,14 +100,6 @@ class LogCapture:
             timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
             log_entry = (timestamp, self.source, text.strip())
             self.log_messages.append(log_entry)
-            
-            # Notify about new message for redraw triggering
-            if self.update_callback:
-                self.update_callback()
-            
-            # Send to remote clients if callback is available
-            if self.remote_callback:
-                self.remote_callback(log_entry)
     
     def flush(self):
         # flush() is called to ensure buffered data is written
@@ -164,13 +150,6 @@ class LogManager:
         self._stream_output_handler = None
         self._remote_monitoring_handler = None
         
-        # Remote monitoring setup
-        self.remote_port = remote_port
-        self.remote_clients = []
-        self.server_socket = None
-        self.server_thread = None
-        self.running = True
-        
         # Store desktop mode flag
         self.is_desktop_mode = is_desktop_mode
         
@@ -178,17 +157,10 @@ class LogManager:
         self.original_stdout = sys.stdout
         self.original_stderr = sys.stderr
         
-        # NOTE: Old remote server code disabled - now using RemoteMonitoringHandler
-        # Start remote server if port is specified
-        # if self.remote_port:
-        #     self._start_remote_server()
-        
         # Redirect stdout and stderr
-        remote_callback = self._broadcast_to_clients if self.remote_port else None
-        update_callback = self._on_message_added
-        sys.stdout = LogCapture(self.log_messages, "STDOUT", remote_callback, update_callback, 
+        sys.stdout = LogCapture(self.log_messages, "STDOUT", 
                                self.original_stdout, is_desktop_mode, logger=self._stream_logger)
-        sys.stderr = LogCapture(self.log_messages, "STDERR", remote_callback, update_callback,
+        sys.stderr = LogCapture(self.log_messages, "STDERR",
                                self.original_stderr, is_desktop_mode, logger=self._stream_logger)
         
         # Initialize handlers based on configuration
@@ -434,198 +406,6 @@ class LogManager:
     def remote_handler(self):
         """Get the remote monitoring handler instance."""
         return self._remote_monitoring_handler
-        
-    def _start_remote_server(self):
-        """Start TCP server for remote log monitoring"""
-        try:
-            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.server_socket.bind(('localhost', self.remote_port))
-            self.server_socket.listen(5)
-            
-            self.server_thread = threading.Thread(target=self._accept_connections, daemon=True)
-            self.server_thread.start()
-            
-            # Log server start
-            timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
-            log_entry = (timestamp, "REMOTE", f"Log server started on port {self.remote_port}")
-            self.log_messages.append(log_entry)
-            
-        except Exception as e:
-            timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
-            log_entry = (timestamp, "ERROR", f"Failed to start remote server: {e}")
-            self.log_messages.append(log_entry)
-    
-    def _accept_connections(self):
-        """Accept incoming client connections"""
-        while self.running and self.server_socket:
-            try:
-                client_socket, address = self.server_socket.accept()
-                client_thread = threading.Thread(
-                    target=self._handle_client, 
-                    args=(client_socket, address), 
-                    daemon=True
-                )
-                client_thread.start()
-                
-                # Log new connection using original stdout to avoid recursion
-                try:
-                    self.original_stdout.write(f"Client connected from {address[0]}:{address[1]}\n")
-                    self.original_stdout.flush()
-                except (OSError, IOError) as e:
-                    # Can't write to stdout, but continue serving the client
-                    pass
-                
-            except (ConnectionError, OSError) as e:
-                if self.running:  # Only log if we're still supposed to be running
-                    try:
-                        self.original_stdout.write(f"Error accepting client connection: {e}\n")
-                        self.original_stdout.flush()
-                    except (OSError, IOError):
-                        pass  # Can't log the error, but continue
-                break
-            except Exception as e:
-                if self.running:
-                    try:
-                        self.original_stdout.write(f"Unexpected error in server loop: {e}\n")
-                        self.original_stdout.flush()
-                    except (OSError, IOError):
-                        pass
-                break
-    
-    def _handle_client(self, client_socket, address):
-        """Handle individual client connection"""
-        try:
-            # Add client to list
-            self.remote_clients.append(client_socket)
-            
-            # Send existing log messages to new client
-            for log_entry in self.log_messages:
-                try:
-                    self._send_log_entry(client_socket, log_entry)
-                except (ConnectionError, BrokenPipeError, OSError) as e:
-                    # Client disconnected during initial message send
-                    return
-                except Exception as e:
-                    # Unexpected error sending initial messages
-                    try:
-                        self.original_stdout.write(f"Warning: Could not send initial log to client: {e}\n")
-                        self.original_stdout.flush()
-                    except (OSError, IOError):
-                        pass
-                    return
-            
-            # Keep the thread alive - disconnection will be detected in _broadcast_to_clients
-            # when we try to send data and it fails
-            while self.running and client_socket in self.remote_clients:
-                time.sleep(1.0)  # Just keep the thread alive
-                    
-        except Exception as e:
-            try:
-                self.original_stdout.write(f"Warning: Client handler error: {e}\n")
-                self.original_stdout.flush()
-            except (OSError, IOError):
-                pass
-        finally:
-            # Remove client and close socket
-            if client_socket in self.remote_clients:
-                self.remote_clients.remove(client_socket)
-            try:
-                client_socket.close()
-            except (OSError, ConnectionError) as e:
-                # Socket already closed or connection error
-                pass
-            except Exception as e:
-                try:
-                    self.original_stdout.write(f"Warning: Error closing client socket: {e}\n")
-                    self.original_stdout.flush()
-                except (OSError, IOError):
-                    pass
-            
-            # Don't add disconnection message to avoid potential recursion issues
-            # Just use the original stdout to log
-            try:
-                self.original_stdout.write(f"Client disconnected from {address[0]}:{address[1]}\n")
-                self.original_stdout.flush()
-            except (OSError, IOError) as e:
-                # Can't write to stdout, but that's not critical
-                pass
-            except Exception as e:
-                # Unexpected error, but don't let it crash the handler
-                pass
-    
-    def _broadcast_to_clients(self, log_entry):
-        """Broadcast log entry to all connected clients"""
-        if not self.remote_clients:
-            return
-            
-        # Create a copy of the client list to avoid modification during iteration
-        clients_copy = self.remote_clients.copy()
-        
-        for client_socket in clients_copy:
-            try:
-                self._send_log_entry(client_socket, log_entry)
-            except (ConnectionError, BrokenPipeError, OSError):
-                # Remove failed client - connection lost
-                if client_socket in self.remote_clients:
-                    self.remote_clients.remove(client_socket)
-                try:
-                    client_socket.close()
-                except (OSError, ConnectionError):
-                    pass  # Socket already closed
-                except Exception as e:
-                    try:
-                        self.original_stdout.write(f"Warning: Error closing failed client socket: {e}\n")
-                        self.original_stdout.flush()
-                    except (OSError, IOError):
-                        pass
-            except Exception as e:
-                # Unexpected error - log it and remove client
-                try:
-                    self.original_stdout.write(f"Warning: Unexpected error broadcasting to client: {e}\n")
-                    self.original_stdout.flush()
-                except (OSError, IOError):
-                    pass
-                if client_socket in self.remote_clients:
-                    self.remote_clients.remove(client_socket)
-                try:
-                    client_socket.close()
-                except Exception:
-                    pass
-    
-    def _send_log_entry(self, client_socket, log_entry):
-        """Send a single log entry to a client"""
-        try:
-            # Format as JSON for easy parsing by clients
-            message = {
-                'timestamp': log_entry[0],
-                'source': log_entry[1],
-                'message': log_entry[2]
-            }
-            json_data = json.dumps(message) + '\n'
-            client_socket.send(json_data.encode('utf-8'))
-        except (ConnectionError, BrokenPipeError, OSError):
-            raise  # Re-raise connection errors to handle in calling method
-        except (UnicodeEncodeError, TypeError) as e:
-            # Data encoding error - log and re-raise
-            try:
-                self.original_stdout.write(f"Warning: Could not encode log message: {e}\n")
-                self.original_stdout.flush()
-            except (OSError, IOError):
-                pass
-            raise
-        except Exception as e:
-            # Unexpected error - log and re-raise
-            try:
-                self.original_stdout.write(f"Warning: Unexpected error sending log entry: {e}\n")
-                self.original_stdout.flush()
-            except (OSError, IOError):
-                pass
-            raise
-
-    def _on_message_added(self):
-        """Called when a new message is added to the log"""
-        self.has_new_messages = True
     
     def has_log_updates(self):
         """Check if there are new log messages since last check"""
@@ -830,28 +610,14 @@ class LogManager:
 
     
     def stop_remote_server(self):
-        """Stop the remote server and close all connections"""
-        self.running = False
+        """
+        Stop the remote monitoring server (backward compatibility method).
         
-        # Close all client connections
-        for client_socket in self.remote_clients.copy():
-            try:
-                client_socket.close()
-            except Exception:
-                pass
-        self.remote_clients.clear()
-        
-        # Close server socket
-        if self.server_socket:
-            try:
-                self.server_socket.close()
-            except Exception:
-                pass
-            self.server_socket = None
-        
-        # Wait for server thread to finish
-        if self.server_thread and self.server_thread.is_alive():
-            self.server_thread.join(timeout=1.0)
+        This method maintains backward compatibility with existing code.
+        Remote monitoring is now handled by RemoteMonitoringHandler.
+        """
+        if self._remote_monitoring_handler:
+            self._remote_monitoring_handler.stop_server()
     
     def restore_stdio(self):
         """Restore stdout/stderr to original state"""
@@ -861,6 +627,10 @@ class LogManager:
             sys.stderr = self.original_stderr
     
     def __del__(self):
-        """Restore stdout/stderr when object is destroyed"""
-        self.stop_remote_server()
+        """Cleanup when object is destroyed"""
+        # Stop remote monitoring handler if active
+        if hasattr(self, '_remote_monitoring_handler') and self._remote_monitoring_handler:
+            self._remote_monitoring_handler.stop_server()
+        
+        # Restore stdout/stderr
         self.restore_stdio()
