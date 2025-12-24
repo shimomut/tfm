@@ -634,3 +634,45 @@ class LogManager:
         
         # Restore stdout/stderr
         self.restore_stdio()
+
+
+# Module-level singleton instance
+_log_manager_instance: Optional[LogManager] = None
+
+
+def set_log_manager(log_manager: LogManager):
+    """
+    Set the global LogManager instance.
+    
+    This should be called once during application initialization.
+    
+    Args:
+        log_manager: The LogManager instance to use globally
+    """
+    global _log_manager_instance
+    _log_manager_instance = log_manager
+
+
+def getLogger(name: str) -> logging.Logger:
+    """
+    Get or create a logger with TFM handlers configured.
+    
+    This is a module-level function that can be called without a LogManager instance.
+    If a LogManager has been set via set_log_manager(), it will use that instance.
+    Otherwise, it creates a basic NullHandler logger.
+    
+    Args:
+        name: Logger name (e.g., "Main", "FileOp", "Archive")
+        
+    Returns:
+        Configured logging.Logger instance
+    """
+    if _log_manager_instance is not None:
+        return _log_manager_instance.getLogger(name)
+    else:
+        # No LogManager available - create a basic logger with NullHandler
+        logger = logging.getLogger(name)
+        if not logger.handlers:
+            logger.addHandler(logging.NullHandler())
+            logger.setLevel(logging.CRITICAL + 1)  # Disable all logging
+        return logger

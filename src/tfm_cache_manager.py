@@ -16,21 +16,10 @@ class CacheManager:
     def __init__(self, log_manager=None):
         """Initialize cache manager with optional logging"""
         self.log_manager = log_manager
-        self.logger = log_manager.getLogger("Cache") if log_manager else None
-    
-    def _log(self, message: str, level: str = "INFO"):
-        """Log a message if logger is available"""
-        if self.logger:
-            # Map string levels to logger methods
-            level_map = {
-                "DEBUG": self.logger.debug,
-                "INFO": self.logger.info,
-                "WARNING": self.logger.warning,
-                "ERROR": self.logger.error,
-                "CRITICAL": self.logger.critical
-            }
-            log_method = level_map.get(level.upper(), self.logger.info)
-            log_method(message)
+        # Use module-level getLogger - no need to check if log_manager exists
+        from tfm_log_manager import getLogger
+        self.logger = getLogger("Cache")
+
     
     def invalidate_cache_for_paths(self, paths: List[Path], operation: str = "operation"):
         """
@@ -93,13 +82,13 @@ class CacheManager:
             for bucket, keys in buckets_to_invalidate.items():
                 for key in keys:
                     s3_cache.invalidate_key(bucket, key)
-                    self._log(f"Invalidated S3 cache for {operation}: s3://{bucket}/{key}")
+                    self.logger.info(f"Invalidated S3 cache for {operation}: s3://{bucket}/{key}")
             
             if buckets_to_invalidate:
-                self._log(f"S3 cache invalidation completed for {operation} on {len(s3_paths)} paths")
+                self.logger.info(f"S3 cache invalidation completed for {operation} on {len(s3_paths)} paths")
         
         except Exception as e:
-            self._log(f"Warning: S3 cache invalidation failed for {operation}: {e}", "WARNING")
+            self.logger.warning(f"Warning: S3 cache invalidation failed for {operation}: {e}")
     
     def invalidate_cache_for_directory(self, directory: Path, operation: str = "operation"):
         """

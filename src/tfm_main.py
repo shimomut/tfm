@@ -176,6 +176,10 @@ class FileManager(UILayer):
         self.log_manager = LogManager(self.config, remote_port=remote_log_port, 
                                      is_desktop_mode=is_desktop)
         
+        # Set the global LogManager instance for module-level getLogger() calls
+        from tfm_log_manager import set_log_manager
+        set_log_manager(self.log_manager)
+        
         # Create logger for main application
         self.logger = self.log_manager.getLogger("Main")
         

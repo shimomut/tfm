@@ -1955,23 +1955,13 @@ class ArchiveOperations:
     def __init__(self, log_manager=None, cache_manager=None, progress_manager=None):
         """Initialize archive operations with optional logging, cache management, and progress tracking"""
         self.log_manager = log_manager
-        self.logger = log_manager.getLogger("Archive") if log_manager else None
+        # Use module-level getLogger - no need to check if log_manager exists
+        from tfm_log_manager import getLogger
+        self.logger = getLogger("Archive")
         self.cache_manager = cache_manager
         self.progress_manager = progress_manager
     
-    def _log(self, message: str, level: str = "INFO"):
-        """Log a message if logger is available"""
-        if self.logger:
-            # Map string levels to logger methods
-            level_map = {
-                "DEBUG": self.logger.debug,
-                "INFO": self.logger.info,
-                "WARNING": self.logger.warning,
-                "ERROR": self.logger.error,
-                "CRITICAL": self.logger.critical
-            }
-            log_method = level_map.get(level.upper(), self.logger.info)
-            log_method(message)
+
     
     def get_archive_format(self, filename: str) -> Optional[dict]:
         """
@@ -2021,7 +2011,7 @@ class ArchiveOperations:
             True if successful, False otherwise
         """
         try:
-            self._log(f"Creating {format_type} archive: {archive_path}")
+            self.logger.info(f"Creating {format_type} archive: {archive_path}")
             
             # Determine format info
             format_info = None
@@ -2031,7 +2021,7 @@ class ArchiveOperations:
                     break
             
             if not format_info:
-                self._log(f"Unsupported archive format: {format_type}", "ERROR")
+                self.logger.error(f"Unsupported archive format: {format_type}")
                 return False
             
             # Handle cross-storage scenarios
@@ -2052,7 +2042,7 @@ class ArchiveOperations:
             return success
             
         except Exception as e:
-            self._log(f"Error creating archive: {e}", "ERROR")
+            self.logger.error(f"Error creating archive: {e}")
             return False
     
     def _create_archive_local(self, source_paths: List[Path], archive_path: Path, 
@@ -2073,14 +2063,14 @@ class ArchiveOperations:
                         # Use relative path for archive member name
                         arcname = source_path.name
                         tar.add(str(source_path), arcname=arcname)
-                        self._log(f"Added to archive: {arcname}")
+                        self.logger.info(f"Added to archive: {arcname}")
             
             elif format_info['type'] == 'zip':
                 with zipfile.ZipFile(str(archive_path), 'w', zipfile.ZIP_DEFLATED) as zip_file:
                     for source_path in source_paths:
                         if source_path.is_file():
                             zip_file.write(str(source_path), source_path.name)
-                            self._log(f"Added to archive: {source_path.name}")
+                            self.logger.info(f"Added to archive: {source_path.name}")
                         elif source_path.is_dir():
                             # Add directory recursively
                             for file_path in source_path.rglob('*'):
@@ -2088,17 +2078,17 @@ class ArchiveOperations:
                                     # Create relative path within the directory
                                     rel_path = file_path.relative_to(source_path.parent)
                                     zip_file.write(str(file_path), str(rel_path))
-                                    self._log(f"Added to archive: {rel_path}")
+                                    self.logger.info(f"Added to archive: {rel_path}")
             
             else:
-                self._log(f"Unsupported archive type for local creation: {format_info['type']}", "ERROR")
+                self.logger.error(f"Unsupported archive type for local creation: {format_info['type']}")
                 return False
             
-            self._log(f"Archive created successfully: {archive_path}")
+            self.logger.info(f"Archive created successfully: {archive_path}")
             return True
             
         except Exception as e:
-            self._log(f"Error creating local archive: {e}", "ERROR")
+            self.logger.error(f"Error creating local archive: {e}")
             return False
     
     def _create_archive_cross_storage(self, source_paths: List[Path], archive_path: Path, 
@@ -2122,13 +2112,13 @@ class ArchiveOperations:
                         # Copy file content
                         temp_item.write_bytes(source_path.read_bytes())
                         staged_paths.append(Path(temp_item))
-                        self._log(f"Downloaded to temp: {source_path.name}")
+                        self.logger.info(f"Downloaded to temp: {source_path.name}")
                     elif source_path.is_dir():
                         # Recursively download directory
                         temp_item.mkdir()
                         self._download_directory_recursive(source_path, Path(temp_item))
                         staged_paths.append(Path(temp_item))
-                        self._log(f"Downloaded directory to temp: {source_path.name}")
+                        self.logger.info(f"Downloaded directory to temp: {source_path.name}")
                 else:
                     # Local file, can reference directly
                     staged_paths.append(source_path)
@@ -2144,17 +2134,17 @@ class ArchiveOperations:
             if archive_path.is_remote():
                 # Upload to remote storage
                 archive_path.write_bytes(temp_archive.read_bytes())
-                self._log(f"Uploaded archive to: {archive_path}")
+                self.logger.info(f"Uploaded archive to: {archive_path}")
             else:
                 # Move to local destination
                 import shutil
                 shutil.move(str(temp_archive), str(archive_path))
-                self._log(f"Moved archive to: {archive_path}")
+                self.logger.info(f"Moved archive to: {archive_path}")
             
             return True
             
         except Exception as e:
-            self._log(f"Error creating cross-storage archive: {e}", "ERROR")
+            self.logger.error(f"Error creating cross-storage archive: {e}")
             return False
         
         finally:
@@ -2164,7 +2154,7 @@ class ArchiveOperations:
                 try:
                     shutil.rmtree(temp_dir)
                 except Exception as e:
-                    self._log(f"Warning: Could not clean up temp directory: {e}", "WARNING")
+                    self.logger.warning(f"Warning: Could not clean up temp directory: {e}")
     
     def _download_directory_recursive(self, remote_dir: Path, local_dir: Path):
         """Recursively download a remote directory to local storage"""
@@ -2177,7 +2167,7 @@ class ArchiveOperations:
                     local_item.mkdir()
                     self._download_directory_recursive(item, local_item)
         except Exception as e:
-            self._log(f"Error downloading directory {remote_dir}: {e}", "ERROR")
+            self.logger.error(f"Error downloading directory {remote_dir}: {e}")
             raise
     
     def _get_extension_for_format(self, format_info: dict) -> str:
@@ -2211,15 +2201,15 @@ class ArchiveOperations:
         """
         try:
             if not archive_path.is_file():
-                self._log(f"Archive file not found: {archive_path}", "ERROR")
+                self.logger.error(f"Archive file not found: {archive_path}")
                 return False
             
             format_info = self.get_archive_format(archive_path.name)
             if not format_info:
-                self._log(f"Unsupported archive format: {archive_path.name}", "ERROR")
+                self.logger.error(f"Unsupported archive format: {archive_path.name}")
                 return False
             
-            self._log(f"Extracting archive: {archive_path} to {destination_dir}")
+            self.logger.info(f"Extracting archive: {archive_path} to {destination_dir}")
             
             # Handle cross-storage scenarios
             archive_scheme = archive_path.get_scheme()
@@ -2239,7 +2229,7 @@ class ArchiveOperations:
             return success
             
         except Exception as e:
-            self._log(f"Error extracting archive: {e}", "ERROR")
+            self.logger.error(f"Error extracting archive: {e}")
             return False
     
     def _extract_archive_local(self, archive_path: Path, destination_dir: Path, 
@@ -2267,7 +2257,7 @@ class ArchiveOperations:
                         for member in members:
                             dest_path = destination_dir / member.name
                             if dest_path.exists():
-                                self._log(f"File exists, skipping: {member.name}", "WARNING")
+                                self.logger.warning(f"File exists, skipping: {member.name}")
                             else:
                                 members_to_extract.append(member)
                     else:
@@ -2282,7 +2272,7 @@ class ArchiveOperations:
                             for member in members_to_extract:
                                 tar.extract(member, str(destination_dir))
                     
-                    self._log(f"Extracted {len(members_to_extract)} items")
+                    self.logger.info(f"Extracted {len(members_to_extract)} items")
             
             elif format_info['type'] == 'zip':
                 with zipfile.ZipFile(str(archive_path), 'r') as zip_file:
@@ -2294,7 +2284,7 @@ class ArchiveOperations:
                         for member in members_to_extract:
                             dest_path = destination_dir / member
                             if dest_path.exists():
-                                self._log(f"File exists, skipping: {member}", "WARNING")
+                                self.logger.warning(f"File exists, skipping: {member}")
                             else:
                                 filtered_members.append(member)
                         members_to_extract = filtered_members
@@ -2308,7 +2298,7 @@ class ArchiveOperations:
                             for member in members_to_extract:
                                 zip_file.extract(member, str(destination_dir))
                     
-                    self._log(f"Extracted {len(members_to_extract)} items")
+                    self.logger.info(f"Extracted {len(members_to_extract)} items")
             
             elif format_info['type'] in ['gzip', 'bzip2', 'xz']:
                 # Single file compression
@@ -2319,7 +2309,7 @@ class ArchiveOperations:
                 output_path = destination_dir / output_name
                 
                 if output_path.exists() and not overwrite:
-                    self._log(f"File exists, not overwriting: {output_name}", "WARNING")
+                    self.logger.warning(f"File exists, not overwriting: {output_name}")
                     return False
                 
                 # Decompress single file
@@ -2333,17 +2323,17 @@ class ArchiveOperations:
                     with lzma.open(str(archive_path), 'rb') as f_in:
                         output_path.write_bytes(f_in.read())
                 
-                self._log(f"Decompressed to: {output_name}")
+                self.logger.info(f"Decompressed to: {output_name}")
             
             else:
-                self._log(f"Unsupported archive type for local extraction: {format_info['type']}", "ERROR")
+                self.logger.error(f"Unsupported archive type for local extraction: {format_info['type']}")
                 return False
             
-            self._log(f"Archive extracted successfully to: {destination_dir}")
+            self.logger.info(f"Archive extracted successfully to: {destination_dir}")
             return True
             
         except Exception as e:
-            self._log(f"Error extracting local archive: {e}", "ERROR")
+            self.logger.error(f"Error extracting local archive: {e}")
             return False
     
     def _extract_archive_cross_storage(self, archive_path: Path, destination_dir: Path, 
@@ -2361,7 +2351,7 @@ class ArchiveOperations:
                 temp_archive = temp_dir_path / archive_path.name
                 temp_archive.write_bytes(archive_path.read_bytes())
                 archive_to_extract = Path(temp_archive)
-                self._log(f"Downloaded archive to temp: {archive_path.name}")
+                self.logger.info(f"Downloaded archive to temp: {archive_path.name}")
             else:
                 archive_to_extract = archive_path
             
@@ -2379,7 +2369,7 @@ class ArchiveOperations:
             if destination_dir.is_remote():
                 # Upload extracted files to remote storage
                 self._upload_directory_recursive(Path(temp_extract_dir), destination_dir, overwrite)
-                self._log(f"Uploaded extracted files to: {destination_dir}")
+                self.logger.info(f"Uploaded extracted files to: {destination_dir}")
             else:
                 # Move extracted files to local destination
                 destination_dir.mkdir(parents=True, exist_ok=True)
@@ -2387,23 +2377,23 @@ class ArchiveOperations:
                     dest_item = destination_dir / item.name
                     if item.is_file():
                         if dest_item.exists() and not overwrite:
-                            self._log(f"File exists, skipping: {item.name}", "WARNING")
+                            self.logger.warning(f"File exists, skipping: {item.name}")
                             continue
                         import shutil
                         shutil.copy2(str(item), str(dest_item))
                     elif item.is_dir():
                         if dest_item.exists() and not overwrite:
-                            self._log(f"Directory exists, skipping: {item.name}", "WARNING")
+                            self.logger.warning(f"Directory exists, skipping: {item.name}")
                             continue
                         import shutil
                         shutil.copytree(str(item), str(dest_item))
                 
-                self._log(f"Moved extracted files to: {destination_dir}")
+                self.logger.info(f"Moved extracted files to: {destination_dir}")
             
             return True
             
         except Exception as e:
-            self._log(f"Error extracting cross-storage archive: {e}", "ERROR")
+            self.logger.error(f"Error extracting cross-storage archive: {e}")
             return False
         
         finally:
@@ -2413,7 +2403,7 @@ class ArchiveOperations:
                 try:
                     shutil.rmtree(temp_dir)
                 except Exception as e:
-                    self._log(f"Warning: Could not clean up temp directory: {e}", "WARNING")
+                    self.logger.warning(f"Warning: Could not clean up temp directory: {e}")
     
     def _upload_directory_recursive(self, local_dir: Path, remote_dir: Path, overwrite: bool):
         """Recursively upload a local directory to remote storage"""
@@ -2426,7 +2416,7 @@ class ArchiveOperations:
                 remote_item = remote_dir / item.name
                 if item.is_file():
                     if remote_item.exists() and not overwrite:
-                        self._log(f"Remote file exists, skipping: {item.name}", "WARNING")
+                        self.logger.warning(f"Remote file exists, skipping: {item.name}")
                         continue
                     remote_item.write_bytes(item.read_bytes())
                 elif item.is_dir():
@@ -2434,7 +2424,7 @@ class ArchiveOperations:
                         remote_item.mkdir(parents=True, exist_ok=True)
                     self._upload_directory_recursive(item, remote_item, overwrite)
         except Exception as e:
-            self._log(f"Error uploading directory {local_dir}: {e}", "ERROR")
+            self.logger.error(f"Error uploading directory {local_dir}: {e}")
             raise
     
     def list_archive_contents(self, archive_path: Path) -> List[Tuple[str, int, str]]:
@@ -2502,7 +2492,7 @@ class ArchiveOperations:
             return contents
             
         except Exception as e:
-            self._log(f"Error listing archive contents: {e}", "ERROR")
+            self.logger.error(f"Error listing archive contents: {e}")
             return []
 
 
