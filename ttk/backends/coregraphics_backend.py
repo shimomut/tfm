@@ -762,6 +762,85 @@ class CoreGraphicsBackend(Renderer):
         """
         return (self.rows, self.cols)
     
+    def change_font_size(self, delta: int) -> bool:
+        """
+        Change the font size by the specified delta.
+        
+        This method adjusts the font size and recalculates window dimensions
+        to maintain the same character grid size. The window is resized to
+        accommodate the new font size.
+        
+        Args:
+            delta: Amount to change font size (positive to increase, negative to decrease)
+        
+        Returns:
+            bool: True if font size was changed, False if at limits or error occurred
+        
+        Example:
+            # Increase font size by 1 point
+            backend.change_font_size(1)
+            
+            # Decrease font size by 1 point
+            backend.change_font_size(-1)
+        """
+        # Check if window exists
+        if self.window is None:
+            return False
+        
+        # Calculate new font size
+        new_font_size = self.font_size + delta
+        
+        # Enforce limits (8-72 points)
+        if new_font_size < 8 or new_font_size > 72:
+            return False
+        
+        try:
+            # Update font size
+            self.font_size = new_font_size
+            
+            # Reload font with new size
+            self._load_font()
+            
+            # Recalculate character dimensions
+            self._calculate_char_dimensions()
+            
+            # Note: C++ renderer caches will be automatically reinitialized
+            # on the next render_frame() call when it detects font size change
+            
+            # Calculate new window dimensions to maintain same grid size
+            window_width = self.cols * self.char_width + (self.WINDOW_PADDING_MULTIPLIER * self.char_height)
+            window_height = self.rows * self.char_height + (self.WINDOW_PADDING_MULTIPLIER * self.char_height)
+            
+            # Get current window frame
+            current_frame = self.window.frame()
+            
+            # Create new frame with updated size, keeping same origin
+            new_frame = Cocoa.NSMakeRect(
+                current_frame.origin.x,
+                current_frame.origin.y,
+                window_width,
+                window_height
+            )
+            
+            # Apply new frame to window
+            self.window.setFrame_display_(new_frame, True)
+            
+            # Force view to redraw with new font
+            if self.view:
+                self.view.setNeedsDisplay_(True)
+            
+            return True
+            
+        except Exception as e:
+            # If anything fails, try to restore original font size
+            self.font_size = new_font_size - delta
+            try:
+                self._load_font()
+                self._calculate_char_dimensions()
+            except Exception:
+                pass
+            return False
+    
     def set_event_callback(self, callback: Optional['EventCallback']) -> None:
         """
         Set the event callback for event delivery (REQUIRED).

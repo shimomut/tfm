@@ -17,7 +17,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/tfm.py",
-            "args": ["--backend", "coregraphics", "--debug"],
+            "args": ["--backend", "coregraphics"],
             "console": "integratedTerminal"
         }
     ]

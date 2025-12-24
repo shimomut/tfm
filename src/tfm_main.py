@@ -310,6 +310,26 @@ class FileManager(UILayer):
         Returns:
             True if the event was consumed, False otherwise
         """
+        # Handle desktop mode font size adjustment (Cmd-Plus, Cmd-Minus)
+        if self.is_desktop_mode() and event.has_modifier(ModifierKey.COMMAND):
+            # Cmd-Plus (increase font size)
+            if event.char == '+' or event.char == '=':
+                if hasattr(self.renderer, 'change_font_size'):
+                    if self.renderer.change_font_size(1):
+                        self.logger.info(f"Font size increased to {self.renderer.font_size}pt")
+                        self.mark_dirty()
+                        return True
+            # Cmd-Minus (decrease font size)
+            elif event.char == '-':
+                if hasattr(self.renderer, 'change_font_size'):
+                    if self.renderer.change_font_size(-1):
+                        self.logger.info(f"Font size decreased to {self.renderer.font_size}pt")
+                        self.mark_dirty()
+                        return True
+                    else:
+                        self.logger.info("Font size at minimum (8pt)")
+                        return True
+        
         return self.handle_input(event)
     
     def handle_char_event(self, event) -> bool:

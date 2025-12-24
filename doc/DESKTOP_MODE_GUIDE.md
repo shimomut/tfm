@@ -45,6 +45,7 @@ When you launch TFM in desktop mode:
 - **True RGB Colors**: Accurate color reproduction
 - **Better Fonts**: Crisp font rendering with anti-aliasing
 - **Customizable Fonts**: Choose your preferred monospace font
+- **Dynamic Font Size**: Change font size on-the-fly with Cmd-Plus/Cmd-Minus
 - **Adjustable Size**: Change font size for better readability
 
 
@@ -152,7 +153,11 @@ All keyboard shortcuts work identically in desktop mode:
 - **Help**: ? (help dialog)
 - **Quit**: q/Q
 
-See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference.
+**Desktop Mode Exclusive**:
+- **Cmd-Plus** or **Cmd-=**: Increase font size
+- **Cmd-Minus**: Decrease font size
+
+See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Font Size Adjustment](FONT_SIZE_ADJUSTMENT_FEATURE.md) for details on dynamic font sizing.
 
 ### Window Management
 
