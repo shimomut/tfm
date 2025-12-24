@@ -14,7 +14,8 @@ inclusion: always
 - `doc/` - TFM end-user documentation (`FEATURE_NAME_FEATURE.md`)
 - `doc/dev/` - TFM developer documentation (`SYSTEM_NAME_SYSTEM.md`, `FEATURE_NAME_IMPLEMENTATION.md`)
 - `demo/` - TFM demo scripts (`demo_*.py`)
-- `tools/` - External programs and scripts (`*.sh`, `*.py`)
+- `tools/` - Development tools and scripts for Kiro/developers (`*.sh`, `*.py`)
+- `src/tools/` - External programs for end users (`*.sh`, `*.py`)
 - `src/` - Core application code (`tfm_*.py`)
 - `temp/` - Temporary files during development
 
@@ -36,13 +37,15 @@ inclusion: always
 | TTK tests | `ttk/test/` | `test_*.py` |
 | TFM demos | `demo/` | `demo_*.py` |
 | TTK demos | `ttk/demo/` | `demo_*.py` |
-| External tools | `tools/` | `*.sh`, `*.py` |
+| Development tools | `tools/` | `*.sh`, `*.py` |
+| End-user external programs | `src/tools/` | `*.sh`, `*.py` |
 | Source code | `src/` | `tfm_*.py` |
 | Temporary files | `temp/` | `temp_*`, `TEMP_*` |
 
 ## Key Rules
 
 - **Temporary files** → Always use `temp/` directory during development
-- **External programs** → Always use `tools/` directory
+- **Development tools** → Use `tools/` for Kiro/developer utilities (not for end users)
+- **End-user external programs** → Use `src/tools/` for user-facing external integrations
 - **Separate TTK from TFM** → TTK library files go in `ttk/` subdirectories
 - **Documentation audience** → End-user docs must not include implementation details; developer docs must not include basic usage instructions

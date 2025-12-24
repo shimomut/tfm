@@ -295,10 +295,11 @@ For detailed configuration options, see the **[Configuration Feature Guide](doc/
 ```
 tfm/
 ├── src/           # Core application code
+│   └── tools/     # External programs for end users
+├── tools/         # Development tools and utilities
 ├── test/          # Test files (720+ passing tests)
 ├── doc/           # User documentation
 ├── doc/dev/       # Developer documentation
-├── tools/         # External integration scripts
 ├── demo/          # Interactive demonstrations
 └── tfm.py         # Main entry point
 ```
@@ -312,7 +313,7 @@ Monitor TFM operations remotely for debugging:
 python3 tfm.py --remote-log-port 8888
 
 # Connect from another terminal
-python3 tools/tfm_log_client.py localhost 8888
+python3 src/tools/tfm_log_client.py localhost 8888
 ```
 
 The log client provides color-coded output for different log sources and handles network connectivity gracefully.

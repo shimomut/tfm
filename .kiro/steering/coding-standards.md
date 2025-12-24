@@ -167,7 +167,7 @@ chmod +x script.py
 ./script.py
 ```
 
-Shell scripts in `tools/` directory can have executable permissions.
+Shell scripts in `src/tools/` directory (end-user external programs) can have executable permissions.
 
 ## References
 
