@@ -52,7 +52,6 @@ from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
 from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_cache_manager import CacheManager
-from tfm_profiling import ProfilingManager
 from tfm_menu_manager import MenuManager
 from tfm_ui_layer import UILayerStack, UILayer
 from tfm_adaptive_fps import AdaptiveFPSManager
@@ -146,20 +145,15 @@ class TFMEventCallback(EventCallback):
 
 
 class FileManager(UILayer):
-    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_enabled=False):
+    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None):
         self.renderer = renderer
         self.stdscr = renderer  # Keep stdscr as alias for compatibility during migration
         
-        # Initialize profiling manager if enabled
-        # This must be done early to ensure zero overhead when disabled
-        self.profiling_manager = ProfilingManager(enabled=profiling_enabled) if profiling_enabled else None
+        # Store profiling targets
+        self.profiling_targets = profiling_targets or set()
         
         # Initialize adaptive FPS manager for CPU optimization
         self.adaptive_fps = AdaptiveFPSManager()
-        
-        # Display profiling mode message if enabled
-        if self.profiling_manager:
-            print("Profiling mode enabled - performance data will be collected")
         
         # Load configuration
         self.config = get_config()
@@ -1192,10 +1186,6 @@ class FileManager(UILayer):
         
         # Run event loop with drawing
         while True:
-            # Start loop iteration timing
-            if self.profiling_manager:
-                self.profiling_manager.start_loop_iteration()
-            
             # Check if we should quit
             if self.should_quit:
                 break
@@ -1225,7 +1215,15 @@ class FileManager(UILayer):
             timeout_ms = self.adaptive_fps.get_timeout_ms()
 
             # Process one event with adaptive timeout (events delivered via callbacks)
-            self.renderer.run_event_loop_iteration(timeout_ms=timeout_ms)
+            if 'event' in self.profiling_targets:
+                import cProfile
+                cProfile.runctx(
+                    "self.renderer.run_event_loop_iteration(timeout_ms=timeout_ms)",
+                    globals(),
+                    locals()
+                )
+            else:
+                self.renderer.run_event_loop_iteration(timeout_ms=timeout_ms)
             
             # Check if top layer wants to close and pop it if so
             # This must be done after event processing but before drawing
@@ -1235,12 +1233,6 @@ class FileManager(UILayer):
             
             # Draw interface after event processing
             self.draw_interface()
-            
-            # End loop iteration
-            if self.profiling_manager:
-                self.profiling_manager.end_loop_iteration()
-                if self.profiling_manager.should_print_fps():
-                    self.profiling_manager.print_fps()
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
@@ -4054,11 +4046,12 @@ class FileManager(UILayer):
             print(f"Warning: Could not load search history: {e}")
             return []
 
-def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_enabled=False):
+def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None):
     """Main function to run the file manager"""
     fm = None
     try:
-        fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, profiling_enabled=profiling_enabled)
+        fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, 
+                        profiling_targets=profiling_targets or set())
         fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
@@ -4163,9 +4156,10 @@ def create_parser():
         type=str,
         metavar='TARGETS',
         help='Enable performance profiling for specified targets (comma-separated). '
-             'Available targets: mainloop (FPS and event loop profiling), '
-             'rendering (C++ renderer metrics, CoreGraphics only). '
-             'Example: --profile=mainloop,rendering'
+             'Available targets: '
+             'rendering (C++ renderer metrics, CoreGraphics only), '
+             'event (cProfile event loop iteration). '
+             'Example: --profile=event or --profile=rendering,event'
     )
     
     return parser
@@ -4187,7 +4181,7 @@ def cli_main():
         profile_targets = set()
         if args.profile:
             profile_targets = set(target.strip() for target in args.profile.split(','))
-            valid_targets = {'mainloop', 'rendering'}
+            valid_targets = {'rendering', 'event'}
             invalid_targets = profile_targets - valid_targets
             if invalid_targets:
                 print(f"Warning: Invalid profiling targets: {', '.join(invalid_targets)}", file=sys.stderr)
@@ -4239,7 +4233,7 @@ def cli_main():
                  remote_log_port=args.remote_log_port,
                  left_dir=args.left,
                  right_dir=args.right,
-                 profiling_enabled='mainloop' in profile_targets)
+                 profiling_targets=profile_targets)
         finally:
             # Ensure renderer is properly shut down
             renderer.shutdown()
