@@ -20,13 +20,33 @@ from typing import List, Tuple, Optional, Dict
 from tfm_const import LOG_TIME_FORMAT
 
 
+def should_format_record(record: logging.LogRecord) -> bool:
+    """
+    Determine if a log record should be formatted with timestamp.
+    
+    Formatting rules:
+    - Logger API records (logger.info(), etc.): Always format with timestamp
+    - stdout/stderr records (print(), subprocess output): Never format, output raw
+    
+    Args:
+        record: Log record to check
+        
+    Returns:
+        True if record should be formatted, False if raw output
+    """
+    # Check if this is a stream capture (stdout/stderr from print() or subprocess)
+    # If is_stream_capture is True, it means the message came from stdout/stderr
+    # and should be displayed as raw output without formatting
+    return not getattr(record, 'is_stream_capture', False)
+
+
 class LogPaneHandler(logging.Handler):
     """
     Custom handler that stores log messages in a deque for display in TFM's log pane.
     
     This handler distinguishes between:
     - Logger messages: Formatted with timestamp, logger name, level, and message
-    - Stdout/stderr: Displayed as-is with only timestamp and source prefix
+    - Stdout/stderr: Displayed as raw text without any formatting
     
     The distinction is made using the `is_stream_capture` attribute on LogRecord.
     """
@@ -47,9 +67,9 @@ class LogPaneHandler(logging.Handler):
         """
         Process a log record and add to display queue.
         
-        Checks record.is_stream_capture to determine formatting:
-        - If True: Display as-is (stdout/stderr)
-        - If False: Format with timestamp, name, level, message (logger)
+        Formatting is determined by record source:
+        - Logger API: Format with timestamp, name, level, message
+        - stdout/stderr: Display raw message without formatting (multi-line allowed)
         
         Error handling: All exceptions are caught and logged to sys.__stderr__
         to prevent logging failures from crashing the application. The handler
@@ -70,17 +90,18 @@ class LogPaneHandler(logging.Handler):
                 return
             
             with self.lock:
-                if getattr(record, 'is_stream_capture', False):
-                    # Stdout/stderr: display as-is with minimal formatting
-                    formatted_lines = self.format_stream_message(record)
-                    for line in formatted_lines:
-                        # Store tuple of (formatted_message, record) for color determination
-                        self.messages.append((line, record))
-                else:
-                    # Logger message: apply full formatting
+                if should_format_record(record):
+                    # Logger API: format with timestamp, name, level, message
                     formatted = self.format_logger_message(record)
-                    # Store tuple of (formatted_message, record) for color determination
                     self.messages.append((formatted, record))
+                else:
+                    # stdout/stderr: display raw message without formatting
+                    raw_message = record.getMessage()
+                    # Preserve multi-line output - each line gets its own entry
+                    lines = raw_message.split('\n')
+                    for line in lines:
+                        if line:  # Skip empty lines
+                            self.messages.append((line, record))
         except Exception as e:
             # Requirement 12.1: Handler failure isolation
             # Requirement 12.5: Log errors using fallback mechanism
@@ -140,13 +161,17 @@ class LogPaneHandler(logging.Handler):
             for formatted_msg, record in self.messages:
                 if formatted_msg is None:
                     # Format the message now
-                    if getattr(record, 'is_stream_capture', False):
-                        formatted_lines = self.format_stream_message(record)
-                        for line in formatted_lines:
-                            formatted_messages.append((line, record))
-                    else:
+                    if should_format_record(record):
+                        # Logger API: format with timestamp
                         formatted = self.format_logger_message(record)
                         formatted_messages.append((formatted, record))
+                    else:
+                        # stdout/stderr: display raw message
+                        raw_message = record.getMessage()
+                        lines = raw_message.split('\n')
+                        for line in lines:
+                            if line:
+                                formatted_messages.append((line, record))
                 else:
                     formatted_messages.append((formatted_msg, record))
             return formatted_messages
@@ -181,7 +206,7 @@ class LogPaneHandler(logging.Handler):
         from ttk import TextAttribute
         
         # Check if this is a stream capture (stdout/stderr) or logger message
-        if getattr(record, 'is_stream_capture', False):
+        if not should_format_record(record):
             # For stdout/stderr: use record.name ("STDOUT"/"STDERR") to determine color
             return get_log_color(record.name)
         else:
@@ -205,9 +230,9 @@ class StreamOutputHandler(logging.Handler):
     """
     Custom handler that writes log messages to original stdout/stderr streams.
     
-    This handler respects the is_stream_capture flag:
-    - Logger messages: Written with full formatting
-    - Stdout/stderr: Written as-is (raw text) to preserve original output
+    This handler respects the record source:
+    - Logger messages: Written with full formatting (timestamp, name, level, message)
+    - Stdout/stderr: Written as raw text without any formatting
     """
     
     def __init__(self, stream):
@@ -225,9 +250,9 @@ class StreamOutputHandler(logging.Handler):
         """
         Write log record to stream.
         
-        Respects is_stream_capture flag for formatting:
-        - If True: Write raw message without additional formatting
-        - If False: Write with full formatting
+        Formatting is determined by record source:
+        - Logger API: Write with full formatting (timestamp, name, level, message)
+        - stdout/stderr: Write raw message without any formatting (multi-line allowed)
         
         Error handling: Stream write failures (OSError, IOError) are suppressed
         to prevent logging from crashing the application. Other exceptions are
@@ -239,16 +264,16 @@ class StreamOutputHandler(logging.Handler):
         """
         try:
             with self.lock:
-                if getattr(record, 'is_stream_capture', False):
-                    # Stdout/stderr: write raw message without additional formatting
+                if should_format_record(record):
+                    # Logger API: write with full formatting
+                    formatted = self.format(record)
+                    self.stream.write(formatted + '\n')
+                else:
+                    # stdout/stderr: write raw message without any formatting
                     msg = record.getMessage()
                     self.stream.write(msg)
                     if not msg.endswith('\n'):
                         self.stream.write('\n')
-                else:
-                    # Logger message: write with full formatting
-                    formatted = self.format(record)
-                    self.stream.write(formatted + '\n')
                 self.stream.flush()
         except (OSError, IOError):
             # Requirement 12.3: Stream write failure suppression
@@ -296,6 +321,10 @@ class RemoteMonitoringHandler(logging.Handler):
         """
         Broadcast log record to all connected clients.
         
+        Formatting is determined by record source:
+        - Logger API: Send with timestamp, name, level, message
+        - stdout/stderr: Send raw message without formatting
+        
         Error handling: All exceptions are caught and logged to sys.__stderr__
         to prevent logging failures from crashing the application. Client
         connection failures are handled in _broadcast_to_clients(). The handler
@@ -306,21 +335,20 @@ class RemoteMonitoringHandler(logging.Handler):
         """
         try:
             # Format as JSON message
-            timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
-            
-            if getattr(record, 'is_stream_capture', False):
-                # Stdout/stderr message
+            if should_format_record(record):
+                # Logger API: send with full formatting
+                timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
                 message_dict = {
-                    'timestamp': timestamp,
-                    'source': record.name,
-                    'message': record.getMessage()
-                }
-            else:
-                # Logger message
-                message_dict = {
+                    'type': 'logger',
                     'timestamp': timestamp,
                     'source': record.name,
                     'level': record.levelname,
+                    'message': record.getMessage()
+                }
+            else:
+                # stdout/stderr: send raw message without formatting
+                message_dict = {
+                    'type': 'raw',
                     'message': record.getMessage()
                 }
             
