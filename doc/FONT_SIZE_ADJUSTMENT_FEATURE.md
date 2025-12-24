@@ -8,6 +8,7 @@ TFM's Desktop mode supports dynamic font size adjustment using keyboard shortcut
 
 - **Desktop Mode Only**: This feature is only available when running TFM in Desktop mode (CoreGraphics backend on macOS)
 - **Terminal Mode**: Font size adjustment is not available in terminal mode (curses backend)
+- **Works Everywhere**: The shortcuts work in all contexts - main screen, dialogs, text viewer, etc.
 
 ## Keyboard Shortcuts
 

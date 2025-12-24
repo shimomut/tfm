@@ -22,22 +22,29 @@ Usage:
 
 Expected behavior:
 - Window opens in desktop mode with default font size
-- Press Cmd-Plus to increase font size (window grows)
-- Press Cmd-Minus to decrease font size (window shrinks)
+- Press Cmd-Plus to increase font size (window stays same size, fewer rows/cols)
+- Press Cmd-Minus to decrease font size (window stays same size, more rows/cols)
 - Font size changes are logged in the log pane
 - Minimum font size is 8pt, maximum is 72pt
-- Grid dimensions (rows/cols) remain constant
+- Grid dimensions adjust to fit more/fewer characters
 - Character rendering updates immediately
+- Works in all contexts (main screen, dialogs, text viewer, etc.)
 
 Testing steps:
 1. Launch the demo
 2. Press Cmd-Plus several times to increase font size
-3. Observe window growing and text becoming larger
+3. Observe text becoming larger, fewer files visible
 4. Press Cmd-Minus several times to decrease font size
-5. Observe window shrinking and text becoming smaller
-6. Try to go below 8pt or above 72pt (should be prevented)
-7. Verify log messages show current font size
-8. Press 'q' to quit
+5. Observe text becoming smaller, more files visible
+6. Try in different contexts:
+   - Main file manager screen
+   - Help dialog (press ?)
+   - Text viewer (view a file)
+   - Search dialog (press F)
+7. Verify shortcuts work everywhere
+8. Try to go below 8pt or above 72pt (should be prevented)
+9. Verify log messages show current font size
+10. Press 'q' to quit
 
 Note: This feature is only available in desktop mode (CoreGraphics backend).
 In terminal mode (curses backend), these shortcuts have no effect.
@@ -69,7 +76,8 @@ def main():
     print("  2. Press Cmd-Minus to decrease font size")
     print("  3. Watch the log pane for font size updates")
     print("  4. Try to exceed limits (8pt min, 72pt max)")
-    print("  5. Press 'q' to quit")
+    print("  5. Try in different contexts (main screen, dialogs, viewer)")
+    print("  6. Press 'q' to quit")
     print()
     print("Starting TFM in desktop mode...")
     print()

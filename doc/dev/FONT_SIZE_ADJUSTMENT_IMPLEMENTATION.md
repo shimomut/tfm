@@ -23,9 +23,11 @@ This is the standard behavior users expect from font size changes - the window s
 ### Font Size Change Flow
 
 ```
-User presses Cmd-Plus/Cmd-Minus
+User presses Cmd-Plus/Cmd-Minus (anywhere in the app)
     ↓
-FileManager.handle_key_event() intercepts
+TFMEventCallback.on_key_event() intercepts (global handler)
+    ↓
+Checks if desktop mode and Cmd modifier
     ↓
 CoreGraphicsBackend.change_font_size(delta)
     ↓
@@ -43,6 +45,16 @@ Application receives resize event
     ↓
 UI adjusts to new grid dimensions
 ```
+
+### Why TFMEventCallback?
+
+The font size shortcuts are handled in `TFMEventCallback.on_key_event()` rather than in `FileManager.handle_key_event()` because:
+
+1. **Global availability**: Works in all contexts (main screen, dialogs, text viewer, etc.)
+2. **Early interception**: Processed before routing to UI layers
+3. **Consistent behavior**: Same shortcuts work everywhere in the application
+
+This is similar to how system-wide shortcuts work in macOS applications.
 
 ### Critical Implementation Detail: Keep Window Size Constant
 

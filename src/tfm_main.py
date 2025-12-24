@@ -79,6 +79,8 @@ class TFMEventCallback(EventCallback):
         """
         Handle a key event by routing to the UI layer stack.
         
+        This method intercepts global keyboard shortcuts before routing to layers.
+        
         Args:
             event: KeyEvent to handle
         
@@ -87,6 +89,26 @@ class TFMEventCallback(EventCallback):
         """
         # Mark activity for adaptive FPS
         self.file_manager.adaptive_fps.mark_activity()
+        
+        # Handle global desktop mode shortcuts (work in all contexts)
+        if self.file_manager.is_desktop_mode() and event.has_modifier(ModifierKey.COMMAND):
+            # Cmd-Plus or Cmd-= (increase font size)
+            if event.char == '+' or event.char == '=':
+                if hasattr(self.file_manager.renderer, 'change_font_size'):
+                    if self.file_manager.renderer.change_font_size(1):
+                        self.file_manager.logger.info(f"Font size increased to {self.file_manager.renderer.font_size}pt")
+                        self.file_manager.mark_dirty()
+                        return True
+            # Cmd-Minus (decrease font size)
+            elif event.char == '-':
+                if hasattr(self.file_manager.renderer, 'change_font_size'):
+                    if self.file_manager.renderer.change_font_size(-1):
+                        self.file_manager.logger.info(f"Font size decreased to {self.file_manager.renderer.font_size}pt")
+                        self.file_manager.mark_dirty()
+                        return True
+                    else:
+                        self.file_manager.logger.info("Font size at minimum (8pt)")
+                        return True
         
         # Route to UI layer stack
         return self.file_manager.ui_layer_stack.handle_key_event(event)
@@ -304,32 +326,15 @@ class FileManager(UILayer):
         This method delegates to FileManager.handle_input(), which handles both
         FileManager-specific input modes and main screen keyboard events.
         
+        Note: Global shortcuts like font size adjustment are handled in
+        TFMEventCallback.on_key_event() before reaching this method.
+        
         Args:
             event: KeyEvent to handle
         
         Returns:
             True if the event was consumed, False otherwise
         """
-        # Handle desktop mode font size adjustment (Cmd-Plus, Cmd-Minus)
-        if self.is_desktop_mode() and event.has_modifier(ModifierKey.COMMAND):
-            # Cmd-Plus (increase font size)
-            if event.char == '+' or event.char == '=':
-                if hasattr(self.renderer, 'change_font_size'):
-                    if self.renderer.change_font_size(1):
-                        self.logger.info(f"Font size increased to {self.renderer.font_size}pt")
-                        self.mark_dirty()
-                        return True
-            # Cmd-Minus (decrease font size)
-            elif event.char == '-':
-                if hasattr(self.renderer, 'change_font_size'):
-                    if self.renderer.change_font_size(-1):
-                        self.logger.info(f"Font size decreased to {self.renderer.font_size}pt")
-                        self.mark_dirty()
-                        return True
-                    else:
-                        self.logger.info("Font size at minimum (8pt)")
-                        return True
-        
         return self.handle_input(event)
     
     def handle_char_event(self, event) -> bool:
