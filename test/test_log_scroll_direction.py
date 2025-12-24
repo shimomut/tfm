@@ -25,10 +25,10 @@ def test_log_scroll_direction():
         sys.stdout = log_manager.original_stdout
         sys.stderr = log_manager.original_stderr
         
-        # Add some test messages
-        log_manager.log_messages.clear()
+        # Add some test messages through the logging system
+        logger = log_manager.getLogger("TEST")
         for i in range(10):
-            log_manager.log_messages.append((f"2024-01-01 12:00:{i:02d}", "TEST", f"Message {i}"))
+            logger.info(f"Message {i}")
         
         # Initial state: offset should be 0 (showing newest messages)
         initial_offset = log_manager.log_scroll_offset

@@ -26,10 +26,10 @@ def test_log_scroll_capping():
         sys.stdout = log_manager.original_stdout
         sys.stderr = log_manager.original_stderr
         
-        # Add test messages
-        log_manager.log_messages.clear()
+        # Add test messages through the logging system
+        logger = log_manager.getLogger("TEST")
         for i in range(20):  # 20 messages
-            log_manager.log_messages.append((f"2024-01-01 12:00:{i:02d}", "TEST", f"Message {i}"))
+            logger.info(f"Message {i}")
         
         # Test with different display heights
         test_cases = [
@@ -92,10 +92,10 @@ def test_scroll_percentage_with_display_height():
         sys.stdout = log_manager.original_stdout
         sys.stderr = log_manager.original_stderr
         
-        # Add test messages
-        log_manager.log_messages.clear()
+        # Add test messages through the logging system
+        logger = log_manager.getLogger("TEST")
         for i in range(10):
-            log_manager.log_messages.append((f"2024-01-01 12:00:{i:02d}", "TEST", f"Message {i}"))
+            logger.info(f"Message {i}")
         
         # Test with display height of 5 (so max scroll is 5)
         display_height = 5
@@ -142,14 +142,14 @@ def test_scroll_boundary_conditions():
         sys.stdout = log_manager.original_stdout
         sys.stderr = log_manager.original_stderr
         
-        # Test with empty log
-        log_manager.log_messages.clear()
+        # Test with empty log - handler should have no messages
         result = log_manager.scroll_log_up(1)
         assert result == False, "Should not be able to scroll empty log"
         assert log_manager.log_scroll_offset == 0, "Offset should remain 0 for empty log"
         
-        # Test with single message
-        log_manager.log_messages.append(("2024-01-01 12:00:00", "TEST", "Single message"))
+        # Test with single message through logging system
+        logger = log_manager.getLogger("TEST")
+        logger.info("Single message")
         
         # With display height >= 1, there should be no scrolling possible
         class MockStdscr:

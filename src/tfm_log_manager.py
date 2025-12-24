@@ -44,8 +44,7 @@ class LoggingConfig:
 
 class LogCapture:
     """Capture stdout/stderr and redirect to log pane with line buffering"""
-    def __init__(self, log_messages, source, original_stream=None, is_desktop_mode=False, logger=None):
-        self.log_messages = log_messages
+    def __init__(self, source, original_stream=None, is_desktop_mode=False, logger=None):
         self.source = source
         self.original_stream = original_stream
         self.is_desktop_mode = is_desktop_mode  # Only write to original streams in desktop mode
@@ -67,39 +66,32 @@ class LogCapture:
     
     def _emit_log_record(self, text):
         """Emit a single log record for the given text"""
-        # If logger is available, route through logging infrastructure
-        if self.logger:
-            # Create LogRecord with appropriate level
-            # INFO for stdout, WARNING for stderr
-            level = logging.INFO if self.source == "STDOUT" else logging.WARNING
-            
-            # Requirement 11.1: Performance optimization - check if level is enabled
-            # Skip expensive LogRecord creation and formatting if level is disabled
-            if not self.logger.isEnabledFor(level):
-                return
-            
-            # Create LogRecord - preserve raw text without stripping or modifying
-            record = logging.LogRecord(
-                name=self.source,  # "STDOUT" or "STDERR"
-                level=level,
-                pathname="",
-                lineno=0,
-                msg=text,  # Raw text, not stripped or modified
-                args=(),
-                exc_info=None
-            )
-            
-            # CRITICAL: Mark this as a stream capture (not a formatted logger message)
-            # Handlers will check this flag to determine formatting behavior
-            record.is_stream_capture = True
-            
-            # Route through the logger's handler pipeline
-            self.logger.handle(record)
-        else:
-            # Fallback to old behavior if logger not available (backward compatibility)
-            timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
-            log_entry = (timestamp, self.source, text.strip())
-            self.log_messages.append(log_entry)
+        # Route through logging infrastructure
+        # INFO for stdout, WARNING for stderr
+        level = logging.INFO if self.source == "STDOUT" else logging.WARNING
+        
+        # Requirement 11.1: Performance optimization - check if level is enabled
+        # Skip expensive LogRecord creation and formatting if level is disabled
+        if not self.logger.isEnabledFor(level):
+            return
+        
+        # Create LogRecord - preserve raw text without stripping or modifying
+        record = logging.LogRecord(
+            name=self.source,  # "STDOUT" or "STDERR"
+            level=level,
+            pathname="",
+            lineno=0,
+            msg=text,  # Raw text, not stripped or modified
+            args=(),
+            exc_info=None
+        )
+        
+        # CRITICAL: Mark this as a stream capture (not a formatted logger message)
+        # Handlers will check this flag to determine formatting behavior
+        record.is_stream_capture = True
+        
+        # Route through the logger's handler pipeline
+        self.logger.handle(record)
     
     def flush(self):
         # flush() is called to ensure buffered data is written
@@ -113,9 +105,7 @@ class LogManager:
     """Manages logging system and log display"""
     
     def __init__(self, config, remote_port=None, is_desktop_mode=False):
-        # Log pane setup
-        max_log_messages = getattr(config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
-        self.log_messages = deque(maxlen=max_log_messages)
+        # Log scroll state
         self.log_scroll_offset = 0
         
         # Track log updates for redraw triggering
@@ -132,6 +122,7 @@ class LogManager:
         self._stream_logger.propagate = False
         
         # Store configuration for handler management
+        max_log_messages = getattr(config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
         self._config = LoggingConfig()
         self._config.max_log_messages = max_log_messages
         self._config.remote_monitoring_enabled = remote_port is not None
@@ -158,10 +149,8 @@ class LogManager:
         self.original_stderr = sys.stderr
         
         # Redirect stdout and stderr
-        sys.stdout = LogCapture(self.log_messages, "STDOUT", 
-                               self.original_stdout, is_desktop_mode, logger=self._stream_logger)
-        sys.stderr = LogCapture(self.log_messages, "STDERR",
-                               self.original_stderr, is_desktop_mode, logger=self._stream_logger)
+        sys.stdout = LogCapture("STDOUT", self.original_stdout, is_desktop_mode, logger=self._stream_logger)
+        sys.stderr = LogCapture("STDERR", self.original_stderr, is_desktop_mode, logger=self._stream_logger)
         
         # Initialize handlers based on configuration
         # This creates the LogPaneHandler by default (log_pane_enabled=True by default)
@@ -409,7 +398,7 @@ class LogManager:
     
     def has_log_updates(self):
         """Check if there are new log messages since last check"""
-        current_count = len(self.log_messages)
+        current_count = len(self._log_pane_handler.messages)
         if current_count != self.last_message_count or self.has_new_messages:
             return True
         return False
@@ -417,7 +406,7 @@ class LogManager:
     def mark_log_updates_processed(self):
         """Mark that log updates have been processed (redraw completed)"""
         self.has_new_messages = False
-        self.last_message_count = len(self.log_messages)
+        self.last_message_count = len(self._log_pane_handler.messages)
     
     def add_message(self, source, message):
         """
@@ -483,11 +472,12 @@ class LogManager:
     
     def get_log_scroll_percentage(self, display_height=None):
         """Calculate the current log scroll position as a percentage"""
-        if len(self.log_messages) <= 1:
+        total_messages = len(self._log_pane_handler.messages)
+        
+        if total_messages <= 1:
             return 0
         
         # Calculate max scroll based on display height if available
-        total_messages = len(self.log_messages)
         if display_height is not None:
             max_scroll = max(0, total_messages - display_height)
         else:
@@ -503,8 +493,8 @@ class LogManager:
     
     def scroll_log_up(self, lines=1):
         """Scroll log up by specified number of lines (toward older messages)"""
-        # Use a conservative estimate for max scroll - final capping happens in draw_log_pane
-        total_messages = len(self.log_messages)
+        total_messages = len(self._log_pane_handler.messages)
+        
         if total_messages > 0:
             # Allow scrolling up to the total number of messages
             # The draw method will cap this properly based on display height
@@ -519,6 +509,21 @@ class LogManager:
             return True
         return False
     
+    def get_log_messages(self):
+        """
+        Get all log messages as a list of formatted strings (backward compatibility).
+        
+        This method is provided for backward compatibility with tests that expect
+        a simple list of message strings. In production, messages are accessed
+        through the handler's get_messages() method which returns (formatted, record) tuples.
+        
+        Returns:
+            List of formatted message strings
+        """
+        # Get messages from handler and extract just the formatted strings
+        handler_messages = self._log_pane_handler.get_messages()
+        return [formatted_msg for formatted_msg, record in handler_messages]
+    
     def draw_log_pane(self, renderer, y_start, height, width):
         """Draw the log pane at the specified position"""
         if height <= 0:
@@ -528,15 +533,9 @@ class LogManager:
             # Draw log messages (no header)
             display_height = height  # Use full height for messages
             
-            # Get messages from LogPaneHandler if available, otherwise use old deque
-            if self._log_pane_handler is not None:
-                # New system: get messages from handler (list of (formatted_message, record) tuples)
-                handler_messages = self._log_pane_handler.get_messages()
-                total_messages = len(handler_messages)
-            else:
-                # Old system: use deque directly (list of (timestamp, source, message) tuples)
-                handler_messages = None
-                total_messages = len(self.log_messages)
+            # Get messages from LogPaneHandler (list of (formatted_message, record) tuples)
+            handler_messages = self._log_pane_handler.get_messages()
+            total_messages = len(handler_messages)
             
             # Reserve space for scrollbar if we have messages
             scrollbar_width = calculate_scrollbar_width(total_messages, display_height)
@@ -551,48 +550,24 @@ class LogManager:
                 start_idx = max(0, total_messages - display_height - self.log_scroll_offset)
                 end_idx = min(total_messages, start_idx + display_height)
                 
-                if handler_messages is not None:
-                    # New system: messages from LogPaneHandler
-                    messages_to_show = handler_messages[start_idx:end_idx]
+                messages_to_show = handler_messages[start_idx:end_idx]
+                
+                for i, (formatted_message, record) in enumerate(messages_to_show):
+                    if i >= display_height:
+                        break
+                        
+                    y = y_start + i
+                    if y >= y_start + height:
+                        break
                     
-                    for i, (formatted_message, record) in enumerate(messages_to_show):
-                        if i >= display_height:
-                            break
-                            
-                        y = y_start + i
-                        if y >= y_start + height:
-                            break
-                        
-                        # Truncate if too long (account for scrollbar)
-                        log_line = formatted_message
-                        if len(log_line) > content_width - 1:
-                            log_line = log_line[:content_width - 2] + "…"
-                        
-                        # Get color from handler based on record
-                        color_pair, attributes = self._log_pane_handler.get_color_for_record(record)
-                        renderer.draw_text(y, 0, log_line.ljust(content_width)[:content_width], color_pair=color_pair, attributes=attributes)
-                else:
-                    # Old system: messages from deque
-                    messages_to_show = list(self.log_messages)[start_idx:end_idx]
+                    # Truncate if too long (account for scrollbar)
+                    log_line = formatted_message
+                    if len(log_line) > content_width - 1:
+                        log_line = log_line[:content_width - 2] + "…"
                     
-                    for i, (timestamp, source, message) in enumerate(messages_to_show):
-                        if i >= display_height:
-                            break
-                            
-                        y = y_start + i
-                        if y >= y_start + height:
-                            break
-                        
-                        # Format log line
-                        log_line = f"{timestamp} [{source:>6}] {message}"
-                        
-                        # Truncate if too long (account for scrollbar)
-                        if len(log_line) > content_width - 1:
-                            log_line = log_line[:content_width - 2] + "…"
-                        
-                        # Get color based on source (old behavior)
-                        color_pair, attributes = get_log_color(source)
-                        renderer.draw_text(y, 0, log_line.ljust(content_width)[:content_width], color_pair=color_pair, attributes=attributes)
+                    # Get color from handler based on record
+                    color_pair, attributes = self._log_pane_handler.get_color_for_record(record)
+                    renderer.draw_text(y, 0, log_line.ljust(content_width)[:content_width], color_pair=color_pair, attributes=attributes)
                 
                 # Draw scrollbar if needed using unified implementation
                 # Use inverted=True because scroll_offset=0 means bottom (newest messages)

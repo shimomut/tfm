@@ -256,8 +256,10 @@ class ExternalProgramManager:
             # In desktop mode, LogCapture was never disconnected
             if not desktop_mode:
                 from tfm_log_manager import LogCapture
-                sys.stdout = LogCapture(self.log_manager.log_messages, "STDOUT")
-                sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
+                sys.stdout = LogCapture("STDOUT", self.log_manager.original_stdout, 
+                                       is_desktop_mode=False, logger=self.log_manager._stream_logger)
+                sys.stderr = LogCapture("STDERR", self.log_manager.original_stderr,
+                                       is_desktop_mode=False, logger=self.log_manager._stream_logger)
             
             # Log return from program execution
             self.logger.info(f"Returned from external program: {program['name']}")
@@ -383,8 +385,10 @@ class ExternalProgramManager:
             
             # Restore stdout/stderr capture  
             from tfm_log_manager import LogCapture
-            sys.stdout = LogCapture(self.log_manager.log_messages, "STDOUT")
-            sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
+            sys.stdout = LogCapture("STDOUT", self.log_manager.original_stdout,
+                                   is_desktop_mode=False, logger=self.log_manager._stream_logger)
+            sys.stderr = LogCapture("STDERR", self.log_manager.original_stderr,
+                                   is_desktop_mode=False, logger=self.log_manager._stream_logger)
             
             # Log return from sub-shell
             self.logger.info("Returned from sub-shell mode")
