@@ -1261,6 +1261,10 @@ static void render_backgrounds(
             CGFloat y = ttk_to_cg_y(row, rows, char_height) + offset_y;
             CGFloat x = static_cast<CGFloat>(col) * char_width + offset_x;
             
+            // Determine cell width based on whether this is a wide character
+            // Wide characters (zenkaku) occupy 2 grid cells
+            CGFloat base_cell_width = cell.is_wide ? (char_width * 2.0f) : char_width;
+            
             // Edge extension optimization: Only check edge cells when padding exists
             // For non-edge cells, use standard dimensions (fast path)
             // For edge cells with padding, calculate extended dimensions (slow path)
@@ -1272,18 +1276,18 @@ static void render_backgrounds(
                 // This matches the PyObjC backend behavior to fill window padding
                 CGFloat cell_x = x;
                 CGFloat cell_y = y;
-                CGFloat cell_width = char_width;
+                CGFloat cell_width = base_cell_width;
                 CGFloat cell_height = char_height;
                 
                 // Extend left edge (leftmost column)
                 if (col == left_col) {
                     cell_x = 0;
-                    cell_width = char_width + offset_x;
+                    cell_width = base_cell_width + offset_x;
                 }
                 
                 // Extend right edge (rightmost column)
                 if (col == right_col) {
-                    cell_width = char_width + offset_x;
+                    cell_width = base_cell_width + offset_x;
                 }
                 
                 // Extend top edge (topmost row)
@@ -1303,7 +1307,7 @@ static void render_backgrounds(
                 batcher.add_cell(cell_x, cell_y, cell_width, cell_height, bg_rgb);
             } else {
                 // Fast path: Interior cell or no padding - use standard dimensions
-                batcher.add_cell(x, y, char_width, char_height, bg_rgb);
+                batcher.add_cell(x, y, base_cell_width, char_height, bg_rgb);
             }
         }
         
