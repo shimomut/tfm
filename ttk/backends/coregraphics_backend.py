@@ -766,9 +766,9 @@ class CoreGraphicsBackend(Renderer):
         """
         Change the font size by the specified delta.
         
-        This method adjusts the font size and recalculates window dimensions
-        to maintain the same character grid size. The window is resized to
-        accommodate the new font size.
+        This method adjusts the font size while keeping the window size constant.
+        The grid dimensions (rows, columns) will adjust to fit more or fewer
+        characters in the same window size.
         
         Args:
             delta: Amount to change font size (positive to increase, negative to decrease)
@@ -779,9 +779,11 @@ class CoreGraphicsBackend(Renderer):
         Example:
             # Increase font size by 1 point
             backend.change_font_size(1)
+            # Window stays same size, grid shows fewer rows/cols
             
             # Decrease font size by 1 point
             backend.change_font_size(-1)
+            # Window stays same size, grid shows more rows/cols
         """
         # Check if window exists
         if self.window is None:
@@ -807,23 +809,39 @@ class CoreGraphicsBackend(Renderer):
             # Note: C++ renderer caches will be automatically reinitialized
             # on the next render_frame() call when it detects font size change
             
-            # Calculate new window dimensions to maintain same grid size
-            window_width = self.cols * self.char_width + (self.WINDOW_PADDING_MULTIPLIER * self.char_height)
-            window_height = self.rows * self.char_height + (self.WINDOW_PADDING_MULTIPLIER * self.char_height)
+            # Get current content view size (keep window size constant)
+            content_rect = self.window.contentView().frame()
+            content_width = int(content_rect.size.width)
+            content_height = int(content_rect.size.height)
             
-            # Get current window frame
-            current_frame = self.window.frame()
+            # Calculate new grid dimensions based on new character size
+            # More characters fit with smaller font, fewer with larger font
+            padding = self.WINDOW_PADDING_MULTIPLIER * self.char_height
+            new_cols = max(1, int((content_width - padding) / self.char_width))
+            new_rows = max(1, int((content_height - padding) / self.char_height))
             
-            # Create new frame with updated size, keeping same origin
-            new_frame = Cocoa.NSMakeRect(
-                current_frame.origin.x,
-                current_frame.origin.y,
-                window_width,
-                window_height
-            )
+            # Update grid dimensions
+            old_rows = self.rows
+            old_cols = self.cols
+            self.rows = new_rows
+            self.cols = new_cols
             
-            # Apply new frame to window
-            self.window.setFrame_display_(new_frame, True)
+            # Resize grid to new dimensions
+            old_grid = self.grid
+            new_grid = [
+                [(' ', 0, 0, False) for _ in range(new_cols)]
+                for _ in range(new_rows)
+            ]
+            
+            # Copy old content to new grid (as much as fits)
+            for row in range(min(old_rows, new_rows)):
+                for col in range(min(old_cols, new_cols)):
+                    new_grid[row][col] = old_grid[row][col]
+            
+            self.grid = new_grid
+            
+            # Set flag to generate resize event so application knows grid changed
+            self.resize_pending = True
             
             # Force view to redraw with new font
             if self.view:

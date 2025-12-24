@@ -27,10 +27,14 @@ TFM's Desktop mode supports dynamic font size adjustment using keyboard shortcut
 When you change the font size:
 
 1. **Font renders immediately** with the new size
-2. **Window resizes automatically** to maintain the same number of rows and columns
-3. **Grid dimensions remain constant** (e.g., 80 columns × 24 rows stays the same)
+2. **Window size stays constant** - no resizing
+3. **Grid dimensions adjust** to fit more/fewer characters:
+   - Larger font → Fewer rows and columns visible
+   - Smaller font → More rows and columns visible
 4. **Log message displays** the new font size in the log pane
 5. **Change persists** for the current session only (not saved to configuration)
+
+This is the standard behavior users expect - the window stays the same size, and you see more or less content depending on the font size.
 
 ## Usage Examples
 
@@ -82,6 +86,8 @@ Increase font size when:
 - Experiencing eye strain with small text
 - Viewing from a distance
 
+Note: With larger font, you'll see fewer files at once, but they'll be easier to read.
+
 ### More Content
 
 Decrease font size when:
@@ -89,6 +95,8 @@ Decrease font size when:
 - Needing to see more files at once
 - Comparing many items side-by-side
 - Working with long filenames
+
+Note: With smaller font, you'll see more files at once in the same window size.
 
 ### Quick Adjustments
 
@@ -125,21 +133,23 @@ DESKTOP_FONT_NAME = ['SF Mono', 'Menlo', 'Monaco']
 
 ## Technical Details
 
-### Window Resizing
+### Window Sizing
 
 When font size changes:
+- Window size remains constant (no resizing)
 - Character width and height are recalculated
-- Window dimensions are adjusted: `width = cols × char_width + padding`
-- Window position remains the same (top-left corner doesn't move)
+- Grid dimensions are recalculated: `cols = window_width / char_width`
+- Grid is resized to new dimensions
 - Content redraws immediately with new font metrics
 
-### Grid Preservation
+### Grid Adjustment
 
-The character grid dimensions (rows and columns) remain constant:
-- File pane layouts stay the same
+The character grid dimensions (rows and columns) adjust to fit the window:
+- Larger font → Fewer characters fit → Smaller grid (e.g., 80×24 → 68×20)
+- Smaller font → More characters fit → Larger grid (e.g., 80×24 → 95×28)
+- File pane layouts adjust automatically
 - Log pane height ratio is preserved
-- Status bar and headers maintain their positions
-- Cursor position remains at the same logical location
+- Cursor position adjusts to stay visible
 
 ### Performance
 
@@ -163,12 +173,12 @@ Font size changes are efficient:
 
 ### Window Too Large/Small
 
-**Problem**: Window becomes too large or too small after adjusting
+**Problem**: After adjusting font size, too few/many files are visible
 
 **Solutions**:
 1. Adjust font size in the opposite direction
-2. Restart TFM to use default font size from configuration
-3. Edit `~/.tfm/config.py` to change `DESKTOP_FONT_SIZE`
+2. Resize the window manually to see more/less content
+3. Restart TFM to use default font size and window size from configuration
 
 ### Font Looks Blurry
 

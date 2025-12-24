@@ -134,7 +134,7 @@ class TestFontSizeAdjustment:
             backend.shutdown()
     
     def test_grid_dimensions_unchanged(self):
-        """Test that grid dimensions remain constant after font size change."""
+        """Test that grid dimensions adjust when font size changes (window size stays constant)."""
         backend = CoreGraphicsBackend(
             window_title="Font Size Test",
             font_size=12,
@@ -149,13 +149,25 @@ class TestFontSizeAdjustment:
             assert initial_rows == 24
             assert initial_cols == 80
             
-            # Change font size
+            # Get initial window size
+            content_rect = backend.window.contentView().frame()
+            initial_width = int(content_rect.size.width)
+            initial_height = int(content_rect.size.height)
+            
+            # Increase font size (characters get bigger)
             backend.change_font_size(4)
             
-            # Verify dimensions unchanged
+            # Verify window size unchanged
+            new_content_rect = backend.window.contentView().frame()
+            new_width = int(new_content_rect.size.width)
+            new_height = int(new_content_rect.size.height)
+            assert new_width == initial_width
+            assert new_height == initial_height
+            
+            # Verify grid dimensions decreased (fewer characters fit)
             new_rows, new_cols = backend.get_dimensions()
-            assert new_rows == initial_rows
-            assert new_cols == initial_cols
+            assert new_rows < initial_rows  # Fewer rows fit
+            assert new_cols < initial_cols  # Fewer columns fit
             
         finally:
             backend.shutdown()
