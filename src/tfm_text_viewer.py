@@ -13,6 +13,8 @@ from typing import List, Tuple, Optional, Dict, Any
 import re
 from ttk import KeyEvent, KeyCode, CharEvent, SystemEvent
 from ttk.renderer import TextAttribute
+from tfm_log_manager import getLogger
+from tfm_log_manager import getLogger
 
 # Try to import pygments for syntax highlighting
 try:
@@ -31,11 +33,15 @@ from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_ui_layer import UILayer
 from tfm_info_dialog import InfoDialog
 
+# Module-level logger for utility functions
+logger = getLogger("TextViewer")
+
 
 class TextViewer(UILayer):
     """Text file viewer with syntax highlighting support"""
     
     def __init__(self, renderer, file_path: Path, layer_stack=None):
+        self.logger = getLogger("TextViewer")
         self.renderer = renderer
         self.file_path = file_path
         self.layer_stack = layer_stack
@@ -238,7 +244,7 @@ class TextViewer(UILayer):
             
         except Exception as e:
             # If highlighting fails, create plain highlighted lines
-            print(f"Warning: Syntax highlighting failed: {e}")
+            self.logger.warning(f"Syntax highlighting failed: {e}")
             self.highlighted_lines = [[(line, COLOR_REGULAR_FILE)] for line in self.lines]
     
     def tokens_to_highlighted_lines(self, tokens) -> List[List[Tuple[str, int]]]:
@@ -566,7 +572,7 @@ class TextViewer(UILayer):
             
             # Ensure we got a tuple of two integers
             if not isinstance(dimensions, tuple) or len(dimensions) != 2:
-                print(f"Warning: get_dimensions() returned unexpected value: {dimensions} (type: {type(dimensions)})")
+                self.logger.warning(f"get_dimensions() returned unexpected value: {dimensions} (type: {type(dimensions)})")
                 # Fallback to reasonable defaults
                 height, width = 24, 80
             else:
@@ -574,7 +580,7 @@ class TextViewer(UILayer):
             
             # Ensure height and width are integers
             if not isinstance(height, int) or not isinstance(width, int):
-                print(f"Warning: get_dimensions() returned non-integer values: height={height} (type: {type(height)}), width={width} (type: {type(width)})")
+                self.logger.warning(f"get_dimensions() returned non-integer values: height={height} (type: {type(height)}), width={width} (type: {type(width)})")
                 height, width = 24, 80
             
             # Reserve space for header (1 line) and status bar (1 line)
@@ -594,7 +600,7 @@ class TextViewer(UILayer):
             return start_y, start_x, display_height, display_width
             
         except Exception as e:
-            print(f"Error in get_display_dimensions: {e}")
+            self.logger.error(f"Error in get_display_dimensions: {e}")
             traceback.print_exc()
             # Return safe defaults based on isearch mode
             if self.isearch_mode:
@@ -1178,16 +1184,16 @@ def is_text_file(file_path: Path) -> bool:
             return False
             
     except FileNotFoundError:
-        print(f"Warning: File not found for text detection: {file_path}")
+        logger.warning(f"File not found for text detection: {file_path}")
         return False
     except PermissionError:
-        print(f"Warning: Permission denied for text detection: {file_path}")
+        logger.warning(f"Permission denied for text detection: {file_path}")
         return False
     except OSError as e:
-        print(f"Warning: Could not read file for text detection {file_path}: {e}")
+        logger.warning(f"Could not read file for text detection {file_path}: {e}")
         return False
     except Exception as e:
-        print(f"Warning: Unexpected error in text file detection: {e}")
+        logger.warning(f"Unexpected error in text file detection: {e}")
         return False
 
 
@@ -1212,9 +1218,9 @@ def create_text_viewer(renderer, file_path: Path, layer_stack=None):
     try:
         return TextViewer(renderer, file_path, layer_stack)
     except (OSError, IOError) as e:
-        print(f"Error: Could not open text file {file_path}: {e}")
+        logger.error(f"Could not open text file {file_path}: {e}")
         return None
     except Exception as e:
-        print(f"Error: Unexpected error creating text viewer for {file_path}: {e}")
+        logger.error(f"Unexpected error creating text viewer for {file_path}: {e}")
         traceback.print_exc()
         return None

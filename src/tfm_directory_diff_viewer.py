@@ -34,6 +34,7 @@ from tfm_diff_viewer import DiffViewer
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_info_dialog import InfoDialog
 from tfm_progress_animator import ProgressAnimatorFactory
+from tfm_log_manager import getLogger
 
 
 class DifferenceType(Enum):
@@ -253,12 +254,12 @@ class DirectoryScanner:
                 
                 except Exception as e:
                     # Log error but continue scanning
-                    print(f"Error scanning {current_path}: {e}", file=__import__('sys').stderr)
+                    self.logger.error(f"Error scanning {current_path}: {e}")
                     continue
         
         except Exception as e:
             # Fatal error scanning root directory
-            print(f"Fatal error scanning {root_path}: {e}", file=__import__('sys').stderr)
+            self.logger.error(f"Fatal error scanning {root_path}: {e}")
             raise
         
         return files
@@ -559,7 +560,7 @@ class DiffEngine:
             self.comparison_errors[error_key] = error_msg
             
             # Log the error
-            print(error_msg, file=__import__('sys').stderr)
+            self.logger.error(error_msg)
             
             # If we can't read the files, consider them different
             return False
@@ -587,6 +588,7 @@ class DirectoryDiffViewer(UILayer):
             layer_stack: Optional UILayerStack for pushing new layers (e.g., DiffViewer)
             file_operations: Optional FileOperations instance for accessing show_hidden setting
         """
+        self.logger = getLogger("DirDiff")
         self.renderer = renderer
         self.left_path = left_path
         self.right_path = right_path
@@ -2047,12 +2049,10 @@ class DirectoryDiffViewer(UILayer):
                 self.scanner_thread.join(timeout=2.0)
                 if self.scanner_thread.is_alive():
                     # Thread didn't stop in time - log warning
-                    print("Warning: Scanner thread did not stop within timeout", 
-                          file=__import__('sys').stderr)
+                    self.logger.warning("Scanner thread did not stop within timeout")
             except Exception as e:
                 # Handle any exceptions during thread join
-                print(f"Error stopping scanner thread: {e}", 
-                      file=__import__('sys').stderr)
+                self.logger.error(f"Error stopping scanner thread: {e}")
         
         # Wait for comparator thread to finish (with timeout)
         if self.comparator_thread and self.comparator_thread.is_alive():
@@ -2060,12 +2060,10 @@ class DirectoryDiffViewer(UILayer):
                 self.comparator_thread.join(timeout=2.0)
                 if self.comparator_thread.is_alive():
                     # Thread didn't stop in time - log warning
-                    print("Warning: Comparator thread did not stop within timeout", 
-                          file=__import__('sys').stderr)
+                    self.logger.warning("Comparator thread did not stop within timeout")
             except Exception as e:
                 # Handle any exceptions during thread join
-                print(f"Error stopping comparator thread: {e}", 
-                      file=__import__('sys').stderr)
+                self.logger.error(f"Error stopping comparator thread: {e}")
         
         # Clean up resources
         # Clear queues to release any blocked threads
@@ -2204,7 +2202,7 @@ class DirectoryDiffViewer(UILayer):
         except (OSError, PermissionError) as e:
             # Cannot read directory contents - this is a fatal error for this directory
             # Log the error but don't raise - caller will handle empty result
-            print(f"Error scanning directory {directory_path}: {e}", file=__import__('sys').stderr)
+            self.logger.error(f"Error scanning directory {directory_path}: {e}")
         
         return files
     
@@ -2528,8 +2526,7 @@ class DirectoryDiffViewer(UILayer):
                         left_children = self._scan_single_level(task.left_path)
                     except Exception as e:
                         # Log error but continue
-                        print(f"Error scanning left path {task.left_path}: {e}", 
-                              file=__import__('sys').stderr)
+                        self.logger.error(f"Error scanning left path {task.left_path}: {e}")
                 
                 # Scan right side
                 if task.right_path:
@@ -2537,8 +2534,7 @@ class DirectoryDiffViewer(UILayer):
                         right_children = self._scan_single_level(task.right_path)
                     except Exception as e:
                         # Log error but continue
-                        print(f"Error scanning right path {task.right_path}: {e}", 
-                              file=__import__('sys').stderr)
+                        self.logger.error(f"Error scanning right path {task.right_path}: {e}")
                 
                 # Update file dictionaries with thread-safe locking
                 with self.data_lock:
@@ -2628,7 +2624,7 @@ class DirectoryDiffViewer(UILayer):
         except Exception as e:
             # Log unexpected errors and set error flag to notify main thread
             error_msg = f"Directory scanner worker error: {e}"
-            print(error_msg, file=__import__('sys').stderr)
+            self.logger.error(error_msg)
             import traceback
             traceback.print_exc()
             
@@ -2680,8 +2676,7 @@ class DirectoryDiffViewer(UILayer):
             
             if not target_node:
                 # Node not found - this shouldn't happen but handle gracefully
-                print(f"Warning: Could not find node for path '{relative_path}'", 
-                      file=__import__('sys').stderr)
+                self.logger.warning(f"Could not find node for path '{relative_path}'")
                 return
             
             # Mark node as scanned
@@ -3156,16 +3151,14 @@ class DirectoryDiffViewer(UILayer):
                 try:
                     left_children = self._scan_single_level(node.left_path)
                 except Exception as e:
-                    print(f"Error scanning left directory {node.left_path}: {e}", 
-                          file=__import__('sys').stderr)
+                    self.logger.error(f"Error scanning left directory {node.left_path}: {e}")
             
             # Scan right directory if it exists
             if node.right_path and node.right_path.is_dir():
                 try:
                     right_children = self._scan_single_level(node.right_path)
                 except Exception as e:
-                    print(f"Error scanning right directory {node.right_path}: {e}", 
-                          file=__import__('sys').stderr)
+                    self.logger.error(f"Error scanning right directory {node.right_path}: {e}")
             
             # Update tree with new children (thread-safe)
             with self.tree_lock:
@@ -3550,8 +3543,7 @@ class DirectoryDiffViewer(UILayer):
                     
                 except Exception as e:
                     # Log error but continue processing other tasks
-                    print(f"Error processing comparison task for {task.relative_path}: {e}", 
-                          file=__import__('sys').stderr)
+                    self.logger.error(f"Error processing comparison task for {task.relative_path}: {e}")
                 
                 finally:
                     # Mark task as done
@@ -3560,7 +3552,7 @@ class DirectoryDiffViewer(UILayer):
             except Exception as e:
                 # Unexpected error in worker loop - log and set error flag
                 error_msg = f"Unexpected error in file comparator worker: {e}"
-                print(error_msg, file=__import__('sys').stderr)
+                self.logger.error(error_msg)
                 
                 # Set error flag to notify main thread
                 self.worker_error = error_msg
@@ -3705,7 +3697,7 @@ class DirectoryDiffViewer(UILayer):
         except Exception as e:
             # Log unexpected errors and set error flag to notify main thread
             error_msg = f"Priority handler worker error: {e}"
-            print(error_msg, file=__import__('sys').stderr)
+            self.logger.error(error_msg)
             import traceback
             traceback.print_exc()
             
@@ -3774,7 +3766,7 @@ class DirectoryDiffViewer(UILayer):
         # Check if layer_stack is available
         if not self.layer_stack:
             # Log warning
-            print("Cannot open file diff: layer_stack not provided to DirectoryDiffViewer", file=__import__('sys').stderr)
+            self.logger.warning("Cannot open file diff: layer_stack not provided to DirectoryDiffViewer")
             return
         
         # Create DiffViewer instance
@@ -3789,4 +3781,4 @@ class DirectoryDiffViewer(UILayer):
             
         except Exception as e:
             # Log error
-            print(f"Error opening file diff viewer: {e}", file=__import__('sys').stderr)
+            self.logger.error(f"Error opening file diff viewer: {e}")

@@ -11,6 +11,7 @@ from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_config import get_favorite_directories, get_programs
 from tfm_input_compat import ensure_input_event
+from tfm_log_manager import getLogger
 
 
 class ListDialog(UILayer, BaseListDialog):
@@ -18,6 +19,7 @@ class ListDialog(UILayer, BaseListDialog):
     
     def __init__(self, config, renderer=None):
         super().__init__(config, renderer)
+        self.logger = getLogger("ListDialog")
         
         # List dialog specific state
         self.title = ""
@@ -322,11 +324,14 @@ class ListDialogHelpers:
             "Yellow passion fruit", "Zucchini"
         ]
         
+        # Create module-level logger for demo
+        demo_logger = getLogger("ListDialog")
+        
         def callback(selected_item):
             if selected_item:
-                print(f"You selected: {selected_item}")
+                demo_logger.info(f"You selected: {selected_item}")
             else:
-                print("Selection cancelled")
+                demo_logger.info("Selection cancelled")
         
         list_dialog.show("Choose a Fruit", sample_items, callback)
     
@@ -450,10 +455,12 @@ class ListDialogHelpers:
                         mtime = item_path.stat().st_mtime if item_path.exists() else 0
                         other_items[name] = {'size': 0, 'mtime': mtime, 'path': item_path, 'is_dir': True}
                 except (OSError, FileNotFoundError) as e:
-                    print(f"Warning: Could not get stats for {item_path}: {e}")
+                    logger = getLogger("ListDialog")
+                    logger.warning(f"Could not get stats for {item_path}: {e}")
                     continue
                 except Exception as e:
-                    print(f"Warning: Unexpected error checking {item_path}: {e}")
+                    logger = getLogger("ListDialog")
+                    logger.warning(f"Unexpected error checking {item_path}: {e}")
                     continue
             
             if not other_items:
@@ -509,10 +516,12 @@ class ListDialogHelpers:
                             matching_items.append(str(item_path))
                             
                     except (OSError, FileNotFoundError) as e:
-                        print(f"Warning: Could not get stats for {item_path}: {e}")
+                        logger = getLogger("ListDialog")
+                        logger.warning(f"Could not get stats for {item_path}: {e}")
                         continue
                     except Exception as e:
-                        print(f"Warning: Unexpected error checking {item_path}: {e}")
+                        logger = getLogger("ListDialog")
+                        logger.warning(f"Unexpected error checking {item_path}: {e}")
                         continue
             
             # Select the matching items

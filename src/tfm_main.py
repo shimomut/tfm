@@ -293,7 +293,7 @@ class FileManager(UILayer):
         except OSError as e:
             # If we can't create the directories, log a warning but don't fail
             # TFM should still work without user directories
-            print(f"Warning: Could not create TFM user directories: {e}", file=sys.stderr)
+            self.logger.warning(f"Warning: Could not create TFM user directories: {e}")
     
     # UILayer interface implementation
     
@@ -350,7 +350,7 @@ class FileManager(UILayer):
             # Handle window close request
             if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
                 # Ignore close event during operations
-                print("Cannot close: file operation in progress")
+                self.logger.error("Cannot close: file operation in progress")
                 return True
             else:
                 # No operations in progress, request close
@@ -680,7 +680,7 @@ class FileManager(UILayer):
         self.refresh_files()
         self.mark_dirty()
         status = "showing" if self.file_operations.show_hidden else "hiding"
-        print(f"Now {status} hidden files")
+        self.logger.info(f"Now {status} hidden files")
         return True
     
     def _action_sort_by(self, sort_type):
@@ -693,14 +693,14 @@ class FileManager(UILayer):
         current_pane['sort_mode'] = sort_type
         self.refresh_files(current_pane)
         self.mark_dirty()
-        print(f"Sorted by {sort_type}")
+        self.logger.info(f"Sorted by {sort_type}")
         return True
     
     def _action_refresh(self):
         """Refresh file list."""
         self.refresh_files()
         self.mark_dirty()
-        print("Refreshed file list")
+        self.logger.info("Refreshed file list")
         return True
     
     def _action_pane_left(self):
@@ -831,7 +831,7 @@ class FileManager(UILayer):
             
         except Exception as e:
             # Any other error, use regular clear
-            print(f"Warning: Screen clear with background failed: {e}")
+            self.logger.error(f"Warning: Screen clear with background failed: {e}")
             self.renderer.clear()
 
     def is_key_for_action(self, event, action):
@@ -897,21 +897,21 @@ class FileManager(UILayer):
         current_pane = self.get_current_pane()
         success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=1)
         if success:
-            print(message)
+            self.logger.info(message)
             
     def toggle_selection_up(self):
         """Toggle selection of current file/directory and move to previous item"""
         current_pane = self.get_current_pane()
         success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=-1)
         if success:
-            print(message)
+            self.logger.info(message)
     
     def toggle_all_files_selection(self):
         """Toggle selection status of all files (not directories) in current pane"""
         current_pane = self.get_current_pane()
         success, message = self.file_operations.toggle_all_files_selection(current_pane)
         if success:
-            print(message)
+            self.logger.info(message)
             self.mark_dirty()
     
     def toggle_all_items_selection(self):
@@ -919,7 +919,7 @@ class FileManager(UILayer):
         current_pane = self.get_current_pane()
         success, message = self.file_operations.toggle_all_items_selection(current_pane)
         if success:
-            print(message)
+            self.logger.info(message)
             self.mark_dirty()
     
     def unselect_all(self):
@@ -927,7 +927,7 @@ class FileManager(UILayer):
         current_pane = self.get_current_pane()
         if current_pane['selected_files']:
             current_pane['selected_files'].clear()
-            print("Unselected all items")
+            self.logger.info("Unselected all items")
             self.mark_dirty()
     
     def select_all(self):
@@ -940,10 +940,10 @@ class FileManager(UILayer):
                 selected_count += 1
         
         if selected_count > 0:
-            print(f"Selected all {len(current_pane['selected_files'])} items")
+            self.logger.info(f"Selected all {len(current_pane['selected_files'])} items")
             self.mark_dirty()
         elif current_pane['selected_files']:
-            print(f"All {len(current_pane['selected_files'])} items already selected")
+            self.logger.info(f"All {len(current_pane['selected_files'])} items already selected")
     
     def sync_current_to_other(self):
         """Change current pane's directory to match the other pane's directory, or sync cursor if already same directory"""
@@ -1144,8 +1144,8 @@ class FileManager(UILayer):
         pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         
         if filter_pattern:
-            print(f"Applied filter '{filter_pattern}' to {pane_name} pane")
-            print(f"Showing {count} items")
+            self.logger.info(f"Applied filter '{filter_pattern}' to {pane_name} pane")
+            self.logger.info(f"Showing {count} items")
         
         self.mark_dirty()
     
@@ -1157,7 +1157,7 @@ class FileManager(UILayer):
             # Log the clear action
             pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
             
-            print(f"Cleared filter from {pane_name} pane")
+            self.logger.info(f"Cleared filter from {pane_name} pane")
             
             self.mark_dirty()
     
@@ -1730,7 +1730,7 @@ class FileManager(UILayer):
                 
                 self.mark_dirty()
             except PermissionError:
-                print("ERROR: Permission denied")
+                self.logger.error("ERROR: Permission denied")
         elif self.archive_operations.is_archive(focused_file):
             # Navigate into archive as virtual directory
             try:
@@ -1801,16 +1801,16 @@ class FileManager(UILayer):
                     self.external_program_manager.resume_curses()
                     
                     if result.returncode == 0:
-                        print(f"Opened file: {focused_file.name}")
+                        self.logger.info(f"Opened file: {focused_file.name}")
                     else:
-                        print(f"Program exited with code {result.returncode}")
+                        self.logger.info(f"Program exited with code {result.returncode}")
                     
                     self.mark_dirty()
                     
                 except Exception as e:
                     # Resume curses even if there's an error
                     self.external_program_manager.resume_curses()
-                    print(f"Error opening file: {e}")
+                    self.logger.error(f"Error opening file: {e}")
                     self.mark_dirty()
             elif is_text_file(focused_file):
                 # Fallback to text viewer for text files without association
@@ -1820,12 +1820,12 @@ class FileManager(UILayer):
                     self.push_layer(viewer)
                     self.renderer.set_cursor_visibility(False)
                     self.mark_dirty()
-                    print(f"Viewing file: {focused_file.name}")
+                    self.logger.info(f"Viewing file: {focused_file.name}")
                 else:
-                    print(f"File: {focused_file.name}")
+                    self.logger.info(f"File: {focused_file.name}")
             else:
                 # For files without association, show file info
-                print(f"File: {focused_file.name}")
+                self.logger.info(f"File: {focused_file.name}")
             
     def find_matches(self, pattern):
         """Find all files matching the fnmatch patterns in current pane
@@ -1910,8 +1910,8 @@ class FileManager(UILayer):
         pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         
         if filter_text:
-            print(f"Applied filter '{filter_text}' to {pane_name} pane")
-            print(f"Showing {count} items")
+            self.logger.info(f"Applied filter '{filter_text}' to {pane_name} pane")
+            self.logger.info(f"Showing {count} items")
         
         self.quick_edit_bar.hide()
         self.mark_dirty()
@@ -1933,9 +1933,9 @@ class FileManager(UILayer):
         # Log the filter action
         pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
         if filter_pattern:
-            print(f"Applied filter '{filter_pattern}' to {pane_name} pane")
+            self.logger.info(f"Applied filter '{filter_pattern}' to {pane_name} pane")
         else:
-            print(f"Cleared filter from {pane_name} pane")
+            self.logger.info(f"Cleared filter from {pane_name} pane")
         
         self.mark_dirty()
     
@@ -1949,7 +1949,7 @@ class FileManager(UILayer):
         
         # Log the clear action
         pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
-        print(f"Cleared filter from {pane_name} pane")
+        self.logger.info(f"Cleared filter from {pane_name} pane")
         
         self.mark_dirty()
     
@@ -1965,7 +1965,7 @@ class FileManager(UILayer):
         
         # Get the current file
         if not current_pane['files']:
-            print("No files to rename")
+            self.logger.info("No files to rename")
             return
             
         focused_file = current_pane['files'][current_pane['focused_index']]
@@ -1975,11 +1975,11 @@ class FileManager(UILayer):
         # Check if this storage implementation supports directory renaming
         try:
             if focused_file.is_dir() and not focused_file.supports_directory_rename():
-                print("Directory renaming is not supported on this storage type due to performance and cost considerations")
+                self.logger.info("Directory renaming is not supported on this storage type due to performance and cost considerations")
                 return
         except Exception as e:
             # Handle any errors gracefully and continue
-            print(f"Warning: Could not check directory rename capability: {e}")
+            self.logger.warning(f"Warning: Could not check directory rename capability: {e}")
         
         # Enter rename mode using general dialog
         self.rename_file_path = focused_file
@@ -1987,12 +1987,12 @@ class FileManager(UILayer):
         self.quick_edit_bar.callback = self.on_rename_confirm
         self.quick_edit_bar.cancel_callback = self.on_rename_cancel
         self.mark_dirty()
-        print(f"Renaming: {focused_file.name}")
+        self.logger.info(f"Renaming: {focused_file.name}")
     
     def on_rename_confirm(self, new_name):
         """Handle rename confirmation"""
         if not self.rename_file_path or not new_name.strip():
-            print("Invalid rename operation")
+            self.logger.error("Invalid rename operation")
             self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.mark_dirty()
@@ -2001,7 +2001,7 @@ class FileManager(UILayer):
         original_name = self.rename_file_path.name
         
         if new_name == original_name:
-            print("Name unchanged")
+            self.logger.info("Name unchanged")
             self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.mark_dirty()
@@ -2013,7 +2013,7 @@ class FileManager(UILayer):
             
             # Check if target already exists
             if new_path.exists():
-                print(f"File '{new_name}' already exists")
+                self.logger.info(f"File '{new_name}' already exists")
                 self.quick_edit_bar.hide()
                 self.rename_file_path = None
                 self.mark_dirty()
@@ -2021,7 +2021,7 @@ class FileManager(UILayer):
             
             # Perform the rename
             self.rename_file_path.rename(new_path)
-            print(f"Renamed '{original_name}' to '{new_name}'")
+            self.logger.info(f"Renamed '{original_name}' to '{new_name}'")
             
             # Refresh the current pane
             current_pane = self.get_current_pane()
@@ -2039,19 +2039,19 @@ class FileManager(UILayer):
             self.mark_dirty()
             
         except PermissionError:
-            print(f"Permission denied: Cannot rename '{original_name}'")
+            self.logger.error(f"Permission denied: Cannot rename '{original_name}'")
             self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.mark_dirty()
         except OSError as e:
-            print(f"Error renaming file: {e}")
+            self.logger.error(f"Error renaming file: {e}")
             self.quick_edit_bar.hide()
             self.rename_file_path = None
             self.mark_dirty()
     
     def on_rename_cancel(self):
         """Handle rename cancellation"""
-        print("Rename cancelled")
+        self.logger.info("Rename cancelled")
         self.quick_edit_bar.hide()
         self.rename_file_path = None
         self.mark_dirty()
@@ -2062,7 +2062,7 @@ class FileManager(UILayer):
         
         # Check if current directory is writable (only for local paths)
         if current_pane['path'].get_scheme() == 'file' and not os.access(current_pane['path'], os.W_OK):
-            print(f"Permission denied: Cannot create directory in {current_pane['path']}")
+            self.logger.error(f"Permission denied: Cannot create directory in {current_pane['path']}")
             return
         
         # Enter create directory mode using general dialog
@@ -2070,12 +2070,12 @@ class FileManager(UILayer):
         self.quick_edit_bar.callback = self.on_create_directory_confirm
         self.quick_edit_bar.cancel_callback = self.on_create_directory_cancel
         self.mark_dirty()
-        print("Creating new directory...")
+        self.logger.info("Creating new directory...")
     
     def on_create_directory_confirm(self, dir_name):
         """Handle create directory confirmation"""
         if not dir_name.strip():
-            print("Invalid directory name")
+            self.logger.error("Invalid directory name")
             self.quick_edit_bar.hide()
             self.mark_dirty()
             return
@@ -2086,7 +2086,7 @@ class FileManager(UILayer):
         
         # Check if directory already exists
         if new_dir_path.exists():
-            print(f"Directory '{new_dir_name}' already exists")
+            self.logger.info(f"Directory '{new_dir_name}' already exists")
             self.quick_edit_bar.hide()
             self.mark_dirty()
             return
@@ -2094,7 +2094,7 @@ class FileManager(UILayer):
         try:
             # Create the directory
             new_dir_path.mkdir(parents=True, exist_ok=False)
-            print(f"Created directory: {new_dir_name}")
+            self.logger.info(f"Created directory: {new_dir_name}")
             
             # Invalidate cache for the new directory
             self.cache_manager.invalidate_cache_for_create_operation(new_dir_path)
@@ -2113,13 +2113,13 @@ class FileManager(UILayer):
             self.mark_dirty()
             
         except OSError as e:
-            print(f"Failed to create directory '{new_dir_name}': {e}")
+            self.logger.error(f"Failed to create directory '{new_dir_name}': {e}")
             self.quick_edit_bar.hide()
             self.mark_dirty()
     
     def on_create_directory_cancel(self):
         """Handle create directory cancellation"""
-        print("Directory creation cancelled")
+        self.logger.info("Directory creation cancelled")
         self.quick_edit_bar.hide()
         self.mark_dirty()
     
@@ -2129,7 +2129,7 @@ class FileManager(UILayer):
         
         # Check if current directory is writable (only for local paths)
         if current_pane['path'].get_scheme() == 'file' and not os.access(current_pane['path'], os.W_OK):
-            print(f"Permission denied: Cannot create file in {current_pane['path']}")
+            self.logger.error(f"Permission denied: Cannot create file in {current_pane['path']}")
             return
         
         # Enter create file mode using general dialog
@@ -2137,12 +2137,12 @@ class FileManager(UILayer):
         self.quick_edit_bar.callback = self.on_create_file_confirm
         self.quick_edit_bar.cancel_callback = self.on_create_file_cancel
         self.mark_dirty()
-        print("Creating new text file...")
+        self.logger.info("Creating new text file...")
     
     def on_create_file_confirm(self, file_name):
         """Handle create file confirmation"""
         if not file_name.strip():
-            print("Invalid file name")
+            self.logger.error("Invalid file name")
             self.quick_edit_bar.hide()
             self.mark_dirty()
             return
@@ -2153,7 +2153,7 @@ class FileManager(UILayer):
         
         # Check if file already exists
         if new_file_path.exists():
-            print(f"File '{new_file_name}' already exists")
+            self.logger.info(f"File '{new_file_name}' already exists")
             self.quick_edit_bar.hide()
             self.mark_dirty()
             return
@@ -2161,7 +2161,7 @@ class FileManager(UILayer):
         try:
             # Create the file
             new_file_path.touch()
-            print(f"Created file: {new_file_name}")
+            self.logger.info(f"Created file: {new_file_name}")
             
             # Invalidate cache for the new file
             self.cache_manager.invalidate_cache_for_create_operation(new_file_path)
@@ -2184,13 +2184,13 @@ class FileManager(UILayer):
             self.mark_dirty()
             
         except OSError as e:
-            print(f"Failed to create file '{new_file_name}': {e}")
+            self.logger.error(f"Failed to create file '{new_file_name}': {e}")
             self.quick_edit_bar.hide()
             self.mark_dirty()
     
     def on_create_file_cancel(self):
         """Handle create file cancellation"""
-        print("File creation cancelled")
+        self.logger.info("File creation cancelled")
         self.quick_edit_bar.hide()
         self.mark_dirty()
 
@@ -2199,7 +2199,7 @@ class FileManager(UILayer):
         current_pane = self.get_current_pane()
         
         if len(current_pane['selected_files']) < 2:
-            print("Select multiple files for batch rename")
+            self.logger.info("Select multiple files for batch rename")
             return
         
         # Get selected files using helper (only files, not directories for safety)
@@ -2210,14 +2210,14 @@ class FileManager(UILayer):
                 selected_files.append(file_path)
         
         if not selected_files:
-            print("No files selected for batch rename")
+            self.logger.info("No files selected for batch rename")
             return
         
         if self.batch_rename_dialog.show(selected_files):
             # Push dialog onto layer stack
             self.push_layer(self.batch_rename_dialog)
             self._force_immediate_redraw()
-            print(f"Batch rename mode: {len(selected_files)} files selected")
+            self.logger.info(f"Batch rename mode: {len(selected_files)} files selected")
     
     def exit_batch_rename_mode(self):
         """Exit batch rename mode - wrapper for batch rename dialog component"""
@@ -2355,7 +2355,7 @@ class FileManager(UILayer):
         """Show favorite directories using the searchable list dialog"""
         # Create a wrapper print function that also triggers redraw
         def print_with_redraw(message):
-            print(message)
+            self.logger.info(message)
             self.mark_dirty()
             
         ListDialogHelpers.show_favorite_directories(
@@ -2430,11 +2430,11 @@ class FileManager(UILayer):
             
             # Check if the path still exists
             if not target_path.exists():
-                print(f"Directory no longer exists: {selected_path}")
+                self.logger.info(f"Directory no longer exists: {selected_path}")
                 return
             
             if not target_path.is_dir():
-                print(f"Path is not a directory: {selected_path}")
+                self.logger.info(f"Path is not a directory: {selected_path}")
                 return
             
             # Get current pane and save cursor position before navigating
@@ -2463,14 +2463,14 @@ class FileManager(UILayer):
             pane_name = "left" if current_pane is self.pane_manager.left_pane else "right"
             if restored and current_pane['files']:
                 focused_file = current_pane['files'][current_pane['focused_index']].name
-                print(f"Navigated {pane_name} pane: {old_path} → {target_path} (cursor: {focused_file})")
+                self.logger.info(f"Navigated {pane_name} pane: {old_path} → {target_path} (cursor: {focused_file})")
             else:
-                print(f"Navigated {pane_name} pane: {old_path} → {target_path}")
+                self.logger.info(f"Navigated {pane_name} pane: {old_path} → {target_path}")
             
             self.mark_dirty()
             
         except Exception as e:
-            print(f"Error navigating to {selected_path}: {e}")
+            self.logger.error(f"Error navigating to {selected_path}: {e}")
     
     def show_programs_dialog(self):
         """Show external programs using the searchable list dialog"""
@@ -2495,7 +2495,7 @@ class FileManager(UILayer):
         
         # Create a wrapper print function that also triggers redraw
         def print_with_redraw(message):
-            print(message)
+            self.logger.info(message)
             self.mark_dirty()
         
         ListDialogHelpers.show_compare_selection(
@@ -2522,14 +2522,14 @@ class FileManager(UILayer):
                 self.pane_manager.left_pane['scroll_offset'] = 0
                 self.pane_manager.right_pane['focused_index'] = 0
                 self.pane_manager.right_pane['scroll_offset'] = 0
-                print(f"Hidden files: {'shown' if new_state else 'hidden'}")
+                self.logger.info(f"Hidden files: {'shown' if new_state else 'hidden'}")
                 self.mark_dirty()
                 
             elif option == "Toggle color scheme (dark/light)":
                 from tfm_colors import toggle_color_scheme, init_colors
                 new_scheme = toggle_color_scheme()
                 init_colors(self.renderer, new_scheme)
-                print(f"Switched to {new_scheme} color scheme")
+                self.logger.info(f"Switched to {new_scheme} color scheme")
                 self.print_color_scheme_info()
                 # Clear screen to apply new background color immediately
                 self.clear_screen_with_background()
@@ -2542,7 +2542,7 @@ class FileManager(UILayer):
                 color_scheme = get_current_color_scheme()
                 init_colors(self.renderer, color_scheme)
                 status = "enabled" if new_state else "disabled"
-                print(f"Fallback color mode: {status}")
+                self.logger.info(f"Fallback color mode: {status}")
                 # Clear screen to apply new background color immediately
                 self.clear_screen_with_background()
                 self.mark_dirty()
@@ -2561,7 +2561,7 @@ class FileManager(UILayer):
                 
                 # Update config
                 self.config.DATE_FORMAT = new_format
-                print(f"Date format: {format_name}")
+                self.logger.info(f"Date format: {format_name}")
                 self.mark_dirty()
         
         # Define the view options
@@ -2590,8 +2590,8 @@ class FileManager(UILayer):
                 
                 # Check if config file exists
                 if not os.path.exists(config_path):
-                    print(f"Config file not found: {config_path}")
-                    print("TFM should have created this file automatically on startup.")
+                    self.logger.info(f"Config file not found: {config_path}")
+                    self.logger.info("TFM should have created this file automatically on startup.")
                     return
                 
                 # Try to open the config file with the configured text editor
@@ -2610,22 +2610,22 @@ class FileManager(UILayer):
                     self.external_program_manager.resume_curses()
                     
                     if result.returncode == 0:
-                        print(f"Edited config file: {config_path}")
+                        self.logger.info(f"Edited config file: {config_path}")
                     else:
-                        print(f"Editor exited with code {result.returncode}")
+                        self.logger.info(f"Editor exited with code {result.returncode}")
                     
                     self.mark_dirty()
                     
                 except FileNotFoundError:
                     # Resume curses even if editor not found
                     self.external_program_manager.resume_curses()
-                    print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
-                    print("You can manually edit the file at: " + config_path)
+                    self.logger.error(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
+                    self.logger.info("You can manually edit the file at: " + config_path)
                 except Exception as e:
                     # Resume curses even if there's an error
                     self.external_program_manager.resume_curses()
-                    print(f"Error opening config file: {e}")
-                    print("You can manually edit the file at: " + config_path)
+                    self.logger.error(f"Error opening config file: {e}")
+                    self.logger.info("You can manually edit the file at: " + config_path)
                 
             elif option == "Reload config.py":
                 try:
@@ -2643,31 +2643,31 @@ class FileManager(UILayer):
                     if hasattr(self.config, 'COLOR_SCHEME'):
                         from tfm_colors import init_colors
                         init_colors(self.renderer, self.config.COLOR_SCHEME)
-                        print(f"Applied color scheme: {self.config.COLOR_SCHEME}")
+                        self.logger.info(f"Applied color scheme: {self.config.COLOR_SCHEME}")
                     
                     if hasattr(self.config, 'SHOW_HIDDEN_FILES'):
                         self.file_operations.show_hidden = self.config.SHOW_HIDDEN_FILES
-                        print(f"Hidden files setting: {'shown' if self.config.SHOW_HIDDEN_FILES else 'hidden'}")
+                        self.logger.info(f"Hidden files setting: {'shown' if self.config.SHOW_HIDDEN_FILES else 'hidden'}")
                     
                     if hasattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO'):
                         self.log_height_ratio = self.config.DEFAULT_LOG_HEIGHT_RATIO
-                        print(f"Log height ratio: {self.config.DEFAULT_LOG_HEIGHT_RATIO}")
+                        self.logger.info(f"Log height ratio: {self.config.DEFAULT_LOG_HEIGHT_RATIO}")
                     
-                    print("Configuration reloaded successfully")
+                    self.logger.info("Configuration reloaded successfully")
                     self.mark_dirty()
                     
                 except Exception as e:
-                    print(f"Error reloading configuration: {e}")
-                    print("Please check your config file for syntax errors")
+                    self.logger.error(f"Error reloading configuration: {e}")
+                    self.logger.error("Please check your config file for syntax errors")
                 
             elif option == "Report issues":
                 try:
                     # Open the GitHub issues page
                     webbrowser.open("https://github.com/shimomut/tfm/issues")
-                    print("Opened GitHub issues page in your default browser")
+                    self.logger.info("Opened GitHub issues page in your default browser")
                 except Exception as e:
-                    print(f"Error opening browser: {e}")
-                    print("Please visit: https://github.com/shimomut/tfm/issues")
+                    self.logger.error(f"Error opening browser: {e}")
+                    self.logger.error("Please visit: https://github.com/shimomut/tfm/issues")
         
         # Define the settings options
         options = [
@@ -2700,18 +2700,18 @@ class FileManager(UILayer):
         
         def handle_sort_choice(sort_type):
             if sort_type is None:
-                print("Sort cancelled")
+                self.logger.info("Sort cancelled")
                 return
                 
             if sort_type == "reverse":
                 # Toggle reverse order
                 current_pane['sort_reverse'] = not current_pane['sort_reverse']
                 reverse_status = "enabled" if current_pane['sort_reverse'] else "disabled"
-                print(f"Reverse sorting {reverse_status}")
+                self.logger.info(f"Reverse sorting {reverse_status}")
             elif sort_type in ["name", "ext", "size", "date"]:
                 # Set new sort mode
                 current_pane['sort_mode'] = sort_type
-                print(f"Sorting by {sort_type}")
+                self.logger.info(f"Sorting by {sort_type}")
             
             # Refresh the file list after sorting
             self.refresh_files(current_pane)
@@ -2732,11 +2732,11 @@ class FileManager(UILayer):
             # Toggle reverse mode
             current_pane['sort_reverse'] = not current_pane['sort_reverse']
             reverse_status = "reverse" if current_pane['sort_reverse'] else "normal"
-            print(f"Toggled {pane_name} pane to {sort_mode} sorting ({reverse_status})")
+            self.logger.info(f"Toggled {pane_name} pane to {sort_mode} sorting ({reverse_status})")
         else:
             # Change to new sort mode (keep current reverse setting)
             current_pane['sort_mode'] = sort_mode
-            print(f"Sorted {pane_name} pane by {sort_mode}")
+            self.logger.info(f"Sorted {pane_name} pane by {sort_mode}")
         
         # Refresh the file list
         self.refresh_files(current_pane)
@@ -2747,7 +2747,7 @@ class FileManager(UILayer):
         current_pane = self.get_current_pane()
         
         if not current_pane['files']:
-            print("No files to show details for")
+            self.logger.info("No files to show details for")
             return
         
         # Determine which files to show details for
@@ -2761,7 +2761,7 @@ class FileManager(UILayer):
                     if file_path.exists():
                         files_to_show.append(file_path)
                 except (OSError, ValueError) as e:
-                    print(f"Warning: Could not process selected file path '{file_path_str}': {e}")
+                    self.logger.warning(f"Warning: Could not process selected file path '{file_path_str}': {e}")
                     continue
         else:
             # Show details for current cursor position
@@ -2769,7 +2769,7 @@ class FileManager(UILayer):
             files_to_show.append(current_file)
         
         if not files_to_show:
-            print("No valid files to show details for")
+            self.logger.info("No valid files to show details for")
             return
         
         # Use the helper method to show file details
@@ -2787,9 +2787,9 @@ class FileManager(UILayer):
         available_schemes = get_available_color_schemes()
         fallback_mode = is_fallback_mode()
         
-        print(f"Color scheme: {current_scheme}")
-        print(f"Available schemes: {', '.join(available_schemes)}")
-        print(f"Fallback mode: {'enabled' if fallback_mode else 'disabled'}")
+        self.logger.info(f"Color scheme: {current_scheme}")
+        self.logger.info(f"Available schemes: {', '.join(available_schemes)}")
+        self.logger.info(f"Fallback mode: {'enabled' if fallback_mode else 'disabled'}")
         
         # Get current scheme colors for key elements
         rgb_colors = get_current_rgb_colors()
@@ -2798,7 +2798,7 @@ class FileManager(UILayer):
         for color_name in key_colors:
             if color_name in rgb_colors:
                 rgb = rgb_colors[color_name]['rgb']
-                print(f"  {color_name}: RGB{rgb}")
+                self.logger.info(f"  {color_name}: RGB{rgb}")
     
     def toggle_fallback_color_mode(self):
         """Toggle fallback color mode on/off"""
@@ -2813,7 +2813,7 @@ class FileManager(UILayer):
         
         # Log the change
         mode_text = "enabled" if fallback_enabled else "disabled"
-        print(f"Fallback color mode {mode_text}")
+        self.logger.info(f"Fallback color mode {mode_text}")
         
         # Print detailed color scheme info to log
         self.print_color_scheme_info()
@@ -2834,13 +2834,13 @@ class FileManager(UILayer):
         current_pane = self.get_current_pane()
         
         if not current_pane['files']:
-            print("No files to view")
+            self.logger.info("No files to view")
             return
         
         focused_file = current_pane['files'][current_pane['focused_index']]
         
         if focused_file.is_dir():
-            print("Cannot view directory")
+            self.logger.error("Cannot view directory")
             return
         
         # Try to use file association for 'view' action
@@ -2861,16 +2861,16 @@ class FileManager(UILayer):
                 self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
-                    print(f"Viewed file: {focused_file.name}")
+                    self.logger.info(f"Viewed file: {focused_file.name}")
                 else:
-                    print(f"Viewer exited with code {result.returncode}")
+                    self.logger.info(f"Viewer exited with code {result.returncode}")
                 
                 self.mark_dirty()
                 
             except Exception as e:
                 # Resume curses even if there's an error
                 self.external_program_manager.resume_curses()
-                print(f"Error viewing file: {e}")
+                self.logger.error(f"Error viewing file: {e}")
                 self.mark_dirty()
         else:
             # No file association found - check if it's a text file
@@ -2883,16 +2883,16 @@ class FileManager(UILayer):
                         self.push_layer(viewer)
                         self.renderer.set_cursor_visibility(False)
                         self.mark_dirty()
-                        print(f"Viewing text file: {focused_file.name}")
+                        self.logger.info(f"Viewing text file: {focused_file.name}")
                     else:
-                        print(f"Failed to view file: {focused_file.name}")
+                        self.logger.error(f"Failed to view file: {focused_file.name}")
                     
                 except Exception as e:
-                    print(f"Error viewing file: {str(e)}")
+                    self.logger.error(f"Error viewing file: {str(e)}")
                     self.mark_dirty()
             else:
                 # Not a text file and no viewer configured
-                print(f"No viewer configured for '{focused_file.name}' (not a text file)")
+                self.logger.info(f"No viewer configured for '{focused_file.name}' (not a text file)")
     
     def diff_selected_files(self):
         """View diff between two selected text files"""
@@ -2909,24 +2909,24 @@ class FileManager(UILayer):
         # Check if exactly 2 files are selected
         if len(selected_files) != 2:
             if len(all_selected) == 0:
-                print("No files selected. Select exactly 2 text files to compare.")
+                self.logger.info("No files selected. Select exactly 2 text files to compare.")
             elif len(all_selected) == 1:
-                print("Only 1 file selected. Select exactly 2 text files to compare.")
+                self.logger.info("Only 1 file selected. Select exactly 2 text files to compare.")
             elif len(selected_files) < len(all_selected):
-                print(f"Selected items include directories. Select exactly 2 text files to compare.")
+                self.logger.info(f"Selected items include directories. Select exactly 2 text files to compare.")
             else:
-                print(f"Selected {len(selected_files)} files. Select exactly 2 text files to compare.")
+                self.logger.info(f"Selected {len(selected_files)} files. Select exactly 2 text files to compare.")
             return
         
         file1, file2 = selected_files[0], selected_files[1]
         
         # Check if both are text files
         if not is_text_file(file1):
-            print(f"'{file1.name}' is not a text file")
+            self.logger.info(f"'{file1.name}' is not a text file")
             return
         
         if not is_text_file(file2):
-            print(f"'{file2.name}' is not a text file")
+            self.logger.info(f"'{file2.name}' is not a text file")
             return
         
         # Launch diff viewer
@@ -2937,15 +2937,15 @@ class FileManager(UILayer):
                 self.push_layer(viewer)
                 self.renderer.set_cursor_visibility(False)
                 self.mark_dirty()
-                print(f"Comparing: {file1.name} <-> {file2.name}")
+                self.logger.info(f"Comparing: {file1.name} <-> {file2.name}")
             else:
-                print(f"Failed to compare files")
+                self.logger.error(f"Failed to compare files")
         except Exception as e:
-            print(f"Error creating diff viewer: {e}")
+            self.logger.error(f"Error creating diff viewer: {e}")
             self.mark_dirty()
             
         except Exception as e:
-            print(f"Error viewing diff: {e}")
+            self.logger.error(f"Error viewing diff: {e}")
             self.mark_dirty()
     
     def show_directory_diff(self):
@@ -2956,19 +2956,19 @@ class FileManager(UILayer):
         
         # Validate that both paths are directories
         if not left_path.exists():
-            print(f"Left pane path does not exist: {left_path}")
+            self.logger.info(f"Left pane path does not exist: {left_path}")
             return
         
         if not right_path.exists():
-            print(f"Right pane path does not exist: {right_path}")
+            self.logger.info(f"Right pane path does not exist: {right_path}")
             return
         
         if not left_path.is_dir():
-            print(f"Left pane path is not a directory: {left_path}")
+            self.logger.info(f"Left pane path is not a directory: {left_path}")
             return
         
         if not right_path.is_dir():
-            print(f"Right pane path is not a directory: {right_path}")
+            self.logger.info(f"Right pane path is not a directory: {right_path}")
             return
         
         # Create and launch directory diff viewer
@@ -2979,11 +2979,11 @@ class FileManager(UILayer):
                 self.push_layer(viewer)
                 self.renderer.set_cursor_visibility(False)
                 self.mark_dirty()
-                print(f"Comparing directories: {left_path} <-> {right_path}")
+                self.logger.info(f"Comparing directories: {left_path} <-> {right_path}")
             else:
-                print(f"Failed to create directory diff viewer")
+                self.logger.error(f"Failed to create directory diff viewer")
         except Exception as e:
-            print(f"Error creating directory diff viewer: {e}")
+            self.logger.error(f"Error creating directory diff viewer: {e}")
             self.mark_dirty()
     
     def edit_selected_file(self):
@@ -2991,19 +2991,19 @@ class FileManager(UILayer):
         current_pane = self.get_current_pane()
         
         if not current_pane['files']:
-            print("No files in current directory")
+            self.logger.info("No files in current directory")
             return
             
         focused_file = current_pane['files'][current_pane['focused_index']]
         
         # Check if file editing is supported for this storage type
         if not focused_file.supports_file_editing():
-            print("Editing S3 files is not supported for now")
+            self.logger.info("Editing S3 files is not supported for now")
             return
         
         # Allow editing directories (some editors can handle them)
         if focused_file.is_dir():
-            print(f"Warning: '{focused_file.name}' is a directory")
+            self.logger.warning(f"Warning: '{focused_file.name}' is a directory")
         
         # Try to use file association for 'edit' action
         filename = focused_file.name
@@ -3023,18 +3023,18 @@ class FileManager(UILayer):
                 self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
-                    print(f"Edited file: {focused_file.name}")
+                    self.logger.info(f"Edited file: {focused_file.name}")
                 else:
-                    print(f"Editor exited with code {result.returncode}")
+                    self.logger.info(f"Editor exited with code {result.returncode}")
                     
             except FileNotFoundError:
                 # Resume curses even if editor not found
                 self.external_program_manager.resume_curses()
-                print(f"Editor not found. Please check your file associations configuration.")
+                self.logger.error(f"Editor not found. Please check your file associations configuration.")
             except Exception as e:
                 # Resume curses even if there's an error
                 self.external_program_manager.resume_curses()
-                print(f"Error launching editor: {e}")
+                self.logger.error(f"Error launching editor: {e}")
         else:
             # Fallback to TEXT_EDITOR config for files without association
             editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
@@ -3051,18 +3051,18 @@ class FileManager(UILayer):
                 self.external_program_manager.resume_curses()
                 
                 if result.returncode == 0:
-                    print(f"Edited file: {focused_file.name}")
+                    self.logger.info(f"Edited file: {focused_file.name}")
                 else:
-                    print(f"Editor exited with code {result.returncode}")
+                    self.logger.info(f"Editor exited with code {result.returncode}")
                     
             except FileNotFoundError:
                 # Resume curses even if editor not found
                 self.external_program_manager.resume_curses()
-                print(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
+                self.logger.error(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
             except Exception as e:
                 # Resume curses even if there's an error
                 self.external_program_manager.resume_curses()
-                print(f"Error launching editor: {e}")
+                self.logger.error(f"Error launching editor: {e}")
     
     def copy_selected_files(self):
         """Copy selected files to the opposite pane's directory - delegated to FileOperationsUI"""
@@ -3120,7 +3120,7 @@ class FileManager(UILayer):
     # Legacy method - no longer used with new UI approach
     def perform_create_archive(self):
         """Create the archive file - legacy method, functionality moved to ArchiveUI"""
-        print("Legacy archive creation method called - this should not happen")
+        self.logger.info("Legacy archive creation method called - this should not happen")
         pass
     
     def _progress_callback(self, progress_data):
@@ -3131,7 +3131,7 @@ class FileManager(UILayer):
             self.draw_status()
             self.mark_dirty()
         except Exception as e:
-            print(f"Warning: Progress callback display update failed: {e}")
+            self.logger.error(f"Warning: Progress callback display update failed: {e}")
     
     def _count_files_recursively(self, paths):
         """Count total number of individual files in the given paths (including files in directories)"""
@@ -3161,12 +3161,12 @@ class FileManager(UILayer):
     # Legacy methods - functionality moved to ArchiveOperations class
     def create_zip_archive(self, archive_path, files_to_archive):
         """Create a ZIP archive - legacy method, functionality moved to ArchiveOperations"""
-        print("Legacy ZIP creation method called - this should not happen")
+        self.logger.info("Legacy ZIP creation method called - this should not happen")
         pass
     
     def create_tar_archive(self, archive_path, files_to_archive):
         """Create a TAR.GZ archive - legacy method, functionality moved to ArchiveOperations"""
-        print("Legacy TAR creation method called - this should not happen")
+        self.logger.info("Legacy TAR creation method called - this should not happen")
         pass
     
     def extract_selected_archive(self):
@@ -3181,17 +3181,17 @@ class FileManager(UILayer):
     # Legacy extraction methods - functionality moved to ArchiveUI and ArchiveOperations
     def perform_extraction(self, archive_file, extract_dir, archive_format, other_pane):
         """Perform extraction - legacy method, functionality moved to ArchiveUI"""
-        print("Legacy extraction method called - this should not happen")
+        self.logger.info("Legacy extraction method called - this should not happen")
         pass
     
     def extract_zip_archive(self, archive_file, extract_dir):
         """Extract ZIP archive - legacy method, functionality moved to ArchiveOperations"""
-        print("Legacy ZIP extraction method called - this should not happen")
+        self.logger.info("Legacy ZIP extraction method called - this should not happen")
         pass
     
     def extract_tar_archive(self, archive_file, extract_dir):
         """Extract TAR archive - legacy method, functionality moved to ArchiveOperations"""
-        print("Legacy TAR extraction method called - this should not happen")
+        self.logger.info("Legacy TAR extraction method called - this should not happen")
         pass
         
     def handle_isearch_input(self, event):
@@ -3369,7 +3369,7 @@ class FileManager(UILayer):
                     current_pane['scroll_offset'] = 0
                 
                 self.mark_dirty()
-                print(f"Jumped to: {target_path}")
+                self.logger.info(f"Jumped to: {target_path}")
                 
             except Exception as e:
                 self.logger.error(f"Failed to jump to path: {e}")
@@ -3405,7 +3405,7 @@ class FileManager(UILayer):
                     # Validate the path exists and is accessible (for local drives)
                     if drive_entry.drive_type == 'local':
                         if not drive_path.exists() or not drive_path.is_dir():
-                            print(f"Error: Drive path no longer exists or is not accessible: {drive_entry.path}")
+                            self.logger.error(f"Error: Drive path no longer exists or is not accessible: {drive_entry.path}")
                             self.mark_dirty()
                             return
                     
@@ -3420,15 +3420,15 @@ class FileManager(UILayer):
                     self.pane_manager.refresh_files(current_pane)
                     
                     pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
-                    print(f"Switched to {drive_entry.name}: {drive_entry.path}")
+                    self.logger.info(f"Switched to {drive_entry.name}: {drive_entry.path}")
                     self.mark_dirty()
                     
                 except Exception as e:
-                    print(f"Error: Failed to navigate to drive: {e}")
+                    self.logger.error(f"Error: Failed to navigate to drive: {e}")
                     self.mark_dirty()
             else:
                 # Cancelled or no selection
-                print("Drive selection cancelled")
+                self.logger.info("Drive selection cancelled")
                 self.mark_dirty()
         
         self.drives_dialog.show(drive_callback)
@@ -3525,7 +3525,7 @@ class FileManager(UILayer):
             new_scheme = toggle_color_scheme()
             # Reinitialize colors with the new scheme
             init_colors(self.renderer, new_scheme)
-            print(f"Switched to {new_scheme} color scheme")
+            self.logger.info(f"Switched to {new_scheme} color scheme")
             # Print detailed color scheme info to log
             self.print_color_scheme_info()
             # Clear screen to apply new background color immediately
@@ -3810,12 +3810,12 @@ class FileManager(UILayer):
         elif self.is_key_for_action(event, 'reset_log_height'):  # Reset log pane height
             self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
             self.mark_dirty()
-            print(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
+            self.logger.info(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
             return True
         elif event.key_code == ord('-'):  # '-' key - reset pane ratio to 50/50
             self.pane_manager.left_pane_ratio = 0.5
             self.mark_dirty()
-            print("Pane split reset to 50% | 50%")
+            self.logger.info("Pane split reset to 50% | 50%")
             return True
         elif self.is_key_for_action(event, 'subshell'):  # Sub-shell mode
             self.external_program_manager.enter_subshell_mode(
@@ -3893,7 +3893,7 @@ class FileManager(UILayer):
             if layout:
                 self.pane_manager.left_pane_ratio = layout.get('left_pane_ratio', 0.5)
                 self.log_height_ratio = layout.get('log_height_ratio', 0.25)
-                print(f"Restored window layout: panes {int(self.pane_manager.left_pane_ratio*100)}%/{int((1-self.pane_manager.left_pane_ratio)*100)}%, log {int(self.log_height_ratio*100)}%")
+                self.logger.info(f"Restored window layout: panes {int(self.pane_manager.left_pane_ratio*100)}%/{int((1-self.pane_manager.left_pane_ratio)*100)}%, log {int(self.log_height_ratio*100)}%")
             
             # Load pane states
             left_state = self.state_manager.load_pane_state('left')
@@ -3903,14 +3903,14 @@ class FileManager(UILayer):
                 self.pane_manager.left_pane['sort_mode'] = left_state.get('sort_mode', 'name')
                 self.pane_manager.left_pane['sort_reverse'] = left_state.get('sort_reverse', False)
                 self.pane_manager.left_pane['filter_pattern'] = left_state.get('filter_pattern', '')
-                print(f"Restored left pane: {left_state['path']}")
+                self.logger.info(f"Restored left pane: {left_state['path']}")
             elif self.cmdline_left_dir_provided:
                 # Load other settings but keep command line directory
                 if left_state:
                     self.pane_manager.left_pane['sort_mode'] = left_state.get('sort_mode', 'name')
                     self.pane_manager.left_pane['sort_reverse'] = left_state.get('sort_reverse', False)
                     self.pane_manager.left_pane['filter_pattern'] = left_state.get('filter_pattern', '')
-                print(f"Using command line left directory: {self.pane_manager.left_pane['path']}")
+                self.logger.info(f"Using command line left directory: {self.pane_manager.left_pane['path']}")
             
             right_state = self.state_manager.load_pane_state('right')
             if right_state and Path(right_state['path']).exists() and not self.cmdline_right_dir_provided:
@@ -3919,14 +3919,14 @@ class FileManager(UILayer):
                 self.pane_manager.right_pane['sort_mode'] = right_state.get('sort_mode', 'name')
                 self.pane_manager.right_pane['sort_reverse'] = right_state.get('sort_reverse', False)
                 self.pane_manager.right_pane['filter_pattern'] = right_state.get('filter_pattern', '')
-                print(f"Restored right pane: {right_state['path']}")
+                self.logger.info(f"Restored right pane: {right_state['path']}")
             elif self.cmdline_right_dir_provided:
                 # Load other settings but keep command line directory
                 if right_state:
                     self.pane_manager.right_pane['sort_mode'] = right_state.get('sort_mode', 'name')
                     self.pane_manager.right_pane['sort_reverse'] = right_state.get('sort_reverse', False)
                     self.pane_manager.right_pane['filter_pattern'] = right_state.get('filter_pattern', '')
-                print(f"Using command line right directory: {self.pane_manager.right_pane['path']}")
+                self.logger.info(f"Using command line right directory: {self.pane_manager.right_pane['path']}")
             
             # Refresh file lists after loading state
             self.refresh_files()
@@ -3935,7 +3935,7 @@ class FileManager(UILayer):
             self.restore_startup_cursor_positions()
             
         except Exception as e:
-            print(f"Warning: Could not load application state: {e}")
+            self.logger.warning(f"Warning: Could not load application state: {e}")
     
     def restore_startup_cursor_positions(self):
         """Restore cursor positions for both panes during startup."""
@@ -3952,7 +3952,7 @@ class FileManager(UILayer):
                 left_path = self.pane_manager.left_pane['path']
                 if self.pane_manager.left_pane['files']:
                     selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['focused_index']].name
-                    print(f"Restored left pane cursor: {left_path} -> {selected_file}")
+                    self.logger.info(f"Restored left pane cursor: {left_path} -> {selected_file}")
             
             # Restore right pane cursor position
             right_restored = self.pane_manager.restore_cursor_position(self.pane_manager.right_pane, display_height)
@@ -3960,14 +3960,14 @@ class FileManager(UILayer):
                 right_path = self.pane_manager.right_pane['path']
                 if self.pane_manager.right_pane['files']:
                     selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['focused_index']].name
-                    print(f"Restored right pane cursor: {right_path} -> {selected_file}")
+                    self.logger.info(f"Restored right pane cursor: {right_path} -> {selected_file}")
             
             # If either cursor was restored, trigger a redraw
             if left_restored or right_restored:
                 self.mark_dirty()
                 
         except Exception as e:
-            print(f"Warning: Could not restore startup cursor positions: {e}")
+            self.logger.warning(f"Warning: Could not restore startup cursor positions: {e}")
     
     def save_application_state(self):
         """Save current application state to persistent storage."""
@@ -3996,10 +3996,10 @@ class FileManager(UILayer):
             # Clean up session
             self.state_manager.cleanup_session()
             
-            print("Application state saved")
+            self.logger.info("Application state saved")
             
         except Exception as e:
-            print(f"Warning: Could not save application state: {e}")
+            self.logger.warning(f"Warning: Could not save application state: {e}")
     
     def save_quit_cursor_positions(self):
         """Save current cursor positions when quitting TFM."""
@@ -4012,7 +4012,7 @@ class FileManager(UILayer):
                 
                 left_path = self.pane_manager.left_pane['path']
                 selected_file = self.pane_manager.left_pane['files'][self.pane_manager.left_pane['focused_index']].name
-                print(f"Saved left pane cursor position: {left_path} -> {selected_file}")
+                self.logger.info(f"Saved left pane cursor position: {left_path} -> {selected_file}")
             
             # Save right pane cursor position
             if (self.pane_manager.right_pane['files'] and 
@@ -4022,17 +4022,17 @@ class FileManager(UILayer):
                 
                 right_path = self.pane_manager.right_pane['path']
                 selected_file = self.pane_manager.right_pane['files'][self.pane_manager.right_pane['focused_index']].name
-                print(f"Saved right pane cursor position: {right_path} -> {selected_file}")
+                self.logger.info(f"Saved right pane cursor position: {right_path} -> {selected_file}")
                 
         except Exception as e:
-            print(f"Warning: Could not save cursor positions on quit: {e}")
+            self.logger.warning(f"Warning: Could not save cursor positions on quit: {e}")
     
     def get_recent_directories(self):
         """Get list of recent directories for quick navigation."""
         try:
             return self.state_manager.load_recent_directories()
         except Exception as e:
-            print(f"Warning: Could not load recent directories: {e}")
+            self.logger.warning(f"Warning: Could not load recent directories: {e}")
             return []
     
     def add_search_to_history(self, search_term):
@@ -4040,14 +4040,14 @@ class FileManager(UILayer):
         try:
             self.state_manager.add_search_term(search_term)
         except Exception as e:
-            print(f"Warning: Could not save search term: {e}")
+            self.logger.warning(f"Warning: Could not save search term: {e}")
     
     def get_search_history(self):
         """Get search history for auto-completion."""
         try:
             return self.state_manager.load_search_history()
         except Exception as e:
-            print(f"Warning: Could not load search history: {e}")
+            self.logger.warning(f"Warning: Could not load search history: {e}")
             return []
 
 def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None):
@@ -4066,9 +4066,9 @@ def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profilin
             fm.restore_stdio()
         
         # Print error information to help with debugging
-        print(f"\nTFM encountered an unexpected error:", file=sys.stderr)
-        print(f"Error: {type(e).__name__}: {e}", file=sys.stderr)
-        print("\nFull traceback:", file=sys.stderr)
+        self.logger.error(f"\nTFM encountered an unexpected error:")
+        self.logger.error(f"Error: {type(e).__name__}: {e}")
+        self.logger.info("\nFull traceback:")
         traceback.print_exc()
         
         # Re-raise the exception so it can be seen after TFM exits
@@ -4179,7 +4179,7 @@ def cli_main():
         # Store debug mode in environment for access by other modules
         if args.debug:
             os.environ['TFM_DEBUG'] = '1'
-            print("Debug mode enabled - full stack traces will be shown for uncaught exceptions", file=sys.stderr)
+            self.logger.error("Debug mode enabled - full stack traces will be shown for uncaught exceptions")
         
         # Parse profiling targets
         profile_targets = set()
@@ -4188,8 +4188,8 @@ def cli_main():
             valid_targets = {'rendering', 'event'}
             invalid_targets = profile_targets - valid_targets
             if invalid_targets:
-                print(f"Warning: Invalid profiling targets: {', '.join(invalid_targets)}", file=sys.stderr)
-                print(f"Valid targets: {', '.join(sorted(valid_targets))}", file=sys.stderr)
+                self.logger.error(f"Warning: Invalid profiling targets: {', '.join(invalid_targets)}")
+                self.logger.info(f"Valid targets: {', '.join(sorted(valid_targets))}")
                 profile_targets = profile_targets & valid_targets
         
         # Handle color testing mode
@@ -4222,9 +4222,9 @@ def cli_main():
                 try:
                     import ttk_coregraphics_render
                     ttk_coregraphics_render.enable_perf_logging(1)
-                    print("TFM: C++ renderer performance logging enabled", file=sys.stderr)
+                    self.logger.info("TFM: C++ renderer performance logging enabled")
                 except Exception as e:
-                    print(f"TFM: Failed to enable C++ renderer performance logging: {e}", file=sys.stderr)
+                    self.logger.error(f"TFM: Failed to enable C++ renderer performance logging: {e}")
         else:
             raise ValueError(f"Unknown backend: {backend_name}")
         
@@ -4243,23 +4243,23 @@ def cli_main():
             renderer.shutdown()
         
     except ImportError as e:
-        print(f"Error importing TFM modules: {e}", file=sys.stderr)
-        print("Make sure you're running from the TFM root directory", file=sys.stderr)
+        self.logger.error(f"Error importing TFM modules: {e}")
+        self.logger.error("Make sure you're running from the TFM root directory")
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\nTFM interrupted by user", file=sys.stderr)
+        self.logger.error("\nTFM interrupted by user")
         sys.exit(130)  # Standard exit code for SIGINT
     except Exception as e:
         # In debug mode, print full stack trace
         if os.environ.get('TFM_DEBUG') == '1':
-            print("\n" + "="*60, file=sys.stderr)
-            print("UNCAUGHT EXCEPTION (Debug Mode)", file=sys.stderr)
-            print("="*60, file=sys.stderr)
+            self.logger.error("\n" + "="*60)
+            self.logger.error("UNCAUGHT EXCEPTION (Debug Mode)")
+            self.logger.error("="*60)
             traceback.print_exc(file=sys.stderr)
-            print("="*60, file=sys.stderr)
+            self.logger.error("="*60)
         else:
-            print(f"Error running TFM: {e}", file=sys.stderr)
-            print("Run with --debug flag for full stack trace", file=sys.stderr)
+            self.logger.error(f"Error running TFM: {e}")
+            self.logger.info("Run with --debug flag for full stack trace")
         sys.exit(1)
 
 if __name__ == "__main__":

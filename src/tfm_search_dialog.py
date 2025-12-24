@@ -16,6 +16,10 @@ from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_wide_char_utils import get_display_width, get_safe_functions
 from tfm_input_compat import ensure_input_event
+from tfm_log_manager import getLogger
+
+# Module-level logger
+logger = getLogger("SearchDlg")
 
 
 class SearchDialog(UILayer, BaseListDialog):
@@ -294,7 +298,7 @@ class SearchDialog(UILayer, BaseListDialog):
                             continue
                         except Exception as e:
                             # Catch any unexpected errors with logging
-                            print(f"Warning: Unexpected error searching file {file_path}: {e}")
+                            logger.warning(f"Unexpected error searching file {file_path}: {e}")
                             continue
                             
         except Exception as e:
@@ -336,18 +340,18 @@ class SearchDialog(UILayer, BaseListDialog):
                             text_chars = sum(1 for byte in sample if 32 <= byte <= 126 or byte in [9, 10, 13])
                             return text_chars / len(sample) > 0.7
                 except (OSError, IOError) as e:
-                    print(f"Warning: Could not read file for text detection {file_path}: {e}")
+                    logger.warning(f"Could not read file for text detection {file_path}: {e}")
                     pass
                 except Exception as e:
-                    print(f"Warning: Unexpected error in file text detection: {e}")
+                    logger.warning(f"Unexpected error in file text detection: {e}")
                     pass
             
             return False
         except (OSError, PermissionError) as e:
-            print(f"Warning: Could not access file {file_path}: {e}")
+            logger.warning(f"Could not access file {file_path}: {e}")
             return False
         except Exception as e:
-            print(f"Warning: Unexpected error checking if file is text: {e}")
+            logger.warning(f"Unexpected error checking if file is text: {e}")
             return False
             
 
