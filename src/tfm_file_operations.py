@@ -428,6 +428,9 @@ class FileOperationsUI:
         self.progress_manager = file_manager.progress_manager
         self.cache_manager = file_manager.cache_manager
         self.config = file_manager.config
+        # Initialize logger
+        from tfm_log_manager import getLogger
+        self.logger = getLogger("FileOp")
     
     def _validate_operation_capabilities(self, operation, source_paths, dest_path=None):
         """
