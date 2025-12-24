@@ -181,6 +181,10 @@ class FileManager(UILayer):
         
         # Initialize modular components
         self.log_manager = LogManager(self.config, remote_port=remote_log_port, debug_mode=debug_mode)
+        
+        # Create logger for main application
+        self.logger = self.log_manager.getLogger("Main")
+        
         self.state_manager = get_state_manager()
         
         # Track whether command line directories were provided
@@ -194,17 +198,18 @@ class FileManager(UILayer):
         
         # Validate directories exist, fall back to defaults if not
         if not initial_left_dir.exists() or not initial_left_dir.is_dir():
-            self.log_manager.add_message("WARNING", f"Left directory '{initial_left_dir}' does not exist, using current directory")
+            self.logger.warning(f"Left directory '{initial_left_dir}' does not exist, using current directory")
             initial_left_dir = Path.cwd()
             
         if not initial_right_dir.exists() or not initial_right_dir.is_dir():
-            self.log_manager.add_message("WARNING", f"Right directory '{initial_right_dir}' does not exist, using home directory")
+            self.logger.warning(f"Right directory '{initial_right_dir}' does not exist, using home directory")
             initial_right_dir = Path.home()
         
         # Use simple defaults since TFM loads previous state anyway
         self.pane_manager = PaneManager(self.config, initial_left_dir, initial_right_dir, self.state_manager)
         self.file_operations = FileOperations(self.config)
         self.file_operations.log_manager = self.log_manager  # Set log_manager for error reporting
+        self.file_operations.logger = self.log_manager.getLogger("FileOp")  # Set logger for file operations
         self.pane_manager.file_operations = self.file_operations  # Set file_operations for refresh_files
         self.list_dialog = ListDialog(self.config, renderer)
         self.info_dialog = InfoDialog(self.config, renderer)
@@ -480,9 +485,9 @@ class FileManager(UILayer):
         try:
             menu_structure = self.menu_manager.get_menu_structure()
             self.renderer.set_menu_bar(menu_structure)
-            self.log_manager.add_message("INFO", "Menu bar initialized for desktop mode")
+            self.logger.info("Menu bar initialized for desktop mode")
         except Exception as e:
-            self.log_manager.add_message("ERROR", f"Failed to initialize menu bar: {e}")
+            self.logger.error(f"Failed to initialize menu bar: {e}")
     
     def _update_menu_states(self):
         """
@@ -499,7 +504,7 @@ class FileManager(UILayer):
             for item_id, enabled in states.items():
                 self.renderer.update_menu_item_state(item_id, enabled)
         except Exception as e:
-            self.log_manager.add_message("ERROR", f"Failed to update menu states: {e}")
+            self.logger.error(f"Failed to update menu states: {e}")
     
     def _handle_menu_event(self, event):
         """Handle menu selection events.
@@ -589,9 +594,9 @@ class FileManager(UILayer):
         from tfm_const import VERSION, GITHUB_URL
         
         # Add empty line and separator before
-        self.log_manager.add_message("INFO", "")
-        self.log_manager.add_message("INFO", "─" * 50)
-        self.log_manager.add_message("INFO", "")
+        self.logger.info("")
+        self.logger.info("─" * 50)
+        self.logger.info("")
         
         # TFM ASCII art logo (filled block style)
         logo = [
@@ -605,17 +610,17 @@ class FileManager(UILayer):
         
         # Add logo to log
         for line in logo:
-            self.log_manager.add_message("INFO", line)
+            self.logger.info(line)
         
         # Add version and GitHub URL
-        self.log_manager.add_message("INFO", "")
-        self.log_manager.add_message("INFO", f"Version: {VERSION}")
-        self.log_manager.add_message("INFO", f"GitHub: {GITHUB_URL}")
+        self.logger.info("")
+        self.logger.info(f"Version: {VERSION}")
+        self.logger.info(f"GitHub: {GITHUB_URL}")
         
         # Add empty line and separator after
-        self.log_manager.add_message("INFO", "")
-        self.log_manager.add_message("INFO", "─" * 50)
-        self.log_manager.add_message("INFO", "")
+        self.logger.info("")
+        self.logger.info("─" * 50)
+        self.logger.info("")
         
         # Trigger redraw to show the messages
         self.mark_dirty()
@@ -767,10 +772,10 @@ class FileManager(UILayer):
             import webbrowser
             issues_url = f"{GITHUB_URL}/issues"
             webbrowser.open(issues_url)
-            self.log_manager.add_message("INFO", f"Opened {issues_url} in browser")
+            self.logger.info(f"Opened {issues_url} in browser")
         except Exception as e:
-            self.log_manager.add_message("ERROR", f"Failed to open browser: {e}")
-            self.log_manager.add_message("INFO", f"Please visit: {GITHUB_URL}/issues")
+            self.logger.error(f"Failed to open browser: {e}")
+            self.logger.info(f"Please visit: {GITHUB_URL}/issues")
         self.mark_dirty()
         return True
         
@@ -1758,29 +1763,29 @@ class FileManager(UILayer):
                 current_pane['scroll_offset'] = 0
                 
                 self.mark_dirty()
-                self.log_manager.add_message("INFO", f"Entered archive: {focused_file.name}")
+                self.logger.info(f"Entered archive: {focused_file.name}")
             except FileNotFoundError as e:
                 # Archive file doesn't exist
                 user_msg = getattr(e, 'args', ['Archive file not found'])[1] if len(getattr(e, 'args', [])) > 1 else "Archive file not found"
-                self.log_manager.add_message("ERROR", f"Archive not found: {focused_file}: {e}")
+                self.logger.error(f"Archive not found: {focused_file}: {e}")
             except ArchiveCorruptedError as e:
                 # Archive is corrupted
-                self.log_manager.add_message("ERROR", f"Corrupted archive: {focused_file}: {e}")
+                self.logger.error(f"Corrupted archive: {focused_file}: {e}")
             except ArchiveFormatError as e:
                 # Unsupported or invalid format
-                self.log_manager.add_message("ERROR", f"Invalid archive format: {focused_file}: {e}")
+                self.logger.error(f"Invalid archive format: {focused_file}: {e}")
             except ArchivePermissionError as e:
                 # Permission denied
-                self.log_manager.add_message("ERROR", f"Permission denied: {focused_file}: {e}")
+                self.logger.error(f"Permission denied: {focused_file}: {e}")
             except ArchiveDiskSpaceError as e:
                 # Insufficient disk space
-                self.log_manager.add_message("ERROR", f"Insufficient disk space: {e}")
+                self.logger.error(f"Insufficient disk space: {e}")
             except ArchiveError as e:
                 # Generic archive error
-                self.log_manager.add_message("ERROR", f"Archive error: {focused_file}: {e}")
+                self.logger.error(f"Archive error: {focused_file}: {e}")
             except Exception as e:
                 # Unexpected error
-                self.log_manager.add_message("ERROR", f"Unexpected error opening archive: {focused_file}: {e}")
+                self.logger.error(f"Unexpected error opening archive: {focused_file}: {e}")
         else:
             # For files, try to use file association for 'open' action
             filename = focused_file.name
@@ -3345,11 +3350,11 @@ class FileManager(UILayer):
                 
                 # Check if path exists and is a directory
                 if not target_path.exists():
-                    self.log_manager.add_message("ERROR", f"Path does not exist: {target_path}")
+                    self.logger.error(f"Path does not exist: {target_path}")
                     return
                 
                 if not target_path.is_dir():
-                    self.log_manager.add_message("ERROR", f"Not a directory: {target_path}")
+                    self.logger.error(f"Not a directory: {target_path}")
                     return
                 
                 # Save current cursor position
@@ -3371,7 +3376,7 @@ class FileManager(UILayer):
                 print(f"Jumped to: {target_path}")
                 
             except Exception as e:
-                self.log_manager.add_message("ERROR", f"Failed to jump to path: {e}")
+                self.logger.error(f"Failed to jump to path: {e}")
         
         def on_cancel():
             """Handle cancellation"""
@@ -3584,9 +3589,9 @@ class FileManager(UILayer):
                         current_pane['scroll_offset'] = 0
                     
                     self.mark_dirty()
-                    self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
+                    self.logger.info(f"Exited archive: {archive_filename}")
                 except Exception as e:
-                    self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
+                    self.logger.error(f"Error exiting archive: {e}")
                     self.mark_dirty()
             elif current_pane['path'] != current_pane['path'].parent:
                 try:
@@ -3618,9 +3623,9 @@ class FileManager(UILayer):
                         current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
-                    self.log_manager.add_message("INFO", f"Exited archive: {archive_filename}")
+                    self.logger.info(f"Exited archive: {archive_filename}")
                 except Exception as e:
-                    self.log_manager.add_message("ERROR", f"Error exiting archive: {e}")
+                    self.logger.error(f"Error exiting archive: {e}")
                     self.mark_dirty()
             return True
         elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
@@ -3643,7 +3648,7 @@ class FileManager(UILayer):
                     
                     self.mark_dirty()
                 except PermissionError:
-                    self.log_manager.add_message("ERROR", "Permission denied")
+                    self.logger.error("Permission denied")
             return True
         elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
             if current_pane['path'] != current_pane['path'].parent:
@@ -3665,7 +3670,7 @@ class FileManager(UILayer):
                     
                     self.mark_dirty()
                 except PermissionError:
-                    self.log_manager.add_message("ERROR", "Permission denied")
+                    self.logger.error("Permission denied")
             return True
         elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left' and not (event.modifiers & ModifierKey.SHIFT):  # Right arrow in left pane - switch to right pane
             self.pane_manager.active_pane = 'right'

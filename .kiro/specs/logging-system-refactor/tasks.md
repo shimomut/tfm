@@ -6,7 +6,7 @@ This implementation plan refactors TFM's logging system to use Python's standard
 
 ## Tasks
 
-- [ ] 1. Create custom logging handlers
+- [x] 1. Create custom logging handlers
   - Create `LogPaneHandler` class that stores messages in a deque
   - Create `StreamOutputHandler` class that writes to original streams
   - Create `RemoteMonitoringHandler` class that broadcasts to TCP clients
@@ -17,12 +17,12 @@ This implementation plan refactors TFM's logging system to use Python's standard
   - **Property 4: Logger handler configuration**
   - **Validates: Requirements 1.2**
 
-- [ ] 2. Implement LogManager.getLogger() method
-  - [ ] 2.1 Add logger caching dictionary to LogManager.__init__
+- [x] 2. Implement LogManager.getLogger() method
+  - [x] 2.1 Add logger caching dictionary to LogManager.__init__
     - Store created loggers by name in self._loggers
     - _Requirements: 1.3_
 
-  - [ ] 2.2 Implement getLogger(name) method
+  - [x] 2.2 Implement getLogger(name) method
     - Return cached logger if exists
     - Create new logger with Python's logging.getLogger()
     - Attach configured handlers to new logger
@@ -37,8 +37,8 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 3: Multiple logger support**
     - **Validates: Requirements 1.4**
 
-- [ ] 3. Enhance LogCapture for logging integration
-  - [ ] 3.1 Modify LogCapture.write() to create LogRecords
+- [-] 3. Enhance LogCapture for logging integration
+  - [x] 3.1 Modify LogCapture.write() to create LogRecords
     - Create LogRecord with appropriate level (INFO for stdout, WARNING for stderr)
     - Set `is_stream_capture=True` flag on record
     - Preserve raw text in msg field (don't strip or modify)
@@ -53,19 +53,19 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 10: Source distinction preservation**
     - **Validates: Requirements 5.5**
 
-- [ ] 4. Implement message formatting logic
-  - [ ] 4.1 Implement LogPaneHandler.format_logger_message()
+- [x] 4. Implement message formatting logic
+  - [x] 4.1 Implement LogPaneHandler.format_logger_message()
     - Format as "timestamp [logger_name] LEVEL: message"
     - Use LOG_TIME_FORMAT for timestamp
     - _Requirements: 8.1_
 
-  - [ ] 4.2 Implement LogPaneHandler.format_stream_message()
+  - [x] 4.2 Implement LogPaneHandler.format_stream_message()
     - Format as "timestamp [source] raw_message"
     - Preserve multi-line output (split on newlines)
     - Each line gets its own timestamp and source prefix
     - _Requirements: 8.2, 8.3, 8.4_
 
-  - [ ] 4.3 Implement LogPaneHandler.emit() with format dispatch
+  - [x] 4.3 Implement LogPaneHandler.emit() with format dispatch
     - Check `is_stream_capture` flag
     - Call format_logger_message() for logger messages
     - Call format_stream_message() for stdout/stderr
@@ -84,14 +84,14 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 17: Multi-line preservation**
     - **Validates: Requirements 8.4**
 
-- [ ] 5. Implement configuration management
-  - [ ] 5.1 Create LoggingConfig dataclass
+- [x] 5. Implement configuration management
+  - [x] 5.1 Create LoggingConfig dataclass
     - Define all configuration fields with defaults
     - Include log_pane_enabled, stream_output_enabled, remote_monitoring_enabled
     - Include max_log_messages, default_log_level, logger_levels
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 5.2 Implement LogManager.configure_handlers()
+  - [x] 5.2 Implement LogManager.configure_handlers()
     - Add/remove handlers based on configuration
     - Support dynamic reconfiguration without restart
     - _Requirements: 6.1, 6.2, 6.3, 6.5_
@@ -100,19 +100,19 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 11: Dynamic configuration application**
     - **Validates: Requirements 6.5**
 
-- [ ] 6. Checkpoint - Ensure core functionality works
+- [x] 6. Checkpoint - Ensure core functionality works
   - Verify getLogger() returns configured loggers
   - Verify logger messages are formatted correctly
   - Verify stdout/stderr is displayed as-is
   - Ask the user if questions arise
 
-- [ ] 7. Implement log level filtering
-  - [ ] 7.1 Add level configuration to LogManager
+- [x] 7. Implement log level filtering
+  - [x] 7.1 Add level configuration to LogManager
     - Store global default level
     - Store per-logger level overrides
     - _Requirements: 7.1, 7.3, 7.4, 7.5_
 
-  - [ ] 7.2 Apply levels when creating loggers
+  - [x] 7.2 Apply levels when creating loggers
     - Set logger.setLevel() based on configuration
     - Apply per-logger overrides if specified
     - _Requirements: 7.1, 7.4_
@@ -125,15 +125,15 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 13: Per-logger level override**
     - **Validates: Requirements 7.4**
 
-- [ ] 8. Implement color coding
-  - [ ] 8.1 Implement LogPaneHandler.get_color_for_record()
+- [x] 8. Implement color coding
+  - [x] 8.1 Implement LogPaneHandler.get_color_for_record()
     - Check `is_stream_capture` flag
     - For logger messages: use record.levelno to determine color
     - For stdout/stderr: use record.name ("STDOUT"/"STDERR") to determine color
     - Return (color_pair, attributes) tuple
     - _Requirements: 2.2, 2.3_
 
-  - [ ] 8.2 Update draw_log_pane() to use colors from records
+  - [x] 8.2 Update draw_log_pane() to use colors from records
     - Get color for each message based on its record
     - Apply color when drawing text
     - _Requirements: 2.2_
@@ -142,14 +142,14 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 7: Color coding by log level**
     - **Validates: Requirements 2.2**
 
-- [ ] 9. Implement remote monitoring handler
-  - [ ] 9.1 Implement RemoteMonitoringHandler.emit()
+- [x] 9. Implement remote monitoring handler
+  - [x] 9.1 Implement RemoteMonitoringHandler.emit()
     - Convert LogRecord to JSON message
     - Broadcast to all connected clients
     - Handle client failures gracefully
     - _Requirements: 4.2, 4.4, 4.5_
 
-  - [ ] 9.2 Implement RemoteMonitoringHandler server lifecycle
+  - [x] 9.2 Implement RemoteMonitoringHandler server lifecycle
     - Implement start_server() to begin accepting connections
     - Implement stop_server() to close all connections
     - Implement _accept_connections() background thread
@@ -159,8 +159,8 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 9: Remote broadcast to all clients**
     - **Validates: Requirements 4.2, 4.4, 4.5**
 
-- [ ] 10. Implement backward compatibility
-  - [ ] 10.1 Update LogManager.add_message() to use logging
+- [x] 10. Implement backward compatibility
+  - [x] 10.1 Update LogManager.add_message() to use logging
     - Create a LogRecord for the message
     - Set appropriate source and level
     - Route through handler pipeline
@@ -170,26 +170,26 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 21: Backward compatibility routing**
     - **Validates: Requirements 10.2**
 
-- [ ] 11. Checkpoint - Ensure all routing works
+- [x] 11. Checkpoint - Ensure all routing works
   - Verify messages reach all configured destinations
   - Verify remote monitoring works
   - Verify backward compatibility with add_message()
   - Ask the user if questions arise
 
-- [ ] 12. Implement error handling
-  - [ ] 12.1 Add error isolation to handler emission
+- [x] 12. Implement error handling
+  - [x] 12.1 Add error isolation to handler emission
     - Wrap each handler.emit() in try-except
     - Continue with remaining handlers on failure
     - Log errors to fallback (sys.__stderr__)
     - _Requirements: 12.1, 12.5_
 
-  - [ ] 12.2 Add error handling to remote client operations
+  - [x] 12.2 Add error handling to remote client operations
     - Detect client failures during broadcast
     - Remove failed clients from active list
     - Close failed client sockets
     - _Requirements: 12.2_
 
-  - [ ] 12.3 Add error handling to stream writes
+  - [x] 12.3 Add error handling to stream writes
     - Wrap stream writes in try-except
     - Suppress OSError and IOError
     - Continue processing with other handlers
@@ -207,13 +207,13 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 27: Stream write failure suppression**
     - **Validates: Requirements 12.3**
 
-- [ ] 13. Implement thread safety
-  - [ ] 13.1 Add locking to LogPaneHandler
+- [x] 13. Implement thread safety
+  - [x] 13.1 Add locking to LogPaneHandler
     - Use threading.Lock for message deque access
     - Protect emit() and get_messages() operations
     - _Requirements: 9.1_
 
-  - [ ] 13.2 Add locking to RemoteMonitoringHandler
+  - [x] 13.2 Add locking to RemoteMonitoringHandler
     - Use threading.Lock for client list access
     - Protect client addition/removal operations
     - _Requirements: 9.3_
@@ -226,18 +226,18 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 20: Thread-safe client management**
     - **Validates: Requirements 9.3**
 
-- [ ] 14. Implement performance optimizations
-  - [ ] 14.1 Add level checking before formatting
+- [x] 14. Implement performance optimizations
+  - [x] 14.1 Add level checking before formatting
     - Check logger.isEnabledFor(level) before creating LogRecord
     - Skip expensive formatting for disabled levels
     - _Requirements: 11.1_
 
-  - [ ] 14.2 Add visibility checking for log pane
+  - [x] 14.2 Add visibility checking for log pane
     - Track whether log pane is visible
     - Skip rendering operations when not visible
     - _Requirements: 11.3_
 
-  - [ ] 14.3 Implement message retention limit
+  - [x] 14.3 Implement message retention limit
     - Use deque with maxlen for automatic old message removal
     - Verify oldest messages are discarded when limit reached
     - _Requirements: 11.4_
@@ -246,28 +246,28 @@ This implementation plan refactors TFM's logging system to use Python's standard
     - **Property 24: Message retention limit**
     - **Validates: Requirements 11.4**
 
-- [ ] 15. Update existing code to use new logging
-  - [ ] 15.1 Update tfm_main.py to use getLogger()
+- [x] 15. Update existing code to use new logging
+  - [x] 15.1 Update tfm_main.py to use getLogger()
     - Replace add_message() calls with logger.info(), logger.error(), etc.
     - Create "Main" logger
     - _Requirements: 1.1, 1.4_
 
-  - [ ] 15.2 Update tfm_file_operations.py to use getLogger()
+  - [x] 15.2 Update tfm_file_operations.py to use getLogger()
     - Create "FileOp" logger
     - Replace add_message() calls with logger methods
     - _Requirements: 1.4_
 
-  - [ ] 15.3 Update tfm_directory_diff_viewer.py to use getLogger()
+  - [x] 15.3 Update tfm_directory_diff_viewer.py to use getLogger()
     - Create "DirDiff" logger
     - Replace add_message() calls with logger methods
     - _Requirements: 1.4_
 
-  - [ ] 15.4 Update tfm_archive.py to use getLogger()
+  - [x] 15.4 Update tfm_archive.py to use getLogger()
     - Create "Archive" logger
     - Replace add_message() calls with logger methods
     - _Requirements: 1.4_
 
-- [ ] 16. Final checkpoint - Integration testing
+- [x] 16. Final checkpoint - Integration testing
   - Run TFM and verify all logging works correctly
   - Test logger messages appear with correct formatting
   - Test stdout/stderr appears as-is
@@ -276,7 +276,7 @@ This implementation plan refactors TFM's logging system to use Python's standard
   - Test thread safety under concurrent load
   - Ask the user if questions arise
 
-- [ ] 17. Update documentation
+- [x] 17. Update documentation
   - Document getLogger() usage in developer docs
   - Document logging configuration options
   - Document migration guide from add_message() to logger

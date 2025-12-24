@@ -242,6 +242,7 @@ class UILayerStack:
         """
         self._layers: List[UILayer] = [bottom_layer]
         self._log_manager = log_manager
+        self._logger = log_manager.getLogger("UILayer") if log_manager else None
         self._adaptive_fps = adaptive_fps
         
         # Activate the bottom layer
@@ -278,8 +279,8 @@ class UILayerStack:
         """
         # Prevent removal of bottom layer
         if len(self._layers) <= 1:
-            if self._log_manager:
-                self._log_manager.add_message("WARNING", "Cannot remove bottom layer from UI stack")
+            if self._logger:
+                self._logger.warning("Cannot remove bottom layer from UI stack")
             return None
         
         # Pop top layer and deactivate it
@@ -332,9 +333,8 @@ class UILayerStack:
         try:
             return top_layer.handle_key_event(event)
         except Exception as e:
-            if self._log_manager:
-                self._log_manager.add_message(
-                    "ERROR",
+            if self._logger:
+                self._logger.error(
                     f"Layer {top_layer.__class__.__name__} raised exception during key event: {e}"
                 )
             return False
@@ -361,9 +361,8 @@ class UILayerStack:
         try:
             return top_layer.handle_char_event(event)
         except Exception as e:
-            if self._log_manager:
-                self._log_manager.add_message(
-                    "ERROR",
+            if self._logger:
+                self._logger.error(
                     f"Layer {top_layer.__class__.__name__} raised exception during char event: {e}"
                 )
             return False
@@ -398,9 +397,8 @@ class UILayerStack:
                 if layer.handle_system_event(event):
                     any_handled = True
             except Exception as e:
-                if self._log_manager:
-                    self._log_manager.add_message(
-                        "ERROR",
+                if self._logger:
+                    self._logger.error(
                         f"Layer {layer.__class__.__name__} raised exception during system event: {e}"
                     )
                 # Continue broadcasting to other layers despite error
@@ -465,9 +463,8 @@ class UILayerStack:
                     layer.render(renderer)
                     layer.clear_dirty()
                 except Exception as e:
-                    if self._log_manager:
-                        self._log_manager.add_message(
-                            "ERROR",
+                    if self._logger:
+                        self._logger.error(
                             f"Layer {layer.__class__.__name__} raised exception during rendering: {e}"
                         )
                     # Continue rendering other layers despite error

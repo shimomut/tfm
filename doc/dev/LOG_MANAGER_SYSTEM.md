@@ -4,6 +4,17 @@
 
 The Log Manager System provides comprehensive logging functionality for TFM, capturing application output, error messages, and user feedback in a dedicated log pane. It enables debugging, monitoring, and user communication through a centralized logging interface.
 
+## Important Note
+
+**This document describes the legacy logging system.** TFM has been refactored to use Python's standard `logging` module. For new code, please refer to:
+
+- **Developer Guide**: `doc/dev/LOGGING_SYSTEM_REFACTOR.md`
+- **Migration Guide**: `doc/dev/LOGGING_MIGRATION_GUIDE.md`
+- **Quick Reference**: `doc/dev/LOGGING_QUICK_REFERENCE.md`
+- **User Guide**: `doc/LOGGING_FEATURE.md`
+
+The legacy `add_message()` method is still supported for backward compatibility, but new code should use `getLogger()` instead.
+
 ## Features
 
 ### Core Capabilities

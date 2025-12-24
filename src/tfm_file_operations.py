@@ -20,6 +20,7 @@ class FileOperations:
         self.config = config
         self.show_hidden = getattr(config, 'SHOW_HIDDEN_FILES', False)
         self.log_manager = None  # Will be set by FileManager if available
+        self.logger = None  # Will be set when log_manager is assigned
     
     def refresh_files(self, pane_data):
         """Refresh the file list for specified pane"""
@@ -67,56 +68,56 @@ class FileOperations:
             # Archive navigation error - path doesn't exist in archive
             user_msg = getattr(e, 'user_message', str(e))
             print(f"Archive navigation error: {user_msg}")
-            if self.log_manager:
-                self.log_manager.add_message("ERROR", f"Archive navigation error: {pane_data['path']}: {e}")
+            if self.logger:
+                self.logger.error(f"Archive navigation error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except ArchiveCorruptedError as e:
             # Archive is corrupted
             user_msg = getattr(e, 'user_message', str(e))
             print(f"Corrupted archive: {user_msg}")
-            if self.log_manager:
-                self.log_manager.add_message("ERROR", f"Corrupted archive: {pane_data['path']}: {e}")
+            if self.logger:
+                self.logger.error(f"Corrupted archive: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except ArchivePermissionError as e:
             # Permission denied for archive
             user_msg = getattr(e, 'user_message', str(e))
             print(f"Permission denied: {user_msg}")
-            if self.log_manager:
-                self.log_manager.add_message("ERROR", f"Archive permission denied: {pane_data['path']}: {e}")
+            if self.logger:
+                self.logger.error(f"Archive permission denied: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except ArchiveError as e:
             # Generic archive error
             user_msg = getattr(e, 'user_message', str(e))
             print(f"Archive error: {user_msg}")
-            if self.log_manager:
-                self.log_manager.add_message("ERROR", f"Archive error: {pane_data['path']}: {e}")
+            if self.logger:
+                self.logger.error(f"Archive error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except PermissionError as e:
             print(f"Permission denied accessing directory {pane_data['path']}: {e}")
-            if self.log_manager:
-                self.log_manager.add_message("ERROR", f"Permission denied: {pane_data['path']}: {e}")
+            if self.logger:
+                self.logger.error(f"Permission denied: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except FileNotFoundError as e:
             print(f"Directory not found: {pane_data['path']}: {e}")
-            if self.log_manager:
-                self.log_manager.add_message("ERROR", f"Directory not found: {pane_data['path']}: {e}")
+            if self.logger:
+                self.logger.error(f"Directory not found: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except OSError as e:
             print(f"System error reading directory {pane_data['path']}: {e}")
-            if self.log_manager:
-                self.log_manager.add_message("ERROR", f"System error: {pane_data['path']}: {e}")
+            if self.logger:
+                self.logger.error(f"System error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except Exception as e:
             print(f"Unexpected error reading directory {pane_data['path']}: {e}")
-            if self.log_manager:
-                self.log_manager.add_message("ERROR", f"Unexpected error: {pane_data['path']}: {e}")
+            if self.logger:
+                self.logger.error(f"Unexpected error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
     

@@ -1955,13 +1955,23 @@ class ArchiveOperations:
     def __init__(self, log_manager=None, cache_manager=None, progress_manager=None):
         """Initialize archive operations with optional logging, cache management, and progress tracking"""
         self.log_manager = log_manager
+        self.logger = log_manager.getLogger("Archive") if log_manager else None
         self.cache_manager = cache_manager
         self.progress_manager = progress_manager
     
     def _log(self, message: str, level: str = "INFO"):
-        """Log a message if log manager is available"""
-        if self.log_manager:
-            self.log_manager.add_message(level, message)
+        """Log a message if logger is available"""
+        if self.logger:
+            # Map string levels to logger methods
+            level_map = {
+                "DEBUG": self.logger.debug,
+                "INFO": self.logger.info,
+                "WARNING": self.logger.warning,
+                "ERROR": self.logger.error,
+                "CRITICAL": self.logger.critical
+            }
+            log_method = level_map.get(level.upper(), self.logger.info)
+            log_method(message)
     
     def get_archive_format(self, filename: str) -> Optional[dict]:
         """
