@@ -46,7 +46,7 @@ run-profile:
 	@python3 tfm.py --backend $(BACKEND) --profile
 
 monitor-log:
-	@python3 tools/tfm_log_client.py localhost 8123
+	@python3 src/tools/tfm_log_client.py localhost 8123
 
 test:
 	@echo "Running TFM tests (backend: $(BACKEND))..."

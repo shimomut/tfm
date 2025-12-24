@@ -303,7 +303,7 @@ class RemoteMonitoringHandler(logging.Handler):
         
         Formatting is determined by record source:
         - Logger API: Send with timestamp, name, level, message
-        - stdout/stderr: Send raw message without formatting
+        - stdout/stderr: Send with timestamp, source name, raw message
         
         Error handling: All exceptions are caught and logged to sys.__stderr__
         to prevent logging failures from crashing the application. Client
@@ -314,21 +314,21 @@ class RemoteMonitoringHandler(logging.Handler):
             record: Log record to broadcast
         """
         try:
-            # Format as JSON message
+            # Format as JSON message compatible with tfm_log_client.py
+            timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
+            
             if should_format_record(record):
                 # Logger API: send with full formatting
-                timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
                 message_dict = {
-                    'type': 'logger',
                     'timestamp': timestamp,
                     'source': record.name,
-                    'level': record.levelname,
-                    'message': record.getMessage()
+                    'message': f"{record.levelname}: {record.getMessage()}"
                 }
             else:
-                # stdout/stderr: send raw message without formatting
+                # stdout/stderr: send with timestamp and source name
                 message_dict = {
-                    'type': 'raw',
+                    'timestamp': timestamp,
+                    'source': record.name,  # "STDOUT" or "STDERR"
                     'message': record.getMessage()
                 }
             
