@@ -127,25 +127,6 @@ class LogPaneHandler(logging.Handler):
         timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
         return f"{timestamp} [{record.name}] {record.levelname}: {record.getMessage()}"
     
-    def format_stream_message(self, record: logging.LogRecord) -> List[str]:
-        """
-        Format a stdout/stderr message as-is, preserving multi-line output.
-        Only adds timestamp and source prefix, no other formatting.
-        
-        Args:
-            record: Log record from stdout/stderr capture
-            
-        Returns:
-            List of formatted strings, one per line
-        """
-        timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
-        source = record.name  # "STDOUT" or "STDERR"
-        raw_message = record.getMessage()
-        
-        # Preserve multi-line output - each line gets its own entry
-        lines = raw_message.split('\n')
-        return [f"{timestamp} [{source}] {line}" for line in lines if line]
-    
     def get_messages(self) -> List[Tuple[str, logging.LogRecord]]:
         """
         Get messages for display.
@@ -266,7 +247,8 @@ class StreamOutputHandler(logging.Handler):
             with self.lock:
                 if should_format_record(record):
                     # Logger API: write with full formatting
-                    formatted = self.format(record)
+                    timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
+                    formatted = f"{timestamp} [{record.name}] {record.levelname}: {record.getMessage()}"
                     self.stream.write(formatted + '\n')
                 else:
                     # stdout/stderr: write raw message without any formatting
