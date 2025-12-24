@@ -15,6 +15,7 @@ from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_ui_layer import UILayer
 from tfm_info_dialog import InfoDialog
+from tfm_log_manager import getLogger
 
 # Try to import pygments for syntax highlighting
 try:
@@ -26,11 +27,15 @@ try:
 except ImportError:
     PYGMENTS_AVAILABLE = False
 
+# Module-level logger for utility functions
+logger = getLogger("DiffViewer")
+
 
 class DiffViewer(UILayer):
     """Side-by-side text diff viewer that implements UILayer interface"""
     
     def __init__(self, renderer, file1_path: Path, file2_path: Path, layer_stack=None):
+        self.logger = getLogger("DiffViewer")
         self.renderer = renderer
         self.file1_path = file1_path
         self.file2_path = file2_path
@@ -224,7 +229,7 @@ class DiffViewer(UILayer):
             
         except Exception as e:
             # If highlighting fails, create plain highlighted lines
-            print(f"Warning: Syntax highlighting failed: {e}")
+            self.logger.warning(f"Syntax highlighting failed: {e}")
             return [[(line, COLOR_REGULAR_FILE)] for line in lines]
     
     def _tokens_to_highlighted_lines(self, tokens) -> List[List[Tuple[str, int]]]:
@@ -453,7 +458,7 @@ class DiffViewer(UILayer):
             return start_y, start_x, display_height, display_width
             
         except Exception as e:
-            print(f"Error in get_display_dimensions: {e}")
+            self.logger.error(f"Error in get_display_dimensions: {e}")
             return 1, 0, 22, 80
     
     def _show_help_dialog(self) -> None:
@@ -1361,18 +1366,18 @@ def create_diff_viewer(renderer, file1_path: Path, file2_path: Path, layer_stack
         DiffViewer instance or None if files cannot be viewed
     """
     if not file1_path.exists() or not file1_path.is_file():
-        print(f"Error: First file does not exist or is not a file: {file1_path}")
+        logger.error(f"First file does not exist or is not a file: {file1_path}")
         return None
     
     if not file2_path.exists() or not file2_path.is_file():
-        print(f"Error: Second file does not exist or is not a file: {file2_path}")
+        logger.error(f"Second file does not exist or is not a file: {file2_path}")
         return None
     
     try:
         return DiffViewer(renderer, file1_path, file2_path, layer_stack)
     except (OSError, IOError) as e:
-        print(f"Error: Could not open files for diff: {e}")
+        logger.error(f"Could not open files for diff: {e}")
         return None
     except Exception as e:
-        print(f"Error: Unexpected error creating diff viewer: {e}")
+        logger.error(f"Unexpected error creating diff viewer: {e}")
         return None

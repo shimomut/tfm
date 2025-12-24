@@ -2,6 +2,7 @@
 Color definitions and initialization for TFM (Terminal File Manager)
 """
 from typing import Tuple, Optional
+
 try:
     from ttk import TextAttribute
 except ImportError:
@@ -650,14 +651,12 @@ def print_current_color_scheme():
     
     # Get current scheme colors
     rgb_colors = get_current_rgb_colors()
-    fallback_colors = get_current_fallback_colors()
     
     print(f"Available schemes: {', '.join(get_available_color_schemes())}")
     print(f"RGB colors defined: {len(rgb_colors)} colors")
-    print(f"Fallback colors defined: {len(fallback_colors)} colors")
     
     # Show a few key colors as examples
-    key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'SELECTED_FG', 'REGULAR_FILE_FG']
+    key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'REGULAR_FILE_FG']
     print(f"Key colors in {current_color_scheme} scheme:")
     for color_name in key_colors:
         if color_name in rgb_colors:
@@ -674,7 +673,7 @@ def print_all_color_schemes():
         print("-" * 20)
         
         scheme_colors = COLOR_SCHEMES[scheme_name]
-        key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'SELECTED_FG', 'REGULAR_FILE_FG']
+        key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'REGULAR_FILE_FG']
         
         for color_name in key_colors:
             if color_name in scheme_colors:

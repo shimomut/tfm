@@ -8,6 +8,10 @@ configuration, and platform availability.
 
 import platform
 import sys
+from tfm_log_manager import getLogger
+
+# Module-level logger
+logger = getLogger("BackendSel")
 
 
 def select_backend(args):
@@ -86,7 +90,7 @@ def _get_requested_backend(args):
             return config.PREFERRED_BACKEND
     except Exception as e:
         # If config loading fails, just use default
-        print(f"Warning: Could not load configuration: {e}", file=sys.stderr)
+        logger.warning(f"Could not load configuration: {e}")
     
     # Default to curses backend
     return 'curses'
@@ -112,17 +116,17 @@ def _validate_backend_availability(backend_name):
     if backend_name == 'coregraphics':
         # Check if running on macOS
         if platform.system() != 'Darwin':
-            print("Error: CoreGraphics backend is only available on macOS", file=sys.stderr)
-            print("Falling back to curses backend", file=sys.stderr)
+            logger.error("CoreGraphics backend is only available on macOS")
+            logger.info("Falling back to curses backend")
             return 'curses'
         
         # Check if PyObjC is available
         try:
             import objc
         except ImportError:
-            print("Error: PyObjC is required for CoreGraphics backend", file=sys.stderr)
-            print("Install with: pip install pyobjc-framework-Cocoa", file=sys.stderr)
-            print("Falling back to curses backend", file=sys.stderr)
+            logger.error("PyObjC is required for CoreGraphics backend")
+            logger.info("Install with: pip install pyobjc-framework-Cocoa")
+            logger.info("Falling back to curses backend")
             return 'curses'
     
     return backend_name
@@ -190,8 +194,8 @@ def _get_backend_options(backend_name, args):
         
         except Exception as e:
             # If config loading fails, just use defaults
-            print(f"Warning: Could not load desktop mode configuration: {e}", file=sys.stderr)
-            print("Using default desktop mode options", file=sys.stderr)
+            logger.warning(f"Could not load desktop mode configuration: {e}")
+            logger.info("Using default desktop mode options")
         
         # Calculate approximate character dimensions from pixel dimensions
         # These are rough estimates - the backend will calculate exact dimensions

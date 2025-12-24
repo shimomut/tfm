@@ -25,41 +25,46 @@ from tfm_colors import (
     get_available_color_schemes, set_color_scheme, toggle_fallback_mode,
     is_fallback_mode, set_fallback_mode, print_color_support_info,
     get_file_color, get_header_color, get_footer_color, get_status_color,
-    get_error_color, get_boundary_color, COLOR_SCHEMES, FALLBACK_COLOR_SCHEMES
+    get_error_color, get_boundary_color, COLOR_SCHEMES
 )
+
+# Import logging
+from tfm_log_manager import getLogger
+
+# Initialize module-level logger
+logger = getLogger("ColorTest")
 
 def print_basic_info():
     """Print basic color information without curses initialization"""
-    print("TFM Color Testing - Basic Information")
-    print("=" * 50)
-    print()
+    logger.info("TFM Color Testing - Basic Information")
+    logger.info("=" * 50)
+    logger.info("")
     
     # Terminal environment info
-    print("Terminal Environment:")
-    print(f"  TERM: {os.environ.get('TERM', 'not set')}")
-    print(f"  COLORTERM: {os.environ.get('COLORTERM', 'not set')}")
-    print(f"  TERM_PROGRAM: {os.environ.get('TERM_PROGRAM', 'not set')}")
-    print(f"  TERM_PROGRAM_VERSION: {os.environ.get('TERM_PROGRAM_VERSION', 'not set')}")
-    print()
+    logger.info("Terminal Environment:")
+    logger.info(f"  TERM: {os.environ.get('TERM', 'not set')}")
+    logger.info(f"  COLORTERM: {os.environ.get('COLORTERM', 'not set')}")
+    logger.info(f"  TERM_PROGRAM: {os.environ.get('TERM_PROGRAM', 'not set')}")
+    logger.info(f"  TERM_PROGRAM_VERSION: {os.environ.get('TERM_PROGRAM_VERSION', 'not set')}")
+    logger.info("")
     
     # Available color schemes
-    print("Available Color Schemes:")
+    logger.info("Available Color Schemes:")
     for scheme in get_available_color_schemes():
         marker = " (current)" if scheme == get_current_color_scheme() else ""
-        print(f"  - {scheme}{marker}")
-    print()
+        logger.info(f"  - {scheme}{marker}")
+    logger.info("")
     
     # RGB color definitions
-    print("RGB Color Definitions:")
+    logger.info("RGB Color Definitions:")
     for scheme_name, colors in COLOR_SCHEMES.items():
-        print(f"  {scheme_name.upper()} scheme: {len(colors)} colors defined")
-    print()
+        logger.info(f"  {scheme_name.upper()} scheme: {len(colors)} colors defined")
+    logger.info("")
     
-    # Fallback color definitions
-    print("Fallback Color Definitions:")
-    for scheme_name, colors in FALLBACK_COLOR_SCHEMES.items():
-        print(f"  {scheme_name.upper()} scheme: {len(colors)} colors defined")
-    print()
+    # Note: Fallback color schemes are no longer needed with TTK
+    # TTK always supports full RGB colors
+    logger.info("Note: TTK always supports full RGB colors (no fallback needed)")
+    logger.info("")
 
 def test_color_capabilities(stdscr):
     """Test and display terminal color capabilities"""
@@ -354,11 +359,10 @@ def test_fallback_colors(stdscr):
     stdscr.addstr(y, 0, "This test forces the use of fallback colors even if RGB is supported.")
     y += 2
     
-    # Show current scheme fallback colors
+    # Note: Fallback colors are no longer used with TTK
     current_scheme = get_current_color_scheme()
-    fallback_colors = FALLBACK_COLOR_SCHEMES.get(current_scheme, {})
     
-    stdscr.addstr(y, 0, f"Current scheme ({current_scheme}) fallback values:")
+    stdscr.addstr(y, 0, f"Current scheme ({current_scheme}) - TTK uses full RGB (no fallback)")
     y += 1
     
     color_names = {
@@ -733,10 +737,9 @@ def show_detailed_info(stdscr):
     # Color scheme details
     current_scheme = get_current_color_scheme()
     rgb_colors = COLOR_SCHEMES.get(current_scheme, {})
-    fallback_colors = FALLBACK_COLOR_SCHEMES.get(current_scheme, {})
     
     y += 1
-    stdscr.addstr(y, 0, f"RGB Colors in {current_scheme} scheme:")
+    stdscr.addstr(y, 0, f"RGB Colors in {current_scheme} scheme (TTK always uses RGB):")
     y += 1
     
     max_lines = stdscr.getmaxyx()[0] - y - 3
@@ -868,35 +871,34 @@ def run_color_test(test_mode):
         
     elif test_mode == 'schemes':
         print_basic_info()
-        print("\nDetailed Color Scheme Information:")
-        print("=" * 50)
+        logger.info("\nDetailed Color Scheme Information:")
+        logger.info("=" * 50)
         
         for scheme_name in get_available_color_schemes():
-            print(f"\n{scheme_name.upper()} SCHEME:")
-            print("-" * 20)
+            logger.info(f"\n{scheme_name.upper()} SCHEME:")
+            logger.info("-" * 20)
             
             # RGB colors
             rgb_colors = COLOR_SCHEMES.get(scheme_name, {})
-            print(f"RGB colors: {len(rgb_colors)}")
+            logger.info(f"RGB colors: {len(rgb_colors)}")
             
             # Show key colors
             key_colors = ['DIRECTORY_FG', 'EXECUTABLE_FG', 'REGULAR_FILE_FG', 'SELECTED_BG']
             for color_name in key_colors:
                 if color_name in rgb_colors:
                     rgb = rgb_colors[color_name]['rgb']
-                    print(f"  {color_name:20}: RGB{rgb}")
+                    logger.info(f"  {color_name:20}: RGB{rgb}")
             
-            # Fallback colors
-            fallback_colors = FALLBACK_COLOR_SCHEMES.get(scheme_name, {})
-            print(f"Fallback colors: {len(fallback_colors)}")
+            # Note: Fallback colors no longer used with TTK
+            logger.info("Note: TTK always uses full RGB colors (no fallback)")
         
     elif test_mode == 'capabilities':
         print_basic_info()
-        print("\nTesting terminal capabilities...")
+        logger.info("\nTesting terminal capabilities...")
         
         # Test without curses first
-        print(f"TERM environment: {os.environ.get('TERM', 'not set')}")
-        print(f"COLORTERM environment: {os.environ.get('COLORTERM', 'not set')}")
+        logger.info(f"TERM environment: {os.environ.get('TERM', 'not set')}")
+        logger.info(f"COLORTERM environment: {os.environ.get('COLORTERM', 'not set')}")
         
         # Test with curses
         def test_caps(stdscr):
@@ -905,30 +907,30 @@ def run_color_test(test_mode):
         curses.wrapper(test_caps)
         
     elif test_mode == 'rgb-test':
-        print("Testing RGB color support...")
+        logger.info("Testing RGB color support...")
         curses.wrapper(test_rgb_colors)
         
     elif test_mode == 'fallback-test':
-        print("Testing fallback color support...")
+        logger.info("Testing fallback color support...")
         curses.wrapper(test_fallback_colors)
         
     elif test_mode == 'interactive':
-        print("Starting interactive color tester...")
-        print("Use the controls shown in the interface to test different settings.")
+        logger.info("Starting interactive color tester...")
+        logger.info("Use the controls shown in the interface to test different settings.")
         curses.wrapper(interactive_color_tester)
         
     elif test_mode == 'tfm-init':
-        print("Testing TFM initialization sequence...")
-        print("This test replicates the exact same initialization as main TFM.")
+        logger.info("Testing TFM initialization sequence...")
+        logger.info("This test replicates the exact same initialization as main TFM.")
         curses.wrapper(test_tfm_initialization_sequence)
         
     elif test_mode == 'diagnose':
-        print("Diagnosing color initialization issues...")
-        print("This test helps identify why colors work in --color-test but not in main TFM.")
+        logger.info("Diagnosing color initialization issues...")
+        logger.info("This test helps identify why colors work in --color-test but not in main TFM.")
         curses.wrapper(diagnose_color_initialization_issue)
     
     else:
-        print(f"Unknown test mode: {test_mode}")
+        logger.error(f"Unknown test mode: {test_mode}")
         sys.exit(1)
 
 if __name__ == "__main__":
@@ -937,5 +939,5 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         run_color_test(sys.argv[1])
     else:
-        print("Usage: python tfm_color_tester.py <test_mode>")
-        print("Available modes: info, schemes, capabilities, rgb-test, fallback-test, interactive")
+        logger.info("Usage: python tfm_color_tester.py <test_mode>")
+        logger.info("Available modes: info, schemes, capabilities, rgb-test, fallback-test, interactive")

@@ -12,6 +12,7 @@ import os
 import sys
 from tfm_path import Path
 from ttk import KeyCode
+from tfm_log_manager import getLogger
 
 
 # Special key name to TTK KeyCode mapping
@@ -43,6 +44,9 @@ SPECIAL_KEY_MAP = {
 
 # Reverse mapping for display purposes
 SPECIAL_KEY_NAMES = {v: k for k, v in SPECIAL_KEY_MAP.items()}
+
+# Module-level logger
+logger = getLogger("Config")
 
 
 class DefaultConfig:
@@ -224,6 +228,7 @@ class ConfigManager:
     """Manages TFM configuration loading and saving"""
     
     def __init__(self):
+        self.logger = getLogger("Config")
         self.config_dir = Path.home() / '.tfm'
         self.config_file = self.config_dir / 'config.py'
         self.config = None
@@ -234,7 +239,7 @@ class ConfigManager:
             self.config_dir.mkdir(parents=True, exist_ok=True)
             return True
         except Exception as e:
-            print(f"Warning: Could not create config directory {self.config_dir}: {e}")
+            self.logger.warning(f"Could not create config directory {self.config_dir}: {e}")
             return False
     
     def create_default_config(self):
@@ -249,7 +254,7 @@ class ConfigManager:
             
             # Check if template file exists
             if not template_file.exists():
-                print(f"Warning: Template file not found at {template_file}")
+                self.logger.warning(f"Template file not found at {template_file}")
                 return False
             
             # Read the template file
@@ -260,22 +265,22 @@ class ConfigManager:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 f.write(template_content)
             
-            print(f"Created default configuration at: {self.config_file}")
+            self.logger.info(f"Created default configuration at: {self.config_file}")
             return True
             
         except Exception as e:
-            print(f"Error creating default config: {e}")
+            self.logger.error(f"Error creating default config: {e}")
             return False
     
     def load_config(self):
         """Load configuration from file or create default if not exists"""
         # Check if config file exists
         if not self.config_file.exists():
-            print(f"Configuration file not found at: {self.config_file}")
+            self.logger.info(f"Configuration file not found at: {self.config_file}")
             if self.create_default_config():
-                print("Created default configuration file")
+                self.logger.info("Created default configuration file")
             else:
-                print("Using built-in default configuration")
+                self.logger.info("Using built-in default configuration")
                 self.config = DefaultConfig()
                 return self.config
         
@@ -292,13 +297,13 @@ class ConfigManager:
             # Get the Config class
             if hasattr(config_module, 'Config'):
                 self.config = config_module.Config()
-                print(f"Loaded configuration from: {self.config_file}")
+                self.logger.info(f"Loaded configuration from: {self.config_file}")
             else:
                 raise AttributeError("Config class not found in configuration file")
                 
         except Exception as e:
-            print(f"Error loading configuration: {e}")
-            print("Using built-in default configuration")
+            self.logger.error(f"Error loading configuration: {e}")
+            self.logger.info("Using built-in default configuration")
             self.config = DefaultConfig()
         
         return self.config
@@ -651,9 +656,9 @@ def get_favorite_directories():
                             'path': str(path)
                         })
                     else:
-                        print(f"Warning: Favorite directory does not exist: {fav['name']} -> {fav['path']}")
+                        logger.warning(f"Favorite directory does not exist: {fav['name']} -> {fav['path']}")
                 except Exception as e:
-                    print(f"Warning: Invalid favorite directory path: {fav['name']} -> {fav['path']}: {e}")
+                    logger.warning(f"Invalid favorite directory path: {fav['name']} -> {fav['path']}: {e}")
     
     return favorites
 
@@ -682,9 +687,9 @@ def get_programs():
                     
                     programs.append(program_entry)
                 else:
-                    print(f"Warning: Program command must be a non-empty list: {prog['name']}")
+                    logger.warning(f"Program command must be a non-empty list: {prog['name']}")
             else:
-                print(f"Warning: Invalid program configuration: {prog}")
+                logger.warning(f"Invalid program configuration: {prog}")
     
     return programs
 

@@ -10,6 +10,7 @@ import shlex
 import time
 from tfm_path import Path
 from tfm_backend_detector import is_desktop_mode
+from tfm_log_manager import getLogger
 
 
 def tfm_tool(tool_name):
@@ -93,6 +94,7 @@ class ExternalProgramManager:
         self.config = config
         self.log_manager = log_manager
         self.renderer = renderer
+        self.logger = getLogger("ExtProg")
     
 
 
@@ -157,17 +159,17 @@ class ExternalProgramManager:
                 working_dir = str(current_pane['path'])
             
             # Print information about the program execution
-            print(f"TFM External Program: {program['name']}")
-            print("=" * 50)
-            print(f"Command: {' '.join(command)}")
-            print(f"Working Directory: {working_dir}")
+            self.logger.info(f"TFM External Program: {program['name']}")
+            self.logger.info("=" * 50)
+            self.logger.info(f"Command: {' '.join(command)}")
+            self.logger.info(f"Working Directory: {working_dir}")
             if current_pane['path'].is_remote():
-                print(f"Note: Current pane is browsing remote directory: {current_pane['path']}")
-                print(f"Working directory set to TFM's directory: {working_dir}")
-            print(f"TFM_THIS_DIR: {env['TFM_THIS_DIR']}")
-            print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
-            print("=" * 50)
-            print()
+                self.logger.info(f"Note: Current pane is browsing remote directory: {current_pane['path']}")
+                self.logger.info(f"Working directory set to TFM's directory: {working_dir}")
+            self.logger.info(f"TFM_THIS_DIR: {env['TFM_THIS_DIR']}")
+            self.logger.info(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
+            self.logger.info("=" * 50)
+            self.logger.info("")
             
             # Change to the working directory
             os.chdir(working_dir)
@@ -180,12 +182,12 @@ class ExternalProgramManager:
                 # Redirect stdout to log pane (LogCapture is still active)
                 if result.stdout:
                     for line in result.stdout.splitlines():
-                        print(line)
+                        self.logger.info(line)
                 
                 # Redirect stderr to log pane (LogCapture is still active)
                 if result.stderr:
                     for line in result.stderr.splitlines():
-                        print(line, file=sys.stderr)
+                        self.logger.error(line)
             else:
                 # Terminal mode - let subprocess use terminal directly
                 result = subprocess.run(command, env=env)
@@ -194,51 +196,51 @@ class ExternalProgramManager:
             auto_return = program.get('options', {}).get('auto_return', False)
             
             # Show exit status
-            print()
-            print("=" * 50)
+            self.logger.info("")
+            self.logger.info("=" * 50)
             if result.returncode == 0:
-                print(f"Program '{program['name']}' completed successfully")
+                self.logger.info(f"Program '{program['name']}' completed successfully")
                 
                 if auto_return or desktop_mode:
                     # In desktop mode, no sleep needed - just return immediately
                     if not desktop_mode:
                         time.sleep(1)  # Brief pause in terminal mode only
                 else:
-                    print("Press Enter to return to TFM...")
+                    self.logger.info("Press Enter to return to TFM...")
                     input()
             else:
-                print(f"Program '{program['name']}' exited with code {result.returncode}")
+                self.logger.error(f"Program '{program['name']}' exited with code {result.returncode}")
                 # In desktop mode, auto-return even on error (user can check log pane)
                 # In terminal mode, wait for user input when there's an error
                 if desktop_mode:
-                    print("Check log pane for error details.")
+                    self.logger.info("Check log pane for error details.")
                     # No sleep in desktop mode - return immediately
                 else:
-                    print("Press Enter to return to TFM...")
+                    self.logger.info("Press Enter to return to TFM...")
                     input()
             
         except FileNotFoundError:
-            print(f"Error: Command not found: {program['command'][0]}")
-            print("Tip: Use tfm_tool() function for TFM tools in your configuration")
+            self.logger.error(f"Error: Command not found: {program['command'][0]}")
+            self.logger.info("Tip: Use tfm_tool() function for TFM tools in your configuration")
             
             # In desktop mode, auto-return (user can check log pane)
             # In terminal mode, wait for user input
             if desktop_mode:
-                print("Check log pane for error details.")
+                self.logger.info("Check log pane for error details.")
                 # No sleep in desktop mode - return immediately
             else:
-                print("Press Enter to continue...")
+                self.logger.info("Press Enter to continue...")
                 input()
         except Exception as e:
-            print(f"Error executing program '{program['name']}': {e}")
+            self.logger.error(f"Error executing program '{program['name']}': {e}")
             
             # In desktop mode, auto-return (user can check log pane)
             # In terminal mode, wait for user input
             if desktop_mode:
-                print("Check log pane for error details.")
+                self.logger.info("Check log pane for error details.")
                 # No sleep in desktop mode - return immediately
             else:
-                print("Press Enter to continue...")
+                self.logger.info("Press Enter to continue...")
                 input()
         
         finally:
@@ -258,7 +260,7 @@ class ExternalProgramManager:
                 sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
             
             # Log return from program execution
-            print(f"Returned from external program: {program['name']}")
+            self.logger.info(f"Returned from external program: {program['name']}")
     
     def enter_subshell_mode(self, pane_manager):
         """Enter sub-shell mode with environment variables set"""
@@ -325,39 +327,39 @@ class ExternalProgramManager:
             working_dir = None
             if current_pane['path'].is_remote():
                 working_dir = os.getcwd()
-                print("TFM Sub-shell Mode")
-                print("=" * 50)
-                print(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
-                print(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
-                print(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
-                print(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
-                print(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
-                print(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
-                print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
-                print(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
-                print("=" * 50)
-                print(f"Note: Current pane is browsing remote directory: {current_pane['path']}")
-                print(f"Subshell working directory set to TFM's directory: {working_dir}")
+                self.logger.info("TFM Sub-shell Mode")
+                self.logger.info("=" * 50)
+                self.logger.info(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
+                self.logger.info(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
+                self.logger.info(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
+                self.logger.info(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
+                self.logger.info(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
+                self.logger.info(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
+                self.logger.info(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
+                self.logger.info(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
+                self.logger.info("=" * 50)
+                self.logger.info(f"Note: Current pane is browsing remote directory: {current_pane['path']}")
+                self.logger.info(f"Subshell working directory set to TFM's directory: {working_dir}")
             else:
                 working_dir = str(current_pane['path'])
-                print("TFM Sub-shell Mode")
-                print("=" * 50)
-                print(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
-                print(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
-                print(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
-                print(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
-                print(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
-                print(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
-                print(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
-                print(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
-                print("=" * 50)
+                self.logger.info("TFM Sub-shell Mode")
+                self.logger.info("=" * 50)
+                self.logger.info(f"TFM_LEFT_DIR:      {env['TFM_LEFT_DIR']}")
+                self.logger.info(f"TFM_RIGHT_DIR:     {env['TFM_RIGHT_DIR']}")
+                self.logger.info(f"TFM_THIS_DIR:      {env['TFM_THIS_DIR']}")
+                self.logger.info(f"TFM_OTHER_DIR:     {env['TFM_OTHER_DIR']}")
+                self.logger.info(f"TFM_LEFT_SELECTED: {env['TFM_LEFT_SELECTED']}")
+                self.logger.info(f"TFM_RIGHT_SELECTED: {env['TFM_RIGHT_SELECTED']}")
+                self.logger.info(f"TFM_THIS_SELECTED: {env['TFM_THIS_SELECTED']}")
+                self.logger.info(f"TFM_OTHER_SELECTED: {env['TFM_OTHER_SELECTED']}")
+                self.logger.info("=" * 50)
             
-            print("TFM_ACTIVE environment variable is set for shell customization")
-            print("To show [TFM] in your prompt, add this to your shell config:")
-            print("  Zsh (~/.zshrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PROMPT=\"[TFM] $PROMPT\"; fi")
-            print("  Bash (~/.bashrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PS1=\"[TFM] $PS1\"; fi")
-            print("Type 'exit' to return to TFM")
-            print()
+            self.logger.info("TFM_ACTIVE environment variable is set for shell customization")
+            self.logger.info("To show [TFM] in your prompt, add this to your shell config:")
+            self.logger.info("  Zsh (~/.zshrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PROMPT=\"[TFM] $PROMPT\"; fi")
+            self.logger.info("  Bash (~/.bashrc): if [[ -n \"$TFM_ACTIVE\" ]]; then PS1=\"[TFM] $PS1\"; fi")
+            self.logger.info("Type 'exit' to return to TFM")
+            self.logger.info("")
             
             # Change to the working directory
             os.chdir(working_dir)
@@ -367,7 +369,7 @@ class ExternalProgramManager:
             subprocess.run([shell], env=env)
             
         except Exception as e:
-            print(f"Error starting sub-shell: {e}")
+            self.logger.error(f"Error starting sub-shell: {e}")
             input("Press Enter to continue...")
         
         finally:
@@ -385,7 +387,7 @@ class ExternalProgramManager:
             sys.stderr = LogCapture(self.log_manager.log_messages, "STDERR")
             
             # Log return from sub-shell
-            print("Returned from sub-shell mode")
+            self.logger.info("Returned from sub-shell mode")
     
     def suspend_curses(self):
         """Suspend the renderer to allow external programs to run"""

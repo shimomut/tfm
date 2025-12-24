@@ -15,6 +15,7 @@ import socket
 from tfm_path import Path
 from contextlib import contextmanager
 from typing import Any, Dict, Optional, List
+from tfm_log_manager import getLogger
 
 
 class StateManager:
@@ -36,6 +37,8 @@ class StateManager:
         Args:
             db_path: Optional custom database path. Defaults to ~/.tfm/state.db
         """
+        self.logger = getLogger("StateMgr")
+        
         if db_path is None:
             self.db_path = Path.home() / '.tfm' / 'state.db'
         else:
@@ -91,7 +94,7 @@ class StateManager:
                 conn.commit()
                 
         except Exception as e:
-            print(f"Warning: Could not initialize state database: {e}")
+            self.logger.warning(f"Could not initialize state database: {e}")
     
     @contextmanager
     def _get_connection(self):
@@ -194,7 +197,7 @@ class StateManager:
                 return True
                 
             except Exception as e:
-                print(f"Warning: Could not set state '{key}': {e}")
+                self.logger.warning(f"Could not set state '{key}': {e}")
                 return False
     
     def get_state(self, key: str, default: Any = None) -> Any:
@@ -223,7 +226,7 @@ class StateManager:
                         return default
                         
             except Exception as e:
-                print(f"Warning: Could not get state '{key}': {e}")
+                self.logger.warning(f"Could not get state '{key}': {e}")
                 return default
     
     def delete_state(self, key: str) -> bool:
@@ -245,7 +248,7 @@ class StateManager:
                 return True
                 
             except Exception as e:
-                print(f"Warning: Could not delete state '{key}': {e}")
+                self.logger.warning(f"Could not delete state '{key}': {e}")
                 return False
     
     def get_all_states(self, prefix: Optional[str] = None) -> Dict[str, Any]:
@@ -280,12 +283,12 @@ class StateManager:
                         try:
                             result[key] = self._deserialize_value(value)
                         except Exception as e:
-                            print(f"Warning: Could not deserialize state '{key}': {e}")
+                            self.logger.warning(f"Could not deserialize state '{key}': {e}")
                     
                     return result
                     
             except Exception as e:
-                print(f"Warning: Could not get all states: {e}")
+                self.logger.warning(f"Could not get all states: {e}")
                 return {}
     
     def clear_all_states(self, prefix: Optional[str] = None) -> bool:
@@ -311,7 +314,7 @@ class StateManager:
                 return True
                 
             except Exception as e:
-                print(f"Warning: Could not clear states: {e}")
+                self.logger.warning(f"Could not clear states: {e}")
                 return False
 
 
@@ -352,7 +355,7 @@ class TFMStateManager(StateManager):
                 ''', (self.instance_id, os.getpid(), current_time, current_time, socket.gethostname()))
                 
         except Exception as e:
-            print(f"Warning: Could not register session: {e}")
+            self.logger.warning(f"Could not register session: {e}")
     
     def update_session_heartbeat(self):
         """Update the last_seen timestamp for this session."""
@@ -366,7 +369,7 @@ class TFMStateManager(StateManager):
                 ''', (current_time, self.instance_id))
                 
         except Exception as e:
-            print(f"Warning: Could not update session heartbeat: {e}")
+            self.logger.warning(f"Could not update session heartbeat: {e}")
     
     def cleanup_session(self):
         """Clean up this session from the sessions table."""
@@ -376,7 +379,7 @@ class TFMStateManager(StateManager):
                 cursor.execute('DELETE FROM sessions WHERE instance_id = ?', (self.instance_id,))
                 
         except Exception as e:
-            print(f"Warning: Could not cleanup session: {e}")
+            self.logger.warning(f"Could not cleanup session: {e}")
     
     def get_active_sessions(self, timeout_seconds: float = 300.0) -> List[Dict[str, Any]]:
         """
@@ -414,7 +417,7 @@ class TFMStateManager(StateManager):
                 return sessions
                 
         except Exception as e:
-            print(f"Warning: Could not get active sessions: {e}")
+            self.logger.warning(f"Could not get active sessions: {e}")
             return []
     
     def cleanup_stale_sessions(self, timeout_seconds: float = 300.0):
@@ -433,7 +436,7 @@ class TFMStateManager(StateManager):
                 cursor.execute('DELETE FROM sessions WHERE last_seen <= ?', (cutoff_time,))
                 
         except Exception as e:
-            print(f"Warning: Could not cleanup stale sessions: {e}")
+            self.logger.warning(f"Could not cleanup stale sessions: {e}")
     
     # TFM-specific convenience methods
     
@@ -643,10 +646,10 @@ class TFMStateManager(StateManager):
                     config = get_config()
                     max_entries = getattr(config, 'MAX_HISTORY_ENTRIES', 100)
                 except ImportError as e:
-                    print(f"Warning: Could not import config module: {e}")
+                    self.logger.warning(f"Could not import config module: {e}")
                     max_entries = 100
                 except Exception as e:
-                    print(f"Warning: Could not get config for history limit: {e}")
+                    self.logger.warning(f"Could not get config for history limit: {e}")
                     max_entries = 100
             
             # Limit the size of the history (keep most recent entries)
@@ -656,7 +659,7 @@ class TFMStateManager(StateManager):
             return self.set_state(state_key, history, self.instance_id)
             
         except Exception as e:
-            print(f"Warning: Could not save position for {pane_name} pane: {e}")
+            self.logger.warning(f"Could not save position for {pane_name} pane: {e}")
             return False
     
     def load_pane_cursor_position(self, pane_name: str, directory_path: str) -> Optional[str]:
@@ -687,7 +690,7 @@ class TFMStateManager(StateManager):
             return None
             
         except Exception as e:
-            print(f"Warning: Could not load position for {pane_name} pane: {e}")
+            self.logger.warning(f"Could not load position for {pane_name} pane: {e}")
             return None
     
     def get_pane_cursor_positions(self, pane_name: str) -> Dict[str, str]:
@@ -718,7 +721,7 @@ class TFMStateManager(StateManager):
             return result
             
         except Exception as e:
-            print(f"Warning: Could not load positions for {pane_name} pane: {e}")
+            self.logger.warning(f"Could not load positions for {pane_name} pane: {e}")
             return {}
     
     def get_ordered_pane_history(self, pane_name: str) -> List[Dict[str, Any]]:
@@ -762,7 +765,7 @@ class TFMStateManager(StateManager):
             return result
             
         except Exception as e:
-            print(f"Warning: Could not load history for {pane_name} pane: {e}")
+            self.logger.warning(f"Could not load history for {pane_name} pane: {e}")
             return []
     
     def clear_pane_history(self, pane_name: str) -> bool:
@@ -780,7 +783,7 @@ class TFMStateManager(StateManager):
             state_key = f"path_history_{pane_name}"
             return self.set_state(state_key, [], self.instance_id)
         except Exception as e:
-            print(f"Warning: Could not clear history for {pane_name} pane: {e}")
+            self.logger.warning(f"Could not clear history for {pane_name} pane: {e}")
             return False
     
     def cleanup_non_existing_directories(self) -> bool:
@@ -849,18 +852,18 @@ class TFMStateManager(StateManager):
                         success = False
                         
                 except Exception as e:
-                    print(f"Warning: Could not clean history for {pane_name} pane: {e}")
+                    self.logger.warning(f"Could not clean history for {pane_name} pane: {e}")
                     success = False
             
             if cleaned_count > 0:
-                print(f"Cleaned up {cleaned_count} non-existing directory entries from cursor history")
+                self.logger.info(f"Cleaned up {cleaned_count} non-existing directory entries from cursor history")
             if skipped_remote_count > 0:
-                print(f"Skipped existence check for {skipped_remote_count} remote storage entries")
+                self.logger.info(f"Skipped existence check for {skipped_remote_count} remote storage entries")
             
             return success
             
         except Exception as e:
-            print(f"Warning: Could not cleanup non-existing directories: {e}")
+            self.logger.warning(f"Could not cleanup non-existing directories: {e}")
             return False
 
 

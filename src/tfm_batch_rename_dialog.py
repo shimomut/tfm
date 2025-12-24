@@ -13,6 +13,10 @@ from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color, COLOR_ERROR
 from tfm_wide_char_utils import get_display_width, get_safe_functions
 from tfm_input_compat import ensure_input_event
+from tfm_log_manager import getLogger
+
+# Module-level logger
+logger = getLogger("BatchRename")
 
 
 class BatchRenameDialog(UILayer, BaseListDialog):
@@ -642,10 +646,10 @@ class BatchRenameDialogHelpers:
                 if file_path.exists():
                     selected_files.append(file_path)
             except (OSError, ValueError) as e:
-                print(f"Warning: Could not process selected file path '{file_path_str}': {e}")
+                logger.warning(f"Could not process selected file path '{file_path_str}': {e}")
                 continue
             except Exception as e:
-                print(f"Warning: Unexpected error processing file path: {e}")
+                logger.warning(f"Unexpected error processing file path: {e}")
                 continue
                 
         return selected_files if selected_files else None
