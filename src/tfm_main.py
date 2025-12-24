@@ -4204,7 +4204,7 @@ def cli_main():
         # Store debug mode in environment for access by other modules
         if args.debug:
             os.environ['TFM_DEBUG'] = '1'
-            self.logger.error("Debug mode enabled - full stack traces will be shown for uncaught exceptions")
+            print("Debug mode enabled - full stack traces will be shown for uncaught exceptions", file=sys.stderr)
         
         # Parse profiling targets
         profile_targets = set()
@@ -4213,8 +4213,8 @@ def cli_main():
             valid_targets = {'rendering', 'event'}
             invalid_targets = profile_targets - valid_targets
             if invalid_targets:
-                self.logger.error(f"Warning: Invalid profiling targets: {', '.join(invalid_targets)}")
-                self.logger.info(f"Valid targets: {', '.join(sorted(valid_targets))}")
+                print(f"Warning: Invalid profiling targets: {', '.join(invalid_targets)}", file=sys.stderr)
+                print(f"Valid targets: {', '.join(sorted(valid_targets))}")
                 profile_targets = profile_targets & valid_targets
         
         # Handle color testing mode
@@ -4247,9 +4247,9 @@ def cli_main():
                 try:
                     import ttk_coregraphics_render
                     ttk_coregraphics_render.enable_perf_logging(1)
-                    self.logger.info("TFM: C++ renderer performance logging enabled")
+                    print("TFM: C++ renderer performance logging enabled")
                 except Exception as e:
-                    self.logger.error(f"TFM: Failed to enable C++ renderer performance logging: {e}")
+                    print(f"TFM: Failed to enable C++ renderer performance logging: {e}", file=sys.stderr)
         else:
             raise ValueError(f"Unknown backend: {backend_name}")
         
@@ -4268,23 +4268,23 @@ def cli_main():
             renderer.shutdown()
         
     except ImportError as e:
-        self.logger.error(f"Error importing TFM modules: {e}")
-        self.logger.error("Make sure you're running from the TFM root directory")
+        print(f"Error importing TFM modules: {e}", file=sys.stderr)
+        print("Make sure you're running from the TFM root directory", file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
-        self.logger.error("\nTFM interrupted by user")
+        print("\nTFM interrupted by user", file=sys.stderr)
         sys.exit(130)  # Standard exit code for SIGINT
     except Exception as e:
         # In debug mode, print full stack trace
         if os.environ.get('TFM_DEBUG') == '1':
-            self.logger.error("\n" + "="*60)
-            self.logger.error("UNCAUGHT EXCEPTION (Debug Mode)")
-            self.logger.error("="*60)
+            print("\n" + "="*60, file=sys.stderr)
+            print("UNCAUGHT EXCEPTION (Debug Mode)", file=sys.stderr)
+            print("="*60, file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
-            self.logger.error("="*60)
+            print("="*60, file=sys.stderr)
         else:
-            self.logger.error(f"Error running TFM: {e}")
-            self.logger.info("Run with --debug flag for full stack trace")
+            print(f"Error running TFM: {e}", file=sys.stderr)
+            print("Run with --debug flag for full stack trace")
         sys.exit(1)
 
 if __name__ == "__main__":
