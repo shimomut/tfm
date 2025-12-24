@@ -96,12 +96,11 @@ class LogPaneHandler(logging.Handler):
                     self.messages.append((formatted, record))
                 else:
                     # stdout/stderr: display raw message without formatting
+                    # Note: LogCapture already handles line buffering, so we receive
+                    # complete lines here. No need to split on newlines again.
                     raw_message = record.getMessage()
-                    # Preserve multi-line output - each line gets its own entry
-                    lines = raw_message.split('\n')
-                    for line in lines:
-                        if line:  # Skip empty lines
-                            self.messages.append((line, record))
+                    if raw_message:  # Only add non-empty messages
+                        self.messages.append((raw_message, record))
         except Exception as e:
             # Requirement 12.1: Handler failure isolation
             # Requirement 12.5: Log errors using fallback mechanism
@@ -148,11 +147,10 @@ class LogPaneHandler(logging.Handler):
                         formatted_messages.append((formatted, record))
                     else:
                         # stdout/stderr: display raw message
+                        # Note: LogCapture already handles line buffering
                         raw_message = record.getMessage()
-                        lines = raw_message.split('\n')
-                        for line in lines:
-                            if line:
-                                formatted_messages.append((line, record))
+                        if raw_message:
+                            formatted_messages.append((raw_message, record))
                 else:
                     formatted_messages.append((formatted_msg, record))
             return formatted_messages

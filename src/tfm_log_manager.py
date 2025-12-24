@@ -46,7 +46,7 @@ class LoggingConfig:
 
 
 class LogCapture:
-    """Capture stdout/stderr and redirect to log pane"""
+    """Capture stdout/stderr and redirect to log pane with line buffering"""
     def __init__(self, log_messages, source, remote_callback=None, update_callback=None, original_stream=None, is_desktop_mode=False, logger=None):
         self.log_messages = log_messages
         self.source = source
@@ -55,67 +55,72 @@ class LogCapture:
         self.original_stream = original_stream
         self.is_desktop_mode = is_desktop_mode  # Only write to original streams in desktop mode
         self.logger = logger  # Logger instance for routing through handler pipeline
+        self.buffer = ""  # Line buffer - accumulates text until newline
+        self.lock = threading.RLock()  # Thread safety for buffer access
         
     def write(self, text):
-        # Only write to original stream in desktop mode (to avoid conflicting with curses in terminal mode)
-        if self.is_desktop_mode and self.original_stream:
-            try:
-                self.original_stream.write(text)
-                self.original_stream.flush()
-            except (OSError, IOError):
-                pass  # Ignore errors writing to original stream
-        
-        # Only log non-empty messages to the log pane
-        if text.strip():
-            # If logger is available, route through logging infrastructure
-            if self.logger:
-                # Create LogRecord with appropriate level
-                # INFO for stdout, WARNING for stderr
-                level = logging.INFO if self.source == "STDOUT" else logging.WARNING
+        with self.lock:
+            # Add text to buffer
+            self.buffer += text
+            
+            # Process complete lines (split on newlines)
+            while '\n' in self.buffer:
+                line, self.buffer = self.buffer.split('\n', 1)
                 
-                # Requirement 11.1: Performance optimization - check if level is enabled
-                # Skip expensive LogRecord creation and formatting if level is disabled
-                if not self.logger.isEnabledFor(level):
-                    return
-                
-                # Create LogRecord - preserve raw text without stripping or modifying
-                record = logging.LogRecord(
-                    name=self.source,  # "STDOUT" or "STDERR"
-                    level=level,
-                    pathname="",
-                    lineno=0,
-                    msg=text,  # Raw text, not stripped or modified
-                    args=(),
-                    exc_info=None
-                )
-                
-                # CRITICAL: Mark this as a stream capture (not a formatted logger message)
-                # Handlers will check this flag to determine formatting behavior
-                record.is_stream_capture = True
-                
-                # Route through the logger's handler pipeline
-                self.logger.handle(record)
-            else:
-                # Fallback to old behavior if logger not available (backward compatibility)
-                timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
-                log_entry = (timestamp, self.source, text.strip())
-                self.log_messages.append(log_entry)
-                
-                # Notify about new message for redraw triggering
-                if self.update_callback:
-                    self.update_callback()
-                
-                # Send to remote clients if callback is available
-                if self.remote_callback:
-                    self.remote_callback(log_entry)
+                # Only log non-empty lines to the log pane
+                if line.strip():
+                    self._emit_log_record(line)
+    
+    def _emit_log_record(self, text):
+        """Emit a single log record for the given text"""
+        # If logger is available, route through logging infrastructure
+        if self.logger:
+            # Create LogRecord with appropriate level
+            # INFO for stdout, WARNING for stderr
+            level = logging.INFO if self.source == "STDOUT" else logging.WARNING
+            
+            # Requirement 11.1: Performance optimization - check if level is enabled
+            # Skip expensive LogRecord creation and formatting if level is disabled
+            if not self.logger.isEnabledFor(level):
+                return
+            
+            # Create LogRecord - preserve raw text without stripping or modifying
+            record = logging.LogRecord(
+                name=self.source,  # "STDOUT" or "STDERR"
+                level=level,
+                pathname="",
+                lineno=0,
+                msg=text,  # Raw text, not stripped or modified
+                args=(),
+                exc_info=None
+            )
+            
+            # CRITICAL: Mark this as a stream capture (not a formatted logger message)
+            # Handlers will check this flag to determine formatting behavior
+            record.is_stream_capture = True
+            
+            # Route through the logger's handler pipeline
+            self.logger.handle(record)
+        else:
+            # Fallback to old behavior if logger not available (backward compatibility)
+            timestamp = datetime.now().strftime(LOG_TIME_FORMAT)
+            log_entry = (timestamp, self.source, text.strip())
+            self.log_messages.append(log_entry)
+            
+            # Notify about new message for redraw triggering
+            if self.update_callback:
+                self.update_callback()
+            
+            # Send to remote clients if callback is available
+            if self.remote_callback:
+                self.remote_callback(log_entry)
     
     def flush(self):
-        # Only flush original stream in desktop mode
-        if self.is_desktop_mode and self.original_stream:
-            try:
-                self.original_stream.flush()
-            except (OSError, IOError):
-                pass  # Ignore errors flushing original stream
+        # flush() is called to ensure buffered data is written
+        # However, we should NOT emit incomplete lines (lines without newline)
+        # The buffer will be emitted when a newline is eventually received
+        # This matches standard stream behavior where flush() doesn't add newlines
+        pass
 
 
 class LogManager:
