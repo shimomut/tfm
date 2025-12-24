@@ -20,7 +20,9 @@ class FileOperations:
         self.config = config
         self.show_hidden = getattr(config, 'SHOW_HIDDEN_FILES', False)
         self.log_manager = None  # Will be set by FileManager if available
-        self.logger = None  # Will be set when log_manager is assigned
+        # Use module-level getLogger - no need to check if log_manager exists
+        from tfm_log_manager import getLogger
+        self.logger = getLogger("FileOp")
     
     def refresh_files(self, pane_data):
         """Refresh the file list for specified pane"""
@@ -67,57 +69,45 @@ class FileOperations:
         except ArchiveNavigationError as e:
             # Archive navigation error - path doesn't exist in archive
             user_msg = getattr(e, 'user_message', str(e))
-            print(f"Archive navigation error: {user_msg}")
-            if self.logger:
-                self.logger.error(f"Archive navigation error: {pane_data['path']}: {e}")
+            self.logger.error(f"Archive navigation error: {user_msg}")
+            self.logger.error(f"Archive navigation error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except ArchiveCorruptedError as e:
             # Archive is corrupted
             user_msg = getattr(e, 'user_message', str(e))
-            print(f"Corrupted archive: {user_msg}")
-            if self.logger:
-                self.logger.error(f"Corrupted archive: {pane_data['path']}: {e}")
+            self.logger.error(f"Corrupted archive: {user_msg}")
+            self.logger.error(f"Corrupted archive: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except ArchivePermissionError as e:
             # Permission denied for archive
             user_msg = getattr(e, 'user_message', str(e))
-            print(f"Permission denied: {user_msg}")
-            if self.logger:
-                self.logger.error(f"Archive permission denied: {pane_data['path']}: {e}")
+            self.logger.error(f"Permission denied: {user_msg}")
+            self.logger.error(f"Archive permission denied: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except ArchiveError as e:
             # Generic archive error
             user_msg = getattr(e, 'user_message', str(e))
-            print(f"Archive error: {user_msg}")
-            if self.logger:
-                self.logger.error(f"Archive error: {pane_data['path']}: {e}")
+            self.logger.error(f"Archive error: {user_msg}")
+            self.logger.error(f"Archive error: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except PermissionError as e:
-            print(f"Permission denied accessing directory {pane_data['path']}: {e}")
-            if self.logger:
-                self.logger.error(f"Permission denied: {pane_data['path']}: {e}")
+            self.logger.error(f"Permission denied accessing directory {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except FileNotFoundError as e:
-            print(f"Directory not found: {pane_data['path']}: {e}")
-            if self.logger:
-                self.logger.error(f"Directory not found: {pane_data['path']}: {e}")
+            self.logger.error(f"Directory not found: {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except OSError as e:
-            print(f"System error reading directory {pane_data['path']}: {e}")
-            if self.logger:
-                self.logger.error(f"System error: {pane_data['path']}: {e}")
+            self.logger.error(f"System error reading directory {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
         except Exception as e:
-            print(f"Unexpected error reading directory {pane_data['path']}: {e}")
-            if self.logger:
-                self.logger.error(f"Unexpected error: {pane_data['path']}: {e}")
+            self.logger.error(f"Unexpected error reading directory {pane_data['path']}: {e}")
             pane_data['files'] = []
             pane_data['focused_index'] = 0
     
@@ -503,7 +493,7 @@ class FileOperationsUI:
                 files_to_copy.append(focused_file)
         
         if not files_to_copy:
-            print("No files to copy")
+            self.logger.info("No files to copy")
             return
         
         destination_dir = other_pane['path']
@@ -516,7 +506,7 @@ class FileOperationsUI:
         
         # Check if destination directory is writable (only for local paths)
         if destination_dir.get_scheme() == 'file' and not os.access(destination_dir, os.W_OK):
-            print(f"Permission denied: Cannot write to {destination_dir}")
+            self.logger.error(f"Permission denied: Cannot write to {destination_dir}")
             return
         
         # Check if copy confirmation is enabled
@@ -531,7 +521,7 @@ class FileOperationsUI:
                 if confirmed:
                     self.copy_files_to_directory(files_to_copy, destination_dir)
                 else:
-                    print("Copy operation cancelled")
+                    self.logger.info("Copy operation cancelled")
             
             self.file_manager.show_confirmation(message, copy_callback)
         else:
@@ -565,7 +555,7 @@ class FileOperationsUI:
             
             def handle_conflict_choice(choice):
                 if choice == "cancel":
-                    print("Copy operation cancelled")
+                    self.logger.info("Copy operation cancelled")
                     return
                 elif choice == "skip":
                     # Copy only non-conflicting files
@@ -575,7 +565,7 @@ class FileOperationsUI:
                         self.perform_copy_operation(non_conflicting, destination_dir)
                         # Success message will be printed by the operation thread
                     else:
-                        print("No files copied (all had conflicts)")
+                        self.logger.info("No files copied (all had conflicts)")
                 elif choice == "overwrite":
                     # Copy all files, overwriting conflicts
                     self.perform_copy_operation(files_to_copy, destination_dir, overwrite=True)
@@ -632,7 +622,7 @@ class FileOperationsUI:
                 for source_file in files_to_copy:
                     # Check for cancellation
                     if self.file_manager.operation_cancelled:
-                        print("Copy operation cancelled by user")
+                        self.logger.info("Copy operation cancelled by user")
                         break
                     
                     try:
@@ -671,19 +661,19 @@ class FileOperationsUI:
                                     source_file, dest_path, processed_files, total_individual_files, overwrite
                                 )
                             
-                            print(f"Copied directory: {source_file.name}")
+                            self.logger.info(f"Copied directory: {source_file.name}")
                         else:
                             # Copy single file with progress tracking
                             processed_files += 1
                             self.progress_manager.update_progress(source_file.name, processed_files)
                             
                             self._copy_file_with_progress(source_file, dest_path, overwrite)
-                            print(f"Copied file: {source_file.name}")
+                            self.logger.info(f"Copied file: {source_file.name}")
                         
                         copied_count += 1
                         
                     except PermissionError as e:
-                        print(f"Permission denied copying {source_file.name}: {e}")
+                        self.logger.error(f"Permission denied copying {source_file.name}: {e}")
                         error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
@@ -692,7 +682,7 @@ class FileOperationsUI:
                         elif source_file.is_dir():
                             processed_files += self._count_files_recursively([source_file])
                     except Exception as e:
-                        print(f"Error copying {source_file.name}: {e}")
+                        self.logger.error(f"Error copying {source_file.name}: {e}")
                         error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
@@ -726,13 +716,13 @@ class FileOperationsUI:
             
             # Print completion message
             if self.file_manager.operation_cancelled:
-                print(f"Copy cancelled: {copied_count} files copied before cancellation")
+                self.logger.info(f"Copy cancelled: {copied_count} files copied before cancellation")
             elif error_count > 0:
-                print(f"Copy completed: {copied_count} files copied, {error_count} errors")
+                self.logger.warning(f"Copy completed: {copied_count} files copied, {error_count} errors")
             elif copied_count > 0:
-                print(f"Successfully copied {copied_count} files")
+                self.logger.info(f"Successfully copied {copied_count} files")
             else:
-                print("No files copied")
+                self.logger.info("No files copied")
         
         # Start the copy thread
         thread = threading.Thread(target=copy_thread, daemon=True)
@@ -759,7 +749,7 @@ class FileOperationsUI:
                 files_to_move.append(focused_file)
         
         if not files_to_move:
-            print("No files to move")
+            self.logger.info("No files to move")
             return
         
         destination_dir = other_pane['path']
@@ -772,7 +762,7 @@ class FileOperationsUI:
         
         # Check if destination directory is writable (only for local paths)
         if destination_dir.get_scheme() == 'file' and not os.access(destination_dir, os.W_OK):
-            print(f"Permission denied: Cannot write to {destination_dir}")
+            self.logger.error(f"Permission denied: Cannot write to {destination_dir}")
             return
         
         # Check for cross-storage move and inform user
@@ -785,18 +775,18 @@ class FileOperationsUI:
             scheme_names = {'file': 'Local', 's3': 'S3', 'scp': 'SCP', 'ftp': 'FTP'}
             source_names = [scheme_names.get(scheme, scheme.upper()) for scheme in source_schemes]
             dest_name = scheme_names.get(dest_scheme, dest_scheme.upper())
-            print(f"Cross-storage move: {'/'.join(set(source_names))} → {dest_name}")
+            self.logger.info(f"Cross-storage move: {'/'.join(set(source_names))} → {dest_name}")
         
         # Check if any files are being moved to the same directory
         same_dir_files = [f for f in files_to_move if f.parent == destination_dir]
         if same_dir_files:
             if len(same_dir_files) == len(files_to_move):
-                print("Cannot move files to the same directory")
+                self.logger.info("Cannot move files to the same directory")
                 return
             else:
                 # Remove files that are already in the destination directory
                 files_to_move = [f for f in files_to_move if f.parent != destination_dir]
-                print(f"Skipping {len(same_dir_files)} files already in destination directory")
+                self.logger.info(f"Skipping {len(same_dir_files)} files already in destination directory")
         
         # Check if move confirmation is enabled
         if getattr(self.config, 'CONFIRM_MOVE', True):
@@ -810,7 +800,7 @@ class FileOperationsUI:
                 if confirmed:
                     self.move_files_to_directory(files_to_move, destination_dir)
                 else:
-                    print("Move operation cancelled")
+                    self.logger.info("Move operation cancelled")
             
             self.file_manager.show_confirmation(message, move_callback)
         else:
@@ -844,7 +834,7 @@ class FileOperationsUI:
             
             def handle_conflict_choice(choice):
                 if choice == "cancel":
-                    print("Move operation cancelled")
+                    self.logger.info("Move operation cancelled")
                     return
                 elif choice == "skip":
                     # Move only non-conflicting files
@@ -854,7 +844,7 @@ class FileOperationsUI:
                         self.perform_move_operation(non_conflicting, destination_dir)
                         # Success message will be printed by the operation thread
                     else:
-                        print("No files moved (all had conflicts)")
+                        self.logger.info("No files moved (all had conflicts)")
                 elif choice == "overwrite":
                     # Move all files, overwriting conflicts
                     self.perform_move_operation(files_to_move, destination_dir, overwrite=True)
@@ -911,7 +901,7 @@ class FileOperationsUI:
                 for source_file in files_to_move:
                     # Check for cancellation
                     if self.file_manager.operation_cancelled:
-                        print("Move operation cancelled by user")
+                        self.logger.info("Move operation cancelled by user")
                         break
                     
                     try:
@@ -955,13 +945,13 @@ class FileOperationsUI:
                             link_target = os.readlink(str(source_file))
                             dest_path.symlink_to(link_target)
                             source_file.unlink()
-                            print(f"Moved symbolic link: {source_file.name}")
+                            self.logger.info(f"Moved symbolic link: {source_file.name}")
                         elif source_file.is_dir():
                             # For directories, we need to track individual files being moved
                             processed_files = self._move_directory_with_progress(
                                 source_file, dest_path, processed_files, total_individual_files, is_cross_storage
                             )
-                            print(f"Moved directory: {source_file.name}")
+                            self.logger.info(f"Moved directory: {source_file.name}")
                         else:
                             # Move single file
                             processed_files += 1
@@ -972,16 +962,16 @@ class FileOperationsUI:
                                 # Cross-storage move: copy then delete
                                 source_file.copy_to(dest_path, overwrite=overwrite)
                                 source_file.unlink()
-                                print(f"Moved file (cross-storage): {source_file.name}")
+                                self.logger.info(f"Moved file (cross-storage): {source_file.name}")
                             else:
                                 # Same-storage move: use rename
                                 source_file.rename(dest_path)
-                                print(f"Moved file: {source_file.name}")
+                                self.logger.info(f"Moved file: {source_file.name}")
                         
                         moved_count += 1
                         
                     except PermissionError as e:
-                        print(f"Permission denied moving {source_file.name}: {e}")
+                        self.logger.error(f"Permission denied moving {source_file.name}: {e}")
                         error_count += 1
                         if total_individual_files > 1:
                             self.progress_manager.increment_errors()
@@ -991,7 +981,7 @@ class FileOperationsUI:
                             elif source_file.is_dir():
                                 processed_files += self._count_files_recursively([source_file])
                     except Exception as e:
-                        print(f"Error moving {source_file.name}: {e}")
+                        self.logger.error(f"Error moving {source_file.name}: {e}")
                         error_count += 1
                         if total_individual_files > 1:
                             self.progress_manager.increment_errors()
@@ -1026,13 +1016,13 @@ class FileOperationsUI:
                 
                 # Print completion message
                 if self.file_manager.operation_cancelled:
-                    print(f"Move cancelled: {moved_count} files moved before cancellation")
+                    self.logger.info(f"Move cancelled: {moved_count} files moved before cancellation")
                 elif error_count > 0:
-                    print(f"Move completed: {moved_count} files moved, {error_count} errors")
+                    self.logger.warning(f"Move completed: {moved_count} files moved, {error_count} errors")
                 elif moved_count > 0:
-                    print(f"Successfully moved {moved_count} files")
+                    self.logger.info(f"Successfully moved {moved_count} files")
                 else:
-                    print("No files moved")
+                    self.logger.info("No files moved")
         
         # Start the thread
         thread = threading.Thread(target=move_thread, daemon=True)
@@ -1058,7 +1048,7 @@ class FileOperationsUI:
                 files_to_delete.append(focused_file)
         
         if not files_to_delete:
-            print("No files to delete")
+            self.logger.info("No files to delete")
             return
         
         # Validate operation capabilities - check BEFORE confirmation dialog
@@ -1071,7 +1061,7 @@ class FileOperationsUI:
             if confirmed:
                 self.perform_delete_operation(files_to_delete)
             else:
-                print("Delete operation cancelled")
+                self.logger.info("Delete operation cancelled")
         
         # Check if delete confirmation is enabled
         if getattr(self.config, 'CONFIRM_DELETE', True):
@@ -1145,7 +1135,7 @@ class FileOperationsUI:
                 for file_path in files_to_delete:
                     # Check for cancellation
                     if self.file_manager.operation_cancelled:
-                        print("Delete operation cancelled by user")
+                        self.logger.info("Delete operation cancelled by user")
                         break
                     
                     try:
@@ -1155,25 +1145,25 @@ class FileOperationsUI:
                             self.progress_manager.update_progress(f"Link: {file_path.name}", processed_files)
                             
                             file_path.unlink()
-                            print(f"Deleted symbolic link: {file_path.name}")
+                            self.logger.info(f"Deleted symbolic link: {file_path.name}")
                         elif file_path.is_dir():
                             # Delete directory recursively with progress tracking
                             processed_files = self._delete_directory_with_progress(
                                 file_path, processed_files, total_individual_files
                             )
-                            print(f"Deleted directory: {file_path.name}")
+                            self.logger.info(f"Deleted directory: {file_path.name}")
                         else:
                             # Delete single file
                             processed_files += 1
                             self.progress_manager.update_progress(file_path.name, processed_files)
                             
                             file_path.unlink()
-                            print(f"Deleted file: {file_path.name}")
+                            self.logger.info(f"Deleted file: {file_path.name}")
                         
                         deleted_count += 1
                         
                     except PermissionError as e:
-                        print(f"Permission denied deleting {file_path.name}: {e}")
+                        self.logger.error(f"Permission denied deleting {file_path.name}: {e}")
                         error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
@@ -1182,7 +1172,7 @@ class FileOperationsUI:
                         elif file_path.is_dir():
                             processed_files += self._count_files_recursively([file_path])
                     except FileNotFoundError:
-                        print(f"File not found (already deleted?): {file_path.name}")
+                        self.logger.warning(f"File not found (already deleted?): {file_path.name}")
                         error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
@@ -1191,7 +1181,7 @@ class FileOperationsUI:
                         elif file_path.is_dir():
                             processed_files += self._count_files_recursively([file_path])
                     except Exception as e:
-                        print(f"Error deleting {file_path.name}: {e}")
+                        self.logger.error(f"Error deleting {file_path.name}: {e}")
                         error_count += 1
                         self.progress_manager.increment_errors()
                         # Still count the file for progress tracking
@@ -1228,11 +1218,11 @@ class FileOperationsUI:
                 
                 # Print completion message
                 if self.file_manager.operation_cancelled:
-                    print(f"Delete cancelled: {deleted_count} files deleted before cancellation")
+                    self.logger.info(f"Delete cancelled: {deleted_count} files deleted before cancellation")
                 elif error_count > 0:
-                    print(f"Delete completed: {deleted_count} files deleted, {error_count} errors")
+                    self.logger.warning(f"Delete completed: {deleted_count} files deleted, {error_count} errors")
                 elif deleted_count > 0:
-                    print(f"Successfully deleted {deleted_count} files")
+                    self.logger.info(f"Successfully deleted {deleted_count} files")
         
         # Start the thread
         thread = threading.Thread(target=delete_thread, daemon=True)
@@ -1421,7 +1411,7 @@ class FileOperationsUI:
                             # Copy file with byte-level progress for large files
                             self._copy_file_with_progress(item, dest_file, overwrite=True)
                         except Exception as e:
-                            print(f"Error copying {item}: {e}")
+                            self.logger.error(f"Error copying {item}: {e}")
                             self.progress_manager.increment_errors()
                 
                 return processed_files
@@ -1464,7 +1454,7 @@ class FileOperationsUI:
                             # Copy regular file with byte-level progress for large files
                             self._copy_file_with_progress(source_file, dest_file, overwrite=True)
                     except Exception as e:
-                        print(f"Error copying {source_file}: {e}")
+                        self.logger.error(f"Error copying {source_file}: {e}")
                         self.progress_manager.increment_errors()
                 
                 # Handle symbolic links to directories
@@ -1480,13 +1470,13 @@ class FileOperationsUI:
                             link_target = os.readlink(str(source_subdir))
                             dest_subdir.symlink_to(link_target)
                         except Exception as e:
-                            print(f"Error copying symlink {source_subdir}: {e}")
+                            self.logger.error(f"Error copying symlink {source_subdir}: {e}")
                             self.progress_manager.increment_errors()
             
             return processed_files
             
         except Exception as e:
-            print(f"Error copying directory {source_dir}: {e}")
+            self.logger.error(f"Error copying directory {source_dir}: {e}")
             self.progress_manager.increment_errors()
             return processed_files
     
@@ -1517,13 +1507,13 @@ class FileOperationsUI:
                         # Use _copy_file_with_progress for byte-level progress and cancellation support
                         self._copy_file_with_progress(item, dest_item, overwrite=overwrite)
                     except Exception as e:
-                        print(f"Error copying {item}: {e}")
+                        self.logger.error(f"Error copying {item}: {e}")
                         self.progress_manager.increment_errors()
             
             return processed_files
             
         except Exception as e:
-            print(f"Error copying directory {source_dir}: {e}")
+            self.logger.error(f"Error copying directory {source_dir}: {e}")
             self.progress_manager.increment_errors()
             return processed_files
     
@@ -1569,7 +1559,7 @@ class FileOperationsUI:
             return processed_files
             
         except Exception as e:
-            print(f"Error moving directory {source_dir}: {e}")
+            self.logger.error(f"Error moving directory {source_dir}: {e}")
             if total_files > 1:
                 self.progress_manager.increment_errors()
             return processed_files
@@ -1610,7 +1600,7 @@ class FileOperationsUI:
                     try:
                         file_path.unlink()  # Remove file or symlink
                     except Exception as e:
-                        print(f"Error deleting {file_path}: {e}")
+                        self.logger.error(f"Error deleting {file_path}: {e}")
                         self.progress_manager.increment_errors()
                 
                 # Delete empty subdirectories (they should be empty now since we're going bottom-up)
@@ -1636,7 +1626,7 @@ class FileOperationsUI:
                         # The directory will be handled by shutil.rmtree fallback if needed
                         pass
                     except Exception as e:
-                        print(f"Error deleting directory {subdir_path}: {e}")
+                        self.logger.error(f"Error deleting directory {subdir_path}: {e}")
                         self.progress_manager.increment_errors()
             
             # Finally remove the main directory
@@ -1649,12 +1639,12 @@ class FileOperationsUI:
                     # For S3 paths, this will handle directory deletion properly
                     dir_path.rmdir()
                 except Exception as e:
-                    print(f"Warning: Could not remove directory {dir_path}: {e}")
+                    self.logger.warning(f"Warning: Could not remove directory {dir_path}: {e}")
             
             return processed_files
             
         except Exception as e:
-            print(f"Error deleting directory {dir_path}: {e}")
+            self.logger.error(f"Error deleting directory {dir_path}: {e}")
     
     def _delete_s3_directory_with_progress(self, dir_path, processed_files, total_files):
         """Delete S3 directory recursively with fine-grained progress updates"""
@@ -1703,7 +1693,7 @@ class FileOperationsUI:
                         try:
                             s3_impl._delete_objects_batch(objects_to_delete)
                         except Exception as e:
-                            print(f"Error deleting S3 objects batch: {e}")
+                            self.logger.error(f"Error deleting S3 objects batch: {e}")
                             if total_files > 1:
                                 self.progress_manager.increment_errors()
                         objects_to_delete = []
@@ -1713,14 +1703,14 @@ class FileOperationsUI:
                 try:
                     s3_impl._delete_objects_batch(objects_to_delete)
                 except Exception as e:
-                    print(f"Error deleting S3 objects batch: {e}")
+                    self.logger.error(f"Error deleting S3 objects batch: {e}")
                     if total_files > 1:
                         self.progress_manager.increment_errors()
             
             return processed_files
             
         except Exception as e:
-            print(f"Error deleting S3 directory {dir_path}: {e}")
+            self.logger.error(f"Error deleting S3 directory {dir_path}: {e}")
             if total_files > 1:
                 self.progress_manager.increment_errors()
             return processed_files
@@ -1758,9 +1748,9 @@ class FileOperationsUI:
             total_skipped = len(context['skipped_files'])
             
             if total_copied > 0:
-                print(f"Copied {total_copied} files, skipped {total_skipped} conflicts")
+                self.logger.info(f"Copied {total_copied} files, skipped {total_skipped} conflicts")
             else:
-                print(f"No files copied, skipped {total_skipped} conflicts")
+                self.logger.info(f"No files copied, skipped {total_skipped} conflicts")
             
             return
         
@@ -1799,7 +1789,7 @@ class FileOperationsUI:
                 context['conflict_index'] = len(context['conflicts'])
                 self._process_next_copy_conflict()
             else:  # cancel
-                print("Copy operation cancelled")
+                self.logger.info("Copy operation cancelled")
         
         self.file_manager.show_dialog(message, choices, handle_single_conflict)
     
@@ -1825,7 +1815,7 @@ class FileOperationsUI:
     def _on_copy_rename_confirm(self, new_name):
         """Handle copy rename confirmation"""
         if not new_name or new_name.strip() == "":
-            print("Copy cancelled: empty filename")
+            self.logger.info("Copy cancelled: empty filename")
             self.file_manager.quick_edit_bar.hide()
             self.file_manager.mark_dirty()
             return
@@ -1854,7 +1844,7 @@ class FileOperationsUI:
                 if choice == "overwrite":
                     # Copy with the new name, overwriting
                     self._perform_single_copy(source_file, new_dest_path, overwrite=True)
-                    print(f"Copied as '{new_name}' (overwrote existing)")
+                    self.logger.info(f"Copied as '{new_name}' (overwrote existing)")
                     # Continue with batch if in batch mode
                     if hasattr(self.file_manager, '_copy_rename_batch_context'):
                         batch_context = self.file_manager._copy_rename_batch_context
@@ -1865,7 +1855,7 @@ class FileOperationsUI:
                     # Ask for another name
                     self._handle_copy_rename(source_file, destination_dir)
                 else:
-                    print("Copy operation cancelled")
+                    self.logger.info("Copy operation cancelled")
                     # Cancel batch if in batch mode
                     if hasattr(self.file_manager, '_copy_rename_batch_context'):
                         delattr(self.file_manager, '_copy_rename_batch_context')
@@ -1874,7 +1864,7 @@ class FileOperationsUI:
         else:
             # No conflict, proceed with copy
             self._perform_single_copy(source_file, new_dest_path, overwrite=False)
-            print(f"Copied as '{new_name}'")
+            self.logger.info(f"Copied as '{new_name}'")
             
             # Continue with batch if in batch mode
             if hasattr(self.file_manager, '_copy_rename_batch_context'):
@@ -1885,7 +1875,7 @@ class FileOperationsUI:
     
     def _on_copy_rename_cancel(self):
         """Handle copy rename cancellation"""
-        print("Copy operation cancelled")
+        self.logger.info("Copy operation cancelled")
         self.file_manager.quick_edit_bar.hide()
         self.file_manager.mark_dirty()
     
@@ -1922,9 +1912,9 @@ class FileOperationsUI:
             total_skipped = len(context['skipped_files'])
             
             if total_moved > 0:
-                print(f"Moved {total_moved} files, skipped {total_skipped} conflicts")
+                self.logger.info(f"Moved {total_moved} files, skipped {total_skipped} conflicts")
             else:
-                print(f"No files moved, skipped {total_skipped} conflicts")
+                self.logger.info(f"No files moved, skipped {total_skipped} conflicts")
             
             return
         
@@ -1963,7 +1953,7 @@ class FileOperationsUI:
                 context['conflict_index'] = len(context['conflicts'])
                 self._process_next_move_conflict()
             else:  # cancel
-                print("Move operation cancelled")
+                self.logger.info("Move operation cancelled")
         
         self.file_manager.show_dialog(message, choices, handle_single_conflict)
     
@@ -1989,7 +1979,7 @@ class FileOperationsUI:
     def _on_move_rename_confirm(self, new_name):
         """Handle move rename confirmation"""
         if not new_name or new_name.strip() == "":
-            print("Move cancelled: empty filename")
+            self.logger.info("Move cancelled: empty filename")
             self.file_manager.quick_edit_bar.hide()
             self.file_manager.mark_dirty()
             return
@@ -2018,7 +2008,7 @@ class FileOperationsUI:
                 if choice == "overwrite":
                     # Move with the new name, overwriting
                     self._perform_single_move(source_file, new_dest_path, overwrite=True)
-                    print(f"Moved as '{new_name}' (overwrote existing)")
+                    self.logger.info(f"Moved as '{new_name}' (overwrote existing)")
                     # Continue with batch if in batch mode
                     if hasattr(self.file_manager, '_move_rename_batch_context'):
                         batch_context = self.file_manager._move_rename_batch_context
@@ -2029,7 +2019,7 @@ class FileOperationsUI:
                     # Ask for another name
                     self._handle_move_rename(source_file, destination_dir)
                 else:
-                    print("Move operation cancelled")
+                    self.logger.info("Move operation cancelled")
                     # Cancel batch if in batch mode
                     if hasattr(self.file_manager, '_move_rename_batch_context'):
                         delattr(self.file_manager, '_move_rename_batch_context')
@@ -2038,7 +2028,7 @@ class FileOperationsUI:
         else:
             # No conflict, proceed with move
             self._perform_single_move(source_file, new_dest_path, overwrite=False)
-            print(f"Moved as '{new_name}'")
+            self.logger.info(f"Moved as '{new_name}'")
             
             # Continue with batch if in batch mode
             if hasattr(self.file_manager, '_move_rename_batch_context'):
@@ -2049,7 +2039,7 @@ class FileOperationsUI:
     
     def _on_move_rename_cancel(self):
         """Handle move rename cancellation"""
-        print("Move operation cancelled")
+        self.logger.info("Move operation cancelled")
         self.file_manager.quick_edit_bar.hide()
         self.file_manager.mark_dirty()
     
@@ -2081,7 +2071,7 @@ class FileOperationsUI:
             current_pane['selected_files'].clear()
             
         except Exception as e:
-            print(f"Error copying {source_file.name}: {e}")
+            self.logger.error(f"Error copying {source_file.name}: {e}")
     
     def _perform_single_move(self, source_file, dest_path, overwrite=False):
         """Perform move operation for a single file"""
@@ -2128,4 +2118,4 @@ class FileOperationsUI:
             current_pane['selected_files'].clear()
             
         except Exception as e:
-            print(f"Error moving {source_file.name}: {e}")
+            self.logger.error(f"Error moving {source_file.name}: {e}")
