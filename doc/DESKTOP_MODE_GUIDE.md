@@ -65,7 +65,10 @@ Now `python3 tfm.py` will launch in desktop mode automatically.
 
 ```python
 # Font settings
+# Single font (simple format)
 DESKTOP_FONT_NAME = 'Menlo'         # Font name (see available fonts below)
+# Multiple fonts with cascade fallback (recommended for international text)
+# DESKTOP_FONT_NAME = ['Menlo', 'Monaco', 'Courier']  # First available font is used
 DESKTOP_FONT_SIZE = 14              # Font size in points (10-24 recommended)
 
 # Window settings
@@ -388,7 +391,7 @@ If you encounter issues not covered here:
 1. Check console output for error messages
 2. Try terminal mode to isolate desktop-specific issues
 3. Review the [User Guide](TFM_USER_GUIDE.md)
-4. Check [TTK Integration](dev/TTK_INTEGRATION.md) for technical details
+4. Check [TTK Integration](dev/TTK_INTEGRATION_GUIDE.md) for technical details
 5. Report issues on GitHub with:
    - macOS version
    - Python version

@@ -433,9 +433,8 @@ def verify_shortcuts(self):
 
 ### Related TFM Documentation
 
-- [Menu Bar Feature](../MENU_BAR_FEATURE.md) - End-user menu bar documentation
-- [Keyboard Shortcuts Feature](../MENU_BAR_KEYBOARD_SHORTCUTS_FEATURE.md) - End-user shortcut documentation
-- [CoreGraphics Backend Implementation](COREGRAPHICS_BACKEND_IMPLEMENTATION.md) - Backend details
+- [Menu Bar Feature](../MENU_BAR_FEATURE.md) - End-user menu bar documentation (includes keyboard shortcuts reference)
+- CoreGraphics Backend Implementation - Backend details
 
 ## Code Locations
 

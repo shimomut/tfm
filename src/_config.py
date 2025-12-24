@@ -33,6 +33,7 @@ class Config:
     SHOW_HIDDEN_FILES = False
     DEFAULT_LEFT_PANE_RATIO = 0.5  # 0.1 to 0.9
     DEFAULT_LOG_HEIGHT_RATIO = 0.25  # 0.1 to 0.5
+    DATE_FORMAT = 'short'  # 'short' (YY-MM-DD HH:mm) or 'full' (YYYY-MM-DD HH:mm:ss)
     
     # Sorting settings
     DEFAULT_SORT_MODE = 'name'  # 'name', 'size', 'date'

@@ -1,4 +1,4 @@
-# Progress Animation Feature
+# Search Animation Feature
 
 ## Overview
 
@@ -95,6 +95,17 @@ Searching [███░░░░░] (42 found)
 - **File Search**: When searching for files by name
 - **Content Search**: When searching inside files
 - **Long Operations**: During any operation that takes time
+
+## Search Result Limit
+
+By default, search results are limited to 10,000 matches to maintain performance with large directory trees. This limit can be configured in your TFM configuration file:
+
+```python
+class Config(DefaultConfig):
+    MAX_SEARCH_RESULTS = 10000  # Adjust as needed
+```
+
+When the limit is reached, the search will stop and display "limit reached" in the status. Consider using more specific search patterns if you hit this limit frequently.
 
 ## Troubleshooting
 

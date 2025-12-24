@@ -264,10 +264,10 @@ tfm --left /home/user/documents --right /home/user/downloads
 ## See Also
 
 <!-- TODO: Create FILE_OPERATIONS_FEATURE.md -->
-<!-- - [File Operations Feature](FILE_OPERATIONS_FEATURE.md) -->
+<!-- - File Operations Feature -->
 <!-- TODO: Create SELECTION_FEATURE.md -->
-<!-- - [Selection Feature](SELECTION_FEATURE.md) -->
+<!-- - Selection Feature -->
 <!-- TODO: Create COMPARE_SELECTION_FEATURE.md -->
-<!-- - [Compare Selection Feature](COMPARE_SELECTION_FEATURE.md) -->
+<!-- - Compare Selection Feature -->
 <!-- TODO: Create STATE_PERSISTENCE_FEATURE.md -->
-<!-- - [State Persistence Feature](STATE_PERSISTENCE_FEATURE.md) -->
+<!-- - State Persistence Feature -->

@@ -594,8 +594,7 @@ python3 tools/benchmark_coregraphics_performance.py \
 
 - [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - High-performance desktop mode
 - Developer documentation: `doc/dev/PROFILING_SYSTEM_IMPLEMENTATION.md`
-- CoreGraphics baseline: `doc/dev/COREGRAPHICS_PERFORMANCE_BASELINE.md`
-- Performance measurement: `doc/dev/COREGRAPHICS_PERFORMANCE_MEASUREMENT.md`
+- CoreGraphics performance: `doc/dev/COREGRAPHICS_PERFORMANCE_ANALYSIS.md`
 
 ---
 

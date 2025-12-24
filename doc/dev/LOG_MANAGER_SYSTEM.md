@@ -8,7 +8,7 @@ The Log Manager System provides comprehensive logging functionality for TFM, cap
 
 **This document describes the legacy logging system.** TFM has been refactored to use Python's standard `logging` module. For new code, please refer to:
 
-- **Developer Guide**: `doc/dev/LOGGING_SYSTEM_REFACTOR.md`
+- **Developer Guide**: `doc/dev/LOGGING_SYSTEM_REFACTOR_GUIDE.md`
 - **Migration Guide**: `doc/dev/LOGGING_MIGRATION_GUIDE.md`
 - **Quick Reference**: `doc/dev/LOGGING_QUICK_REFERENCE.md`
 - **User Guide**: `doc/LOGGING_FEATURE.md`

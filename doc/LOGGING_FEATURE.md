@@ -238,7 +238,7 @@ Logs are sent as JSON:
 **Problem:** Log pane fills with too many messages.
 
 **Solution:**
-- Increase `MAX_LOG_MESSAGES` in config
+- Increase `MAX_LOG_MESSAGES` in config (default: 1000)
 - Set higher log level (WARNING or ERROR)
 - Clear old messages by restarting TFM
 
@@ -351,4 +351,4 @@ Messages are color-coded for easy identification:
 
 TFM's logging feature provides comprehensive visibility into application operations, helping you monitor activity, troubleshoot issues, and understand what the application is doing. The color-coded, scrollable log pane makes it easy to track operations and identify problems quickly.
 
-For developer documentation, see `doc/dev/LOGGING_SYSTEM_REFACTOR.md`.
+For developer documentation, see `doc/dev/LOGGING_SYSTEM_REFACTOR_GUIDE.md`.

@@ -374,7 +374,8 @@ class InfoDialogHelpers:
         # File Operations (configurable)
         help_lines.append("File Operations:")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_file')} Toggle file selection")
-
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all')} Select all items")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('unselect_all')} Unselect all items")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all_files')} Toggle all files selection")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all_items')} Toggle all items selection")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('compare_selection')} Compare selection (select files/directories matching other pane)")
@@ -397,6 +398,8 @@ class InfoDialogHelpers:
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('jump_to_path')} Jump to path")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('search_content')} Content search dialog")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('file_details')} Show file details")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('diff_files')} View diff between two selected text files")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('directory_diff')} Compare directories recursively")
         help_lines.append("")
         
         # Pane Operations (configurable)
@@ -435,9 +438,14 @@ class InfoDialogHelpers:
         help_lines.append(f"• {'Ctrl+R'.ljust(12)} Refresh file list")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('toggle_hidden')} Toggle visibility of hidden files")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('toggle_color_scheme')} Switch color schemes")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('toggle_fallback_colors')} Toggle fallback color mode")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('favorites')} Show favorite directories")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('history')} Show history for current pane")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('drives_dialog')} Show drives/storage selection dialog")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('programs')} Show external programs menu")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('subshell')} Enter subshell (command line) mode")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('view_options')} Show view options menu")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('settings_menu')} Show settings and configuration menu")
         help_lines.append("")
         
         # Remote Log Monitoring

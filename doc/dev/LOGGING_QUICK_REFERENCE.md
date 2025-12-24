@@ -281,7 +281,7 @@ log_manager.configure_handlers(
 
 ## Resources
 
-- **Developer Guide**: `doc/dev/LOGGING_SYSTEM_REFACTOR.md`
+- **Developer Guide**: `doc/dev/LOGGING_SYSTEM_REFACTOR_GUIDE.md`
 - **Migration Guide**: `doc/dev/LOGGING_MIGRATION_GUIDE.md`
 - **User Guide**: `doc/LOGGING_FEATURE.md`
 - **Design Document**: `.kiro/specs/logging-system-refactor/design.md`

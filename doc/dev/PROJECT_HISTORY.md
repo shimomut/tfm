@@ -8,7 +8,7 @@ This document chronicles the evolution of TFM (TUI File Manager) from its initia
 
 ## Visual Timeline
 
-![TFM Project Evolution Timeline](images/project_history_timeline.svg)
+!TFM Project Evolution Timeline
 
 ---
 

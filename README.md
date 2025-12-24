@@ -78,6 +78,8 @@ For comprehensive information about TFM's features and usage:
 
 ### User Documentation
 - **[Complete User Guide](doc/TFM_USER_GUIDE.md)** - Comprehensive guide covering all features, configuration, and usage
+- **[Configuration](doc/CONFIGURATION_FEATURE.md)** - Complete configuration reference and customization guide
+- **[AWS S3 Support](doc/S3_SUPPORT_FEATURE.md)** - Cloud storage integration and S3 bucket management
 - **[Archive Virtual Directory Browsing](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md)** - Browse archives as directories
 - **[Remote Log Monitoring](doc/REMOTE_LOG_MONITORING_FEATURE.md)** - Real-time log monitoring setup and usage
 - **[Search Animation](doc/SEARCH_ANIMATION_FEATURE.md)** - Advanced search features and visual feedback
@@ -107,6 +109,8 @@ All key bindings are fully customizable through the configuration system. For co
 - **Sub-shell Mode:** `X` to enter shell with TFM environment variables
 - **Configuration:** `Z` for settings menu
 - **AWS S3 Support:** Navigate S3 buckets using `s3://bucket/path` syntax
+
+For comprehensive S3 setup and usage, see the **[AWS S3 Support Feature Guide](doc/S3_SUPPORT_FEATURE.md)**.
 
 ## Archive Virtual Directory Browsing
 
@@ -187,8 +191,9 @@ python3 tfm.py --left /path/to/projects --right /path/to/documents
 # Enable remote log monitoring
 python3 tfm.py --remote-log-port 8888
 
-# Enable performance profiling
-python3 tfm.py --profile
+# Enable performance profiling (specify targets: event, rendering, or both)
+python3 tfm.py --profile event
+python3 tfm.py --profile rendering,event
 
 # Enable debug mode (full stack traces)
 python3 tfm.py --debug
@@ -283,7 +288,7 @@ TFM is highly configurable through `~/.tfm/config.py`. Access configuration via 
 - Favorite directories and startup paths
 - Performance and behavior settings
 
-For detailed configuration options, see the [User Guide](doc/TFM_USER_GUIDE.md#configuration).
+For detailed configuration options, see the **[Configuration Feature Guide](doc/CONFIGURATION_FEATURE.md)** and the [User Guide](doc/TFM_USER_GUIDE.md#configuration).
 
 ## Project Structure
 

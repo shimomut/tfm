@@ -525,7 +525,7 @@ self.logger.info("Processing completed")
 
 - **Design Document**: `.kiro/specs/logging-system-refactor/design.md`
 - **Requirements**: `.kiro/specs/logging-system-refactor/requirements.md`
-- **Developer Guide**: `doc/dev/LOGGING_SYSTEM_REFACTOR.md`
+- **Developer Guide**: `doc/dev/LOGGING_SYSTEM_REFACTOR_GUIDE.md`
 - **Tests**: `test/test_*.py` (logging-related tests)
 
 ### Questions?

@@ -198,4 +198,4 @@ The jump dialog searches from the current directory:
 - [Favorite Directories Feature](FAVORITE_DIRECTORIES_FEATURE.md)
 - [Drives Dialog Feature](DRIVES_DIALOG_FEATURE.md)
 <!-- TODO: Create HISTORY_NAVIGATION_FEATURE.md -->
-<!-- - [History Navigation Feature](HISTORY_NAVIGATION_FEATURE.md) -->
+<!-- - History Navigation Feature -->

@@ -156,6 +156,6 @@ class Config:
 
 ## See Also
 
-- [View Options Menu](VIEW_OPTIONS_FEATURE.md)
-- [Configuration Guide](CONFIGURATION_GUIDE.md)
-- [Keyboard Shortcuts](KEYBOARD_SHORTCUTS.md)
+- View Options Menu
+- [Configuration Guide](CONFIGURATION_FEATURE.md)
+- Keyboard Shortcuts

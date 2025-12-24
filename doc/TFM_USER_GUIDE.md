@@ -240,7 +240,9 @@ Desktop mode settings are configured in `~/.tfm/config.py`:
 PREFERRED_BACKEND = 'coregraphics'  # Use desktop mode by default
 
 # Desktop mode settings (macOS only)
-DESKTOP_FONT_NAME = 'Menlo'         # Font name
+# Font name - can be a single font or list for cascade fallback
+DESKTOP_FONT_NAME = 'Menlo'         # Single font (simple)
+# DESKTOP_FONT_NAME = ['Menlo', 'Monaco', 'Courier']  # Multiple fonts with fallback
 DESKTOP_FONT_SIZE = 14              # Font size in points
 DESKTOP_WINDOW_WIDTH = 1200         # Initial window width in pixels
 DESKTOP_WINDOW_HEIGHT = 800         # Initial window height in pixels
@@ -279,6 +281,8 @@ python3 tfm.py --desktop
 ### Keyboard Shortcuts
 
 All keyboard shortcuts work identically in both terminal and desktop modes. The same key bindings apply regardless of which backend you're using.
+
+For a complete list of all keyboard shortcuts, see the [Keyboard Shortcuts Reference](#keyboard-shortcuts-reference) section. You can also press **?** at any time while using TFM to see the built-in help dialog with all available shortcuts.
 
 ### Performance
 
@@ -440,10 +444,20 @@ G        - Content search (grep) dialog
 :        - Clear current filter
 ```
 
+### Sorting
+```
+s/S      - Show sort options menu
+1        - Quick sort by name
+2        - Quick sort by extension
+3        - Quick sort by size
+4        - Quick sort by date
+```
+
 ### Search Tips
 - **Incremental search**: Start typing to filter files immediately
 - **Pattern filtering**: Use wildcards like `*.txt` or `test_*`
 - **Content search**: Search inside files with progress tracking
+- **Quick sort**: Use number keys 1-4 for instant sorting
 - **ESC**: Cancel any search operation
 
 **See detailed documentation**: [Search Animation Feature](SEARCH_ANIMATION_FEATURE.md)
@@ -488,7 +502,10 @@ TEXT_EDITOR = 'vim'  # or 'nano', 'code', etc.
 
 ## AWS S3 Integration
 
-### Setup
+TFM provides native AWS S3 integration for seamless cloud storage management. For comprehensive S3 documentation including setup, usage, troubleshooting, and advanced features, see the **[AWS S3 Support Feature Guide](S3_SUPPORT_FEATURE.md)**.
+
+### Quick Start
+
 1. Install boto3: `pip install boto3`
 2. Configure AWS credentials (AWS CLI, environment variables, or IAM roles)
 3. Navigate to S3 buckets using s3:// URIs
@@ -558,6 +575,24 @@ python3 tools/tfm_log_client.py localhost 8888
 _        - Reset log pane height (Shift+-)
 ```
 
+### File Comparison
+```
+=        - View diff between two selected text files (requires 2 files selected)
+@        - Compare directories recursively (Shift+2)
+w/W      - Show file and directory comparison options
+```
+
+**See detailed documentation**: [Diff Viewer Feature](DIFF_VIEWER_FEATURE.md), [Directory Diff Viewer Feature](DIRECTORY_DIFF_VIEWER_FEATURE.md)
+
+### View and Display Options
+```
+z        - Show view options menu
+Z        - Show settings and configuration menu
+t        - Toggle between dark and light color schemes
+T        - Toggle fallback color mode for terminal compatibility
+.        - Toggle visibility of hidden files
+```
+
 ### Progress Animation
 TFM shows animated progress indicators during long-running operations like searching files.
 
@@ -605,6 +640,8 @@ snakeviz profiling_output/render_profile_*.prof
 TFM creates `~/.tfm/config.py` on first run. Access it via:
 - Press **Z** → Settings Menu → Edit Configuration
 - Or edit `~/.tfm/config.py` directly
+
+**For comprehensive configuration documentation**, see the **[Configuration Feature Guide](CONFIGURATION_FEATURE.md)** which covers all available options, examples, and best practices.
 
 ### Key Bindings
 Customize any key binding in your config file:
@@ -671,7 +708,7 @@ python3 tfm.py --desktop               # Shorthand for desktop mode
 ```bash
 --remote-log-port 8888            # Enable remote monitoring
 --color-test MODE                 # Test color support (see modes below)
---profile                         # Enable performance profiling
+--profile TARGETS                 # Enable performance profiling (see targets below)
 --debug                           # Enable debug mode with full stack traces
 --version                         # Show version
 --help                            # Show help
@@ -690,6 +727,21 @@ python3 tfm.py --color-test diagnose       # Diagnose color issues
 ```
 
 **See detailed documentation**: [Color Debugging Feature](COLOR_DEBUGGING_FEATURE.md)
+
+#### Performance Profiling
+Enable performance profiling for specific targets:
+
+```bash
+python3 tfm.py --profile event              # Profile event loop iterations
+python3 tfm.py --profile rendering          # Profile C++ renderer (CoreGraphics only)
+python3 tfm.py --profile rendering,event    # Profile multiple targets
+```
+
+**Available profiling targets:**
+- `event` - Profile event loop iterations using cProfile
+- `rendering` - Profile C++ renderer metrics (CoreGraphics backend only)
+
+Profiling data helps identify performance bottlenecks and optimize TFM's responsiveness.
 
 #### Debug Mode
 Enable detailed error reporting for troubleshooting:
@@ -714,7 +766,7 @@ python3 tfm.py --desktop --left ~/projects --right ~/docs
 python3 tfm.py --backend curses --remote-log-port 8888
 
 # Desktop mode with profiling
-python3 tfm.py --desktop --profile
+python3 tfm.py --desktop --profile event
 ```
 
 **See detailed documentation**: [Command Line Directory Arguments Feature](COMMAND_LINE_DIRECTORY_ARGUMENTS_FEATURE.md)
@@ -781,6 +833,10 @@ For detailed information about specific features, see these dedicated guides:
 - [File Details Feature](FILE_DETAILS_FEATURE.md) - Viewing detailed file information
 - [Rename Conflict Resolution Feature](RENAME_CONFLICT_RESOLUTION_FEATURE.md) - Handling file name conflicts
 
+### Cloud Storage and Archives
+- [AWS S3 Support Feature](S3_SUPPORT_FEATURE.md) - Cloud storage integration and S3 bucket management
+- [Archive Virtual Directory Feature](ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md) - Browse ZIP, TAR, and compressed archives as directories
+
 ### Navigation and Search
 - [Favorite Directories Feature](FAVORITE_DIRECTORIES_FEATURE.md) - Quick directory bookmarks
 - [Search Animation Feature](SEARCH_ANIMATION_FEATURE.md) - Progress indicators during search
@@ -795,6 +851,9 @@ For detailed information about specific features, see these dedicated guides:
 - [Status Bar Feature](STATUS_BAR_FEATURE.md) - Status information display
 - [Wide Character Support Feature](WIDE_CHARACTER_SUPPORT_FEATURE.md) - International character display
 
+### Configuration and Customization
+- [Configuration Feature](CONFIGURATION_FEATURE.md) - Complete configuration reference and customization guide
+
 ### Performance and Debugging
 - [Performance Profiling Feature](PERFORMANCE_PROFILING_FEATURE.md) - Performance analysis, optimization, and testing
 
@@ -804,6 +863,123 @@ For detailed information about specific features, see these dedicated guides:
 - [Remote Log Monitoring Feature](REMOTE_LOG_MONITORING_FEATURE.md) - Network log streaming
 - [Text Editor Feature](TEXT_EDITOR_FEATURE.md) - External editor integration
 - [VSCode Integration](VSCODE_INTEGRATION.md) - Visual Studio Code integration
+
+---
+
+## Keyboard Shortcuts Reference
+
+TFM provides extensive keyboard shortcuts for efficient file management. All shortcuts work identically in both terminal and desktop modes. Press **?** at any time to see the help dialog with all available shortcuts.
+
+### Navigation
+
+| Key | Action |
+|-----|--------|
+| ↑↓ or j/k | Move cursor up/down |
+| ←→ or h/l | Switch between panes |
+| Enter | Enter directory or open file |
+| Backspace | Go to parent directory |
+| Home/End | Go to first/last item |
+| Page Up/Down | Scroll by page |
+| Tab | Switch active pane |
+
+### File Selection
+
+| Key | Action |
+|-----|--------|
+| Space | Toggle file selection |
+| HOME | Select all items |
+| END | Unselect all items |
+| a | Toggle all files selection |
+| A | Toggle all items selection |
+| w, W | Compare selection (select files/directories matching other pane) |
+
+### File Operations
+
+| Key | Action | Selection Required |
+|-----|--------|-------------------|
+| c, C | Copy selected files | Yes |
+| m, M | Move selected files | Yes |
+| k, K | Delete selected files | Yes |
+| r, R | Rename file/directory | No |
+| m, M | Create new directory | No (only when no files selected) |
+| E | Create new file | No |
+
+### View and Search
+
+| Key | Action |
+|-----|--------|
+| v, V | View file content |
+| e | Edit file |
+| f | Search files (isearch) |
+| ; | Filter files by pattern |
+| : | Clear file filter |
+| F | Filename search dialog |
+| J | Jump to path |
+| G | Content search dialog (grep) |
+| i, I | Show file details |
+| = | View diff between two selected text files (requires 2 files selected) |
+| @ | Compare directories recursively |
+
+### Pane Operations
+
+| Key | Action |
+|-----|--------|
+| o | Sync current pane directory to other pane |
+| O | Sync other pane directory to current pane |
+| [ | Make left pane smaller (adjust boundary left) |
+| ] | Make left pane larger (adjust boundary right) |
+| - | Reset pane split to 50% \| 50% |
+
+### Log Pane Controls
+
+| Key | Action |
+|-----|--------|
+| { | Make log pane larger (Shift+[) |
+| } | Make log pane smaller (Shift+]) |
+| _ | Reset log pane height to default (Shift+-) |
+| Shift+Up | Scroll log up (toward older messages) |
+| Shift+Down | Scroll log down (toward newer messages) |
+| Shift+Left | Fast scroll up (toward older messages) |
+| Shift+Right | Fast scroll down (toward newer messages) |
+
+### Sorting
+
+| Key | Action |
+|-----|--------|
+| s, S | Show sort options menu |
+| 1 | Quick sort by filename |
+| 2 | Quick sort by file extension |
+| 3 | Quick sort by file size |
+| 4 | Quick sort by modification date |
+
+### Archive Operations
+
+| Key | Action | Selection Required |
+|-----|--------|-------------------|
+| p, P | Create archive from selected files | Yes |
+| u, U | Extract selected archive | No |
+
+### Other Operations
+
+| Key | Action |
+|-----|--------|
+| ? | Show help dialog |
+| q, Q | Quit TFM |
+| Ctrl+R | Refresh file list |
+| . | Toggle visibility of hidden files |
+| t | Switch color schemes |
+| T | Toggle fallback color mode |
+| j | Show favorite directories |
+| h, H | Show history for current pane |
+| d, D | Show drives/storage selection dialog |
+| x | Show external programs menu |
+| X | Enter subshell (command line) mode |
+| z | Show view options menu |
+| Z | Show settings and configuration menu |
+
+### Customizing Key Bindings
+
+All key bindings can be customized in your configuration file (`~/.tfm/config.py`). See the [Configuration](#customization) section and [Key Bindings Selection Feature](KEY_BINDINGS_SELECTION_FEATURE.md) for details.
 
 ---
 

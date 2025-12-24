@@ -174,6 +174,8 @@ To view detailed information about an archive entry:
 
 ## Key Bindings Summary
 
+Archive browsing uses the same key bindings as regular file browsing in TFM. The keys listed below are the most commonly used operations when working with archives. For the complete list of TFM key bindings, see the [TFM User Guide](TFM_USER_GUIDE.md) or press **?** for help.
+
 | Key | Action |
 |-----|--------|
 | **ENTER** | Enter archive / Enter directory within archive |

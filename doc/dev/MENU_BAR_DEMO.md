@@ -170,9 +170,9 @@ python tfm.py --backend coregraphics
 
 ## Related Documentation
 
-- [Menu Bar Keyboard Shortcuts Feature](MENU_BAR_KEYBOARD_SHORTCUTS_FEATURE.md) - End-user documentation
-- [Keyboard Shortcuts Implementation](dev/KEYBOARD_SHORTCUTS_IMPLEMENTATION.md) - Developer documentation
-- [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - General desktop mode documentation
+- [Menu Bar Feature](../MENU_BAR_FEATURE.md) - End-user documentation (includes keyboard shortcuts reference)
+- [Keyboard Shortcuts Implementation](KEYBOARD_SHORTCUTS_IMPLEMENTATION.md) - Developer documentation
+- [Desktop Mode Guide](../DESKTOP_MODE_GUIDE.md) - General desktop mode documentation
 
 ## Demo Source Code
 

@@ -296,7 +296,7 @@ Potential improvements to the verification system:
 
 - **Requirements Document**: `.kiro/specs/coregraphics-performance-optimization/requirements.md`
 - **Implementation Plan**: `.kiro/specs/coregraphics-performance-optimization/tasks.md`
-- **Performance Measurement**: `doc/dev/COREGRAPHICS_PERFORMANCE_MEASUREMENT.md`
+- **Performance Analysis**: `doc/dev/COREGRAPHICS_PERFORMANCE_ANALYSIS.md`
 - **CoreGraphics Backend**: `ttk/backends/coregraphics_backend.py`
 
 ## Related Documentation

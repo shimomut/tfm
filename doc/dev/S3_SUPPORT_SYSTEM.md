@@ -755,7 +755,7 @@ def __init__(self, s3_uri: str, metadata: Optional[Dict[str, Any]] = None):
 
 ## Related Documentation
 <!-- TODO: Create TFM_PATH_ARCHITECTURE.md -->
-<!-- - [TFM Path Architecture](TFM_PATH_ARCHITECTURE.md) -->
-- [External Programs Policy](../../.kiro/steering/external-programs-policy.md)
+<!-- - TFM Path Architecture -->
+- External Programs Policy
 - [AWS S3 Documentation](https://docs.aws.amazon.com/s3/)
 - [boto3 Documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)

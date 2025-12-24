@@ -407,6 +407,6 @@ Since this is an AI-driven process rather than automated code, testing focuses o
 ## Related Documents
 
 - [Requirements Document](requirements.md)
-- [Project File Placement Policy](.kiro/steering/project-file-placement.md)
-- [TFM User Guide](../../doc/TFM_USER_GUIDE.md)
-- [Project Structure](../../doc/dev/PROJECT_STRUCTURE.md)
+- [Project File Placement Policy](../../../.kiro/steering/project-file-placement.md)
+- [TFM User Guide](../../../doc/TFM_USER_GUIDE.md)
+- [Project Structure](../../../doc/dev/PROJECT_STRUCTURE.md)

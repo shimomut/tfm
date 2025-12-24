@@ -1503,9 +1503,8 @@ def show_context_menu(self, file_path: Path, position: Tuple[int, int]):
 
 ### Documentation
 
-- **End-User Documentation**: `doc/MENU_BAR_FEATURE.md`
-- **Keyboard Shortcuts**: `doc/MENU_BAR_KEYBOARD_SHORTCUTS_FEATURE.md`
-- **Developer Documentation**: `doc/dev/MENU_SYSTEM_ARCHITECTURE.md` (this file)
+- **End-User Documentation**: `doc/MENU_BAR_FEATURE.md` (includes keyboard shortcuts reference)
+- **Developer Documentation**: `doc/dev/MENU_SYSTEM.md` (this file)
 - **Keyboard Shortcuts Implementation**: `doc/dev/KEYBOARD_SHORTCUTS_IMPLEMENTATION.md`
 
 ## References
@@ -1526,10 +1525,9 @@ def show_context_menu(self, file_path: Path, position: Tuple[int, int]):
 
 ### Related TFM Documentation
 
-- [Menu Bar Feature](../MENU_BAR_FEATURE.md) - End-user documentation
-- [Keyboard Shortcuts Feature](../MENU_BAR_KEYBOARD_SHORTCUTS_FEATURE.md) - Shortcut reference
+- [Menu Bar Feature](../MENU_BAR_FEATURE.md) - End-user documentation (includes keyboard shortcuts reference)
 - [Desktop Mode Guide](../DESKTOP_MODE_GUIDE.md) - Desktop mode overview
-- [CoreGraphics Backend Implementation](COREGRAPHICS_BACKEND_IMPLEMENTATION.md) - Backend details
+- CoreGraphics Backend Implementation - Backend details
 
 ## Contributing
 

@@ -414,6 +414,6 @@ print(result)
 ## See Also
 
 - [Date Format Feature Documentation](../DATE_FORMAT_FEATURE.md)
-- [View Options Implementation](VIEW_OPTIONS_IMPLEMENTATION.md)
+- View Options Implementation
 - [Configuration System](CONFIGURATION_SYSTEM.md)
-- [File Operations Module](FILE_OPERATIONS_MODULE.md)
+- File Operations Module

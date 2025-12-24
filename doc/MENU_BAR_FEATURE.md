@@ -221,7 +221,102 @@ This is the fastest way to perform common operations.
 
 ### Complete Shortcut Reference
 
-See [Menu Bar Keyboard Shortcuts Feature](MENU_BAR_KEYBOARD_SHORTCUTS_FEATURE.md) for a complete list of all available keyboard shortcuts.
+The following tables provide a complete reference of all keyboard shortcuts available in TFM's Desktop mode. Shortcuts automatically adapt to your platform (Command key on macOS, Ctrl key on Windows).
+
+#### File Menu Shortcuts
+
+| Shortcut | Action | Description | Requirements |
+|----------|--------|-------------|--------------|
+| Cmd+N / Ctrl+N | New File | Create a new file in the current directory | None |
+| Cmd+Shift+N / Ctrl+Shift+N | New Folder | Create a new folder in the current directory | None |
+| Cmd+O / Ctrl+O | Open | Open the selected file or folder | None |
+| Cmd+D / Ctrl+D | Delete | Delete selected files | Files selected |
+| Cmd+R / Ctrl+R | Rename | Rename selected file | Single file selected |
+| Cmd+Q / Ctrl+Q | Quit | Exit TFM | None |
+
+#### Edit Menu Shortcuts
+
+| Shortcut | Action | Description | Requirements |
+|----------|--------|-------------|--------------|
+| Cmd+C / Ctrl+C | Copy | Copy selected files to clipboard | Files selected |
+| Cmd+X / Ctrl+X | Cut | Cut selected files to clipboard | Files selected |
+| Cmd+V / Ctrl+V | Paste | Paste files from clipboard | Clipboard has content |
+| Cmd+A / Ctrl+A | Select All | Select all files in current directory | None |
+
+#### View Menu Shortcuts
+
+| Shortcut | Action | Description | Requirements |
+|----------|--------|-------------|--------------|
+| Cmd+H / Ctrl+H | Show Hidden Files | Toggle visibility of hidden files | None |
+| Cmd+R / Ctrl+R | Refresh | Refresh the current directory view | None |
+
+#### Go Menu Shortcuts
+
+| Shortcut | Action | Description | Requirements |
+|----------|--------|-------------|--------------|
+| Cmd+Up / Ctrl+Up | Parent Directory | Navigate to parent directory | Not at root |
+| Cmd+Shift+H / Ctrl+Shift+H | Home | Navigate to home directory | None |
+| Cmd+F / Ctrl+F | Favorites | Open favorites dialog | None |
+| Cmd+Shift+R / Ctrl+Shift+R | Recent Locations | Open recent locations dialog | None |
+
+### How Keyboard Shortcuts Work
+
+#### Immediate Execution
+
+When you press a keyboard shortcut:
+
+1. The shortcut is recognized by the operating system's native menu system
+2. A menu event is generated and sent to TFM
+3. TFM executes the corresponding action immediately
+4. No menu needs to be opened or displayed
+
+This provides the fastest possible response time for common operations.
+
+#### Context-Aware Shortcuts
+
+Some shortcuts are only active when certain conditions are met:
+
+- **Selection-dependent shortcuts** (Copy, Cut, Delete, Rename) only work when files are selected
+- **Clipboard-dependent shortcuts** (Paste) only work when the clipboard has content
+- **Navigation shortcuts** (Parent Directory) may be disabled in certain contexts (e.g., at root)
+
+When a shortcut is disabled, pressing it has no effect. The menu bar visually indicates which items are currently enabled or disabled.
+
+#### Learning Shortcuts
+
+1. **Check the menus**: Open menus to see which shortcuts are available
+2. **Start with common operations**: Learn shortcuts for frequently used actions first
+3. **Practice regularly**: Use shortcuts instead of clicking menu items to build muscle memory
+4. **Watch the display**: Shortcuts are shown next to menu items to help you learn
+
+#### Shortcut Conflicts
+
+If a keyboard shortcut conflicts with another application or system shortcut:
+
+1. The menu shortcut takes priority when TFM is the active application
+2. System-level shortcuts (like Cmd+Tab on macOS) always take precedence
+3. You can still access the menu item by clicking it in the menu bar
+
+### Technical Details
+
+#### Shortcut Format
+
+Shortcuts are specified in a platform-independent format:
+
+- Format: `Modifier+Key` (e.g., `Cmd+N`, `Ctrl+C`)
+- Multiple modifiers: `Modifier1+Modifier2+Key` (e.g., `Cmd+Shift+N`)
+- Supported modifiers: `Cmd`, `Ctrl`, `Shift`, `Alt`/`Option`
+
+The MenuManager automatically converts these to the appropriate platform-specific format.
+
+#### Implementation
+
+Keyboard shortcuts are implemented at the native operating system level:
+
+- **macOS**: Uses NSMenuItem key equivalents and modifier masks
+- **Windows**: Will use Win32 menu accelerators (when implemented)
+
+This ensures shortcuts work reliably and feel native to the platform.
 
 ## Usage Examples
 
@@ -361,9 +456,8 @@ Both modes provide the same functionality, just with different interfaces optimi
 
 ## See Also
 
-- [Menu Bar Keyboard Shortcuts Feature](MENU_BAR_KEYBOARD_SHORTCUTS_FEATURE.md) - Complete keyboard shortcut reference
 - [Desktop Mode Guide](DESKTOP_MODE_GUIDE.md) - Overview of desktop mode features
-- [Menu Bar Demo](MENU_BAR_DEMO.md) - Interactive demonstration of menu bar features
+- [Menu Bar Demo](dev/MENU_BAR_DEMO.md) - Interactive demonstration of menu bar features
 - [Key Bindings Selection Feature](KEY_BINDINGS_SELECTION_FEATURE.md) - Terminal mode key bindings
 
 ## Future Enhancements
