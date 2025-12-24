@@ -3344,14 +3344,16 @@ class DirectoryDiffViewer(UILayer):
         Recursively collect all visible children of a node.
         
         This respects the expansion state of child directories - only children
-        of expanded directories are included.
+        of expanded directories are included. Also respects the show_identical filter.
         
         Args:
             node: Parent node whose children to collect
             result: List to append visible children to
         """
         for child in node.children:
-            result.append(child)
+            # Apply show_identical filter (same logic as _flatten_tree)
+            if self.show_identical or child.difference_type != DifferenceType.IDENTICAL:
+                result.append(child)
             
             # If child is an expanded directory, recursively collect its children
             if child.is_directory and child.is_expanded:

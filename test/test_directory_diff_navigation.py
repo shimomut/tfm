@@ -31,6 +31,7 @@ class TestDirectoryDiffNavigation(unittest.TestCase):
         # Create mock renderer
         self.renderer = Mock()
         self.renderer.get_size.return_value = (80, 24)
+        self.renderer.get_dimensions.return_value = (24, 80)  # height, width
         
         # Create mock paths
         self.left_path = Mock(spec=Path)
@@ -301,6 +302,95 @@ class TestDirectoryDiffNavigation(unittest.TestCase):
         
         self.assertTrue(result)  # Event consumed
         self.assertEqual(self.viewer.cursor_position, initial_cursor)  # But no action
+    
+    def test_expand_respects_identical_filter(self):
+        """Test that expanding a directory respects the show_identical filter."""
+        # Create a directory with both identical and different children
+        root = TreeNode(
+            name="",
+            left_path=None,
+            right_path=None,
+            is_directory=True,
+            difference_type=DifferenceType.CONTAINS_DIFFERENCE,
+            depth=0,
+            is_expanded=True,
+            children=[],
+            parent=None
+        )
+        
+        # Create a directory with mixed children
+        parent_dir = TreeNode(
+            name="parent",
+            left_path=Mock(spec=Path),
+            right_path=Mock(spec=Path),
+            is_directory=True,
+            difference_type=DifferenceType.CONTAINS_DIFFERENCE,
+            depth=1,
+            is_expanded=False,
+            children=[],
+            parent=root
+        )
+        
+        # Add identical child
+        identical_child = TreeNode(
+            name="identical.txt",
+            left_path=Mock(spec=Path),
+            right_path=Mock(spec=Path),
+            is_directory=False,
+            difference_type=DifferenceType.IDENTICAL,
+            depth=2,
+            is_expanded=False,
+            children=[],
+            parent=parent_dir
+        )
+        
+        # Add different child
+        different_child = TreeNode(
+            name="different.txt",
+            left_path=Mock(spec=Path),
+            right_path=Mock(spec=Path),
+            is_directory=False,
+            difference_type=DifferenceType.CONTENT_DIFFERENT,
+            depth=2,
+            is_expanded=False,
+            children=[],
+            parent=parent_dir
+        )
+        
+        parent_dir.children = [identical_child, different_child]
+        parent_dir.children_scanned = True  # Mark as already scanned
+        root.children = [parent_dir]
+        
+        self.viewer.root_node = root
+        self.viewer._update_visible_nodes()
+        
+        # Initially, only parent_dir should be visible
+        self.assertEqual(len(self.viewer.visible_nodes), 1)
+        self.assertEqual(self.viewer.visible_nodes[0].name, "parent")
+        
+        # Hide identical files
+        self.viewer.show_identical = False
+        
+        # Expand the parent directory
+        self.viewer.expand_node(0)
+        
+        # After expansion with filter on, only different_child should be visible
+        # visible_nodes should contain: parent_dir, different_child
+        self.assertEqual(len(self.viewer.visible_nodes), 2)
+        self.assertEqual(self.viewer.visible_nodes[0].name, "parent")
+        self.assertEqual(self.viewer.visible_nodes[1].name, "different.txt")
+        
+        # Collapse and re-expand with show_identical = True
+        self.viewer.collapse_node(0)
+        self.viewer.show_identical = True
+        self.viewer.expand_node(0)
+        
+        # Now both children should be visible
+        # visible_nodes should contain: parent_dir, identical_child, different_child
+        self.assertEqual(len(self.viewer.visible_nodes), 3)
+        self.assertEqual(self.viewer.visible_nodes[0].name, "parent")
+        self.assertEqual(self.viewer.visible_nodes[1].name, "identical.txt")
+        self.assertEqual(self.viewer.visible_nodes[2].name, "different.txt")
 
 
 if __name__ == '__main__':
