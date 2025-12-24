@@ -3619,9 +3619,9 @@ class FileManager(UILayer):
                         current_pane['focused_index'] = 0
                         current_pane['scroll_offset'] = 0
                     
-                    self.logger.info(f"Exited archive: {archive_filename}")
+                    self.mark_dirty()
                 except Exception as e:
-                    self.logger.error(f"Error exiting archive: {e}")
+                    self.logger.error(f"Error navigating to parent directory: {e}")
                     self.mark_dirty()
             return True
         elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
