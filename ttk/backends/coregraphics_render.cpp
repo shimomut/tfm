@@ -1821,9 +1821,12 @@ static void draw_character_batch(
     
     // Draw underline if needed
     if (batch.underline) {
-        // Calculate underline position and thickness
-        CGFloat underline_position = baseline_y + CTFontGetUnderlinePosition(font_to_use);
+        // Position underline between the text baseline and bottom of the text grid row
+        // This provides better visual balance than positioning at the very bottom
+        // baseline_y is where the text sits, batch.y is the bottom of the cell
+        // Position underline midway between them
         CGFloat underline_thickness = CTFontGetUnderlineThickness(font_to_use);
+        CGFloat underline_position = (baseline_y + batch.y) / 2.0f;
         
         // Draw underline as a filled rectangle
         // Use the actual batch width (sum of cell widths) for underline
@@ -1880,8 +1883,15 @@ static void render_characters(
                 continue;
             }
             
-            // Skip spaces - backgrounds already rendered
-            if (cell.character.length() == 1 && cell.character[0] == u' ') {
+            // Check if this is a space character
+            bool is_space = (cell.character.length() == 1 && cell.character[0] == u' ');
+            
+            // Extract underline attribute early to decide if we should skip spaces
+            bool has_underline = (cell.attributes & 2) != 0;  // UNDERLINE is bit 1
+            
+            // Skip spaces only if they don't have underline - backgrounds already rendered
+            // If space has underline, we need to include it in the batch to draw underline
+            if (is_space && !has_underline) {
                 // Finish current batch if any
                 if (current_batch.has_value()) {
                     draw_character_batch(context, current_batch.value(), char_width, char_height, font_ascent, attr_dict_cache);
