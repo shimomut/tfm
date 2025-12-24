@@ -4160,14 +4160,12 @@ def create_parser():
     
     parser.add_argument(
         '--profile',
-        action='store_true',
-        help='Enable performance profiling mode (collects FPS data and generates profiling files)'
-    )
-    
-    parser.add_argument(
-        '--perf-logging',
-        action='store_true',
-        help='Enable C++ renderer performance logging (CoreGraphics backend only, logs metrics every 60 frames)'
+        type=str,
+        metavar='TARGETS',
+        help='Enable performance profiling for specified targets (comma-separated). '
+             'Available targets: mainloop (FPS and event loop profiling), '
+             'rendering (C++ renderer metrics, CoreGraphics only). '
+             'Example: --profile=mainloop,rendering'
     )
     
     return parser
@@ -4184,6 +4182,17 @@ def cli_main():
         if args.debug:
             os.environ['TFM_DEBUG'] = '1'
             print("Debug mode enabled - full stack traces will be shown for uncaught exceptions", file=sys.stderr)
+        
+        # Parse profiling targets
+        profile_targets = set()
+        if args.profile:
+            profile_targets = set(target.strip() for target in args.profile.split(','))
+            valid_targets = {'mainloop', 'rendering'}
+            invalid_targets = profile_targets - valid_targets
+            if invalid_targets:
+                print(f"Warning: Invalid profiling targets: {', '.join(invalid_targets)}", file=sys.stderr)
+                print(f"Valid targets: {', '.join(sorted(valid_targets))}", file=sys.stderr)
+                profile_targets = profile_targets & valid_targets
         
         # Handle color testing mode
         if args.color_test:
@@ -4210,14 +4219,14 @@ def cli_main():
             from ttk.backends.coregraphics_backend import CoreGraphicsBackend
             renderer = CoreGraphicsBackend(**backend_options)
             
-            # Enable C++ performance logging if requested via environment variable
-            if os.environ.get('TFM_PERF_LOGGING', '').lower() in ('1', 'true', 'yes'):
+            # Enable C++ performance logging if 'rendering' profiling target is specified
+            if 'rendering' in profile_targets:
                 try:
                     import ttk_coregraphics_render
                     ttk_coregraphics_render.enable_perf_logging(1)
-                    print("TFM: C++ performance logging enabled", file=sys.stderr)
+                    print("TFM: C++ renderer performance logging enabled", file=sys.stderr)
                 except Exception as e:
-                    print(f"TFM: Failed to enable C++ performance logging: {e}", file=sys.stderr)
+                    print(f"TFM: Failed to enable C++ renderer performance logging: {e}", file=sys.stderr)
         else:
             raise ValueError(f"Unknown backend: {backend_name}")
         
@@ -4230,7 +4239,7 @@ def cli_main():
                  remote_log_port=args.remote_log_port,
                  left_dir=args.left,
                  right_dir=args.right,
-                 profiling_enabled=args.profile)
+                 profiling_enabled='mainloop' in profile_targets)
         finally:
             # Ensure renderer is properly shut down
             renderer.shutdown()
