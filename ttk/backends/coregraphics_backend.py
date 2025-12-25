@@ -188,7 +188,7 @@ class CoreGraphicsBackend(Renderer):
     
     # Window padding multiplier: adds (WINDOW_PADDING_MULTIPLIER * char_height) to window dimensions
     # This creates a pleasant frame around the text grid that edge cells will fill
-    WINDOW_PADDING_MULTIPLIER = 0.5
+    WINDOW_PADDING_MULTIPLIER = 0.4
     
     
     def __init__(self, window_title: str = "TTK Application",
@@ -1964,17 +1964,17 @@ if COCOA_AVAILABLE:
                 Handle the start of a live resize operation.
                 
                 This method is called when the user starts dragging the window
-                resize handle. We enable resize increments to ensure the window
-                snaps to character grid boundaries during manual resizing.
-                
-                Note: We no longer call _snap_window_to_grid() here because:
-                1. It would change both dimensions even when resizing only one edge
-                2. The resize increments handle snapping during the drag operation
-                3. This prevents unwanted dimension changes (e.g., width changing when adjusting height)
+                resize handle. We snap the window to the grid first to ensure
+                proper alignment, then enable resize increments for snapping
+                during the drag operation.
                 
                 Args:
                     notification: NSNotification containing resize information
                 """
+                # Snap window to grid before starting resize
+                # This ensures we start from a properly aligned state
+                self._snap_window_to_grid()
+                
                 # Enable resize increments for manual resizing
                 # This ensures the window snaps to character grid boundaries during drag
                 resize_increment = Cocoa.NSMakeSize(self.backend.char_width, self.backend.char_height)
@@ -1996,19 +1996,65 @@ if COCOA_AVAILABLE:
                 # Setting increments to (1, 1) effectively disables the constraint
                 self.backend.window.setResizeIncrements_(Cocoa.NSMakeSize(1.0, 1.0))
             
+            def _is_window_snapped_to_edge(self):
+                """
+                Check if the window is snapped to any monitor edge.
+                
+                This method compares the window's frame with the screen's visible
+                frame to determine if the window is aligned with any edge. This is
+                used to detect when the window is in a macOS-managed state (split
+                view, tiled, or manually snapped to screen edges).
+                
+                Returns:
+                    bool: True if window is snapped to any edge (left, right, top, or bottom)
+                """
+                window_frame = self.backend.window.frame()
+                screen = self.backend.window.screen()
+                
+                if not screen:
+                    return False
+                
+                # Get the visible frame (excludes menu bar and dock)
+                visible_frame = screen.visibleFrame()
+                
+                # Define a small tolerance for floating point comparison (1.5 pixel)
+                tolerance = 1.5
+                
+                # Check if window is snapped to any edge
+                snapped_left = abs(window_frame.origin.x - visible_frame.origin.x) < tolerance
+                snapped_right = abs((window_frame.origin.x + window_frame.size.width) - 
+                                    (visible_frame.origin.x + visible_frame.size.width)) < tolerance
+                snapped_bottom = abs(window_frame.origin.y - visible_frame.origin.y) < tolerance
+                snapped_top = abs((window_frame.origin.y + window_frame.size.height) - 
+                                  (visible_frame.origin.y + visible_frame.size.height)) < tolerance
+                
+                return snapped_left or snapped_right or snapped_bottom or snapped_top
+            
             def _snap_window_to_grid(self):
                 """
                 Snap the window size to the character grid.
                 
                 This method adjusts the window frame to ensure the content size
                 is an exact multiple of the character cell size plus the standard
-                padding. This prevents partial character cells
-                from appearing at the edges of the window.
+                padding. This prevents partial character cells from appearing at
+                the edges of the window.
                 
-                Called only at the start of resize operations to ensure proper
-                initial alignment. Not called at the end to respect macOS window
-                management features (maximized, split view, tiled windows).
+                The window's top-left position is preserved during snapping.
+                Since macOS uses bottom-left origin coordinates, we calculate
+                the new bottom-left position to maintain the same top-left.
+                
+                If the window is snapped to any screen edge (split view, tiled,
+                or manually positioned), snapping is skipped to respect the
+                macOS window management state.
+                
+                Called at the start of resize operations to ensure proper
+                initial alignment.
                 """
+                # Skip snapping if window is snapped to any screen edge
+                # This preserves macOS window management features (split view, tiling)
+                if self._is_window_snapped_to_edge():
+                    return
+                
                 # Get current window frame and content rect
                 window_frame = self.backend.window.frame()
                 content_rect = self.backend.window.contentView().frame()
@@ -2046,10 +2092,15 @@ if COCOA_AVAILABLE:
                 new_frame_width = snapped_width + frame_width_diff
                 new_frame_height = snapped_height + frame_height_diff
                 
-                # Create new frame with snapped size, keeping the same origin
+                # Calculate height change to adjust origin
+                height_change = new_frame_height - window_frame.size.height
+                
+                # Create new frame with snapped size
+                # Adjust origin.y to preserve top-left position (macOS uses bottom-left origin)
+                # When height increases, origin.y must decrease to keep top fixed
                 new_frame = Cocoa.NSMakeRect(
                     window_frame.origin.x,
-                    window_frame.origin.y,
+                    window_frame.origin.y - height_change,
                     new_frame_width,
                     new_frame_height
                 )
