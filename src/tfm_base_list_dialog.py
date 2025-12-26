@@ -23,6 +23,7 @@ class BaseListDialog:
         self.selected = 0  # Index of currently selected item
         self.scroll = 0  # Scroll offset for the list
         self.text_editor = SingleLineTextEdit()  # Text editor for input
+        self._last_content_height = None  # Cache actual content height from last draw
         
     def exit(self):
         """Exit dialog mode - to be overridden by subclasses"""
@@ -30,6 +31,7 @@ class BaseListDialog:
         self.selected = 0
         self.scroll = 0
         self.text_editor.clear()
+        self._last_content_height = None  # Clear cached content height
         
     def handle_common_navigation(self, event, items_list):
         """Handle common navigation keys for list dialogs
@@ -129,17 +131,28 @@ class BaseListDialog:
             content_height: Height of the content area (calculated if None)
         """
         if content_height is None:
-            # Use default dialog dimensions for scroll calculation
-            height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
-            min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
-            screen_height = 24  # Default terminal height
-            
-            # Handle case where config values might be Mock objects in tests
-            try:
-                dialog_height = max(min_height, int(screen_height * height_ratio))
-            except (TypeError, ValueError):
-                dialog_height = 15  # Fallback for tests
-            content_height = dialog_height - 6  # Account for title, input, borders, help
+            # Try to use cached content height from last draw
+            if self._last_content_height is not None:
+                content_height = self._last_content_height
+            else:
+                # Fallback: estimate content height from dialog dimensions
+                # This is only used before first draw or if draw hasn't been called
+                height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
+                min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
+                
+                # Get actual terminal height from renderer
+                if self.renderer:
+                    screen_height, _ = self.renderer.get_dimensions()
+                else:
+                    screen_height = 24  # Fallback if no renderer available
+                
+                # Handle case where config values might be Mock objects in tests
+                try:
+                    dialog_height = max(min_height, int(screen_height * height_ratio))
+                except (TypeError, ValueError):
+                    dialog_height = 15  # Fallback for tests
+                # Conservative estimate - actual content area varies by dialog layout
+                content_height = dialog_height - 8
         
         if self.selected < self.scroll:
             self.scroll = self.selected
@@ -296,6 +309,9 @@ class BaseListDialog:
         """
         height, _ = self.renderer.get_dimensions()
         content_height = end_y - start_y + 1
+        
+        # Cache the actual content height for use in navigation
+        self._last_content_height = content_height
         
         # Update scroll with actual content height
         self._adjust_scroll(len(items_list), content_height)
