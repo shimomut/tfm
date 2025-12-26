@@ -1557,12 +1557,6 @@ class FileManager(UILayer):
                     pass
             return
         
-        # Calculate scroll offset
-        if pane_data['focused_index'] < pane_data['scroll_offset']:
-            pane_data['scroll_offset'] = pane_data['focused_index']
-        elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
-            pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
-        
         # Pre-calculate layout constants (once per pane, not per file)
         datetime_width = self.get_date_column_width()
         size_width = 8
@@ -3371,6 +3365,7 @@ class FileManager(UILayer):
                 self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
                 current_pane['focused_index'] = self.isearch_matches[self.isearch_match_index]
+                self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
@@ -3379,6 +3374,7 @@ class FileManager(UILayer):
                 self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
                 current_pane['focused_index'] = self.isearch_matches[self.isearch_match_index]
+                self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
         
@@ -3652,11 +3648,13 @@ class FileManager(UILayer):
         elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['focused_index'] > 0:
                 current_pane['focused_index'] -= 1
+                self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['focused_index'] < len(current_pane['files']) - 1:
                 current_pane['focused_index'] += 1
+                self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
         elif event.key_code == KeyCode.ENTER:
@@ -3694,10 +3692,12 @@ class FileManager(UILayer):
             return True
         elif event.key_code == KeyCode.PAGE_UP:  # Page Up - file navigation only
             current_pane['focused_index'] = max(0, current_pane['focused_index'] - 10)
+            self.adjust_scroll_for_focus(current_pane)
             self.mark_dirty()
             return True
         elif event.key_code == KeyCode.PAGE_DOWN:  # Page Down - file navigation only
             current_pane['focused_index'] = min(len(current_pane['files']) - 1, current_pane['focused_index'] + 10)
+            self.adjust_scroll_for_focus(current_pane)
             self.mark_dirty()
             return True
         elif event.key_code == KeyCode.BACKSPACE:  # Backspace - go to parent directory
