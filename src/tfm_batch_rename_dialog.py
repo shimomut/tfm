@@ -573,15 +573,22 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         """
         Handle a mouse event (UILayer interface).
         
-        Mouse events are not yet implemented for dialogs.
+        Supports mouse wheel scrolling for vertical navigation.
         
         Args:
             event: MouseEvent to handle
         
         Returns:
-            False (not yet implemented)
+            True if event was handled, False otherwise
         """
-        return False
+        # Call BaseListDialog's wheel scrolling method directly
+        result = BaseListDialog.handle_mouse_event(self, event, self.preview_items)
+        
+        # Mark content as changed if scroll position changed
+        if result:
+            self.content_changed = True
+        
+        return result
     
     def render(self, renderer) -> None:
         """

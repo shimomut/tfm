@@ -402,3 +402,40 @@ class BaseListDialog:
                 help_x = start_x + (dialog_width - help_width) // 2
                 if help_x >= start_x:
                     self.renderer.draw_text(y, help_x, truncated_help, color_pair=status_color_pair, attributes=help_attributes)
+    
+    def handle_mouse_event(self, event, items_list):
+        """Handle mouse events for list dialogs
+        
+        Supports mouse wheel scrolling for vertical navigation.
+        
+        Args:
+            event: MouseEvent to handle
+            items_list: List of items to navigate through
+            
+        Returns:
+            True if event was handled, False otherwise
+        """
+        from ttk.ttk_mouse_event import MouseEventType
+        
+        # Handle wheel events for scrolling
+        if event.event_type == MouseEventType.WHEEL:
+            # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
+            scroll_lines = int(event.scroll_delta_y * 1)
+            
+            if scroll_lines != 0 and items_list:
+                # Calculate max scroll based on cached content height
+                content_height = self._last_content_height if self._last_content_height else 10
+                max_scroll = max(0, len(items_list) - content_height)
+                
+                # Adjust scroll based on scroll direction
+                old_scroll = self.scroll
+                new_scroll = old_scroll - scroll_lines  # Negative delta scrolls down (increases scroll)
+                
+                # Clamp to valid range
+                new_scroll = max(0, min(new_scroll, max_scroll))
+                
+                if new_scroll != old_scroll:
+                    self.scroll = new_scroll
+                    return True
+        
+        return False
