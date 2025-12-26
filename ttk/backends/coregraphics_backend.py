@@ -275,6 +275,12 @@ class CoreGraphicsBackend(Renderer):
         # Event callback for callback-based event delivery
         self.event_callback: Optional['EventCallback'] = None
         
+        # Scroll delta accumulation for wheel events
+        self.accumulated_scroll_x = 0.0
+        self.accumulated_scroll_y = 0.0
+        self.last_scroll_time = 0.0
+        self.SCROLL_ACCUMULATION_TIMEOUT = 1.0  # Reset after 1 second of no scrolling
+        
         # C++ renderer module (initialized in initialize())
         self._cpp_renderer = None
     
@@ -2095,12 +2101,49 @@ class CoreGraphicsBackend(Renderer):
         scroll_delta_x = 0.0
         scroll_delta_y = 0.0
         if mouse_event_type == MouseEventType.WHEEL:
-            scroll_delta_x = float(event.scrollingDeltaX())
-            scroll_delta_y = float(event.scrollingDeltaY())
+            # Get raw scroll deltas from the event
+            raw_delta_x = float(event.scrollingDeltaX())
+            raw_delta_y = float(event.scrollingDeltaY())
             
             # Skip scroll events with zero delta (phase events like MayBegin, Ended)
             # These are momentum/gesture tracking events that don't represent actual scrolling
-            if scroll_delta_x == 0.0 and scroll_delta_y == 0.0:
+            if raw_delta_x == 0.0 and raw_delta_y == 0.0:
+                return
+            
+            # Normalize deltas by dividing by font height to get line-based scrolling
+            # This makes scrolling consistent regardless of font size
+            if self.char_height > 0:
+                normalized_delta_x = raw_delta_x / self.char_height
+                normalized_delta_y = raw_delta_y / self.char_height
+            else:
+                # Fallback if char_height not yet initialized
+                normalized_delta_x = raw_delta_x / 16.0
+                normalized_delta_y = raw_delta_y / 16.0
+            
+            # Check if we need to reset accumulation (more than 1 second since last scroll)
+            current_time = time.time()
+            if current_time - self.last_scroll_time > self.SCROLL_ACCUMULATION_TIMEOUT:
+                self.accumulated_scroll_x = 0.0
+                self.accumulated_scroll_y = 0.0
+            
+            # Update last scroll time
+            self.last_scroll_time = current_time
+            
+            # Accumulate the normalized deltas
+            self.accumulated_scroll_x += normalized_delta_x
+            self.accumulated_scroll_y += normalized_delta_y
+            
+            # Only emit event if accumulated delta exceeds 1.0 in either direction
+            if abs(self.accumulated_scroll_x) >= 1.0 or abs(self.accumulated_scroll_y) >= 1.0:
+                # Extract integer part for the event
+                scroll_delta_x = int(self.accumulated_scroll_x)
+                scroll_delta_y = int(self.accumulated_scroll_y)
+                
+                # Keep the fractional part for next accumulation
+                self.accumulated_scroll_x -= scroll_delta_x
+                self.accumulated_scroll_y -= scroll_delta_y
+            else:
+                # Not enough accumulated delta yet, skip this event
                 return
         
         # Get modifier keys

@@ -2012,19 +2012,6 @@ class FileManager(UILayer):
         else:
             self.isearch_match_index = 0
             
-    def adjust_scroll_for_focus(self, pane_data):
-        """Ensure the selected item is visible by adjusting scroll offset"""
-        height, width = self.renderer.get_dimensions()
-        calculated_height = int(height * self.log_height_ratio)
-        log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 3  # Reserve space for header, footer, and status
-        
-        # Adjust scroll offset to keep selection visible
-        if pane_data['focused_index'] < pane_data['scroll_offset']:
-            pane_data['scroll_offset'] = pane_data['focused_index']
-        elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
-            pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
-            
     def enter_isearch_mode(self):
         """Enter isearch mode"""
         self.isearch_mode = True
