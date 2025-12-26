@@ -1069,14 +1069,40 @@ class TextViewer(UILayer):
         """
         Handle a mouse event (UILayer interface method).
         
-        Mouse events are not yet implemented for the text viewer.
+        Supports mouse wheel scrolling for vertical navigation.
         
         Args:
             event: MouseEvent to handle
         
         Returns:
-            False (not yet implemented)
+            True if event was handled, False otherwise
         """
+        from ttk.ttk_mouse_event import MouseEventType
+        
+        # Handle wheel events for scrolling
+        if event.event_type == MouseEventType.WHEEL:
+            # Get display dimensions for boundary checking
+            _, _, display_height, _ = self.get_display_dimensions()
+            display_lines, _ = self.get_wrapped_lines_with_mapping()
+            max_scroll = max(0, len(display_lines) - display_height)
+            
+            # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
+            scroll_lines = int(event.scroll_delta_y * 1)
+            
+            if scroll_lines != 0:
+                # Adjust scroll_offset based on scroll direction
+                old_offset = self.scroll_offset
+                new_offset = old_offset - scroll_lines  # Negative delta scrolls down (increases offset)
+                
+                # Clamp to valid range
+                new_offset = max(0, min(new_offset, max_scroll))
+                
+                if new_offset != old_offset:
+                    self.scroll_offset = new_offset
+                    self._dirty = True
+                
+                return True
+        
         return False
     
     def render(self, renderer) -> None:

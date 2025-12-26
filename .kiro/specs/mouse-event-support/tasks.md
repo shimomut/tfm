@@ -148,6 +148,22 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - Update documentation with wheel scrolling feature
   - _Requirements: 2.5, 5.6_
 
+- [x] 16. Implement mouse wheel scrolling in log pane
+  - Add wheel event handling for log pane area in FileManager.handle_mouse_event()
+  - Detect wheel events in log pane area (row >= log_pane_top)
+  - Call log_manager.scroll_log_up/down() based on scroll direction
+  - Create comprehensive test suite for log pane scrolling (7 tests)
+  - _Requirements: 2.5, 5.6_
+
+- [x] 17. Implement mouse wheel scrolling in viewers
+  - Add wheel event handling to TextViewer.handle_mouse_event()
+  - Add wheel event handling to DiffViewer.handle_mouse_event()
+  - Add wheel event handling to DirectoryDiffViewer.handle_mouse_event()
+  - Adjust scroll_offset based on scroll_delta_y with 1x multiplier
+  - Implement boundary checking for each viewer type
+  - Create comprehensive test suite for viewer scrolling (10 tests)
+  - _Requirements: 2.5, 5.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP

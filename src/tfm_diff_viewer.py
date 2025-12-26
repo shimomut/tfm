@@ -1280,14 +1280,45 @@ class DiffViewer(UILayer):
         """
         Handle a mouse event (UILayer interface method).
         
-        Mouse events are not yet implemented for the diff viewer.
+        Supports mouse wheel scrolling for vertical navigation.
         
         Args:
             event: MouseEvent to handle
         
         Returns:
-            False (not yet implemented)
+            True if event was handled, False otherwise
         """
+        from ttk.ttk_mouse_event import MouseEventType
+        
+        # Handle wheel events for scrolling
+        if event.event_type == MouseEventType.WHEEL:
+            # Get display dimensions for boundary checking
+            _, _, display_height, _ = self.get_display_dimensions()
+            
+            # Get max scroll based on diff lines or wrapped lines
+            if self.wrap_lines:
+                display_lines, _ = self.get_wrapped_lines_with_mapping()
+                max_scroll = max(0, len(display_lines) - display_height)
+            else:
+                max_scroll = max(0, len(self.diff_lines) - display_height)
+            
+            # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
+            scroll_lines = int(event.scroll_delta_y * 1)
+            
+            if scroll_lines != 0:
+                # Adjust scroll_offset based on scroll direction
+                old_offset = self.scroll_offset
+                new_offset = old_offset - scroll_lines  # Negative delta scrolls down (increases offset)
+                
+                # Clamp to valid range
+                new_offset = max(0, min(new_offset, max_scroll))
+                
+                if new_offset != old_offset:
+                    self.scroll_offset = new_offset
+                    self._dirty = True
+                
+                return True
+        
         return False
     
     def render(self, renderer) -> None:
