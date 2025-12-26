@@ -69,15 +69,38 @@ class TestPaneFocusSwitching:
              patch('tfm_main.UILayerStack'), \
              patch('tfm_main.Path'):
             
-            # Setup pane manager mock instance
+            # Setup pane manager mock instance with proper pane data structures
             pane_mgr_instance = Mock()
             pane_mgr_instance.active_pane = 'left'
-            pane_mgr_instance.left_pane_ratio = 0.5  # This will be a Mock, need to configure it
+            pane_mgr_instance.left_pane_ratio = 0.5
+            
+            # Configure left_pane and right_pane as dictionaries (not Mocks)
+            pane_mgr_instance.left_pane = {
+                'path': Mock(),
+                'focused_index': 0,
+                'scroll_offset': 0,
+                'files': [],  # Empty list initially
+                'selected_files': set(),
+                'sort_mode': 'name',
+                'sort_reverse': False,
+                'filter_pattern': "",
+            }
+            pane_mgr_instance.right_pane = {
+                'path': Mock(),
+                'focused_index': 0,
+                'scroll_offset': 0,
+                'files': [],  # Empty list initially
+                'selected_files': set(),
+                'sort_mode': 'name',
+                'sort_reverse': False,
+                'filter_pattern': "",
+            }
+            
             mock_pane_mgr_class.return_value = pane_mgr_instance
             
             fm = FileManager(mock_renderer)
             
-            # After FileManager is created, set the left_pane_ratio as a real float
+            # After FileManager is created, ensure settings are correct
             fm.pane_manager.left_pane_ratio = 0.5
             fm.log_height_ratio = 0.2  # 20% for log pane
             

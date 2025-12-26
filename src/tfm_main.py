@@ -504,7 +504,7 @@ class FileManager(UILayer):
             
             return True  # Event handled even if no scroll occurred
         
-        # Handle button down events for focus switching
+        # Handle button down events for focus switching and item selection
         if event.event_type == MouseEventType.BUTTON_DOWN:
             # Check if event is within the file pane area (vertically)
             if event.row < 1 or event.row >= file_pane_bottom:
@@ -513,20 +513,40 @@ class FileManager(UILayer):
             # Determine which pane was clicked based on column
             if event.column < left_pane_width:
                 # Click in left pane
-                if self.pane_manager.active_pane != 'left':
+                pane_data = self.pane_manager.left_pane
+                pane_changed = self.pane_manager.active_pane != 'left'
+                if pane_changed:
                     self.pane_manager.active_pane = 'left'
                     self.logger.info("Switched focus to left pane")
-                    self.mark_dirty()
-                    return True
-                return True  # Already in left pane, event handled
+                
+                # Calculate which file was clicked (row 1 is first file)
+                clicked_file_index = event.row - 1 + pane_data['scroll_offset']
+                
+                # Move cursor to clicked item if valid
+                if pane_data['files'] and 0 <= clicked_file_index < len(pane_data['files']):
+                    pane_data['focused_index'] = clicked_file_index
+                    self.logger.info(f"Moved cursor to item {clicked_file_index} in left pane")
+                
+                self.mark_dirty()
+                return True
             else:
                 # Click in right pane (including the separator column)
-                if self.pane_manager.active_pane != 'right':
+                pane_data = self.pane_manager.right_pane
+                pane_changed = self.pane_manager.active_pane != 'right'
+                if pane_changed:
                     self.pane_manager.active_pane = 'right'
                     self.logger.info("Switched focus to right pane")
-                    self.mark_dirty()
-                    return True
-                return True  # Already in right pane, event handled
+                
+                # Calculate which file was clicked (row 1 is first file)
+                clicked_file_index = event.row - 1 + pane_data['scroll_offset']
+                
+                # Move cursor to clicked item if valid
+                if pane_data['files'] and 0 <= clicked_file_index < len(pane_data['files']):
+                    pane_data['focused_index'] = clicked_file_index
+                    self.logger.info(f"Moved cursor to item {clicked_file_index} in right pane")
+                
+                self.mark_dirty()
+                return True
         
         return False
     
