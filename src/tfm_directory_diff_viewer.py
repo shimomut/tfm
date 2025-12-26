@@ -924,6 +924,7 @@ class DirectoryDiffViewer(UILayer):
         Supports:
         - Mouse wheel scrolling for vertical navigation
         - Mouse button clicks to move cursor to clicked item
+        - Double-click to toggle expand/collapse or open file diff
         
         Args:
             event: MouseEvent to handle
@@ -936,6 +937,40 @@ class DirectoryDiffViewer(UILayer):
         # Get display dimensions
         height, width = self.renderer.get_dimensions()
         display_height = height - 7  # Reserve space for header, divider, details, status
+        
+        # Handle double-click events to toggle expand/collapse or open file diff
+        if event.event_type == MouseEventType.DOUBLE_CLICK:
+            # Check if click is within the tree view area
+            tree_view_start = 1
+            tree_view_end = height - 5  # Reserve space for details pane (3 lines) and status (2 lines)
+            
+            if event.row < tree_view_start or event.row >= tree_view_end:
+                return False
+            
+            # Calculate which item was double-clicked
+            clicked_item_index = event.row - tree_view_start + self.scroll_offset
+            
+            # Validate the clicked index
+            if self.visible_nodes and 0 <= clicked_item_index < len(self.visible_nodes):
+                # Move cursor to the double-clicked item
+                self.cursor_position = clicked_item_index
+                
+                # Trigger the same action as Enter key
+                node = self.visible_nodes[self.cursor_position]
+                if node.is_directory:
+                    # Toggle expand/collapse for directories
+                    if node.is_expanded:
+                        self.collapse_node(self.cursor_position)
+                    else:
+                        self.expand_node(self.cursor_position)
+                else:
+                    # Open file diff viewer for files
+                    self.open_file_diff(self.cursor_position)
+                
+                self.logger.info(f"Double-clicked item {clicked_item_index}")
+                return True
+            
+            return False
         
         # Handle wheel events for scrolling
         if event.event_type == MouseEventType.WHEEL:

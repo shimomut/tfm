@@ -428,11 +428,13 @@ class FileManager(UILayer):
     
     def handle_mouse_event(self, event) -> bool:
         """
-        Handle a mouse event for pane focus switching and wheel scrolling.
+        Handle a mouse event for pane focus switching, wheel scrolling, and double-click.
         
         This method handles:
         - Mouse button down events to switch focus between left and right panes
         - Mouse wheel events to scroll the file list in the active pane
+        - Double-click events to open files/directories (same as Enter key)
+        - Double-click on header to go to parent directory (same as Backspace key)
         
         Args:
             event: MouseEvent to handle
@@ -453,6 +455,60 @@ class FileManager(UILayer):
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         file_pane_bottom = height - log_height - 2
         log_pane_top = height - log_height - 1
+        
+        # Handle double-click events
+        if event.event_type == MouseEventType.DOUBLE_CLICK:
+            # Check if double-click is on header (row 0) - go to parent directory
+            if event.row == 0:
+                # Determine which pane header was clicked
+                if event.column < left_pane_width:
+                    target_pane = 'left'
+                else:
+                    target_pane = 'right'
+                
+                # Switch to the clicked pane if not already active
+                if self.pane_manager.active_pane != target_pane:
+                    self.pane_manager.active_pane = target_pane
+                    self.logger.info(f"Switched focus to {target_pane} pane")
+                
+                # Navigate to parent directory (same as Backspace key)
+                self._action_go_parent()
+                self.logger.info(f"Double-clicked header in {target_pane} pane - navigating to parent")
+                return True
+            
+            # Check if event is within the file pane area (vertically)
+            if event.row < 1 or event.row >= file_pane_bottom:
+                return False
+            
+            # Determine which pane was double-clicked
+            if event.column < left_pane_width:
+                pane_data = self.pane_manager.left_pane
+                target_pane = 'left'
+            else:
+                pane_data = self.pane_manager.right_pane
+                target_pane = 'right'
+            
+            # Calculate which file was double-clicked
+            clicked_file_index = event.row - 1 + pane_data['scroll_offset']
+            
+            # Validate the clicked index
+            if pane_data['files'] and 0 <= clicked_file_index < len(pane_data['files']):
+                # Switch to the clicked pane if not already active
+                if self.pane_manager.active_pane != target_pane:
+                    self.pane_manager.active_pane = target_pane
+                    self.logger.info(f"Switched focus to {target_pane} pane")
+                
+                # Move cursor to the double-clicked item
+                pane_data['focused_index'] = clicked_file_index
+                
+                # Trigger the same action as Enter key
+                self.handle_enter()
+                self.mark_dirty()
+                
+                self.logger.info(f"Double-clicked item {clicked_file_index} in {target_pane} pane")
+                return True
+            
+            return False
         
         # Handle wheel events for scrolling
         if event.event_type == MouseEventType.WHEEL:
