@@ -283,14 +283,38 @@ class InfoDialog(UILayer, BaseListDialog):
         """
         Handle a mouse event (UILayer interface).
         
-        Mouse events are not yet implemented for dialogs.
+        Supports mouse wheel scrolling for vertical navigation.
         
         Args:
             event: MouseEvent to handle
         
         Returns:
-            False (not yet implemented)
+            True if event was handled, False otherwise
         """
+        from ttk.ttk_mouse_event import MouseEventType
+        
+        # Handle wheel events for scrolling
+        if event.event_type == MouseEventType.WHEEL:
+            # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
+            scroll_lines = int(event.scroll_delta_y * 1)
+            
+            if scroll_lines != 0:
+                # Calculate max scroll based on cached content height
+                max_scroll = max(0, len(self.lines) - self.cached_content_height)
+                
+                # Adjust scroll based on scroll direction
+                old_scroll = self.scroll
+                new_scroll = old_scroll - scroll_lines  # Negative delta scrolls down (increases scroll)
+                
+                # Clamp to valid range
+                new_scroll = max(0, min(new_scroll, max_scroll))
+                
+                if new_scroll != old_scroll:
+                    self.scroll = new_scroll
+                    self.content_changed = True
+                
+                return True
+        
         return False
     
     def render(self, renderer) -> None:
