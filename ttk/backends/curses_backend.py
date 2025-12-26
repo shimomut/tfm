@@ -743,6 +743,34 @@ class CursesBackend(Renderer):
                 self.event_callback.on_system_event(event)
                 return
             
+            # Handle mouse events
+            if key == curses.KEY_MOUSE:
+                if self.mouse_enabled:
+                    try:
+                        # Get mouse event details
+                        _, x, y, _, bstate = curses.getmouse()
+                        
+                        # Map curses button state to our event type and button
+                        event_type = self._map_curses_event_type(bstate)
+                        button = self._map_curses_button(bstate)
+                        
+                        if event_type is not None:
+                            # Create and deliver mouse event via callback
+                            mouse_event = MouseEvent(
+                                event_type=event_type,
+                                column=x,
+                                row=y,
+                                sub_cell_x=0.5,  # Center of cell
+                                sub_cell_y=0.5,  # Center of cell
+                                button=button,
+                                timestamp=0.0  # Will be set by MouseEvent.__post_init__
+                            )
+                            self.event_callback.on_mouse_event(mouse_event)
+                    except (curses.error, ValueError):
+                        # Error getting mouse event - ignore
+                        pass
+                return
+            
             # Special keys (> 255) are not UTF-8 bytes - handle them directly
             if key > 255:
                 # This is a special key (arrow, function key, etc.)
