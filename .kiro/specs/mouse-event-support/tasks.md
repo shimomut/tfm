@@ -142,9 +142,9 @@ This implementation adds comprehensive mouse event support to TFM across both te
 - [x] 15. Implement mouse wheel scrolling in file lists
   - Add wheel event handling to FileManager.handle_mouse_event()
   - Detect which pane the mouse is over during wheel events
-  - Adjust focused_index based on scroll_delta_y with 3x multiplier
+  - Adjust scroll_offset (not focused_index) based on scroll_delta_y with 1x multiplier
   - Implement boundary checking to prevent scrolling past top/bottom
-  - Create comprehensive test suite for wheel scrolling
+  - Create comprehensive test suite for wheel scrolling (10 tests)
   - Update documentation with wheel scrolling feature
   - _Requirements: 2.5, 5.6_
 

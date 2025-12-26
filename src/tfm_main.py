@@ -465,18 +465,23 @@ class FileManager(UILayer):
             
             # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
             # Use a multiplier to make scrolling feel responsive
-            scroll_lines = int(event.scroll_delta_y * 3)
+            scroll_lines = int(event.scroll_delta_y * 1)
             
             if scroll_lines != 0 and len(pane_data['files']) > 0:
-                # Adjust focused_index based on scroll direction
-                old_index = pane_data['focused_index']
-                new_index = old_index - scroll_lines  # Negative delta scrolls down (increases index)
+                # Adjust scroll_offset based on scroll direction
+                old_offset = pane_data['scroll_offset']
+                new_offset = old_offset - scroll_lines  # Negative delta scrolls down (increases offset)
+                
+                # Calculate display height for clamping
+                # file_pane_bottom already accounts for header (1) and status bar (1)
+                display_height = file_pane_bottom - 1
+                max_offset = max(0, len(pane_data['files']) - display_height)
                 
                 # Clamp to valid range
-                new_index = max(0, min(new_index, len(pane_data['files']) - 1))
+                new_offset = max(0, min(new_offset, max_offset))
                 
-                if new_index != old_index:
-                    pane_data['focused_index'] = new_index
+                if new_offset != old_offset:
+                    pane_data['scroll_offset'] = new_offset
                     self.mark_dirty()
                 
                 return True

@@ -31,10 +31,10 @@ You can scroll through file lists using your mouse wheel in both left and right 
 
 #### How It Works
 
-1. **Scroll up** → Move focus up in the file list
-2. **Scroll down** → Move focus down in the file list
+1. **Scroll up** → Scroll the view up in the file list
+2. **Scroll down** → Scroll the view down in the file list
 3. **Works in any pane** → Scroll the pane where your mouse is positioned
-4. **Responsive scrolling** → Uses a 3x multiplier for smooth navigation
+4. **Smooth scrolling** → Natural 1:1 scroll ratio for precise control
 5. **Boundary protection** → Won't scroll past the top or bottom of the list
 
 #### Availability
