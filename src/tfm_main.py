@@ -452,13 +452,29 @@ class FileManager(UILayer):
         calculated_height = int(height * self.log_height_ratio)
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         file_pane_bottom = height - log_height - 2
-        
-        # Check if event is within the file pane area (vertically)
-        if event.row < 1 or event.row >= file_pane_bottom:
-            return False
+        log_pane_top = height - log_height - 1
         
         # Handle wheel events for scrolling
         if event.event_type == MouseEventType.WHEEL:
+            # Check if event is in the log pane area
+            if log_height > 0 and event.row >= log_pane_top:
+                # Scroll the log pane
+                scroll_lines = int(event.scroll_delta_y * 1)
+                
+                if scroll_lines > 0:
+                    # Scroll up (toward older messages)
+                    if self.log_manager.scroll_log_up(scroll_lines):
+                        self.mark_dirty()
+                elif scroll_lines < 0:
+                    # Scroll down (toward newer messages)
+                    if self.log_manager.scroll_log_down(-scroll_lines):
+                        self.mark_dirty()
+                
+                return True
+            
+            # Check if event is within the file pane area (vertically)
+            if event.row < 1 or event.row >= file_pane_bottom:
+                return False
             # Determine which pane to scroll based on mouse position
             target_pane = 'left' if event.column < left_pane_width else 'right'
             pane_data = self.pane_manager.left_pane if target_pane == 'left' else self.pane_manager.right_pane
@@ -490,6 +506,10 @@ class FileManager(UILayer):
         
         # Handle button down events for focus switching
         if event.event_type == MouseEventType.BUTTON_DOWN:
+            # Check if event is within the file pane area (vertically)
+            if event.row < 1 or event.row >= file_pane_bottom:
+                return False
+            
             # Determine which pane was clicked based on column
             if event.column < left_pane_width:
                 # Click in left pane

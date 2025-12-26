@@ -214,11 +214,17 @@ class TestMouseWheelScrolling(unittest.TestCase):
         # Verify event was not handled
         self.assertFalse(result)
     
-    def test_wheel_scroll_in_log_area_not_handled(self):
-        """Test that wheel events in log area are not handled by file pane."""
+    def test_wheel_scroll_in_log_area_scrolls_log(self):
+        """Test that wheel events in log area scroll the log pane, not file pane."""
         height, width = self.mock_renderer.get_dimensions()
         calculated_height = int(height * self.fm.log_height_ratio)
         log_start_row = height - calculated_height - 1
+        
+        # Get initial file pane scroll offset
+        initial_file_offset = self.fm.pane_manager.left_pane['scroll_offset']
+        
+        # Get initial log scroll offset
+        initial_log_offset = self.fm.log_manager.log_scroll_offset
         
         # Create wheel event in log area
         event = MouseEvent(
@@ -234,8 +240,14 @@ class TestMouseWheelScrolling(unittest.TestCase):
         # Handle the event
         result = self.fm.handle_mouse_event(event)
         
-        # Verify event was not handled
-        self.assertFalse(result)
+        # Verify event was handled
+        self.assertTrue(result)
+        
+        # Verify file pane scroll offset unchanged
+        self.assertEqual(self.fm.pane_manager.left_pane['scroll_offset'], initial_file_offset)
+        
+        # Verify log scroll offset changed (scrolled up toward older messages)
+        self.assertGreater(self.fm.log_manager.log_scroll_offset, initial_log_offset)
     
     def test_wheel_scroll_with_empty_file_list(self):
         """Test that wheel events with empty file list are handled gracefully."""
