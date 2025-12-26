@@ -173,6 +173,23 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - All 10 viewer wheel scrolling tests pass
   - _Requirements: 5.6_
 
+- [x] 19. Implement click-to-focus in DirectoryDiffViewer
+  - Add button down event handling to DirectoryDiffViewer.handle_mouse_event()
+  - Calculate which item was clicked based on row and scroll_offset
+  - Move cursor_position to clicked item when valid
+  - Implement boundary checking (tree view area: rows 2 to height-5)
+  - Create comprehensive test suite (9 tests covering all scenarios)
+  - All 44 mouse event tests pass
+  - _Requirements: 5.1, 5.2_
+
+- [x] 20. Implement click-to-focus in FileManager file lists
+  - Add item selection when clicking in file list (in addition to pane focus switching)
+  - Calculate clicked_file_index using scroll_offset
+  - Set focused_index directly via pane_data dictionary
+  - Update test suite to verify both pane switching and item selection
+  - All 44 mouse event tests pass
+  - _Requirements: 5.1, 5.2_
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP

@@ -921,7 +921,9 @@ class DirectoryDiffViewer(UILayer):
         """
         Handle a mouse event (UILayer interface method).
         
-        Supports mouse wheel scrolling for vertical navigation.
+        Supports:
+        - Mouse wheel scrolling for vertical navigation
+        - Mouse button clicks to move cursor to clicked item
         
         Args:
             event: MouseEvent to handle
@@ -931,11 +933,12 @@ class DirectoryDiffViewer(UILayer):
         """
         from ttk.ttk_mouse_event import MouseEventType
         
+        # Get display dimensions
+        height, width = self.renderer.get_dimensions()
+        display_height = height - 7  # Reserve space for header, divider, details, status
+        
         # Handle wheel events for scrolling
         if event.event_type == MouseEventType.WHEEL:
-            # Get display dimensions for boundary checking
-            height, width = self.renderer.get_dimensions()
-            display_height = height - 7  # Reserve space for header, divider, details, status
             max_scroll = max(0, len(self.visible_nodes) - display_height)
             
             # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
@@ -960,6 +963,26 @@ class DirectoryDiffViewer(UILayer):
                         if hasattr(first_node, 'is_directory'):
                             self._update_priorities()
                 
+                return True
+        
+        # Handle button down events for cursor movement
+        if event.event_type == MouseEventType.BUTTON_DOWN:
+            # Check if click is within the tree view area
+            # Tree view starts at row 1 (after header) and ends before details pane
+            tree_view_start = 1
+            tree_view_end = height - 5  # Reserve space for details pane (3 lines) and status (2 lines)
+            
+            if event.row < tree_view_start or event.row >= tree_view_end:
+                return False
+            
+            # Calculate which item was clicked (row 1 is first visible item)
+            clicked_item_index = event.row - tree_view_start + self.scroll_offset
+            
+            # Move cursor to clicked item if valid
+            if self.visible_nodes and 0 <= clicked_item_index < len(self.visible_nodes):
+                self.cursor_position = clicked_item_index
+                self.logger.info(f"Moved cursor to item {clicked_item_index}")
+                self._dirty = True
                 return True
         
         return False
