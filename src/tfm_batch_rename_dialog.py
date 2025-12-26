@@ -400,6 +400,11 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                     
                     self.renderer.draw_text(y, content_start_x, preview_line, 
                                      color_pair=status_color_pair, attributes=status_attributes)
+            
+            # Draw scrollbar if needed
+            if len(self.preview) > preview_height:
+                scrollbar_x = start_x + dialog_width - 2
+                self.draw_scrollbar(self.preview, preview_start_y, preview_height, scrollbar_x)
         else:
             # No preview available
             no_preview_y = preview_start_y + 2
