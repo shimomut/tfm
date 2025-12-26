@@ -25,6 +25,30 @@ If your terminal doesn't support mouse events, TFM automatically falls back to k
 
 ## Features
 
+### Mouse Wheel Scrolling
+
+You can scroll through file lists using your mouse wheel in both left and right panes.
+
+#### How It Works
+
+1. **Scroll up** → Move focus up in the file list
+2. **Scroll down** → Move focus down in the file list
+3. **Works in any pane** → Scroll the pane where your mouse is positioned
+4. **Responsive scrolling** → Uses a 3x multiplier for smooth navigation
+5. **Boundary protection** → Won't scroll past the top or bottom of the list
+
+#### Availability
+
+- **Desktop Mode**: Full support with smooth scrolling
+- **Terminal Mode**: Support depends on terminal emulator capabilities
+
+#### Usage Tips
+
+- Hover your mouse over the pane you want to scroll
+- Use the scroll wheel to navigate through long file lists
+- The pane under your mouse will scroll, regardless of which pane has focus
+- Combine with clicking to quickly navigate and select files
+
 ### Pane Focus Switching
 
 The primary mouse feature is the ability to switch focus between the left and right file panes by clicking on them.

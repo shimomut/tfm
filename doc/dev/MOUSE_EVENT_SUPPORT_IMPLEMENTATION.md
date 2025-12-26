@@ -465,14 +465,75 @@ def handle_mouse_event(self, event: MouseEvent) -> bool:
 **Pattern 3: Scroll Wheel Handling**
 ```python
 def handle_mouse_event(self, event: MouseEvent) -> bool:
+    """Handle mouse wheel scrolling in file lists."""
     if event.event_type == MouseEventType.WHEEL:
-        if event.scroll_delta_y > 0:
-            self.scroll_up()
-        elif event.scroll_delta_y < 0:
-            self.scroll_down()
-        return True
+        # Determine which pane to scroll based on mouse position
+        target_pane = self._get_pane_at_position(event.column, event.row)
+        if not target_pane:
+            return False
+        
+        # Calculate scroll amount with multiplier for responsive feel
+        # Positive delta = scroll up (decrease index)
+        # Negative delta = scroll down (increase index)
+        scroll_lines = int(event.scroll_delta_y * 3)
+        
+        if scroll_lines != 0 and len(target_pane['files']) > 0:
+            old_index = target_pane['focused_index']
+            new_index = old_index - scroll_lines
+            
+            # Clamp to valid range
+            new_index = max(0, min(new_index, len(target_pane['files']) - 1))
+            
+            if new_index != old_index:
+                target_pane['focused_index'] = new_index
+                self.mark_dirty()
+            
+            return True
+        
+        return True  # Event handled even if no scroll occurred
     return False
 ```
+
+**Key Implementation Details**:
+- Use a multiplier (e.g., 3x) to make scrolling feel responsive
+- Positive `scroll_delta_y` means scroll up (move focus up, decrease index)
+- Negative `scroll_delta_y` means scroll down (move focus down, increase index)
+- Always clamp the new index to valid bounds `[0, len(files)-1]`
+- Return `True` even when no scroll occurs to prevent event propagation
+- Mark the component dirty when the focus changes to trigger redraw
+
+**Backend Implementation Notes (macOS)**:
+
+1. **Zero-Delta Scroll Event Filtering**: On macOS, scroll wheel events include gesture tracking phases (MayBegin, Changed, Ended, etc.) that can have zero deltas. The CoreGraphics backend filters these out before creating MouseEvent objects:
+
+```python
+# In CoreGraphicsBackend._handle_mouse_event()
+if mouse_event_type == MouseEventType.WHEEL:
+    scroll_delta_x = float(event.scrollingDeltaX())
+    scroll_delta_y = float(event.scrollingDeltaY())
+    
+    # Skip scroll events with zero delta (phase events)
+    # These are momentum/gesture tracking events that don't represent actual scrolling
+    if scroll_delta_x == 0.0 and scroll_delta_y == 0.0:
+        return
+```
+
+This filtering ensures that only meaningful scroll events with actual delta values are delivered to the application layer, preventing unnecessary event processing and potential issues with gesture phase tracking.
+
+2. **Double-Click Detection**: The `clickCount()` method is only valid for button events (mouse down/up), not scroll wheel events. The backend must check the event type before calling this method:
+
+```python
+# Check for double-click (only valid for button events, not scroll wheel events)
+button_event_types = (
+    Cocoa.NSEventTypeLeftMouseDown,
+    Cocoa.NSEventTypeRightMouseDown,
+    Cocoa.NSEventTypeOtherMouseDown
+)
+if ns_event_type in button_event_types and event.clickCount() == 2 and mouse_event_type == MouseEventType.BUTTON_DOWN:
+    mouse_event_type = MouseEventType.DOUBLE_CLICK
+```
+
+Calling `clickCount()` on scroll wheel events causes an `NSInternalInconsistencyException` with the message "Invalid message sent to event". This conditional check prevents the exception.
 
 
 ## Extending for Drag-and-Drop

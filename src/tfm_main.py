@@ -428,23 +428,20 @@ class FileManager(UILayer):
     
     def handle_mouse_event(self, event) -> bool:
         """
-        Handle a mouse event for pane focus switching.
+        Handle a mouse event for pane focus switching and wheel scrolling.
         
-        This method handles mouse button down events to switch focus between
-        left and right panes when the user clicks within a pane's bounds.
+        This method handles:
+        - Mouse button down events to switch focus between left and right panes
+        - Mouse wheel events to scroll the file list in the active pane
         
         Args:
             event: MouseEvent to handle
         
         Returns:
-            True if the event was handled (click in a pane), False otherwise
+            True if the event was handled, False otherwise
         """
         # Import MouseEventType for event type checking
         from ttk.ttk_mouse_event import MouseEventType
-        
-        # Only handle button down events for focus switching
-        if event.event_type != MouseEventType.BUTTON_DOWN:
-            return False
         
         # Get current dimensions and layout
         height, width = self.renderer.get_dimensions()
@@ -456,27 +453,57 @@ class FileManager(UILayer):
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         file_pane_bottom = height - log_height - 2
         
-        # Check if click is within the file pane area (vertically)
+        # Check if event is within the file pane area (vertically)
         if event.row < 1 or event.row >= file_pane_bottom:
             return False
         
-        # Determine which pane was clicked based on column
-        if event.column < left_pane_width:
-            # Click in left pane
-            if self.pane_manager.active_pane != 'left':
-                self.pane_manager.active_pane = 'left'
-                self.logger.info("Switched focus to left pane")
-                self.mark_dirty()
+        # Handle wheel events for scrolling
+        if event.event_type == MouseEventType.WHEEL:
+            # Determine which pane to scroll based on mouse position
+            target_pane = 'left' if event.column < left_pane_width else 'right'
+            pane_data = self.pane_manager.left_pane if target_pane == 'left' else self.pane_manager.right_pane
+            
+            # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
+            # Use a multiplier to make scrolling feel responsive
+            scroll_lines = int(event.scroll_delta_y * 3)
+            
+            if scroll_lines != 0 and len(pane_data['files']) > 0:
+                # Adjust focused_index based on scroll direction
+                old_index = pane_data['focused_index']
+                new_index = old_index - scroll_lines  # Negative delta scrolls down (increases index)
+                
+                # Clamp to valid range
+                new_index = max(0, min(new_index, len(pane_data['files']) - 1))
+                
+                if new_index != old_index:
+                    pane_data['focused_index'] = new_index
+                    self.mark_dirty()
+                
                 return True
-            return True  # Already in left pane, event handled
-        else:
-            # Click in right pane (including the separator column)
-            if self.pane_manager.active_pane != 'right':
-                self.pane_manager.active_pane = 'right'
-                self.logger.info("Switched focus to right pane")
-                self.mark_dirty()
-                return True
-            return True  # Already in right pane, event handled
+            
+            return True  # Event handled even if no scroll occurred
+        
+        # Handle button down events for focus switching
+        if event.event_type == MouseEventType.BUTTON_DOWN:
+            # Determine which pane was clicked based on column
+            if event.column < left_pane_width:
+                # Click in left pane
+                if self.pane_manager.active_pane != 'left':
+                    self.pane_manager.active_pane = 'left'
+                    self.logger.info("Switched focus to left pane")
+                    self.mark_dirty()
+                    return True
+                return True  # Already in left pane, event handled
+            else:
+                # Click in right pane (including the separator column)
+                if self.pane_manager.active_pane != 'right':
+                    self.pane_manager.active_pane = 'right'
+                    self.logger.info("Switched focus to right pane")
+                    self.mark_dirty()
+                    return True
+                return True  # Already in right pane, event handled
+        
+        return False
     
     def render(self, renderer) -> None:
         """

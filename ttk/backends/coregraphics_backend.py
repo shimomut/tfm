@@ -2097,6 +2097,11 @@ class CoreGraphicsBackend(Renderer):
         if mouse_event_type == MouseEventType.WHEEL:
             scroll_delta_x = float(event.scrollingDeltaX())
             scroll_delta_y = float(event.scrollingDeltaY())
+            
+            # Skip scroll events with zero delta (phase events like MayBegin, Ended)
+            # These are momentum/gesture tracking events that don't represent actual scrolling
+            if scroll_delta_x == 0.0 and scroll_delta_y == 0.0:
+                return
         
         # Get modifier keys
         modifier_flags = event.modifierFlags()
@@ -2105,8 +2110,13 @@ class CoreGraphicsBackend(Renderer):
         alt = bool(modifier_flags & Cocoa.NSEventModifierFlagOption)
         meta = bool(modifier_flags & Cocoa.NSEventModifierFlagCommand)
         
-        # Check for double-click
-        if event.clickCount() == 2 and mouse_event_type == MouseEventType.BUTTON_DOWN:
+        # Check for double-click (only valid for button events, not scroll wheel events)
+        button_event_types = (
+            Cocoa.NSEventTypeLeftMouseDown,
+            Cocoa.NSEventTypeRightMouseDown,
+            Cocoa.NSEventTypeOtherMouseDown
+        )
+        if ns_event_type in button_event_types and event.clickCount() == 2 and mouse_event_type == MouseEventType.BUTTON_DOWN:
             mouse_event_type = MouseEventType.DOUBLE_CLICK
         
         # Create MouseEvent
