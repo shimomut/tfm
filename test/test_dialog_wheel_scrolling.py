@@ -273,6 +273,52 @@ class TestBaseListDialogWheelScrolling(unittest.TestCase):
         
         self.assertFalse(result)  # No items to scroll
     
+    def test_wheel_scroll_independent_of_selection(self):
+        """Test that wheel scrolling doesn't move selection cursor"""
+        # Set selection to item 5
+        self.dialog.selected = 5
+        self.dialog.scroll = 0
+        
+        # Scroll down with wheel (should not affect selection)
+        event = MouseEvent(
+            event_type=MouseEventType.WHEEL,
+            row=5,
+            column=10,
+            sub_cell_x=0.5,
+            sub_cell_y=0.5,
+            button=MouseButton.NONE,
+            scroll_delta_y=-5.0  # Scroll down
+        )
+        
+        result = self.dialog.handle_mouse_event(event, self.items)
+        
+        self.assertTrue(result)
+        self.assertEqual(self.dialog.scroll, 5)  # Scroll changed
+        self.assertEqual(self.dialog.selected, 5)  # Selection unchanged
+    
+    def test_wheel_scroll_can_move_selection_offscreen(self):
+        """Test that wheel scrolling can scroll past the selected item"""
+        # Set selection to item 5, scroll to show it
+        self.dialog.selected = 5
+        self.dialog.scroll = 5
+        
+        # Scroll down past the selection
+        event = MouseEvent(
+            event_type=MouseEventType.WHEEL,
+            row=5,
+            column=10,
+            sub_cell_x=0.5,
+            sub_cell_y=0.5,
+            button=MouseButton.NONE,
+            scroll_delta_y=-10.0  # Scroll down significantly
+        )
+        
+        result = self.dialog.handle_mouse_event(event, self.items)
+        
+        self.assertTrue(result)
+        self.assertEqual(self.dialog.scroll, 15)  # Scrolled down
+        self.assertEqual(self.dialog.selected, 5)  # Selection still at 5 (now offscreen)
+    
     def test_wheel_scroll_uses_fallback_content_height(self):
         """Test that wheel scrolling works even without cached content height"""
         # Clear cached content height

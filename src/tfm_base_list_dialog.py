@@ -313,8 +313,11 @@ class BaseListDialog:
         # Cache the actual content height for use in navigation
         self._last_content_height = content_height
         
-        # Update scroll with actual content height
-        self._adjust_scroll(len(items_list), content_height)
+        # DON'T adjust scroll here - that would override wheel scrolling
+        # Only clamp scroll to valid range
+        max_scroll = max(0, len(items_list) - content_height)
+        if self.scroll > max_scroll:
+            self.scroll = max_scroll
         
         # Draw visible items
         visible_items = items_list[self.scroll:self.scroll + content_height]
