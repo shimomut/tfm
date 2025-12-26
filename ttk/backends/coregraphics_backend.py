@@ -1018,9 +1018,17 @@ class CoreGraphicsBackend(Renderer):
         
         if event:
             # Send event to the application for processing
-            app.sendEvent_(event)
-            # Update the application (process any pending operations)
-            app.updateWindows()
+            try:
+                app.sendEvent_(event)
+                # Update the application (process any pending operations)
+                app.updateWindows()
+            except Exception as e:
+                # Some events (like scroll wheel with phase=MayBegin) can cause errors
+                # Log and ignore these errors to prevent crashes
+                if hasattr(self, 'logger'):
+                    self.logger.error(f"Error processing event: {e}")
+                # Continue processing other events
+                pass
     
     def clear(self) -> None:
         """

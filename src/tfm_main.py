@@ -4188,9 +4188,15 @@ def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profilin
             fm.restore_stdio()
         
         # Print error information to help with debugging
-        self.logger.error(f"\nTFM encountered an unexpected error:")
-        self.logger.error(f"Error: {type(e).__name__}: {e}")
-        self.logger.info("\nFull traceback:")
+        # Use fm.logger if available, otherwise use print
+        if fm is not None and hasattr(fm, 'logger'):
+            fm.logger.error(f"\nTFM encountered an unexpected error:")
+            fm.logger.error(f"Error: {type(e).__name__}: {e}")
+            fm.logger.info("\nFull traceback:")
+        else:
+            print(f"\nTFM encountered an unexpected error:")
+            print(f"Error: {type(e).__name__}: {e}")
+            print("\nFull traceback:")
         traceback.print_exc()
         
         # Re-raise the exception so it can be seen after TFM exits
