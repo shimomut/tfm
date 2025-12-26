@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_main import FileManager
-from tfm_ui_layer import UILayer, UILayerStack, FileManagerLayer
+from tfm_ui_layer import UILayer, UILayerStack
 
 
 class MockLayer(UILayer):
@@ -28,6 +28,8 @@ class MockLayer(UILayer):
         self.deactivated = False
         self.key_events_handled = []
         self.char_events_handled = []
+        self.mouse_events_handled = []
+        self.system_events_handled = []
         self.render_called = False
     
     def handle_key_event(self, event) -> bool:
@@ -36,6 +38,14 @@ class MockLayer(UILayer):
     
     def handle_char_event(self, event) -> bool:
         self.char_events_handled.append(event)
+        return True
+    
+    def handle_system_event(self, event) -> bool:
+        self.system_events_handled.append(event)
+        return True
+    
+    def handle_mouse_event(self, event) -> bool:
+        self.mouse_events_handled.append(event)
         return True
     
     def render(self, renderer) -> None:
@@ -109,10 +119,10 @@ class TestUILayerStackIntegration(unittest.TestCase):
         self.assertIsInstance(self.file_manager.ui_layer_stack, UILayerStack)
     
     def test_ui_layer_stack_has_file_manager_layer_as_bottom(self):
-        """Test that UILayerStack has FileManagerLayer as bottom layer."""
+        """Test that UILayerStack has FileManager as bottom layer."""
         self.assertEqual(self.file_manager.ui_layer_stack.get_layer_count(), 1)
         bottom_layer = self.file_manager.ui_layer_stack.get_top_layer()
-        self.assertIsInstance(bottom_layer, FileManagerLayer)
+        self.assertIsInstance(bottom_layer, FileManager)
     
     def test_push_layer_adds_to_stack(self):
         """Test that push_layer adds a layer to the stack."""

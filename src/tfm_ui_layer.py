@@ -100,6 +100,59 @@ class UILayer(ABC):
         pass
     
     @abstractmethod
+    def handle_mouse_event(self, event) -> bool:
+        """
+        Handle a mouse event.
+        
+        This method is called when a mouse event occurs and this layer is
+        the top layer in the stack. The layer should process the event and
+        return True if it consumed the event, or False if it did not handle it.
+        
+        Note: Events are only sent to the top layer. Lower layers do not
+        receive mouse events unless they become the top layer. There is no
+        event propagation to lower layers.
+        
+        The topmost layer receives ALL mouse events regardless of whether
+        they are within its bounds. The layer is responsible for checking
+        if the event coordinates are within its bounds using is_point_inside().
+        
+        Args:
+            event: MouseEvent to handle (from TTK backend)
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        pass
+    
+    def is_point_inside(self, column: int, row: int) -> bool:
+        """
+        Check if a point is inside this layer's bounds.
+        
+        This helper method checks if the given text grid coordinates fall
+        within this layer's rectangular bounds. Layers should use this method
+        to determine if a mouse event is relevant to them.
+        
+        The default implementation checks against layer bounds defined by
+        x, y, width, and height attributes. Layers with non-rectangular
+        bounds or custom hit testing should override this method.
+        
+        Args:
+            column: Text grid column (0-based)
+            row: Text grid row (0-based)
+            
+        Returns:
+            True if the point is inside this layer's bounds, False otherwise
+        """
+        # Default implementation: check against rectangular bounds
+        if not hasattr(self, 'x') or not hasattr(self, 'y'):
+            return False
+        if not hasattr(self, 'width') or not hasattr(self, 'height'):
+            return False
+        
+        return (self.x <= column < self.x + self.width and
+                self.y <= row < self.y + self.height)
+    
+    @abstractmethod
     def render(self, renderer) -> None:
         """
         Render the layer's content.
@@ -404,6 +457,37 @@ class UILayerStack:
                 # Continue broadcasting to other layers despite error
         
         return any_handled
+    
+    def handle_mouse_event(self, event) -> bool:
+        """
+        Route a mouse event to the top layer only.
+        
+        Events are only sent to the top layer. The top layer is responsible
+        for handling the event completely. Event propagation to lower layers
+        is not supported - only the topmost layer receives events.
+        
+        This maintains consistency with keyboard and character event routing,
+        where only the topmost layer receives events.
+        
+        Exception handling: If the top layer raises an exception during event
+        handling, the exception is caught and logged.
+        
+        Args:
+            event: MouseEvent to route
+        
+        Returns:
+            True if the top layer consumed the event, False otherwise
+        """
+        # Only route to the top layer
+        top_layer = self._layers[-1]
+        try:
+            return top_layer.handle_mouse_event(event)
+        except Exception as e:
+            if self._logger:
+                self._logger.error(
+                    f"Layer {top_layer.__class__.__name__} raised exception during mouse event: {e}"
+                )
+            return False
     
     def render(self, renderer) -> None:
         """

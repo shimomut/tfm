@@ -279,6 +279,20 @@ class InfoDialog(UILayer, BaseListDialog):
             return True
         return False
     
+    def handle_mouse_event(self, event) -> bool:
+        """
+        Handle a mouse event (UILayer interface).
+        
+        Mouse events are not yet implemented for dialogs.
+        
+        Args:
+            event: MouseEvent to handle
+        
+        Returns:
+            False (not yet implemented)
+        """
+        return False
+    
     def render(self, renderer) -> None:
         """
         Render the layer's content (UILayer interface).

@@ -275,6 +275,12 @@ class CoreGraphicsBackend(Renderer):
         # Event callback for callback-based event delivery
         self.event_callback: Optional['EventCallback'] = None
         
+        # Scroll delta accumulation for wheel events
+        self.accumulated_scroll_x = 0.0
+        self.accumulated_scroll_y = 0.0
+        self.last_scroll_time = 0.0
+        self.SCROLL_ACCUMULATION_TIMEOUT = 1.0  # Reset after 1 second of no scrolling
+        
         # C++ renderer module (initialized in initialize())
         self._cpp_renderer = None
     
@@ -1018,9 +1024,17 @@ class CoreGraphicsBackend(Renderer):
         
         if event:
             # Send event to the application for processing
-            app.sendEvent_(event)
-            # Update the application (process any pending operations)
-            app.updateWindows()
+            try:
+                app.sendEvent_(event)
+                # Update the application (process any pending operations)
+                app.updateWindows()
+            except Exception as e:
+                # Some events (like scroll wheel with phase=MayBegin) can cause errors
+                # Log and ignore these errors to prevent crashes
+                if hasattr(self, 'logger'):
+                    self.logger.error(f"Error processing event: {e}")
+                # Continue processing other events
+                pass
     
     def clear(self) -> None:
         """
@@ -1909,6 +1923,269 @@ class CoreGraphicsBackend(Renderer):
             bool: Always True for CoreGraphics backend
         """
         return True
+    
+    def supports_mouse(self) -> bool:
+        """
+        Query whether this backend supports mouse events.
+        
+        The CoreGraphics backend provides full mouse support including all
+        event types (button, move, wheel, double-click).
+        
+        Returns:
+            bool: Always True for CoreGraphics backend
+        """
+        return True
+    
+    def get_supported_mouse_events(self) -> set:
+        """
+        Query which mouse event types are supported by this backend.
+        
+        The CoreGraphics backend supports all mouse event types through
+        native macOS NSEvent handling.
+        
+        Returns:
+            set: Set of all MouseEventType values
+        """
+        from ttk.ttk_mouse_event import MouseEventType
+        
+        return {
+            MouseEventType.BUTTON_DOWN,
+            MouseEventType.BUTTON_UP,
+            MouseEventType.DOUBLE_CLICK,
+            MouseEventType.MOVE,
+            MouseEventType.WHEEL,
+            MouseEventType.DRAG
+        }
+    
+    def enable_mouse_events(self) -> bool:
+        """
+        Enable mouse event capture.
+        
+        This method activates mouse event tracking in the CoreGraphics backend.
+        After calling this method successfully, mouse events will be delivered
+        via the event callback's on_mouse_event() method.
+        
+        Returns:
+            bool: True if mouse events were successfully enabled
+        """
+        if not hasattr(self, 'mouse_enabled'):
+            self.mouse_enabled = False
+        
+        # Mouse support is always available in CoreGraphics
+        self.mouse_enabled = True
+        return True
+    
+
+    def _transform_mouse_coordinates(self, window_x: float, window_y: float) -> tuple:
+        """
+        Transform window coordinates to text grid coordinates.
+        
+        This method converts macOS window coordinates (origin at bottom-left)
+        to TTK text grid coordinates (origin at top-left) with sub-cell positioning.
+        
+        Args:
+            window_x: X coordinate in window space (pixels from left edge)
+            window_y: Y coordinate in window space (pixels from bottom edge)
+            
+        Returns:
+            Tuple of (column, row, sub_cell_x, sub_cell_y) where:
+            - column: Integer grid column (0-based)
+            - row: Integer grid row (0-based)
+            - sub_cell_x: Fractional position within cell horizontally [0.0, 1.0)
+            - sub_cell_y: Fractional position within cell vertically [0.0, 1.0)
+        """
+        # Get view frame to calculate centering offset
+        if self.view is None:
+            # No view, use simple transformation
+            offset_x = 0.0
+            offset_y = 0.0
+        else:
+            view_frame = self.view.frame()
+            view_width = view_frame.size.width
+            view_height = view_frame.size.height
+            
+            grid_width = self.cols * self.char_width
+            grid_height = self.rows * self.char_height
+            
+            offset_x = (view_width - grid_width) / 2.0
+            offset_y = (view_height - grid_height) / 2.0
+        
+        # Adjust for centering offset
+        adjusted_x = window_x - offset_x
+        adjusted_y = window_y - offset_y
+        
+        # CoreGraphics uses bottom-left origin, TTK uses top-left origin
+        # Convert Y coordinate from bottom-left to top-left
+        ttk_y = (self.rows * self.char_height) - adjusted_y
+        
+        # Calculate grid position
+        column = int(adjusted_x / self.char_width)
+        row = int(ttk_y / self.char_height)
+        
+        # Calculate sub-cell position as fraction
+        sub_cell_x = (adjusted_x % self.char_width) / self.char_width
+        sub_cell_y = (ttk_y % self.char_height) / self.char_height
+        
+        # Ensure sub-cell values are in valid range [0.0, 1.0)
+        sub_cell_x = max(0.0, min(sub_cell_x, 0.999999))
+        sub_cell_y = max(0.0, min(sub_cell_y, 0.999999))
+        
+        # Clamp grid coordinates to valid range
+        column = max(0, min(column, self.cols - 1))
+        row = max(0, min(row, self.rows - 1))
+        
+        return column, row, sub_cell_x, sub_cell_y
+    
+    def _handle_mouse_event(self, event) -> None:
+        """
+        Handle a native macOS mouse event and convert it to a MouseEvent.
+        
+        This method is called by the TTKView when it receives mouse events.
+        It converts the native NSEvent to a TTK MouseEvent and delivers it
+        via the event callback.
+        
+        Args:
+            event: NSEvent from macOS event system
+        """
+        if not hasattr(self, 'mouse_enabled') or not self.mouse_enabled:
+            return
+        
+        # Check if event callback is set
+        if not self.event_callback:
+            return
+        
+        from ttk.ttk_mouse_event import MouseEvent, MouseEventType, MouseButton
+        import time
+        
+        # Get event type
+        event_type_map = {
+            Cocoa.NSEventTypeLeftMouseDown: MouseEventType.BUTTON_DOWN,
+            Cocoa.NSEventTypeLeftMouseUp: MouseEventType.BUTTON_UP,
+            Cocoa.NSEventTypeRightMouseDown: MouseEventType.BUTTON_DOWN,
+            Cocoa.NSEventTypeRightMouseUp: MouseEventType.BUTTON_UP,
+            Cocoa.NSEventTypeOtherMouseDown: MouseEventType.BUTTON_DOWN,
+            Cocoa.NSEventTypeOtherMouseUp: MouseEventType.BUTTON_UP,
+            Cocoa.NSEventTypeMouseMoved: MouseEventType.MOVE,
+            Cocoa.NSEventTypeLeftMouseDragged: MouseEventType.DRAG,
+            Cocoa.NSEventTypeRightMouseDragged: MouseEventType.DRAG,
+            Cocoa.NSEventTypeOtherMouseDragged: MouseEventType.DRAG,
+            Cocoa.NSEventTypeScrollWheel: MouseEventType.WHEEL,
+        }
+        
+        ns_event_type = event.type()
+        mouse_event_type = event_type_map.get(ns_event_type)
+        
+        if mouse_event_type is None:
+            return
+        
+        # Get mouse button
+        button = MouseButton.NONE
+        if ns_event_type in (Cocoa.NSEventTypeLeftMouseDown, Cocoa.NSEventTypeLeftMouseUp, Cocoa.NSEventTypeLeftMouseDragged):
+            button = MouseButton.LEFT
+        elif ns_event_type in (Cocoa.NSEventTypeRightMouseDown, Cocoa.NSEventTypeRightMouseUp, Cocoa.NSEventTypeRightMouseDragged):
+            button = MouseButton.RIGHT
+        elif ns_event_type in (Cocoa.NSEventTypeOtherMouseDown, Cocoa.NSEventTypeOtherMouseUp, Cocoa.NSEventTypeOtherMouseDragged):
+            # Middle button or other buttons
+            button = MouseButton.MIDDLE
+        
+        # Get mouse location in window coordinates
+        location_in_window = event.locationInWindow()
+        
+        # Transform to text grid coordinates
+        column, row, sub_cell_x, sub_cell_y = self._transform_mouse_coordinates(
+            location_in_window.x,
+            location_in_window.y
+        )
+        
+        # Get scroll deltas for wheel events
+        scroll_delta_x = 0.0
+        scroll_delta_y = 0.0
+        if mouse_event_type == MouseEventType.WHEEL:
+            # Get raw scroll deltas from the event
+            raw_delta_x = float(event.scrollingDeltaX())
+            raw_delta_y = float(event.scrollingDeltaY())
+            
+            # Skip scroll events with zero delta (phase events like MayBegin, Ended)
+            # These are momentum/gesture tracking events that don't represent actual scrolling
+            if raw_delta_x == 0.0 and raw_delta_y == 0.0:
+                return
+            
+            # Normalize deltas by dividing by font height to get line-based scrolling
+            # This makes scrolling consistent regardless of font size
+            if self.char_height > 0:
+                normalized_delta_x = raw_delta_x / self.char_height
+                normalized_delta_y = raw_delta_y / self.char_height
+            else:
+                # Fallback if char_height not yet initialized
+                normalized_delta_x = raw_delta_x / 16.0
+                normalized_delta_y = raw_delta_y / 16.0
+            
+            # Check if we need to reset accumulation (more than 1 second since last scroll)
+            current_time = time.time()
+            if current_time - self.last_scroll_time > self.SCROLL_ACCUMULATION_TIMEOUT:
+                self.accumulated_scroll_x = 0.0
+                self.accumulated_scroll_y = 0.0
+            
+            # Update last scroll time
+            self.last_scroll_time = current_time
+            
+            # Accumulate the normalized deltas
+            self.accumulated_scroll_x += normalized_delta_x
+            self.accumulated_scroll_y += normalized_delta_y
+            
+            # Only emit event if accumulated delta exceeds 1.0 in either direction
+            if abs(self.accumulated_scroll_x) >= 1.0 or abs(self.accumulated_scroll_y) >= 1.0:
+                # Extract integer part for the event
+                scroll_delta_x = int(self.accumulated_scroll_x)
+                scroll_delta_y = int(self.accumulated_scroll_y)
+                
+                # Keep the fractional part for next accumulation
+                self.accumulated_scroll_x -= scroll_delta_x
+                self.accumulated_scroll_y -= scroll_delta_y
+            else:
+                # Not enough accumulated delta yet, skip this event
+                return
+        
+        # Get modifier keys
+        modifier_flags = event.modifierFlags()
+        shift = bool(modifier_flags & Cocoa.NSEventModifierFlagShift)
+        ctrl = bool(modifier_flags & Cocoa.NSEventModifierFlagControl)
+        alt = bool(modifier_flags & Cocoa.NSEventModifierFlagOption)
+        meta = bool(modifier_flags & Cocoa.NSEventModifierFlagCommand)
+        
+        # Check for double-click (only valid for button events, not scroll wheel events)
+        button_event_types = (
+            Cocoa.NSEventTypeLeftMouseDown,
+            Cocoa.NSEventTypeRightMouseDown,
+            Cocoa.NSEventTypeOtherMouseDown
+        )
+        if ns_event_type in button_event_types and event.clickCount() == 2 and mouse_event_type == MouseEventType.BUTTON_DOWN:
+            mouse_event_type = MouseEventType.DOUBLE_CLICK
+        
+        # Create MouseEvent
+        mouse_event = MouseEvent(
+            event_type=mouse_event_type,
+            column=column,
+            row=row,
+            sub_cell_x=sub_cell_x,
+            sub_cell_y=sub_cell_y,
+            button=button,
+            scroll_delta_x=scroll_delta_x,
+            scroll_delta_y=scroll_delta_y,
+            timestamp=time.time(),
+            shift=shift,
+            ctrl=ctrl,
+            alt=alt,
+            meta=meta
+        )
+        
+        # Deliver mouse event via callback (similar to keyboard events)
+        try:
+            self.event_callback.on_mouse_event(mouse_event)
+        except Exception as e:
+            import traceback
+            print(f"Error in mouse event callback: {e}")
+            traceback.print_exc()
 
 
 # Define TTKWindowDelegate class for handling window events
@@ -2871,6 +3148,122 @@ if COCOA_AVAILABLE:
                 """
                 # We don't support clicking to position cursor in composition text
                 return Cocoa.NSNotFound
+            
+            # Mouse event handlers
+            
+            def acceptsFirstMouse_(self, event):
+                """
+                Allow the view to receive mouse events even when not the key window.
+                
+                This method returns True to allow mouse clicks to be processed
+                immediately, even if the window is not currently active.
+                
+                Args:
+                    event: NSEvent for the mouse down event
+                
+                Returns:
+                    bool: True to accept first mouse click
+                """
+                return True
+            
+            def mouseDown_(self, event):
+                """
+                Handle left mouse button down event.
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def mouseUp_(self, event):
+                """
+                Handle left mouse button up event.
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def rightMouseDown_(self, event):
+                """
+                Handle right mouse button down event.
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def rightMouseUp_(self, event):
+                """
+                Handle right mouse button up event.
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def otherMouseDown_(self, event):
+                """
+                Handle other mouse button (middle button) down event.
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def otherMouseUp_(self, event):
+                """
+                Handle other mouse button (middle button) up event.
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def mouseMoved_(self, event):
+                """
+                Handle mouse moved event (no button pressed).
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def mouseDragged_(self, event):
+                """
+                Handle mouse dragged event (left button pressed).
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def rightMouseDragged_(self, event):
+                """
+                Handle mouse dragged event (right button pressed).
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def otherMouseDragged_(self, event):
+                """
+                Handle mouse dragged event (other button pressed).
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
+            
+            def scrollWheel_(self, event):
+                """
+                Handle scroll wheel event.
+                
+                Args:
+                    event: NSEvent from macOS event system
+                """
+                self.backend._handle_mouse_event(event)
 
 else:
     # Provide a dummy class when PyObjC is not available

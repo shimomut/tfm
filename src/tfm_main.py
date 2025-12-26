@@ -164,6 +164,25 @@ class TFMEventCallback(EventCallback):
         self.file_manager.adaptive_fps.mark_activity()
         
         return self.file_manager._handle_menu_event(event)
+    
+    def on_mouse_event(self, event: 'MouseEvent') -> bool:
+        """
+        Handle a mouse event by routing to the UI layer stack.
+        
+        Mouse events are delivered to the topmost UILayer only, consistent
+        with keyboard event routing.
+        
+        Args:
+            event: MouseEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        # Mark activity for adaptive FPS
+        self.file_manager.adaptive_fps.mark_activity()
+        
+        # Route to UI layer stack
+        return self.file_manager.ui_layer_stack.handle_mouse_event(event)
 
 
 class FileManager(UILayer):
@@ -275,6 +294,9 @@ class FileManager(UILayer):
         self.event_callback = TFMEventCallback(self)
         self.renderer.set_event_callback(self.event_callback)
         
+        # Query and enable mouse capabilities
+        self._setup_mouse_support()
+        
         # Initialize UI layer stack with FileManager as bottom layer
         self.ui_layer_stack = UILayerStack(self, self.log_manager, self.adaptive_fps)
         
@@ -316,6 +338,27 @@ class FileManager(UILayer):
             # If we can't create the directories, log a warning but don't fail
             # TFM should still work without user directories
             self.logger.warning(f"Warning: Could not create TFM user directories: {e}")
+    
+    def _setup_mouse_support(self):
+        """Query and enable mouse support capabilities at startup."""
+        # Query if mouse is supported by the backend
+        if self.renderer.supports_mouse():
+            # Get supported mouse event types
+            supported_events = self.renderer.get_supported_mouse_events()
+            
+            # Enable mouse event capture
+            if self.renderer.enable_mouse_events():
+                # Log success with event count (handle both set and mock objects)
+                try:
+                    event_count = len(supported_events)
+                    self.logger.info(f"Mouse support enabled: {event_count} event types supported")
+                except TypeError:
+                    # Handle mock objects in tests
+                    self.logger.info("Mouse support enabled")
+            else:
+                self.logger.warning("Mouse support available but failed to enable")
+        else:
+            self.logger.info("Mouse support not available on this backend")
     
     # UILayer interface implementation
     
@@ -381,6 +424,186 @@ class FileManager(UILayer):
                 # No operations in progress, request close
                 self.should_quit = True
                 return True
+        return False
+    
+    def handle_mouse_event(self, event) -> bool:
+        """
+        Handle a mouse event for pane focus switching, wheel scrolling, and double-click.
+        
+        This method handles:
+        - Mouse button down events to switch focus between left and right panes
+        - Mouse wheel events to scroll the file list in the active pane
+        - Double-click events to open files/directories (same as Enter key)
+        - Double-click on header to go to parent directory (same as Backspace key)
+        
+        Args:
+            event: MouseEvent to handle
+        
+        Returns:
+            True if the event was handled, False otherwise
+        """
+        # Import MouseEventType for event type checking
+        from ttk.ttk_mouse_event import MouseEventType
+        
+        # Get current dimensions and layout
+        height, width = self.renderer.get_dimensions()
+        left_pane_width = int(width * self.pane_manager.left_pane_ratio)
+        
+        # Calculate pane bounds
+        # Panes start at row 1 (after header) and end before footer/log area
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        file_pane_bottom = height - log_height - 2
+        log_pane_top = height - log_height - 1
+        
+        # Handle double-click events
+        if event.event_type == MouseEventType.DOUBLE_CLICK:
+            # Check if double-click is on header (row 0) - go to parent directory
+            if event.row == 0:
+                # Determine which pane header was clicked
+                if event.column < left_pane_width:
+                    target_pane = 'left'
+                else:
+                    target_pane = 'right'
+                
+                # Switch to the clicked pane if not already active
+                if self.pane_manager.active_pane != target_pane:
+                    self.pane_manager.active_pane = target_pane
+                    self.logger.info(f"Switched focus to {target_pane} pane")
+                
+                # Navigate to parent directory (same as Backspace key)
+                self._action_go_parent()
+                self.logger.info(f"Double-clicked header in {target_pane} pane - navigating to parent")
+                return True
+            
+            # Check if event is within the file pane area (vertically)
+            if event.row < 1 or event.row >= file_pane_bottom:
+                return False
+            
+            # Determine which pane was double-clicked
+            if event.column < left_pane_width:
+                pane_data = self.pane_manager.left_pane
+                target_pane = 'left'
+            else:
+                pane_data = self.pane_manager.right_pane
+                target_pane = 'right'
+            
+            # Calculate which file was double-clicked
+            clicked_file_index = event.row - 1 + pane_data['scroll_offset']
+            
+            # Validate the clicked index
+            if pane_data['files'] and 0 <= clicked_file_index < len(pane_data['files']):
+                # Switch to the clicked pane if not already active
+                if self.pane_manager.active_pane != target_pane:
+                    self.pane_manager.active_pane = target_pane
+                    self.logger.info(f"Switched focus to {target_pane} pane")
+                
+                # Move cursor to the double-clicked item
+                pane_data['focused_index'] = clicked_file_index
+                
+                # Trigger the same action as Enter key
+                self.handle_enter()
+                self.mark_dirty()
+                
+                self.logger.info(f"Double-clicked item {clicked_file_index} in {target_pane} pane")
+                return True
+            
+            return False
+        
+        # Handle wheel events for scrolling
+        if event.event_type == MouseEventType.WHEEL:
+            # Check if event is in the log pane area
+            if log_height > 0 and event.row >= log_pane_top:
+                # Scroll the log pane
+                scroll_lines = int(event.scroll_delta_y * 1)
+                
+                if scroll_lines > 0:
+                    # Scroll up (toward older messages)
+                    if self.log_manager.scroll_log_up(scroll_lines):
+                        self.mark_dirty()
+                elif scroll_lines < 0:
+                    # Scroll down (toward newer messages)
+                    if self.log_manager.scroll_log_down(-scroll_lines):
+                        self.mark_dirty()
+                
+                return True
+            
+            # Check if event is within the file pane area (vertically)
+            if event.row < 1 or event.row >= file_pane_bottom:
+                return False
+            # Determine which pane to scroll based on mouse position
+            target_pane = 'left' if event.column < left_pane_width else 'right'
+            pane_data = self.pane_manager.left_pane if target_pane == 'left' else self.pane_manager.right_pane
+            
+            # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
+            # Use a multiplier to make scrolling feel responsive
+            scroll_lines = int(event.scroll_delta_y * 1)
+            
+            if scroll_lines != 0 and len(pane_data['files']) > 0:
+                # Adjust scroll_offset based on scroll direction
+                old_offset = pane_data['scroll_offset']
+                new_offset = old_offset - scroll_lines  # Negative delta scrolls down (increases offset)
+                
+                # Calculate display height for clamping
+                # file_pane_bottom already accounts for header (1) and status bar (1)
+                display_height = file_pane_bottom - 1
+                max_offset = max(0, len(pane_data['files']) - display_height)
+                
+                # Clamp to valid range
+                new_offset = max(0, min(new_offset, max_offset))
+                
+                if new_offset != old_offset:
+                    pane_data['scroll_offset'] = new_offset
+                    self.mark_dirty()
+                
+                return True
+            
+            return True  # Event handled even if no scroll occurred
+        
+        # Handle button down events for focus switching and item selection
+        if event.event_type == MouseEventType.BUTTON_DOWN:
+            # Check if event is within the file pane area (vertically)
+            if event.row < 1 or event.row >= file_pane_bottom:
+                return False
+            
+            # Determine which pane was clicked based on column
+            if event.column < left_pane_width:
+                # Click in left pane
+                pane_data = self.pane_manager.left_pane
+                pane_changed = self.pane_manager.active_pane != 'left'
+                if pane_changed:
+                    self.pane_manager.active_pane = 'left'
+                    self.logger.info("Switched focus to left pane")
+                
+                # Calculate which file was clicked (row 1 is first file)
+                clicked_file_index = event.row - 1 + pane_data['scroll_offset']
+                
+                # Move cursor to clicked item if valid
+                if pane_data['files'] and 0 <= clicked_file_index < len(pane_data['files']):
+                    pane_data['focused_index'] = clicked_file_index
+                    self.logger.info(f"Moved cursor to item {clicked_file_index} in left pane")
+                
+                self.mark_dirty()
+                return True
+            else:
+                # Click in right pane (including the separator column)
+                pane_data = self.pane_manager.right_pane
+                pane_changed = self.pane_manager.active_pane != 'right'
+                if pane_changed:
+                    self.pane_manager.active_pane = 'right'
+                    self.logger.info("Switched focus to right pane")
+                
+                # Calculate which file was clicked (row 1 is first file)
+                clicked_file_index = event.row - 1 + pane_data['scroll_offset']
+                
+                # Move cursor to clicked item if valid
+                if pane_data['files'] and 0 <= clicked_file_index < len(pane_data['files']):
+                    pane_data['focused_index'] = clicked_file_index
+                    self.logger.info(f"Moved cursor to item {clicked_file_index} in right pane")
+                
+                self.mark_dirty()
+                return True
+        
         return False
     
     def render(self, renderer) -> None:
@@ -1254,6 +1477,8 @@ class FileManager(UILayer):
             else:
                 self.renderer.run_event_loop_iteration(timeout_ms=timeout_ms)
             
+
+            
             # Check if top layer wants to close and pop it if so
             # This must be done after event processing but before drawing
             # to handle layers that want to close due to system events
@@ -1427,12 +1652,6 @@ class FileManager(UILayer):
                 except Exception:
                     pass
             return
-        
-        # Calculate scroll offset
-        if pane_data['focused_index'] < pane_data['scroll_offset']:
-            pane_data['scroll_offset'] = pane_data['focused_index']
-        elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
-            pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
         
         # Pre-calculate layout constants (once per pane, not per file)
         datetime_width = self.get_date_column_width()
@@ -1888,19 +2107,6 @@ class FileManager(UILayer):
             self.adjust_scroll_for_focus(current_pane)
         else:
             self.isearch_match_index = 0
-            
-    def adjust_scroll_for_focus(self, pane_data):
-        """Ensure the selected item is visible by adjusting scroll offset"""
-        height, width = self.renderer.get_dimensions()
-        calculated_height = int(height * self.log_height_ratio)
-        log_height = calculated_height if self.log_height_ratio > 0 else 0
-        display_height = height - log_height - 3  # Reserve space for header, footer, and status
-        
-        # Adjust scroll offset to keep selection visible
-        if pane_data['focused_index'] < pane_data['scroll_offset']:
-            pane_data['scroll_offset'] = pane_data['focused_index']
-        elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
-            pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
             
     def enter_isearch_mode(self):
         """Enter isearch mode"""
@@ -3242,6 +3448,7 @@ class FileManager(UILayer):
                 self.isearch_match_index = (self.isearch_match_index - 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
                 current_pane['focused_index'] = self.isearch_matches[self.isearch_match_index]
+                self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
@@ -3250,6 +3457,7 @@ class FileManager(UILayer):
                 self.isearch_match_index = (self.isearch_match_index + 1) % len(self.isearch_matches)
                 current_pane = self.get_current_pane()
                 current_pane['focused_index'] = self.isearch_matches[self.isearch_match_index]
+                self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
         
@@ -3523,11 +3731,13 @@ class FileManager(UILayer):
         elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['focused_index'] > 0:
                 current_pane['focused_index'] -= 1
+                self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
         elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
             if current_pane['focused_index'] < len(current_pane['files']) - 1:
                 current_pane['focused_index'] += 1
+                self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
         elif event.key_code == KeyCode.ENTER:
@@ -3565,10 +3775,12 @@ class FileManager(UILayer):
             return True
         elif event.key_code == KeyCode.PAGE_UP:  # Page Up - file navigation only
             current_pane['focused_index'] = max(0, current_pane['focused_index'] - 10)
+            self.adjust_scroll_for_focus(current_pane)
             self.mark_dirty()
             return True
         elif event.key_code == KeyCode.PAGE_DOWN:  # Page Down - file navigation only
             current_pane['focused_index'] = min(len(current_pane['files']) - 1, current_pane['focused_index'] + 10)
+            self.adjust_scroll_for_focus(current_pane)
             self.mark_dirty()
             return True
         elif event.key_code == KeyCode.BACKSPACE:  # Backspace - go to parent directory
@@ -4091,9 +4303,15 @@ def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profilin
             fm.restore_stdio()
         
         # Print error information to help with debugging
-        self.logger.error(f"\nTFM encountered an unexpected error:")
-        self.logger.error(f"Error: {type(e).__name__}: {e}")
-        self.logger.info("\nFull traceback:")
+        # Use fm.logger if available, otherwise use print
+        if fm is not None and hasattr(fm, 'logger'):
+            fm.logger.error(f"\nTFM encountered an unexpected error:")
+            fm.logger.error(f"Error: {type(e).__name__}: {e}")
+            fm.logger.info("\nFull traceback:")
+        else:
+            print(f"\nTFM encountered an unexpected error:")
+            print(f"Error: {type(e).__name__}: {e}")
+            print("\nFull traceback:")
         traceback.print_exc()
         
         # Re-raise the exception so it can be seen after TFM exits

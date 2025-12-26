@@ -770,9 +770,8 @@ class DirectoryDiffViewer(UILayer):
                 # Move cursor up
                 if self.cursor_position > 0:
                     self.cursor_position -= 1
-                    # Adjust scroll if cursor moves above visible area
-                    if self.cursor_position < self.scroll_offset:
-                        self.scroll_offset = self.cursor_position
+                    # Ensure cursor is visible
+                    self._ensure_cursor_visible(display_height)
                     self.mark_dirty()
                     # Update priorities when viewport changes
                     self._update_priorities()
@@ -786,9 +785,8 @@ class DirectoryDiffViewer(UILayer):
                 # Move cursor down
                 if self.cursor_position < len(self.visible_nodes) - 1:
                     self.cursor_position += 1
-                    # Adjust scroll if cursor moves below visible area
-                    if self.cursor_position >= self.scroll_offset + display_height:
-                        self.scroll_offset = self.cursor_position - display_height + 1
+                    # Ensure cursor is visible
+                    self._ensure_cursor_visible(display_height)
                     self.mark_dirty()
                     # Update priorities when viewport changes
                     self._update_priorities()
@@ -862,9 +860,8 @@ class DirectoryDiffViewer(UILayer):
                         # Already expanded, move to first child if it exists
                         if node.children and self.cursor_position + 1 < len(self.visible_nodes):
                             self.cursor_position += 1
-                            # Adjust scroll if needed
-                            if self.cursor_position >= self.scroll_offset + display_height:
-                                self.scroll_offset = self.cursor_position - display_height + 1
+                            # Ensure cursor is visible
+                            self._ensure_cursor_visible(display_height)
                             self.mark_dirty()
             return True
         
@@ -882,9 +879,8 @@ class DirectoryDiffViewer(UILayer):
                     for i, visible_node in enumerate(self.visible_nodes):
                         if visible_node is parent_node:
                             self.cursor_position = i
-                            # Adjust scroll if needed
-                            if self.cursor_position < self.scroll_offset:
-                                self.scroll_offset = self.cursor_position
+                            # Ensure cursor is visible
+                            self._ensure_cursor_visible(display_height)
                             self.mark_dirty()
                             break
             return True
@@ -918,6 +914,111 @@ class DirectoryDiffViewer(UILayer):
         if event.is_resize():
             self.mark_dirty()
             return True
+        
+        return False
+    
+    def handle_mouse_event(self, event) -> bool:
+        """
+        Handle a mouse event (UILayer interface method).
+        
+        Supports:
+        - Mouse wheel scrolling for vertical navigation
+        - Mouse button clicks to move cursor to clicked item
+        - Double-click to toggle expand/collapse or open file diff
+        
+        Args:
+            event: MouseEvent to handle
+        
+        Returns:
+            True if event was handled, False otherwise
+        """
+        from ttk.ttk_mouse_event import MouseEventType
+        
+        # Get display dimensions
+        height, width = self.renderer.get_dimensions()
+        display_height = height - 7  # Reserve space for header, divider, details, status
+        
+        # Handle double-click events to toggle expand/collapse or open file diff
+        if event.event_type == MouseEventType.DOUBLE_CLICK:
+            # Check if click is within the tree view area
+            tree_view_start = 1
+            tree_view_end = height - 5  # Reserve space for details pane (3 lines) and status (2 lines)
+            
+            if event.row < tree_view_start or event.row >= tree_view_end:
+                return False
+            
+            # Calculate which item was double-clicked
+            clicked_item_index = event.row - tree_view_start + self.scroll_offset
+            
+            # Validate the clicked index
+            if self.visible_nodes and 0 <= clicked_item_index < len(self.visible_nodes):
+                # Move cursor to the double-clicked item
+                self.cursor_position = clicked_item_index
+                
+                # Trigger the same action as Enter key
+                node = self.visible_nodes[self.cursor_position]
+                if node.is_directory:
+                    # Toggle expand/collapse for directories
+                    if node.is_expanded:
+                        self.collapse_node(self.cursor_position)
+                    else:
+                        self.expand_node(self.cursor_position)
+                else:
+                    # Open file diff viewer for files
+                    self.open_file_diff(self.cursor_position)
+                
+                self.logger.info(f"Double-clicked item {clicked_item_index}")
+                return True
+            
+            return False
+        
+        # Handle wheel events for scrolling
+        if event.event_type == MouseEventType.WHEEL:
+            max_scroll = max(0, len(self.visible_nodes) - display_height)
+            
+            # Calculate scroll amount (positive delta = scroll up, negative = scroll down)
+            scroll_lines = int(event.scroll_delta_y * 1)
+            
+            if scroll_lines != 0:
+                # Adjust scroll_offset based on scroll direction
+                old_offset = self.scroll_offset
+                new_offset = old_offset - scroll_lines  # Negative delta scrolls down (increases offset)
+                
+                # Clamp to valid range
+                new_offset = max(0, min(new_offset, max_scroll))
+                
+                if new_offset != old_offset:
+                    self.scroll_offset = new_offset
+                    self._dirty = True
+                    
+                    # Update priorities when viewport changes (only if we have real TreeNode objects)
+                    if self.visible_nodes and len(self.visible_nodes) > 0:
+                        # Check if first item is a TreeNode (not a mock string)
+                        first_node = self.visible_nodes[0]
+                        if hasattr(first_node, 'is_directory'):
+                            self._update_priorities()
+                
+                return True
+        
+        # Handle button down events for cursor movement
+        if event.event_type == MouseEventType.BUTTON_DOWN:
+            # Check if click is within the tree view area
+            # Tree view starts at row 1 (after header) and ends before details pane
+            tree_view_start = 1
+            tree_view_end = height - 5  # Reserve space for details pane (3 lines) and status (2 lines)
+            
+            if event.row < tree_view_start or event.row >= tree_view_end:
+                return False
+            
+            # Calculate which item was clicked (row 1 is first visible item)
+            clicked_item_index = event.row - tree_view_start + self.scroll_offset
+            
+            # Move cursor to clicked item if valid
+            if self.visible_nodes and 0 <= clicked_item_index < len(self.visible_nodes):
+                self.cursor_position = clicked_item_index
+                self.logger.info(f"Moved cursor to item {clicked_item_index}")
+                self._dirty = True
+                return True
         
         return False
     
@@ -3056,6 +3157,23 @@ class DirectoryDiffViewer(UILayer):
             for child in node.children:
                 self._flatten_tree(child)
     
+    def _ensure_cursor_visible(self, display_height: int) -> None:
+        """
+        Adjust scroll_offset to ensure cursor_position is visible in the viewport.
+        
+        This method should be called after any operation that changes cursor_position
+        to ensure the cursor remains visible on screen.
+        
+        Args:
+            display_height: Height of the display area for scroll adjustment
+        """
+        # If cursor is above visible area, scroll up
+        if self.cursor_position < self.scroll_offset:
+            self.scroll_offset = self.cursor_position
+        # If cursor is below visible area, scroll down
+        elif self.cursor_position >= self.scroll_offset + display_height:
+            self.scroll_offset = self.cursor_position - display_height + 1
+    
     def _jump_to_previous_difference(self, display_height: int) -> None:
         """
         Jump cursor to the previous node with a difference.
@@ -3074,9 +3192,8 @@ class DirectoryDiffViewer(UILayer):
             node = self.visible_nodes[i]
             if node.difference_type != DifferenceType.IDENTICAL:
                 self.cursor_position = i
-                # Adjust scroll if cursor moves above visible area
-                if self.cursor_position < self.scroll_offset:
-                    self.scroll_offset = self.cursor_position
+                # Ensure cursor is visible
+                self._ensure_cursor_visible(display_height)
                 self.mark_dirty()
                 return
         
@@ -3100,9 +3217,8 @@ class DirectoryDiffViewer(UILayer):
             node = self.visible_nodes[i]
             if node.difference_type != DifferenceType.IDENTICAL:
                 self.cursor_position = i
-                # Adjust scroll if cursor moves below visible area
-                if self.cursor_position >= self.scroll_offset + display_height:
-                    self.scroll_offset = self.cursor_position - display_height + 1
+                # Ensure cursor is visible
+                self._ensure_cursor_visible(display_height)
                 self.mark_dirty()
                 return
         

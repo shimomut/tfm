@@ -12,6 +12,7 @@ from typing import Tuple, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ttk.input_event import KeyEvent, CharEvent, SystemEvent
+    from ttk.ttk_mouse_event import MouseEvent
 
 
 class TextAttribute(IntEnum):
@@ -670,6 +671,91 @@ class Renderer(ABC):
         """
         pass
     
+    @abstractmethod
+    def supports_mouse(self) -> bool:
+        """
+        Query whether this backend supports mouse events.
+        
+        This method allows applications to detect mouse support capabilities
+        at runtime and adapt their behavior accordingly. Applications should
+        call this method during initialization to determine if mouse features
+        should be enabled.
+        
+        Returns:
+            bool: True if mouse events are available, False otherwise.
+        
+        Note: Even if this returns True, specific mouse event types may not
+        be supported. Use get_supported_mouse_events() to query which specific
+        event types are available.
+        
+        Example:
+            if renderer.supports_mouse():
+                renderer.enable_mouse_events()
+                print("Mouse support enabled")
+            else:
+                print("Mouse not supported, using keyboard-only mode")
+        """
+        pass
+    
+    @abstractmethod
+    def get_supported_mouse_events(self) -> set:
+        """
+        Query which mouse event types are supported by this backend.
+        
+        Different backends support different subsets of mouse events. For example,
+        the CoreGraphics backend supports all event types (button, move, wheel,
+        double-click), while the curses backend typically only supports button
+        clicks.
+        
+        Returns:
+            set: Set of MouseEventType values supported by this backend.
+                Returns an empty set if mouse events are not supported.
+        
+        Note: The returned set contains MouseEventType enum values from the
+        ttk_mouse_event module. Import MouseEventType to check for specific
+        event types.
+        
+        Example:
+            from ttk.ttk_mouse_event import MouseEventType
+            
+            supported = renderer.get_supported_mouse_events()
+            if MouseEventType.WHEEL in supported:
+                print("Scroll wheel supported")
+            if MouseEventType.DOUBLE_CLICK in supported:
+                print("Double-click supported")
+        """
+        pass
+    
+    @abstractmethod
+    def enable_mouse_events(self) -> bool:
+        """
+        Enable mouse event capture.
+        
+        This method activates mouse event tracking in the backend. After calling
+        this method successfully, mouse events will be delivered through the
+        event callback's on_mouse_event() method.
+        
+        This method should be called after initialize() and before starting the
+        event loop. If the backend does not support mouse events, this method
+        returns False and the application should continue without mouse support.
+        
+        Returns:
+            bool: True if mouse events were successfully enabled, False otherwise.
+        
+        Note: This method is idempotent - calling it multiple times has no
+        additional effect after the first successful call.
+        
+        Example:
+            renderer.initialize()
+            if renderer.supports_mouse():
+                if renderer.enable_mouse_events():
+                    print("Mouse events enabled successfully")
+                else:
+                    print("Failed to enable mouse events")
+        """
+        pass
+    
+
     def is_desktop_mode(self) -> bool:
         """
         Check if the renderer is running in desktop mode.
