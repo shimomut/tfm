@@ -582,7 +582,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
             True if event was handled, False otherwise
         """
         # Call BaseListDialog's wheel scrolling method directly
-        result = BaseListDialog.handle_mouse_event(self, event, self.preview_items)
+        result = BaseListDialog.handle_mouse_event(self, event, self.preview)
         
         # Mark content as changed if scroll position changed
         if result:

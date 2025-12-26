@@ -523,8 +523,11 @@ class DrivesDialog(UILayer, BaseListDialog):
         Returns:
             True if event was handled, False otherwise
         """
-        # Call BaseListDialog's wheel scrolling method directly
-        result = BaseListDialog.handle_mouse_event(self, event, self.drives)
+        # Call BaseListDialog's wheel scrolling method directly (thread-safe)
+        with self.s3_lock:
+            current_filtered = self.filtered_drives.copy()
+        
+        result = BaseListDialog.handle_mouse_event(self, event, current_filtered)
         
         # Mark content as changed if scroll position changed
         if result:
