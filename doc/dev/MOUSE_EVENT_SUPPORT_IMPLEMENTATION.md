@@ -181,11 +181,14 @@ class TtkBackend:
         raise NotImplementedError
     
     def enable_mouse_events(self) -> bool:
-        """Enable mouse event capture. Returns True if successful."""
-        raise NotImplementedError
-    
-    def poll_mouse_event(self) -> Optional[MouseEvent]:
-        """Poll for pending mouse events. Returns None if no events."""
+        """
+        Enable mouse event capture.
+        
+        Mouse events are delivered via the event_callback.on_mouse_event() method,
+        similar to how keyboard events use event_callback.on_key_event().
+        
+        Returns True if successful.
+        """
         raise NotImplementedError
 ```
 
@@ -198,7 +201,7 @@ class TtkBackend:
 **Key Implementation Details**:
 
 1. **Event Registration**: Registers for NSEvent mouse event types in C++ extension
-2. **Event Queue**: Maintains queue of pending mouse events
+2. **Event Delivery**: Delivers events via callback mechanism (no polling required)
 3. **Coordinate Transformation**: Converts window coordinates to text grid
 4. **Sub-Cell Calculation**: Provides precise fractional positioning
 5. **Scroll Delta**: Calculates scroll wheel delta values
@@ -215,13 +218,10 @@ def enable_mouse_events(self) -> bool:
     self.mouse_enabled = True
     return True
 
-def poll_mouse_event(self) -> Optional[MouseEvent]:
-    """Poll for pending mouse events from the event queue."""
-    if not self.mouse_enabled or not self.pending_mouse_events:
-        return None
-    
-    # Get next event from queue
-    native_event = self.pending_mouse_events.pop(0)
+def _handle_mouse_event(self, native_event):
+    """Handle a native mouse event and deliver via callback."""
+    if not self.mouse_enabled:
+        return
     
     # Transform coordinates
     col, row, sub_x, sub_y = self._transform_coordinates(
@@ -229,7 +229,7 @@ def poll_mouse_event(self) -> Optional[MouseEvent]:
     )
     
     # Create MouseEvent object
-    return MouseEvent(
+    mouse_event = MouseEvent(
         event_type=self._map_event_type(native_event.type),
         column=col,
         row=row,
@@ -244,6 +244,12 @@ def poll_mouse_event(self) -> Optional[MouseEvent]:
         alt=native_event.alt,
         meta=native_event.meta
     )
+    
+    # Deliver event via callback
+    try:
+        self.event_callback.on_mouse_event(mouse_event)
+    except Exception as e:
+        self.logger.error(f"Error in mouse event callback: {e}")
 ```
 
 
@@ -325,20 +331,19 @@ def poll_mouse_event(self) -> Optional[MouseEvent]:
 
 ### UI Layer Stack
 
-Mouse events are routed through the UI layer stack, similar to keyboard events:
+Mouse events are routed through the UI layer stack via callback mechanism, similar to keyboard events:
 
 ```python
 # In tfm_main.py
-def handle_events(self):
-    """Main event loop handling both keyboard and mouse events."""
+def on_mouse_event(self, event: MouseEvent):
+    """
+    Callback invoked by backend when mouse event occurs.
     
-    # Poll for mouse events
-    mouse_event = self.backend.poll_mouse_event()
-    if mouse_event:
-        # Route to topmost layer only
-        if self.ui_layers:
-            topmost_layer = self.ui_layers[-1]
-            topmost_layer.handle_mouse_event(mouse_event)
+    Routes event to topmost UI layer only, matching keyboard event behavior.
+    """
+    if self.ui_layers:
+        topmost_layer = self.ui_layers[-1]
+        topmost_layer.handle_mouse_event(event)
 ```
 
 **Key Principles**:
@@ -747,10 +752,14 @@ if not backend.supports_mouse():
 if not backend.enable_mouse_events():
     print("Failed to enable mouse events")
 
-# Check event polling
-event = backend.poll_mouse_event()
-if event is None:
-    print("No mouse events in queue")
+# Check if callback is registered
+if not hasattr(backend, 'event_callback'):
+    print("Event callback not registered with backend")
+
+# Add logging to on_mouse_event callback
+def on_mouse_event(self, event: MouseEvent):
+    self.logger.info(f"Received mouse event: {event.event_type.value}")
+    # ... route to layers
 ```
 
 **Issue: Incorrect coordinate transformation**

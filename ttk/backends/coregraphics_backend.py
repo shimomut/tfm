@@ -1948,8 +1948,8 @@ class CoreGraphicsBackend(Renderer):
         Enable mouse event capture.
         
         This method activates mouse event tracking in the CoreGraphics backend.
-        After calling this method successfully, mouse events will be available
-        via poll_mouse_event().
+        After calling this method successfully, mouse events will be delivered
+        via the event callback's on_mouse_event() method.
         
         Returns:
             bool: True if mouse events were successfully enabled
@@ -1957,35 +1957,11 @@ class CoreGraphicsBackend(Renderer):
         if not hasattr(self, 'mouse_enabled'):
             self.mouse_enabled = False
         
-        if not hasattr(self, 'pending_mouse_events'):
-            self.pending_mouse_events = []
-        
         # Mouse support is always available in CoreGraphics
         self.mouse_enabled = True
         return True
     
-    def poll_mouse_event(self) -> Optional['MouseEvent']:
-        """
-        Poll for pending mouse events.
-        
-        This method checks if any mouse events are available and returns the
-        next event in the queue. If no events are pending, it returns None
-        immediately without blocking.
-        
-        Returns:
-            Optional[MouseEvent]: MouseEvent if one is available, None otherwise
-        """
-        if not hasattr(self, 'mouse_enabled') or not self.mouse_enabled:
-            return None
-        
-        if not hasattr(self, 'pending_mouse_events'):
-            self.pending_mouse_events = []
-        
-        if len(self.pending_mouse_events) > 0:
-            return self.pending_mouse_events.pop(0)
-        
-        return None
-    
+
     def _transform_mouse_coordinates(self, window_x: float, window_y: float) -> tuple:
         """
         Transform window coordinates to text grid coordinates.
@@ -2051,8 +2027,8 @@ class CoreGraphicsBackend(Renderer):
         Handle a native macOS mouse event and convert it to a MouseEvent.
         
         This method is called by the TTKView when it receives mouse events.
-        It converts the native NSEvent to a TTK MouseEvent and adds it to
-        the pending events queue.
+        It converts the native NSEvent to a TTK MouseEvent and delivers it
+        via the event callback.
         
         Args:
             event: NSEvent from macOS event system
@@ -2060,8 +2036,9 @@ class CoreGraphicsBackend(Renderer):
         if not hasattr(self, 'mouse_enabled') or not self.mouse_enabled:
             return
         
-        if not hasattr(self, 'pending_mouse_events'):
-            self.pending_mouse_events = []
+        # Check if event callback is set
+        if not self.event_callback:
+            return
         
         from ttk.ttk_mouse_event import MouseEvent, MouseEventType, MouseButton
         import time
@@ -2141,8 +2118,13 @@ class CoreGraphicsBackend(Renderer):
             meta=meta
         )
         
-        # Add to pending events queue
-        self.pending_mouse_events.append(mouse_event)
+        # Deliver mouse event via callback (similar to keyboard events)
+        try:
+            self.event_callback.on_mouse_event(mouse_event)
+        except Exception as e:
+            import traceback
+            print(f"Error in mouse event callback: {e}")
+            traceback.print_exc()
 
 
 # Define TTKWindowDelegate class for handling window events

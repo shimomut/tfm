@@ -732,8 +732,8 @@ class Renderer(ABC):
         Enable mouse event capture.
         
         This method activates mouse event tracking in the backend. After calling
-        this method successfully, mouse events will be available via
-        poll_mouse_event() or delivered through the event callback.
+        this method successfully, mouse events will be delivered through the
+        event callback's on_mouse_event() method.
         
         This method should be called after initialize() and before starting the
         event loop. If the backend does not support mouse events, this method
@@ -755,39 +755,7 @@ class Renderer(ABC):
         """
         pass
     
-    @abstractmethod
-    def poll_mouse_event(self) -> Optional['MouseEvent']:
-        """
-        Poll for pending mouse events.
-        
-        This method checks if any mouse events are available and returns the
-        next event in the queue. If no events are pending, it returns None
-        immediately without blocking.
-        
-        Mouse events include button presses/releases, mouse movement, scroll
-        wheel events, and double-clicks (depending on backend support). Each
-        event contains text grid coordinates and sub-cell positioning information.
-        
-        Returns:
-            Optional[MouseEvent]: MouseEvent if one is available, None otherwise.
-        
-        Note: This method does not block. Applications should call this method
-        in their event loop to check for mouse events. If mouse events are not
-        enabled or not supported, this method always returns None.
-        
-        Example:
-            from ttk.ttk_mouse_event import MouseEventType
-            
-            # In event loop
-            mouse_event = renderer.poll_mouse_event()
-            if mouse_event:
-                if mouse_event.event_type == MouseEventType.BUTTON_DOWN:
-                    print(f"Click at ({mouse_event.column}, {mouse_event.row})")
-                elif mouse_event.event_type == MouseEventType.WHEEL:
-                    print(f"Scroll: {mouse_event.scroll_delta_y}")
-        """
-        pass
-    
+
     def is_desktop_mode(self) -> bool:
         """
         Check if the renderer is running in desktop mode.

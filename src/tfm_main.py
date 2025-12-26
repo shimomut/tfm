@@ -1349,11 +1349,7 @@ class FileManager(UILayer):
             else:
                 self.renderer.run_event_loop_iteration(timeout_ms=timeout_ms)
             
-            # Poll for mouse events and route to UI layer stack
-            # Mouse events are polled separately from keyboard/system events
-            mouse_event = self.renderer.poll_mouse_event()
-            if mouse_event:
-                self.ui_layer_stack.handle_mouse_event(mouse_event)
+
             
             # Check if top layer wants to close and pop it if so
             # This must be done after event processing but before drawing

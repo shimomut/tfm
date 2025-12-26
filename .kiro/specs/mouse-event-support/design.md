@@ -53,7 +53,7 @@ The design follows a layered approach:
 1. **Native Event Capture**: Backend receives OS/terminal mouse event
 2. **Coordinate Transformation**: Backend converts to text grid coordinates with sub-cell positioning
 3. **Event Object Creation**: Backend creates MouseEvent object with all relevant data
-4. **Event Delivery**: TTK provides event to application via polling or callback
+4. **Event Delivery**: Backend calls `event_callback.on_mouse_event()` to deliver event (callback-based, no polling)
 5. **Event Routing**: TFM's UI Layer Stack Manager delivers event to topmost UILayer only
 6. **Event Handling**: UILayer processes event (no propagation to lower layers)
 
@@ -137,17 +137,11 @@ class TtkBackend:
         """
         Enable mouse event capture.
         
-        Returns:
-            True if mouse events were successfully enabled, False otherwise.
-        """
-        raise NotImplementedError
-    
-    def poll_mouse_event(self) -> Optional[MouseEvent]:
-        """
-        Poll for pending mouse events.
+        Mouse events are delivered via the event_callback.on_mouse_event() method,
+        similar to how keyboard events use event_callback.on_key_event().
         
         Returns:
-            MouseEvent if one is available, None otherwise.
+            True if mouse events were successfully enabled, False otherwise.
         """
         raise NotImplementedError
 ```
@@ -164,7 +158,6 @@ class CoreGraphicsBackend(TtkBackend):
         self.mouse_enabled = False
         self.cell_width = 0  # Set during initialization
         self.cell_height = 0
-        self.pending_mouse_events = []
     
     def supports_mouse(self) -> bool:
         return True
@@ -185,6 +178,43 @@ class CoreGraphicsBackend(TtkBackend):
         # Implementation in C++ extension
         self.mouse_enabled = True
         return True
+    
+    def _handle_mouse_event(self, native_event):
+        """
+        Handle a native mouse event and deliver via callback.
+        
+        Called by C++ extension when mouse event occurs.
+        """
+        if not self.mouse_enabled:
+            return
+        
+        # Transform coordinates
+        col, row, sub_x, sub_y = self._transform_coordinates(
+            native_event.x, native_event.y
+        )
+        
+        # Create MouseEvent object
+        mouse_event = MouseEvent(
+            event_type=self._map_event_type(native_event.type),
+            column=col,
+            row=row,
+            sub_cell_x=sub_x,
+            sub_cell_y=sub_y,
+            button=self._map_button(native_event.button),
+            scroll_delta_x=native_event.scroll_x,
+            scroll_delta_y=native_event.scroll_y,
+            timestamp=time.time(),
+            shift=native_event.shift,
+            ctrl=native_event.ctrl,
+            alt=native_event.alt,
+            meta=native_event.meta
+        )
+        
+        # Deliver event via callback
+        try:
+            self.event_callback.on_mouse_event(mouse_event)
+        except Exception as e:
+            self.logger.error(f"Error in mouse event callback: {e}")
     
     def _transform_coordinates(self, window_x: float, window_y: float) -> tuple:
         """
@@ -252,6 +282,9 @@ class CursesBackend(TtkBackend):
         except:
             return False
     
+    # Note: Curses backend still uses poll_mouse_event() as mouse support
+    # is not fully implemented. Future work should migrate to callback-based
+    # delivery like CoreGraphics backend.
     def poll_mouse_event(self) -> Optional[MouseEvent]:
         """Poll for mouse events from curses."""
         if not self.mouse_enabled:
