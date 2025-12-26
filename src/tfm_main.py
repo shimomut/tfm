@@ -164,6 +164,25 @@ class TFMEventCallback(EventCallback):
         self.file_manager.adaptive_fps.mark_activity()
         
         return self.file_manager._handle_menu_event(event)
+    
+    def on_mouse_event(self, event: 'MouseEvent') -> bool:
+        """
+        Handle a mouse event by routing to the UI layer stack.
+        
+        Mouse events are delivered to the topmost UILayer only, consistent
+        with keyboard event routing.
+        
+        Args:
+            event: MouseEvent to handle
+        
+        Returns:
+            True if the event was consumed, False otherwise
+        """
+        # Mark activity for adaptive FPS
+        self.file_manager.adaptive_fps.mark_activity()
+        
+        # Route to UI layer stack
+        return self.file_manager.ui_layer_stack.handle_mouse_event(event)
 
 
 class FileManager(UILayer):
@@ -275,6 +294,9 @@ class FileManager(UILayer):
         self.event_callback = TFMEventCallback(self)
         self.renderer.set_event_callback(self.event_callback)
         
+        # Query and enable mouse capabilities
+        self._setup_mouse_support()
+        
         # Initialize UI layer stack with FileManager as bottom layer
         self.ui_layer_stack = UILayerStack(self, self.log_manager, self.adaptive_fps)
         
@@ -316,6 +338,27 @@ class FileManager(UILayer):
             # If we can't create the directories, log a warning but don't fail
             # TFM should still work without user directories
             self.logger.warning(f"Warning: Could not create TFM user directories: {e}")
+    
+    def _setup_mouse_support(self):
+        """Query and enable mouse support capabilities at startup."""
+        # Query if mouse is supported by the backend
+        if self.renderer.supports_mouse():
+            # Get supported mouse event types
+            supported_events = self.renderer.get_supported_mouse_events()
+            
+            # Enable mouse event capture
+            if self.renderer.enable_mouse_events():
+                # Log success with event count (handle both set and mock objects)
+                try:
+                    event_count = len(supported_events)
+                    self.logger.info(f"Mouse support enabled: {event_count} event types supported")
+                except TypeError:
+                    # Handle mock objects in tests
+                    self.logger.info("Mouse support enabled")
+            else:
+                self.logger.warning("Mouse support available but failed to enable")
+        else:
+            self.logger.info("Mouse support not available on this backend")
     
     # UILayer interface implementation
     
@@ -382,6 +425,58 @@ class FileManager(UILayer):
                 self.should_quit = True
                 return True
         return False
+    
+    def handle_mouse_event(self, event) -> bool:
+        """
+        Handle a mouse event for pane focus switching.
+        
+        This method handles mouse button down events to switch focus between
+        left and right panes when the user clicks within a pane's bounds.
+        
+        Args:
+            event: MouseEvent to handle
+        
+        Returns:
+            True if the event was handled (click in a pane), False otherwise
+        """
+        # Import MouseEventType for event type checking
+        from ttk.ttk_mouse_event import MouseEventType
+        
+        # Only handle button down events for focus switching
+        if event.event_type != MouseEventType.BUTTON_DOWN:
+            return False
+        
+        # Get current dimensions and layout
+        height, width = self.renderer.get_dimensions()
+        left_pane_width = int(width * self.pane_manager.left_pane_ratio)
+        
+        # Calculate pane bounds
+        # Panes start at row 1 (after header) and end before footer/log area
+        calculated_height = int(height * self.log_height_ratio)
+        log_height = calculated_height if self.log_height_ratio > 0 else 0
+        file_pane_bottom = height - log_height - 2
+        
+        # Check if click is within the file pane area (vertically)
+        if event.row < 1 or event.row >= file_pane_bottom:
+            return False
+        
+        # Determine which pane was clicked based on column
+        if event.column < left_pane_width:
+            # Click in left pane
+            if self.pane_manager.active_pane != 'left':
+                self.pane_manager.active_pane = 'left'
+                self.logger.info("Switched focus to left pane")
+                self.mark_dirty()
+                return True
+            return True  # Already in left pane, event handled
+        else:
+            # Click in right pane (including the separator column)
+            if self.pane_manager.active_pane != 'right':
+                self.pane_manager.active_pane = 'right'
+                self.logger.info("Switched focus to right pane")
+                self.mark_dirty()
+                return True
+            return True  # Already in right pane, event handled
     
     def render(self, renderer) -> None:
         """
@@ -1253,6 +1348,12 @@ class FileManager(UILayer):
                 )
             else:
                 self.renderer.run_event_loop_iteration(timeout_ms=timeout_ms)
+            
+            # Poll for mouse events and route to UI layer stack
+            # Mouse events are polled separately from keyboard/system events
+            mouse_event = self.renderer.poll_mouse_event()
+            if mouse_event:
+                self.ui_layer_stack.handle_mouse_event(mouse_event)
             
             # Check if top layer wants to close and pop it if so
             # This must be done after event processing but before drawing

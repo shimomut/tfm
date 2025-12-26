@@ -921,6 +921,20 @@ class DirectoryDiffViewer(UILayer):
         
         return False
     
+    def handle_mouse_event(self, event) -> bool:
+        """
+        Handle a mouse event (UILayer interface method).
+        
+        Mouse events are not yet implemented for the directory diff viewer.
+        
+        Args:
+            event: MouseEvent to handle
+        
+        Returns:
+            False (not yet implemented)
+        """
+        return False
+    
     def render(self, renderer) -> None:
         """
         Render the directory diff viewer.

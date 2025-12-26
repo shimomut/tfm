@@ -1065,6 +1065,20 @@ class TextViewer(UILayer):
             return True
         return False
     
+    def handle_mouse_event(self, event) -> bool:
+        """
+        Handle a mouse event (UILayer interface method).
+        
+        Mouse events are not yet implemented for the text viewer.
+        
+        Args:
+            event: MouseEvent to handle
+        
+        Returns:
+            False (not yet implemented)
+        """
+        return False
+    
     def render(self, renderer) -> None:
         """
         Render the layer's content (UILayer interface method).

@@ -11,6 +11,7 @@ from typing import Tuple, Optional
 
 from ttk.renderer import Renderer, TextAttribute
 from ttk.input_event import Event, KeyEvent, CharEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
+from ttk.ttk_mouse_event import MouseEvent, MouseEventType, MouseButton
 
 
 class UTF8Accumulator:
@@ -130,6 +131,8 @@ class CursesBackend(Renderer):
         self.utf8_accumulator = UTF8Accumulator()  # UTF-8 byte accumulator for multi-byte characters
         self.caret_x = 0  # Stored caret X position
         self.caret_y = 0  # Stored caret Y position
+        self.mouse_enabled = False  # Whether mouse events are enabled
+        self.mouse_available = False  # Whether terminal supports mouse events
     
     def initialize(self) -> None:
         """
@@ -953,6 +956,197 @@ class CursesBackend(Renderer):
                 # Log error but continue loop
                 print(f"Error in event loop: {e}")
                 continue
+    
+    
+    def supports_mouse(self) -> bool:
+        """
+        Query whether this backend supports mouse events.
+        
+        This method checks if the terminal has mouse capability. The check
+        is performed during initialization and cached.
+        
+        Returns:
+            bool: True if mouse events are available, False otherwise.
+        """
+        if self.stdscr is None:
+            return False
+        
+        try:
+            # Check if terminal has mouse capability
+            # curses.has_key() is not reliable for KEY_MOUSE, so we check
+            # if mousemask is available and try to enable it
+            return hasattr(curses, 'mousemask') and hasattr(curses, 'getmouse')
+        except (AttributeError, curses.error):
+            return False
+    
+    def get_supported_mouse_events(self) -> set:
+        """
+        Query which mouse event types are supported.
+        
+        The curses backend typically only supports button clicks. Movement
+        and wheel events are generally not available in terminal mode.
+        
+        Returns:
+            set: Set of MouseEventType values supported by this backend.
+        """
+        if not self.supports_mouse():
+            return set()
+        
+        # Curses typically only supports button down and button up events
+        return {
+            MouseEventType.BUTTON_DOWN,
+            MouseEventType.BUTTON_UP
+        }
+    
+    def enable_mouse_events(self) -> bool:
+        """
+        Enable mouse event capture in curses.
+        
+        This method enables mouse event tracking if the terminal supports it.
+        If mouse events are not supported, it returns False and the application
+        should continue without mouse support.
+        
+        Returns:
+            bool: True if mouse events were successfully enabled, False otherwise.
+        """
+        if not self.supports_mouse():
+            return False
+        
+        if self.mouse_enabled:
+            # Already enabled
+            return True
+        
+        try:
+            # Enable all mouse events
+            # ALL_MOUSE_EVENTS includes button presses, releases, and clicks
+            # REPORT_MOUSE_POSITION enables position reporting
+            curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
+            self.mouse_enabled = True
+            self.mouse_available = True
+            return True
+        except (curses.error, AttributeError) as e:
+            # Mouse not supported or error enabling
+            self.mouse_enabled = False
+            self.mouse_available = False
+            return False
+    
+    def poll_mouse_event(self) -> Optional[MouseEvent]:
+        """
+        Poll for mouse events from curses.
+        
+        This method checks if a mouse event is available and returns it.
+        If no mouse event is pending, it returns None immediately.
+        
+        Returns:
+            Optional[MouseEvent]: MouseEvent if one is available, None otherwise.
+        """
+        if not self.mouse_enabled:
+            return None
+        
+        try:
+            # Check if there's a pending character
+            # Use nodelay mode to avoid blocking
+            self.stdscr.nodelay(True)
+            ch = self.stdscr.getch()
+            self.stdscr.nodelay(False)
+            
+            if ch == -1:
+                # No input available
+                return None
+            
+            if ch != curses.KEY_MOUSE:
+                # Not a mouse event - put it back for other handlers
+                curses.ungetch(ch)
+                return None
+            
+            # Get mouse event details
+            _, x, y, _, bstate = curses.getmouse()
+            
+            # Map curses button state to our event type and button
+            event_type = self._map_curses_event_type(bstate)
+            button = self._map_curses_button(bstate)
+            
+            if event_type is None:
+                # Unsupported event type
+                return None
+            
+            # Curses coordinates are already in text grid units
+            # Sub-cell positioning not available in curses - use center of cell
+            return MouseEvent(
+                event_type=event_type,
+                column=x,
+                row=y,
+                sub_cell_x=0.5,  # Center of cell
+                sub_cell_y=0.5,  # Center of cell
+                button=button,
+                timestamp=0.0  # Will be set by MouseEvent.__post_init__
+            )
+        except (curses.error, ValueError):
+            # Error getting mouse event - ignore
+            return None
+    
+    def _map_curses_event_type(self, bstate: int) -> Optional[MouseEventType]:
+        """
+        Map curses button state to MouseEventType.
+        
+        Args:
+            bstate: Curses button state bitmask
+            
+        Returns:
+            Optional[MouseEventType]: Mapped event type, or None if unsupported
+        """
+        # Check for button press events
+        if (bstate & curses.BUTTON1_PRESSED or
+            bstate & curses.BUTTON2_PRESSED or
+            bstate & curses.BUTTON3_PRESSED):
+            return MouseEventType.BUTTON_DOWN
+        
+        # Check for button release events
+        if (bstate & curses.BUTTON1_RELEASED or
+            bstate & curses.BUTTON2_RELEASED or
+            bstate & curses.BUTTON3_RELEASED):
+            return MouseEventType.BUTTON_UP
+        
+        # Check for button click events (press + release)
+        if (bstate & curses.BUTTON1_CLICKED or
+            bstate & curses.BUTTON2_CLICKED or
+            bstate & curses.BUTTON3_CLICKED):
+            # Treat clicks as button down for simplicity
+            return MouseEventType.BUTTON_DOWN
+        
+        # Unsupported event type
+        return None
+    
+    def _map_curses_button(self, bstate: int) -> MouseButton:
+        """
+        Map curses button state to MouseButton.
+        
+        Args:
+            bstate: Curses button state bitmask
+            
+        Returns:
+            MouseButton: Mapped button identifier
+        """
+        # Check for button 1 (left button) events
+        if (bstate & curses.BUTTON1_PRESSED or
+            bstate & curses.BUTTON1_RELEASED or
+            bstate & curses.BUTTON1_CLICKED):
+            return MouseButton.LEFT
+        
+        # Check for button 2 (middle button) events
+        if (bstate & curses.BUTTON2_PRESSED or
+            bstate & curses.BUTTON2_RELEASED or
+            bstate & curses.BUTTON2_CLICKED):
+            return MouseButton.MIDDLE
+        
+        # Check for button 3 (right button) events
+        if (bstate & curses.BUTTON3_PRESSED or
+            bstate & curses.BUTTON3_RELEASED or
+            bstate & curses.BUTTON3_CLICKED):
+            return MouseButton.RIGHT
+        
+        # Default to NONE if no button detected
+        return MouseButton.NONE
     
     
     def _translate_key_to_char(self, event: KeyEvent) -> Optional['CharEvent']:

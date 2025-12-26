@@ -6,7 +6,7 @@ This implementation adds comprehensive mouse event support to TFM across both te
 
 ## Tasks
 
-- [ ] 1. Create TTK mouse event data structures
+- [x] 1. Create TTK mouse event data structures
   - Create `ttk/ttk_mouse_event.py` with MouseEvent, MouseEventType, and MouseButton classes
   - Implement dataclass with all required fields including scroll deltas
   - Add coordinate transformation utility functions
@@ -22,13 +22,13 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - **Property 4: Sub-cell position accuracy**
   - **Validates: Requirements 1.2, 1.3, 2.4, 2.5**
 
-- [ ] 2. Extend TTK backend interface for mouse support
+- [x] 2. Extend TTK backend interface for mouse support
   - Add mouse support methods to `ttk/ttk_backend.py` base class
   - Implement `supports_mouse()`, `get_supported_mouse_events()`, `enable_mouse_events()`, `poll_mouse_event()`
   - Add capability detection methods
   - _Requirements: 1.5, 7.1, 7.2, 7.3_
 
-- [ ] 3. Implement CoreGraphics backend mouse support
+- [x] 3. Implement CoreGraphics backend mouse support
   - Extend `ttk/backends/coregraphics_backend.py` with mouse event capture
   - Implement coordinate transformation from window to text grid coordinates
   - Add sub-cell position calculation
@@ -42,7 +42,7 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - Test scroll delta calculation
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 4. Implement Curses backend mouse support
+- [x] 4. Implement Curses backend mouse support
   - Extend `ttk/backends/curses_backend.py` with mouse event capture
   - Implement terminal capability detection
   - Map curses mouse events to TTK MouseEvent objects
@@ -59,10 +59,10 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - Test event type mapping from curses to TTK
   - _Requirements: 3.1, 3.2, 3.5_
 
-- [ ] 5. Checkpoint - Ensure backend tests pass
+- [x] 5. Checkpoint - Ensure backend tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Add mouse event handling to UILayer base class
+- [x] 6. Add mouse event handling to UILayer base class
   - Extend `src/tfm_ui_layer.py` with `handle_mouse_event()` method
   - Add `is_point_inside()` helper method for bounds checking
   - Document that only topmost layer receives events (no propagation)
@@ -72,7 +72,7 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - **Property 5: Event handler registration and invocation**
   - **Validates: Requirements 1.5**
 
-- [ ] 7. Implement mouse event routing in TFM
+- [x] 7. Implement mouse event routing in TFM
   - Update `src/tfm_main.py` to poll for mouse events from backend
   - Route mouse events to topmost UILayer in stack
   - Ensure consistent routing with keyboard events
@@ -84,7 +84,7 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - **Property 7: Consistent routing for mouse and keyboard events**
   - **Validates: Requirements 4.1, 4.2, 4.3**
 
-- [ ] 8. Implement pane focus switching in FileManager
+- [x] 8. Implement pane focus switching in FileManager
   - Update file pane components to handle mouse events
   - Implement `handle_mouse_event()` in pane classes
   - Add bounds checking using `is_point_inside()`
@@ -105,7 +105,7 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - Test visual indicators update
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 9. Add event timestamp ordering
+- [x] 9. Add event timestamp ordering
   - Ensure all MouseEvent objects have monotonic timestamps
   - Add timestamp validation in event creation
   - _Requirements: 8.2_
@@ -114,29 +114,29 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - **Property 13: Event timestamp ordering**
   - **Validates: Requirements 8.2**
 
-- [ ] 10. Checkpoint - Ensure integration tests pass
+- [x] 10. Checkpoint - Ensure integration tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Create demo script for mouse event support
+- [x] 11. Create demo script for mouse event support
   - Create `demo/demo_mouse_events.py` showing pane focus switching
   - Demonstrate mouse event capture in both backends
   - Show coordinate transformation and sub-cell positioning
   - _Requirements: All_
 
-- [ ] 12. Create end-user documentation
+- [x] 12. Create end-user documentation
   - Create `doc/MOUSE_EVENT_SUPPORT_FEATURE.md` with user guide
   - Document how to use mouse to switch pane focus
   - Document backend capabilities and limitations
   - _Requirements: All_
 
-- [ ] 13. Create developer documentation
+- [x] 13. Create developer documentation
   - Create `doc/dev/MOUSE_EVENT_SUPPORT_IMPLEMENTATION.md`
   - Document MouseEvent API and coordinate system
   - Document backend implementation details
   - Document how to extend for future drag-and-drop
   - _Requirements: All_
 
-- [ ] 14. Final checkpoint - Complete feature verification
+- [x] 14. Final checkpoint - Complete feature verification
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

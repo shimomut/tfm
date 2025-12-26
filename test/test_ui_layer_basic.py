@@ -21,6 +21,8 @@ class MockLayer(UILayer):
         self.deactivated = False
         self.key_events_received = []
         self.char_events_received = []
+        self.mouse_events_received = []
+        self.system_events_received = []
         self.render_calls = 0
     
     def handle_key_event(self, event) -> bool:
@@ -29,6 +31,14 @@ class MockLayer(UILayer):
     
     def handle_char_event(self, event) -> bool:
         self.char_events_received.append(event)
+        return event.get('consume', False)
+    
+    def handle_system_event(self, event) -> bool:
+        self.system_events_received.append(event)
+        return event.get('consume', False)
+    
+    def handle_mouse_event(self, event) -> bool:
+        self.mouse_events_received.append(event)
         return event.get('consume', False)
     
     def render(self, renderer) -> None:
@@ -204,6 +214,63 @@ def test_check_and_close_top_layer():
     result = stack.check_and_close_top_layer()
     assert result is True
     assert stack.get_layer_count() == 1
+
+
+def test_mouse_event_routing_to_top_layer():
+    """Test that mouse events are routed to top layer only."""
+    bottom = MockLayer("bottom")
+    stack = UILayerStack(bottom)
+    
+    top = MockLayer("top")
+    stack.push(top)
+    
+    event = {'type': 'mouse', 'consume': True}
+    result = stack.handle_mouse_event(event)
+    
+    assert result is True
+    assert len(top.mouse_events_received) == 1
+    assert len(bottom.mouse_events_received) == 0
+
+
+def test_mouse_event_no_propagation():
+    """Test that mouse events only go to top layer (no propagation)."""
+    bottom = MockLayer("bottom")
+    stack = UILayerStack(bottom)
+    
+    top = MockLayer("top")
+    stack.push(top)
+    
+    event = {'type': 'mouse', 'consume': False}
+    result = stack.handle_mouse_event(event)
+    
+    # Only top layer receives events (no propagation)
+    assert len(top.mouse_events_received) == 1
+    assert len(bottom.mouse_events_received) == 0
+
+
+def test_is_point_inside_default_implementation():
+    """Test the default is_point_inside implementation."""
+    layer = MockLayer("test")
+    
+    # Without bounds attributes, should return False
+    assert layer.is_point_inside(5, 5) is False
+    
+    # Add bounds attributes
+    layer.x = 10
+    layer.y = 10
+    layer.width = 20
+    layer.height = 15
+    
+    # Test points inside bounds
+    assert layer.is_point_inside(10, 10) is True  # Top-left corner
+    assert layer.is_point_inside(15, 15) is True  # Inside
+    assert layer.is_point_inside(29, 24) is True  # Bottom-right corner (exclusive)
+    
+    # Test points outside bounds
+    assert layer.is_point_inside(9, 10) is False   # Left of bounds
+    assert layer.is_point_inside(10, 9) is False   # Above bounds
+    assert layer.is_point_inside(30, 15) is False  # Right of bounds
+    assert layer.is_point_inside(15, 25) is False  # Below bounds
 
 
 if __name__ == '__main__':
