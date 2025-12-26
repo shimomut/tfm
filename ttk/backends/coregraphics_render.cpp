@@ -880,7 +880,8 @@ static PyMethodDef CppRendererMethods[] = {
         "Parameters:\n"
         "  view: NSView object (as Python integer/long)\n"
         "  file_urls: List of file:// URL strings\n"
-        "  drag_image_text: Text to display in drag image (str)\n\n"
+        "  drag_image_text: Text to display in drag image (str)\n"
+        "  event: NSEvent object (as Python integer/long, 0 if not available)\n\n"
         "Returns:\n"
         "  bool: True if drag started successfully, False otherwise\n"
     },
@@ -3245,6 +3246,7 @@ static PyObject* enable_perf_logging(PyObject* self, PyObject* args) {
  *             - view: NSView object (as Python integer/long)
  *             - file_urls: List of file:// URL strings
  *             - drag_image_text: Text to display in drag image (str)
+ *             - event: NSEvent object (as Python integer/long, optional, default 0)
  * @return PyObject* True if drag started successfully, False otherwise
  */
 static PyObject* start_drag_session(PyObject* self, PyObject* args) {
@@ -3252,9 +3254,10 @@ static PyObject* start_drag_session(PyObject* self, PyObject* args) {
     PyObject* view_obj = nullptr;
     PyObject* file_urls_obj = nullptr;
     const char* drag_image_text = nullptr;
+    PyObject* event_obj = nullptr;
     
-    if (!PyArg_ParseTuple(args, "OOs", &view_obj, &file_urls_obj, &drag_image_text)) {
-        PyErr_SetString(PyExc_TypeError, "Expected (view, file_urls, drag_image_text)");
+    if (!PyArg_ParseTuple(args, "OOsO", &view_obj, &file_urls_obj, &drag_image_text, &event_obj)) {
+        PyErr_SetString(PyExc_TypeError, "Expected (view, file_urls, drag_image_text, event)");
         return nullptr;
     }
     
@@ -3276,6 +3279,13 @@ static PyObject* start_drag_session(PyObject* self, PyObject* args) {
     if (view_ptr == nullptr && PyErr_Occurred()) {
         PyErr_SetString(PyExc_TypeError, "Invalid view object");
         return nullptr;
+    }
+    
+    // Extract NSEvent pointer from Python object (may be 0/nullptr if not provided)
+    void* event_ptr = PyLong_AsVoidPtr(event_obj);
+    // Clear any error from PyLong_AsVoidPtr if event_obj was 0
+    if (event_ptr == nullptr) {
+        PyErr_Clear();
     }
     
     // Cast to NSView (using id to avoid Objective-C++ requirement)
@@ -3339,47 +3349,6 @@ static PyObject* start_drag_session(PyObject* self, PyObject* args) {
         return nullptr;
     }
     
-    // Set up NSPasteboard with file URLs
-    // Get the dragging pasteboard
-    id pasteboard = ((id(*)(id, SEL, id))objc_msgSend)(
-        (id)objc_getClass("NSPasteboard"),
-        sel_registerName("pasteboardWithName:"),
-        ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSPasteboardNameDrag"), sel_registerName("self"))
-    );
-    
-    if (pasteboard == nullptr) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to get dragging pasteboard");
-        return nullptr;
-    }
-    
-    // Clear pasteboard
-    ((void(*)(id, SEL))objc_msgSend)(pasteboard, sel_registerName("clearContents"));
-    
-    // Convert NSURLs to file paths for NSFilenamesPboardType
-    id file_paths_array = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMutableArray"), sel_registerName("array"));
-    
-    for (Py_ssize_t i = 0; i < url_count; ++i) {
-        id ns_url = ((id(*)(id, SEL, unsigned long))objc_msgSend)(file_url_array, sel_registerName("objectAtIndex:"), (unsigned long)i);
-        id file_path = ((id(*)(id, SEL))objc_msgSend)(ns_url, sel_registerName("path"));
-        
-        if (file_path != nullptr) {
-            ((void(*)(id, SEL, id))objc_msgSend)(file_paths_array, sel_registerName("addObject:"), file_path);
-        }
-    }
-    
-    // Write file paths to pasteboard with NSFilenamesPboardType
-    id filenames_type = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSPasteboardTypeFileURL"), sel_registerName("self"));
-    BOOL success = ((BOOL(*)(id, SEL, id))objc_msgSend)(
-        pasteboard,
-        sel_registerName("writeObjects:"),
-        file_url_array
-    );
-    
-    if (!success) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to write file URLs to pasteboard");
-        return nullptr;
-    }
-    
     // Create drag image with text overlay
     // Create NSImage with text
     id font = ((id(*)(id, SEL, CGFloat))objc_msgSend)(
@@ -3390,11 +3359,20 @@ static PyObject* start_drag_session(PyObject* self, PyObject* args) {
     
     // Create attributes dictionary for text
     id attributes_dict = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMutableDictionary"), sel_registerName("dictionary"));
+    
+    // Get NSFontAttributeName constant
+    // This is a global NSString constant, we need to create an NSString with the same value
+    id font_attr_key = ((id(*)(id, SEL, const char*))objc_msgSend)(
+        (id)objc_getClass("NSString"),
+        sel_registerName("stringWithUTF8String:"),
+        "NSFont"
+    );
+    
     ((void(*)(id, SEL, id, id))objc_msgSend)(
         attributes_dict,
         sel_registerName("setObject:forKey:"),
         font,
-        ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSFontAttributeName"), sel_registerName("self"))
+        font_attr_key
     );
     
     // Calculate text size
@@ -3453,20 +3431,10 @@ static PyObject* start_drag_session(PyObject* self, PyObject* args) {
     
     ((void(*)(id, SEL))objc_msgSend)(drag_image, sel_registerName("unlockFocus"));
     
-    // Create NSDraggingItem for the drag session
-    id dragging_item = ((id(*)(id, SEL, id))objc_msgSend)(
-        ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSDraggingItem"), sel_registerName("alloc")),
-        sel_registerName("initWithPasteboardWriter:"),
-        file_url_array
-    );
+    // Create NSDraggingItem array - one item per URL
+    id dragging_items_array = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMutableArray"), sel_registerName("array"));
     
-    if (dragging_item == nullptr) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to create NSDraggingItem");
-        return nullptr;
-    }
-    
-    // Set dragging frame (position where drag image appears)
-    // Get mouse location in view coordinates
+    // Get mouse location for positioning drag image
     id window = ((id(*)(id, SEL))objc_msgSend)(view, sel_registerName("window"));
     CGPoint mouse_location_window = ((CGPoint(*)(id, SEL))objc_msgSend)(window, sel_registerName("mouseLocationOutsideOfEventStream"));
     CGPoint mouse_location = ((CGPoint(*)(id, SEL, CGPoint, id))objc_msgSend)(
@@ -3476,6 +3444,7 @@ static PyObject* start_drag_session(PyObject* self, PyObject* args) {
         nullptr
     );
     
+    // Create dragging frame for the image
     CGRect dragging_frame = CGRectMake(
         mouse_location.x - image_size.width / 2,
         mouse_location.y - image_size.height / 2,
@@ -3483,21 +3452,55 @@ static PyObject* start_drag_session(PyObject* self, PyObject* args) {
         image_size.height
     );
     
-    ((void(*)(id, SEL, CGRect, id))objc_msgSend)(
-        dragging_item,
-        sel_registerName("setDraggingFrame:contents:"),
-        dragging_frame,
-        drag_image
-    );
-    
-    // Create array with single dragging item
-    id dragging_items_array = ((id(*)(id, SEL, id))objc_msgSend)((id)objc_getClass("NSArray"), sel_registerName("arrayWithObject:"), dragging_item);
+    // Create a dragging item for each URL
+    for (Py_ssize_t i = 0; i < url_count; ++i) {
+        id ns_url = ((id(*)(id, SEL, unsigned long))objc_msgSend)(file_url_array, sel_registerName("objectAtIndex:"), (unsigned long)i);
+        
+        // Create NSDraggingItem with this URL as the pasteboard writer
+        id dragging_item = ((id(*)(id, SEL, id))objc_msgSend)(
+            ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSDraggingItem"), sel_registerName("alloc")),
+            sel_registerName("initWithPasteboardWriter:"),
+            ns_url
+        );
+        
+        if (dragging_item == nullptr) {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to create NSDraggingItem");
+            return nullptr;
+        }
+        
+        // Set dragging frame and image (only for first item to avoid overlapping images)
+        if (i == 0) {
+            ((void(*)(id, SEL, CGRect, id))objc_msgSend)(
+                dragging_item,
+                sel_registerName("setDraggingFrame:contents:"),
+                dragging_frame,
+                drag_image
+            );
+        } else {
+            // For additional items, use same frame but no image
+            ((void(*)(id, SEL, CGRect, id))objc_msgSend)(
+                dragging_item,
+                sel_registerName("setDraggingFrame:contents:"),
+                dragging_frame,
+                nullptr
+            );
+        }
+        
+        // Add to array
+        ((void(*)(id, SEL, id))objc_msgSend)(dragging_items_array, sel_registerName("addObject:"), dragging_item);
+    }
     
     // Get current event for drag session
-    id current_event = ((id(*)(id, SEL))objc_msgSend)(
-        ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSApp"), sel_registerName("sharedApplication")),
-        sel_registerName("currentEvent")
-    );
+    // Use provided event if available, otherwise try to get current event from NSApp
+    id current_event = nullptr;
+    if (event_ptr != nullptr) {
+        current_event = (id)event_ptr;
+    } else {
+        current_event = ((id(*)(id, SEL))objc_msgSend)(
+            ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSApp"), sel_registerName("sharedApplication")),
+            sel_registerName("currentEvent")
+        );
+    }
     
     if (current_event == nullptr) {
         PyErr_SetString(PyExc_RuntimeError, "No current event available for drag session");

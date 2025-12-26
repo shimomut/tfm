@@ -281,6 +281,9 @@ class CoreGraphicsBackend(Renderer):
         self.last_scroll_time = 0.0
         self.SCROLL_ACCUMULATION_TIMEOUT = 1.0  # Reset after 1 second of no scrolling
         
+        # Current NSEvent for drag-and-drop (stored during mouse event processing)
+        self.current_nsevent = None
+        
         # C++ renderer module (initialized in initialize())
         self._cpp_renderer = None
     
@@ -2047,6 +2050,10 @@ class CoreGraphicsBackend(Renderer):
         Args:
             event: NSEvent from macOS event system
         """
+        # Store the current NSEvent for drag-and-drop
+        # The drag session needs access to the NSEvent to pass to beginDraggingSessionWithItems:event:source:
+        self.current_nsevent = event
+        
         if not hasattr(self, 'mouse_enabled') or not self.mouse_enabled:
             return
         
@@ -2066,9 +2073,12 @@ class CoreGraphicsBackend(Renderer):
             Cocoa.NSEventTypeOtherMouseDown: MouseEventType.BUTTON_DOWN,
             Cocoa.NSEventTypeOtherMouseUp: MouseEventType.BUTTON_UP,
             Cocoa.NSEventTypeMouseMoved: MouseEventType.MOVE,
-            Cocoa.NSEventTypeLeftMouseDragged: MouseEventType.DRAG,
-            Cocoa.NSEventTypeRightMouseDragged: MouseEventType.DRAG,
-            Cocoa.NSEventTypeOtherMouseDragged: MouseEventType.DRAG,
+            # Map dragged events to MOVE for drag gesture detection
+            # When a button is pressed and mouse moves, macOS sends dragged events
+            # We need these as MOVE events so the drag gesture detector can track position
+            Cocoa.NSEventTypeLeftMouseDragged: MouseEventType.MOVE,
+            Cocoa.NSEventTypeRightMouseDragged: MouseEventType.MOVE,
+            Cocoa.NSEventTypeOtherMouseDragged: MouseEventType.MOVE,
             Cocoa.NSEventTypeScrollWheel: MouseEventType.WHEEL,
         }
         
@@ -2293,10 +2303,19 @@ class CoreGraphicsBackend(Renderer):
             # 4. Create drag image with text overlay
             # 5. Begin NSDraggingSession
             # 6. Register completion/cancellation callbacks
+            
+            # Convert PyObjC view object to pointer integer for C++
+            # objc.pyobjc_id() returns the underlying Objective-C object pointer
+            view_ptr = objc.pyobjc_id(self.view)
+            
+            # Convert current NSEvent to pointer integer (may be None)
+            event_ptr = objc.pyobjc_id(self.current_nsevent) if self.current_nsevent else 0
+            
             success = self._cpp_renderer.start_drag_session(
-                self.view,
+                view_ptr,
                 file_urls,
-                drag_image_text
+                drag_image_text,
+                event_ptr
             )
             
             if success:
@@ -2732,6 +2751,21 @@ if COCOA_AVAILABLE:
                 # This is critical for IME to work - without an active input context,
                 # the IME system cannot communicate with the view
                 self._input_context = Cocoa.NSTextInputContext.alloc().initWithClient_(self)
+                
+                # Set up mouse tracking to receive mouse moved events
+                # Create a tracking area that covers the entire view bounds
+                tracking_options = (
+                    Cocoa.NSTrackingMouseMoved |  # Track mouse moved events
+                    Cocoa.NSTrackingActiveInKeyWindow |  # Only track when window is key
+                    Cocoa.NSTrackingInVisibleRect  # Automatically update when view resizes
+                )
+                tracking_area = Cocoa.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+                    self.bounds(),  # Track entire view bounds
+                    tracking_options,
+                    self,  # Owner receives the events
+                    None  # No user info needed
+                )
+                self.addTrackingArea_(tracking_area)
                 
                 return self
             
