@@ -755,6 +755,190 @@ class Renderer(ABC):
         """
         pass
     
+    @abstractmethod
+    def supports_drag_and_drop(self) -> bool:
+        """
+        Query whether this backend supports drag-and-drop operations.
+        
+        This method allows applications to detect drag-and-drop capabilities
+        at runtime and adapt their behavior accordingly. Drag-and-drop is
+        typically only available in desktop mode (e.g., CoreGraphics backend
+        on macOS) and not in terminal mode (e.g., curses backend).
+        
+        Applications should call this method during initialization to determine
+        if drag-and-drop features should be enabled. If this returns False,
+        the application should not attempt to initiate drag operations.
+        
+        Returns:
+            bool: True if drag-and-drop is available, False otherwise.
+        
+        Platform Support:
+            - macOS (CoreGraphics): True - uses native NSDraggingSession
+            - Terminal (Curses): False - drag-and-drop not supported
+            - Windows (future): True - will use IDropSource/IDataObject
+            - Linux (future): True - will use X11/Wayland drag protocols
+        
+        Note: The default implementation returns False. Desktop backends
+        that support drag-and-drop should override this to return True.
+        
+        Example:
+            if renderer.supports_drag_and_drop():
+                print("Drag-and-drop enabled")
+                # Enable drag gesture detection
+            else:
+                print("Drag-and-drop not available")
+                # Use keyboard-only file operations
+        """
+        pass
+    
+    @abstractmethod
+    def start_drag_session(self, file_urls: list, drag_image_text: str) -> bool:
+        """
+        Start a native drag-and-drop session.
+        
+        This method initiates a platform-specific drag operation with the
+        specified file URLs. The drag session is managed by the operating
+        system, which handles the drag cursor, visual feedback, and drop
+        target validation.
+        
+        The file_urls parameter uses the file:// URI scheme (RFC 8089), which
+        is cross-platform compatible. Each backend converts these URLs to the
+        appropriate platform-specific format:
+        - macOS: Converts to NSURLs for NSDraggingItem/NSPasteboard
+        - Windows (future): Converts to Windows paths for CF_HDROP
+        - Linux (future): Uses file:// URLs directly with X11/Wayland
+        
+        The drag session runs asynchronously. When the drag completes or is
+        cancelled, the backend invokes the completion callback set via
+        set_drag_completion_callback().
+        
+        This method should only be called if supports_drag_and_drop() returns
+        True. Calling this method on backends that don't support drag-and-drop
+        will return False.
+        
+        Args:
+            file_urls: List of file:// URLs to drag (platform-independent format).
+                      Example: ["file:///Users/username/Documents/file.txt"]
+                      URLs should be properly percent-encoded for special characters.
+            drag_image_text: Text to display in the drag image. For single files,
+                           this is typically the filename. For multiple files,
+                           this is typically a count like "3 files".
+        
+        Returns:
+            bool: True if the drag session started successfully, False otherwise.
+                 Returns False if drag-and-drop is not supported or if the
+                 operation failed (e.g., invalid URLs, OS rejection).
+        
+        Platform-Specific Implementation Details:
+            macOS (CoreGraphics):
+                - Creates NSDraggingItem for each file URL
+                - Sets up NSPasteboard with NSFilenamesPboardType
+                - Generates drag image using NSImage with text overlay
+                - Begins NSDraggingSession with NSDraggingContext
+                - Supports standard macOS drag modifiers (Option, Command)
+            
+            Windows (future):
+                - Converts file:// URLs to Windows paths
+                - Creates IDataObject with CF_HDROP format
+                - Creates IDropSource implementation
+                - Calls DoDragDrop() to start drag
+                - Handles DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_LINK
+            
+            Terminal (Curses):
+                - Returns False immediately (not supported)
+                - Logs informational message
+        
+        Raises:
+            RuntimeError: If called before initialize() or after shutdown()
+        
+        Note: The drag session blocks user interaction with the source window
+        until the drag completes or is cancelled. The application should not
+        process other mouse events during the drag.
+        
+        Example:
+            # Drag a single file
+            urls = ["file:///Users/username/Documents/report.pdf"]
+            if renderer.start_drag_session(urls, "report.pdf"):
+                print("Drag started successfully")
+            
+            # Drag multiple files
+            urls = [
+                "file:///Users/username/file1.txt",
+                "file:///Users/username/file2.txt",
+                "file:///Users/username/file3.txt"
+            ]
+            if renderer.start_drag_session(urls, "3 files"):
+                print("Multi-file drag started")
+        """
+        pass
+    
+    @abstractmethod
+    def set_drag_completion_callback(self, callback) -> None:
+        """
+        Set callback for drag-and-drop completion or cancellation.
+        
+        This method registers a callback function that will be invoked when
+        a drag session completes (successful drop) or is cancelled (escape key,
+        invalid drop target, etc.). The callback allows the application to
+        respond to the drag outcome and restore normal state.
+        
+        The callback function should accept a single boolean parameter:
+        - True: Drag completed successfully (dropped on valid target)
+        - False: Drag was cancelled (escape key, invalid target, etc.)
+        
+        The callback is invoked asynchronously by the backend when the OS
+        notifies it of the drag outcome. The callback should be lightweight
+        and avoid blocking operations.
+        
+        This method should be called before initiating any drag operations.
+        The callback remains registered until explicitly changed or the
+        renderer is shut down.
+        
+        Args:
+            callback: Callable that accepts a boolean parameter indicating
+                     completion status. The signature should be:
+                     def callback(completed: bool) -> None
+                     
+                     The callback will be invoked with:
+                     - completed=True: Drag completed successfully
+                     - completed=False: Drag was cancelled
+        
+        Platform-Specific Behavior:
+            macOS (CoreGraphics):
+                - Callback invoked from NSDraggingSession delegate methods
+                - draggingSession:endedAtPoint:operation: for completion
+                - Callback runs on the main thread
+            
+            Windows (future):
+                - Callback invoked from IDropSource::QueryContinueDrag
+                - DRAGDROP_S_DROP for completion
+                - DRAGDROP_S_CANCEL for cancellation
+            
+            Terminal (Curses):
+                - No-op (drag-and-drop not supported)
+        
+        Note: The callback should not raise exceptions. Any exceptions will
+        be logged but not propagated, to avoid disrupting the event loop.
+        
+        Example:
+            def on_drag_completed(completed: bool):
+                if completed:
+                    print("Files were dropped successfully")
+                    # Update UI to reflect successful operation
+                else:
+                    print("Drag was cancelled")
+                    # Restore UI to pre-drag state
+                
+                # Reset drag state
+                reset_drag_gesture()
+            
+            renderer.set_drag_completion_callback(on_drag_completed)
+            
+            # Later, initiate drag
+            renderer.start_drag_session(urls, "file.txt")
+            # Callback will be invoked when drag completes or is cancelled
+        """
+        pass
 
     def is_desktop_mode(self) -> bool:
         """

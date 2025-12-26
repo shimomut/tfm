@@ -2186,6 +2186,212 @@ class CoreGraphicsBackend(Renderer):
             import traceback
             print(f"Error in mouse event callback: {e}")
             traceback.print_exc()
+    
+    def supports_drag_and_drop(self) -> bool:
+        """
+        Query whether this backend supports drag-and-drop operations.
+        
+        The CoreGraphics backend provides full drag-and-drop support through
+        native macOS NSDraggingSession APIs. This enables users to drag files
+        from TFM to other macOS applications.
+        
+        Returns:
+            bool: Always True for CoreGraphics backend (macOS desktop mode)
+        
+        Platform Support:
+            - macOS (CoreGraphics): True - uses native NSDraggingSession
+            - Terminal (Curses): False - drag-and-drop not supported
+        
+        Example:
+            if renderer.supports_drag_and_drop():
+                print("Drag-and-drop enabled")
+                # Enable drag gesture detection
+            else:
+                print("Drag-and-drop not available")
+                # Use keyboard-only file operations
+        """
+        return True
+    
+    def start_drag_session(self, file_urls: list, drag_image_text: str) -> bool:
+        """
+        Start a native macOS drag-and-drop session.
+        
+        This method initiates a drag operation using macOS NSDraggingSession.
+        It calls into the C++ extension (ttk_coregraphics_render) to perform
+        the native drag operation with proper Objective-C/Cocoa integration.
+        
+        The drag session is managed by macOS, which handles:
+        - Drag cursor and visual feedback
+        - Drop target validation
+        - File operation type (copy/move/link) based on modifiers
+        - Completion/cancellation notifications
+        
+        macOS-Specific Implementation:
+            1. Converts file:// URLs to NSURLs
+            2. Creates NSDraggingItem for each file
+            3. Sets up NSPasteboard with NSFilenamesPboardType
+            4. Generates drag image using NSImage with text overlay
+            5. Begins NSDraggingSession with the view as dragging source
+            6. Registers callbacks for completion/cancellation
+        
+        The drag session runs asynchronously. When it completes or is cancelled,
+        the backend invokes the completion callback set via
+        set_drag_completion_callback().
+        
+        Args:
+            file_urls: List of file:// URLs to drag (RFC 8089 format).
+                      Example: ["file:///Users/username/Documents/file.txt"]
+                      URLs should be properly percent-encoded.
+            drag_image_text: Text to display in drag image.
+                           For single files: filename (e.g., "report.pdf")
+                           For multiple files: count (e.g., "3 files")
+        
+        Returns:
+            bool: True if drag session started successfully, False otherwise.
+                 Returns False if:
+                 - C++ renderer module not available
+                 - Invalid file URLs
+                 - macOS rejects the drag operation
+        
+        Raises:
+            RuntimeError: If called before initialize() or after shutdown()
+        
+        Note: The drag session blocks user interaction with the source window
+        until the drag completes or is cancelled. The application should not
+        process other mouse events during the drag.
+        
+        Example:
+            # Drag a single file
+            urls = ["file:///Users/username/Documents/report.pdf"]
+            if renderer.start_drag_session(urls, "report.pdf"):
+                print("Drag started successfully")
+            
+            # Drag multiple files
+            urls = [
+                "file:///Users/username/file1.txt",
+                "file:///Users/username/file2.txt"
+            ]
+            if renderer.start_drag_session(urls, "2 files"):
+                print("Multi-file drag started")
+        """
+        # Check if C++ renderer module is available
+        if self._cpp_renderer is None:
+            print("CoreGraphicsBackend: C++ renderer not available, drag-and-drop not supported")
+            return False
+        
+        # Check if view exists
+        if self.view is None:
+            print("CoreGraphicsBackend: View not initialized, cannot start drag")
+            return False
+        
+        try:
+            # Call C++ extension to start native drag session
+            # The C++ code will:
+            # 1. Convert file:// URLs to NSURLs
+            # 2. Create NSDraggingItem objects
+            # 3. Set up NSPasteboard with file paths
+            # 4. Create drag image with text overlay
+            # 5. Begin NSDraggingSession
+            # 6. Register completion/cancellation callbacks
+            success = self._cpp_renderer.start_drag_session(
+                self.view,
+                file_urls,
+                drag_image_text
+            )
+            
+            if success:
+                print(f"CoreGraphicsBackend: Started drag session with {len(file_urls)} file(s)")
+            else:
+                print("CoreGraphicsBackend: Failed to start drag session")
+            
+            return success
+            
+        except Exception as e:
+            print(f"CoreGraphicsBackend: Error starting drag session: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def set_drag_completion_callback(self, callback) -> None:
+        """
+        Set callback for drag-and-drop completion or cancellation.
+        
+        This method registers a callback function that will be invoked when
+        a drag session completes (successful drop) or is cancelled (escape key,
+        invalid drop target, etc.).
+        
+        The callback function should accept a single boolean parameter:
+        - True: Drag completed successfully (dropped on valid target)
+        - False: Drag was cancelled (escape key, invalid target, etc.)
+        
+        The callback is invoked asynchronously by the C++ extension when macOS
+        notifies it of the drag outcome through NSDraggingSession delegate
+        methods. The callback runs on the main thread.
+        
+        macOS-Specific Behavior:
+            - Callback invoked from NSDraggingSession delegate methods:
+              * draggingSession:endedAtPoint:operation: for completion
+              * Callback runs on the main thread
+            - The operation parameter indicates the drag result:
+              * NSDragOperationCopy: Files were copied
+              * NSDragOperationMove: Files were moved
+              * NSDragOperationNone: Drag was cancelled
+        
+        Args:
+            callback: Callable that accepts a boolean parameter.
+                     Signature: def callback(completed: bool) -> None
+                     
+                     The callback will be invoked with:
+                     - completed=True: Drag completed successfully
+                     - completed=False: Drag was cancelled
+        
+        Note: The callback should not raise exceptions. Any exceptions will
+        be logged but not propagated, to avoid disrupting the event loop.
+        
+        Example:
+            def on_drag_completed(completed: bool):
+                if completed:
+                    print("Files were dropped successfully")
+                else:
+                    print("Drag was cancelled")
+                # Reset drag state
+                reset_drag_gesture()
+            
+            renderer.set_drag_completion_callback(on_drag_completed)
+            
+            # Later, initiate drag
+            renderer.start_drag_session(urls, "file.txt")
+            # Callback will be invoked when drag completes or is cancelled
+        """
+        # Store the callback for later invocation
+        self.drag_completion_callback = callback
+        
+        # If C++ renderer is available, register the callback with it
+        # The C++ code will call this callback when the drag completes
+        if self._cpp_renderer is not None:
+            try:
+                self._cpp_renderer.set_drag_completion_callback(self._on_drag_completed_internal)
+            except Exception as e:
+                print(f"CoreGraphicsBackend: Error setting drag completion callback: {e}")
+    
+    def _on_drag_completed_internal(self, completed: bool) -> None:
+        """
+        Internal callback invoked by C++ extension when drag completes.
+        
+        This method is called by the C++ extension when the macOS drag session
+        completes or is cancelled. It forwards the notification to the
+        application's drag completion callback.
+        
+        Args:
+            completed: True if drag completed successfully, False if cancelled
+        """
+        if hasattr(self, 'drag_completion_callback') and self.drag_completion_callback:
+            try:
+                self.drag_completion_callback(completed)
+            except Exception as e:
+                print(f"CoreGraphicsBackend: Error in drag completion callback: {e}")
+                import traceback
+                traceback.print_exc()
 
 
 # Define TTKWindowDelegate class for handling window events

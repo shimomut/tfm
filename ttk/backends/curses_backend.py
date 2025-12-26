@@ -1202,3 +1202,79 @@ class CursesBackend(Renderer):
             return CharEvent(char=event.char)
         
         return None
+    
+    def supports_drag_and_drop(self) -> bool:
+        """
+        Query whether this backend supports drag-and-drop operations.
+        
+        The Curses backend does not support drag-and-drop as it runs in
+        terminal mode where native drag-and-drop is not available. Applications
+        should check this method and gracefully disable drag-and-drop features
+        when running in terminal mode.
+        
+        Returns:
+            bool: Always False for Curses backend (terminal mode)
+        
+        Platform Support:
+            - macOS (CoreGraphics): True - uses native NSDraggingSession
+            - Terminal (Curses): False - drag-and-drop not supported
+            - Windows (future): True - will use IDropSource/IDataObject
+            - Linux (future): True - will use X11/Wayland drag protocols
+        
+        Example:
+            if renderer.supports_drag_and_drop():
+                print("Drag-and-drop enabled")
+                # Enable drag gesture detection
+            else:
+                print("Drag-and-drop not available")
+                # Use keyboard-only file operations
+        """
+        return False
+    
+    def start_drag_session(self, file_urls: list, drag_image_text: str) -> bool:
+        """
+        Start a drag-and-drop session (not supported in terminal mode).
+        
+        This method always returns False for the Curses backend as drag-and-drop
+        is not available in terminal mode. Applications should check
+        supports_drag_and_drop() before attempting to start a drag session.
+        
+        The method logs an informational message to help with debugging if
+        it's called unexpectedly.
+        
+        Args:
+            file_urls: List of file:// URLs to drag (ignored)
+            drag_image_text: Text to display in drag image (ignored)
+        
+        Returns:
+            bool: Always False (drag-and-drop not supported in terminal mode)
+        
+        Note: Applications should use keyboard-based file operations (copy, move)
+        instead of drag-and-drop when running in terminal mode.
+        
+        Example:
+            # Check support before attempting drag
+            if renderer.supports_drag_and_drop():
+                renderer.start_drag_session(urls, "3 files")
+            else:
+                print("Use keyboard shortcuts for file operations")
+        """
+        # Log informational message for debugging
+        print("CursesBackend: Drag-and-drop not supported in terminal mode")
+        return False
+    
+    def set_drag_completion_callback(self, callback) -> None:
+        """
+        Set callback for drag-and-drop completion (no-op in terminal mode).
+        
+        This method is a no-op for the Curses backend as drag-and-drop is not
+        supported in terminal mode. The callback is never invoked.
+        
+        Args:
+            callback: Callback function (ignored)
+        
+        Note: This method is provided for interface compatibility but has no
+        effect in terminal mode.
+        """
+        # No-op: Terminal backend does not support drag-and-drop
+        pass
