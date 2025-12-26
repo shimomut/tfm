@@ -770,9 +770,8 @@ class DirectoryDiffViewer(UILayer):
                 # Move cursor up
                 if self.cursor_position > 0:
                     self.cursor_position -= 1
-                    # Adjust scroll if cursor moves above visible area
-                    if self.cursor_position < self.scroll_offset:
-                        self.scroll_offset = self.cursor_position
+                    # Ensure cursor is visible
+                    self._ensure_cursor_visible(display_height)
                     self.mark_dirty()
                     # Update priorities when viewport changes
                     self._update_priorities()
@@ -786,9 +785,8 @@ class DirectoryDiffViewer(UILayer):
                 # Move cursor down
                 if self.cursor_position < len(self.visible_nodes) - 1:
                     self.cursor_position += 1
-                    # Adjust scroll if cursor moves below visible area
-                    if self.cursor_position >= self.scroll_offset + display_height:
-                        self.scroll_offset = self.cursor_position - display_height + 1
+                    # Ensure cursor is visible
+                    self._ensure_cursor_visible(display_height)
                     self.mark_dirty()
                     # Update priorities when viewport changes
                     self._update_priorities()
@@ -862,9 +860,8 @@ class DirectoryDiffViewer(UILayer):
                         # Already expanded, move to first child if it exists
                         if node.children and self.cursor_position + 1 < len(self.visible_nodes):
                             self.cursor_position += 1
-                            # Adjust scroll if needed
-                            if self.cursor_position >= self.scroll_offset + display_height:
-                                self.scroll_offset = self.cursor_position - display_height + 1
+                            # Ensure cursor is visible
+                            self._ensure_cursor_visible(display_height)
                             self.mark_dirty()
             return True
         
@@ -882,9 +879,8 @@ class DirectoryDiffViewer(UILayer):
                     for i, visible_node in enumerate(self.visible_nodes):
                         if visible_node is parent_node:
                             self.cursor_position = i
-                            # Adjust scroll if needed
-                            if self.cursor_position < self.scroll_offset:
-                                self.scroll_offset = self.cursor_position
+                            # Ensure cursor is visible
+                            self._ensure_cursor_visible(display_height)
                             self.mark_dirty()
                             break
             return True
@@ -3103,6 +3099,23 @@ class DirectoryDiffViewer(UILayer):
             for child in node.children:
                 self._flatten_tree(child)
     
+    def _ensure_cursor_visible(self, display_height: int) -> None:
+        """
+        Adjust scroll_offset to ensure cursor_position is visible in the viewport.
+        
+        This method should be called after any operation that changes cursor_position
+        to ensure the cursor remains visible on screen.
+        
+        Args:
+            display_height: Height of the display area for scroll adjustment
+        """
+        # If cursor is above visible area, scroll up
+        if self.cursor_position < self.scroll_offset:
+            self.scroll_offset = self.cursor_position
+        # If cursor is below visible area, scroll down
+        elif self.cursor_position >= self.scroll_offset + display_height:
+            self.scroll_offset = self.cursor_position - display_height + 1
+    
     def _jump_to_previous_difference(self, display_height: int) -> None:
         """
         Jump cursor to the previous node with a difference.
@@ -3121,9 +3134,8 @@ class DirectoryDiffViewer(UILayer):
             node = self.visible_nodes[i]
             if node.difference_type != DifferenceType.IDENTICAL:
                 self.cursor_position = i
-                # Adjust scroll if cursor moves above visible area
-                if self.cursor_position < self.scroll_offset:
-                    self.scroll_offset = self.cursor_position
+                # Ensure cursor is visible
+                self._ensure_cursor_visible(display_height)
                 self.mark_dirty()
                 return
         
@@ -3147,9 +3159,8 @@ class DirectoryDiffViewer(UILayer):
             node = self.visible_nodes[i]
             if node.difference_type != DifferenceType.IDENTICAL:
                 self.cursor_position = i
-                # Adjust scroll if cursor moves below visible area
-                if self.cursor_position >= self.scroll_offset + display_height:
-                    self.scroll_offset = self.cursor_position - display_height + 1
+                # Ensure cursor is visible
+                self._ensure_cursor_visible(display_height)
                 self.mark_dirty()
                 return
         

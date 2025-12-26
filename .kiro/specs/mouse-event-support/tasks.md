@@ -164,6 +164,15 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - Create comprehensive test suite for viewer scrolling (10 tests)
   - _Requirements: 2.5, 5.6_
 
+- [x] 18. Fix DirectoryDiffViewer cursor visibility when navigating
+  - Create helper method `_ensure_cursor_visible(display_height)` that checks both above and below
+  - Update `_jump_to_previous_difference()` to use the helper
+  - Update `_jump_to_next_difference()` to use the helper
+  - Update LEFT arrow key handler to use the helper when moving to parent
+  - Verify all navigation keeps cursor visible
+  - All 10 viewer wheel scrolling tests pass
+  - _Requirements: 5.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP
