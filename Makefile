@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-dmg
+.PHONY: help run run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg
 
 # Backend selection (default: curses)
 # Usage: make run BACKEND=coregraphics
@@ -28,6 +28,7 @@ help:
 	@echo "  macos-app         - Build native macOS application bundle"
 	@echo "  macos-app-clean   - Clean macOS app build artifacts"
 	@echo "  macos-app-install - Install TFM.app to Applications folder"
+	@echo "  macos-refresh-icon - Refresh macOS icon cache (after icon changes)"
 	@echo "  macos-dmg         - Create DMG installer for distribution"
 	@echo ""
 	@echo "Backend Selection:"
@@ -148,6 +149,23 @@ macos-app-install:
 			exit 1; \
 			;; \
 	esac
+
+macos-refresh-icon:
+	@echo "Refreshing macOS icon cache..."
+	@if [ ! -d "macos_app/build/TFM.app" ]; then \
+		echo "Warning: TFM.app not found at macos_app/build/TFM.app"; \
+	else \
+		touch macos_app/build/TFM.app; \
+		echo "Touched app bundle to invalidate cache"; \
+	fi
+	@echo "Clearing system icon cache (may require password)..."
+	@sudo rm -rf /Library/Caches/com.apple.iconservices.store 2>/dev/null || echo "Skipped system cache (no sudo access)"
+	@rm -rf ~/Library/Caches/com.apple.iconservices 2>/dev/null || true
+	@echo "Restarting Dock and Finder..."
+	@killall Dock 2>/dev/null || true
+	@killall Finder 2>/dev/null || true
+	@echo "Icon cache cleared successfully"
+	@echo "The new icon should appear now. If the app is running, quit and relaunch it."
 
 macos-dmg: macos-app
 	@echo "Creating DMG installer..."
