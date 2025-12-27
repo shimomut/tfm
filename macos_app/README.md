@@ -12,72 +12,35 @@ The application uses a simple single-process architecture:
 - One TFM window per application instance
 - Clean user experience with single Dock icon
 
-See `SINGLE_PROCESS_ARCHITECTURE.md` for detailed architecture documentation.
+## Documentation
+
+Comprehensive documentation is available in the main project documentation directory:
+
+- **[Build System Documentation](../doc/dev/MACOS_APP_BUILD_SYSTEM.md)** - Complete build system guide
+  - Build philosophy and process
+  - Python detection and component collection
+  - Framework structure creation
+  - Bundle optimization (pre-compilation, cleanup)
+  - System independence verification
+  - External program support
+  - Troubleshooting and verification
+
+- **[Testing Guide](../doc/dev/MACOS_APP_TESTING.md)** - Comprehensive testing procedures
+  - Quick test checklist
+  - Detailed test procedures (10 tests)
+  - Troubleshooting guide
+  - Issue reporting guidelines
+  - Distribution preparation
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
 - [Project Structure](#project-structure)
 - [Build Requirements](#build-requirements)
-- [Quick Start](#quick-start)
 - [Build Scripts](#build-scripts)
 - [Bundle Structure](#bundle-structure)
 - [Customization](#customization)
-- [Troubleshooting](#troubleshooting)
-
-## Project Structure
-
-```
-macos_app/
-├── README.md                    # This file
-├── build.sh                     # Main build script
-├── collect_dependencies.py      # Python dependency collector
-├── create_dmg.sh               # DMG installer creator
-├── test_single_process.sh      # Single-process architecture test
-├── src/                        # Objective-C source files
-│   ├── main.m                  # Application entry point
-│   ├── TFMAppDelegate.h        # App delegate header
-│   └── TFMAppDelegate.m        # App delegate implementation
-├── resources/                  # Build resources
-│   ├── Info.plist.template     # App metadata template
-│   └── TFM.icns               # Application icon (optional)
-├── doc/                        # Documentation
-│   ├── SINGLE_PROCESS_ARCHITECTURE.md      # Architecture overview
-│   ├── SINGLE_PROCESS_IMPLEMENTATION.md    # Implementation details
-│   ├── DEPENDENCY_COLLECTION_FIX.md        # Dependency fix details
-│   ├── ENTRY_POINT_FIX.md                  # Entry point fix details
-│   ├── COMPLETION_SUMMARY.md               # Project completion summary
-│   ├── MANUAL_TEST_GUIDE.md                # Manual testing guide
-│   └── INTEGRATION_TEST_RESULTS.md         # Test results
-└── build/                      # Build output (created by build.sh)
-    ├── TFM                     # Compiled executable
-    ├── TFM.app/               # Complete app bundle
-    └── TFM-{version}.dmg      # DMG installer
-```
-
-## Build Requirements
-
-### Required Software
-
-1. **Xcode Command Line Tools**
-   - Provides the `clang` compiler and macOS frameworks
-   - Install with: `xcode-select --install`
-   - Verify installation: `clang --version`
-
-2. **Python 3.9 or later**
-   - Must be installed as a framework (standard macOS Python installer)
-   - Verify installation: `python3 --version`
-   - Check framework: `ls /Library/Frameworks/Python.framework/Versions/`
-
-3. **Python Dependencies**
-   - All packages from `requirements.txt` must be installed
-   - Install with: `pip install -r ../requirements.txt`
-   - Required packages include: pygments, boto3, PyObjC frameworks
-
-### Why These Requirements?
-
-- **Xcode Command Line Tools**: Provides the Cocoa framework (for native macOS UI) and the `clang` compiler (to compile Objective-C code)
-- **Python Framework**: The app embeds Python, so it needs to be installed as a framework (not just a standalone binary)
-- **Python Dependencies**: All packages TFM uses must be bundled into the app for it to be self-contained
+- [Development Workflow](#development-workflow)
 
 ## Quick Start
 
@@ -96,13 +59,15 @@ cd macos_app
 
 The built application will be at `macos_app/build/TFM.app`.
 
-### Running the App
+### Testing the App
 
 ```bash
-# Open the app
+# Launch the app
 open macos_app/build/TFM.app
 
 # Or double-click TFM.app in Finder
+
+# Run manual tests (see Testing Guide)
 ```
 
 ### Creating a DMG Installer
@@ -137,6 +102,53 @@ make macos-app-clean
 # Or remove manually
 rm -rf macos_app/build
 ```
+
+## Project Structure
+
+```
+macos_app/
+├── README.md                    # This file
+├── build.sh                     # Main build script
+├── collect_dependencies.py      # Python dependency collector
+├── create_dmg.sh               # DMG installer creator
+├── test_single_process.sh      # Single-process architecture test
+├── src/                        # Objective-C source files
+│   ├── main.m                  # Application entry point
+│   ├── TFMAppDelegate.h        # App delegate header
+│   └── TFMAppDelegate.m        # App delegate implementation
+├── resources/                  # Build resources
+│   ├── Info.plist.template     # App metadata template
+│   └── TFM.icns               # Application icon (optional)
+└── build/                      # Build output (created by build.sh)
+    ├── TFM                     # Compiled executable
+    ├── TFM.app/               # Complete app bundle
+    └── TFM-{version}.dmg      # DMG installer
+```
+
+## Build Requirements
+
+### Required Software
+
+1. **Xcode Command Line Tools**
+   - Provides the `clang` compiler and macOS frameworks
+   - Install with: `xcode-select --install`
+   - Verify installation: `clang --version`
+
+2. **Python 3.9 or later**
+   - Must be installed as a framework (standard macOS Python installer)
+   - Verify installation: `python3 --version`
+   - Check framework: `ls /Library/Frameworks/Python.framework/Versions/`
+
+3. **Python Dependencies**
+   - All packages from `requirements.txt` must be installed
+   - Install with: `pip install -r ../requirements.txt`
+   - Required packages include: pygments, boto3, PyObjC frameworks
+
+### Why These Requirements?
+
+- **Xcode Command Line Tools**: Provides the Cocoa framework (for native macOS UI) and the `clang` compiler (to compile Objective-C code)
+- **Python Framework**: The app embeds Python, so it needs to be installed as a framework (not just a standalone binary)
+- **Python Dependencies**: All packages TFM uses must be bundled into the app for it to be self-contained
 
 ## Build Scripts
 
@@ -416,182 +428,6 @@ Edit `resources/Info.plist.template` to change:
 
 After editing, rebuild with `./build.sh`.
 
-## Troubleshooting
-
-### Build Errors
-
-#### "clang: command not found"
-
-**Problem:** Xcode Command Line Tools not installed.
-
-**Solution:**
-```bash
-xcode-select --install
-```
-
-Follow the prompts to install the tools, then try building again.
-
-#### "Python.framework not found"
-
-**Problem:** Python not installed as a framework, or wrong version.
-
-**Solution:**
-1. Check installed Python versions:
-   ```bash
-   ls /Library/Frameworks/Python.framework/Versions/
-   ```
-2. Install Python from python.org (not Homebrew)
-3. Or modify `PYTHON_VERSION` in `build.sh` to match installed version
-
-#### "Compilation failed" with framework errors
-
-**Problem:** Python framework headers not found.
-
-**Solution:**
-1. Verify Python framework installation:
-   ```bash
-   ls /Library/Frameworks/Python.framework/Versions/3.12/include/
-   ```
-2. Reinstall Python from python.org if headers are missing
-
-#### "Failed to collect dependencies"
-
-**Problem:** Python packages not installed.
-
-**Solution:**
-```bash
-cd ..  # Go to project root
-pip install -r requirements.txt
-cd macos_app
-./build.sh
-```
-
-### Runtime Errors
-
-#### "Failed to initialize Python interpreter"
-
-**Problem:** Python.framework not properly embedded or wrong version.
-
-**Diagnosis:**
-1. Check Console.app for detailed error messages
-2. Verify Python.framework exists in bundle:
-   ```bash
-   ls build/TFM.app/Contents/Frameworks/Python.framework/
-   ```
-
-**Solution:**
-- Rebuild the app with correct Python version
-- Ensure Python.framework was copied correctly
-
-#### "Failed to import TFM module"
-
-**Problem:** TFM source code not properly bundled or sys.path misconfigured.
-
-**Diagnosis:**
-1. Check Console.app for Python traceback
-2. Verify TFM source exists in bundle:
-   ```bash
-   ls build/TFM.app/Contents/Resources/tfm/
-   ```
-
-**Solution:**
-- Ensure all TFM source files are present in `src/`
-- Rebuild the app
-- Check for Python syntax errors in source files
-
-#### "Module 'pygments' not found" or similar import errors
-
-**Problem:** Python dependencies not bundled.
-
-**Diagnosis:**
-1. Check if package exists in bundle:
-   ```bash
-   ls build/TFM.app/Contents/Resources/python_packages/
-   ```
-
-**Solution:**
-```bash
-# Install missing packages
-pip install pygments boto3 pyobjc-framework-Cocoa
-
-# Rebuild
-./build.sh
-```
-
-#### "Window creation failed"
-
-**Problem:** CoreGraphics backend initialization error.
-
-**Diagnosis:**
-1. Check Console.app for Python exceptions
-2. Verify TTK library is bundled:
-   ```bash
-   ls build/TFM.app/Contents/Resources/ttk/
-   ```
-
-**Solution:**
-- Ensure TTK library exists in project root
-- Rebuild the app
-- Check for errors in CoreGraphics backend code
-
-### Code Signing Issues
-
-#### "Code signature invalid"
-
-**Problem:** Code signing failed or identity not found.
-
-**Solution:**
-1. List available signing identities:
-   ```bash
-   security find-identity -v -p codesigning
-   ```
-2. Use correct identity:
-   ```bash
-   CODESIGN_IDENTITY="Developer ID Application: Your Name" ./build.sh
-   ```
-3. Or skip code signing for development:
-   ```bash
-   unset CODESIGN_IDENTITY
-   ./build.sh
-   ```
-
-### DMG Creation Issues
-
-#### "TFM.app not found"
-
-**Problem:** Trying to create DMG before building app.
-
-**Solution:**
-```bash
-# Build app first
-./build.sh
-
-# Then create DMG
-./create_dmg.sh
-```
-
-### Getting More Information
-
-**View detailed logs:**
-1. Open Console.app
-2. Search for "TFM" or "Python"
-3. Look for error messages and stack traces
-
-**Enable verbose build output:**
-```bash
-# Add -v flag to see detailed compilation
-bash -x ./build.sh
-```
-
-**Check bundle contents:**
-```bash
-# List all files in bundle
-find build/TFM.app -type f
-
-# Check executable dependencies
-otool -L build/TFM.app/Contents/MacOS/TFM
-```
-
 ## Development Workflow
 
 ### Iterative Development
@@ -637,40 +473,24 @@ open build/TFM.app
 
 1. Update version number in `resources/Info.plist.template`
 2. Build the app: `./build.sh`
-3. Test the app thoroughly
+3. Test the app thoroughly (see Testing Guide)
 4. Create DMG: `./create_dmg.sh`
 5. (Optional) Code sign: `CODESIGN_IDENTITY="..." ./build.sh`
 6. Distribute `TFM-{version}.dmg`
 
-## Additional Resources
+## Quick Links
 
-### Documentation
-
-Detailed documentation is available in the `doc/` directory:
-
-- **[SINGLE_PROCESS_ARCHITECTURE.md](doc/SINGLE_PROCESS_ARCHITECTURE.md)** - Architecture overview and design decisions
-- **[SINGLE_PROCESS_IMPLEMENTATION.md](doc/SINGLE_PROCESS_IMPLEMENTATION.md)** - Implementation details and changes
-- **[DEPENDENCY_COLLECTION_FIX.md](doc/DEPENDENCY_COLLECTION_FIX.md)** - How dependencies are collected and bundled
-- **[ENTRY_POINT_FIX.md](doc/ENTRY_POINT_FIX.md)** - Entry point consistency between CLI and app
-- **[EXTERNAL_PROGRAMS_FIX.md](doc/EXTERNAL_PROGRAMS_FIX.md)** - External programs execution in app bundle
-- **[VENV_BASED_BUILD.md](doc/VENV_BASED_BUILD.md)** - Virtual environment based build system
-- **[FONT_RENDERING_FIX.md](doc/FONT_RENDERING_FIX.md)** - Font rendering consistency fix
-- **[COMPLETION_SUMMARY.md](doc/COMPLETION_SUMMARY.md)** - Project completion summary
-- **[MANUAL_TEST_GUIDE.md](doc/MANUAL_TEST_GUIDE.md)** - Manual testing procedures
-- **[INTEGRATION_TEST_RESULTS.md](doc/INTEGRATION_TEST_RESULTS.md)** - Automated test results
-
-### External Resources
-
-- **TFM Documentation**: `../doc/`
-- **TTK Documentation**: `../ttk/doc/`
-- **Apple Bundle Documentation**: https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/
-- **Python/C API**: https://docs.python.org/3/c-api/
-- **PyObjC Documentation**: https://pyobjc.readthedocs.io/
+- **[Build System Documentation](../doc/dev/MACOS_APP_BUILD_SYSTEM.md)** - Complete build system guide
+- **[Testing Guide](../doc/dev/MACOS_APP_TESTING.md)** - Comprehensive testing procedures
+- **[Build Script](build.sh)** - Main build automation with inline documentation
+- **[Source Code](src/)** - Objective-C implementation
+- **[Project Makefile](../Makefile)** - Build automation targets
 
 ## Support
 
 For issues or questions:
-1. Check this README's troubleshooting section
+1. Check the Build System Documentation for troubleshooting
 2. Check Console.app for error messages
 3. Review the build script output
 4. Open an issue on the project repository
+
