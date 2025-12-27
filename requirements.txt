@@ -3,5 +3,6 @@
 # Optional: pygments for syntax highlighting (will fallback gracefully if not available)
 # boto3 for AWS S3 support
 
+pyobjc
 pygments
 boto3
