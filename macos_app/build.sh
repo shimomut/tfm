@@ -217,6 +217,17 @@ log_success "Resources copied successfully"
 
 log_info "Step 4: Embedding Python..."
 
+# Clean up old Python versions from previous builds
+if [ -d "${FRAMEWORKS_DIR}/Python.framework/Versions" ]; then
+    log_info "Cleaning up old Python versions..."
+    for old_version in "${FRAMEWORKS_DIR}/Python.framework/Versions"/*; do
+        if [ -d "${old_version}" ] && [ "$(basename "${old_version}")" != "Current" ] && [ "$(basename "${old_version}")" != "${PYTHON_VERSION}" ]; then
+            log_info "  Removing old version: $(basename "${old_version}")"
+            rm -rf "${old_version}"
+        fi
+    done
+fi
+
 # Determine Python source based on installation type
 if [ "$USE_FRAMEWORK" = true ]; then
     # Python.framework installation
