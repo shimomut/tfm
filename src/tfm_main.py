@@ -4503,7 +4503,7 @@ def create_window():
         # Create backend with default configuration
         backend = CoreGraphicsBackend(
             window_title="TFM - Terminal File Manager",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=40,
             cols=120
