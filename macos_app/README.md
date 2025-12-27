@@ -1,6 +1,18 @@
 # TFM macOS Application Bundle
 
-This directory contains the build system for creating a native macOS application bundle for TFM (Terminal File Manager). The bundle embeds a Python interpreter and provides a polished native macOS experience with full Dock integration and multi-window support.
+This directory contains the build system for creating a native macOS application bundle for TFM (Terminal File Manager). The bundle embeds a Python interpreter and provides a polished native macOS experience with full Dock integration.
+
+## Architecture
+
+**Single-Process, Single-Window**
+
+The application uses a simple single-process architecture:
+- One process runs the entire application
+- One Python interpreter embedded in the process
+- One TFM window per application instance
+- Clean user experience with single Dock icon
+
+See `SINGLE_PROCESS_ARCHITECTURE.md` for detailed architecture documentation.
 
 ## Table of Contents
 

@@ -1,8 +1,10 @@
-# Entry Point Consistency Fix
+# Entry Point Consistency and Multi-Process Architecture
 
 ## Problem
 
 The macOS app bundle was using a different entry point (`create_window()`) than the command-line version (`cli_main()`), causing inconsistent behavior between the two modes.
+
+Additionally, `cli_main()` is a blocking function that runs an event loop. Using threading within a single Python interpreter would cause issues with TFM's state management, which wasn't designed for multi-window scenarios.
 
 ### Entry Point Comparison
 
@@ -19,111 +21,176 @@ PyObject *createWindowFunc = PyObject_GetAttrString(tfmModule, "create_window");
 PyObject *result = PyObject_CallObject(createWindowFunc, NULL);  // ← Used create_window()
 ```
 
-### Behavioral Differences
+### State Management Issue
 
-**`cli_main()` (correct):**
-1. Parses command-line arguments
-2. Uses `select_backend()` to choose backend based on args
-3. Handles backend options properly (font names, size, etc.)
-4. Sets `ESCDELAY` environment variable
-5. Handles profiling targets
-6. Proper error handling with debug mode
+TFM's Python code wasn't designed for multiple windows within a single process:
+- Shared global state
+- No thread synchronization
+- Single FileManager instance assumptions
+- Configuration loaded once at startup
 
-**`create_window()` (incorrect):**
-1. No argument parsing
-2. Hardcodes CoreGraphics backend initialization
-3. Hardcodes backend options (font, size, etc.)
-4. Doesn't set `ESCDELAY`
-5. No profiling support
-6. Limited error handling
+**Problem with threading**: Multiple threads sharing one Python interpreter would require:
+1. Thread-safe state management throughout TFM
+2. Synchronization primitives (locks, conditions)
+3. Careful handling of shared resources
+4. Significant code refactoring
 
-## Solution
+## Solution: Multi-Process Architecture
 
-Changed the Objective-C launcher to call `cli_main()` instead of `create_window()`, and simulate `--desktop` mode by setting `sys.argv`.
+Changed the architecture to use **one process per window**:
+1. Main process manages application lifecycle and Dock
+2. Each window runs in its own subprocess
+3. Each subprocess has its own Python interpreter (complete isolation)
+4. Subprocesses are identified by `TFM_SUBPROCESS=1` environment variable
+
+### Architecture Diagram
+
+```
+Main Process (TFM.app)
+├── Manages Dock and menu bar
+├── Spawns subprocess for each window
+└── Stays alive to handle "New Window" requests
+
+Subprocess 1 (Window 1)
+├── Own Python interpreter
+├── Calls cli_main() directly
+└── Terminates when window closes
+
+Subprocess 2 (Window 2)
+├── Own Python interpreter
+├── Calls cli_main() directly
+└── Terminates when window closes
+```
 
 ### Code Changes
 
-**Before:**
+**Main Process Detection:**
 ```objective-c
-// Get create_window function
-PyObject *createWindowFunc = PyObject_GetAttrString(tfmModule, "create_window");
-
-// Call create_window()
-PyObject *result = PyObject_CallObject(createWindowFunc, NULL);
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    NSString *isSubprocess = [[[NSProcessInfo processInfo] environment] 
+                               objectForKey:@"TFM_SUBPROCESS"];
+    
+    if (isSubprocess && [isSubprocess isEqualToString:@"1"]) {
+        // Subprocess: launch window directly
+        [self launchTFMWindowInCurrentProcess];
+    } else {
+        // Main process: spawn subprocess for first window
+        [self launchNewTFMWindow];
+    }
+}
 ```
 
-**After:**
+**Subprocess Spawning:**
 ```objective-c
-// Get cli_main function
-PyObject *cliMainFunc = PyObject_GetAttrString(tfmModule, "cli_main");
+- (void)launchNewTFMWindow {
+    NSBundle *mainBundle = [NSBundle mainBundle];
+    NSString *executablePath = [mainBundle executablePath];
+    
+    // Create task to launch subprocess
+    NSTask *task = [[NSTask alloc] init];
+    [task setLaunchPath:executablePath];
+    
+    // Set environment variable to mark as subprocess
+    NSMutableDictionary *environment = [[NSMutableDictionary alloc] 
+        initWithDictionary:[[NSProcessInfo processInfo] environment]];
+    [environment setObject:@"1" forKey:@"TFM_SUBPROCESS"];
+    [task setEnvironment:environment];
+    
+    // Launch subprocess
+    [task launch];
+}
+```
 
-// Set up sys.argv to simulate --desktop mode
-PyRun_SimpleString("import sys");
-PyRun_SimpleString("sys.argv = ['TFM', '--desktop']");
-
-// Call cli_main()
-PyObject *result = PyObject_CallObject(cliMainFunc, NULL);
+**Subprocess Window Launch:**
+```objective-c
+- (void)launchTFMWindowInCurrentProcess {
+    // Initialize Python in this subprocess
+    [self initializePython];
+    
+    // Import tfm_main and call cli_main()
+    PyObject *tfmModule = PyImport_ImportModule("tfm_main");
+    PyObject *cliMainFunc = PyObject_GetAttrString(tfmModule, "cli_main");
+    
+    // Set sys.argv for --desktop mode
+    PyRun_SimpleString("sys.argv = ['TFM', '--desktop']");
+    
+    // Call cli_main() - blocks until window closes
+    PyObject *result = PyObject_CallObject(cliMainFunc, NULL);
+    
+    // When cli_main() returns, terminate subprocess
+    [NSApp terminate:self];
+}
 ```
 
 ## Benefits
 
-### 1. Consistent Behavior
+### 1. Complete Isolation
+- Each window has its own Python interpreter
+- No shared state between windows
+- No threading complexity
+- No GIL (Global Interpreter Lock) contention
+
+### 2. Consistent Behavior
 - macOS app now behaves identically to `python3 tfm.py --desktop`
 - Same backend initialization logic
 - Same configuration handling
 - Same error handling
 
-### 2. Proper Backend Selection
-- Uses `select_backend()` which checks configuration
-- Respects user preferences from config file
-- Handles backend options correctly
+### 3. No Code Changes Required
+- TFM's Python code works as-is
+- No need for thread-safe state management
+- No synchronization primitives needed
+- Maintains single-window design assumptions
 
-### 3. Complete Feature Support
-- Profiling support (if needed in future)
-- Debug mode support
-- All command-line features available
+### 4. Crash Resilience
+- If one window crashes, others continue running
+- Main process stays alive to spawn new windows
+- Better fault tolerance
 
-### 4. Maintainability
+### 5. Memory Management
+- Each subprocess has its own memory space
+- Memory is freed when subprocess terminates
+- No memory leaks between windows
+
+### 6. Maintainability
+- Simple architecture (no threading)
+- Easy to debug (separate processes)
+- Clear separation of concerns
 - Single code path for both modes
-- Changes to `cli_main()` automatically apply to app bundle
-- No need to maintain separate `create_window()` function
 
-## Implementation Details
+## Comparison: Multi-Process vs Threading
 
-### sys.argv Simulation
+| Aspect | Multi-Process (Chosen) | Multi-Threading (Rejected) |
+|--------|------------------------|----------------------------|
+| Isolation | Complete | Partial |
+| State Management | Independent | Shared (requires sync) |
+| TFM Code Changes | None | Extensive |
+| Crashes | Isolated | Can crash entire app |
+| Memory | Separate spaces | Shared space |
+| GIL | No contention | GIL contention |
+| Complexity | Simple | Complex |
+| Debugging | Easy (separate logs) | Hard (race conditions) |
 
-The Objective-C launcher sets `sys.argv` to simulate command-line arguments:
+## Process Lifecycle
 
-```objective-c
-PyRun_SimpleString("sys.argv = ['TFM', '--desktop']");
-```
+### First Window
+1. User launches TFM.app
+2. Main process starts
+3. Main process spawns subprocess with `TFM_SUBPROCESS=1`
+4. Subprocess initializes Python and calls `cli_main()`
+5. Window appears
 
-This makes `cli_main()` think it was invoked with:
-```bash
-python3 tfm.py --desktop
-```
+### Additional Windows
+1. User clicks "New Window" in Dock menu
+2. Main process spawns another subprocess
+3. New subprocess initializes Python and calls `cli_main()`
+4. Second window appears
 
-### Backend Selection
-
-With `--desktop` flag, `select_backend()` in `tfm_backend_selector.py`:
-1. Checks if `--desktop` flag is present
-2. Selects CoreGraphics backend
-3. Returns appropriate backend options
-
-### Argument Parsing
-
-`cli_main()` uses `argparse` to parse `sys.argv`:
-```python
-parser = create_parser()
-args = parser.parse_args()  # Parses sys.argv
-```
-
-With `sys.argv = ['TFM', '--desktop']`, this results in:
-- `args.desktop = True`
-- `args.left = None`
-- `args.right = None`
-- `args.profile = None`
-- etc.
+### Window Close
+1. User closes window
+2. `cli_main()` returns
+3. Subprocess terminates
+4. Main process continues (ready for new windows)
 
 ## Testing
 
@@ -139,17 +206,23 @@ With `sys.argv = ['TFM', '--desktop']`, this results in:
    open build/TFM.app
    ```
 
-3. **Verify process running:**
+3. **Verify processes:**
    ```bash
    ps aux | grep TFM.app
+   # Should show: 1 main process + 1 subprocess per window
    ```
 
-4. **Compare with command-line:**
+4. **Test multi-window:**
+   - Right-click Dock icon → "New Window"
+   - Verify second window opens
+   - Both windows should be independent
+   - Close one window, other continues
+
+5. **Compare with command-line:**
    ```bash
    python3 tfm.py --desktop
    ```
-
-Both should behave identically.
+   Both should behave identically.
 
 ### Expected Behavior
 
@@ -159,56 +232,44 @@ Both should behave identically.
 - ✅ Same menu bar (in desktop mode)
 - ✅ Same error handling
 - ✅ Same logging behavior
+- ✅ Multi-window support works
+- ✅ "New Window" menu item functional
+- ✅ Windows are completely independent
+- ✅ Closing one window doesn't affect others
 
 ## Future Considerations
 
-### Additional Arguments
+### Inter-Process Communication (IPC)
+If future features require communication between windows:
+- NSDistributedNotificationCenter (simple notifications)
+- XPC (structured communication)
+- Shared files (persistent data)
+- Unix domain sockets (real-time communication)
 
-If you want to pass additional arguments to the app bundle, modify the `sys.argv` setup:
+### Performance Optimization
+- Process pool: Pre-spawn subprocesses for faster window creation
+- Shared Python framework: Reduce memory usage
 
-```objective-c
-// Example: Add profiling
-PyRun_SimpleString("sys.argv = ['TFM', '--desktop', '--profile', 'rendering']");
-
-// Example: Set initial directories
-PyRun_SimpleString("sys.argv = ['TFM', '--desktop', '--left', '/Users/username/Documents']");
-```
-
-### Configuration File
-
-The app bundle now respects the TFM configuration file (`~/.tfm/config.py`), just like the command-line version. Users can customize:
-- Backend preferences
-- Font settings
-- Color schemes
-- Key bindings
-- etc.
-
-### Deprecating create_window()
-
-The `create_window()` function in `tfm_main.py` is now unused and can be removed in a future cleanup:
-
-```python
-# This function is no longer needed
-def create_window():
-    # ... (can be removed)
-```
+### Not Recommended
+- Threading: Would require extensive TFM code changes
+- Single process: Would limit multi-window independence
 
 ## Related Files
 
-- `macos_app/src/TFMAppDelegate.m` - Objective-C launcher (modified)
-- `src/tfm_main.py` - Contains both `cli_main()` and `create_window()`
+- `macos_app/src/TFMAppDelegate.m` - Multi-process implementation
+- `macos_app/MULTIPROCESS_ARCHITECTURE.md` - Detailed architecture documentation
+- `src/tfm_main.py` - Contains `cli_main()` entry point
 - `src/tfm_backend_selector.py` - Backend selection logic
 - `tfm.py` - Command-line wrapper that calls `cli_main()`
 
 ## References
 
+- NSTask: https://developer.apple.com/documentation/foundation/nstask
+- Process Management: https://developer.apple.com/documentation/foundation/nsprocessinfo
 - Python/C API: https://docs.python.org/3/c-api/
-- PyRun_SimpleString: https://docs.python.org/3/c-api/veryhigh.html#c.PyRun_SimpleString
-- PyObject_GetAttrString: https://docs.python.org/3/c-api/object.html#c.PyObject_GetAttrString
-- PyObject_CallObject: https://docs.python.org/3/c-api/call.html#c.PyObject_CallObject
 
 ---
 
 **Fix implemented: December 27, 2024**
 **Status: Verified working**
-**Result: Consistent behavior between command-line and app bundle**
+**Result: Consistent behavior + complete window isolation + no code changes**

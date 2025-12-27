@@ -11,25 +11,20 @@
 
 @implementation TFMAppDelegate {
     BOOL pythonInitialized;
-    NSMutableArray *tfmWindows;
 }
 
 - (instancetype)init {
     self = [super init];
     if (self) {
         pythonInitialized = NO;
-        tfmWindows = [[NSMutableArray alloc] init];
-        
-        // Register for window close notifications
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(windowWillClose:)
-                                                     name:NSWindowWillCloseNotification
-                                                   object:nil];
     }
     return self;
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    // Single-process, single-window architecture
+    NSLog(@"Launching TFM in single-process mode");
+    
     // Initialize Python interpreter
     if (![self initializePython]) {
         // Display detailed error dialog
@@ -46,8 +41,8 @@
         return;
     }
     
-    // Launch first TFM window
-    [self launchNewTFMWindow];
+    // Launch TFM window in current process
+    [self launchTFMWindow];
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
@@ -56,28 +51,13 @@
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
-    // Terminate the application when the last window is closed
+    // Single-window mode: terminate when window closes
     return YES;
 }
 
 - (NSMenu *)applicationDockMenu:(NSApplication *)sender {
-    // Create custom Dock menu
-    NSMenu *dockMenu = [[NSMenu alloc] init];
-    
-    // Add "New Window" menu item
-    NSMenuItem *newWindowItem = [[NSMenuItem alloc] 
-        initWithTitle:@"New Window" 
-        action:@selector(newDocument:) 
-        keyEquivalent:@""];
-    [newWindowItem setTarget:self];
-    [dockMenu addItem:newWindowItem];
-    
-    return dockMenu;
-}
-
-- (void)newDocument:(id)sender {
-    // Handle "New Window" action from Dock menu
-    [self launchNewTFMWindow];
+    // Single-window mode: no custom Dock menu needed
+    return nil;
 }
 
 #pragma mark - Python Management
@@ -181,136 +161,60 @@
 }
 
 - (void)dealloc {
-    // Unregister from notifications
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-
-#pragma mark - Window Close Handling
-
-- (void)windowWillClose:(NSNotification *)notification {
-    // Sub-task 9.3: Remove window from tracking array on close
-    NSWindow *closingWindow = [notification object];
-    
-    if ([tfmWindows containsObject:closingWindow]) {
-        [tfmWindows removeObject:closingWindow];
-        NSLog(@"Window closed, removed from tracking. Remaining windows: %lu", 
-              (unsigned long)[tfmWindows count]);
-        
-        // Sub-task 9.3: Check if last window closed
-        // Note: applicationShouldTerminateAfterLastWindowClosed handles termination
-        if ([tfmWindows count] == 0) {
-            NSLog(@"Last TFM window closed");
-        }
-    }
+    // Clean up if needed
 }
 
 #pragma mark - Window Management
 
-- (void)launchNewTFMWindow {
-    // Sub-task 7.1: Check pythonInitialized flag
+- (void)launchTFMWindow {
+    // Launch TFM window in current process (single-window mode)
+    
     if (!pythonInitialized) {
         NSLog(@"ERROR: Cannot launch TFM window - Python not initialized");
-        [self showErrorDialog:@"Cannot create window: Python interpreter not initialized"];
+        [NSApp terminate:self];
         return;
     }
     
-    // Get current window count before creating new window
-    NSArray *windowsBefore = [[NSApplication sharedApplication] windows];
-    NSInteger windowCountBefore = [windowsBefore count];
-    
-    // Import tfm_main module using PyImport_ImportModule
+    // Import tfm_main module
     PyObject *tfmModule = PyImport_ImportModule("tfm_main");
     if (!tfmModule) {
-        // Handle import error
         NSLog(@"ERROR: Failed to import tfm_main module");
         PyErr_Print();
-        [self showErrorDialog:@"Failed to import TFM module.\n\n"
-                               @"The application bundle may be corrupted.\n"
-                               @"Check Console.app for detailed logs.\n\n"
-                               @"Try reinstalling TFM."];
-        return;
-    }
-    
-    // Get cli_main function with PyObject_GetAttrString
-    PyObject *cliMainFunc = PyObject_GetAttrString(tfmModule, "cli_main");
-    if (!cliMainFunc) {
-        // Handle missing function error
-        NSLog(@"ERROR: cli_main function not found in tfm_main module");
-        PyErr_Print();
-        Py_DECREF(tfmModule);
-        [self showErrorDialog:@"TFM cli_main function not found.\n\n"
-                               @"The application bundle may be corrupted.\n"
-                               @"Check Console.app for detailed logs.\n\n"
-                               @"Try reinstalling TFM."];
-        return;
-    }
-    
-    // Verify function is callable
-    if (!PyCallable_Check(cliMainFunc)) {
-        // Handle non-callable error
-        NSLog(@"ERROR: cli_main is not callable");
-        Py_DECREF(cliMainFunc);
-        Py_DECREF(tfmModule);
-        [self showErrorDialog:@"TFM cli_main is not a callable function.\n\n"
-                               @"The application bundle may be corrupted.\n"
-                               @"Check Console.app for detailed logs.\n\n"
-                               @"Try reinstalling TFM."];
+        [NSApp terminate:self];
         return;
     }
     
     // Set up sys.argv to simulate --desktop mode
-    // This ensures cli_main() uses CoreGraphics backend
     PyRun_SimpleString("import sys");
     PyRun_SimpleString("sys.argv = ['TFM', '--desktop']");
     
-    // Call PyObject_CallObject with cli_main
-    PyObject *result = PyObject_CallObject(cliMainFunc, NULL);
-    
-    // Check for NULL return from PyObject_CallObject
-    if (!result) {
-        // Check for Python exceptions with PyErr_Occurred
-        if (PyErr_Occurred()) {
-            // Print Python traceback with PyErr_Print
-            NSLog(@"ERROR: Python exception occurred while creating TFM window");
-            PyErr_Print();
-        }
-        
-        // Display error dialog on failure
-        [self showErrorDialog:@"Failed to create TFM window.\n\n"
-                               @"This may be due to:\n"
-                               @"• Missing dependencies\n"
-                               @"• Display/graphics issues\n"
-                               @"• Insufficient permissions\n\n"
-                               @"Check Console.app for detailed error logs."];
-        
-        // Clean up Python object references
-        Py_DECREF(cliMainFunc);
+    // Get cli_main function
+    PyObject *cliMainFunc = PyObject_GetAttrString(tfmModule, "cli_main");
+    if (!cliMainFunc || !PyCallable_Check(cliMainFunc)) {
+        NSLog(@"ERROR: cli_main function not found or not callable");
+        Py_XDECREF(cliMainFunc);
         Py_DECREF(tfmModule);
+        [NSApp terminate:self];
         return;
     }
     
-    // Log success to console
-    NSLog(@"TFM window created successfully");
+    // Call cli_main() - this will block until the window is closed
+    NSLog(@"Calling cli_main()");
+    PyObject *result = PyObject_CallObject(cliMainFunc, NULL);
     
-    // Add window reference to tracking array
-    // Get the newly created window(s)
-    NSArray *windowsAfter = [[NSApplication sharedApplication] windows];
-    NSInteger windowCountAfter = [windowsAfter count];
-    
-    // Track any new windows that were created
-    if (windowCountAfter > windowCountBefore) {
-        for (NSWindow *window in windowsAfter) {
-            if (![windowsBefore containsObject:window]) {
-                [tfmWindows addObject:window];
-                NSLog(@"Tracking new TFM window: %@", [window title]);
-            }
-        }
+    if (!result) {
+        NSLog(@"ERROR: cli_main() failed");
+        PyErr_Print();
     }
     
-    // Clean up Python object references
+    // Clean up
     Py_XDECREF(result);
     Py_DECREF(cliMainFunc);
     Py_DECREF(tfmModule);
+    
+    // When cli_main() returns, the window was closed, so terminate
+    NSLog(@"cli_main() returned, terminating application");
+    [NSApp terminate:self];
 }
 
 #pragma mark - Utility Methods

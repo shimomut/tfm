@@ -15,14 +15,10 @@
 - (void)shutdownPython;
 
 // Window management
-- (void)launchNewTFMWindow;
-- (void)windowWillClose:(NSNotification *)notification;
+- (void)launchTFMWindow;
 
 // Utility methods
 - (NSString *)getBundleResourcePath;
 - (void)showErrorDialog:(NSString *)message;
-
-// Dock menu action
-- (void)newDocument:(id)sender;
 
 @end

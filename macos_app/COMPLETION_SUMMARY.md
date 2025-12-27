@@ -6,14 +6,26 @@ The native macOS application bundle for TFM has been **successfully completed**!
 
 ### Recent Updates (December 27, 2025)
 
-**1. Fixed entry point to use `cli_main()` instead of `create_window()`:**
+**1. Simplified to single-process, single-window architecture:**
+- Changed from multi-process to single-process architecture
+- One process runs entire application with one window
+- Clean user experience with single Dock icon
+- Simpler code, no subprocess management needed
+- See `SINGLE_PROCESS_ARCHITECTURE.md` for details
+
+**2. Previous multi-process approach (archived):**
+- Multi-process architecture was attempted but caused multiple Dock icons
+- Each subprocess's CoreGraphics backend created its own NSApplication
+- No way to share NSApplication across processes in macOS
+- Reverted to single-process for clean user experience
+- See `MULTIPROCESS_ARCHITECTURE.md` and `DOCK_ICON_FIX.md` for historical context
+
+**3. Fixed entry point to use `cli_main()` instead of `create_window()`:**
 - macOS app now uses the same entry point as command-line version
-- Changed Objective-C launcher to call `cli_main()` with `--desktop` flag
 - Ensures consistent behavior between `python3 tfm.py --desktop` and app bundle
 - Proper backend selection, argument parsing, and configuration handling
-- See `ENTRY_POINT_FIX.md` for details
 
-**2. Fixed dependency collection to copy all packages from virtual environment:**
+**4. Fixed dependency collection to copy all packages from virtual environment:**
 - Updated `collect_dependencies.py` to copy ALL packages from `.venv/lib/python3.12/site-packages`
 - Previous approach (selective copying from requirements.txt) missed many PyObjC framework modules
 - New approach copies 435 items from site-packages (excluding build tools like pip, setuptools, wheel)
@@ -187,7 +199,7 @@ See `macos_app/MANUAL_TEST_GUIDE.md` for detailed manual testing procedures.
 - ✅ Dock icon and menu
 - ✅ Native NSWindow instances
 - ✅ macOS event handling
-- ✅ Multi-window support
+- ✅ Single-window mode
 - ✅ Cmd+Q quit support
 - ✅ Window management
 
