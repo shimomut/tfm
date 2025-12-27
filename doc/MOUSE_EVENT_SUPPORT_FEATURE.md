@@ -212,6 +212,65 @@ All mouse events include timestamps for:
 - Timing analysis (detecting double-clicks, drags, etc.)
 - Future gesture recognition
 
+## Input Mode Behavior
+
+### Mouse Events During Text Input
+
+When TFM is in a text input mode, mouse events are automatically ignored to prevent accidental disruption of your keyboard-based workflow. This ensures that mouse clicks don't interfere while you're typing.
+
+#### Input Modes That Block Mouse Events
+
+1. **Quick Edit Bar**: When renaming files or editing paths
+   - Activated by pressing 'r' (rename) or other edit commands
+   - Mouse clicks are ignored until you press Enter or Escape
+   - Prevents accidental pane switching while typing
+
+2. **Quick Choice Bar**: When confirming operations
+   - Activated by copy, move, delete operations requiring confirmation
+   - Mouse clicks are ignored until you make a choice
+   - Prevents accidental clicks during decision-making
+
+3. **I-search Mode**: When searching in the text viewer
+   - Activated by pressing '/' in the text viewer
+   - Mouse clicks are ignored until you exit search mode
+   - Prevents accidental scrolling while typing search terms
+
+#### How It Works
+
+- **Automatic Detection**: TFM automatically detects when you're in an input mode
+- **Silent Filtering**: Mouse events are silently ignored (no error messages)
+- **Immediate Resume**: Mouse events work normally as soon as you exit the input mode
+- **Keyboard Always Works**: Keyboard shortcuts continue to function normally
+
+#### Example Scenarios
+
+**Scenario 1: Renaming a File**
+```
+1. Press 'r' to rename a file → Quick Edit Bar appears
+2. Start typing the new filename
+3. Accidentally move your mouse and click → Nothing happens (click ignored)
+4. Press Enter to confirm → Quick Edit Bar closes
+5. Mouse clicks now work normally again
+```
+
+**Scenario 2: Searching in Text Viewer**
+```
+1. Open a file in the text viewer
+2. Press '/' to start i-search → Search prompt appears
+3. Type your search term
+4. Accidentally click with mouse → Nothing happens (click ignored)
+5. Press Escape to exit search → I-search mode ends
+6. Mouse wheel scrolling works normally again
+```
+
+#### Why This Matters
+
+This behavior is designed to protect your workflow:
+- **Prevents Mistakes**: Accidental mouse clicks won't disrupt text input
+- **Maintains Focus**: You can type without worrying about mouse position
+- **Seamless Experience**: No need to think about mouse vs. keyboard modes
+- **Consistent Behavior**: All text input modes behave the same way
+
 ## Limitations
 
 ### Current Limitations
@@ -220,7 +279,6 @@ All mouse events include timestamps for:
 2. **No drag-and-drop**: Dragging files between panes is not yet supported
 3. **No context menus**: Right-click context menus are not yet implemented
 4. **No file selection**: Clicking on individual files doesn't select them (use keyboard)
-5. **No scrolling**: Mouse wheel scrolling is not yet implemented
 
 ### Terminal Mode Limitations
 
@@ -235,6 +293,13 @@ When a dialog is open:
 - Mouse events go to the dialog, not the file panes
 - Clicking outside the dialog doesn't close it or switch pane focus
 - Use Escape key to close dialogs
+
+### Input Mode Behavior
+
+When in text input modes (Quick Edit Bar, Quick Choice Bar, or I-search):
+- All mouse events are ignored
+- Keyboard input continues to work normally
+- Mouse events resume immediately after exiting the input mode
 
 ## Troubleshooting
 

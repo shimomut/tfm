@@ -29,9 +29,9 @@ class TestMouseWheelScrolling(unittest.TestCase):
         self.mock_renderer.set_event_callback = Mock()
         
         # Patch init_colors to prevent color initialization
-        with patch('src.tfm_main.init_colors'):
+        with patch('tfm_main.init_colors'):
             # Import after patching
-            from src.tfm_main import FileManager
+            from tfm_main import FileManager
             
             # Create FileManager instance
             self.fm = FileManager(self.mock_renderer)

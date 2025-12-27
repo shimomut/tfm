@@ -173,7 +173,9 @@ class TFMEventCallback(EventCallback):
         Handle a mouse event by routing to the UI layer stack.
         
         Mouse events are delivered to the topmost UILayer only, consistent
-        with keyboard event routing.
+        with keyboard event routing. Mouse events are filtered out during
+        input modes (quick edit, quick choice, i-search) to prevent
+        accidental disruption of keyboard-based workflows.
         
         Args:
             event: MouseEvent to handle
@@ -183,6 +185,11 @@ class TFMEventCallback(EventCallback):
         """
         # Mark activity for adaptive FPS
         self.file_manager.adaptive_fps.mark_activity()
+        
+        # Filter out mouse events during input modes
+        if self.file_manager.is_in_input_mode():
+            self.file_manager.logger.debug(f"Ignoring mouse event during input mode: {event.event_type}")
+            return True  # Event consumed (ignored)
         
         # Route to UI layer stack
         return self.file_manager.ui_layer_stack.handle_mouse_event(event)
@@ -877,6 +884,42 @@ class FileManager(UILayer):
             bool: True if renderer supports menu bar (desktop mode)
         """
         return hasattr(self.renderer, 'set_menu_bar')
+    
+    def is_in_input_mode(self) -> bool:
+        """
+        Check if TFM is currently in an input mode that should block mouse events.
+        
+        This method checks if any of the following input modes are active:
+        - Quick Edit Bar (for editing filenames and paths)
+        - Quick Choice Bar (for confirmation dialogs)
+        - I-search mode in Text Viewer (for incremental search)
+        
+        Uses defensive hasattr() checks to handle cases where components
+        may not be initialized or attributes may not exist.
+        
+        Returns:
+            True if in an input mode (quick edit, quick choice, or i-search),
+            False otherwise.
+        """
+        # Check quick edit bar
+        if hasattr(self, 'quick_edit_bar') and hasattr(self.quick_edit_bar, 'is_active'):
+            if self.quick_edit_bar.is_active:
+                return True
+        
+        # Check quick choice bar
+        if hasattr(self, 'quick_choice_bar') and hasattr(self.quick_choice_bar, 'is_active'):
+            if self.quick_choice_bar.is_active:
+                return True
+        
+        # Check text viewer i-search mode
+        # Text viewer is dynamically created and pushed onto the UI layer stack
+        # Check if the top layer is a text viewer in isearch mode
+        if hasattr(self, 'ui_layer_stack'):
+            top_layer = self.ui_layer_stack.get_top_layer()
+            if hasattr(top_layer, 'isearch_mode') and top_layer.isearch_mode:
+                return True
+        
+        return False
     
     def _setup_menu_bar(self):
         """Initialize menu bar for desktop mode."""

@@ -398,6 +398,210 @@ class UILayer:
 
 ## Application Integration
 
+### Input Mode Mouse Event Filtering
+
+TFM implements input mode filtering to prevent mouse events from disrupting keyboard-based text input workflows. This is a critical feature that ensures users can type without worrying about accidental mouse clicks.
+
+#### Architecture
+
+The filtering is implemented at the top level of the event routing system in `src/tfm_main.py`:
+
+```python
+class TFM:
+    """Main TFM application with input mode-aware mouse filtering."""
+    
+    def __init__(self):
+        self.quick_edit_bar = QuickEditBar(...)
+        self.quick_choice_bar = QuickChoiceBar(...)
+        self.text_viewer = TextViewer(...)
+        self.logger = getLogger("Main")
+    
+    def is_in_input_mode(self) -> bool:
+        """
+        Check if TFM is currently in an input mode that should block mouse events.
+        
+        Returns:
+            True if in an input mode (quick edit, quick choice, or i-search),
+            False otherwise.
+        """
+        # Check quick edit bar
+        if hasattr(self.quick_edit_bar, 'is_active') and self.quick_edit_bar.is_active:
+            return True
+        
+        # Check quick choice bar
+        if hasattr(self.quick_choice_bar, 'is_active') and self.quick_choice_bar.is_active:
+            return True
+        
+        # Check text viewer i-search mode
+        if hasattr(self.text_viewer, 'isearch_mode') and self.text_viewer.isearch_mode:
+            return True
+        
+        return False
+    
+    def handle_mouse_event(self, event: MouseEvent) -> None:
+        """
+        Handle mouse events with input mode filtering.
+        
+        Args:
+            event: The mouse event to process
+        """
+        # Filter out mouse events during input modes
+        if self.is_in_input_mode():
+            self.logger.debug(f"Ignoring mouse event during input mode: {event.event_type}")
+            return
+        
+        # Normal mouse event processing
+        # Route to UI layer stack, etc.
+        self._route_mouse_event_to_layers(event)
+```
+
+#### Design Rationale
+
+1. **Centralized Check**: The `is_in_input_mode()` method provides a single point to check all input mode states
+2. **Early Filtering**: Mouse events are filtered at the top level before routing to UI layers
+3. **Extensible**: New input modes can be added by extending the `is_in_input_mode()` check
+4. **Defensive**: Uses `hasattr()` checks to handle cases where components may not be initialized
+5. **Logging**: Debug logging helps troubleshoot mouse event filtering behavior
+
+#### Input Modes
+
+Three input modes trigger mouse event filtering:
+
+1. **Quick Edit Bar** (`quick_edit_bar.is_active`)
+   - Activated during file rename operations
+   - Activated during path editing
+   - Single-line text input component
+   - Blocks all mouse events while active
+
+2. **Quick Choice Bar** (`quick_choice_bar.is_active`)
+   - Activated during confirmation dialogs
+   - Multiple choice selection component
+   - Blocks all mouse events while active
+
+3. **I-search Mode** (`text_viewer.isearch_mode`)
+   - Activated during incremental search in text viewer
+   - Interactive search with live results
+   - Blocks all mouse events while active
+
+#### Implementation Details
+
+**Defensive Attribute Checking**:
+```python
+# Use hasattr() to handle cases where components may not exist
+if hasattr(self.quick_edit_bar, 'is_active') and self.quick_edit_bar.is_active:
+    return True
+```
+
+This defensive approach ensures the code doesn't crash if:
+- Components are not yet initialized
+- Components are None
+- Attributes don't exist on the component
+
+**Debug Logging**:
+```python
+self.logger.debug(f"Ignoring mouse event during input mode: {event.event_type}")
+```
+
+Debug-level logging provides visibility into filtering behavior without cluttering normal logs. This helps developers troubleshoot issues where mouse events seem to be ignored.
+
+**Early Return Pattern**:
+```python
+if self.is_in_input_mode():
+    self.logger.debug(...)
+    return  # Early return prevents further processing
+```
+
+The early return pattern ensures filtered events don't reach the UI layer stack, preventing any side effects.
+
+#### Testing Input Mode Filtering
+
+**Unit Test Example**:
+```python
+def test_mouse_events_ignored_during_quick_edit():
+    """Test that mouse events are ignored when quick edit bar is active."""
+    tfm = TFM()
+    tfm.quick_edit_bar.is_active = True
+    
+    event = MouseEvent(
+        event_type=MouseEventType.BUTTON_DOWN,
+        column=5, row=10,
+        sub_cell_x=0.5, sub_cell_y=0.5,
+        button=MouseButton.LEFT,
+        timestamp=time.time()
+    )
+    
+    # Event should be filtered
+    tfm.handle_mouse_event(event)
+    
+    # Verify event didn't reach UI layers
+    assert not tfm.ui_layers[-1].received_event
+```
+
+**Property-Based Test Example**:
+```python
+from hypothesis import given, strategies as st
+
+@given(event_type=st.sampled_from(list(MouseEventType)))
+def test_all_mouse_events_blocked_during_input_mode(event_type):
+    """All mouse event types must be blocked during input modes."""
+    tfm = TFM()
+    tfm.quick_edit_bar.is_active = True
+    
+    event = MouseEvent(
+        event_type=event_type,
+        column=5, row=10,
+        sub_cell_x=0.5, sub_cell_y=0.5,
+        button=MouseButton.LEFT,
+        timestamp=time.time()
+    )
+    
+    tfm.handle_mouse_event(event)
+    
+    # No event should reach UI layers
+    assert not tfm.ui_layers[-1].received_event
+```
+
+#### Extending Input Mode Filtering
+
+To add a new input mode:
+
+1. **Add state check to `is_in_input_mode()`**:
+```python
+def is_in_input_mode(self) -> bool:
+    # ... existing checks ...
+    
+    # Check new input mode
+    if hasattr(self.new_component, 'is_input_active') and self.new_component.is_input_active:
+        return True
+    
+    return False
+```
+
+2. **Ensure component has appropriate state attribute**:
+```python
+class NewInputComponent:
+    def __init__(self):
+        self.is_input_active = False
+    
+    def activate_input(self):
+        self.is_input_active = True
+    
+    def deactivate_input(self):
+        self.is_input_active = False
+```
+
+3. **Add tests for the new input mode**:
+```python
+def test_mouse_events_ignored_during_new_input_mode():
+    tfm = TFM()
+    tfm.new_component.is_input_active = True
+    
+    event = create_test_mouse_event()
+    tfm.handle_mouse_event(event)
+    
+    assert not tfm.ui_layers[-1].received_event
+```
+
 ### Implementing Mouse Support in Components
 
 To add mouse support to a TFM component:
