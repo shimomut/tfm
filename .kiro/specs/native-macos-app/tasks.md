@@ -505,6 +505,30 @@ This implementation plan breaks down the creation of a native macOS application 
   - Python pre-compilation implemented
   - Ready for manual testing and distribution
 
+- [x] 23. Optimize TTK library bundle size
+  - [x] 23.1 Implement selective TTK file copying
+    - Copy only runtime files (__init__.py, py.typed, *.py modules)
+    - Copy essential directories (backends/, serialization/, utils/)
+    - Exclude test files (test_*.py, demo_*.py)
+    - Exclude development directories (doc/, demo/, test/, build/)
+    - Exclude development files (.coverage, .pytest_cache/, ttk.egg-info/)
+    - Exclude metadata files (CHANGELOG.md, MANIFEST.in, Makefile, README.md, pyproject.toml)
+    - _Requirements: 17.1, 17.2_
+
+  - [x] 23.2 Verify TTK cleanup results
+    - Verify TTK directory size reduced from 13MB to 740KB
+    - Verify ~12.3MB space savings (~94% reduction)
+    - Verify app launches successfully
+    - Verify all runtime functionality preserved
+    - _Requirements: 17.3, 17.7_
+
+  - [x] 23.3 Document TTK cleanup
+    - Create temp/TTK_CLEANUP.md
+    - Document files excluded and why
+    - Document space savings
+    - Document pattern consistency with TFM copy approach
+    - _Requirements: 17.7_
+
 ## Notes
 
 - Tasks marked with `*` are optional testing tasks that can be skipped for faster MVP

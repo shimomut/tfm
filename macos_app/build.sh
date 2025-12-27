@@ -180,15 +180,51 @@ else
     log_info "  Warning: Compilation failed"
 fi
 
-# Copy TTK library
+# Copy TTK library (runtime files only)
 log_info "Copying TTK library..."
 TTK_DEST="${RESOURCES_DIR_BUNDLE}/ttk"
-if [ -d "${PROJECT_ROOT}/ttk" ]; then
-    cp -R "${PROJECT_ROOT}/ttk" "${TTK_DEST}"
-else
-    log_error "TTK library not found at ${PROJECT_ROOT}/ttk"
+TTK_SRC="${PROJECT_ROOT}/ttk"
+
+if [ ! -d "${TTK_SRC}" ]; then
+    log_error "TTK library not found at ${TTK_SRC}"
     exit 1
 fi
+
+# Create TTK destination directory
+mkdir -p "${TTK_DEST}"
+
+# Copy only runtime files (exclude docs, tests, demos, build artifacts)
+log_info "  Copying TTK runtime files..."
+
+# Copy essential Python files (exclude py.typed - only needed for type checkers)
+cp "${TTK_SRC}/__init__.py" "${TTK_DEST}/" 2>/dev/null || true
+
+# Copy top-level Python modules (exclude test/demo/setup files)
+for file in "${TTK_SRC}"/*.py; do
+    if [ -f "$file" ]; then
+        basename=$(basename "$file")
+        # Skip test, demo, and setup files
+        if [[ ! "$basename" =~ ^test_ ]] && [[ ! "$basename" =~ ^demo_ ]] && [[ "$basename" != "setup.py" ]]; then
+            cp "$file" "${TTK_DEST}/"
+        fi
+    fi
+done
+
+# Copy essential subdirectories (backends, serialization, utils)
+for dir in backends serialization utils; do
+    if [ -d "${TTK_SRC}/${dir}" ]; then
+        cp -R "${TTK_SRC}/${dir}" "${TTK_DEST}/"
+        log_info "    Copied ${dir}/"
+    fi
+done
+
+# Remove C++ source files from backends (only compiled .so is needed)
+if [ -d "${TTK_DEST}/backends" ]; then
+    find "${TTK_DEST}/backends" -name "*.cpp" -delete 2>/dev/null || true
+    log_info "    Removed C++ source files from backends/"
+fi
+
+log_info "  TTK runtime files copied (excluded: doc/, demo/, test/, build/, .coverage, etc.)"
 
 # Copy C++ renderer extension module to Resources root
 # This allows "import ttk_coregraphics_render" to work from anywhere

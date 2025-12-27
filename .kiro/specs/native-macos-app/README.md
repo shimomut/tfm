@@ -28,7 +28,7 @@ The Objective-C launcher creates NSApplication and embeds Python, which then cre
 
 - **requirements.md** - Complete requirements with EARS patterns and acceptance criteria
 - **design.md** - Detailed architecture, components, and implementation design
-- **tasks.md** - Step-by-step implementation plan with 20 major tasks
+- **tasks.md** - Step-by-step implementation plan with 23 major tasks, 75+ subtasks
 
 ## Key Design Decisions
 
@@ -82,10 +82,11 @@ cd macos_app
 
 - [x] Requirements defined (18 requirements with acceptance criteria)
 - [x] Design completed (architecture, components, interfaces)
-- [x] Tasks planned (22 major tasks, 70+ subtasks)
+- [x] Tasks planned (23 major tasks, 75+ subtasks)
 - [x] Core implementation (Objective-C launcher, Python embedding, build system)
-- [x] Bundle optimization (unnecessary files cleanup, ~400KB savings)
+- [x] Bundle optimization (unnecessary files cleanup, ~12.7MB savings total)
 - [x] Python pre-compilation (faster startup, consistent performance)
+- [x] TTK library optimization (selective file copying, ~12.3MB savings)
 - [x] Documentation (build guide, cleanup guide, pre-compilation guide)
 - [ ] Final testing and distribution
 
