@@ -171,7 +171,7 @@
     
     if (!pythonInitialized) {
         NSLog(@"ERROR: Cannot launch TFM window - Python not initialized");
-        [NSApp terminate:self];
+        exit(1);
         return;
     }
     
@@ -180,7 +180,7 @@
     if (!tfmModule) {
         NSLog(@"ERROR: Failed to import tfm_main module");
         PyErr_Print();
-        [NSApp terminate:self];
+        exit(1);
         return;
     }
     
@@ -194,7 +194,7 @@
         NSLog(@"ERROR: cli_main function not found or not callable");
         Py_XDECREF(cliMainFunc);
         Py_DECREF(tfmModule);
-        [NSApp terminate:self];
+        exit(1);
         return;
     }
     
@@ -212,9 +212,12 @@
     Py_DECREF(cliMainFunc);
     Py_DECREF(tfmModule);
     
-    // When cli_main() returns, the window was closed, so terminate
+    // When cli_main() returns, the window was closed
     NSLog(@"cli_main() returned, terminating application");
-    [NSApp terminate:self];
+    
+    // Use exit() instead of [NSApp terminate:self] to avoid issues
+    // when running directly from command line
+    exit(0);
 }
 
 #pragma mark - Utility Methods
