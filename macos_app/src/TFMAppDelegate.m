@@ -111,12 +111,14 @@
     }
     
     // Configure sys.path to include bundled modules
-    NSString *tfmPath = [resourcesPath stringByAppendingPathComponent:@"tfm"];
-    NSString *ttkPath = [resourcesPath stringByAppendingPathComponent:@"ttk"];
+    // Add Resources directory to sys.path so Python can find tfm and ttk packages
     NSString *packagesPath = [resourcesPath 
         stringByAppendingPathComponent:@"python_packages"];
     
     // Verify required directories exist
+    NSString *tfmPath = [resourcesPath stringByAppendingPathComponent:@"tfm"];
+    NSString *ttkPath = [resourcesPath stringByAppendingPathComponent:@"ttk"];
+    
     if (![fileManager fileExistsAtPath:tfmPath]) {
         NSLog(@"ERROR: TFM source directory not found at: %@", tfmPath);
         Py_Finalize();
@@ -129,13 +131,11 @@
     }
     
     // Add paths to sys.path
+    // Add Resources directory so Python can import tfm and ttk packages
     PyRun_SimpleString("import sys");
     
-    NSString *tfmPathCmd = [NSString stringWithFormat:@"sys.path.insert(0, '%@')", tfmPath];
-    PyRun_SimpleString([tfmPathCmd UTF8String]);
-    
-    NSString *ttkPathCmd = [NSString stringWithFormat:@"sys.path.insert(0, '%@')", ttkPath];
-    PyRun_SimpleString([ttkPathCmd UTF8String]);
+    NSString *resourcesPathCmd = [NSString stringWithFormat:@"sys.path.insert(0, '%@')", resourcesPath];
+    PyRun_SimpleString([resourcesPathCmd UTF8String]);
     
     NSString *packagesPathCmd = [NSString stringWithFormat:@"sys.path.insert(0, '%@')", packagesPath];
     PyRun_SimpleString([packagesPathCmd UTF8String]);
@@ -177,9 +177,9 @@
     }
     
     // Import tfm_main module
-    PyObject *tfmModule = PyImport_ImportModule("tfm_main");
+    PyObject *tfmModule = PyImport_ImportModule("tfm.tfm_main");
     if (!tfmModule) {
-        NSLog(@"ERROR: Failed to import tfm_main module");
+        NSLog(@"ERROR: Failed to import tfm.tfm_main module");
         PyErr_Print();
         exit(1);
         return;

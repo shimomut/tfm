@@ -168,6 +168,14 @@ TFM_DEST="${RESOURCES_DIR_BUNDLE}/tfm"
 mkdir -p "${TFM_DEST}"
 cp -R "${PROJECT_ROOT}/src/"* "${TFM_DEST}/"
 
+# Pre-compile TFM Python files
+log_info "Pre-compiling TFM Python files..."
+if "${VENV_PYTHON}" -m compileall -q "${TFM_DEST}"; then
+    log_info "  Compiled TFM Python files"
+else
+    log_info "  Warning: Compilation failed"
+fi
+
 # Copy TTK library
 log_info "Copying TTK library..."
 TTK_DEST="${RESOURCES_DIR_BUNDLE}/ttk"
@@ -176,6 +184,25 @@ if [ -d "${PROJECT_ROOT}/ttk" ]; then
 else
     log_error "TTK library not found at ${PROJECT_ROOT}/ttk"
     exit 1
+fi
+
+# Copy C++ renderer extension module to Resources root
+# This allows "import ttk_coregraphics_render" to work from anywhere
+log_info "Copying C++ renderer extension module..."
+if [ -f "${PROJECT_ROOT}/ttk_coregraphics_render.cpython-313-darwin.so" ]; then
+    cp "${PROJECT_ROOT}/ttk_coregraphics_render.cpython-313-darwin.so" "${RESOURCES_DIR_BUNDLE}/"
+    log_info "  Copied ttk_coregraphics_render.cpython-313-darwin.so to Resources/"
+else
+    log_warning "C++ renderer module not found at project root"
+    log_warning "Application will fall back to PyObjC rendering"
+fi
+
+# Pre-compile TTK Python files
+log_info "Pre-compiling TTK Python files..."
+if "${VENV_PYTHON}" -m compileall -q "${TTK_DEST}"; then
+    log_info "  Compiled TTK Python files"
+else
+    log_info "  Warning: Compilation failed"
 fi
 
 # Collect Python dependencies

@@ -38,6 +38,12 @@ This directory contains detailed documentation for the TFM macOS application bun
   - Framework structure creation
   - Benefits and troubleshooting
 
+- **[PYTHON_PRECOMPILATION.md](PYTHON_PRECOMPILATION.md)** - Python pre-compilation
+  - Pre-compiling Python source files to bytecode
+  - Performance benefits
+  - File structure and compatibility
+  - Verification and testing
+
 - **[UNNECESSARY_FILES_CLEANUP.md](UNNECESSARY_FILES_CLEANUP.md)** - Unnecessary files cleanup
   - Identification of unnecessary Python files
   - Python.app removal

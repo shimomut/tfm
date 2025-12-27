@@ -242,3 +242,31 @@ This specification defines a native macOS application bundle for TFM (Terminal F
 5. THE Documentation SHALL document how to customize the launcher
 6. THE Documentation SHALL explain how to update bundled Python version
 7. THE Documentation SHALL include troubleshooting guide for common issues
+
+### Requirement 17: Bundle Size Optimization
+
+**User Story:** As a user, I want the app bundle to be as small as possible, so that it downloads faster and uses less disk space.
+
+#### Acceptance Criteria
+
+1. THE Build_Process SHALL remove unnecessary files from embedded Python
+2. THE Build_Process SHALL remove Python.app GUI launcher (not needed for embedded use)
+3. THE Build_Process SHALL remove development tools (idle, pip, pydoc, python-config)
+4. THE Build_Process SHALL remove pkg-config files (build system metadata)
+5. THE Build_Process SHALL remove Resources directory from Python.framework (Info.plist not needed)
+6. THE Build_Process SHALL create framework-level bin symlink for external programs
+7. THE Build_Process SHALL log all cleanup operations for verification
+
+### Requirement 18: Python Pre-compilation
+
+**User Story:** As a user, I want faster app startup, so that TFM launches quickly.
+
+#### Acceptance Criteria
+
+1. THE Build_Process SHALL pre-compile all Python source files to bytecode
+2. THE Build_Process SHALL use Python's compileall module for compilation
+3. THE Build_Process SHALL create .pyc files in __pycache__ directories
+4. THE Build_Process SHALL pre-compile both TFM source and TTK library
+5. THE Build_Process SHALL keep both .py source and .pyc bytecode files
+6. THE Bytecode_Files SHALL be version-specific (e.g., .cpython-313.pyc)
+7. THE Pre-compilation SHALL reduce startup time and CPU usage at runtime

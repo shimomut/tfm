@@ -442,9 +442,67 @@ This implementation plan breaks down the creation of a native macOS application 
     - Test with missing TFM modules
     - Verify error dialogs appear
 
-- [x] 20. Final checkpoint - Complete implementation
+- [x] 20. Optimize bundle size
+  - [x] 20.1 Remove unnecessary files from embedded Python
+    - Remove Python.app GUI launcher (~172KB)
+    - Remove development tools (idle, pip, pydoc, python-config) (~60KB)
+    - Remove pkg-config files (~8KB)
+    - Remove Resources directory entirely (~176KB)
+    - Log all cleanup operations
+    - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.7_
+
+  - [x] 20.2 Create framework-level bin symlink
+    - Create Python.framework/bin -> Versions/Current/bin symlink
+    - Use ln -sfn to prevent following existing symlinks
+    - Required for external programs to find bundled Python
+    - _Requirements: 17.6_
+
+  - [x] 20.3 Create verification script
+    - Create temp/verify_cleanup.sh
+    - Check that unnecessary files are removed
+    - Check that essential files exist
+    - Check framework-level symlinks exist
+    - _Requirements: 17.7_
+
+  - [x] 20.4 Document cleanup process
+    - Create macos_app/doc/UNNECESSARY_FILES_CLEANUP.md
+    - Document what files are removed and why
+    - Document space savings (~400KB total)
+    - Document verification process
+    - _Requirements: 17.7_
+
+- [x] 21. Implement Python pre-compilation
+  - [x] 21.1 Add pre-compilation step to build script
+    - Use Python's compileall module
+    - Pre-compile TFM source files
+    - Pre-compile TTK library files
+    - Use -q flag for quiet mode
+    - _Requirements: 18.1, 18.2, 18.4_
+
+  - [x] 21.2 Verify bytecode generation
+    - Check __pycache__ directories are created
+    - Check .pyc files exist for all .py files
+    - Verify version-specific naming (.cpython-313.pyc)
+    - _Requirements: 18.3, 18.6_
+
+  - [x] 21.3 Keep source files alongside bytecode
+    - Keep both .py and .pyc files in bundle
+    - Preserve for debugging and introspection
+    - Document trade-off in documentation
+    - _Requirements: 18.5_
+
+  - [x] 21.4 Document pre-compilation
+    - Create macos_app/doc/PYTHON_PRECOMPILATION.md
+    - Document benefits (faster startup, consistent performance)
+    - Document file structure with __pycache__
+    - Document why source files are kept
+    - _Requirements: 18.7_
+
+- [x] 22. Final checkpoint - Complete implementation
   - All automated tests passed successfully
   - Comprehensive documentation created
+  - Bundle size optimized (~400KB savings)
+  - Python pre-compilation implemented
   - Ready for manual testing and distribution
 
 ## Notes
