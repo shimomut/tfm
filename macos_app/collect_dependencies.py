@@ -44,18 +44,37 @@ def log_warning(message):
 def get_site_packages_dir():
     """
     Get the site-packages directory for the current Python environment.
+    Prioritizes project virtual environment over user site-packages.
     
     Returns:
         Path: Path to site-packages directory
     """
-    # Try to get from sys.path
+    # First, try to find project's .venv
+    # Look for .venv in current directory and parent directories
+    current_dir = Path.cwd()
+    for parent in [current_dir] + list(current_dir.parents):
+        venv_site_packages = parent / '.venv' / 'lib' / f'python{sys.version_info.major}.{sys.version_info.minor}' / 'site-packages'
+        if venv_site_packages.exists():
+            log_info(f"Using project virtual environment: {venv_site_packages}")
+            return venv_site_packages
+    
+    # Try to get from sys.path (prefer .venv paths)
     for path in sys.path:
-        if 'site-packages' in path and os.path.isdir(path):
+        if '.venv' in path and 'site-packages' in path and os.path.isdir(path):
+            log_info(f"Using virtual environment from sys.path: {path}")
             return Path(path)
     
-    # Fallback: use sysconfig
+    # Fallback: any site-packages in sys.path
+    for path in sys.path:
+        if 'site-packages' in path and os.path.isdir(path):
+            log_warning(f"Using site-packages from sys.path: {path}")
+            return Path(path)
+    
+    # Last resort: use sysconfig
     import sysconfig
-    return Path(sysconfig.get_path('purelib'))
+    site_packages = Path(sysconfig.get_path('purelib'))
+    log_warning(f"Using site-packages from sysconfig: {site_packages}")
+    return site_packages
 
 
 def read_requirements(requirements_file):
@@ -268,7 +287,7 @@ def get_package_dependencies(package_name):
     """
     try:
         result = subprocess.run(
-            ['pip', 'show', package_name],
+            [sys.executable, '-m', 'pip', 'show', package_name],
             capture_output=True,
             text=True,
             check=True
@@ -303,6 +322,9 @@ def collect_all_dependencies(packages, site_packages_dir, dest_dir):
     success_count = 0
     failed_packages = []
     
+    # PyObjC packages that will be handled by verify_pyobjc_frameworks()
+    pyobjc_packages = {'pyobjc-framework-cocoa', 'pyobjc-framework-appkit', 'pyobjc-core'}
+    
     while to_process:
         package_name = to_process.pop(0)
         
@@ -311,6 +333,11 @@ def collect_all_dependencies(packages, site_packages_dir, dest_dir):
             continue
         
         processed.add(package_name)
+        
+        # Skip PyObjC packages - they'll be handled by verify_pyobjc_frameworks()
+        if package_name.lower() in pyobjc_packages:
+            log_info(f"Skipping {package_name} (will be verified separately)")
+            continue
         
         log_info(f"Processing package: {package_name}")
         
@@ -336,7 +363,7 @@ def collect_dependencies(requirements_file, dest_dir):
     Main function to collect all dependencies.
     
     Args:
-        requirements_file: Path to requirements.txt
+        requirements_file: Path to requirements.txt (not used, kept for compatibility)
         dest_dir: Destination directory for packages
         
     Returns:
@@ -350,26 +377,48 @@ def collect_dependencies(requirements_file, dest_dir):
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     
-    # Read requirements
-    packages = read_requirements(requirements_file)
+    # Copy all packages from site-packages
+    log_info("Copying all packages from site-packages...")
     
-    if not packages:
-        log_warning("No packages found in requirements.txt")
-        return True
+    copied_count = 0
+    skipped_count = 0
     
-    # Collect packages and their dependencies
-    log_info(f"Collecting {len(packages)} packages and their dependencies...")
-    success_count, failed_packages = collect_all_dependencies(
-        packages, site_packages_dir, dest_dir
-    )
+    for item in site_packages_dir.iterdir():
+        # Skip __pycache__ and other special directories
+        if item.name.startswith('__') and item.name.endswith('__'):
+            continue
+        
+        # Skip _distutils_hack (setuptools internal)
+        if item.name == '_distutils_hack':
+            continue
+        
+        # Skip pip, setuptools, wheel (build tools not needed at runtime)
+        if item.name in ['pip', 'setuptools', 'wheel', 'pkg_resources']:
+            log_info(f"Skipping build tool: {item.name}")
+            skipped_count += 1
+            continue
+        
+        # Skip .dist-info and .egg-info for pip, setuptools, wheel
+        if item.name.startswith(('pip-', 'setuptools-', 'wheel-')) and (item.name.endswith('.dist-info') or item.name.endswith('.egg-info')):
+            skipped_count += 1
+            continue
+        
+        dest_item = dest_dir / item.name
+        
+        try:
+            if item.is_dir():
+                log_info(f"Copying directory: {item.name}")
+                if dest_item.exists():
+                    shutil.rmtree(dest_item)
+                shutil.copytree(item, dest_item)
+            else:
+                log_info(f"Copying file: {item.name}")
+                shutil.copy2(item, dest_item)
+            copied_count += 1
+        except Exception as e:
+            log_warning(f"Failed to copy {item.name}: {e}")
     
-    # Report results
-    log_info(f"Successfully copied {success_count} packages (including dependencies)")
-    
-    if failed_packages:
-        log_error(f"Failed to copy packages: {', '.join(failed_packages)}")
-        log_error("Please ensure all dependencies are installed: pip install -r requirements.txt")
-        return False
+    log_success(f"Copied {copied_count} items from site-packages (skipped {skipped_count} build tools)")
     
     # Verify PyObjC frameworks
     if not verify_pyobjc_frameworks(site_packages_dir, dest_dir):
