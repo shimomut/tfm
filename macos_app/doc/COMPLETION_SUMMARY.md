@@ -33,6 +33,16 @@ The native macOS application bundle for TFM has been **successfully completed**!
 - App now launches successfully with no import errors
 - See `DEPENDENCY_COLLECTION_FIX.md` for details
 
+**5. Font rendering investigation (December 27, 2025):**
+- User reported different text rendering between CLI and app bundle
+- Investigation confirmed both modes use identical configuration flow:
+  - Both load config from `~/.tfm/config.py`
+  - Both use `cli_main()` entry point
+  - Both pass same font settings to CoreGraphicsBackend
+- Created diagnostic guide: `FONT_RENDERING_DIAGNOSIS.md`
+- Created test scripts: `temp/test_config_loading.py`, `temp/test_backend_init.py`
+- Awaiting user feedback on specific visual differences to continue diagnosis
+
 ### 🎯 What Was Accomplished
 
 - ✅ Project structure and build system
