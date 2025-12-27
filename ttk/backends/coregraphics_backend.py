@@ -2688,7 +2688,7 @@ if COCOA_AVAILABLE:
     # ALWAYS create a new class to ensure we have the latest implementation
     # Don't try to reuse an old class from the Objective-C runtime
     # This ensures our keyDown_ and other methods are properly registered
-    class TTKView(Cocoa.NSView, protocols=[objc.protocolNamed('NSTextInputClient')]):
+    class TTKView(Cocoa.NSView, protocols=[objc.protocolNamed('NSTextInputClient'), objc.protocolNamed('NSDraggingSource')]):
             """
             Custom NSView subclass for rendering the TTK character grid.
             
@@ -3023,6 +3023,7 @@ if COCOA_AVAILABLE:
             # These methods are required for proper text input handling on macOS
             # and enable the callback-based event system with CharEvent generation
             
+            @objc.signature(b'B@:')
             def hasMarkedText(self) -> bool:
                 """
                 Check if there is marked text (IME composition in progress).
@@ -3194,6 +3195,7 @@ if COCOA_AVAILABLE:
                     # Deliver CharEvent to application (callback always set)
                     self.backend.event_callback.on_char_event(char_event)
             
+            @objc.signature(b'{CGRect={CGPoint=dd}{CGSize=dd}}@:{_NSRange=QQ}^{_NSRange=QQ}')
             def firstRectForCharacterRange_actualRange_(self, char_range, actual_range):
                 """
                 Provide screen rectangle for composition text positioning.
@@ -3289,6 +3291,7 @@ if COCOA_AVAILABLE:
                     # This prevents IME from crashing but may position the candidate window incorrectly
                     return Cocoa.NSMakeRect(0, 0, 0, 0)
             
+            @objc.signature(b'@@:{_NSRange=QQ}^{_NSRange=QQ}')
             def attributedSubstringForProposedRange_actualRange_(self, proposed_range, actual_range):
                 """
                 Provide attributed string for font information.
@@ -3504,6 +3507,29 @@ if COCOA_AVAILABLE:
                     event: NSEvent from macOS event system
                 """
                 self.backend._handle_mouse_event(event)
+            
+            # NSDraggingSource protocol methods
+            def draggingSession_sourceOperationMaskForDraggingContext_(self, session, context):
+                """
+                Return the allowed drag operations for this drag session.
+                
+                This method is called by macOS to determine what operations are allowed
+                for the drag. The return value determines what cursor is shown based on
+                modifier keys:
+                - NSDragOperationCopy (1): Shows green + cursor
+                - NSDragOperationMove (16): Shows no + cursor
+                - Both: macOS chooses based on modifier keys
+                
+                Args:
+                    session: NSDraggingSession object
+                    context: NSDraggingContext (0 = outside app, 1 = within app)
+                
+                Returns:
+                    int: Bitmask of allowed operations (Copy | Move = 17)
+                """
+                # Allow both copy and move operations
+                # NSDragOperationCopy = 1, NSDragOperationMove = 16
+                return 1 | 16  # NSDragOperationCopy | NSDragOperationMove
 
 else:
     # Provide a dummy class when PyObjC is not available

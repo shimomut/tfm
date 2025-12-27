@@ -378,9 +378,15 @@ NSImage *dragImage = /* create image with text */;
 **Key Implementation Details**:
 - Uses `NSFilenamesPboardType` for maximum compatibility with macOS apps
 - Drag image is simple text overlay (filename or "N files")
-- Supports standard macOS drag modifiers (Option for copy, Command for move)
-- Drag operation type determined by drop target, not source
+- Supports standard macOS drag modifiers via operation mask:
+  - Sets `NSDragOperationCopy | NSDragOperationMove` on the dragging session
+  - macOS automatically shows appropriate cursor based on modifier keys:
+    - No modifier or Option (⌥): Copy cursor (green + icon)
+    - Command (⌘): Move cursor (no + icon)
+  - Operation mask set for both local and non-local drags
+- Drag operation type determined by drop target and modifier keys
 - Completion callback invoked from Objective-C delegate method
+- Animation back to start position on cancel/fail enabled
 
 **Limitations**:
 - Requires desktop mode (window with NSView)

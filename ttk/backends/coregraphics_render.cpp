@@ -3529,6 +3529,17 @@ static PyObject* start_drag_session(PyObject* self, PyObject* args) {
         0  // NSDraggingFormationDefault
     );
     
+    // Enable animation back to start position on cancel/fail
+    ((void(*)(id, SEL, unsigned long))objc_msgSend)(
+        dragging_session,
+        sel_registerName("setAnimatesToStartingPositionsOnCancelOrFail:"),
+        1  // YES - animate back on cancel
+    );
+    
+    // Note: The drag operation mask (Copy | Move) is set by the NSDraggingSource
+    // protocol method draggingSession:sourceOperationMaskForDraggingContext:
+    // implemented in TTKView in coregraphics_backend.py
+    
     // Success
     Py_RETURN_TRUE;
 }

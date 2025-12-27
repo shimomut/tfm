@@ -38,10 +38,11 @@ During a drag operation, you'll see:
 Drag-and-drop is **fully supported** when running TFM in desktop mode on macOS:
 - Uses native macOS drag-and-drop system
 - Works with Finder, applications, and the Dock
-- Supports standard macOS drag modifiers:
-  - **No modifier**: Default operation (usually copy)
-  - **Option (⌥)**: Force copy operation
-  - **Command (⌘)**: Force move operation
+- Supports standard macOS drag modifiers (hold while dragging):
+  - **No modifier**: Copy operation (shows + cursor)
+  - **Option (⌥)**: Copy operation (shows + cursor)
+  - **Command (⌘)**: Move operation (no + cursor)
+- The cursor changes automatically based on the modifier key and drop target
 
 ### Terminal Mode
 
