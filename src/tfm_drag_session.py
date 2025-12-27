@@ -71,10 +71,14 @@ class DragSessionManager:
             self.logger.error(f"Exception starting drag session: {e}")
             return False
         
-        self.state = DragState.DRAGGING
-        self.current_urls = urls
-        self.completion_callback = completion_callback
-        self.logger.info(f"Started drag session with {len(urls)} files")
+        # Note: The drag session is now running asynchronously in macOS.
+        # We immediately reset to IDLE state since the drag is handled by the OS.
+        # In the future, we can implement NSDraggingSource protocol callbacks
+        # to get notified when the drag completes, but for now we reset immediately.
+        self.state = DragState.IDLE
+        self.current_urls = None
+        self.completion_callback = None
+        self.logger.info(f"Started drag session with {len(urls)} files (async)")
         return True
     
     def handle_drag_completed(self) -> None:

@@ -665,8 +665,9 @@ class FileManager(UILayer):
         # Get current pane data
         current_pane = self.get_current_pane()
         
-        # Get selected files (as list of Path objects)
-        selected_files = list(current_pane['selected_files'])
+        # Get selected files (convert strings to Path objects)
+        # Note: selected_files is a set of strings (see tfm_file_operations.py line 67)
+        selected_files = [Path(f) for f in current_pane['selected_files']]
         
         # Get focused item
         focused_item = None
