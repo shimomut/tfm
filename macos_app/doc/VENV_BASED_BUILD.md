@@ -29,16 +29,21 @@ PYTHON_BASE_PREFIX=$("${VENV_PYTHON}" -c "import sys; print(sys.base_prefix)")
 ### 2. Installation Type Detection
 
 The script detects whether Python is installed as:
-- **Python.framework** (official python.org installer)
-- **Standard Python** (mise, pyenv, homebrew, system Python)
+- **Python.framework** (python.org installer or Homebrew)
+- **Standard Python** (mise, pyenv, system Python)
 
 ```bash
-if [[ "${PYTHON_BASE_PREFIX}" == *"/Library/Frameworks/Python.framework"* ]]; then
+if [[ "${PYTHON_BASE_PREFIX}" == *"/Python.framework/Versions/"* ]]; then
+    # Framework installation (python.org or Homebrew)
+    PYTHON_FRAMEWORK="${PYTHON_BASE_PREFIX%/Versions/*}"
     USE_FRAMEWORK=true
 else
+    # Standard installation
     USE_FRAMEWORK=false
 fi
 ```
+
+For Homebrew Python, the framework root is extracted from the full base_prefix path.
 
 ### 3. Component Collection
 
@@ -67,18 +72,20 @@ The build script creates a Python.framework-like structure for consistency:
 ```
 TFM.app/Contents/Frameworks/Python.framework/
   Versions/
-    3.12/                    # Version-specific directory
+    3.13/                    # Version-specific directory (auto-detected)
       Python                 # Shared library (framework style only)
       bin/
-        python3.12           # Actual Python executable
-        python3 -> python3.12
+        python3.13           # Actual Python executable
+        python3 -> python3.13
       lib/
-        python3.12/          # Standard library
-        libpython3.12.dylib  # Shared library (standard style)
-    Current -> 3.12          # Symlink to current version
+        python3.13/          # Standard library
+        libpython3.13.dylib  # Shared library (standard style)
+    Current -> 3.13          # Symlink to current version
   bin -> Versions/Current/bin
   lib -> Versions/Current/lib
 ```
+
+**Version Flexibility:** The Objective-C launcher uses the `Current` symlink instead of hardcoded version numbers, allowing the app to work with any Python version embedded during build time.
 
 ### 5. Install Name Updates
 
@@ -86,10 +93,12 @@ The build script updates the TFM executable to use the bundled Python:
 
 ```bash
 install_name_tool -change \
-    "${PYTHON_BASE_PREFIX}/lib/libpython3.12.dylib" \
-    "@executable_path/../Frameworks/Python.framework/Versions/3.12/lib/libpython3.12.dylib" \
+    "${PYTHON_BASE_PREFIX}/lib/libpython3.13.dylib" \
+    "@executable_path/../Frameworks/Python.framework/Versions/3.13/lib/libpython3.13.dylib" \
     "${MACOS_DIR}/TFM"
 ```
+
+The version number is automatically detected from the venv and used in the install name path.
 
 ## Benefits
 
@@ -160,9 +169,11 @@ This ensures external programs (like preview scripts) use the bundled Python whe
 ### Wrong Python Version
 The bundled Python version matches the venv's Python version. To change:
 1. Delete the venv: `rm -rf .venv`
-2. Create new venv with desired Python: `python3.12 -m venv .venv`
+2. Create new venv with desired Python: `python3.13 -m venv .venv`
 3. Install dependencies: `pip install -r requirements.txt`
 4. Rebuild: `./macos_app/build.sh`
+
+The Objective-C launcher automatically uses whatever Python version is embedded via the `Current` symlink.
 
 ## Related Files
 

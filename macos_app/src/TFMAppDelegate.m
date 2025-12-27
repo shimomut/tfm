@@ -65,8 +65,9 @@
 - (BOOL)initializePython {
     // Get bundle paths
     NSBundle *mainBundle = [NSBundle mainBundle];
+    // Use "Current" symlink to support any Python version
     NSString *frameworksPath = [[mainBundle privateFrameworksPath] 
-        stringByAppendingPathComponent:@"Python.framework/Versions/3.12"];
+        stringByAppendingPathComponent:@"Python.framework/Versions/Current"];
     NSString *resourcesPath = [mainBundle resourcePath];
     
     // Verify Python.framework exists

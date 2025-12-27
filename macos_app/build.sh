@@ -59,13 +59,16 @@ log_info "Python base: ${PYTHON_BASE_PREFIX}"
 log_info "Site packages: ${PYTHON_SITE_PACKAGES}"
 
 # Check if using Python.framework or standard Python installation
-if [[ "${PYTHON_BASE_PREFIX}" == *"/Library/Frameworks/Python.framework"* ]]; then
-    # Python.framework installation
-    PYTHON_FRAMEWORK="${PYTHON_BASE_PREFIX}"
+# Python.framework can be in /Library/Frameworks (python.org) or /opt/homebrew (Homebrew)
+if [[ "${PYTHON_BASE_PREFIX}" == *"/Python.framework/Versions/"* ]]; then
+    # Python.framework installation (python.org or Homebrew)
+    # Extract framework root by removing /Versions/X.Y suffix
+    PYTHON_FRAMEWORK="${PYTHON_BASE_PREFIX%/Versions/*}"
     USE_FRAMEWORK=true
     log_info "Using Python.framework installation"
+    log_info "Framework root: ${PYTHON_FRAMEWORK}"
 else
-    # Standard Python installation (mise, pyenv, homebrew, etc.)
+    # Standard Python installation (mise, pyenv, system Python)
     PYTHON_FRAMEWORK="${PYTHON_BASE_PREFIX}"
     USE_FRAMEWORK=false
     log_info "Using standard Python installation"
@@ -248,6 +251,18 @@ if [ "$USE_FRAMEWORK" = true ]; then
     cd "${FRAMEWORKS_DIR}/Python.framework"
     ln -sf "Versions/Current/Python" Python
     ln -sf "Versions/Current/Resources" Resources 2>/dev/null || true
+    
+    # Add sitecustomize.py to disable user site-packages
+    log_info "Adding sitecustomize.py to disable user site-packages..."
+    SITECUSTOMIZE_SOURCE="${SCRIPT_DIR}/resources/sitecustomize.py"
+    SITECUSTOMIZE_DEST="${PYTHON_DEST}/lib/python${PYTHON_VERSION}/sitecustomize.py"
+    if [ -f "${SITECUSTOMIZE_SOURCE}" ]; then
+        cp "${SITECUSTOMIZE_SOURCE}" "${SITECUSTOMIZE_DEST}"
+        log_info "  Installed sitecustomize.py"
+    else
+        log_error "sitecustomize.py not found at ${SITECUSTOMIZE_SOURCE}"
+        exit 1
+    fi
     
     log_success "Python.framework embedded successfully"
     
