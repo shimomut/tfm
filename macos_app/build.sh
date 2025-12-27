@@ -261,7 +261,7 @@ if [ "$USE_FRAMEWORK" = true ]; then
     ln -sf "${PYTHON_VERSION}" Current
     cd "${FRAMEWORKS_DIR}/Python.framework"
     ln -sf "Versions/Current/Python" Python
-    ln -sf "Versions/Current/Resources" Resources 2>/dev/null || true
+    ln -sf "Versions/Current/bin" bin
     
     # Create python3 symlink in bin directory
     log_info "Creating python3 symlink in bin directory..."
@@ -284,6 +284,37 @@ if [ "$USE_FRAMEWORK" = true ]; then
     fi
     
     log_success "Python.framework embedded successfully"
+    
+    # Remove unnecessary files from embedded Python
+    log_info "Removing unnecessary files from embedded Python..."
+    
+    # Remove Python.app (GUI launcher)
+    if [ -d "${PYTHON_DEST}/Resources/Python.app" ]; then
+        rm -rf "${PYTHON_DEST}/Resources/Python.app"
+        log_info "  Removed Python.app"
+    fi
+    
+    # Remove Resources directory entirely (Info.plist not needed for embedded use)
+    if [ -d "${PYTHON_DEST}/Resources" ]; then
+        rm -rf "${PYTHON_DEST}/Resources"
+        log_info "  Removed Resources/"
+    fi
+    
+    # Remove development tools from bin/
+    for tool in idle3.13 pip3 pip3.13 pydoc3.13 python3.13-config; do
+        if [ -f "${PYTHON_DEST}/bin/${tool}" ]; then
+            rm -f "${PYTHON_DEST}/bin/${tool}"
+            log_info "  Removed bin/${tool}"
+        fi
+    done
+    
+    # Remove pkg-config files
+    if [ -d "${PYTHON_DEST}/lib/pkgconfig" ]; then
+        rm -rf "${PYTHON_DEST}/lib/pkgconfig"
+        log_info "  Removed lib/pkgconfig/"
+    fi
+    
+    log_success "Unnecessary files removed"
     
     # Update install names to use embedded framework
     log_info "Updating install names to use embedded framework..."
@@ -360,6 +391,25 @@ else
     log_info "  Created ${FRAMEWORK_DIR}/lib -> Versions/Current/lib"
     
     log_success "Python embedded successfully"
+    
+    # Remove unnecessary files from embedded Python
+    log_info "Removing unnecessary files from embedded Python..."
+    
+    # Remove development tools from bin/
+    for tool in idle3.13 pip3 pip3.13 pydoc3.13 python3.13-config; do
+        if [ -f "${PYTHON_DEST}/bin/${tool}" ]; then
+            rm -f "${PYTHON_DEST}/bin/${tool}"
+            log_info "  Removed bin/${tool}"
+        fi
+    done
+    
+    # Remove pkg-config files
+    if [ -d "${PYTHON_DEST}/lib/pkgconfig" ]; then
+        rm -rf "${PYTHON_DEST}/lib/pkgconfig"
+        log_info "  Removed lib/pkgconfig/"
+    fi
+    
+    log_success "Unnecessary files removed"
     
     # Update install names for Python shared library
     log_info "Updating install names to use embedded Python..."

@@ -38,6 +38,12 @@ This directory contains detailed documentation for the TFM macOS application bun
   - Framework structure creation
   - Benefits and troubleshooting
 
+- **[UNNECESSARY_FILES_CLEANUP.md](UNNECESSARY_FILES_CLEANUP.md)** - Unnecessary files cleanup
+  - Identification of unnecessary Python files
+  - Python.app removal
+  - Development tools cleanup
+  - Space savings and verification
+
 - **[SYMLINK_FIX.md](SYMLINK_FIX.md)** - Broken symlink fix
   - Problem description and root cause
   - Solution using `ln -sfn` flag
