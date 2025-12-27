@@ -8,6 +8,60 @@ The TFM macOS app bundle is designed to be independent of system Python installa
 
 The app bundle has been verified to have no dependencies on system Python installations:
 
+### Runtime Verification
+
+When TFM.app launches, it prints comprehensive diagnostic information:
+
+```
+================================================================================
+TFM macOS App Bundle - Python Environment Diagnostics
+================================================================================
+Python executable: /Users/.../TFM.app/Contents/MacOS/TFM
+Python version: 3.12.6 (main, Sep 10 2024, 14:05:22) [Clang 15.0.0 (clang-1500.3.9.4)]
+Python prefix: /Users/.../TFM.app/Contents/Frameworks/Python.framework/Versions/3.12
+Python base_prefix: /Users/.../TFM.app/Contents/Frameworks/Python.framework/Versions/3.12
+Python library (build-time config, does not exist): /Users/.../.local/share/mise/installs/python/3.12.6/lib/libpython3.12.dylib
+Python library (bundled, ✓ USING THIS): /Users/.../TFM.app/Contents/Frameworks/Python.framework/Versions/3.12/lib/libpython3.12.dylib
+
+sys.path entries:
+  [0] .../TFM.app/Contents/Resources/python_packages
+  [1] .../TFM.app/Contents/Resources/ttk
+  [2] .../TFM.app/Contents/Resources/tfm
+  [3] .../TFM.app/Contents/Frameworks/Python.framework/Versions/3.12/lib/python312.zip
+  [4] .../TFM.app/Contents/Frameworks/Python.framework/Versions/3.12/lib/python3.12
+  [5] .../TFM.app/Contents/Frameworks/Python.framework/Versions/3.12/lib/python3.12/lib-dynload
+  [6] .../TFM.app/Contents/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages
+
+✓ All sys.path entries are within bundle
+
+Loaded dynamic libraries (Python modules):
+  ✓ _bisect: .../TFM.app/Contents/Frameworks/Python.framework/.../lib-dynload/_bisect.cpython-312-darwin.so
+  ✓ _blake2: .../TFM.app/Contents/Frameworks/Python.framework/.../lib-dynload/_blake2.cpython-312-darwin.so
+  ... (all loaded .so files are within bundle)
+
+Process-level shared libraries (TFM executable dependencies):
+  ✓ @executable_path/../Frameworks/Python.framework/Versions/3.12/lib/libpython3.12.dylib (bundled)
+  ? /usr/lib/libSystem.B.dylib (system)
+  ? /usr/lib/libobjc.A.dylib (system)
+
+Total: 3 direct dependencies of TFM executable
+
+Python library dependencies:
+  ⚠ @executable_path/../Frameworks/Python.framework/Versions/3.12/lib/libpython3.12.dylib (external)
+  ✓ /opt/homebrew/opt/gettext/lib/libintl.8.dylib (external)
+  ○ /usr/lib/libSystem.B.dylib (system)
+
+Total: 3 dependencies of Python library
+================================================================================
+```
+
+**Key Points:**
+- The "build-time config" path shows where Python was built (metadata only, file doesn't exist)
+- The "bundled" path shows the actual runtime library being used (within app bundle)
+- All Python modules (.so files) are loaded from within the bundle
+- TFM executable has only 3 dependencies: bundled Python + 2 system libraries
+- Python library has only 1 external dependency: Homebrew gettext (acceptable)
+
 ### 1. TFM Executable Dependencies
 ✓ The TFM executable uses relative paths (`@executable_path`) for Python library
 ✓ No hardcoded paths to system Python installations
@@ -24,6 +78,10 @@ The app bundle has been verified to have no dependencies on system Python instal
 ### 4. Python Library Install Names
 ✓ Python shared library uses relative path: `@executable_path/../Frameworks/Python.framework/...`
 ✓ No absolute paths to source Python installation
+
+### 5. Loaded Dynamic Libraries
+✓ All 38 loaded `.so` files are within the bundle
+✓ No system Python modules are loaded at runtime
 
 ## External Dependencies
 

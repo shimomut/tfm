@@ -4611,6 +4611,209 @@ def create_parser():
 
 def cli_main():
     """Command-line entry point with argument parsing"""
+    
+    # Print diagnostic information about Python environment (for system independence verification)
+    if sys.platform == 'darwin' and '.app/Contents/MacOS' in sys.executable:
+        print("=" * 80, file=sys.stderr)
+        print("TFM macOS App Bundle - Python Environment Diagnostics", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        print(f"Python executable: {sys.executable}", file=sys.stderr)
+        print(f"Python version: {sys.version}", file=sys.stderr)
+        print(f"Python prefix: {sys.prefix}", file=sys.stderr)
+        print(f"Python base_prefix: {sys.base_prefix}", file=sys.stderr)
+        
+        # Print Python library path (both configured and actual)
+        try:
+            import sysconfig
+            import glob
+            
+            # Get configured library path (from build time - metadata only, not used at runtime)
+            python_lib_configured = sysconfig.get_config_var('LDLIBRARY')
+            if python_lib_configured:
+                lib_dir = sysconfig.get_config_var('LIBDIR')
+                if lib_dir:
+                    configured_path = os.path.join(lib_dir, python_lib_configured)
+                    configured_exists = os.path.exists(configured_path)
+                    status = "exists" if configured_exists else "does not exist"
+                    print(f"Python library (build-time config, {status}): {configured_path}", file=sys.stderr)
+            
+            # Find actual bundled library path (this is what's actually used at runtime)
+            bundle_path = sys.executable.rsplit('.app/Contents/MacOS', 1)[0] + '.app'
+            python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            lib_pattern = os.path.join(bundle_path, "Contents", "Frameworks", "Python.framework", 
+                                      "Versions", python_version, "lib", f"libpython{python_version}*.dylib")
+            bundled_libs = glob.glob(lib_pattern)
+            if bundled_libs:
+                bundled_exists = os.path.exists(bundled_libs[0])
+                status = "✓ USING THIS" if bundled_exists else "not found"
+                print(f"Python library (bundled, {status}): {bundled_libs[0]}", file=sys.stderr)
+            else:
+                print("Python library (bundled): (not found)", file=sys.stderr)
+        except Exception as e:
+            print(f"Python library: (Error: {e})", file=sys.stderr)
+        
+        print(file=sys.stderr)
+        
+        print("sys.path entries:", file=sys.stderr)
+        for i, path in enumerate(sys.path):
+            if path:  # Skip empty string
+                print(f"  [{i}] {path}", file=sys.stderr)
+        print(file=sys.stderr)
+        
+        # Check for external paths (outside bundle)
+        bundle_path = sys.executable.rsplit('.app/Contents/MacOS', 1)[0] + '.app'
+        external_paths = [p for p in sys.path if p and not p.startswith(bundle_path)]
+        if external_paths:
+            print("⚠ WARNING: External paths found in sys.path:", file=sys.stderr)
+            for path in external_paths:
+                print(f"  - {path}", file=sys.stderr)
+        else:
+            print("✓ All sys.path entries are within bundle", file=sys.stderr)
+        print(file=sys.stderr)
+        
+        # Print loaded dynamic libraries
+        print("Loaded dynamic libraries (Python modules):", file=sys.stderr)
+        try:
+            import ctypes
+            import ctypes.util
+            
+            # Get list of loaded modules
+            loaded_modules = []
+            for name, module in sorted(sys.modules.items()):
+                if module and hasattr(module, '__file__') and module.__file__:
+                    if module.__file__.endswith(('.so', '.dylib', '.pyd')):
+                        loaded_modules.append((name, module.__file__))
+            
+            if loaded_modules:
+                for name, path in loaded_modules:
+                    # Check if outside bundle
+                    if not path.startswith(bundle_path):
+                        print(f"  ⚠ {name}: {path}", file=sys.stderr)
+                    else:
+                        print(f"  ✓ {name}: {path}", file=sys.stderr)
+            else:
+                print("  (No dynamic libraries loaded yet)", file=sys.stderr)
+        except Exception as e:
+            print(f"  Error checking loaded libraries: {e}", file=sys.stderr)
+        
+        print(file=sys.stderr)
+        
+        # Print all process-level shared libraries and dynamic link libraries
+        print("Process-level shared libraries (TFM executable dependencies):", file=sys.stderr)
+        try:
+            import subprocess
+            
+            # Use otool -L to get direct dependencies of the TFM executable
+            result = subprocess.run(['otool', '-L', sys.executable], 
+                                  capture_output=True, 
+                                  text=True, 
+                                  timeout=2)
+            
+            if result.returncode == 0:
+                libraries = []
+                lines = result.stdout.split('\n')[1:]  # Skip first line (executable path)
+                
+                for line in lines:
+                    line = line.strip()
+                    if line and ('.dylib' in line or '.so' in line):
+                        # Extract library path (before the compatibility version info)
+                        lib_path = line.split('(')[0].strip()
+                        if lib_path:
+                            libraries.append(lib_path)
+                
+                if libraries:
+                    for lib_path in libraries:
+                        # Resolve @executable_path, @loader_path, @rpath
+                        resolved_path = lib_path
+                        if lib_path.startswith('@executable_path/'):
+                            exe_dir = os.path.dirname(sys.executable)
+                            resolved_path = os.path.normpath(os.path.join(exe_dir, lib_path[17:]))
+                        elif lib_path.startswith('@loader_path/'):
+                            exe_dir = os.path.dirname(sys.executable)
+                            resolved_path = os.path.normpath(os.path.join(exe_dir, lib_path[13:]))
+                        elif lib_path.startswith('@rpath/'):
+                            # For @rpath, we'd need to check LC_RPATH, just show as-is
+                            resolved_path = lib_path
+                        
+                        # Check existence and location
+                        exists = os.path.exists(resolved_path) if not resolved_path.startswith('@') else False
+                        exists_str = "✓" if exists else "?"
+                        
+                        # Categorize
+                        if resolved_path.startswith(bundle_path):
+                            print(f"  {exists_str} {lib_path} → {resolved_path} (bundled)", file=sys.stderr)
+                        elif resolved_path.startswith(('/usr/lib/', '/System/')):
+                            print(f"  {exists_str} {lib_path} (system)", file=sys.stderr)
+                        else:
+                            print(f"  {exists_str} {lib_path} → {resolved_path} (external)", file=sys.stderr)
+                    
+                    print(f"\nTotal: {len(libraries)} direct dependencies of TFM executable", file=sys.stderr)
+                else:
+                    print("  (No shared libraries found)", file=sys.stderr)
+            else:
+                print(f"  Error running otool: {result.stderr}", file=sys.stderr)
+        except subprocess.TimeoutExpired:
+            print("  Error: otool command timed out", file=sys.stderr)
+        except FileNotFoundError:
+            print("  Error: otool command not found", file=sys.stderr)
+        except Exception as e:
+            print(f"  Error checking process libraries: {e}", file=sys.stderr)
+        
+        print(file=sys.stderr)
+        
+        # Also check Python library dependencies
+        print("Python library dependencies:", file=sys.stderr)
+        try:
+            import subprocess
+            import glob
+            
+            # Find the bundled Python library
+            python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            lib_pattern = os.path.join(bundle_path, "Contents", "Frameworks", "Python.framework", 
+                                      "Versions", python_version, "lib", f"libpython{python_version}*.dylib")
+            bundled_libs = glob.glob(lib_pattern)
+            
+            if bundled_libs:
+                python_lib = bundled_libs[0]
+                result = subprocess.run(['otool', '-L', python_lib], 
+                                      capture_output=True, 
+                                      text=True, 
+                                      timeout=2)
+                
+                if result.returncode == 0:
+                    libraries = []
+                    lines = result.stdout.split('\n')[1:]  # Skip first line (library path)
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if line and ('.dylib' in line or '.so' in line):
+                            lib_path = line.split('(')[0].strip()
+                            if lib_path:
+                                libraries.append(lib_path)
+                    
+                    if libraries:
+                        for lib_path in libraries:
+                            # Categorize
+                            if lib_path.startswith(bundle_path):
+                                print(f"  ✓ {lib_path} (bundled)", file=sys.stderr)
+                            elif lib_path.startswith(('/usr/lib/', '/System/')):
+                                print(f"  ○ {lib_path} (system)", file=sys.stderr)
+                            else:
+                                exists = os.path.exists(lib_path)
+                                exists_str = "✓" if exists else "⚠"
+                                print(f"  {exists_str} {lib_path} (external)", file=sys.stderr)
+                        
+                        print(f"\nTotal: {len(libraries)} dependencies of Python library", file=sys.stderr)
+                else:
+                    print(f"  Error: {result.stderr}", file=sys.stderr)
+            else:
+                print("  (Python library not found)", file=sys.stderr)
+        except Exception as e:
+            print(f"  Error checking Python library dependencies: {e}", file=sys.stderr)
+        
+        print("=" * 80, file=sys.stderr)
+        print(file=sys.stderr)
+    
     parser = create_parser()
     
     try:
