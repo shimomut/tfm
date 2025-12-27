@@ -454,8 +454,8 @@ class CoreGraphicsBackend(Renderer):
         # Store character dimensions
         # Width from NSAttributedString (accurate for character advance)
         # Height from font metrics (consistent across execution contexts)
-        self.char_width = int(size.width)
-        self.char_height = int(metrics_height)
+        self.char_width = round(size.width)
+        self.char_height = round(metrics_height)
         
         # Get font ascent for baseline positioning
         # CTLineDraw uses baseline positioning, while NSAttributedString.drawAtPoint_
