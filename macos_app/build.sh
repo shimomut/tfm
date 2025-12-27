@@ -291,6 +291,18 @@ else
         log_info "  Removed ${PYTHON_DEST}/${PYTHON_VERSION}"
     fi
     
+    # Add sitecustomize.py to disable user site-packages
+    log_info "Adding sitecustomize.py to disable user site-packages..."
+    SITECUSTOMIZE_SOURCE="${SCRIPT_DIR}/resources/sitecustomize.py"
+    SITECUSTOMIZE_DEST="${PYTHON_DEST}/lib/python${PYTHON_VERSION}/sitecustomize.py"
+    if [ -f "${SITECUSTOMIZE_SOURCE}" ]; then
+        cp "${SITECUSTOMIZE_SOURCE}" "${SITECUSTOMIZE_DEST}"
+        log_info "  Installed sitecustomize.py"
+    else
+        log_error "sitecustomize.py not found at ${SITECUSTOMIZE_SOURCE}"
+        exit 1
+    fi
+    
     # Create version symlinks
     log_info "Creating framework-level symlinks..."
     VERSIONS_DIR="${FRAMEWORKS_DIR}/Python.framework/Versions"
@@ -314,10 +326,28 @@ else
     PYTHON_LIB=$(find "${PYTHON_DEST}/lib" -name "libpython${PYTHON_VERSION}*.dylib" -type f | head -1)
     if [ -n "${PYTHON_LIB}" ]; then
         PYTHON_LIB_NAME=$(basename "${PYTHON_LIB}")
+        
+        # Update the TFM executable to use bundled Python library
         install_name_tool -change \
             "${PYTHON_BASE_PREFIX}/lib/${PYTHON_LIB_NAME}" \
             "@executable_path/../Frameworks/Python.framework/Versions/${PYTHON_VERSION}/lib/${PYTHON_LIB_NAME}" \
             "${MACOS_DIR}/${APP_NAME}" 2>/dev/null || true
+        
+        # Update the Python library's own install name (id)
+        install_name_tool -id \
+            "@executable_path/../Frameworks/Python.framework/Versions/${PYTHON_VERSION}/lib/${PYTHON_LIB_NAME}" \
+            "${PYTHON_LIB}"
+        log_info "  Updated Python library install name"
+        
+        # Check for and update any external library dependencies
+        EXTERNAL_LIBS=$(otool -L "${PYTHON_LIB}" | grep -E "/(opt|usr/local|Users)" | grep -v "/usr/lib" | grep -v "/System" | awk '{print $1}')
+        if [ -n "${EXTERNAL_LIBS}" ]; then
+            log_info "  Warning: Python library has external dependencies:"
+            echo "${EXTERNAL_LIBS}" | while read -r lib; do
+                log_info "    - ${lib}"
+            done
+            log_info "  These libraries must be available on the target system"
+        fi
     fi
 fi
 

@@ -44,6 +44,12 @@ This directory contains detailed documentation for the TFM macOS application bun
   - Framework structure verification
   - Technical notes on symlink behavior
 
+- **[SYSTEM_INDEPENDENCE.md](SYSTEM_INDEPENDENCE.md)** - System Python independence
+  - Verification of no system Python dependencies
+  - sitecustomize.py implementation
+  - Install name updates
+  - External dependencies (gettext)
+
 - **[FONT_RENDERING_FIX.md](FONT_RENDERING_FIX.md)** - Font rendering consistency
   - Font height calculation fix
   - CLI vs app bundle rendering
