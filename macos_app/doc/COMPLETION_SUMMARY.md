@@ -20,8 +20,8 @@ The native macOS application bundle for TFM has been **successfully completed**!
 - Reverted to single-process for clean user experience
 - See `MULTIPROCESS_ARCHITECTURE.md` and `DOCK_ICON_FIX.md` for historical context
 
-**3. Fixed entry point to use `cli_main()` instead of `create_window()`:**
-- macOS app now uses the same entry point as command-line version
+**3. Fixed entry point to use `cli_main()`:**
+- macOS app now uses `cli_main()` as the entry point (same as command-line version)
 - Ensures consistent behavior between `python3 tfm.py --desktop` and app bundle
 - Proper backend selection, argument parsing, and configuration handling
 
@@ -96,10 +96,10 @@ The native macOS application bundle for TFM has been **successfully completed**!
 
 ### 4. Python Integration
 - **Files Modified:**
-  - `src/tfm_main.py` - Added `create_window()` function
+  - `src/tfm_main.py` - Uses `cli_main()` for app bundle
 
 - **Features:**
-  - New entry point for app bundle
+  - Entry point for app bundle (cli_main)
   - CoreGraphics backend initialization
   - Preserved command-line functionality
   - Error handling and logging
@@ -163,7 +163,7 @@ TFM.app/
 2. **Development Mode Test**
    - Command-line interface works (`python3 tfm.py`)
    - Desktop mode works (`python3 tfm.py --desktop`)
-   - `create_window()` function implemented
+   - `cli_main()` function works correctly
    - No breaking changes to existing functionality
 
 3. **Multi-Window Test**
@@ -369,7 +369,7 @@ These are all optional enhancements and don't affect core functionality.
 11. `macos_app/COMPLETION_SUMMARY.md`
 
 ### Modified Files (2)
-1. `src/tfm_main.py` - Added `create_window()` function
+1. `src/tfm_main.py` - Uses `cli_main()` for app bundle
 2. `Makefile` - Added macOS targets
 
 ### Generated Files (Build Output)

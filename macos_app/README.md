@@ -306,8 +306,8 @@ TFM.app/
 - Creates NSApplication for macOS integration
 - Initializes embedded Python interpreter
 - Configures Python's sys.path
-- Calls TFM's `create_window()` function
-- Handles Dock menu and multi-window support
+- Calls TFM's `cli_main()` function
+- Handles application lifecycle
 
 **Resources/** - All Python code and dependencies:
 - TFM source code (from `src/`)

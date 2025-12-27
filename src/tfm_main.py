@@ -4485,47 +4485,6 @@ class FileManager(UILayer):
             self.logger.warning(f"Warning: Could not load search history: {e}")
             return []
 
-def create_window():
-    """
-    Create a new TFM window with CoreGraphics backend.
-    Called by the Objective-C launcher for the macOS app bundle.
-    
-    The CoreGraphics backend will automatically use the shared
-    NSApplication instance created by the Objective-C launcher.
-    
-    Returns:
-        True on success, False on failure
-    """
-    try:
-        # Import CoreGraphics backend
-        from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-        
-        # Create backend with default configuration
-        backend = CoreGraphicsBackend(
-            window_title="TFM - Terminal File Manager",
-            font_names=["Menlo"],
-            font_size=12,
-            rows=40,
-            cols=120
-        )
-        
-        # Initialize backend
-        backend.initialize()
-        
-        # Run TFM with the backend
-        # Use main() function which handles FileManager creation and lifecycle
-        main(backend)
-        
-        return True
-        
-    except Exception as e:
-        # Log error and return False
-        # Note: At this point, logging may not be initialized yet
-        import traceback
-        print(f"Error creating TFM window: {e}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
-        return False
-
 def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None):
     """Main function to run the file manager"""
     fm = None

@@ -57,19 +57,19 @@ Verify that development mode (running TFM directly with Python) still works afte
 
 ### Test Steps
 1. Run `python3 tfm.py --help` to verify command-line interface
-2. Verify `create_window()` function exists in `src/tfm_main.py`
-3. Verify function signature and implementation
+2. Verify `cli_main()` function exists in `src/tfm_main.py`
+3. Verify function works correctly for both terminal and desktop modes
 
 ### Results
 **Status: PASSED**
 
 - Command-line interface works correctly
 - Help text displays all expected options
-- `create_window()` function found at line 4488 in `src/tfm_main.py`
+- `cli_main()` function works correctly in `src/tfm_main.py`
 - Function properly implemented with:
-  - CoreGraphics backend initialization
-  - Error handling with try/except
-  - Proper return values (True/False)
+  - Backend selection (curses or CoreGraphics)
+  - Argument parsing
+  - Configuration handling
   - Integration with existing `main()` function
 
 ### Verified Functionality

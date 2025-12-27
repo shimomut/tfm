@@ -2,7 +2,7 @@
 
 ## Problem
 
-The macOS app bundle was using a different entry point (`create_window()`) than the command-line version (`cli_main()`), causing inconsistent behavior between the two modes.
+The macOS app bundle was initially designed to use a different entry point (`create_window()`) than the command-line version (`cli_main()`). This was changed to use `cli_main()` for both to ensure consistent behavior.
 
 Additionally, `cli_main()` is a blocking function that runs an event loop. Using threading within a single Python interpreter would cause issues with TFM's state management, which wasn't designed for multi-window scenarios.
 
