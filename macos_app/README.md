@@ -32,6 +32,7 @@ macos_app/
 ├── build.sh                     # Main build script
 ├── collect_dependencies.py      # Python dependency collector
 ├── create_dmg.sh               # DMG installer creator
+├── test_single_process.sh      # Single-process architecture test
 ├── src/                        # Objective-C source files
 │   ├── main.m                  # Application entry point
 │   ├── TFMAppDelegate.h        # App delegate header
@@ -39,6 +40,14 @@ macos_app/
 ├── resources/                  # Build resources
 │   ├── Info.plist.template     # App metadata template
 │   └── TFM.icns               # Application icon (optional)
+├── doc/                        # Documentation
+│   ├── SINGLE_PROCESS_ARCHITECTURE.md      # Architecture overview
+│   ├── SINGLE_PROCESS_IMPLEMENTATION.md    # Implementation details
+│   ├── DEPENDENCY_COLLECTION_FIX.md        # Dependency fix details
+│   ├── ENTRY_POINT_FIX.md                  # Entry point fix details
+│   ├── COMPLETION_SUMMARY.md               # Project completion summary
+│   ├── MANUAL_TEST_GUIDE.md                # Manual testing guide
+│   └── INTEGRATION_TEST_RESULTS.md         # Test results
 └── build/                      # Build output (created by build.sh)
     ├── TFM                     # Compiled executable
     ├── TFM.app/               # Complete app bundle
@@ -634,6 +643,20 @@ open build/TFM.app
 6. Distribute `TFM-{version}.dmg`
 
 ## Additional Resources
+
+### Documentation
+
+Detailed documentation is available in the `doc/` directory:
+
+- **[SINGLE_PROCESS_ARCHITECTURE.md](doc/SINGLE_PROCESS_ARCHITECTURE.md)** - Architecture overview and design decisions
+- **[SINGLE_PROCESS_IMPLEMENTATION.md](doc/SINGLE_PROCESS_IMPLEMENTATION.md)** - Implementation details and changes
+- **[DEPENDENCY_COLLECTION_FIX.md](doc/DEPENDENCY_COLLECTION_FIX.md)** - How dependencies are collected and bundled
+- **[ENTRY_POINT_FIX.md](doc/ENTRY_POINT_FIX.md)** - Entry point consistency between CLI and app
+- **[COMPLETION_SUMMARY.md](doc/COMPLETION_SUMMARY.md)** - Project completion summary
+- **[MANUAL_TEST_GUIDE.md](doc/MANUAL_TEST_GUIDE.md)** - Manual testing procedures
+- **[INTEGRATION_TEST_RESULTS.md](doc/INTEGRATION_TEST_RESULTS.md)** - Automated test results
+
+### External Resources
 
 - **TFM Documentation**: `../doc/`
 - **TTK Documentation**: `../ttk/doc/`
