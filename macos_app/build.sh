@@ -263,7 +263,7 @@ else
     PYTHON_DEST="${FRAMEWORKS_DIR}/Python.framework/Versions/${PYTHON_VERSION}"
     mkdir -p "${PYTHON_DEST}"
     
-    # Copy Python components
+    # Copy Python components (excluding problematic symlinks from source)
     if command -v rsync > /dev/null 2>&1; then
         rsync -a --no-perms --chmod=u+rw "${PYTHON_BASE_PREFIX}/lib" "${PYTHON_DEST}/"
         rsync -a --no-perms --chmod=u+rw "${PYTHON_BASE_PREFIX}/bin" "${PYTHON_DEST}/"
@@ -275,12 +275,36 @@ else
         chmod -R u+rw "${PYTHON_DEST}" 2>/dev/null || true
     fi
     
+    # Remove problematic symlinks that were copied from source Python
+    # These are framework-level symlinks that don't belong in version-specific directory
+    log_info "Removing broken symlinks from copied Python..."
+    if [ -L "${PYTHON_DEST}/bin/bin" ]; then
+        rm -f "${PYTHON_DEST}/bin/bin"
+        log_info "  Removed ${PYTHON_DEST}/bin/bin"
+    fi
+    if [ -L "${PYTHON_DEST}/lib/lib" ]; then
+        rm -f "${PYTHON_DEST}/lib/lib"
+        log_info "  Removed ${PYTHON_DEST}/lib/lib"
+    fi
+    if [ -L "${PYTHON_DEST}/${PYTHON_VERSION}" ]; then
+        rm -f "${PYTHON_DEST}/${PYTHON_VERSION}"
+        log_info "  Removed ${PYTHON_DEST}/${PYTHON_VERSION}"
+    fi
+    
     # Create version symlinks
-    cd "${FRAMEWORKS_DIR}/Python.framework/Versions"
-    ln -sf "${PYTHON_VERSION}" Current
-    cd "${FRAMEWORKS_DIR}/Python.framework"
-    ln -sf "Versions/Current/bin" bin
-    ln -sf "Versions/Current/lib" lib
+    log_info "Creating framework-level symlinks..."
+    VERSIONS_DIR="${FRAMEWORKS_DIR}/Python.framework/Versions"
+    FRAMEWORK_DIR="${FRAMEWORKS_DIR}/Python.framework"
+    
+    # Create Current -> 3.12 symlink
+    (cd "${VERSIONS_DIR}" && ln -sfn "${PYTHON_VERSION}" Current)
+    log_info "  Created ${VERSIONS_DIR}/Current -> ${PYTHON_VERSION}"
+    
+    # Create framework-level bin and lib symlinks (use -n to avoid following symlinks)
+    (cd "${FRAMEWORK_DIR}" && ln -sfn "Versions/Current/bin" bin)
+    (cd "${FRAMEWORK_DIR}" && ln -sfn "Versions/Current/lib" lib)
+    log_info "  Created ${FRAMEWORK_DIR}/bin -> Versions/Current/bin"
+    log_info "  Created ${FRAMEWORK_DIR}/lib -> Versions/Current/lib"
     
     log_success "Python embedded successfully"
     

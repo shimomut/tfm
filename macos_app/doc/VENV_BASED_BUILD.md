@@ -188,6 +188,8 @@ Framework-level symlinks (`Python.framework/bin`, `Python.framework/lib`) point 
 - Consistent paths for external programs
 - Multiple Python versions in future (if needed)
 
+**Important:** The build script uses `ln -sfn` (with `-n` flag) to prevent following existing symlinks when creating framework-level symlinks. This avoids creating broken symlinks inside the version-specific directory. See `macos_app/doc/SYMLINK_FIX.md` for details.
+
 ### Install Name Tool
 
 The `install_name_tool` command updates dynamic library references in the TFM executable. This is necessary because:

@@ -38,6 +38,12 @@ This directory contains detailed documentation for the TFM macOS application bun
   - Framework structure creation
   - Benefits and troubleshooting
 
+- **[SYMLINK_FIX.md](SYMLINK_FIX.md)** - Broken symlink fix
+  - Problem description and root cause
+  - Solution using `ln -sfn` flag
+  - Framework structure verification
+  - Technical notes on symlink behavior
+
 - **[FONT_RENDERING_FIX.md](FONT_RENDERING_FIX.md)** - Font rendering consistency
   - Font height calculation fix
   - CLI vs app bundle rendering
