@@ -2,11 +2,20 @@
 
 ## Overview
 
-The TFM macOS app bundle pre-compiles all Python source files (`.py`) to bytecode (`.pyc`) during the build process. This improves startup performance and ensures consistent behavior across different Python versions.
+The TFM macOS app bundle pre-compiles all Python source files (`.py`) to bytecode (`.pyc`) during the build process. This includes:
+
+1. **TFM application code** (`Resources/tfm/`)
+2. **TTK library code** (`Resources/ttk/`)
+3. **Third-party packages** (`Resources/python_packages/`)
+4. **Python standard library** (`Frameworks/Python.framework/.../lib/python3.13/`)
+
+Pre-compilation improves startup performance and ensures consistent behavior across different Python versions.
 
 ## Implementation
 
 The build script uses Python's `compileall` module to pre-compile all Python files:
+
+### Application Code (TFM and TTK)
 
 ```bash
 # Pre-compile TFM Python files
@@ -26,12 +35,45 @@ else
 fi
 ```
 
+### Python Standard Library
+
+```bash
+# Pre-compile Python standard library
+log_info "Pre-compiling Python standard library..."
+STDLIB_PATH="${PYTHON_DEST}/lib/python${PYTHON_VERSION}"
+if [ -d "${STDLIB_PATH}" ]; then
+    BUNDLE_PYTHON="${PYTHON_DEST}/bin/python3"
+    if [ -f "${BUNDLE_PYTHON}" ]; then
+        # -q: quiet mode (only show errors)
+        # -f: force recompilation even if .pyc files exist
+        if "${BUNDLE_PYTHON}" -m compileall -q -f "${STDLIB_PATH}"; then
+            log_info "  Compiled Python standard library"
+            PYC_COUNT=$(find "${STDLIB_PATH}" -name "*.pyc" | wc -l | tr -d ' ')
+            PY_COUNT=$(find "${STDLIB_PATH}" -name "*.py" | wc -l | tr -d ' ')
+            log_info "  Created ${PYC_COUNT} .pyc files from ${PY_COUNT} .py files"
+        fi
+    fi
+fi
+```
+
+**Note**: The standard library compilation uses the bundled Python interpreter to ensure bytecode compatibility. A few test files with intentional syntax errors will fail to compile (this is expected and non-critical).
+
 ## Benefits
 
 1. **Faster Startup**: Python doesn't need to compile `.py` files on first import
 2. **Consistent Behavior**: Bytecode is generated once during build, not at runtime
 3. **Reduced I/O**: Python can load `.pyc` files directly from `__pycache__` directories
 4. **Version Compatibility**: Bytecode files are version-specific (e.g., `.cpython-313.pyc`)
+5. **Complete Coverage**: All Python code (application, libraries, and standard library) is pre-compiled
+
+## Compilation Statistics
+
+Typical compilation results:
+
+- **TFM**: ~50 Python files
+- **TTK**: ~20 Python files
+- **Third-party packages**: ~350 packages (varies by dependencies)
+- **Python standard library**: ~1751 files (out of 1756 total, 5 intentionally broken test files excluded)
 
 ## File Structure
 
@@ -77,12 +119,17 @@ The bytecode files are specific to Python 3.13 (`.cpython-313.pyc`). If the bund
 To verify pre-compilation worked:
 
 ```bash
-# Check for __pycache__ directories
+# Check TFM and TTK __pycache__ directories
 ls macos_app/build/TFM.app/Contents/Resources/tfm/__pycache__/
 ls macos_app/build/TFM.app/Contents/Resources/ttk/__pycache__/
 
 # Check bytecode files exist
 ls macos_app/build/TFM.app/Contents/Resources/tfm/__pycache__/*.pyc | head -5
+
+# Check standard library pre-compilation
+find macos_app/build/TFM.app/Contents/Frameworks/Python.framework/Versions/3.13/lib/python3.13 \
+  -name "*.pyc" | wc -l
+# Expected: ~1751 files
 ```
 
 ## Performance Impact

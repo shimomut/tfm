@@ -16,6 +16,10 @@ log_info() {
     echo "[INFO] $1"
 }
 
+log_warning() {
+    echo "[WARNING] $1"
+}
+
 log_error() {
     echo "[ERROR] $1" >&2
 }
@@ -343,6 +347,34 @@ if [ "$USE_FRAMEWORK" = true ]; then
     
     log_success "Unnecessary files removed"
     
+    # Pre-compile Python standard library
+    log_info "Pre-compiling Python standard library..."
+    STDLIB_PATH="${PYTHON_DEST}/lib/python${PYTHON_VERSION}"
+    if [ -d "${STDLIB_PATH}" ]; then
+        # Use the bundled Python to compile the standard library
+        # This ensures compatibility and uses the correct Python version
+        BUNDLE_PYTHON="${PYTHON_DEST}/bin/python3"
+        if [ -f "${BUNDLE_PYTHON}" ]; then
+            # Compile all .py files in the standard library
+            # -q: quiet mode (only show errors)
+            # -f: force recompilation even if .pyc files exist
+            if "${BUNDLE_PYTHON}" -m compileall -q -f "${STDLIB_PATH}"; then
+                log_info "  Compiled Python standard library"
+                
+                # Count compiled files for verification
+                PYC_COUNT=$(find "${STDLIB_PATH}" -name "*.pyc" | wc -l | tr -d ' ')
+                PY_COUNT=$(find "${STDLIB_PATH}" -name "*.py" | wc -l | tr -d ' ')
+                log_info "  Created ${PYC_COUNT} .pyc files from ${PY_COUNT} .py files"
+            else
+                log_warning "Standard library compilation had errors (non-critical)"
+            fi
+        else
+            log_warning "Bundled Python not found, skipping standard library pre-compilation"
+        fi
+    else
+        log_warning "Standard library path not found: ${STDLIB_PATH}"
+    fi
+    
     # Update install names to use embedded framework
     log_info "Updating install names to use embedded framework..."
     install_name_tool -change \
@@ -437,6 +469,34 @@ else
     fi
     
     log_success "Unnecessary files removed"
+    
+    # Pre-compile Python standard library
+    log_info "Pre-compiling Python standard library..."
+    STDLIB_PATH="${PYTHON_DEST}/lib/python${PYTHON_VERSION}"
+    if [ -d "${STDLIB_PATH}" ]; then
+        # Use the bundled Python to compile the standard library
+        # This ensures compatibility and uses the correct Python version
+        BUNDLE_PYTHON="${PYTHON_DEST}/bin/python3"
+        if [ -f "${BUNDLE_PYTHON}" ]; then
+            # Compile all .py files in the standard library
+            # -q: quiet mode (only show errors)
+            # -f: force recompilation even if .pyc files exist
+            if "${BUNDLE_PYTHON}" -m compileall -q -f "${STDLIB_PATH}"; then
+                log_info "  Compiled Python standard library"
+                
+                # Count compiled files for verification
+                PYC_COUNT=$(find "${STDLIB_PATH}" -name "*.pyc" | wc -l | tr -d ' ')
+                PY_COUNT=$(find "${STDLIB_PATH}" -name "*.py" | wc -l | tr -d ' ')
+                log_info "  Created ${PYC_COUNT} .pyc files from ${PY_COUNT} .py files"
+            else
+                log_warning "Standard library compilation had errors (non-critical)"
+            fi
+        else
+            log_warning "Bundled Python not found, skipping standard library pre-compilation"
+        fi
+    else
+        log_warning "Standard library path not found: ${STDLIB_PATH}"
+    fi
     
     # Update install names for Python shared library
     log_info "Updating install names to use embedded Python..."
