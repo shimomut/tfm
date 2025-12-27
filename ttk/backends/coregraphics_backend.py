@@ -3514,11 +3514,19 @@ if COCOA_AVAILABLE:
                 Return the allowed drag operations for this drag session.
                 
                 This method is called by macOS to determine what operations are allowed
-                for the drag. The return value determines what cursor is shown based on
-                modifier keys:
-                - NSDragOperationCopy (1): Shows green + cursor
-                - NSDragOperationMove (16): Shows no + cursor
-                - Both: macOS chooses based on modifier keys
+                for the drag. We return both Copy and Move operations, and macOS/Finder
+                will automatically:
+                1. Show the appropriate cursor based on modifier keys
+                2. Validate if the operation is possible (e.g., move requires same volume)
+                3. Show 🚫 if the operation is not allowed
+                
+                By returning both operations, we let the destination (Finder) decide
+                what's actually possible, while macOS handles the cursor display.
+                
+                This method is called:
+                - When the drag starts
+                - When modifier keys change (if ignoreModifierKeysForDraggingSession returns NO)
+                - When the mouse moves to a new location
                 
                 Args:
                     session: NSDraggingSession object
@@ -3529,7 +3537,29 @@ if COCOA_AVAILABLE:
                 """
                 # Allow both copy and move operations
                 # NSDragOperationCopy = 1, NSDragOperationMove = 16
+                # macOS will show the appropriate cursor based on modifier keys:
+                # - No modifier or Option: green + (copy)
+                # - Command: no + (move, if destination allows it)
                 return 1 | 16  # NSDragOperationCopy | NSDragOperationMove
+            
+            def ignoreModifierKeysForDraggingSession_(self, session):
+                """
+                Tell macOS whether to ignore modifier key changes during drag.
+                
+                Returning NO (False) tells macOS to continuously monitor modifier keys
+                and update the drag cursor immediately when they change, without waiting
+                for mouse movement.
+                
+                This enables immediate visual feedback when the user presses or releases
+                modifier keys (Command, Option, etc.) during a drag operation.
+                
+                Args:
+                    session: NSDraggingSession object
+                
+                Returns:
+                    bool: False to enable immediate modifier key response
+                """
+                return False  # NO - do not ignore modifier keys, update cursor immediately
 
 else:
     # Provide a dummy class when PyObjC is not available
