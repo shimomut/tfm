@@ -4,14 +4,22 @@
 
 The native macOS application bundle for TFM has been **successfully completed**! All core implementation tasks (1-20) have been finished and verified.
 
-### Recent Update (December 27, 2025)
+### Recent Updates (December 27, 2025)
 
-**Fixed dependency collection to copy all packages from virtual environment:**
+**1. Fixed entry point to use `cli_main()` instead of `create_window()`:**
+- macOS app now uses the same entry point as command-line version
+- Changed Objective-C launcher to call `cli_main()` with `--desktop` flag
+- Ensures consistent behavior between `python3 tfm.py --desktop` and app bundle
+- Proper backend selection, argument parsing, and configuration handling
+- See `ENTRY_POINT_FIX.md` for details
+
+**2. Fixed dependency collection to copy all packages from virtual environment:**
 - Updated `collect_dependencies.py` to copy ALL packages from `.venv/lib/python3.12/site-packages`
 - Previous approach (selective copying from requirements.txt) missed many PyObjC framework modules
 - New approach copies 435 items from site-packages (excluding build tools like pip, setuptools, wheel)
 - Ensures complete dependency coverage including all PyObjC frameworks needed by CoreGraphics backend
 - App now launches successfully with no import errors
+- See `DEPENDENCY_COLLECTION_FIX.md` for details
 
 ### 🎯 What Was Accomplished
 

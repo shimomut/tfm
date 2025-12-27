@@ -218,10 +218,10 @@
     NSArray *windowsBefore = [[NSApplication sharedApplication] windows];
     NSInteger windowCountBefore = [windowsBefore count];
     
-    // Sub-task 7.1: Import tfm_main module using PyImport_ImportModule
+    // Import tfm_main module using PyImport_ImportModule
     PyObject *tfmModule = PyImport_ImportModule("tfm_main");
     if (!tfmModule) {
-        // Sub-task 7.3: Handle import error
+        // Handle import error
         NSLog(@"ERROR: Failed to import tfm_main module");
         PyErr_Print();
         [self showErrorDialog:@"Failed to import TFM module.\n\n"
@@ -231,46 +231,51 @@
         return;
     }
     
-    // Sub-task 7.1: Get create_window function with PyObject_GetAttrString
-    PyObject *createWindowFunc = PyObject_GetAttrString(tfmModule, "create_window");
-    if (!createWindowFunc) {
-        // Sub-task 7.3: Handle missing function error
-        NSLog(@"ERROR: create_window function not found in tfm_main module");
+    // Get cli_main function with PyObject_GetAttrString
+    PyObject *cliMainFunc = PyObject_GetAttrString(tfmModule, "cli_main");
+    if (!cliMainFunc) {
+        // Handle missing function error
+        NSLog(@"ERROR: cli_main function not found in tfm_main module");
         PyErr_Print();
         Py_DECREF(tfmModule);
-        [self showErrorDialog:@"TFM create_window function not found.\n\n"
+        [self showErrorDialog:@"TFM cli_main function not found.\n\n"
                                @"The application bundle may be corrupted.\n"
                                @"Check Console.app for detailed logs.\n\n"
                                @"Try reinstalling TFM."];
         return;
     }
     
-    // Sub-task 7.1: Verify function is callable
-    if (!PyCallable_Check(createWindowFunc)) {
-        // Sub-task 7.3: Handle non-callable error
-        NSLog(@"ERROR: create_window is not callable");
-        Py_DECREF(createWindowFunc);
+    // Verify function is callable
+    if (!PyCallable_Check(cliMainFunc)) {
+        // Handle non-callable error
+        NSLog(@"ERROR: cli_main is not callable");
+        Py_DECREF(cliMainFunc);
         Py_DECREF(tfmModule);
-        [self showErrorDialog:@"TFM create_window is not a callable function.\n\n"
+        [self showErrorDialog:@"TFM cli_main is not a callable function.\n\n"
                                @"The application bundle may be corrupted.\n"
                                @"Check Console.app for detailed logs.\n\n"
                                @"Try reinstalling TFM."];
         return;
     }
     
-    // Sub-task 7.2: Call PyObject_CallObject with create_window
-    PyObject *result = PyObject_CallObject(createWindowFunc, NULL);
+    // Set up sys.argv to simulate --desktop mode
+    // This ensures cli_main() uses CoreGraphics backend
+    PyRun_SimpleString("import sys");
+    PyRun_SimpleString("sys.argv = ['TFM', '--desktop']");
     
-    // Sub-task 7.3: Check for NULL return from PyObject_CallObject
+    // Call PyObject_CallObject with cli_main
+    PyObject *result = PyObject_CallObject(cliMainFunc, NULL);
+    
+    // Check for NULL return from PyObject_CallObject
     if (!result) {
-        // Sub-task 7.2: Check for Python exceptions with PyErr_Occurred
+        // Check for Python exceptions with PyErr_Occurred
         if (PyErr_Occurred()) {
-            // Sub-task 7.2: Print Python traceback with PyErr_Print
+            // Print Python traceback with PyErr_Print
             NSLog(@"ERROR: Python exception occurred while creating TFM window");
             PyErr_Print();
         }
         
-        // Sub-task 7.3: Display error dialog on failure
+        // Display error dialog on failure
         [self showErrorDialog:@"Failed to create TFM window.\n\n"
                                @"This may be due to:\n"
                                @"• Missing dependencies\n"
@@ -278,16 +283,16 @@
                                @"• Insufficient permissions\n\n"
                                @"Check Console.app for detailed error logs."];
         
-        // Sub-task 7.2: Clean up Python object references
-        Py_DECREF(createWindowFunc);
+        // Clean up Python object references
+        Py_DECREF(cliMainFunc);
         Py_DECREF(tfmModule);
         return;
     }
     
-    // Sub-task 7.3: Log error to console (success case)
+    // Log success to console
     NSLog(@"TFM window created successfully");
     
-    // Sub-task 9.2: Add window reference to tracking array
+    // Add window reference to tracking array
     // Get the newly created window(s)
     NSArray *windowsAfter = [[NSApplication sharedApplication] windows];
     NSInteger windowCountAfter = [windowsAfter count];
@@ -302,9 +307,9 @@
         }
     }
     
-    // Sub-task 7.2: Clean up Python object references
+    // Clean up Python object references
     Py_XDECREF(result);
-    Py_DECREF(createWindowFunc);
+    Py_DECREF(cliMainFunc);
     Py_DECREF(tfmModule);
 }
 
