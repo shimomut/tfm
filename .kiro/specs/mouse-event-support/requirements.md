@@ -16,6 +16,10 @@ This document specifies the requirements for adding comprehensive mouse event su
 - **Event_Stack**: The ordered collection of UILayers where the topmost layer receives events first
 - **File_Pane**: A UILayer component displaying a directory listing in TFM
 - **TFM**: Terminal File Manager, the application using TTK
+- **Quick_Edit_Bar**: A single-line text input component for editing filenames and paths
+- **Quick_Choice_Bar**: A component displaying multiple choice options for user confirmation
+- **I-search**: Incremental search mode in the text viewer where users type to search interactively
+- **Text_Viewer**: A UILayer component for viewing file contents with search capabilities
 
 ## Requirements
 
@@ -115,3 +119,15 @@ This document specifies the requirements for adding comprehensive mouse event su
 3. THE UILayer SHALL support a design pattern that allows adding drag-and-drop handlers in the future
 4. THE Mouse_Event SHALL include modifier key state (shift, ctrl, alt) for future gesture support
 5. THE architecture SHALL separate low-level event capture from high-level gesture recognition
+
+### Requirement 9: Input Mode Mouse Event Filtering
+
+**User Story:** As a TFM user, I want mouse events to be ignored during text input modes, so that accidental mouse clicks don't disrupt my keyboard-based workflow.
+
+#### Acceptance Criteria
+
+1. WHILE Quick_Edit_Bar is active, THE TFM SHALL ignore all mouse events
+2. WHILE Quick_Choice_Bar is active, THE TFM SHALL ignore all mouse events
+3. WHILE I-search mode is active in Text_Viewer, THE TFM SHALL ignore all mouse events
+4. WHEN exiting any of these input modes, THE TFM SHALL resume normal mouse event processing
+5. THE TFM SHALL check input mode state before processing any mouse event

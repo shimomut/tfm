@@ -400,6 +400,67 @@ class FilePane(UILayer):
         return True
 ```
 
+### Input Mode Mouse Event Filtering
+
+TFM must filter mouse events when in specific input modes to prevent accidental disruption of keyboard-based workflows:
+
+```python
+class TFM:
+    """Main TFM application with input mode-aware mouse filtering."""
+    
+    def __init__(self):
+        self.quick_edit_bar = QuickEditBar(...)
+        self.quick_choice_bar = QuickChoiceBar(...)
+        self.text_viewer = TextViewer(...)
+        self.logger = getLogger("Main")
+    
+    def is_in_input_mode(self) -> bool:
+        """
+        Check if TFM is currently in an input mode that should block mouse events.
+        
+        Returns:
+            True if in an input mode (quick edit, quick choice, or i-search),
+            False otherwise.
+        """
+        # Check quick edit bar
+        if hasattr(self.quick_edit_bar, 'is_active') and self.quick_edit_bar.is_active:
+            return True
+        
+        # Check quick choice bar
+        if hasattr(self.quick_choice_bar, 'is_active') and self.quick_choice_bar.is_active:
+            return True
+        
+        # Check text viewer i-search mode
+        if hasattr(self.text_viewer, 'isearch_mode') and self.text_viewer.isearch_mode:
+            return True
+        
+        return False
+    
+    def handle_mouse_event(self, event: MouseEvent) -> None:
+        """
+        Handle mouse events with input mode filtering.
+        
+        Args:
+            event: The mouse event to process
+        """
+        # Filter out mouse events during input modes
+        if self.is_in_input_mode():
+            self.logger.debug(f"Ignoring mouse event during input mode: {event.event_type}")
+            return
+        
+        # Normal mouse event processing
+        # Route to UI layer stack, etc.
+        self._route_mouse_event_to_layers(event)
+```
+
+**Design Rationale:**
+
+1. **Centralized Check**: The `is_in_input_mode()` method provides a single point to check all input mode states
+2. **Early Filtering**: Mouse events are filtered at the top level before routing to UI layers
+3. **Extensible**: New input modes can be added by extending the `is_in_input_mode()` check
+4. **Defensive**: Uses `hasattr()` checks to handle cases where components may not be initialized
+5. **Logging**: Debug logging helps troubleshoot mouse event filtering behavior
+
 ## Data Models
 
 ### Coordinate System
@@ -506,6 +567,24 @@ The following properties eliminate these redundancies while ensuring comprehensi
 *For any* sequence of mouse events, the timestamps must be monotonically non-decreasing (later events have timestamps >= earlier events).
 **Validates: Requirements 8.2**
 
+### Input Mode Filtering Properties
+
+**Property 14: Quick Edit Bar blocks all mouse events**
+*For any* mouse event and TFM state where Quick_Edit_Bar is active, the mouse event must not be routed to any UI layer.
+**Validates: Requirements 9.1**
+
+**Property 15: Quick Choice Bar blocks all mouse events**
+*For any* mouse event and TFM state where Quick_Choice_Bar is active, the mouse event must not be routed to any UI layer.
+**Validates: Requirements 9.2**
+
+**Property 16: I-search mode blocks all mouse events**
+*For any* mouse event and TFM state where Text_Viewer is in i-search mode, the mouse event must not be routed to any UI layer.
+**Validates: Requirements 9.3**
+
+**Property 17: Exiting input mode resumes mouse processing**
+*For any* input mode (Quick_Edit_Bar, Quick_Choice_Bar, or i-search), when the mode is deactivated, subsequent mouse events must be routed to UI layers normally.
+**Validates: Requirements 9.4**
+
 ## Error Handling
 
 ### Backend Initialization Errors
@@ -590,6 +669,7 @@ test/
 ├── test_mouse_curses_backend.py           # Properties 11, 12 (PBT + unit)
 ├── test_mouse_coregraphics_backend.py     # Unit tests for CoreGraphics
 ├── test_mouse_event_ordering.py           # Property 13 (PBT)
+├── test_mouse_input_mode_filtering.py     # Properties 14, 15, 16, 17 (PBT)
 └── test_mouse_integration.py              # End-to-end integration tests
 ```
 

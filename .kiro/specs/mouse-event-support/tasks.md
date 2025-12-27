@@ -190,6 +190,51 @@ This implementation adds comprehensive mouse event support to TFM across both te
   - All 44 mouse event tests pass
   - _Requirements: 5.1, 5.2_
 
+- [ ] 21. Implement input mode detection in TFM
+  - Add `is_in_input_mode()` method to `src/tfm_main.py`
+  - Check `quick_edit_bar.is_active` attribute
+  - Check `quick_choice_bar.is_active` attribute
+  - Check `text_viewer.isearch_mode` attribute
+  - Use defensive `hasattr()` checks for all attributes
+  - Return True if any input mode is active, False otherwise
+  - _Requirements: 9.1, 9.2, 9.3, 9.5_
+
+- [ ] 22. Add mouse event filtering to TFM event handler
+  - Update `handle_mouse_event()` in `src/tfm_main.py` to check input mode
+  - Call `is_in_input_mode()` before routing events to UI layers
+  - Return early (ignore event) if in input mode
+  - Add debug logging when filtering events
+  - Ensure normal processing when not in input mode
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+
+- [ ]* 22.1 Write property tests for input mode filtering
+  - **Property 14: Quick Edit Bar blocks all mouse events**
+  - **Property 15: Quick Choice Bar blocks all mouse events**
+  - **Property 16: I-search mode blocks all mouse events**
+  - **Property 17: Exiting input mode resumes mouse processing**
+  - **Validates: Requirements 9.1, 9.2, 9.3, 9.4**
+
+- [ ]* 22.2 Write unit tests for input mode filtering
+  - Test mouse events ignored when quick_edit_bar.is_active is True
+  - Test mouse events ignored when quick_choice_bar.is_active is True
+  - Test mouse events ignored when text_viewer.isearch_mode is True
+  - Test mouse events processed when all modes are False
+  - Test defensive behavior when attributes don't exist
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+
+- [ ] 23. Checkpoint - Ensure input mode filtering tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 24. Update documentation for input mode filtering
+  - Update `doc/MOUSE_EVENT_SUPPORT_FEATURE.md` with input mode behavior
+  - Document that mouse events are ignored during text input modes
+  - List the three input modes: quick edit, quick choice, i-search
+  - Update `doc/dev/MOUSE_EVENT_SUPPORT_IMPLEMENTATION.md` with implementation details
+  - _Requirements: 9.1, 9.2, 9.3, 9.4_
+
+- [ ] 25. Final checkpoint - Complete input mode filtering verification
+  - Ensure all tests pass, ask the user if questions arise.
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP
