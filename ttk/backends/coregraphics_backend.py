@@ -281,6 +281,9 @@ class CoreGraphicsBackend(Renderer):
         self.last_scroll_time = 0.0
         self.SCROLL_ACCUMULATION_TIMEOUT = 1.0  # Reset after 1 second of no scrolling
         
+        # Current NSEvent for drag-and-drop (stored during mouse event processing)
+        self.current_nsevent = None
+        
         # C++ renderer module (initialized in initialize())
         self._cpp_renderer = None
     
@@ -2047,6 +2050,10 @@ class CoreGraphicsBackend(Renderer):
         Args:
             event: NSEvent from macOS event system
         """
+        # Store the current NSEvent for drag-and-drop
+        # The drag session needs access to the NSEvent to pass to beginDraggingSessionWithItems:event:source:
+        self.current_nsevent = event
+        
         if not hasattr(self, 'mouse_enabled') or not self.mouse_enabled:
             return
         
@@ -2066,9 +2073,12 @@ class CoreGraphicsBackend(Renderer):
             Cocoa.NSEventTypeOtherMouseDown: MouseEventType.BUTTON_DOWN,
             Cocoa.NSEventTypeOtherMouseUp: MouseEventType.BUTTON_UP,
             Cocoa.NSEventTypeMouseMoved: MouseEventType.MOVE,
-            Cocoa.NSEventTypeLeftMouseDragged: MouseEventType.DRAG,
-            Cocoa.NSEventTypeRightMouseDragged: MouseEventType.DRAG,
-            Cocoa.NSEventTypeOtherMouseDragged: MouseEventType.DRAG,
+            # Map dragged events to MOVE for drag gesture detection
+            # When a button is pressed and mouse moves, macOS sends dragged events
+            # We need these as MOVE events so the drag gesture detector can track position
+            Cocoa.NSEventTypeLeftMouseDragged: MouseEventType.MOVE,
+            Cocoa.NSEventTypeRightMouseDragged: MouseEventType.MOVE,
+            Cocoa.NSEventTypeOtherMouseDragged: MouseEventType.MOVE,
             Cocoa.NSEventTypeScrollWheel: MouseEventType.WHEEL,
         }
         
@@ -2186,6 +2196,221 @@ class CoreGraphicsBackend(Renderer):
             import traceback
             print(f"Error in mouse event callback: {e}")
             traceback.print_exc()
+    
+    def supports_drag_and_drop(self) -> bool:
+        """
+        Query whether this backend supports drag-and-drop operations.
+        
+        The CoreGraphics backend provides full drag-and-drop support through
+        native macOS NSDraggingSession APIs. This enables users to drag files
+        from TFM to other macOS applications.
+        
+        Returns:
+            bool: Always True for CoreGraphics backend (macOS desktop mode)
+        
+        Platform Support:
+            - macOS (CoreGraphics): True - uses native NSDraggingSession
+            - Terminal (Curses): False - drag-and-drop not supported
+        
+        Example:
+            if renderer.supports_drag_and_drop():
+                print("Drag-and-drop enabled")
+                # Enable drag gesture detection
+            else:
+                print("Drag-and-drop not available")
+                # Use keyboard-only file operations
+        """
+        return True
+    
+    def start_drag_session(self, file_urls: list, drag_image_text: str) -> bool:
+        """
+        Start a native macOS drag-and-drop session.
+        
+        This method initiates a drag operation using macOS NSDraggingSession.
+        It calls into the C++ extension (ttk_coregraphics_render) to perform
+        the native drag operation with proper Objective-C/Cocoa integration.
+        
+        The drag session is managed by macOS, which handles:
+        - Drag cursor and visual feedback
+        - Drop target validation
+        - File operation type (copy/move/link) based on modifiers
+        - Completion/cancellation notifications
+        
+        macOS-Specific Implementation:
+            1. Converts file:// URLs to NSURLs
+            2. Creates NSDraggingItem for each file
+            3. Sets up NSPasteboard with NSFilenamesPboardType
+            4. Generates drag image using NSImage with text overlay
+            5. Begins NSDraggingSession with the view as dragging source
+            6. Registers callbacks for completion/cancellation
+        
+        The drag session runs asynchronously. When it completes or is cancelled,
+        the backend invokes the completion callback set via
+        set_drag_completion_callback().
+        
+        Args:
+            file_urls: List of file:// URLs to drag (RFC 8089 format).
+                      Example: ["file:///Users/username/Documents/file.txt"]
+                      URLs should be properly percent-encoded.
+            drag_image_text: Text to display in drag image.
+                           For single files: filename (e.g., "report.pdf")
+                           For multiple files: count (e.g., "3 files")
+        
+        Returns:
+            bool: True if drag session started successfully, False otherwise.
+                 Returns False if:
+                 - C++ renderer module not available
+                 - Invalid file URLs
+                 - macOS rejects the drag operation
+        
+        Raises:
+            RuntimeError: If called before initialize() or after shutdown()
+        
+        Note: The drag session blocks user interaction with the source window
+        until the drag completes or is cancelled. The application should not
+        process other mouse events during the drag.
+        
+        Example:
+            # Drag a single file
+            urls = ["file:///Users/username/Documents/report.pdf"]
+            if renderer.start_drag_session(urls, "report.pdf"):
+                print("Drag started successfully")
+            
+            # Drag multiple files
+            urls = [
+                "file:///Users/username/file1.txt",
+                "file:///Users/username/file2.txt"
+            ]
+            if renderer.start_drag_session(urls, "2 files"):
+                print("Multi-file drag started")
+        """
+        # Check if C++ renderer module is available
+        if self._cpp_renderer is None:
+            print("CoreGraphicsBackend: C++ renderer not available, drag-and-drop not supported")
+            return False
+        
+        # Check if view exists
+        if self.view is None:
+            print("CoreGraphicsBackend: View not initialized, cannot start drag")
+            return False
+        
+        try:
+            # Call C++ extension to start native drag session
+            # The C++ code will:
+            # 1. Convert file:// URLs to NSURLs
+            # 2. Create NSDraggingItem objects
+            # 3. Set up NSPasteboard with file paths
+            # 4. Create drag image with text overlay
+            # 5. Begin NSDraggingSession
+            # 6. Register completion/cancellation callbacks
+            
+            # Convert PyObjC view object to pointer integer for C++
+            # objc.pyobjc_id() returns the underlying Objective-C object pointer
+            view_ptr = objc.pyobjc_id(self.view)
+            
+            # Convert current NSEvent to pointer integer (may be None)
+            event_ptr = objc.pyobjc_id(self.current_nsevent) if self.current_nsevent else 0
+            
+            success = self._cpp_renderer.start_drag_session(
+                view_ptr,
+                file_urls,
+                drag_image_text,
+                event_ptr
+            )
+            
+            if success:
+                print(f"CoreGraphicsBackend: Started drag session with {len(file_urls)} file(s)")
+            else:
+                print("CoreGraphicsBackend: Failed to start drag session")
+            
+            return success
+            
+        except Exception as e:
+            print(f"CoreGraphicsBackend: Error starting drag session: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def set_drag_completion_callback(self, callback) -> None:
+        """
+        Set callback for drag-and-drop completion or cancellation.
+        
+        This method registers a callback function that will be invoked when
+        a drag session completes (successful drop) or is cancelled (escape key,
+        invalid drop target, etc.).
+        
+        The callback function should accept a single boolean parameter:
+        - True: Drag completed successfully (dropped on valid target)
+        - False: Drag was cancelled (escape key, invalid target, etc.)
+        
+        The callback is invoked asynchronously by the C++ extension when macOS
+        notifies it of the drag outcome through NSDraggingSession delegate
+        methods. The callback runs on the main thread.
+        
+        macOS-Specific Behavior:
+            - Callback invoked from NSDraggingSession delegate methods:
+              * draggingSession:endedAtPoint:operation: for completion
+              * Callback runs on the main thread
+            - The operation parameter indicates the drag result:
+              * NSDragOperationCopy: Files were copied
+              * NSDragOperationMove: Files were moved
+              * NSDragOperationNone: Drag was cancelled
+        
+        Args:
+            callback: Callable that accepts a boolean parameter.
+                     Signature: def callback(completed: bool) -> None
+                     
+                     The callback will be invoked with:
+                     - completed=True: Drag completed successfully
+                     - completed=False: Drag was cancelled
+        
+        Note: The callback should not raise exceptions. Any exceptions will
+        be logged but not propagated, to avoid disrupting the event loop.
+        
+        Example:
+            def on_drag_completed(completed: bool):
+                if completed:
+                    print("Files were dropped successfully")
+                else:
+                    print("Drag was cancelled")
+                # Reset drag state
+                reset_drag_gesture()
+            
+            renderer.set_drag_completion_callback(on_drag_completed)
+            
+            # Later, initiate drag
+            renderer.start_drag_session(urls, "file.txt")
+            # Callback will be invoked when drag completes or is cancelled
+        """
+        # Store the callback for later invocation
+        self.drag_completion_callback = callback
+        
+        # If C++ renderer is available, register the callback with it
+        # The C++ code will call this callback when the drag completes
+        if self._cpp_renderer is not None:
+            try:
+                self._cpp_renderer.set_drag_completion_callback(self._on_drag_completed_internal)
+            except Exception as e:
+                print(f"CoreGraphicsBackend: Error setting drag completion callback: {e}")
+    
+    def _on_drag_completed_internal(self, completed: bool) -> None:
+        """
+        Internal callback invoked by C++ extension when drag completes.
+        
+        This method is called by the C++ extension when the macOS drag session
+        completes or is cancelled. It forwards the notification to the
+        application's drag completion callback.
+        
+        Args:
+            completed: True if drag completed successfully, False if cancelled
+        """
+        if hasattr(self, 'drag_completion_callback') and self.drag_completion_callback:
+            try:
+                self.drag_completion_callback(completed)
+            except Exception as e:
+                print(f"CoreGraphicsBackend: Error in drag completion callback: {e}")
+                import traceback
+                traceback.print_exc()
 
 
 # Define TTKWindowDelegate class for handling window events
@@ -2463,7 +2688,7 @@ if COCOA_AVAILABLE:
     # ALWAYS create a new class to ensure we have the latest implementation
     # Don't try to reuse an old class from the Objective-C runtime
     # This ensures our keyDown_ and other methods are properly registered
-    class TTKView(Cocoa.NSView, protocols=[objc.protocolNamed('NSTextInputClient')]):
+    class TTKView(Cocoa.NSView, protocols=[objc.protocolNamed('NSTextInputClient'), objc.protocolNamed('NSDraggingSource')]):
             """
             Custom NSView subclass for rendering the TTK character grid.
             
@@ -2526,6 +2751,21 @@ if COCOA_AVAILABLE:
                 # This is critical for IME to work - without an active input context,
                 # the IME system cannot communicate with the view
                 self._input_context = Cocoa.NSTextInputContext.alloc().initWithClient_(self)
+                
+                # Set up mouse tracking to receive mouse moved events
+                # Create a tracking area that covers the entire view bounds
+                tracking_options = (
+                    Cocoa.NSTrackingMouseMoved |  # Track mouse moved events
+                    Cocoa.NSTrackingActiveInKeyWindow |  # Only track when window is key
+                    Cocoa.NSTrackingInVisibleRect  # Automatically update when view resizes
+                )
+                tracking_area = Cocoa.NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+                    self.bounds(),  # Track entire view bounds
+                    tracking_options,
+                    self,  # Owner receives the events
+                    None  # No user info needed
+                )
+                self.addTrackingArea_(tracking_area)
                 
                 return self
             
@@ -2783,6 +3023,7 @@ if COCOA_AVAILABLE:
             # These methods are required for proper text input handling on macOS
             # and enable the callback-based event system with CharEvent generation
             
+            @objc.signature(b'B@:')
             def hasMarkedText(self) -> bool:
                 """
                 Check if there is marked text (IME composition in progress).
@@ -2954,6 +3195,7 @@ if COCOA_AVAILABLE:
                     # Deliver CharEvent to application (callback always set)
                     self.backend.event_callback.on_char_event(char_event)
             
+            @objc.signature(b'{CGRect={CGPoint=dd}{CGSize=dd}}@:{_NSRange=QQ}^{_NSRange=QQ}')
             def firstRectForCharacterRange_actualRange_(self, char_range, actual_range):
                 """
                 Provide screen rectangle for composition text positioning.
@@ -3049,6 +3291,7 @@ if COCOA_AVAILABLE:
                     # This prevents IME from crashing but may position the candidate window incorrectly
                     return Cocoa.NSMakeRect(0, 0, 0, 0)
             
+            @objc.signature(b'@@:{_NSRange=QQ}^{_NSRange=QQ}')
             def attributedSubstringForProposedRange_actualRange_(self, proposed_range, actual_range):
                 """
                 Provide attributed string for font information.
@@ -3264,6 +3507,59 @@ if COCOA_AVAILABLE:
                     event: NSEvent from macOS event system
                 """
                 self.backend._handle_mouse_event(event)
+            
+            # NSDraggingSource protocol methods
+            def draggingSession_sourceOperationMaskForDraggingContext_(self, session, context):
+                """
+                Return the allowed drag operations for this drag session.
+                
+                This method is called by macOS to determine what operations are allowed
+                for the drag. We return both Copy and Move operations, and macOS/Finder
+                will automatically:
+                1. Show the appropriate cursor based on modifier keys
+                2. Validate if the operation is possible (e.g., move requires same volume)
+                3. Show 🚫 if the operation is not allowed
+                
+                By returning both operations, we let the destination (Finder) decide
+                what's actually possible, while macOS handles the cursor display.
+                
+                This method is called:
+                - When the drag starts
+                - When modifier keys change (if ignoreModifierKeysForDraggingSession returns NO)
+                - When the mouse moves to a new location
+                
+                Args:
+                    session: NSDraggingSession object
+                    context: NSDraggingContext (0 = outside app, 1 = within app)
+                
+                Returns:
+                    int: Bitmask of allowed operations (Copy | Move = 17)
+                """
+                # Allow both copy and move operations
+                # NSDragOperationCopy = 1, NSDragOperationMove = 16
+                # macOS will show the appropriate cursor based on modifier keys:
+                # - No modifier or Option: green + (copy)
+                # - Command: no + (move, if destination allows it)
+                return 1 | 16  # NSDragOperationCopy | NSDragOperationMove
+            
+            def ignoreModifierKeysForDraggingSession_(self, session):
+                """
+                Tell macOS whether to ignore modifier key changes during drag.
+                
+                Returning NO (False) tells macOS to continuously monitor modifier keys
+                and update the drag cursor immediately when they change, without waiting
+                for mouse movement.
+                
+                This enables immediate visual feedback when the user presses or releases
+                modifier keys (Command, Option, etc.) during a drag operation.
+                
+                Args:
+                    session: NSDraggingSession object
+                
+                Returns:
+                    bool: False to enable immediate modifier key response
+                """
+                return False  # NO - do not ignore modifier keys, update cursor immediately
 
 else:
     # Provide a dummy class when PyObjC is not available

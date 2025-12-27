@@ -7,6 +7,8 @@
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreText/CoreText.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <objc/runtime.h>
+#include <objc/message.h>
 
 #include <string>
 #include <vector>
@@ -804,6 +806,9 @@ static PyObject* get_performance_metrics(PyObject* self, PyObject* args);
 static PyObject* reset_metrics(PyObject* self, PyObject* args);
 static PyObject* enable_perf_logging(PyObject* self, PyObject* args);
 
+// Drag-and-drop function
+static PyObject* start_drag_session(PyObject* self, PyObject* args);
+
 //=============================================================================
 // Module Method Definitions
 //=============================================================================
@@ -866,6 +871,19 @@ static PyMethodDef CppRendererMethods[] = {
         "  - Average characters per frame\n"
         "  - Average batch splits per frame\n"
         "  - Font cache hit rate\n"
+    },
+    {
+        "start_drag_session",
+        (PyCFunction)start_drag_session,
+        METH_VARARGS,
+        "Start a native macOS drag-and-drop session.\n\n"
+        "Parameters:\n"
+        "  view: NSView object (as Python integer/long)\n"
+        "  file_urls: List of file:// URL strings\n"
+        "  drag_image_text: Text to display in drag image (str)\n"
+        "  event: NSEvent object (as Python integer/long, 0 if not available)\n\n"
+        "Returns:\n"
+        "  bool: True if drag started successfully, False otherwise\n"
     },
     {nullptr, nullptr, 0, nullptr}  // Sentinel
 };
@@ -3204,4 +3222,324 @@ static PyObject* enable_perf_logging(PyObject* self, PyObject* args) {
     }
     
     Py_RETURN_NONE;
+}
+
+//=============================================================================
+// Drag-and-Drop Support
+//=============================================================================
+
+/**
+ * Start a native macOS drag-and-drop session.
+ * 
+ * This function initiates a drag operation using macOS NSDraggingSession.
+ * It creates NSDraggingItem objects for each file URL, sets up the pasteboard,
+ * generates a drag image with text overlay, and begins the drag session.
+ * 
+ * The drag session is managed by macOS, which handles:
+ * - Drag cursor and visual feedback
+ * - Drop target validation
+ * - File operation type (copy/move/link) based on modifiers
+ * - Completion/cancellation notifications
+ * 
+ * @param self Module object (unused)
+ * @param args Arguments tuple containing:
+ *             - view: NSView object (as Python integer/long)
+ *             - file_urls: List of file:// URL strings
+ *             - drag_image_text: Text to display in drag image (str)
+ *             - event: NSEvent object (as Python integer/long, optional, default 0)
+ * @return PyObject* True if drag started successfully, False otherwise
+ */
+static PyObject* start_drag_session(PyObject* self, PyObject* args) {
+    // Parse arguments
+    PyObject* view_obj = nullptr;
+    PyObject* file_urls_obj = nullptr;
+    const char* drag_image_text = nullptr;
+    PyObject* event_obj = nullptr;
+    
+    if (!PyArg_ParseTuple(args, "OOsO", &view_obj, &file_urls_obj, &drag_image_text, &event_obj)) {
+        PyErr_SetString(PyExc_TypeError, "Expected (view, file_urls, drag_image_text, event)");
+        return nullptr;
+    }
+    
+    // Validate file_urls is a list
+    if (!PyList_Check(file_urls_obj)) {
+        PyErr_SetString(PyExc_TypeError, "file_urls must be a list");
+        return nullptr;
+    }
+    
+    Py_ssize_t url_count = PyList_Size(file_urls_obj);
+    if (url_count == 0) {
+        PyErr_SetString(PyExc_ValueError, "file_urls list cannot be empty");
+        return nullptr;
+    }
+    
+    // Extract NSView pointer from Python object
+    // The view is passed as a Python integer containing the pointer address
+    void* view_ptr = PyLong_AsVoidPtr(view_obj);
+    if (view_ptr == nullptr && PyErr_Occurred()) {
+        PyErr_SetString(PyExc_TypeError, "Invalid view object");
+        return nullptr;
+    }
+    
+    // Extract NSEvent pointer from Python object (may be 0/nullptr if not provided)
+    void* event_ptr = PyLong_AsVoidPtr(event_obj);
+    // Clear any error from PyLong_AsVoidPtr if event_obj was 0
+    if (event_ptr == nullptr) {
+        PyErr_Clear();
+    }
+    
+    // Cast to NSView (using id to avoid Objective-C++ requirement)
+    id view = (id)view_ptr;
+    
+    // Create NSMutableArray for file URLs
+    id file_url_array = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMutableArray"), sel_registerName("array"));
+    
+    // Convert Python file:// URL strings to NSURLs
+    for (Py_ssize_t i = 0; i < url_count; ++i) {
+        PyObject* url_str_obj = PyList_GetItem(file_urls_obj, i);  // Borrowed reference
+        
+        if (!PyUnicode_Check(url_str_obj)) {
+            PyErr_SetString(PyExc_TypeError, "All file URLs must be strings");
+            return nullptr;
+        }
+        
+        // Get UTF-8 string from Python Unicode object
+        const char* url_str = PyUnicode_AsUTF8(url_str_obj);
+        if (url_str == nullptr) {
+            return nullptr;  // PyUnicode_AsUTF8 sets exception
+        }
+        
+        // Create NSString from UTF-8
+        id ns_url_string = ((id(*)(id, SEL, const char*))objc_msgSend)(
+            (id)objc_getClass("NSString"),
+            sel_registerName("stringWithUTF8String:"),
+            url_str
+        );
+        
+        if (ns_url_string == nullptr) {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to create NSString from URL");
+            return nullptr;
+        }
+        
+        // Create NSURL from string
+        id ns_url = ((id(*)(id, SEL, id))objc_msgSend)(
+            (id)objc_getClass("NSURL"),
+            sel_registerName("URLWithString:"),
+            ns_url_string
+        );
+        
+        if (ns_url == nullptr) {
+            PyErr_Format(PyExc_ValueError, "Invalid file URL: %s", url_str);
+            return nullptr;
+        }
+        
+        // Add to array
+        ((void(*)(id, SEL, id))objc_msgSend)(file_url_array, sel_registerName("addObject:"), ns_url);
+    }
+    
+    // Create NSString for drag image text
+    id drag_text_string = ((id(*)(id, SEL, const char*))objc_msgSend)(
+        (id)objc_getClass("NSString"),
+        sel_registerName("stringWithUTF8String:"),
+        drag_image_text
+    );
+    
+    if (drag_text_string == nullptr) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create NSString for drag image text");
+        return nullptr;
+    }
+    
+    // Create drag image with text overlay
+    // Create NSImage with text
+    id font = ((id(*)(id, SEL, CGFloat))objc_msgSend)(
+        (id)objc_getClass("NSFont"),
+        sel_registerName("systemFontOfSize:"),
+        14.0
+    );
+    
+    // Create attributes dictionary for text
+    id attributes_dict = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMutableDictionary"), sel_registerName("dictionary"));
+    
+    // Get NSFontAttributeName constant
+    // This is a global NSString constant, we need to create an NSString with the same value
+    id font_attr_key = ((id(*)(id, SEL, const char*))objc_msgSend)(
+        (id)objc_getClass("NSString"),
+        sel_registerName("stringWithUTF8String:"),
+        "NSFont"
+    );
+    
+    ((void(*)(id, SEL, id, id))objc_msgSend)(
+        attributes_dict,
+        sel_registerName("setObject:forKey:"),
+        font,
+        font_attr_key
+    );
+    
+    // Calculate text size
+    CGSize text_size = ((CGSize(*)(id, SEL, id))objc_msgSend)(
+        drag_text_string,
+        sel_registerName("sizeWithAttributes:"),
+        attributes_dict
+    );
+    
+    // Add padding to image size
+    CGFloat padding = 10.0;
+    CGSize image_size = CGSizeMake(
+        text_size.width + padding * 2,
+        text_size.height + padding * 2
+    );
+    
+    // Create NSImage
+    id drag_image = ((id(*)(id, SEL, CGSize))objc_msgSend)(
+        ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSImage"), sel_registerName("alloc")),
+        sel_registerName("initWithSize:"),
+        image_size
+    );
+    
+    if (drag_image == nullptr) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create drag image");
+        return nullptr;
+    }
+    
+    // Lock focus and draw
+    ((void(*)(id, SEL))objc_msgSend)(drag_image, sel_registerName("lockFocus"));
+    
+    // Draw semi-transparent background
+    id background_color = ((id(*)(id, SEL, CGFloat, CGFloat))objc_msgSend)(
+        (id)objc_getClass("NSColor"),
+        sel_registerName("colorWithWhite:alpha:"),
+        0.9,
+        0.8
+    );
+    ((void(*)(id, SEL))objc_msgSend)(background_color, sel_registerName("set"));
+    
+    CGRect background_rect = CGRectMake(0, 0, image_size.width, image_size.height);
+    ((void(*)(id, SEL, CGRect))objc_msgSend)(
+        (id)objc_getClass("NSBezierPath"),
+        sel_registerName("fillRect:"),
+        background_rect
+    );
+    
+    // Draw text
+    CGPoint text_point = CGPointMake(padding, padding);
+    ((void(*)(id, SEL, CGPoint, id))objc_msgSend)(
+        drag_text_string,
+        sel_registerName("drawAtPoint:withAttributes:"),
+        text_point,
+        attributes_dict
+    );
+    
+    ((void(*)(id, SEL))objc_msgSend)(drag_image, sel_registerName("unlockFocus"));
+    
+    // Create NSDraggingItem array - one item per URL
+    id dragging_items_array = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMutableArray"), sel_registerName("array"));
+    
+    // Get mouse location for positioning drag image
+    id window = ((id(*)(id, SEL))objc_msgSend)(view, sel_registerName("window"));
+    CGPoint mouse_location_window = ((CGPoint(*)(id, SEL))objc_msgSend)(window, sel_registerName("mouseLocationOutsideOfEventStream"));
+    CGPoint mouse_location = ((CGPoint(*)(id, SEL, CGPoint, id))objc_msgSend)(
+        view,
+        sel_registerName("convertPoint:fromView:"),
+        mouse_location_window,
+        nullptr
+    );
+    
+    // Create dragging frame for the image
+    CGRect dragging_frame = CGRectMake(
+        mouse_location.x - image_size.width / 2,
+        mouse_location.y - image_size.height / 2,
+        image_size.width,
+        image_size.height
+    );
+    
+    // Create a dragging item for each URL
+    for (Py_ssize_t i = 0; i < url_count; ++i) {
+        id ns_url = ((id(*)(id, SEL, unsigned long))objc_msgSend)(file_url_array, sel_registerName("objectAtIndex:"), (unsigned long)i);
+        
+        // Create NSDraggingItem with this URL as the pasteboard writer
+        id dragging_item = ((id(*)(id, SEL, id))objc_msgSend)(
+            ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSDraggingItem"), sel_registerName("alloc")),
+            sel_registerName("initWithPasteboardWriter:"),
+            ns_url
+        );
+        
+        if (dragging_item == nullptr) {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to create NSDraggingItem");
+            return nullptr;
+        }
+        
+        // Set dragging frame and image (only for first item to avoid overlapping images)
+        if (i == 0) {
+            ((void(*)(id, SEL, CGRect, id))objc_msgSend)(
+                dragging_item,
+                sel_registerName("setDraggingFrame:contents:"),
+                dragging_frame,
+                drag_image
+            );
+        } else {
+            // For additional items, use same frame but no image
+            ((void(*)(id, SEL, CGRect, id))objc_msgSend)(
+                dragging_item,
+                sel_registerName("setDraggingFrame:contents:"),
+                dragging_frame,
+                nullptr
+            );
+        }
+        
+        // Add to array
+        ((void(*)(id, SEL, id))objc_msgSend)(dragging_items_array, sel_registerName("addObject:"), dragging_item);
+    }
+    
+    // Get current event for drag session
+    // Use provided event if available, otherwise try to get current event from NSApp
+    id current_event = nullptr;
+    if (event_ptr != nullptr) {
+        current_event = (id)event_ptr;
+    } else {
+        current_event = ((id(*)(id, SEL))objc_msgSend)(
+            ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSApp"), sel_registerName("sharedApplication")),
+            sel_registerName("currentEvent")
+        );
+    }
+    
+    if (current_event == nullptr) {
+        PyErr_SetString(PyExc_RuntimeError, "No current event available for drag session");
+        return nullptr;
+    }
+    
+    // Begin dragging session
+    // NSDraggingSession* session = [view beginDraggingSessionWithItems:draggingItems event:currentEvent source:view];
+    id dragging_session = ((id(*)(id, SEL, id, id, id))objc_msgSend)(
+        view,
+        sel_registerName("beginDraggingSessionWithItems:event:source:"),
+        dragging_items_array,
+        current_event,
+        view
+    );
+    
+    if (dragging_session == nullptr) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to begin dragging session");
+        return nullptr;
+    }
+    
+    // Set dragging formation to default (files stack)
+    ((void(*)(id, SEL, long))objc_msgSend)(
+        dragging_session,
+        sel_registerName("setDraggingFormation:"),
+        0  // NSDraggingFormationDefault
+    );
+    
+    // Enable animation back to start position on cancel/fail
+    ((void(*)(id, SEL, unsigned long))objc_msgSend)(
+        dragging_session,
+        sel_registerName("setAnimatesToStartingPositionsOnCancelOrFail:"),
+        1  // YES - animate back on cancel
+    );
+    
+    // Note: The drag operation mask (Copy | Move) is set by the NSDraggingSource
+    // protocol method draggingSession:sourceOperationMaskForDraggingContext:
+    // implemented in TTKView in coregraphics_backend.py
+    
+    // Success
+    Py_RETURN_TRUE;
 }

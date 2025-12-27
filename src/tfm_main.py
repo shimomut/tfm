@@ -55,6 +55,9 @@ from tfm_cache_manager import CacheManager
 from tfm_menu_manager import MenuManager
 from tfm_ui_layer import UILayerStack, UILayer
 from tfm_adaptive_fps import AdaptiveFPSManager
+from tfm_drag_gesture import DragGestureDetector
+from tfm_drag_payload import DragPayloadBuilder
+from tfm_drag_session import DragSessionManager
 
 
 class TFMEventCallback(EventCallback):
@@ -264,6 +267,11 @@ class FileManager(UILayer):
         self.archive_ui = ArchiveUI(self, self.archive_operations)
         self.file_operations_ui = FileOperationsUI(self, self.file_operations)
         
+        # Initialize drag-and-drop components
+        self.drag_gesture_detector = DragGestureDetector()
+        self.drag_payload_builder = DragPayloadBuilder()
+        self.drag_session_manager = DragSessionManager(renderer)
+        
         # Initialize menu system for desktop mode
         self.menu_manager = None
         if self.is_desktop_mode():
@@ -428,9 +436,10 @@ class FileManager(UILayer):
     
     def handle_mouse_event(self, event) -> bool:
         """
-        Handle a mouse event for pane focus switching, wheel scrolling, and double-click.
+        Handle a mouse event for pane focus switching, wheel scrolling, double-click, and drag-and-drop.
         
         This method handles:
+        - Drag gesture detection for drag-and-drop operations
         - Mouse button down events to switch focus between left and right panes
         - Mouse wheel events to scroll the file list in the active pane
         - Double-click events to open files/directories (same as Enter key)
@@ -443,7 +452,11 @@ class FileManager(UILayer):
             True if the event was handled, False otherwise
         """
         # Import MouseEventType for event type checking
-        from ttk.ttk_mouse_event import MouseEventType
+        from ttk.ttk_mouse_event import MouseEventType, transform_grid_to_screen
+        
+        # Block all mouse events if drag is in progress
+        if self.drag_session_manager.is_dragging():
+            return True
         
         # Get current dimensions and layout
         height, width = self.renderer.get_dimensions()
@@ -455,6 +468,38 @@ class FileManager(UILayer):
         log_height = calculated_height if self.log_height_ratio > 0 else 0
         file_pane_bottom = height - log_height - 2
         log_pane_top = height - log_height - 1
+        
+        # Get cell dimensions for pixel coordinate conversion
+        # Assume standard cell size (this is approximate for drag detection)
+        cell_width = 8.0  # Typical monospace character width
+        cell_height = 16.0  # Typical line height
+        
+        # Convert grid coordinates to pixel coordinates for drag detection
+        pixel_x, pixel_y = transform_grid_to_screen(
+            event.column, event.row,
+            event.sub_cell_x, event.sub_cell_y,
+            cell_width, cell_height
+        )
+        
+        # Handle drag gesture detection
+        if event.event_type == MouseEventType.BUTTON_DOWN:
+            # Check if event is within the file pane area (vertically)
+            if event.row >= 1 and event.row < file_pane_bottom:
+                # Start tracking potential drag gesture
+                self.drag_gesture_detector.handle_button_down(int(pixel_x), int(pixel_y))
+        
+        elif event.event_type == MouseEventType.MOVE:
+            # Check for drag gesture
+            if self.drag_gesture_detector.handle_move(int(pixel_x), int(pixel_y)):
+                # Drag gesture detected - initiate drag
+                return self._initiate_drag()
+        
+        elif event.event_type == MouseEventType.BUTTON_UP:
+            # Check if this was a drag gesture
+            was_dragging = self.drag_gesture_detector.handle_button_up()
+            if was_dragging:
+                # Was a drag, not a click - don't process as click
+                return True
         
         # Handle double-click events
         if event.event_type == MouseEventType.DOUBLE_CLICK:
@@ -605,6 +650,116 @@ class FileManager(UILayer):
                 return True
         
         return False
+    
+    def _initiate_drag(self) -> bool:
+        """
+        Initiate a drag operation.
+        
+        This method is called when a drag gesture is detected. It builds the
+        drag payload from selected files or the focused item, and starts a
+        native drag session through the backend.
+        
+        Returns:
+            True if drag started successfully, False otherwise
+        """
+        # Get current pane data
+        current_pane = self.get_current_pane()
+        
+        # Get selected files (convert strings to Path objects)
+        # Note: selected_files is a set of strings (see tfm_file_operations.py line 67)
+        selected_files = [Path(f) for f in current_pane['selected_files']]
+        
+        # Get focused item
+        focused_item = None
+        if current_pane['files'] and 0 <= current_pane['focused_index'] < len(current_pane['files']):
+            focused_item = current_pane['files'][current_pane['focused_index']]
+        
+        # Get current directory
+        current_dir = current_pane['path']
+        
+        # Build drag payload
+        urls = self.drag_payload_builder.build_payload(
+            selected_files,
+            focused_item,
+            current_dir
+        )
+        
+        if not urls:
+            # Payload building failed - check for error message
+            error_msg = self.drag_payload_builder.get_last_error()
+            if error_msg:
+                # Show error dialog to user
+                from tfm_quick_choice_bar import QuickChoiceBarHelpers
+                QuickChoiceBarHelpers.show_error_dialog(
+                    self.quick_choice_bar,
+                    error_msg,
+                    callback=lambda _: self.mark_dirty()
+                )
+            
+            # Reset gesture detector
+            self.drag_gesture_detector.reset()
+            return False
+        
+        # Create drag image text
+        if len(urls) == 1:
+            # Single file - show filename
+            if focused_item:
+                drag_text = focused_item.name
+            else:
+                drag_text = "1 file"
+        else:
+            # Multiple files - show count
+            drag_text = f"{len(urls)} files"
+        
+        # Start drag session
+        success = self.drag_session_manager.start_drag(
+            urls,
+            drag_text,
+            completion_callback=self._on_drag_completed
+        )
+        
+        if not success:
+            # Drag session failed to start
+            # Check if backend doesn't support drag-and-drop
+            if not self.renderer.supports_drag_and_drop():
+                # Terminal mode - no error message (expected limitation)
+                self.logger.info("Drag-and-drop not available in terminal mode")
+            else:
+                # Desktop mode but drag failed - show error
+                from tfm_quick_choice_bar import QuickChoiceBarHelpers
+                QuickChoiceBarHelpers.show_error_dialog(
+                    self.quick_choice_bar,
+                    "Failed to start drag operation. The system may have rejected the drag.",
+                    callback=lambda _: self.mark_dirty()
+                )
+            
+            self.drag_gesture_detector.reset()
+            return False
+        
+        self.logger.info(f"Drag initiated: {drag_text}")
+        return True
+    
+    def _on_drag_completed(self, completed: bool) -> None:
+        """
+        Called when drag session completes or is cancelled.
+        
+        This callback is invoked by the drag session manager when the drag
+        operation finishes, either successfully (dropped on valid target) or
+        cancelled (dropped on invalid target or ESC pressed).
+        
+        Args:
+            completed: True if drag completed successfully, False if cancelled
+        """
+        if completed:
+            self.logger.info("Drag completed successfully")
+        else:
+            self.logger.info("Drag was cancelled")
+        
+        # Reset gesture detector
+        self.drag_gesture_detector.reset()
+        
+        # Redraw UI to restore normal state
+        self.mark_dirty()
     
     def render(self, renderer) -> None:
         """

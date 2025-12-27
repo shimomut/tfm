@@ -130,6 +130,36 @@ def test_complete_implementation_can_be_instantiated():
         
         def update_menu_item_state(self, item_id, enabled):
             pass
+        
+        def set_event_callback(self, callback):
+            pass
+        
+        def run_event_loop(self):
+            pass
+        
+        def run_event_loop_iteration(self, timeout_ms=-1):
+            pass
+        
+        def set_caret_position(self, x, y):
+            pass
+        
+        def supports_mouse(self):
+            return False
+        
+        def get_supported_mouse_events(self):
+            return set()
+        
+        def enable_mouse_events(self):
+            return False
+        
+        def supports_drag_and_drop(self):
+            return False
+        
+        def start_drag_session(self, file_urls, drag_image_text):
+            return False
+        
+        def set_drag_completion_callback(self, callback):
+            pass
     
     # Should be able to instantiate
     renderer = CompleteRenderer()
