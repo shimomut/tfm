@@ -652,6 +652,9 @@ Detailed documentation is available in the `doc/` directory:
 - **[SINGLE_PROCESS_IMPLEMENTATION.md](doc/SINGLE_PROCESS_IMPLEMENTATION.md)** - Implementation details and changes
 - **[DEPENDENCY_COLLECTION_FIX.md](doc/DEPENDENCY_COLLECTION_FIX.md)** - How dependencies are collected and bundled
 - **[ENTRY_POINT_FIX.md](doc/ENTRY_POINT_FIX.md)** - Entry point consistency between CLI and app
+- **[EXTERNAL_PROGRAMS_FIX.md](doc/EXTERNAL_PROGRAMS_FIX.md)** - External programs execution in app bundle
+- **[VENV_BASED_BUILD.md](doc/VENV_BASED_BUILD.md)** - Virtual environment based build system
+- **[FONT_RENDERING_FIX.md](doc/FONT_RENDERING_FIX.md)** - Font rendering consistency fix
 - **[COMPLETION_SUMMARY.md](doc/COMPLETION_SUMMARY.md)** - Project completion summary
 - **[MANUAL_TEST_GUIDE.md](doc/MANUAL_TEST_GUIDE.md)** - Manual testing procedures
 - **[INTEGRATION_TEST_RESULTS.md](doc/INTEGRATION_TEST_RESULTS.md)** - Automated test results

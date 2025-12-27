@@ -13,6 +13,20 @@ from tfm_backend_detector import is_desktop_mode
 from tfm_log_manager import getLogger
 
 
+# Python interpreter path for external programs
+# This variable points to the correct Python interpreter depending on execution context:
+# - When running from macOS app bundle: uses bundled python3 executable
+# - When running normally: uses sys.executable (current Python interpreter)
+if sys.platform == 'darwin' and '.app/Contents/MacOS' in sys.executable:
+    # Running from macOS app bundle - use bundled python3
+    # The bundled Python is at: TFM.app/Contents/Frameworks/Python.framework/bin/python3
+    bundle_path = sys.executable.rsplit('.app/Contents/MacOS', 1)[0] + '.app'
+    tfm_python = os.path.join(bundle_path, 'Contents', 'Frameworks', 'Python.framework', 'bin', 'python3')
+else:
+    # Normal execution - use current Python interpreter
+    tfm_python = sys.executable
+
+
 def tfm_tool(tool_name):
     """
     Find and return the path to a TFM tool.

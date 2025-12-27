@@ -9,6 +9,22 @@
 set -e  # Exit on error
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+log_info() {
+    echo "[INFO] $1"
+}
+
+log_error() {
+    echo "[ERROR] $1" >&2
+}
+
+log_success() {
+    echo "[SUCCESS] $1"
+}
+
+# ============================================================================
 # Build Configuration
 # ============================================================================
 
@@ -25,16 +41,52 @@ APP_BUNDLE="${BUILD_DIR}/${APP_NAME}.app"
 SRC_DIR="${SCRIPT_DIR}/src"
 RESOURCES_DIR="${SCRIPT_DIR}/resources"
 
-# Python configuration
-PYTHON_VERSION="3.12"
-PYTHON_FRAMEWORK="/Library/Frameworks/Python.framework"
+# Python configuration - detect from .venv
+VENV_PYTHON="${PROJECT_ROOT}/.venv/bin/python3"
+if [ ! -f "${VENV_PYTHON}" ]; then
+    log_error "Virtual environment not found at ${PROJECT_ROOT}/.venv"
+    log_error "Please create a virtual environment: python3 -m venv .venv"
+    exit 1
+fi
+
+# Get Python version and paths from venv
+PYTHON_VERSION=$("${VENV_PYTHON}" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PYTHON_BASE_PREFIX=$("${VENV_PYTHON}" -c "import sys; print(sys.base_prefix)")
+PYTHON_SITE_PACKAGES="${PROJECT_ROOT}/.venv/lib/python${PYTHON_VERSION}/site-packages"
+
+log_info "Detected Python ${PYTHON_VERSION} from venv"
+log_info "Python base: ${PYTHON_BASE_PREFIX}"
+log_info "Site packages: ${PYTHON_SITE_PACKAGES}"
+
+# Check if using Python.framework or standard Python installation
+if [[ "${PYTHON_BASE_PREFIX}" == *"/Library/Frameworks/Python.framework"* ]]; then
+    # Python.framework installation
+    PYTHON_FRAMEWORK="${PYTHON_BASE_PREFIX}"
+    USE_FRAMEWORK=true
+    log_info "Using Python.framework installation"
+else
+    # Standard Python installation (mise, pyenv, homebrew, etc.)
+    PYTHON_FRAMEWORK="${PYTHON_BASE_PREFIX}"
+    USE_FRAMEWORK=false
+    log_info "Using standard Python installation"
+fi
 
 # Compiler settings
 CC="clang"
 CFLAGS="-framework Cocoa"
-CFLAGS="${CFLAGS} -F${PYTHON_FRAMEWORK}/Versions/${PYTHON_VERSION}"
-CFLAGS="${CFLAGS} -I${PYTHON_FRAMEWORK}/Versions/${PYTHON_VERSION}/include/python${PYTHON_VERSION}"
-CFLAGS="${CFLAGS} -L${PYTHON_FRAMEWORK}/Versions/${PYTHON_VERSION}/lib"
+
+# Configure compiler flags based on Python installation type
+if [ "$USE_FRAMEWORK" = true ]; then
+    # Python.framework style
+    CFLAGS="${CFLAGS} -F${PYTHON_FRAMEWORK}/Versions/${PYTHON_VERSION}"
+    CFLAGS="${CFLAGS} -I${PYTHON_FRAMEWORK}/Versions/${PYTHON_VERSION}/include/python${PYTHON_VERSION}"
+    CFLAGS="${CFLAGS} -L${PYTHON_FRAMEWORK}/Versions/${PYTHON_VERSION}/lib"
+else
+    # Standard Python style
+    CFLAGS="${CFLAGS} -I${PYTHON_BASE_PREFIX}/include/python${PYTHON_VERSION}"
+    CFLAGS="${CFLAGS} -L${PYTHON_BASE_PREFIX}/lib"
+fi
+
 CFLAGS="${CFLAGS} -lpython${PYTHON_VERSION}"
 LDFLAGS="-rpath @executable_path/../Frameworks"
 
@@ -43,22 +95,6 @@ CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
 
 # Version number (can be overridden by environment variable)
 VERSION="${VERSION:-0.98}"
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-log_info() {
-    echo "[INFO] $1"
-}
-
-log_error() {
-    echo "[ERROR] $1" >&2
-}
-
-log_success() {
-    echo "[SUCCESS] $1"
-}
 
 # ============================================================================
 # Build Script Entry Point
@@ -148,7 +184,8 @@ REQUIREMENTS_FILE="${PROJECT_ROOT}/requirements.txt"
 COLLECT_SCRIPT="${SCRIPT_DIR}/collect_dependencies.py"
 
 if [ -f "${COLLECT_SCRIPT}" ]; then
-    if python3 "${COLLECT_SCRIPT}" --requirements "${REQUIREMENTS_FILE}" --dest "${PACKAGES_DEST}"; then
+    # Use venv's Python to run the collection script
+    if "${VENV_PYTHON}" "${COLLECT_SCRIPT}" --requirements "${REQUIREMENTS_FILE}" --dest "${PACKAGES_DEST}"; then
         log_success "Dependencies collected successfully"
     else
         log_error "Failed to collect dependencies"
@@ -172,54 +209,93 @@ fi
 log_success "Resources copied successfully"
 
 # ============================================================================
-# Step 4: Embed Python.framework
+# Step 4: Embed Python
 # ============================================================================
 
-log_info "Step 4: Embedding Python.framework..."
+log_info "Step 4: Embedding Python..."
 
-# Locate system Python.framework
-PYTHON_FW_SOURCE="${PYTHON_FRAMEWORK}/Versions/${PYTHON_VERSION}"
-if [ ! -d "${PYTHON_FW_SOURCE}" ]; then
-    log_error "Python.framework not found at ${PYTHON_FW_SOURCE}"
-    log_error "Please install Python ${PYTHON_VERSION} framework"
-    exit 1
-fi
-
-# Copy Python.framework to bundle
-log_info "Copying Python.framework from ${PYTHON_FW_SOURCE}..."
-PYTHON_FW_DEST="${FRAMEWORKS_DIR}/Python.framework/Versions/${PYTHON_VERSION}"
-mkdir -p "${PYTHON_FW_DEST}"
-
-# Copy essential framework components (use rsync to handle permissions better)
-if command -v rsync > /dev/null 2>&1; then
-    # Use rsync if available (better permission handling)
-    rsync -a --no-perms --chmod=u+rw "${PYTHON_FW_SOURCE}/Python" "${PYTHON_FW_DEST}/"
-    rsync -a --no-perms --chmod=u+rw "${PYTHON_FW_SOURCE}/Resources" "${PYTHON_FW_DEST}/"
-    rsync -a --no-perms --chmod=u+rw "${PYTHON_FW_SOURCE}/lib" "${PYTHON_FW_DEST}/"
+# Determine Python source based on installation type
+if [ "$USE_FRAMEWORK" = true ]; then
+    # Python.framework installation
+    PYTHON_SOURCE="${PYTHON_FRAMEWORK}/Versions/${PYTHON_VERSION}"
+    if [ ! -d "${PYTHON_SOURCE}" ]; then
+        log_error "Python.framework not found at ${PYTHON_SOURCE}"
+        exit 1
+    fi
+    
+    # Copy Python.framework to bundle
+    log_info "Copying Python.framework from ${PYTHON_SOURCE}..."
+    PYTHON_DEST="${FRAMEWORKS_DIR}/Python.framework/Versions/${PYTHON_VERSION}"
+    mkdir -p "${PYTHON_DEST}"
+    
+    # Copy essential framework components
+    if command -v rsync > /dev/null 2>&1; then
+        rsync -a --no-perms --chmod=u+rw "${PYTHON_SOURCE}/Python" "${PYTHON_DEST}/"
+        rsync -a --no-perms --chmod=u+rw "${PYTHON_SOURCE}/Resources" "${PYTHON_DEST}/" 2>/dev/null || true
+        rsync -a --no-perms --chmod=u+rw "${PYTHON_SOURCE}/lib" "${PYTHON_DEST}/"
+        rsync -a --no-perms --chmod=u+rw "${PYTHON_SOURCE}/bin" "${PYTHON_DEST}/"
+    else
+        cp -R "${PYTHON_SOURCE}/Python" "${PYTHON_DEST}/" 2>/dev/null || true
+        cp -R "${PYTHON_SOURCE}/Resources" "${PYTHON_DEST}/" 2>/dev/null || true
+        cp -R "${PYTHON_SOURCE}/lib" "${PYTHON_DEST}/"
+        cp -R "${PYTHON_SOURCE}/bin" "${PYTHON_DEST}/"
+        chmod -R u+rw "${PYTHON_DEST}" 2>/dev/null || true
+    fi
+    
+    # Create version symlinks
+    cd "${FRAMEWORKS_DIR}/Python.framework/Versions"
+    ln -sf "${PYTHON_VERSION}" Current
+    cd "${FRAMEWORKS_DIR}/Python.framework"
+    ln -sf "Versions/Current/Python" Python
+    ln -sf "Versions/Current/Resources" Resources 2>/dev/null || true
+    
+    log_success "Python.framework embedded successfully"
+    
+    # Update install names to use embedded framework
+    log_info "Updating install names to use embedded framework..."
+    install_name_tool -change \
+        "${PYTHON_BASE_PREFIX}/Python" \
+        "@executable_path/../Frameworks/Python.framework/Versions/${PYTHON_VERSION}/Python" \
+        "${MACOS_DIR}/${APP_NAME}"
 else
-    # Fallback to cp with permission fixes
-    cp -R "${PYTHON_FW_SOURCE}/Python" "${PYTHON_FW_DEST}/" 2>/dev/null || true
-    cp -R "${PYTHON_FW_SOURCE}/Resources" "${PYTHON_FW_DEST}/" 2>/dev/null || true
-    cp -R "${PYTHON_FW_SOURCE}/lib" "${PYTHON_FW_DEST}/" 2>/dev/null || true
-    # Fix permissions on copied files
-    chmod -R u+rw "${PYTHON_FW_DEST}" 2>/dev/null || true
+    # Standard Python installation (mise, pyenv, homebrew, etc.)
+    log_info "Copying Python from ${PYTHON_BASE_PREFIX}..."
+    PYTHON_DEST="${FRAMEWORKS_DIR}/Python.framework/Versions/${PYTHON_VERSION}"
+    mkdir -p "${PYTHON_DEST}"
+    
+    # Copy Python components
+    if command -v rsync > /dev/null 2>&1; then
+        rsync -a --no-perms --chmod=u+rw "${PYTHON_BASE_PREFIX}/lib" "${PYTHON_DEST}/"
+        rsync -a --no-perms --chmod=u+rw "${PYTHON_BASE_PREFIX}/bin" "${PYTHON_DEST}/"
+        rsync -a --no-perms --chmod=u+rw "${PYTHON_BASE_PREFIX}/include" "${PYTHON_DEST}/" 2>/dev/null || true
+    else
+        cp -R "${PYTHON_BASE_PREFIX}/lib" "${PYTHON_DEST}/"
+        cp -R "${PYTHON_BASE_PREFIX}/bin" "${PYTHON_DEST}/"
+        cp -R "${PYTHON_BASE_PREFIX}/include" "${PYTHON_DEST}/" 2>/dev/null || true
+        chmod -R u+rw "${PYTHON_DEST}" 2>/dev/null || true
+    fi
+    
+    # Create version symlinks
+    cd "${FRAMEWORKS_DIR}/Python.framework/Versions"
+    ln -sf "${PYTHON_VERSION}" Current
+    cd "${FRAMEWORKS_DIR}/Python.framework"
+    ln -sf "Versions/Current/bin" bin
+    ln -sf "Versions/Current/lib" lib
+    
+    log_success "Python embedded successfully"
+    
+    # Update install names for Python shared library
+    log_info "Updating install names to use embedded Python..."
+    # Find the Python shared library
+    PYTHON_LIB=$(find "${PYTHON_DEST}/lib" -name "libpython${PYTHON_VERSION}*.dylib" -type f | head -1)
+    if [ -n "${PYTHON_LIB}" ]; then
+        PYTHON_LIB_NAME=$(basename "${PYTHON_LIB}")
+        install_name_tool -change \
+            "${PYTHON_BASE_PREFIX}/lib/${PYTHON_LIB_NAME}" \
+            "@executable_path/../Frameworks/Python.framework/Versions/${PYTHON_VERSION}/lib/${PYTHON_LIB_NAME}" \
+            "${MACOS_DIR}/${APP_NAME}" 2>/dev/null || true
+    fi
 fi
-
-# Create version symlinks
-cd "${FRAMEWORKS_DIR}/Python.framework/Versions"
-ln -sf "${PYTHON_VERSION}" Current
-cd "${FRAMEWORKS_DIR}/Python.framework"
-ln -sf "Versions/Current/Python" Python
-ln -sf "Versions/Current/Resources" Resources
-
-log_success "Python.framework embedded successfully"
-
-# Update install names to use embedded framework
-log_info "Updating install names to use embedded framework..."
-install_name_tool -change \
-    "/Library/Frameworks/Python.framework/Versions/${PYTHON_VERSION}/Python" \
-    "@executable_path/../Frameworks/Python.framework/Versions/${PYTHON_VERSION}/Python" \
-    "${MACOS_DIR}/${APP_NAME}"
 
 log_success "Install names updated"
 

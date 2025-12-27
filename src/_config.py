@@ -9,8 +9,8 @@ You can modify any of these settings to customize TFM behavior.
 import platform
 import sys
 
-# Import tfm_tool function for tool search functionality
-from tfm_external_programs import tfm_tool
+# Import tfm_tool function and tfm_python variable for external program configuration
+from tfm_external_programs import tfm_tool, tfm_python
 
 # Import backend detector for runtime backend detection
 from tfm_backend_detector import is_desktop_mode
@@ -248,15 +248,15 @@ class Config:
         {'name': 'List Processes', 'command': ['ps', 'aux']},
         {'name': 'System Info', 'command': ['uname', '-a']},
         {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
-        {'name': 'Compare Files (BeyondCompare)', 'command': [sys.executable, tfm_tool('bcompare_files_wrapper.py')], 'options': {'auto_return': True}},
-        {'name': 'Compare Directories (BeyondCompare)', 'command': [sys.executable, tfm_tool('bcompare_dirs_wrapper.py')], 'options': {'auto_return': True}},
-        {'name': 'Open in VSCode', 'command': [sys.executable, tfm_tool('vscode_wrapper.py')], 'options': {'auto_return': True}},
-        {'name': 'Preview Files', 'command': [sys.executable, tfm_tool('preview_files.py')], 'options': {'auto_return': True}},
-        {'name': 'Reveal in File Manager', 'command': [sys.executable, tfm_tool('reveal_in_finder.py')], 'options': {'auto_return': True}},
+        {'name': 'Compare Files (BeyondCompare)', 'command': [tfm_python, tfm_tool('bcompare_files_wrapper.py')], 'options': {'auto_return': True}},
+        {'name': 'Compare Directories (BeyondCompare)', 'command': [tfm_python, tfm_tool('bcompare_dirs_wrapper.py')], 'options': {'auto_return': True}},
+        {'name': 'Open in VSCode', 'command': [tfm_python, tfm_tool('vscode_wrapper.py')], 'options': {'auto_return': True}},
+        {'name': 'Preview Files', 'command': [tfm_python, tfm_tool('preview_files.py')], 'options': {'auto_return': True}},
+        {'name': 'Reveal in File Manager', 'command': [tfm_python, tfm_tool('reveal_in_finder.py')], 'options': {'auto_return': True}},
 
         # Add your own programs here:
-        # {'name': 'My Custom Tool', 'command': [sys.executable, tfm_tool('my_custom_tool.py')], 'options': {'auto_return': True}},
-        # {'name': 'My Script (direct path)', 'command': [sys.executable, '/path/to/script.py']},
+        # {'name': 'My Custom Tool', 'command': [tfm_python, tfm_tool('my_custom_tool.py')], 'options': {'auto_return': True}},
+        # {'name': 'My Script (direct path)', 'command': [tfm_python, '/path/to/script.py']},
         # {'name': 'Python REPL', 'command': ['python3']},
         # {'name': 'Quick Command', 'command': ['ls', '-la'], 'options': {'auto_return': True}},
     ]

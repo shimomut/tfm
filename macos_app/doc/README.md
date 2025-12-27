@@ -27,6 +27,22 @@ This directory contains detailed documentation for the TFM macOS application bun
   - Backend initialization
   - Argument handling
 
+- **[EXTERNAL_PROGRAMS_FIX.md](EXTERNAL_PROGRAMS_FIX.md)** - External programs execution
+  - How external programs work in app bundle
+  - `tfm_python` variable for bundled Python
+  - Configuration examples
+
+- **[VENV_BASED_BUILD.md](VENV_BASED_BUILD.md)** - Virtual environment based build
+  - Build system philosophy
+  - Python detection and collection
+  - Framework structure creation
+  - Benefits and troubleshooting
+
+- **[FONT_RENDERING_FIX.md](FONT_RENDERING_FIX.md)** - Font rendering consistency
+  - Font height calculation fix
+  - CLI vs app bundle rendering
+  - Font metrics approach
+
 ## Testing
 
 - **[MANUAL_TEST_GUIDE.md](MANUAL_TEST_GUIDE.md)** - Manual testing procedures
