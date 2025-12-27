@@ -50,12 +50,13 @@ For Homebrew Python, the framework root is extracted from the full base_prefix p
 All Python components are copied from the venv's base_prefix:
 
 **Python Interpreter:**
-- Source: `${PYTHON_BASE_PREFIX}/bin/python3.12`
-- Destination: `TFM.app/Contents/Frameworks/Python.framework/Versions/3.12/bin/python3.12`
+- Source: `${PYTHON_BASE_PREFIX}/bin/python3.13`
+- Destination: `TFM.app/Contents/Frameworks/Python.framework/Versions/3.13/bin/python3.13`
+- Symlink created: `python3 -> python3.13`
 
 **Python Shared Library:**
-- Source: `${PYTHON_BASE_PREFIX}/lib/libpython3.12.dylib`
-- Destination: `TFM.app/Contents/Frameworks/Python.framework/Versions/3.12/lib/libpython3.12.dylib`
+- Source: `${PYTHON_BASE_PREFIX}/lib/libpython3.13.dylib`
+- Destination: `TFM.app/Contents/Frameworks/Python.framework/Versions/3.13/lib/libpython3.13.dylib`
 
 **Python Standard Libraries:**
 - Source: `${PYTHON_BASE_PREFIX}/lib/python3.12/`

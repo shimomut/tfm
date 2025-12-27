@@ -252,6 +252,14 @@ if [ "$USE_FRAMEWORK" = true ]; then
     ln -sf "Versions/Current/Python" Python
     ln -sf "Versions/Current/Resources" Resources 2>/dev/null || true
     
+    # Create python3 symlink in bin directory
+    log_info "Creating python3 symlink in bin directory..."
+    cd "${PYTHON_DEST}/bin"
+    if [ -f "python${PYTHON_VERSION}" ]; then
+        ln -sf "python${PYTHON_VERSION}" python3
+        log_info "  Created python3 -> python${PYTHON_VERSION}"
+    fi
+    
     # Add sitecustomize.py to disable user site-packages
     log_info "Adding sitecustomize.py to disable user site-packages..."
     SITECUSTOMIZE_SOURCE="${SCRIPT_DIR}/resources/sitecustomize.py"
@@ -316,6 +324,13 @@ else
     else
         log_error "sitecustomize.py not found at ${SITECUSTOMIZE_SOURCE}"
         exit 1
+    fi
+    
+    # Create python3 symlink in bin directory
+    log_info "Creating python3 symlink in bin directory..."
+    if [ -f "${PYTHON_DEST}/bin/python${PYTHON_VERSION}" ]; then
+        (cd "${PYTHON_DEST}/bin" && ln -sf "python${PYTHON_VERSION}" python3)
+        log_info "  Created python3 -> python${PYTHON_VERSION}"
     fi
     
     # Create version symlinks
