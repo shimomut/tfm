@@ -1344,6 +1344,7 @@ class FileManager(UILayer):
         success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=1)
         if success:
             self.logger.info(message)
+            self.adjust_scroll_for_focus(current_pane)
             
     def toggle_selection_up(self):
         """Toggle selection of current file/directory and move to previous item"""
@@ -1351,6 +1352,7 @@ class FileManager(UILayer):
         success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=-1)
         if success:
             self.logger.info(message)
+            self.adjust_scroll_for_focus(current_pane)
     
     def toggle_all_files_selection(self):
         """Toggle selection status of all files (not directories) in current pane"""
