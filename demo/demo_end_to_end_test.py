@@ -56,20 +56,27 @@ def demo_end_to_end():
     for key_char, action, description in test_cases:
         print(f"\n   Testing '{key_char}' -> {action} ({description})")
         
-        # Basic binding check
-        is_bound = config_manager.is_key_bound_to_action(key_char, action)
+        # Use the new API: find_action_for_event
+        from ttk import KeyEvent, ModifierKey
+        event = KeyEvent(key_code=ord(key_char), modifiers=ModifierKey.NONE, char=key_char)
+        
+        from tfm_config import find_action_for_event, get_keys_for_action
+        
+        # Check if key is bound to action
+        found_action_no_sel = find_action_for_event(event, has_selection_no)
+        found_action_with_sel = find_action_for_event(event, has_selection_yes)
+        is_bound = (found_action_no_sel == action) or (found_action_with_sel == action)
+        
         print(f"     Key bound to action: {is_bound}")
         
         if is_bound:
             # Selection requirement
-            requirement = config_manager.get_selection_requirement(action)
+            keys, requirement = get_keys_for_action(action)
             print(f"     Selection requirement: {requirement}")
             
             # Availability in different scenarios
-            available_no_sel = config_manager.is_key_bound_to_action_with_selection(
-                key_char, action, has_selection_no)
-            available_with_sel = config_manager.is_key_bound_to_action_with_selection(
-                key_char, action, has_selection_yes)
+            available_no_sel = found_action_no_sel == action
+            available_with_sel = found_action_with_sel == action
             
             print(f"     Available without selection: {available_no_sel}")
             print(f"     Available with selection: {available_with_sel}")

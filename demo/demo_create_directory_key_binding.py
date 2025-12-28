@@ -77,7 +77,15 @@ def demo_create_directory_migration():
                 key_char = chr(key)
                 current_pane = self.get_current_pane()
                 has_selection = len(current_pane['selected_files']) > 0
-                return self.config_manager.is_key_bound_to_action_with_selection(key_char, action, has_selection)
+                
+                # Use the new API: find_action_for_event
+                from ttk import KeyEvent, ModifierKey
+                event = KeyEvent(key_code=key, modifiers=ModifierKey.NONE, char=key_char)
+                
+                from tfm_config import find_action_for_event
+                found_action = find_action_for_event(event, has_selection)
+                
+                return found_action == action
             return False
     
     fm = MockFileManager(config_manager)
