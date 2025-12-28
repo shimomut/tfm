@@ -1038,33 +1038,38 @@ class FileManager(UILayer):
         from tfm_const import VERSION, GITHUB_URL
         
         # Add empty line and separator before
-        self.logger.info("")
-        self.logger.info("─" * 50)
-        self.logger.info("")
+        print("")
+        print("─" * 80)
         
-        # TFM ASCII art logo (filled block style)
-        logo = [
-            "████████╗███████╗███╗   ███╗",
-            "╚══██╔══╝██╔════╝████╗ ████║",
-            "   ██║   █████╗  ██╔████╔██║",
-            "   ██║   ██╔══╝  ██║╚██╔╝██║",
-            "   ██║   ██║     ██║ ╚═╝ ██║",
-            "   ╚═╝   ╚═╝     ╚═╝     ╚═╝"
+        # TFM ASCII art logo (filled block style) with version and GitHub on the right
+        logo_lines = [
+            "  ████████╗███████╗███╗   ███╗",
+            "  ╚══██╔══╝██╔════╝████╗ ████║",
+            "     ██║   █████╗  ██╔████╔██║",
+            "     ██║   ██╔══╝  ██║╚██╔╝██║",
+            "     ██║   ██║     ██║ ╚═╝ ██║",
+            "     ╚═╝   ╚═╝     ╚═╝     ╚═╝"
         ]
         
-        # Add logo to log
-        for line in logo:
-            self.logger.info(line)
+        # Add version and GitHub info on the right side of the logo
+        info_lines = [
+            "",
+            "",
+            f"Version: {VERSION}",
+            f"GitHub: {GITHUB_URL}",
+            "",
+        ]
         
-        # Add version and GitHub URL
-        self.logger.info("")
-        self.logger.info(f"Version: {VERSION}")
-        self.logger.info(f"GitHub: {GITHUB_URL}")
+        # Print logo with info on the right
+        for logo_line, info_line in zip(logo_lines, info_lines):
+            if info_line:
+                print(f"{logo_line}  {info_line}")
+            else:
+                print(logo_line)
         
         # Add empty line and separator after
-        self.logger.info("")
-        self.logger.info("─" * 50)
-        self.logger.info("")
+        print("─" * 80)
+        print("")
         
         # Trigger redraw to show the messages
         self.mark_dirty()
