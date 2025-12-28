@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg
+.PHONY: help run run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config
 
 # Backend selection (default: curses)
 # Usage: make run BACKEND=coregraphics
@@ -11,18 +11,19 @@ help:
 	@echo "TFM - Terminal File Manager"
 	@echo ""
 	@echo "Available commands:"
-	@echo "  run          - Run TFM"
-	@echo "  run-debug    - Run TFM with debug mode and remote log monitoring"
-	@echo "  run-profile  - Run TFM with performance profiling enabled"
-	@echo "  monitor-log  - Connect to remote log monitoring (port 8123)"
-	@echo "  test         - Run all tests"
-	@echo "  test-quick   - Run quick verification tests"
-	@echo "  clean        - Clean up temporary files"
-	@echo "  install      - Install TFM"
-	@echo "  uninstall    - Uninstall TFM"
-	@echo "  dev-install  - Install in development mode"
-	@echo "  lint         - Run code linting"
-	@echo "  format       - Format code"
+	@echo "  run            - Run TFM"
+	@echo "  run-debug      - Run TFM with debug mode and remote log monitoring"
+	@echo "  run-profile    - Run TFM with performance profiling enabled"
+	@echo "  monitor-log    - Connect to remote log monitoring (port 8123)"
+	@echo "  test           - Run all tests"
+	@echo "  test-quick     - Run quick verification tests"
+	@echo "  clean          - Clean up temporary files"
+	@echo "  install        - Install TFM"
+	@echo "  uninstall      - Uninstall TFM"
+	@echo "  dev-install    - Install in development mode"
+	@echo "  install-config - Copy default config to ~/.tfm/config.py (overwrites existing)"
+	@echo "  lint           - Run code linting"
+	@echo "  format         - Format code"
 	@echo ""
 	@echo "macOS App Bundle:"
 	@echo "  macos-app         - Build native macOS application bundle"
@@ -39,6 +40,7 @@ help:
 	@echo "  make run                        # Run with curses backend (default)"
 	@echo "  make run BACKEND=coregraphics   # Run with CoreGraphics backend"
 	@echo "  make test BACKEND=coregraphics  # Test with CoreGraphics backend"
+	@echo "  make install-config             # Install/update user config file"
 	@echo "  make macos-app                  # Build macOS app bundle"
 	@echo "  make macos-app-install          # Install to /Applications"
 	@echo "  make macos-dmg                  # Create DMG installer"
@@ -94,6 +96,26 @@ dev-install:
 	@cd ttk && pip3 install -e .
 	@echo "Installing TFM in development mode..."
 	@pip3 install -e .
+
+install-config:
+	@echo "Installing default configuration to ~/.tfm/config.py..."
+	@mkdir -p ~/.tfm
+	@if [ -f ~/.tfm/config.py ]; then \
+		echo "Warning: ~/.tfm/config.py already exists"; \
+		echo "This will overwrite your existing configuration!"; \
+		read -p "Continue? [y/N] " confirm; \
+		if [ "$${confirm}" = "y" ] || [ "$${confirm}" = "Y" ]; then \
+			cp src/_config.py ~/.tfm/config.py; \
+			echo "Configuration installed successfully"; \
+			echo "Your old config has been overwritten"; \
+		else \
+			echo "Installation cancelled"; \
+			exit 1; \
+		fi; \
+	else \
+		cp src/_config.py ~/.tfm/config.py; \
+		echo "Configuration installed successfully"; \
+	fi
 
 lint:
 	@echo "Running linting..."

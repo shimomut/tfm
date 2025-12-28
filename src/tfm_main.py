@@ -3883,31 +3883,31 @@ class FileManager(UILayer):
         if not isinstance(event, KeyEvent):
             return False
         
-        # Handle Shift+Arrow keys for log scrolling (only when no dialogs are active)
-        if event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
-            if self.log_manager.scroll_log_up(1):
-                self.mark_dirty()
-            return True
-        elif event.key_code == KeyCode.DOWN and event.modifiers & ModifierKey.SHIFT:  # Shift+Down
-            if self.log_manager.scroll_log_down(1):
-                self.mark_dirty()
-            return True
-        elif event.key_code == KeyCode.LEFT and event.modifiers & ModifierKey.SHIFT:  # Shift+Left - fast scroll to older messages
-            log_height = self._get_log_pane_height()
-            if self.log_manager.scroll_log_up(max(1, log_height)):
-                self.mark_dirty()
-            return True
-        elif event.key_code == KeyCode.RIGHT and event.modifiers & ModifierKey.SHIFT:  # Shift+Right - fast scroll to newer messages
-            log_height = self._get_log_pane_height()
-            if self.log_manager.scroll_log_down(max(1, log_height)):
-                self.mark_dirty()
-            return True
-        
         # Check if there are selected files for action matching
         has_selection = len(current_pane['selected_files']) > 0
         
         # Find action for this key event (optimized single lookup)
         action = find_action_for_event(event, has_selection)
+        
+        # Handle log scrolling actions
+        if action == 'scroll_log_up':
+            if self.log_manager.scroll_log_up(1):
+                self.mark_dirty()
+            return True
+        elif action == 'scroll_log_down':
+            if self.log_manager.scroll_log_down(1):
+                self.mark_dirty()
+            return True
+        elif action == 'scroll_log_page_up':
+            log_height = self._get_log_pane_height()
+            if self.log_manager.scroll_log_up(max(1, log_height)):
+                self.mark_dirty()
+            return True
+        elif action == 'scroll_log_page_down':
+            log_height = self._get_log_pane_height()
+            if self.log_manager.scroll_log_down(max(1, log_height)):
+                self.mark_dirty()
+            return True
         
         if action == 'quit':
             def quit_callback(confirmed):
@@ -3922,25 +3922,72 @@ class FileManager(UILayer):
                 quit_callback(True)
             return True
 
-        elif event.key_code == KeyCode.TAB:  # Tab key - switch panes
+        elif action == 'switch_pane':
             self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
             self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
+        elif action == 'cursor_up':
             if current_pane['focused_index'] > 0:
                 current_pane['focused_index'] -= 1
                 self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
+        elif action == 'cursor_down':
             if current_pane['focused_index'] < len(current_pane['files']) - 1:
                 current_pane['focused_index'] += 1
                 self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.ENTER:
+        elif action == 'open_item':
             self.handle_enter()
             self.mark_dirty()
+            return True
+        
+        # Handle arrow keys with context-aware behavior
+        # LEFT/RIGHT arrows have different behavior depending on active pane
+        elif event.key_code == KeyCode.LEFT and not (event.modifiers & ModifierKey.SHIFT):
+            if self.pane_manager.active_pane == 'left':
+                # Left arrow in left pane - go to parent directory
+                if current_pane['path'] != current_pane['path'].parent:
+                    try:
+                        self.save_cursor_position(current_pane)
+                        current_pane['path'] = current_pane['path'].parent
+                        current_pane['focused_index'] = 0
+                        current_pane['scroll_offset'] = 0
+                        current_pane['selected_files'].clear()
+                        self.refresh_files(current_pane)
+                        if not self.restore_cursor_position(current_pane):
+                            current_pane['focused_index'] = 0
+                            current_pane['scroll_offset'] = 0
+                        self.mark_dirty()
+                    except PermissionError:
+                        self.logger.error("Permission denied")
+            else:
+                # Left arrow in right pane - switch to left pane
+                self.pane_manager.active_pane = 'left'
+                self.mark_dirty()
+            return True
+        elif event.key_code == KeyCode.RIGHT and not (event.modifiers & ModifierKey.SHIFT):
+            if self.pane_manager.active_pane == 'right':
+                # Right arrow in right pane - go to parent directory
+                if current_pane['path'] != current_pane['path'].parent:
+                    try:
+                        self.save_cursor_position(current_pane)
+                        current_pane['path'] = current_pane['path'].parent
+                        current_pane['focused_index'] = 0
+                        current_pane['scroll_offset'] = 0
+                        current_pane['selected_files'].clear()
+                        self.refresh_files(current_pane)
+                        if not self.restore_cursor_position(current_pane):
+                            current_pane['focused_index'] = 0
+                            current_pane['scroll_offset'] = 0
+                        self.mark_dirty()
+                    except PermissionError:
+                        self.logger.error("Permission denied")
+            else:
+                # Right arrow in left pane - switch to right pane
+                self.pane_manager.active_pane = 'right'
+                self.mark_dirty()
             return True
         elif action == 'toggle_hidden':
             self.file_operations.toggle_hidden_files()
@@ -3971,17 +4018,17 @@ class FileManager(UILayer):
         elif action == 'unselect_all':
             self.unselect_all()
             return True
-        elif event.key_code == KeyCode.PAGE_UP:  # Page Up - file navigation only
+        elif action == 'page_up':
             current_pane['focused_index'] = max(0, current_pane['focused_index'] - 10)
             self.adjust_scroll_for_focus(current_pane)
             self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.PAGE_DOWN:  # Page Down - file navigation only
+        elif action == 'page_down':
             current_pane['focused_index'] = min(len(current_pane['files']) - 1, current_pane['focused_index'] + 10)
             self.adjust_scroll_for_focus(current_pane)
             self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.BACKSPACE:  # Backspace - go to parent directory
+        elif action == 'go_parent':
             # Check if we're at the root of an archive
             current_path_str = str(current_pane['path'])
             if current_path_str.startswith('archive://') and current_path_str.endswith('#'):
@@ -4059,58 +4106,6 @@ class FileManager(UILayer):
                     self.logger.error(f"Error navigating to parent directory: {e}")
                     self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
-            if current_pane['path'] != current_pane['path'].parent:
-                try:
-                    # Save current cursor position before changing directory
-                    self.save_cursor_position(current_pane)
-                    
-                    current_pane['path'] = current_pane['path'].parent
-                    current_pane['focused_index'] = 0
-                    current_pane['scroll_offset'] = 0
-                    current_pane['selected_files'].clear()  # Clear selections when changing directory
-                    self.refresh_files(current_pane)
-                    
-                    # Try to restore cursor position for this directory
-                    if not self.restore_cursor_position(current_pane):
-                        # If no history found, default to first item
-                        current_pane['focused_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                    
-                    self.mark_dirty()
-                except PermissionError:
-                    self.logger.error("Permission denied")
-            return True
-        elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
-            if current_pane['path'] != current_pane['path'].parent:
-                try:
-                    # Save current cursor position before changing directory
-                    self.save_cursor_position(current_pane)
-                    
-                    current_pane['path'] = current_pane['path'].parent
-                    current_pane['focused_index'] = 0
-                    current_pane['scroll_offset'] = 0
-                    current_pane['selected_files'].clear()  # Clear selections when changing directory
-                    self.refresh_files(current_pane)
-                    
-                    # Try to restore cursor position for this directory
-                    if not self.restore_cursor_position(current_pane):
-                        # If no history found, default to first item
-                        current_pane['focused_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                    
-                    self.mark_dirty()
-                except PermissionError:
-                    self.logger.error("Permission denied")
-            return True
-        elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left' and not (event.modifiers & ModifierKey.SHIFT):  # Right arrow in left pane - switch to right pane
-            self.pane_manager.active_pane = 'right'
-            self.mark_dirty()
-            return True
-        elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'right' and not (event.modifiers & ModifierKey.SHIFT):  # Left arrow in right pane - switch to left pane
-            self.pane_manager.active_pane = 'left'
-            self.mark_dirty()
-            return True
         elif action == 'select_file_up':  # Shift+Space - toggle selection and move up
             self.toggle_selection_up()
             self.mark_dirty()
@@ -4119,10 +4114,6 @@ class FileManager(UILayer):
             self.toggle_selection()
             self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.ESCAPE:  # ESC key
-            # In callback mode, we can't peek at the next event
-            # Option key sequences are handled by the backend
-            pass
         elif action == 'select_all_files':  # Toggle all files selection
             self.toggle_all_files_selection()
             return True

@@ -120,6 +120,21 @@ class Config:
         'reset_log_height': ['_'],             # Reset log pane height to default (Shift+-)
         'diff_files': {'keys': ['='], 'selection': 'required'}, # View diff between two selected text files
         'directory_diff': ['@'],               # Compare directories recursively (Shift+2)
+        
+        # Navigation keys
+        'switch_pane': ['TAB'],                # Switch between left and right panes
+        'cursor_up': ['UP'],                   # Move cursor up one item
+        'cursor_down': ['DOWN'],               # Move cursor down one item
+        'open_item': ['ENTER'],                # Open file/directory or enter directory
+        'page_up': ['PAGE_UP'],                # Move cursor up one page
+        'page_down': ['PAGE_DOWN'],            # Move cursor down one page
+        'go_parent': ['BACKSPACE'],            # Go to parent directory
+        
+        # Log scrolling keys
+        'scroll_log_up': ['Shift-UP'],         # Scroll log pane up one line
+        'scroll_log_down': ['Shift-DOWN'],     # Scroll log pane down one line
+        'scroll_log_page_up': ['Shift-LEFT'],  # Scroll log pane up one page (to older messages)
+        'scroll_log_page_down': ['Shift-RIGHT'], # Scroll log pane down one page (to newer messages)
     }
     
     # Favorite directories - customize your frequently used directories

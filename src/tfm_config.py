@@ -398,6 +398,26 @@ class DefaultConfig:
         'adjust_log_up': ['{'],                # Make log pane larger (Shift+[)
         'adjust_log_down': ['}'],              # Make log pane smaller (Shift+])
         'reset_log_height': ['_'],             # Reset log pane height to default (Shift+-)
+        
+        # Navigation keys
+        'switch_pane': ['TAB'],                # Switch between left and right panes
+        'cursor_up': ['UP'],                   # Move cursor up one item
+        'cursor_down': ['DOWN'],               # Move cursor down one item
+        'open_item': ['ENTER'],                # Open file/directory or enter directory
+        'page_up': ['PAGE_UP'],                # Move cursor up one page
+        'page_down': ['PAGE_DOWN'],            # Move cursor down one page
+        'go_parent': ['BACKSPACE'],            # Go to parent directory
+        'drives_dialog': ['D'],                # Show drives/volumes dialog
+        
+        # Log scrolling keys
+        'scroll_log_up': ['Shift-UP'],         # Scroll log pane up one line
+        'scroll_log_down': ['Shift-DOWN'],     # Scroll log pane down one line
+        'scroll_log_page_up': ['Shift-LEFT'],  # Scroll log pane up one page (to older messages)
+        'scroll_log_page_down': ['Shift-RIGHT'], # Scroll log pane down one page (to newer messages)
+        
+        # File comparison actions
+        'diff_files': ['Shift-D'],             # Compare two selected files side-by-side
+        'directory_diff': ['Shift-W'],         # Compare directories recursively
     }
     
     # Favorite directories - list of dictionaries with 'name' and 'path' keys
