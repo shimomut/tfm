@@ -4611,6 +4611,7 @@ def create_parser():
 
 def cli_main():
     """Command-line entry point with argument parsing"""
+    
     parser = create_parser()
     
     try:

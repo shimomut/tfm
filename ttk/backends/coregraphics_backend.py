@@ -426,25 +426,36 @@ class CoreGraphicsBackend(Renderer):
         Calculate fixed character width and height from the font.
         
         Uses the character 'M' (typically the widest in monospace fonts) to
-        determine dimensions. No line spacing is added to ensure box-drawing
-        characters connect seamlessly.
+        determine width. Height is calculated from font metrics (ascender - descender)
+        without line spacing to ensure box-drawing characters connect seamlessly.
         
         Also calculates the font ascent for proper baseline positioning when
         using CoreText APIs.
+        
+        Note: We use font metrics directly instead of NSAttributedString.size()
+        because the latter can include implicit paragraph style line spacing that
+        varies between execution contexts (CLI vs app bundle), causing inconsistent
+        rendering.
         """
-        # Create an attributed string with the font to measure character size
+        # Create an attributed string with the font to measure character width
         test_string = Cocoa.NSAttributedString.alloc().initWithString_attributes_(
             "M",
             {Cocoa.NSFontAttributeName: self.font}
         )
         
-        # Get the size of the character
+        # Get character width from NSAttributedString
         size = test_string.size()
         
+        # Calculate height from font metrics (ascender - descender)
+        # This gives us the actual font height without any implicit line spacing
+        # that NSAttributedString.size() might add
+        metrics_height = self.font.ascender() - self.font.descender()
+        
         # Store character dimensions
-        # Use exact font dimensions without line spacing for seamless box-drawing
-        self.char_width = int(size.width)
-        self.char_height = int(size.height)
+        # Width from NSAttributedString (accurate for character advance)
+        # Height from font metrics (consistent across execution contexts)
+        self.char_width = round(size.width)
+        self.char_height = round(metrics_height)
         
         # Get font ascent for baseline positioning
         # CTLineDraw uses baseline positioning, while NSAttributedString.drawAtPoint_
