@@ -143,6 +143,177 @@ from typing import Tuple, Optional, List, Dict, Any
 from dataclasses import dataclass
 
 
+# macOS Virtual Key Code to TTK KeyCode mapping (ANSI layout)
+# Reference: https://gist.github.com/eegrok/949034
+# Reference: keyhac-mac project (https://github.com/crftwr/keyhac-mac)
+#
+# KEYBOARD LAYOUT SUPPORT
+# =======================
+#
+# Default Layout: ANSI (American National Standards Institute)
+# The ANSI layout is the standard US keyboard layout and is used by default.
+# This is the most common keyboard layout in North America.
+#
+# Supported Layouts:
+# - ANSI: Fully supported (default)
+# - JIS: Not yet implemented (Japanese Industrial Standards)
+# - ISO: Not yet implemented (International Organization for Standardization)
+#
+# Adding New Keyboard Layouts:
+# ----------------------------
+# To add support for JIS or ISO keyboard layouts, follow these steps:
+#
+# 1. Create a new mapping dictionary (e.g., MACOS_JIS_KEY_MAP or MACOS_ISO_KEY_MAP)
+#    following the same structure as MACOS_ANSI_KEY_MAP below.
+#
+# 2. Map macOS virtual key codes to TTK KeyCode values. The virtual key codes
+#    differ between layouts because keys are in different physical positions.
+#    For example:
+#      - ANSI: 0x00 = A
+#      - JIS:  0x00 = A (same position)
+#      - ISO:  0x00 = A (same position)
+#    But some keys differ:
+#      - ANSI: 0x32 = GRAVE (` and ~)
+#      - JIS:  0x32 = Different key (JIS has extra keys)
+#      - ISO:  0x32 = Different key (ISO has different layout)
+#
+# 3. Update the _get_key_map() method in CoreGraphicsBackend to return your
+#    new mapping dictionary when the corresponding layout is selected.
+#
+# 4. Remove the NotImplementedError for the new layout and return the mapping.
+#
+# Mapping Table Structure:
+# ------------------------
+# Each entry maps a macOS virtual key code (integer) to a TTK KeyCode value:
+#   {
+#       macOS_virtual_key_code: KeyCode.TTK_KEY_NAME,
+#       ...
+#   }
+#
+# Key Categories:
+# - Letter keys: Map to A through Z (physical keys)
+# - Digit keys: Map to DIGIT_0 through DIGIT_9 (physical keys)
+# - Symbol keys: Map to MINUS, EQUAL, etc. (physical keys)
+# - Special keys: Map to ENTER, ESCAPE, BACKSPACE, etc.
+# - Arrow keys: Map to UP, DOWN, LEFT, RIGHT
+# - Function keys: Map to F1 through F12
+# - Editing keys: Map to INSERT, DELETE, HOME, END, PAGE_UP, PAGE_DOWN
+#
+# Important Notes:
+# - KeyCode values represent physical keys, not characters
+# - Case (uppercase/lowercase) is handled by the Shift modifier flag
+# - Symbol variants (e.g., ! vs 1, @ vs 2) are handled by the Shift modifier
+# - The same KeyCode is used for both shifted and unshifted versions of a key
+#
+# Future Layout Support:
+# ----------------------
+# When adding JIS or ISO support, consider these differences:
+#
+# JIS (Japanese) Layout:
+# - Has additional keys for Japanese input (Kana, Eisu, etc.)
+# - Different symbol key positions
+# - Smaller Enter key, different backslash position
+# - Reference: https://en.wikipedia.org/wiki/Keyboard_layout#Japanese
+#
+# ISO (European) Layout:
+# - Has an extra key next to left Shift (often backslash or </>)
+# - Different Enter key shape (vertical)
+# - Different symbol key positions
+# - Reference: https://en.wikipedia.org/wiki/Keyboard_layout#ISO
+#
+MACOS_ANSI_KEY_MAP = {
+    # Letter keys (ANSI positions)
+    0x00: KeyCode.A,
+    0x01: KeyCode.S,
+    0x02: KeyCode.D,
+    0x03: KeyCode.F,
+    0x04: KeyCode.H,
+    0x05: KeyCode.G,
+    0x06: KeyCode.Z,
+    0x07: KeyCode.X,
+    0x08: KeyCode.C,
+    0x09: KeyCode.V,
+    0x0B: KeyCode.B,
+    0x0C: KeyCode.Q,
+    0x0D: KeyCode.W,
+    0x0E: KeyCode.E,
+    0x0F: KeyCode.R,
+    0x10: KeyCode.Y,
+    0x11: KeyCode.T,
+    0x1F: KeyCode.O,
+    0x20: KeyCode.U,
+    0x22: KeyCode.I,
+    0x23: KeyCode.P,
+    0x25: KeyCode.L,
+    0x26: KeyCode.J,
+    0x28: KeyCode.K,
+    0x2D: KeyCode.N,
+    0x2E: KeyCode.M,
+    
+    # Digit keys
+    0x12: KeyCode.DIGIT_1,
+    0x13: KeyCode.DIGIT_2,
+    0x14: KeyCode.DIGIT_3,
+    0x15: KeyCode.DIGIT_4,
+    0x16: KeyCode.DIGIT_6,
+    0x17: KeyCode.DIGIT_5,
+    0x1C: KeyCode.DIGIT_8,
+    0x1D: KeyCode.DIGIT_0,
+    0x19: KeyCode.DIGIT_9,
+    0x1A: KeyCode.DIGIT_7,
+    
+    # Symbol/Punctuation keys
+    0x1B: KeyCode.MINUS,        # - and _
+    0x18: KeyCode.EQUAL,        # = and +
+    0x21: KeyCode.LEFT_BRACKET, # [ and {
+    0x1E: KeyCode.RIGHT_BRACKET,# ] and }
+    0x2A: KeyCode.BACKSLASH,    # \ and |
+    0x29: KeyCode.SEMICOLON,    # ; and :
+    0x27: KeyCode.QUOTE,        # ' and "
+    0x2B: KeyCode.COMMA,        # , and <
+    0x2F: KeyCode.PERIOD,       # . and >
+    0x2C: KeyCode.SLASH,        # / and ?
+    0x32: KeyCode.GRAVE,        # ` and ~
+    
+    # Space
+    0x31: KeyCode.SPACE,
+    
+    # Arrow keys
+    123: KeyCode.LEFT,
+    124: KeyCode.RIGHT,
+    125: KeyCode.DOWN,
+    126: KeyCode.UP,
+    
+    # Function keys
+    122: KeyCode.F1,
+    120: KeyCode.F2,
+    99: KeyCode.F3,
+    118: KeyCode.F4,
+    96: KeyCode.F5,
+    97: KeyCode.F6,
+    98: KeyCode.F7,
+    100: KeyCode.F8,
+    101: KeyCode.F9,
+    109: KeyCode.F10,
+    103: KeyCode.F11,
+    111: KeyCode.F12,
+    
+    # Editing keys
+    51: KeyCode.BACKSPACE,  # Delete key (backspace)
+    117: KeyCode.DELETE,     # Forward delete
+    115: KeyCode.HOME,
+    119: KeyCode.END,
+    116: KeyCode.PAGE_UP,
+    121: KeyCode.PAGE_DOWN,
+    
+    # Special keys
+    36: KeyCode.ENTER,       # Return key
+    76: KeyCode.ENTER,       # Enter key (numeric keypad)
+    53: KeyCode.ESCAPE,
+    48: KeyCode.TAB,
+}
+
+
 @lru_cache(maxsize=1024)
 def _is_wide_character(char: str) -> bool:
     """
@@ -196,7 +367,8 @@ class CoreGraphicsBackend(Renderer):
                  rows: int = 24, cols: int = 80,
                  frame_autosave_name: Optional[str] = None,
                  font_names: Optional[list] = None,
-                 enable_perf_logging: bool = False):
+                 enable_perf_logging: bool = False,
+                 keyboard_layout: str = 'ANSI'):
         """
         Initialize the CoreGraphics backend.
         
@@ -214,6 +386,8 @@ class CoreGraphicsBackend(Renderer):
             enable_perf_logging: Enable C++ renderer performance logging to stderr.
                                 When enabled, logs metrics every 60 frames including
                                 render time, batching stats, and font cache hit rate.
+            keyboard_layout: Keyboard layout type ('ANSI', 'JIS', 'ISO')
+                           Default: 'ANSI'
         
         Raises:
             RuntimeError: If PyObjC is not installed
@@ -230,6 +404,10 @@ class CoreGraphicsBackend(Renderer):
         
         # Set font size first (needed by monospace fallback)
         self.font_size = font_size
+        
+        # Store keyboard layout and initialize key mapping
+        self.keyboard_layout = keyboard_layout
+        self._key_map = self._get_key_map(keyboard_layout)
         
         # Automatically add system default monospace font as final fallback
         # This ensures there's always a font available for any character
@@ -286,6 +464,40 @@ class CoreGraphicsBackend(Renderer):
         
         # C++ renderer module (initialized in initialize())
         self._cpp_renderer = None
+    
+    def _get_key_map(self, layout: str) -> dict:
+        """
+        Get the appropriate key map for the keyboard layout.
+        
+        Args:
+            layout: Keyboard layout type ('ANSI', 'JIS', 'ISO')
+        
+        Returns:
+            dict: Mapping from macOS virtual key codes to TTK KeyCode values
+        
+        Raises:
+            NotImplementedError: If layout is 'JIS' or 'ISO' (not yet supported)
+            ValueError: If layout is unknown
+        """
+        if layout == 'ANSI':
+            return MACOS_ANSI_KEY_MAP
+        elif layout == 'JIS':
+            # Future implementation
+            raise NotImplementedError(
+                "JIS keyboard layout not yet supported. "
+                "Use 'ANSI' layout or contribute JIS support."
+            )
+        elif layout == 'ISO':
+            # Future implementation
+            raise NotImplementedError(
+                "ISO keyboard layout not yet supported. "
+                "Use 'ANSI' layout or contribute ISO support."
+            )
+        else:
+            raise ValueError(
+                f"Unknown keyboard layout: {layout}. "
+                f"Supported layouts: ANSI"
+            )
     
     def _add_system_monospace_fallback(self) -> None:
         """
@@ -1496,83 +1708,19 @@ class CoreGraphicsBackend(Renderer):
         chars = event.characters()
         char = chars[0] if chars and len(chars) > 0 else None
         
-        # Map macOS key codes to TTK KeyCode values
-        # These are standard macOS virtual key codes
-        key_map = {
-            # Arrow keys
-            123: KeyCode.LEFT,
-            124: KeyCode.RIGHT,
-            125: KeyCode.DOWN,
-            126: KeyCode.UP,
-            
-            # Function keys
-            122: KeyCode.F1,
-            120: KeyCode.F2,
-            99: KeyCode.F3,
-            118: KeyCode.F4,
-            96: KeyCode.F5,
-            97: KeyCode.F6,
-            98: KeyCode.F7,
-            100: KeyCode.F8,
-            101: KeyCode.F9,
-            109: KeyCode.F10,
-            103: KeyCode.F11,
-            111: KeyCode.F12,
-            
-            # Editing keys
-            51: KeyCode.BACKSPACE,  # Delete key (backspace)
-            117: KeyCode.DELETE,     # Forward delete
-            115: KeyCode.HOME,
-            119: KeyCode.END,
-            116: KeyCode.PAGE_UP,
-            121: KeyCode.PAGE_DOWN,
-            
-            # Special keys
-            36: KeyCode.ENTER,       # Return key
-            76: KeyCode.ENTER,       # Enter key (numeric keypad)
-            53: KeyCode.ESCAPE,
-            48: KeyCode.TAB,
-        }
-        
-        # Check if this is a special key
-        if key_code in key_map:
-            ttk_key_code = key_map[key_code]
+        # Look up in key map
+        if key_code in self._key_map:
+            ttk_key_code = self._key_map[key_code]
             return KeyEvent(
                 key_code=ttk_key_code,
                 modifiers=modifiers,
-                char=None  # Special keys don't have printable characters
+                char=char  # Include character for convenience
             )
         
-        # Handle printable characters
+        # Fallback for unmapped printable ASCII (32-126)
         if char and len(char) == 1:
-            # Handle special characters that might come through as printable
-            if char == '\r' or char == '\n':
-                return KeyEvent(
-                    key_code=KeyCode.ENTER,
-                    modifiers=modifiers,
-                    char=None
-                )
-            elif char == '\t':
-                return KeyEvent(
-                    key_code=KeyCode.TAB,
-                    modifiers=modifiers,
-                    char=None
-                )
-            elif char == '\x1b':  # Escape
-                return KeyEvent(
-                    key_code=KeyCode.ESCAPE,
-                    modifiers=modifiers,
-                    char=None
-                )
-            elif char == '\x7f':  # Delete/Backspace
-                return KeyEvent(
-                    key_code=KeyCode.BACKSPACE,
-                    modifiers=modifiers,
-                    char=None
-                )
-            else:
-                # Regular printable character
-                code_point = ord(char)
+            code_point = ord(char)
+            if 32 <= code_point <= 126:
                 return KeyEvent(
                     key_code=code_point,
                     modifiers=modifiers,

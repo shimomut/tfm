@@ -11,14 +11,16 @@ from typing import Optional
 
 
 class KeyCode(IntEnum):
-    """Standard key codes for special keys."""
-    # Printable characters use their Unicode code points
+    """Standard key codes for keyboard keys."""
     
     # Special keys
     ENTER = 10
     ESCAPE = 27
     BACKSPACE = 127
     TAB = 9
+    
+    # Space key (using Unicode code point)
+    SPACE = 32
     
     # Arrow keys
     UP = 1000
@@ -47,6 +49,62 @@ class KeyCode(IntEnum):
     END = 1203
     PAGE_UP = 1204
     PAGE_DOWN = 1205
+    
+    # Letter keys (physical keys, case handled by Shift modifier)
+    # Range: 2000-2025
+    A = 2000
+    B = 2001
+    C = 2002
+    D = 2003
+    E = 2004
+    F = 2005
+    G = 2006
+    H = 2007
+    I = 2008
+    J = 2009
+    K = 2010
+    L = 2011
+    M = 2012
+    N = 2013
+    O = 2014
+    P = 2015
+    Q = 2016
+    R = 2017
+    S = 2018
+    T = 2019
+    U = 2020
+    V = 2021
+    W = 2022
+    X = 2023
+    Y = 2024
+    Z = 2025
+    
+    # Digit keys (physical keys, symbols handled by Shift modifier)
+    # Range: 2100-2109
+    DIGIT_0 = 2100
+    DIGIT_1 = 2101
+    DIGIT_2 = 2102
+    DIGIT_3 = 2103
+    DIGIT_4 = 2104
+    DIGIT_5 = 2105
+    DIGIT_6 = 2106
+    DIGIT_7 = 2107
+    DIGIT_8 = 2108
+    DIGIT_9 = 2109
+    
+    # Symbol/Punctuation keys (physical keys)
+    # Range: 2200-2299
+    MINUS = 2200          # - and _
+    EQUAL = 2201          # = and +
+    LEFT_BRACKET = 2202   # [ and {
+    RIGHT_BRACKET = 2203  # ] and }
+    BACKSLASH = 2204      # \ and |
+    SEMICOLON = 2205      # ; and :
+    QUOTE = 2206          # ' and "
+    COMMA = 2207          # , and <
+    PERIOD = 2208         # . and >
+    SLASH = 2209          # / and ?
+    GRAVE = 2210          # ` and ~
     
 
 
@@ -88,6 +146,45 @@ class KeyEvent(Event):
     
     This class captures keyboard events including regular key presses,
     special keys (arrows, function keys, etc.), and modifier key states.
+    
+    Examples:
+        Letter keys without Shift:
+            KeyEvent(key_code=KeyCode.A, modifiers=ModifierKey.NONE, char='a')
+            KeyEvent(key_code=KeyCode.Z, modifiers=ModifierKey.NONE, char='z')
+        
+        Letter keys with Shift:
+            KeyEvent(key_code=KeyCode.A, modifiers=ModifierKey.SHIFT, char='A')
+            KeyEvent(key_code=KeyCode.Z, modifiers=ModifierKey.SHIFT, char='Z')
+        
+        Digit keys without Shift:
+            KeyEvent(key_code=KeyCode.DIGIT_5, modifiers=ModifierKey.NONE, char='5')
+            KeyEvent(key_code=KeyCode.DIGIT_0, modifiers=ModifierKey.NONE, char='0')
+        
+        Digit keys with Shift (symbols):
+            KeyEvent(key_code=KeyCode.DIGIT_5, modifiers=ModifierKey.SHIFT, char='%')
+            KeyEvent(key_code=KeyCode.DIGIT_1, modifiers=ModifierKey.SHIFT, char='!')
+        
+        Symbol keys without Shift:
+            KeyEvent(key_code=KeyCode.MINUS, modifiers=ModifierKey.NONE, char='-')
+            KeyEvent(key_code=KeyCode.EQUAL, modifiers=ModifierKey.NONE, char='=')
+            KeyEvent(key_code=KeyCode.SEMICOLON, modifiers=ModifierKey.NONE, char=';')
+        
+        Symbol keys with Shift:
+            KeyEvent(key_code=KeyCode.MINUS, modifiers=ModifierKey.SHIFT, char='_')
+            KeyEvent(key_code=KeyCode.EQUAL, modifiers=ModifierKey.SHIFT, char='+')
+            KeyEvent(key_code=KeyCode.SEMICOLON, modifiers=ModifierKey.SHIFT, char=':')
+        
+        Space key:
+            KeyEvent(key_code=KeyCode.SPACE, modifiers=ModifierKey.NONE, char=' ')
+        
+        Control combinations:
+            KeyEvent(key_code=KeyCode.A, modifiers=ModifierKey.CONTROL, char='\x01')
+            KeyEvent(key_code=KeyCode.C, modifiers=ModifierKey.CONTROL, char='\x03')
+        
+        Special keys:
+            KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE, char=None)
+            KeyEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE, char=None)
+            KeyEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE, char='\n')
     """
     key_code: int  # KeyCode value or Unicode code point
     modifiers: int  # Bitwise OR of ModifierKey values

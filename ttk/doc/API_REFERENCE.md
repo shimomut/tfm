@@ -412,20 +412,22 @@ if event.has_modifier(ModifierKey.SHIFT):
 
 ### KeyCode
 
-Standard key codes for special keys.
+Standard key codes for keyboard keys.
 
 ```python
 from enum import IntEnum
 
 class KeyCode(IntEnum):
-    """Standard key codes for special keys."""
-    # Printable characters use their Unicode code points
+    """Standard key codes for keyboard keys."""
     
     # Special keys
     ENTER = 10
     ESCAPE = 27
     BACKSPACE = 127
     TAB = 9
+    
+    # Space key (using Unicode code point)
+    SPACE = 32
     
     # Arrow keys
     UP = 1000
@@ -455,24 +457,112 @@ class KeyCode(IntEnum):
     PAGE_UP = 1204
     PAGE_DOWN = 1205
     
-    # Mouse event marker
-    MOUSE = 2000
+    # Letter keys (physical keys, case handled by Shift modifier)
+    # Range: 2000-2025
+    A = 2000
+    B = 2001
+    C = 2002
+    D = 2003
+    E = 2004
+    F = 2005
+    G = 2006
+    H = 2007
+    I = 2008
+    J = 2009
+    K = 2010
+    L = 2011
+    M = 2012
+    N = 2013
+    O = 2014
+    P = 2015
+    Q = 2016
+    R = 2017
+    S = 2018
+    T = 2019
+    U = 2020
+    V = 2021
+    W = 2022
+    X = 2023
+    Y = 2024
+    Z = 2025
     
-    # Window events
-    RESIZE = 3000
+    # Digit keys (physical keys, symbols handled by Shift modifier)
+    # Range: 2100-2109
+    DIGIT_0 = 2100
+    DIGIT_1 = 2101
+    DIGIT_2 = 2102
+    DIGIT_3 = 2103
+    DIGIT_4 = 2104
+    DIGIT_5 = 2105
+    DIGIT_6 = 2106
+    DIGIT_7 = 2107
+    DIGIT_8 = 2108
+    DIGIT_9 = 2109
+    
+    # Symbol/Punctuation keys (physical keys)
+    # Range: 2200-2299
+    MINUS = 2200          # - and _
+    EQUAL = 2201          # = and +
+    LEFT_BRACKET = 2202   # [ and {
+    RIGHT_BRACKET = 2203  # ] and }
+    BACKSLASH = 2204      # \ and |
+    SEMICOLON = 2205      # ; and :
+    QUOTE = 2206          # ' and "
+    COMMA = 2207          # , and <
+    PERIOD = 2208         # . and >
+    SLASH = 2209          # / and ?
+    GRAVE = 2210          # ` and ~
 ```
+
+**Key Concepts:**
+
+- **Physical Keys:** KeyCode values represent physical keys on the keyboard, not characters
+- **Modifier Handling:** Case (uppercase/lowercase) is handled by the Shift modifier flag
+- **Symbol Variants:** Symbol variants (e.g., ! vs 1, @ vs 2) are handled by the Shift modifier
+- **Backward Compatibility:** All existing special key codes remain unchanged
 
 **Example:**
 ```python
-from ttk import KeyCode
+from ttk import KeyCode, ModifierKey
 
 event = renderer.get_input()
+
+# Special keys
 if event.key_code == KeyCode.ENTER:
     print("Enter key pressed")
 elif event.key_code == KeyCode.UP:
     print("Up arrow pressed")
 elif event.key_code == KeyCode.F1:
     print("F1 pressed")
+
+# Letter keys (case handled by Shift modifier)
+elif event.key_code == KeyCode.A:
+    if event.has_modifier(ModifierKey.SHIFT):
+        print("Uppercase A pressed")
+    else:
+        print("Lowercase a pressed")
+
+# Digit keys (symbols handled by Shift modifier)
+elif event.key_code == KeyCode.DIGIT_5:
+    if event.has_modifier(ModifierKey.SHIFT):
+        print("% symbol pressed (Shift+5)")
+    else:
+        print("5 digit pressed")
+
+# Symbol keys
+elif event.key_code == KeyCode.MINUS:
+    if event.has_modifier(ModifierKey.SHIFT):
+        print("_ underscore pressed (Shift+-)")
+    else:
+        print("- minus pressed")
+
+# Space key
+elif event.key_code == KeyCode.SPACE:
+    print("Space pressed")
+
+# Control combinations
+elif event.key_code == KeyCode.C and event.has_modifier(ModifierKey.CONTROL):
+    print("Ctrl+C pressed")
 ```
 
 ### ModifierKey

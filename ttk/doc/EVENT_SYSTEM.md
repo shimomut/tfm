@@ -66,6 +66,15 @@ class KeyEvent:
 - `is_special_key() -> bool`: Check if this is a special key (arrow, function, etc.)
 - `has_modifier(modifier: ModifierKey) -> bool`: Check if a specific modifier is pressed
 
+**Printable Character Handling:**
+
+TTK now includes comprehensive KeyCode values for all printable characters:
+
+- **Letter keys** (KEY_A through KEY_Z): Represent physical keys, case handled by Shift modifier
+- **Digit keys** (KEY_0 through KEY_9): Represent physical keys, symbols handled by Shift modifier
+- **Symbol keys** (KEY_MINUS, KEY_EQUAL, etc.): Represent physical keys, variants handled by Shift modifier
+- **Space key** (SPACE): Dedicated KeyCode for the space character
+
 **Example:**
 ```python
 from ttk import KeyEvent, KeyCode, ModifierKey
@@ -74,10 +83,31 @@ from ttk import KeyEvent, KeyCode, ModifierKey
 event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
 
 # Ctrl+C
-event = KeyEvent(key_code=ord('c'), modifiers=ModifierKey.CONTROL, char='c')
+event = KeyEvent(key_code=KeyCode.KEY_C, modifiers=ModifierKey.CONTROL, char='\x03')
 
 # Function key
 event = KeyEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE)
+
+# Letter key without Shift (lowercase 'a')
+event = KeyEvent(key_code=KeyCode.KEY_A, modifiers=ModifierKey.NONE, char='a')
+
+# Letter key with Shift (uppercase 'A')
+event = KeyEvent(key_code=KeyCode.KEY_A, modifiers=ModifierKey.SHIFT, char='A')
+
+# Digit key without Shift (number '5')
+event = KeyEvent(key_code=KeyCode.KEY_5, modifiers=ModifierKey.NONE, char='5')
+
+# Digit key with Shift (symbol '%')
+event = KeyEvent(key_code=KeyCode.KEY_5, modifiers=ModifierKey.SHIFT, char='%')
+
+# Symbol key without Shift (minus '-')
+event = KeyEvent(key_code=KeyCode.KEY_MINUS, modifiers=ModifierKey.NONE, char='-')
+
+# Symbol key with Shift (underscore '_')
+event = KeyEvent(key_code=KeyCode.KEY_MINUS, modifiers=ModifierKey.SHIFT, char='_')
+
+# Space key
+event = KeyEvent(key_code=KeyCode.SPACE, modifiers=ModifierKey.NONE, char=' ')
 ```
 
 ### CharEvent
