@@ -12,7 +12,6 @@ from tfm_base_list_dialog import BaseListDialog
 from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
-from tfm_input_compat import ensure_input_event
 
 # AWS S3 support - import boto3 with fallback
 try:
@@ -405,9 +404,6 @@ class DrivesDialog(UILayer, BaseListDialog):
         Returns:
             True if the event was consumed, False to propagate to next layer
         """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
         if not event or not isinstance(event, KeyEvent):
             return False
         
@@ -477,9 +473,6 @@ class DrivesDialog(UILayer, BaseListDialog):
         Returns:
             True if the event was consumed, False to propagate to next layer
         """
-        # Backward compatibility: convert integer key codes to CharEvent
-        event = ensure_input_event(event)
-        
         if not event or not isinstance(event, CharEvent):
             return False
         

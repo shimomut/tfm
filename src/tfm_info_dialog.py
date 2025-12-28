@@ -10,7 +10,6 @@ from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_config import config_manager
 from tfm_wide_char_utils import get_display_width, get_safe_functions
-from tfm_input_compat import ensure_input_event
 from tfm_scrollbar import draw_scrollbar
 
 
@@ -196,9 +195,6 @@ class InfoDialog(UILayer, BaseListDialog):
         Returns:
             True if the event was consumed, False to propagate to next layer
         """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
         if not event or not isinstance(event, KeyEvent):
             return False
         

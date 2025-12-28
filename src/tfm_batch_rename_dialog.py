@@ -12,7 +12,6 @@ from tfm_ui_layer import UILayer
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color, COLOR_ERROR
 from tfm_wide_char_utils import get_display_width, get_safe_functions
-from tfm_input_compat import ensure_input_event
 from tfm_log_manager import getLogger
 
 # Module-level logger
@@ -456,9 +455,6 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         Returns:
             True if the event was consumed, False to propagate to next layer
         """
-        # Backward compatibility: convert integer key codes to KeyEvent
-        event = ensure_input_event(event)
-        
         if not event or not isinstance(event, KeyEvent):
             return False
         
@@ -538,9 +534,6 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         Returns:
             True if the event was consumed, False to propagate to next layer
         """
-        # Backward compatibility: convert integer key codes to CharEvent
-        event = ensure_input_event(event)
-        
         if not event or not isinstance(event, CharEvent):
             return False
         
