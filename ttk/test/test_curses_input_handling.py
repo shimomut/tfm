@@ -48,40 +48,57 @@ class TestCursesInputHandling(unittest.TestCase):
         self.assertTrue(len(self.capture.events) > 0)
         event_type, event = self.capture.events[0]
         self.assertEqual(event_type, 'key')
-        self.assertEqual(event.key_code, ord('a'))
+        self.assertEqual(event.key_code, KeyCode.KEY_A)
         self.assertEqual(event.char, 'a')
     
     def test_translate_printable_characters(self):
         """Test translation of printable ASCII characters."""
-        # Test lowercase letters
+        # Test lowercase letters - now map to KEY_A through KEY_Z
         for char_code in range(ord('a'), ord('z') + 1):
             event = self.backend._translate_curses_key(char_code)
-            self.assertEqual(event.key_code, char_code)
+            expected_keycode = KeyCode.KEY_A + (char_code - ord('a'))
+            self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
             self.assertEqual(event.modifiers, ModifierKey.NONE)
         
-        # Test uppercase letters
+        # Test uppercase letters - also map to KEY_A through KEY_Z with SHIFT
         for char_code in range(ord('A'), ord('Z') + 1):
             event = self.backend._translate_curses_key(char_code)
-            self.assertEqual(event.key_code, char_code)
+            expected_keycode = KeyCode.KEY_A + (char_code - ord('A'))
+            self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
+            self.assertEqual(event.modifiers, ModifierKey.SHIFT)
         
-        # Test digits
+        # Test digits - now map to KEY_0 through KEY_9
         for char_code in range(ord('0'), ord('9') + 1):
             event = self.backend._translate_curses_key(char_code)
-            self.assertEqual(event.key_code, char_code)
+            expected_keycode = KeyCode.KEY_0 + (char_code - ord('0'))
+            self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
         
-        # Test space
+        # Test space - now maps to KeyCode.SPACE
         event = self.backend._translate_curses_key(32)
-        self.assertEqual(event.key_code, 32)
+        self.assertEqual(event.key_code, KeyCode.SPACE)
         self.assertEqual(event.char, ' ')
         
-        # Test special printable characters
-        for char in '!@#$%^&*()_+-=[]{}|;:,.<>?/~`':
+        # Test special printable characters - map to their respective KEY_* values
+        symbol_tests = [
+            ('-', KeyCode.KEY_MINUS),
+            ('=', KeyCode.KEY_EQUAL),
+            ('[', KeyCode.KEY_LEFT_BRACKET),
+            (']', KeyCode.KEY_RIGHT_BRACKET),
+            ('\\', KeyCode.KEY_BACKSLASH),
+            (';', KeyCode.KEY_SEMICOLON),
+            ("'", KeyCode.KEY_QUOTE),
+            (',', KeyCode.KEY_COMMA),
+            ('.', KeyCode.KEY_PERIOD),
+            ('/', KeyCode.KEY_SLASH),
+            ('`', KeyCode.KEY_GRAVE),
+        ]
+        for char, expected_keycode in symbol_tests:
             char_code = ord(char)
             event = self.backend._translate_curses_key(char_code)
-            self.assertEqual(event.key_code, char_code)
+            self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, char)
     
     def test_translate_arrow_keys(self):
@@ -160,9 +177,11 @@ class TestCursesInputHandling(unittest.TestCase):
     
     def test_translate_resize_event(self):
         """Test translation of window resize event."""
+        from ttk import SystemEvent, SystemEventType
         event = self.backend._translate_curses_key(curses.KEY_RESIZE)
-        self.assertEqual(event.key_code, KeyCode.RESIZE)
-        self.assertIsNone(event.char)
+        # Resize events are SystemEvents, not KeyEvents
+        self.assertIsInstance(event, SystemEvent)
+        self.assertEqual(event.event_type, SystemEventType.RESIZE)
     
     def test_translate_unknown_key(self):
         """Test translation of unknown key codes."""
@@ -178,7 +197,7 @@ class TestCursesInputHandling(unittest.TestCase):
     def test_callback_integration(self):
         """Test event delivery via callback with various key types."""
         test_cases = [
-            (ord('x'), ord('x'), 'x'),  # Printable character
+            (ord('x'), KeyCode.KEY_X, 'x'),  # Printable character - now maps to KEY_X
             (curses.KEY_UP, KeyCode.UP, None),  # Arrow key
             (curses.KEY_F5, KeyCode.F5, None),  # Function key
             (10, KeyCode.ENTER, None),  # Enter

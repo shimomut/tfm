@@ -14,6 +14,220 @@ from ttk.input_event import Event, KeyEvent, CharEvent, SystemEvent, KeyCode, Sy
 from ttk.ttk_mouse_event import MouseEvent, MouseEventType, MouseButton
 
 
+# Curses key code to TTK KeyCode mapping (ANSI layout)
+#
+# KEYBOARD LAYOUT SUPPORT
+# =======================
+#
+# Default Layout: ANSI (American National Standards Institute)
+# The ANSI layout is the standard US keyboard layout and is used by default.
+# This mapping works with most terminal emulators using ANSI keyboard layout.
+#
+# Supported Layouts:
+# - ANSI: Fully supported (default)
+#
+# Adding New Keyboard Layouts:
+# ----------------------------
+# To add support for other keyboard layouts (e.g., AZERTY, QWERTZ), follow these steps:
+#
+# 1. Create a new mapping dictionary (e.g., CURSES_AZERTY_KEY_MAP or CURSES_QWERTZ_KEY_MAP)
+#    following the same structure as CURSES_ANSI_KEY_MAP below.
+#
+# 2. Map curses key codes (ASCII values and curses.KEY_* constants) to TTK KeyCode values.
+#    The ASCII values differ between layouts because keys produce different characters.
+#    For example:
+#      - ANSI:   ord('a') = KEY_A
+#      - AZERTY: ord('q') = KEY_A (Q key is in A position on AZERTY)
+#      - QWERTZ: ord('a') = KEY_A (same as ANSI)
+#
+# 3. Update the _get_key_map() method in CursesBackend to return your
+#    new mapping dictionary when the corresponding layout is selected.
+#
+# Mapping Table Structure:
+# ------------------------
+# Each entry maps a curses key code (integer) to a TTK KeyCode value:
+#   {
+#       curses_key_code: KeyCode.TTK_KEY_NAME,
+#       ...
+#   }
+#
+# Key Categories:
+# - Letter keys: Map both lowercase and uppercase to same KeyCode (e.g., 'a' and 'A' -> KEY_A)
+# - Digit keys: Map to KEY_0 through KEY_9 (physical keys)
+# - Symbol keys (unshifted): Map to KEY_MINUS, KEY_EQUAL, etc.
+# - Symbol keys (shifted): Map to same physical key as unshifted version
+# - Shifted digit symbols: Map to digit keys (e.g., '!' -> KEY_1, '@' -> KEY_2)
+# - Special keys: Map curses.KEY_* constants to TTK KeyCode values
+#
+# Important Notes:
+# - KeyCode values represent physical keys, not characters
+# - Both lowercase and uppercase letters map to the same KeyCode
+# - Shift modifier is detected separately for uppercase letters
+# - Symbol variants (e.g., ! vs 1, @ vs 2) map to the same physical key
+# - The char field in KeyEvent contains the actual character typed
+#
+# Future Layout Support:
+# ----------------------
+# When adding AZERTY or QWERTZ support, consider these differences:
+#
+# AZERTY (French) Layout:
+# - Q and A keys are swapped
+# - W and Z keys are swapped
+# - M key is to the right of L
+# - Different symbol key positions
+# - Reference: https://en.wikipedia.org/wiki/AZERTY
+#
+# QWERTZ (German) Layout:
+# - Y and Z keys are swapped
+# - Different symbol key positions
+# - Reference: https://en.wikipedia.org/wiki/QWERTZ
+#
+CURSES_ANSI_KEY_MAP = {
+    # Letter keys (lowercase ASCII codes)
+    ord('a'): KeyCode.KEY_A,
+    ord('b'): KeyCode.KEY_B,
+    ord('c'): KeyCode.KEY_C,
+    ord('d'): KeyCode.KEY_D,
+    ord('e'): KeyCode.KEY_E,
+    ord('f'): KeyCode.KEY_F,
+    ord('g'): KeyCode.KEY_G,
+    ord('h'): KeyCode.KEY_H,
+    ord('i'): KeyCode.KEY_I,
+    ord('j'): KeyCode.KEY_J,
+    ord('k'): KeyCode.KEY_K,
+    ord('l'): KeyCode.KEY_L,
+    ord('m'): KeyCode.KEY_M,
+    ord('n'): KeyCode.KEY_N,
+    ord('o'): KeyCode.KEY_O,
+    ord('p'): KeyCode.KEY_P,
+    ord('q'): KeyCode.KEY_Q,
+    ord('r'): KeyCode.KEY_R,
+    ord('s'): KeyCode.KEY_S,
+    ord('t'): KeyCode.KEY_T,
+    ord('u'): KeyCode.KEY_U,
+    ord('v'): KeyCode.KEY_V,
+    ord('w'): KeyCode.KEY_W,
+    ord('x'): KeyCode.KEY_X,
+    ord('y'): KeyCode.KEY_Y,
+    ord('z'): KeyCode.KEY_Z,
+    
+    # Uppercase letters (map to same KeyCode, Shift handled separately)
+    ord('A'): KeyCode.KEY_A,
+    ord('B'): KeyCode.KEY_B,
+    ord('C'): KeyCode.KEY_C,
+    ord('D'): KeyCode.KEY_D,
+    ord('E'): KeyCode.KEY_E,
+    ord('F'): KeyCode.KEY_F,
+    ord('G'): KeyCode.KEY_G,
+    ord('H'): KeyCode.KEY_H,
+    ord('I'): KeyCode.KEY_I,
+    ord('J'): KeyCode.KEY_J,
+    ord('K'): KeyCode.KEY_K,
+    ord('L'): KeyCode.KEY_L,
+    ord('M'): KeyCode.KEY_M,
+    ord('N'): KeyCode.KEY_N,
+    ord('O'): KeyCode.KEY_O,
+    ord('P'): KeyCode.KEY_P,
+    ord('Q'): KeyCode.KEY_Q,
+    ord('R'): KeyCode.KEY_R,
+    ord('S'): KeyCode.KEY_S,
+    ord('T'): KeyCode.KEY_T,
+    ord('U'): KeyCode.KEY_U,
+    ord('V'): KeyCode.KEY_V,
+    ord('W'): KeyCode.KEY_W,
+    ord('X'): KeyCode.KEY_X,
+    ord('Y'): KeyCode.KEY_Y,
+    ord('Z'): KeyCode.KEY_Z,
+    
+    # Digit keys
+    ord('0'): KeyCode.KEY_0,
+    ord('1'): KeyCode.KEY_1,
+    ord('2'): KeyCode.KEY_2,
+    ord('3'): KeyCode.KEY_3,
+    ord('4'): KeyCode.KEY_4,
+    ord('5'): KeyCode.KEY_5,
+    ord('6'): KeyCode.KEY_6,
+    ord('7'): KeyCode.KEY_7,
+    ord('8'): KeyCode.KEY_8,
+    ord('9'): KeyCode.KEY_9,
+    
+    # Symbol keys (unshifted)
+    ord('-'): KeyCode.KEY_MINUS,
+    ord('='): KeyCode.KEY_EQUAL,
+    ord('['): KeyCode.KEY_LEFT_BRACKET,
+    ord(']'): KeyCode.KEY_RIGHT_BRACKET,
+    ord('\\'): KeyCode.KEY_BACKSLASH,
+    ord(';'): KeyCode.KEY_SEMICOLON,
+    ord("'"): KeyCode.KEY_QUOTE,
+    ord(','): KeyCode.KEY_COMMA,
+    ord('.'): KeyCode.KEY_PERIOD,
+    ord('/'): KeyCode.KEY_SLASH,
+    ord('`'): KeyCode.KEY_GRAVE,
+    
+    # Symbol keys (shifted - map to same physical key)
+    ord('_'): KeyCode.KEY_MINUS,
+    ord('+'): KeyCode.KEY_EQUAL,
+    ord('{'): KeyCode.KEY_LEFT_BRACKET,
+    ord('}'): KeyCode.KEY_RIGHT_BRACKET,
+    ord('|'): KeyCode.KEY_BACKSLASH,
+    ord(':'): KeyCode.KEY_SEMICOLON,
+    ord('"'): KeyCode.KEY_QUOTE,
+    ord('<'): KeyCode.KEY_COMMA,
+    ord('>'): KeyCode.KEY_PERIOD,
+    ord('?'): KeyCode.KEY_SLASH,
+    ord('~'): KeyCode.KEY_GRAVE,
+    
+    # Shifted digit symbols
+    ord('!'): KeyCode.KEY_1,
+    ord('@'): KeyCode.KEY_2,
+    ord('#'): KeyCode.KEY_3,
+    ord('$'): KeyCode.KEY_4,
+    ord('%'): KeyCode.KEY_5,
+    ord('^'): KeyCode.KEY_6,
+    ord('&'): KeyCode.KEY_7,
+    ord('*'): KeyCode.KEY_8,
+    ord('('): KeyCode.KEY_9,
+    ord(')'): KeyCode.KEY_0,
+    
+    # Space
+    ord(' '): KeyCode.SPACE,
+    
+    # Special keys (existing mappings)
+    curses.KEY_UP: KeyCode.UP,
+    curses.KEY_DOWN: KeyCode.DOWN,
+    curses.KEY_LEFT: KeyCode.LEFT,
+    curses.KEY_RIGHT: KeyCode.RIGHT,
+    curses.KEY_HOME: KeyCode.HOME,
+    curses.KEY_END: KeyCode.END,
+    curses.KEY_PPAGE: KeyCode.PAGE_UP,
+    curses.KEY_NPAGE: KeyCode.PAGE_DOWN,
+    curses.KEY_DC: KeyCode.DELETE,
+    curses.KEY_IC: KeyCode.INSERT,
+    curses.KEY_BACKSPACE: KeyCode.BACKSPACE,
+    
+    # Function keys
+    curses.KEY_F1: KeyCode.F1,
+    curses.KEY_F2: KeyCode.F2,
+    curses.KEY_F3: KeyCode.F3,
+    curses.KEY_F4: KeyCode.F4,
+    curses.KEY_F5: KeyCode.F5,
+    curses.KEY_F6: KeyCode.F6,
+    curses.KEY_F7: KeyCode.F7,
+    curses.KEY_F8: KeyCode.F8,
+    curses.KEY_F9: KeyCode.F9,
+    curses.KEY_F10: KeyCode.F10,
+    curses.KEY_F11: KeyCode.F11,
+    curses.KEY_F12: KeyCode.F12,
+    
+    # Special characters
+    10: KeyCode.ENTER,
+    13: KeyCode.ENTER,
+    27: KeyCode.ESCAPE,
+    9: KeyCode.TAB,
+    127: KeyCode.BACKSPACE,
+}
+
+
 class UTF8Accumulator:
     """
     Accumulates UTF-8 byte sequences to form complete Unicode characters.
@@ -115,9 +329,13 @@ class CursesBackend(Renderer):
     of out-of-bounds drawing operations.
     """
     
-    def __init__(self):
+    def __init__(self, keyboard_layout='ANSI'):
         """
         Initialize the CursesBackend.
+        
+        Args:
+            keyboard_layout: Keyboard layout type ('ANSI', etc.)
+                           Default: 'ANSI'
         
         Note: This does not initialize curses itself. Call initialize() to
         set up the curses environment.
@@ -133,6 +351,26 @@ class CursesBackend(Renderer):
         self.caret_y = 0  # Stored caret Y position
         self.mouse_enabled = False  # Whether mouse events are enabled
         self.mouse_available = False  # Whether terminal supports mouse events
+        self.keyboard_layout = keyboard_layout  # Keyboard layout type
+        self._key_map = self._get_key_map(keyboard_layout)  # Initialize key mapping
+    
+    def _get_key_map(self, layout: str) -> dict:
+        """
+        Get the appropriate key map for the keyboard layout.
+        
+        Args:
+            layout: Keyboard layout type ('ANSI', etc.)
+        
+        Returns:
+            dict: Key mapping dictionary for the specified layout
+        
+        Raises:
+            ValueError: If layout is unknown
+        """
+        if layout == 'ANSI':
+            return CURSES_ANSI_KEY_MAP
+        else:
+            raise ValueError(f"Unknown keyboard layout: {layout}")
     
     def initialize(self) -> None:
         """
@@ -842,43 +1080,33 @@ class CursesBackend(Renderer):
         elif key in (_KEY_SHIFT_RIGHT_1, _KEY_SHIFT_RIGHT_2):
             return KeyEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.SHIFT)
         
-        # Map curses keys to KeyCode
-        key_map = {
-            curses.KEY_UP: KeyCode.UP,
-            curses.KEY_DOWN: KeyCode.DOWN,
-            curses.KEY_LEFT: KeyCode.LEFT,
-            curses.KEY_RIGHT: KeyCode.RIGHT,
-            curses.KEY_HOME: KeyCode.HOME,
-            curses.KEY_END: KeyCode.END,
-            curses.KEY_PPAGE: KeyCode.PAGE_UP,
-            curses.KEY_NPAGE: KeyCode.PAGE_DOWN,
-            curses.KEY_DC: KeyCode.DELETE,
-            curses.KEY_IC: KeyCode.INSERT,
-            curses.KEY_BACKSPACE: KeyCode.BACKSPACE,
-        }
+        # Detect Shift modifier for uppercase letters
+        if ord('A') <= key <= ord('Z'):
+            modifiers = ModifierKey.SHIFT
         
-        # Function keys
-        for i in range(12):
-            key_map[curses.KEY_F1 + i] = KeyCode.F1 + i
+        # Look up key in key map
+        if key in self._key_map:
+            ttk_key_code = self._key_map[key]
+            
+            # Determine character representation
+            char = chr(key) if 32 <= key <= 126 else None
+            
+            return KeyEvent(
+                key_code=ttk_key_code,
+                modifiers=modifiers,
+                char=char
+            )
         
-        if key in key_map:
-            return KeyEvent(key_code=key_map[key], modifiers=modifiers)
-        
-        # Printable character
+        # Fallback for unmapped printable ASCII (32-126)
         if 32 <= key <= 126:
-            return KeyEvent(key_code=key, modifiers=modifiers, char=chr(key))
+            return KeyEvent(
+                key_code=key,
+                modifiers=modifiers,
+                char=chr(key)
+            )
         
-        # Special characters
-        if key == 10 or key == 13:
-            return KeyEvent(key_code=KeyCode.ENTER, modifiers=modifiers)
-        elif key == 27:
-            return KeyEvent(key_code=KeyCode.ESCAPE, modifiers=modifiers)
-        elif key == 9:
-            return KeyEvent(key_code=KeyCode.TAB, modifiers=modifiers)
-        elif key == 127:
-            return KeyEvent(key_code=KeyCode.BACKSPACE, modifiers=modifiers)
-        
-        # Default: return the key code as-is
+        # Completely unmapped key - return None wrapped in KeyEvent
+        # (Return KeyEvent with the raw key code for compatibility)
         return KeyEvent(key_code=key, modifiers=modifiers)
     
     def set_cursor_visibility(self, visible: bool) -> None:

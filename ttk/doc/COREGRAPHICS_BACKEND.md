@@ -117,6 +117,25 @@ renderer = CoreGraphicsBackend(
 
 **Note**: Proportional fonts (like Helvetica or Arial) will be rejected with a clear error message.
 
+### Keyboard Layout Selection
+
+Choose the keyboard layout for key mapping:
+
+```python
+# Default: ANSI layout (standard US keyboard)
+renderer = CoreGraphicsBackend()
+
+# Explicit ANSI layout
+renderer = CoreGraphicsBackend(keyboard_layout='ANSI')
+```
+
+**Supported Layouts:**
+- **ANSI**: American National Standards Institute layout (default) - standard US keyboard
+- **JIS**: Japanese Industrial Standards layout (not yet implemented)
+- **ISO**: International Organization for Standardization layout (not yet implemented)
+
+**Note**: JIS and ISO layouts will raise `NotImplementedError` until they are implemented. The architecture supports adding these layouts in the future without breaking changes.
+
 ## Features
 
 ### Native Text Rendering

@@ -8,7 +8,7 @@ import os
 # Add parent directory to path to allow importing ttk
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from ttk import KeyCode, ModifierKey, KeyEvent
+from ttk import KeyCode, ModifierKey, KeyEvent, SystemEventType, MouseEvent
 
 
 def test_keycode_values():
@@ -17,6 +17,9 @@ def test_keycode_values():
     assert KeyCode.ESCAPE == 27
     assert KeyCode.BACKSPACE == 127
     assert KeyCode.TAB == 9
+    
+    # Space key
+    assert KeyCode.SPACE == 32
     
     # Arrow keys
     assert KeyCode.UP == 1000
@@ -36,9 +39,21 @@ def test_keycode_values():
     assert KeyCode.PAGE_UP == 1204
     assert KeyCode.PAGE_DOWN == 1205
     
-    # Special markers
-    assert KeyCode.MOUSE == 2000
-    assert KeyCode.RESIZE == 3000
+    # Letter keys (NEW)
+    assert KeyCode.KEY_A == 2000
+    assert KeyCode.KEY_Z == 2025
+    
+    # Digit keys (NEW)
+    assert KeyCode.KEY_0 == 2100
+    assert KeyCode.KEY_9 == 2109
+    
+    # Symbol keys (NEW)
+    assert KeyCode.KEY_MINUS == 2200
+    assert KeyCode.KEY_GRAVE == 2210
+    
+    # System event types (moved from KeyCode)
+    assert SystemEventType.RESIZE == 3000
+    assert SystemEventType.CLOSE == 3001
 
 
 def test_modifier_key_values():
@@ -69,9 +84,6 @@ def test_input_event_creation():
     assert event.key_code == ord('a')
     assert event.modifiers == ModifierKey.NONE
     assert event.char == 'a'
-    assert event.mouse_row is None
-    assert event.mouse_col is None
-    assert event.mouse_button is None
     
     # Special key
     event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.SHIFT)
@@ -79,15 +91,12 @@ def test_input_event_creation():
     assert event.modifiers == ModifierKey.SHIFT
     assert event.char is None
     
-    # Mouse event
-    event = KeyEvent(
-        key_code=KeyCode.MOUSE,
-        modifiers=ModifierKey.NONE,
+    # Mouse event (separate class now)
+    event = MouseEvent(
         mouse_row=10,
         mouse_col=20,
         mouse_button=1
     )
-    assert event.key_code == KeyCode.MOUSE
     assert event.mouse_row == 10
     assert event.mouse_col == 20
     assert event.mouse_button == 1
