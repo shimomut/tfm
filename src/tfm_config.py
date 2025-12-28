@@ -157,13 +157,14 @@ class KeyBindings:
         Returns:
             True if event matches the key expression
         """
-        # Check modifiers first
-        if event.modifiers != modifiers:
-            return False
-        
-        # Single character - match against event.char
+        # Single character - match against event.char (ignore modifiers for backward compatibility)
+        # This allows "?" to match even though it's technically Shift-Slash
         if len(main_key) == 1:
             return event.char and event.char.upper() == main_key
+        
+        # Multi-character keys (KeyCode names) - check modifiers AND key_code
+        if event.modifiers != modifiers:
+            return False
         
         # KeyCode name - match against event.key_code
         expected_keycode = self._keycode_from_string(main_key)
