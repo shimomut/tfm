@@ -51,22 +51,14 @@ KEY_BINDINGS = {
    - Updated `KEY_BINDINGS` to support both simple and extended formats
    - Actions requiring selection use the extended format
 
-2. **KeyBindingManager Utility** (`src/tfm_key_bindings.py`)
-   - `get_keys_for_action(action)` - Get keys for an action
-   - `get_selection_requirement(action)` - Get selection requirement
-   - `is_action_available(action, has_selection)` - Check availability
-   - `get_available_actions(has_selection)` - Get all available actions
-   - `get_key_to_action_mapping(has_selection)` - Get filtered key mapping
-   - `validate_key_bindings()` - Validate configuration
-
-3. **Config System Integration** (`src/tfm_config.py`)
+2. **Config System Integration** (`src/tfm_config.py`)
    - Updated `ConfigManager` to handle extended format
    - Added `get_selection_requirement()` method
    - Added `is_action_available()` method
    - Added `is_key_bound_to_action_with_selection()` method
    - Module-level convenience functions for backward compatibility
 
-4. **Main TFM Integration** (`src/tfm_main.py`)
+3. **Main TFM Integration** (`src/tfm_main.py`)
    - Updated `is_key_for_action()` method to be selection-aware by default
    - All key handling automatically respects selection requirements
    - No need to manually choose between different methods
@@ -74,16 +66,13 @@ KEY_BINDINGS = {
 ### Usage in TFM Code
 
 ```python
-# Using KeyBindingManager utility
-from tfm_key_bindings import KeyBindingManager
-
-has_selection = len(selected_files) > 0
-if KeyBindingManager.is_action_available('copy_files', has_selection):
-    # Action is available
-    pass
-
 # Using config system integration
 from tfm_config import is_key_bound_to_with_selection, is_action_available
+
+has_selection = len(selected_files) > 0
+if is_action_available('copy_files', has_selection):
+    # Action is available
+    pass
 
 if is_key_bound_to_with_selection('c', 'copy_files', has_selection):
     # Key is bound and action is available
@@ -123,8 +112,6 @@ elif self.is_key_for_action(key, 'copy_files'):  # Automatically respects select
 
 Comprehensive tests are provided:
 - `test/test_key_bindings_selection.py` - Tests the extended format
-- `test/test_key_bindings_manager.py` - Tests the utility manager
-- `demo/demo_key_bindings_selection.py` - Interactive demonstration
 
 ## Migration Guide
 
@@ -162,15 +149,14 @@ KEY_BINDINGS = {
 ### For TFM Core Integration
 ```python
 # In your key handler
-from tfm_key_bindings import KeyBindingManager
+from tfm_config import is_key_bound_to_with_selection
 
 def handle_key(key, selected_files):
     has_selection = len(selected_files) > 0
-    key_mapping = KeyBindingManager.get_key_to_action_mapping(has_selection)
     
-    if key in key_mapping:
-        action = key_mapping[key]
+    if is_key_bound_to_with_selection(key, 'copy_files', has_selection):
         # Execute action
+        pass
 ```
 
 ## Implementation Status
