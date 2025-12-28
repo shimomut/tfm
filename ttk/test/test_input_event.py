@@ -40,16 +40,16 @@ def test_keycode_values():
     assert KeyCode.PAGE_DOWN == 1205
     
     # Letter keys (NEW)
-    assert KeyCode.KEY_A == 2000
-    assert KeyCode.KEY_Z == 2025
+    assert KeyCode.A == 2000
+    assert KeyCode.Z == 2025
     
     # Digit keys (NEW)
-    assert KeyCode.KEY_0 == 2100
-    assert KeyCode.KEY_9 == 2109
+    assert KeyCode.DIGIT_0 == 2100
+    assert KeyCode.DIGIT_9 == 2109
     
     # Symbol keys (NEW)
-    assert KeyCode.KEY_MINUS == 2200
-    assert KeyCode.KEY_GRAVE == 2210
+    assert KeyCode.MINUS == 2200
+    assert KeyCode.GRAVE == 2210
     
     # System event types (moved from KeyCode)
     assert SystemEventType.RESIZE == 3000

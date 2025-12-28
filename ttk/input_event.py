@@ -52,59 +52,59 @@ class KeyCode(IntEnum):
     
     # Letter keys (physical keys, case handled by Shift modifier)
     # Range: 2000-2025
-    KEY_A = 2000
-    KEY_B = 2001
-    KEY_C = 2002
-    KEY_D = 2003
-    KEY_E = 2004
-    KEY_F = 2005
-    KEY_G = 2006
-    KEY_H = 2007
-    KEY_I = 2008
-    KEY_J = 2009
-    KEY_K = 2010
-    KEY_L = 2011
-    KEY_M = 2012
-    KEY_N = 2013
-    KEY_O = 2014
-    KEY_P = 2015
-    KEY_Q = 2016
-    KEY_R = 2017
-    KEY_S = 2018
-    KEY_T = 2019
-    KEY_U = 2020
-    KEY_V = 2021
-    KEY_W = 2022
-    KEY_X = 2023
-    KEY_Y = 2024
-    KEY_Z = 2025
+    A = 2000
+    B = 2001
+    C = 2002
+    D = 2003
+    E = 2004
+    F = 2005
+    G = 2006
+    H = 2007
+    I = 2008
+    J = 2009
+    K = 2010
+    L = 2011
+    M = 2012
+    N = 2013
+    O = 2014
+    P = 2015
+    Q = 2016
+    R = 2017
+    S = 2018
+    T = 2019
+    U = 2020
+    V = 2021
+    W = 2022
+    X = 2023
+    Y = 2024
+    Z = 2025
     
     # Digit keys (physical keys, symbols handled by Shift modifier)
     # Range: 2100-2109
-    KEY_0 = 2100
-    KEY_1 = 2101
-    KEY_2 = 2102
-    KEY_3 = 2103
-    KEY_4 = 2104
-    KEY_5 = 2105
-    KEY_6 = 2106
-    KEY_7 = 2107
-    KEY_8 = 2108
-    KEY_9 = 2109
+    DIGIT_0 = 2100
+    DIGIT_1 = 2101
+    DIGIT_2 = 2102
+    DIGIT_3 = 2103
+    DIGIT_4 = 2104
+    DIGIT_5 = 2105
+    DIGIT_6 = 2106
+    DIGIT_7 = 2107
+    DIGIT_8 = 2108
+    DIGIT_9 = 2109
     
     # Symbol/Punctuation keys (physical keys)
     # Range: 2200-2299
-    KEY_MINUS = 2200          # - and _
-    KEY_EQUAL = 2201          # = and +
-    KEY_LEFT_BRACKET = 2202   # [ and {
-    KEY_RIGHT_BRACKET = 2203  # ] and }
-    KEY_BACKSLASH = 2204      # \ and |
-    KEY_SEMICOLON = 2205      # ; and :
-    KEY_QUOTE = 2206          # ' and "
-    KEY_COMMA = 2207          # , and <
-    KEY_PERIOD = 2208         # . and >
-    KEY_SLASH = 2209          # / and ?
-    KEY_GRAVE = 2210          # ` and ~
+    MINUS = 2200          # - and _
+    EQUAL = 2201          # = and +
+    LEFT_BRACKET = 2202   # [ and {
+    RIGHT_BRACKET = 2203  # ] and }
+    BACKSLASH = 2204      # \ and |
+    SEMICOLON = 2205      # ; and :
+    QUOTE = 2206          # ' and "
+    COMMA = 2207          # , and <
+    PERIOD = 2208         # . and >
+    SLASH = 2209          # / and ?
+    GRAVE = 2210          # ` and ~
     
 
 
@@ -149,37 +149,37 @@ class KeyEvent(Event):
     
     Examples:
         Letter keys without Shift:
-            KeyEvent(key_code=KeyCode.KEY_A, modifiers=ModifierKey.NONE, char='a')
-            KeyEvent(key_code=KeyCode.KEY_Z, modifiers=ModifierKey.NONE, char='z')
+            KeyEvent(key_code=KeyCode.A, modifiers=ModifierKey.NONE, char='a')
+            KeyEvent(key_code=KeyCode.Z, modifiers=ModifierKey.NONE, char='z')
         
         Letter keys with Shift:
-            KeyEvent(key_code=KeyCode.KEY_A, modifiers=ModifierKey.SHIFT, char='A')
-            KeyEvent(key_code=KeyCode.KEY_Z, modifiers=ModifierKey.SHIFT, char='Z')
+            KeyEvent(key_code=KeyCode.A, modifiers=ModifierKey.SHIFT, char='A')
+            KeyEvent(key_code=KeyCode.Z, modifiers=ModifierKey.SHIFT, char='Z')
         
         Digit keys without Shift:
-            KeyEvent(key_code=KeyCode.KEY_5, modifiers=ModifierKey.NONE, char='5')
-            KeyEvent(key_code=KeyCode.KEY_0, modifiers=ModifierKey.NONE, char='0')
+            KeyEvent(key_code=KeyCode.DIGIT_5, modifiers=ModifierKey.NONE, char='5')
+            KeyEvent(key_code=KeyCode.DIGIT_0, modifiers=ModifierKey.NONE, char='0')
         
         Digit keys with Shift (symbols):
-            KeyEvent(key_code=KeyCode.KEY_5, modifiers=ModifierKey.SHIFT, char='%')
-            KeyEvent(key_code=KeyCode.KEY_1, modifiers=ModifierKey.SHIFT, char='!')
+            KeyEvent(key_code=KeyCode.DIGIT_5, modifiers=ModifierKey.SHIFT, char='%')
+            KeyEvent(key_code=KeyCode.DIGIT_1, modifiers=ModifierKey.SHIFT, char='!')
         
         Symbol keys without Shift:
-            KeyEvent(key_code=KeyCode.KEY_MINUS, modifiers=ModifierKey.NONE, char='-')
-            KeyEvent(key_code=KeyCode.KEY_EQUAL, modifiers=ModifierKey.NONE, char='=')
-            KeyEvent(key_code=KeyCode.KEY_SEMICOLON, modifiers=ModifierKey.NONE, char=';')
+            KeyEvent(key_code=KeyCode.MINUS, modifiers=ModifierKey.NONE, char='-')
+            KeyEvent(key_code=KeyCode.EQUAL, modifiers=ModifierKey.NONE, char='=')
+            KeyEvent(key_code=KeyCode.SEMICOLON, modifiers=ModifierKey.NONE, char=';')
         
         Symbol keys with Shift:
-            KeyEvent(key_code=KeyCode.KEY_MINUS, modifiers=ModifierKey.SHIFT, char='_')
-            KeyEvent(key_code=KeyCode.KEY_EQUAL, modifiers=ModifierKey.SHIFT, char='+')
-            KeyEvent(key_code=KeyCode.KEY_SEMICOLON, modifiers=ModifierKey.SHIFT, char=':')
+            KeyEvent(key_code=KeyCode.MINUS, modifiers=ModifierKey.SHIFT, char='_')
+            KeyEvent(key_code=KeyCode.EQUAL, modifiers=ModifierKey.SHIFT, char='+')
+            KeyEvent(key_code=KeyCode.SEMICOLON, modifiers=ModifierKey.SHIFT, char=':')
         
         Space key:
             KeyEvent(key_code=KeyCode.SPACE, modifiers=ModifierKey.NONE, char=' ')
         
         Control combinations:
-            KeyEvent(key_code=KeyCode.KEY_A, modifiers=ModifierKey.CONTROL, char='\x01')
-            KeyEvent(key_code=KeyCode.KEY_C, modifiers=ModifierKey.CONTROL, char='\x03')
+            KeyEvent(key_code=KeyCode.A, modifiers=ModifierKey.CONTROL, char='\x01')
+            KeyEvent(key_code=KeyCode.C, modifiers=ModifierKey.CONTROL, char='\x03')
         
         Special keys:
             KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE, char=None)

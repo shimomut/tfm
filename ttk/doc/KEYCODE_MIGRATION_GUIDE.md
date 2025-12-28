@@ -30,33 +30,33 @@ The KeyCode enum now includes:
 
 **Letter Keys (Range: 2000-2025)**
 ```python
-KeyCode.KEY_A = 2000
-KeyCode.KEY_B = 2001
+KeyCode.A = 2000
+KeyCode.B = 2001
 # ... through ...
-KeyCode.KEY_Z = 2025
+KeyCode.Z = 2025
 ```
 
 **Digit Keys (Range: 2100-2109)**
 ```python
-KeyCode.KEY_0 = 2100
-KeyCode.KEY_1 = 2101
+KeyCode.DIGIT_0 = 2100
+KeyCode.DIGIT_1 = 2101
 # ... through ...
-KeyCode.KEY_9 = 2109
+KeyCode.DIGIT_9 = 2109
 ```
 
 **Symbol Keys (Range: 2200-2299)**
 ```python
-KeyCode.KEY_MINUS = 2200      # - and _
-KeyCode.KEY_EQUAL = 2201      # = and +
-KeyCode.KEY_LEFT_BRACKET = 2202   # [ and {
-KeyCode.KEY_RIGHT_BRACKET = 2203  # ] and }
-KeyCode.KEY_BACKSLASH = 2204      # \ and |
-KeyCode.KEY_SEMICOLON = 2205      # ; and :
-KeyCode.KEY_QUOTE = 2206          # ' and "
-KeyCode.KEY_COMMA = 2207          # , and <
-KeyCode.KEY_PERIOD = 2208         # . and >
-KeyCode.KEY_SLASH = 2209          # / and ?
-KeyCode.KEY_GRAVE = 2210          # ` and ~
+KeyCode.MINUS = 2200      # - and _
+KeyCode.EQUAL = 2201      # = and +
+KeyCode.LEFT_BRACKET = 2202   # [ and {
+KeyCode.RIGHT_BRACKET = 2203  # ] and }
+KeyCode.BACKSLASH = 2204      # \ and |
+KeyCode.SEMICOLON = 2205      # ; and :
+KeyCode.QUOTE = 2206          # ' and "
+KeyCode.COMMA = 2207          # , and <
+KeyCode.PERIOD = 2208         # . and >
+KeyCode.SLASH = 2209          # / and ?
+KeyCode.GRAVE = 2210          # ` and ~
 ```
 
 **Space Key**
@@ -124,13 +124,13 @@ elif event.key_code == ord('k'):
 
 **After (using KeyCode enum):**
 ```python
-if event.key_code == KeyCode.KEY_Q:
+if event.key_code == KeyCode.Q:
     quit_application()
-elif event.key_code == KeyCode.KEY_H:
+elif event.key_code == KeyCode.H:
     show_help()
-elif event.key_code == KeyCode.KEY_J:
+elif event.key_code == KeyCode.J:
     move_down()
-elif event.key_code == KeyCode.KEY_K:
+elif event.key_code == KeyCode.K:
     move_up()
 ```
 
@@ -151,7 +151,7 @@ elif event.char == 'A':
 
 **After (using KeyCode with modifier check):**
 ```python
-if event.key_code == KeyCode.KEY_A:
+if event.key_code == KeyCode.A:
     if event.has_modifier(ModifierKey.SHIFT):
         action_uppercase_a()
     else:
@@ -179,7 +179,7 @@ if event.char == '%':
 **After (using KeyCode enum):**
 ```python
 # Checking for digit '5' key
-if event.key_code == KeyCode.KEY_5:
+if event.key_code == KeyCode.DIGIT_5:
     if event.has_modifier(ModifierKey.SHIFT):
         show_percentage()  # % symbol
     else:
@@ -205,11 +205,11 @@ elif event.char == '/':
 
 **After (using KeyCode enum):**
 ```python
-if event.key_code == KeyCode.KEY_MINUS:
+if event.key_code == KeyCode.MINUS:
     zoom_out()
-elif event.key_code == KeyCode.KEY_EQUAL:
+elif event.key_code == KeyCode.EQUAL:
     zoom_in()
-elif event.key_code == KeyCode.KEY_SLASH:
+elif event.key_code == KeyCode.SLASH:
     start_search()
 ```
 
@@ -283,7 +283,7 @@ Always use KeyCode enum values instead of character codes:
 
 ```python
 # ✅ Good
-if event.key_code == KeyCode.KEY_Q:
+if event.key_code == KeyCode.Q:
     quit()
 
 # ❌ Avoid
@@ -297,7 +297,7 @@ When case or symbol variants matter, check modifiers explicitly:
 
 ```python
 # ✅ Good
-if event.key_code == KeyCode.KEY_A:
+if event.key_code == KeyCode.A:
     if event.has_modifier(ModifierKey.SHIFT):
         handle_uppercase_a()
     else:
@@ -316,7 +316,7 @@ Think in terms of physical keys, not characters:
 
 ```python
 # ✅ Good - represents the physical '5' key
-if event.key_code == KeyCode.KEY_5:
+if event.key_code == KeyCode.DIGIT_5:
     if event.has_modifier(ModifierKey.SHIFT):
         handle_percent_symbol()
     else:
@@ -337,10 +337,10 @@ Use KeyCode names in documentation for clarity:
 # ✅ Good
 """
 Keyboard Shortcuts:
-- KeyCode.KEY_Q: Quit application
-- KeyCode.KEY_H: Show help
-- KeyCode.KEY_J: Move down
-- KeyCode.KEY_K: Move up
+- KeyCode.Q: Quit application
+- KeyCode.H: Show help
+- KeyCode.J: Move down
+- KeyCode.K: Move up
 - KeyCode.SPACE: Toggle selection
 """
 
@@ -399,15 +399,15 @@ def handle_key(self, event):
 **After:**
 ```python
 def handle_key(self, event):
-    if event.key_code == KeyCode.KEY_J:
+    if event.key_code == KeyCode.J:
         self.move_cursor_down()
-    elif event.key_code == KeyCode.KEY_K:
+    elif event.key_code == KeyCode.K:
         self.move_cursor_up()
-    elif event.key_code == KeyCode.KEY_H:
+    elif event.key_code == KeyCode.H:
         self.go_to_parent_directory()
-    elif event.key_code == KeyCode.KEY_L:
+    elif event.key_code == KeyCode.L:
         self.enter_directory()
-    elif event.key_code == KeyCode.KEY_Q:
+    elif event.key_code == KeyCode.Q:
         self.quit()
 ```
 
@@ -431,13 +431,13 @@ def handle_key(self, event):
 ```python
 def handle_key(self, event):
     # Ctrl+S to save
-    if event.key_code == KeyCode.KEY_S and event.has_modifier(ModifierKey.CONTROL):
+    if event.key_code == KeyCode.S and event.has_modifier(ModifierKey.CONTROL):
         self.save()
     # Ctrl+C to copy
-    elif event.key_code == KeyCode.KEY_C and event.has_modifier(ModifierKey.CONTROL):
+    elif event.key_code == KeyCode.C and event.has_modifier(ModifierKey.CONTROL):
         self.copy()
     # Ctrl+V to paste
-    elif event.key_code == KeyCode.KEY_V and event.has_modifier(ModifierKey.CONTROL):
+    elif event.key_code == KeyCode.V and event.has_modifier(ModifierKey.CONTROL):
         self.paste()
 ```
 
@@ -457,7 +457,7 @@ def handle_key(self, event):
 **After:**
 ```python
 def handle_key(self, event):
-    if event.key_code == KeyCode.KEY_SLASH:
+    if event.key_code == KeyCode.SLASH:
         self.start_search()
     elif event.key_code == KeyCode.ENTER:
         self.execute_search()
@@ -478,17 +478,17 @@ def handle_key(self, event):
 **After:**
 ```python
 def handle_key(self, event):
-    # Map KEY_1 through KEY_9 to indices 0-8
+    # Map DIGIT_1 through DIGIT_9 to indices 0-8
     digit_keys = {
-        KeyCode.KEY_1: 0,
-        KeyCode.KEY_2: 1,
-        KeyCode.KEY_3: 2,
-        KeyCode.KEY_4: 3,
-        KeyCode.KEY_5: 4,
-        KeyCode.KEY_6: 5,
-        KeyCode.KEY_7: 6,
-        KeyCode.KEY_8: 7,
-        KeyCode.KEY_9: 8,
+        KeyCode.DIGIT_1: 0,
+        KeyCode.DIGIT_2: 1,
+        KeyCode.DIGIT_3: 2,
+        KeyCode.DIGIT_4: 3,
+        KeyCode.DIGIT_5: 4,
+        KeyCode.DIGIT_6: 5,
+        KeyCode.DIGIT_7: 6,
+        KeyCode.DIGIT_8: 7,
+        KeyCode.DIGIT_9: 8,
     }
     
     if event.key_code in digit_keys:

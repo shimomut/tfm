@@ -48,31 +48,31 @@ class TestCursesInputHandling(unittest.TestCase):
         self.assertTrue(len(self.capture.events) > 0)
         event_type, event = self.capture.events[0]
         self.assertEqual(event_type, 'key')
-        self.assertEqual(event.key_code, KeyCode.KEY_A)
+        self.assertEqual(event.key_code, KeyCode.A)
         self.assertEqual(event.char, 'a')
     
     def test_translate_printable_characters(self):
         """Test translation of printable ASCII characters."""
-        # Test lowercase letters - now map to KEY_A through KEY_Z
+        # Test lowercase letters - now map to A through Z
         for char_code in range(ord('a'), ord('z') + 1):
             event = self.backend._translate_curses_key(char_code)
-            expected_keycode = KeyCode.KEY_A + (char_code - ord('a'))
+            expected_keycode = KeyCode.A + (char_code - ord('a'))
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
             self.assertEqual(event.modifiers, ModifierKey.NONE)
         
-        # Test uppercase letters - also map to KEY_A through KEY_Z with SHIFT
+        # Test uppercase letters - also map to A through Z with SHIFT
         for char_code in range(ord('A'), ord('Z') + 1):
             event = self.backend._translate_curses_key(char_code)
-            expected_keycode = KeyCode.KEY_A + (char_code - ord('A'))
+            expected_keycode = KeyCode.A + (char_code - ord('A'))
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
             self.assertEqual(event.modifiers, ModifierKey.SHIFT)
         
-        # Test digits - now map to KEY_0 through KEY_9
+        # Test digits - now map to DIGIT_0 through DIGIT_9
         for char_code in range(ord('0'), ord('9') + 1):
             event = self.backend._translate_curses_key(char_code)
-            expected_keycode = KeyCode.KEY_0 + (char_code - ord('0'))
+            expected_keycode = KeyCode.DIGIT_0 + (char_code - ord('0'))
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
             self.assertEqual(event.modifiers, ModifierKey.NONE)
@@ -84,17 +84,17 @@ class TestCursesInputHandling(unittest.TestCase):
         
         # Test unshifted symbol keys - no Shift modifier
         unshifted_symbols = [
-            ('-', KeyCode.KEY_MINUS),
-            ('=', KeyCode.KEY_EQUAL),
-            ('[', KeyCode.KEY_LEFT_BRACKET),
-            (']', KeyCode.KEY_RIGHT_BRACKET),
-            ('\\', KeyCode.KEY_BACKSLASH),
-            (';', KeyCode.KEY_SEMICOLON),
-            ("'", KeyCode.KEY_QUOTE),
-            (',', KeyCode.KEY_COMMA),
-            ('.', KeyCode.KEY_PERIOD),
-            ('/', KeyCode.KEY_SLASH),
-            ('`', KeyCode.KEY_GRAVE),
+            ('-', KeyCode.MINUS),
+            ('=', KeyCode.EQUAL),
+            ('[', KeyCode.LEFT_BRACKET),
+            (']', KeyCode.RIGHT_BRACKET),
+            ('\\', KeyCode.BACKSLASH),
+            (';', KeyCode.SEMICOLON),
+            ("'", KeyCode.QUOTE),
+            (',', KeyCode.COMMA),
+            ('.', KeyCode.PERIOD),
+            ('/', KeyCode.SLASH),
+            ('`', KeyCode.GRAVE),
         ]
         for char, expected_keycode in unshifted_symbols:
             char_code = ord(char)
@@ -105,27 +105,27 @@ class TestCursesInputHandling(unittest.TestCase):
         
         # Test shifted symbol keys - should have Shift modifier
         shifted_symbols = [
-            ('_', KeyCode.KEY_MINUS),
-            ('+', KeyCode.KEY_EQUAL),
-            ('{', KeyCode.KEY_LEFT_BRACKET),
-            ('}', KeyCode.KEY_RIGHT_BRACKET),
-            ('|', KeyCode.KEY_BACKSLASH),
-            (':', KeyCode.KEY_SEMICOLON),
-            ('"', KeyCode.KEY_QUOTE),
-            ('<', KeyCode.KEY_COMMA),
-            ('>', KeyCode.KEY_PERIOD),
-            ('?', KeyCode.KEY_SLASH),
-            ('~', KeyCode.KEY_GRAVE),
-            ('!', KeyCode.KEY_1),
-            ('@', KeyCode.KEY_2),
-            ('#', KeyCode.KEY_3),
-            ('$', KeyCode.KEY_4),
-            ('%', KeyCode.KEY_5),
-            ('^', KeyCode.KEY_6),
-            ('&', KeyCode.KEY_7),
-            ('*', KeyCode.KEY_8),
-            ('(', KeyCode.KEY_9),
-            (')', KeyCode.KEY_0),
+            ('_', KeyCode.MINUS),
+            ('+', KeyCode.EQUAL),
+            ('{', KeyCode.LEFT_BRACKET),
+            ('}', KeyCode.RIGHT_BRACKET),
+            ('|', KeyCode.BACKSLASH),
+            (':', KeyCode.SEMICOLON),
+            ('"', KeyCode.QUOTE),
+            ('<', KeyCode.COMMA),
+            ('>', KeyCode.PERIOD),
+            ('?', KeyCode.SLASH),
+            ('~', KeyCode.GRAVE),
+            ('!', KeyCode.DIGIT_1),
+            ('@', KeyCode.DIGIT_2),
+            ('#', KeyCode.DIGIT_3),
+            ('$', KeyCode.DIGIT_4),
+            ('%', KeyCode.DIGIT_5),
+            ('^', KeyCode.DIGIT_6),
+            ('&', KeyCode.DIGIT_7),
+            ('*', KeyCode.DIGIT_8),
+            ('(', KeyCode.DIGIT_9),
+            (')', KeyCode.DIGIT_0),
         ]
         for char, expected_keycode in shifted_symbols:
             char_code = ord(char)
@@ -230,7 +230,7 @@ class TestCursesInputHandling(unittest.TestCase):
     def test_callback_integration(self):
         """Test event delivery via callback with various key types."""
         test_cases = [
-            (ord('x'), KeyCode.KEY_X, 'x'),  # Printable character - now maps to KEY_X
+            (ord('x'), KeyCode.X, 'x'),  # Printable character - now maps to X
             (curses.KEY_UP, KeyCode.UP, None),  # Arrow key
             (curses.KEY_F5, KeyCode.F5, None),  # Function key
             (10, KeyCode.ENTER, None),  # Enter

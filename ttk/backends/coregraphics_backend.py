@@ -169,11 +169,11 @@ from dataclasses import dataclass
 # 2. Map macOS virtual key codes to TTK KeyCode values. The virtual key codes
 #    differ between layouts because keys are in different physical positions.
 #    For example:
-#      - ANSI: 0x00 = KEY_A
-#      - JIS:  0x00 = KEY_A (same position)
-#      - ISO:  0x00 = KEY_A (same position)
+#      - ANSI: 0x00 = A
+#      - JIS:  0x00 = A (same position)
+#      - ISO:  0x00 = A (same position)
 #    But some keys differ:
-#      - ANSI: 0x32 = KEY_GRAVE (` and ~)
+#      - ANSI: 0x32 = GRAVE (` and ~)
 #      - JIS:  0x32 = Different key (JIS has extra keys)
 #      - ISO:  0x32 = Different key (ISO has different layout)
 #
@@ -191,9 +191,9 @@ from dataclasses import dataclass
 #   }
 #
 # Key Categories:
-# - Letter keys: Map to KEY_A through KEY_Z (physical keys)
-# - Digit keys: Map to KEY_0 through KEY_9 (physical keys)
-# - Symbol keys: Map to KEY_MINUS, KEY_EQUAL, etc. (physical keys)
+# - Letter keys: Map to A through Z (physical keys)
+# - Digit keys: Map to DIGIT_0 through DIGIT_9 (physical keys)
+# - Symbol keys: Map to MINUS, EQUAL, etc. (physical keys)
 # - Special keys: Map to ENTER, ESCAPE, BACKSPACE, etc.
 # - Arrow keys: Map to UP, DOWN, LEFT, RIGHT
 # - Function keys: Map to F1 through F12
@@ -223,57 +223,57 @@ from dataclasses import dataclass
 #
 MACOS_ANSI_KEY_MAP = {
     # Letter keys (ANSI positions)
-    0x00: KeyCode.KEY_A,
-    0x01: KeyCode.KEY_S,
-    0x02: KeyCode.KEY_D,
-    0x03: KeyCode.KEY_F,
-    0x04: KeyCode.KEY_H,
-    0x05: KeyCode.KEY_G,
-    0x06: KeyCode.KEY_Z,
-    0x07: KeyCode.KEY_X,
-    0x08: KeyCode.KEY_C,
-    0x09: KeyCode.KEY_V,
-    0x0B: KeyCode.KEY_B,
-    0x0C: KeyCode.KEY_Q,
-    0x0D: KeyCode.KEY_W,
-    0x0E: KeyCode.KEY_E,
-    0x0F: KeyCode.KEY_R,
-    0x10: KeyCode.KEY_Y,
-    0x11: KeyCode.KEY_T,
-    0x1F: KeyCode.KEY_O,
-    0x20: KeyCode.KEY_U,
-    0x22: KeyCode.KEY_I,
-    0x23: KeyCode.KEY_P,
-    0x25: KeyCode.KEY_L,
-    0x26: KeyCode.KEY_J,
-    0x28: KeyCode.KEY_K,
-    0x2D: KeyCode.KEY_N,
-    0x2E: KeyCode.KEY_M,
+    0x00: KeyCode.A,
+    0x01: KeyCode.S,
+    0x02: KeyCode.D,
+    0x03: KeyCode.F,
+    0x04: KeyCode.H,
+    0x05: KeyCode.G,
+    0x06: KeyCode.Z,
+    0x07: KeyCode.X,
+    0x08: KeyCode.C,
+    0x09: KeyCode.V,
+    0x0B: KeyCode.B,
+    0x0C: KeyCode.Q,
+    0x0D: KeyCode.W,
+    0x0E: KeyCode.E,
+    0x0F: KeyCode.R,
+    0x10: KeyCode.Y,
+    0x11: KeyCode.T,
+    0x1F: KeyCode.O,
+    0x20: KeyCode.U,
+    0x22: KeyCode.I,
+    0x23: KeyCode.P,
+    0x25: KeyCode.L,
+    0x26: KeyCode.J,
+    0x28: KeyCode.K,
+    0x2D: KeyCode.N,
+    0x2E: KeyCode.M,
     
     # Digit keys
-    0x12: KeyCode.KEY_1,
-    0x13: KeyCode.KEY_2,
-    0x14: KeyCode.KEY_3,
-    0x15: KeyCode.KEY_4,
-    0x16: KeyCode.KEY_6,
-    0x17: KeyCode.KEY_5,
-    0x1C: KeyCode.KEY_8,
-    0x1D: KeyCode.KEY_0,
-    0x19: KeyCode.KEY_9,
-    0x1A: KeyCode.KEY_7,
+    0x12: KeyCode.DIGIT_1,
+    0x13: KeyCode.DIGIT_2,
+    0x14: KeyCode.DIGIT_3,
+    0x15: KeyCode.DIGIT_4,
+    0x16: KeyCode.DIGIT_6,
+    0x17: KeyCode.DIGIT_5,
+    0x1C: KeyCode.DIGIT_8,
+    0x1D: KeyCode.DIGIT_0,
+    0x19: KeyCode.DIGIT_9,
+    0x1A: KeyCode.DIGIT_7,
     
     # Symbol/Punctuation keys
-    0x1B: KeyCode.KEY_MINUS,        # - and _
-    0x18: KeyCode.KEY_EQUAL,        # = and +
-    0x21: KeyCode.KEY_LEFT_BRACKET, # [ and {
-    0x1E: KeyCode.KEY_RIGHT_BRACKET,# ] and }
-    0x2A: KeyCode.KEY_BACKSLASH,    # \ and |
-    0x29: KeyCode.KEY_SEMICOLON,    # ; and :
-    0x27: KeyCode.KEY_QUOTE,        # ' and "
-    0x2B: KeyCode.KEY_COMMA,        # , and <
-    0x2F: KeyCode.KEY_PERIOD,       # . and >
-    0x2C: KeyCode.KEY_SLASH,        # / and ?
-    0x32: KeyCode.KEY_GRAVE,        # ` and ~
+    0x1B: KeyCode.MINUS,        # - and _
+    0x18: KeyCode.EQUAL,        # = and +
+    0x21: KeyCode.LEFT_BRACKET, # [ and {
+    0x1E: KeyCode.RIGHT_BRACKET,# ] and }
+    0x2A: KeyCode.BACKSLASH,    # \ and |
+    0x29: KeyCode.SEMICOLON,    # ; and :
+    0x27: KeyCode.QUOTE,        # ' and "
+    0x2B: KeyCode.COMMA,        # , and <
+    0x2F: KeyCode.PERIOD,       # . and >
+    0x2C: KeyCode.SLASH,        # / and ?
+    0x32: KeyCode.GRAVE,        # ` and ~
     
     # Space
     0x31: KeyCode.SPACE,
