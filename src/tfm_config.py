@@ -54,20 +54,21 @@ class KeyBindings:
         
         Returns:
             Tuple of (main_key, modifier_flags)
-            - main_key: The main key as uppercase string
+            - main_key: The main key as string (preserves case for single chars)
             - modifier_flags: Bitwise OR of ModifierKey values
         
         Examples:
-            "q" -> ("Q", 0)
+            "q" -> ("q", 0)
+            "A" -> ("A", 0)
             "Shift-Down" -> ("DOWN", ModifierKey.SHIFT)
             "Command-Shift-X" -> ("X", ModifierKey.COMMAND | ModifierKey.SHIFT)
         """
         # Import ModifierKey here to avoid circular dependency
         from ttk import ModifierKey
         
-        # Single character - return as-is with no modifiers
+        # Single character - return as-is with no modifiers (preserve case)
         if len(key_expr) == 1:
-            return (key_expr.upper(), 0)
+            return (key_expr, 0)
         
         # Multi-character - parse as key expression
         parts = key_expr.split('-')
@@ -151,16 +152,17 @@ class KeyBindings:
         
         Args:
             event: KeyEvent from TTK
-            main_key: Main key string (uppercase)
+            main_key: Main key string (case-sensitive for single chars)
             modifiers: Expected modifier flags
         
         Returns:
             True if event matches the key expression
         """
-        # Single character - match against event.char (ignore modifiers for backward compatibility)
+        # Single character - match against event.char (case-sensitive)
         # This allows "?" to match even though it's technically Shift-Slash
+        # and allows "a" and "A" to be different bindings
         if len(main_key) == 1:
-            return event.char and event.char.upper() == main_key
+            return event.char and event.char == main_key
         
         # Multi-character keys (KeyCode names) - check modifiers AND key_code
         if event.modifiers != modifiers:
