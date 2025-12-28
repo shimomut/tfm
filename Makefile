@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config
+.PHONY: help run run-desktop run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config
 
 # Backend selection (default: curses)
 # Usage: make run BACKEND=coregraphics
@@ -12,6 +12,7 @@ help:
 	@echo ""
 	@echo "Available commands:"
 	@echo "  run            - Run TFM"
+	@echo "  run-desktop    - Run TFM in desktop mode (--desktop flag)"
 	@echo "  run-debug      - Run TFM with debug mode and remote log monitoring"
 	@echo "  run-profile    - Run TFM with performance profiling enabled"
 	@echo "  monitor-log    - Connect to remote log monitoring (port 8123)"
@@ -38,6 +39,7 @@ help:
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run                        # Run with curses backend (default)"
+	@echo "  make run-desktop                # Run with --desktop flag"
 	@echo "  make run BACKEND=coregraphics   # Run with CoreGraphics backend"
 	@echo "  make test BACKEND=coregraphics  # Test with CoreGraphics backend"
 	@echo "  make install-config             # Install/update user config file"
@@ -48,6 +50,10 @@ help:
 run:
 	@echo "Running TFM (backend: $(BACKEND))..."
 	@python3 tfm.py --backend $(BACKEND)
+
+run-desktop:
+	@echo "Running TFM in desktop mode..."
+	@python3 tfm.py --desktop
 
 run-debug:
 	@echo "Running TFM with debug mode and remote log monitoring (backend: $(BACKEND))..."
