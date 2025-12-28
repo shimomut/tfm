@@ -79,25 +79,20 @@ def test_is_key_for_action_with_input_event():
     with patch('tfm_main.get_config'), \
          patch('tfm_main.LogManager'), \
          patch('tfm_main.get_state_manager'), \
-         patch('tfm_main.init_colors'), \
-         patch('tfm_main.is_input_event_bound_to_with_selection') as mock_is_bound:
+         patch('tfm_main.init_colors'):
         
         fm = FileManager(mock_renderer)
         
-        # Test with printable character
-        mock_is_bound.return_value = True
-        char_event = KeyEvent(key_code=ord('q'), modifiers=ModifierKey.NONE, char='q')
-        result = fm.is_key_for_action(char_event, 'quit')
-        assert result is True, "Printable character should be checked"
-        mock_is_bound.assert_called()
-        
-        # Reset mock for next test
-        mock_is_bound.reset_mock()
+        # Test with printable character - use find_action_for_event
+        with patch('tfm_main.find_action_for_event', return_value='quit'):
+            char_event = KeyEvent(key_code=KeyCode.Q, modifiers=ModifierKey.NONE, char='q')
+            result = fm.is_key_for_action(char_event, 'quit')
+            assert result is True, "Printable character should be checked"
         
         # Test with special key
-        mock_is_bound.return_value = True
-        special_event = KeyEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE)
-        result = fm.is_key_for_action(special_event, 'help')
+        with patch('tfm_main.find_action_for_event', return_value='help'):
+            special_event = KeyEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE)
+            result = fm.is_key_for_action(special_event, 'help')
         assert result is True, "Special key should be checked"
         mock_is_bound.assert_called()
         
@@ -192,8 +187,8 @@ def test_main_loop_uses_callback_mode():
             callback_fn(True)
         fm.show_confirmation = mock_show_confirmation
         
-        # Mock is_key_bound_to_with_selection to return True for quit
-        with patch('tfm_main.is_key_bound_to_with_selection', return_value=True):
+        # Mock find_action_for_event to return 'quit' for the quit event
+        with patch('tfm_main.find_action_for_event', return_value='quit'):
             # Deliver event via callback
             callback.on_key_event(quit_event)
         

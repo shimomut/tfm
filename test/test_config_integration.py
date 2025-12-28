@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
-from tfm_config import ConfigManager, is_key_bound_to, is_key_bound_to_with_selection, is_action_available
+from tfm_config import ConfigManager, is_action_available
 from _config import Config
 
 
