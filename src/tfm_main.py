@@ -3889,6 +3889,10 @@ class FileManager(UILayer):
         # Find action for this key event (optimized single lookup)
         action = find_action_for_event(event, has_selection)
         
+        # If no action found, return immediately
+        if action is None:
+            return False
+        
         # Handle log scrolling actions
         if action == 'scroll_log_up':
             if self.log_manager.scroll_log_up(1):
@@ -3942,10 +3946,8 @@ class FileManager(UILayer):
             self.handle_enter()
             self.mark_dirty()
             return True
-        
-        # Handle arrow keys with context-aware behavior
-        # LEFT/RIGHT arrows have different behavior depending on active pane
-        elif event.key_code == KeyCode.LEFT and not (event.modifiers & ModifierKey.SHIFT):
+        elif action == 'nav_left':
+            # Context-aware LEFT arrow: go to parent in left pane, switch pane in right pane
             if self.pane_manager.active_pane == 'left':
                 # Left arrow in left pane - go to parent directory
                 if current_pane['path'] != current_pane['path'].parent:
@@ -3967,7 +3969,8 @@ class FileManager(UILayer):
                 self.pane_manager.active_pane = 'left'
                 self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.RIGHT and not (event.modifiers & ModifierKey.SHIFT):
+        elif action == 'nav_right':
+            # Context-aware RIGHT arrow: go to parent in right pane, switch pane in left pane
             if self.pane_manager.active_pane == 'right':
                 # Right arrow in right pane - go to parent directory
                 if current_pane['path'] != current_pane['path'].parent:

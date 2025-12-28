@@ -130,6 +130,10 @@ class Config:
         'page_down': ['PAGE_DOWN'],            # Move cursor down one page
         'go_parent': ['BACKSPACE'],            # Go to parent directory
         
+        # Context-aware arrow navigation (behavior depends on active pane)
+        'nav_left': ['LEFT'],                  # Left pane: go to parent, Right pane: switch to left pane
+        'nav_right': ['RIGHT'],                # Right pane: go to parent, Left pane: switch to right pane
+        
         # Log scrolling keys
         'scroll_log_up': ['Shift-UP'],         # Scroll log pane up one line
         'scroll_log_down': ['Shift-DOWN'],     # Scroll log pane down one line
