@@ -109,11 +109,7 @@ python3 tools/tfm_log_client.py localhost 8888
 ```
 
 ### Color Testing
-```bash
-python3 tfm.py --color-test info        # Show current colors
-python3 tfm.py --color-test schemes      # List color schemes
-python3 tfm.py --color-test diagnose     # Diagnose color issues
-```
+TFM includes comprehensive color support with multiple color schemes.
 
 ## Configuration System
 

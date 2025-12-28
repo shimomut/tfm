@@ -3,8 +3,7 @@
 Test suite for the color initialization fix
 
 This test verifies that colors are properly initialized before stdout/stderr
-redirection, which should fix the issue where colors work in --color-test
-but not in the main TFM application.
+redirection in the main TFM application.
 """
 
 import unittest
@@ -176,22 +175,13 @@ class TestColorInitializationFix(unittest.TestCase):
 class TestColorInitializationIntegration(unittest.TestCase):
     """Integration tests for color initialization"""
     
-    def test_color_test_vs_main_tfm_consistency(self):
-        """Test that color-test and main TFM use the same initialization"""
-        # This test ensures both code paths initialize colors the same way
+    def test_main_tfm_color_initialization(self):
+        """Test that main TFM initializes colors correctly"""
+        # This test ensures the main TFM code path initializes colors properly
         
         from tfm_colors import init_colors, get_current_color_scheme
         
-        # Test color-test path
-        with patch('curses.start_color'):
-            with patch('curses.can_change_color', return_value=True):
-                with patch('curses.init_color'):
-                    with patch('curses.init_pair'):
-                        # Initialize like color-test does
-                        init_colors('dark')
-                        color_test_scheme = get_current_color_scheme()
-        
-        # Test main TFM path (after our fix)
+        # Test main TFM path
         with patch('curses.start_color'):
             with patch('curses.can_change_color', return_value=True):
                 with patch('curses.init_color'):
@@ -201,13 +191,13 @@ class TestColorInitializationIntegration(unittest.TestCase):
                             config.COLOR_SCHEME = 'dark'
                             mock_config.return_value = config
                             
-                            # Initialize like main TFM does (after fix)
+                            # Initialize like main TFM does
                             color_scheme = getattr(config, 'COLOR_SCHEME', 'dark')
                             init_colors(color_scheme)
                             main_tfm_scheme = get_current_color_scheme()
         
-        # Both should use the same scheme
-        self.assertEqual(color_test_scheme, main_tfm_scheme)
+        # Verify the scheme was set correctly
+        self.assertEqual(main_tfm_scheme, 'dark')
 
 if __name__ == '__main__':
     unittest.main()

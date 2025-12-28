@@ -586,7 +586,6 @@ python3 tools/benchmark_coregraphics_performance.py \
 
 ## Related Features
 
-- **Color Debugging**: Use `--color-test` to diagnose color performance issues
 - **Remote Log Monitoring**: Use `--remote-log-port` to monitor logs during profiling
 - **Desktop Mode**: Desktop mode (macOS) provides better baseline performance
 

@@ -4586,17 +4586,6 @@ def create_parser():
     )
     
     parser.add_argument(
-        '--color-test',
-        type=str,
-        metavar='MODE',
-        choices=['info', 'schemes', 'capabilities', 'rgb-test', 'fallback-test', 'interactive', 'tfm-init', 'diagnose'],
-        help='Run color debugging tests: info (show current colors), schemes (list all schemes), '
-             'capabilities (terminal color support), rgb-test (force RGB mode), '
-             'fallback-test (force fallback mode), interactive (interactive color tester), '
-             'tfm-init (test exact TFM initialization sequence), diagnose (diagnose color issues)'
-    )
-    
-    parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug mode (print full stack traces for uncaught exceptions)'
@@ -4639,16 +4628,6 @@ def cli_main():
                 print(f"Warning: Invalid profiling targets: {', '.join(invalid_targets)}", file=sys.stderr)
                 print(f"Valid targets: {', '.join(sorted(valid_targets))}")
                 profile_targets = profile_targets & valid_targets
-        
-        # Handle color testing mode
-        if args.color_test:
-            # Set ESC delay for color tests that use curses
-            os.environ.setdefault('ESCDELAY', '100')
-            
-            # Import color testing module
-            from tfm_color_tester import run_color_test
-            run_color_test(args.color_test)
-            return
         
         # Set ESC delay to 100ms BEFORE any curses-related imports for responsive ESC key
         os.environ.setdefault('ESCDELAY', '100')

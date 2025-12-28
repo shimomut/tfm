@@ -192,15 +192,6 @@ python3 tfm.py
 # - Press q to quit
 ```
 
-#### Test Color Support
-```bash
-# Test color capabilities
-python3 tfm.py --color-test info
-
-# Interactive color testing
-python3 tfm.py --color-test interactive
-```
-
 ---
 
 ## Desktop Mode (macOS)
@@ -707,26 +698,11 @@ python3 tfm.py --desktop               # Shorthand for desktop mode
 ### Advanced Options
 ```bash
 --remote-log-port 8888            # Enable remote monitoring
---color-test MODE                 # Test color support (see modes below)
 --profile TARGETS                 # Enable performance profiling (see targets below)
 --debug                           # Enable debug mode with full stack traces
 --version                         # Show version
 --help                            # Show help
 ```
-
-#### Color Testing Modes
-```bash
-python3 tfm.py --color-test info           # Show current color configuration
-python3 tfm.py --color-test schemes        # List all available color schemes
-python3 tfm.py --color-test capabilities   # Test terminal color capabilities
-python3 tfm.py --color-test rgb-test       # Force RGB color mode
-python3 tfm.py --color-test fallback-test  # Force fallback color mode
-python3 tfm.py --color-test interactive    # Interactive color tester
-python3 tfm.py --color-test tfm-init       # Test TFM initialization sequence
-python3 tfm.py --color-test diagnose       # Diagnose color issues
-```
-
-**See detailed documentation**: [Color Debugging Feature](COLOR_DEBUGGING_FEATURE.md)
 
 #### Performance Profiling
 Enable performance profiling for specific targets:
@@ -787,9 +763,7 @@ python3 tfm.py --desktop --profile event
 Desktop mode only works on macOS. On other platforms, TFM automatically falls back to terminal mode.
 
 #### Colors not working
-Try `--color-test diagnose` to check terminal support
-
-**See detailed documentation**: [Color Debugging Feature](COLOR_DEBUGGING_FEATURE.md)
+Check your terminal's color support and TERM environment variable
 
 #### Wide characters display incorrectly
 Check terminal Unicode support and locale settings

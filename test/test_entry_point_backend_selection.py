@@ -94,10 +94,6 @@ class TestBackendSelection(unittest.TestCase):
         # Test right directory
         args = parser.parse_args(['--right', '/home'])
         self.assertEqual(args.right, '/home')
-        
-        # Test color test
-        args = parser.parse_args(['--color-test', 'info'])
-        self.assertEqual(args.color_test, 'info')
     
     def test_combined_arguments(self):
         """Test that new backend arguments work with existing arguments"""

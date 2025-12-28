@@ -198,9 +198,6 @@ python3 tfm.py --profile rendering,event
 # Enable debug mode (full stack traces)
 python3 tfm.py --debug
 
-# Test color support
-python3 tfm.py --color-test info
-
 # Combined usage - desktop mode with custom directories
 python3 tfm.py --desktop --left ./src --right ./test
 
