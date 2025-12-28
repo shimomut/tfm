@@ -4114,7 +4114,7 @@ class FileManager(UILayer):
             self.pane_manager.active_pane = 'left'
             self.mark_dirty()
             return True
-        elif event.char == ' ' and event.modifiers & ModifierKey.SHIFT:  # Shift+Space - toggle selection and move up
+        elif self.is_key_for_action(event, 'select_file_up'):  # Shift+Space - toggle selection and move up
             self.toggle_selection_up()
             self.mark_dirty()
             return True
