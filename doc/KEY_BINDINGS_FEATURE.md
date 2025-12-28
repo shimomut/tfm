@@ -17,12 +17,23 @@ TFM's key bindings system allows you to customize keyboard shortcuts for all act
 The simplest form - just a single character:
 
 ```python
-'quit': ['q', 'Q']
+'quit': ['q']
 'help': ['?']
 'toggle_hidden': ['.']
 ```
 
-These match against the character typed by the user.
+**Important behavior:**
+- **Alphabet characters (a-z, A-Z)**: Case-insensitive. 'a' and 'A' are treated as the same key.
+- **Non-alphabet characters (?, /, ., etc.)**: Case-sensitive. '?' and '/' are different keys.
+- **To bind uppercase letters separately**: Use "Shift-A" instead of just "A"
+
+Examples:
+```python
+'quit': ['q']           # Matches both 'q' and 'Q' (alphabet, case-insensitive)
+'help': ['?']           # Matches only '?' (non-alphabet, case-sensitive)
+'search': ['f']         # Matches both 'f' and 'F' (alphabet, case-insensitive)
+'search_dialog': ['Shift-F']  # Matches only Shift+F (explicit modifier)
+```
 
 ### KeyCode Names
 
@@ -78,10 +89,10 @@ For actions without selection requirements, use a list of keys:
 
 ```python
 KEY_BINDINGS = {
-    'quit': ['q', 'Q'],
-    'help': ['?'],
-    'move_up': ['UP', 'k'],
-    'move_down': ['DOWN', 'j'],
+    'quit': ['q'],              # Matches both 'q' and 'Q' (alphabet is case-insensitive)
+    'help': ['?'],              # Matches only '?' (non-alphabet is case-sensitive)
+    'move_up': ['UP', 'k'],     # 'k' matches both 'k' and 'K'
+    'move_down': ['DOWN', 'j'], # 'j' matches both 'j' and 'J'
 }
 ```
 
@@ -117,12 +128,12 @@ Here's a complete configuration example:
 class Config:
     KEY_BINDINGS = {
         # Basic navigation
-        'quit': ['q', 'Q'],
-        'help': ['?'],
-        'move_up': ['UP', 'k'],
-        'move_down': ['DOWN', 'j'],
-        'move_left': ['LEFT', 'h'],
-        'move_right': ['RIGHT', 'l'],
+        'quit': ['q'],                    # Matches both 'q' and 'Q'
+        'help': ['?'],                    # Matches only '?'
+        'move_up': ['UP', 'k'],           # 'k' matches both 'k' and 'K'
+        'move_down': ['DOWN', 'j'],       # 'j' matches both 'j' and 'J'
+        'move_left': ['LEFT', 'h'],       # 'h' matches both 'h' and 'H'
+        'move_right': ['RIGHT', 'l'],     # 'l' matches both 'l' and 'L'
         
         # Page navigation with modifiers
         'page_up': ['PAGE_UP', 'Shift-UP'],
@@ -136,13 +147,15 @@ class Config:
             'selection': 'required'
         },
         'copy_files': {
-            'keys': ['c', 'C'],
+            'keys': ['c'],                # Matches both 'c' and 'C'
             'selection': 'required'
         },
         'create_directory': {
-            'keys': ['m', 'M'],
+            'keys': ['m'],                # Matches both 'm' and 'M'
             'selection': 'none'
         },
+        # Use Shift modifier for uppercase-specific bindings
+        'search_dialog': ['Shift-F'],     # Only matches Shift+F
     }
 ```
 
@@ -154,8 +167,10 @@ If you have an existing configuration, here's how to migrate:
 
 ```python
 KEY_BINDINGS = {
+    'quit': ['q', 'Q'],           # Redundant uppercase
+    'copy_files': ['c', 'C'],     # Redundant uppercase
     'move_up': ['UP', 'k'],
-    'page_up': ['PPAGE'],  # Old special key name
+    'page_up': ['PPAGE'],         # Old special key name
 }
 ```
 
@@ -163,12 +178,17 @@ KEY_BINDINGS = {
 
 ```python
 KEY_BINDINGS = {
-    'move_up': ['UP', 'k'],
+    'quit': ['q'],                # Single entry, matches both 'q' and 'Q'
+    'copy_files': ['c'],          # Single entry, matches both 'c' and 'C'
+    'move_up': ['UP', 'k'],       # 'k' matches both 'k' and 'K'
     'page_up': ['PAGE_UP', 'Shift-UP'],  # Use KeyCode name + modifier
 }
 ```
 
 **Key changes:**
+- **Remove redundant uppercase letters**: 'q' alone matches both 'q' and 'Q'
+- **Use Shift modifier for uppercase-specific bindings**: 'Shift-F' for uppercase F only
+- **Non-alphabet characters remain case-sensitive**: '?' and '/' are different
 - `PPAGE` → `PAGE_UP`
 - `NPAGE` → `PAGE_DOWN`
 - All other KeyCode names remain the same

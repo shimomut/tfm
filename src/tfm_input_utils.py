@@ -45,7 +45,11 @@ def input_event_to_key_char(event):
             return f'ALT_{event.char.upper()}'
         else:
             # Plain character
-            return event.char
+            # For alphabet characters, normalize to uppercase for case-insensitive matching
+            if event.char.isalpha():
+                return event.char.upper()
+            else:
+                return event.char
     
     # Handle special keys
     if event.key_code:

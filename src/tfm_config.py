@@ -50,24 +50,42 @@ class KeyBindings:
         Parse a key expression into main key and modifier flags.
         
         Args:
-            key_expr: Key expression string (e.g., "Shift-Down", "Command-Shift-X", "q")
+            key_expr: Key expression string (e.g., "Shift-Down", "Command-Shift-X", "q", "?")
         
         Returns:
             Tuple of (main_key, modifier_flags)
-            - main_key: The main key as string (preserves case for single chars)
+            - main_key: The main key as string
+              * Non-alphabet single chars: preserved as-is (e.g., "?" stays "?")
+              * Alphabet single chars: normalized to uppercase (e.g., "q" -> "Q", "A" -> "A")
+              * Multi-char keys: normalized to uppercase (e.g., "Down" -> "DOWN")
             - modifier_flags: Bitwise OR of ModifierKey values
+              * Single chars (both alphabet and non-alphabet): always 0
+              * Multi-char expressions: parsed from prefix (e.g., "Shift-Down" -> SHIFT)
+        
+        Key Behavior:
+            - Non-alphabet single characters (?, /, ., etc.): Case-sensitive, match on char, ignore modifiers
+            - Alphabet single characters (a-z, A-Z): Case-insensitive (normalized to uppercase), 
+              match on KeyCode, RESPECT modifiers (modifiers=0 means no modifiers)
+            - Multi-character keys (KeyCode names): Match on KeyCode with modifiers
+        
+        Important:
+            To bind uppercase letters separately, users must use "Shift-A" instead of just "A".
+            Just "A" or "a" in config will match KeyCode.A with NO modifiers (lowercase 'a' press).
         
         Examples:
-            "q" -> ("q", 0)
-            "A" -> ("A", 0)
+            "q" -> ("Q", 0)  # Matches lowercase 'q' press (no Shift)
+            "A" -> ("A", 0)  # Matches lowercase 'a' press (no Shift) - same as "q"
+            "Shift-A" -> ("A", SHIFT)  # Matches uppercase 'A' press (with Shift)
+            "?" -> ("?", 0)  # Matches '?' character regardless of modifiers
+            "/" -> ("/", 0)  # Matches '/' character regardless of modifiers
             "Shift-Down" -> ("DOWN", ModifierKey.SHIFT)
             "Command-Shift-X" -> ("X", ModifierKey.COMMAND | ModifierKey.SHIFT)
         """
         # Import ModifierKey here to avoid circular dependency
         from ttk import ModifierKey
         
-        # Single character - return as-is with no modifiers (preserve case)
-        if len(key_expr) == 1:
+        # Single non-alphabet character - preserve case for case-sensitive matching
+        if len(key_expr) == 1 and not key_expr.isalpha():
             return (key_expr, 0)
         
         # Multi-character - parse as key expression
@@ -150,25 +168,40 @@ class KeyBindings:
         """
         Check if a KeyEvent matches a key expression.
         
+        This method implements the key matching logic that distinguishes between:
+        1. Non-alphabet single characters: Match on event.char (case-sensitive, ignore modifiers)
+        2. Alphabet characters: Match on event.key_code (case-insensitive, RESPECT modifiers)
+        3. Multi-character keys: Match on event.key_code (respect modifiers)
+        
         Args:
             event: KeyEvent from TTK
-            main_key: Main key string (case-sensitive for single chars)
-            modifiers: Expected modifier flags
+            main_key: Main key string from _parse_key_expression()
+              * Non-alphabet single chars: original case (e.g., "?", "/")
+              * Alphabet chars: uppercase (e.g., "Q", "A")
+              * Multi-char keys: uppercase KeyCode name (e.g., "DOWN", "ENTER")
+            modifiers: Expected modifier flags (0 for non-alphabet single chars, may be non-zero for alphabet)
         
         Returns:
             True if event matches the key expression
+        
+        Examples:
+            - "?" matches KeyEvent(char="?") regardless of modifiers
+            - "q" matches KeyEvent(key_code=KeyCode.Q, modifiers=0) but NOT with Shift
+            - "Shift-A" matches KeyEvent(key_code=KeyCode.A, modifiers=SHIFT)
+        
+        Note:
+            To bind uppercase letters separately from lowercase, users must use "Shift-A" 
+            instead of just "A" in the configuration.
         """
-        # Single character - match against event.char (case-sensitive)
-        # This allows "?" to match even though it's technically Shift-Slash
-        # and allows "a" and "A" to be different bindings
-        if len(main_key) == 1:
+        # Single non-alphabet character - match on char field (case-sensitive, ignore modifiers)
+        if len(main_key) == 1 and not main_key.isalpha():
             return event.char and event.char == main_key
         
-        # Multi-character keys (KeyCode names) - check modifiers AND key_code
+        # Alphabet or multi-character keys - check modifiers first
         if event.modifiers != modifiers:
             return False
         
-        # KeyCode name - match against event.key_code
+        # Match against KeyCode (case-insensitive for alphabet, exact for multi-char)
         expected_keycode = self._keycode_from_string(main_key)
         if expected_keycode is None:
             return False
@@ -705,7 +738,19 @@ class ConfigManager:
     def is_key_bound_to_action(self, key_char, action):
         """Check if a key is bound to a specific action"""
         keys = self.get_key_for_action(action)
-        return key_char in keys
+        
+        # Normalize alphabet keys to uppercase for case-insensitive matching
+        normalized_key = key_char.upper() if (len(key_char) == 1 and key_char.isalpha()) else key_char
+        
+        # Also normalize keys from config for comparison
+        normalized_keys = []
+        for key in keys:
+            if len(key) == 1 and key.isalpha():
+                normalized_keys.append(key.upper())
+            else:
+                normalized_keys.append(key)
+        
+        return normalized_key in normalized_keys
     
     def is_key_bound_to_action_with_selection(self, key_char, action, has_selection):
         """Check if a key is bound to a specific action and available for current selection status"""

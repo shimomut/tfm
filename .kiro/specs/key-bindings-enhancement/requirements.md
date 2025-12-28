@@ -40,8 +40,10 @@ This document specifies the requirements for enhancing TFM's key bindings config
 3. THE system SHALL support multiple modifiers in a single expression (e.g., "Command-Shift-X")
 4. THE system SHALL treat modifier names as case-insensitive (e.g., "Shift", "SHIFT", "shift" are equivalent)
 5. THE system SHALL treat modifier order as insignificant (e.g., "Command-Shift-X" equals "Shift-Command-X")
-6. WHEN a key expression is a single character, THE system SHALL compare it with KeyEvent.char (existing behavior)
-7. WHEN a key expression length is greater than 1, THE system SHALL parse it as a key expression with potential modifiers
+6. WHEN a key expression is a single alphabet character (a-z, A-Z), THE system SHALL treat it as case-insensitive (e.g., 'a' and 'A' are the same)
+7. WHEN a key expression is a single non-alphabet character (?, /, ., etc.), THE system SHALL treat it as case-sensitive (e.g., '?' and '/' are different)
+8. WHEN users want to bind uppercase letters separately, THEY SHALL use "Shift-A" instead of just "A"
+9. WHEN a key expression length is greater than 1, THE system SHALL parse it as a key expression with potential modifiers
 
 ### Requirement 3: Key Expression Format
 

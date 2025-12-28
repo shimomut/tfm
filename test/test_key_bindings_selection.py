@@ -93,8 +93,9 @@ class TestKeyBindingsSelection(unittest.TestCase):
                 return True
         
         # Test utility functions
-        self.assertEqual(get_keys_for_action('quit'), ['q', 'Q'])
-        self.assertEqual(get_keys_for_action('copy_files'), ['c', 'C'])
+        # Note: With alphabet case-insensitive behavior, 'q' alone matches both 'q' and 'Q'
+        self.assertEqual(get_keys_for_action('quit'), ['q'])
+        self.assertEqual(get_keys_for_action('copy_files'), ['c'])
         self.assertEqual(get_keys_for_action('nonexistent'), [])
         
         self.assertEqual(get_selection_requirement('quit'), 'any')

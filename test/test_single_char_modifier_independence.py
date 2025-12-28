@@ -122,8 +122,7 @@ class TestSingleCharModifierIndependence(unittest.TestCase):
     def test_single_char_vs_multi_char_distinction(self):
         """Test that the system correctly distinguishes single vs multi-char keys."""
         config = {
-            'action_a': ['a'],  # Single char lowercase - matches 'a' only
-            'action_A': ['A'],  # Single char uppercase - matches 'A' only
+            'action_a': ['a'],  # Single char alphabet - matches both 'a' and 'A' (case-insensitive)
             'action_shift_up': ['Shift-UP'],  # Multi-char expression - respects modifiers
         }
         kb = KeyBindings(config)
@@ -133,10 +132,10 @@ class TestSingleCharModifierIndependence(unittest.TestCase):
         action = kb.find_action_for_event(event_a, False)
         self.assertEqual(action, 'action_a', "Lowercase 'a' should match 'action_a'")
         
-        # 'A' with Shift should match action_A (case-sensitive)
+        # 'A' with Shift should also match action_a (alphabet is case-insensitive)
         event_A = KeyEvent(key_code=KeyCode.A, modifiers=ModifierKey.SHIFT, char='A')
         action = kb.find_action_for_event(event_A, False)
-        self.assertEqual(action, 'action_A', "Uppercase 'A' should match 'action_A'")
+        self.assertEqual(action, 'action_a', "Uppercase 'A' should also match 'action_a' (case-insensitive)")
         
         # Shift-UP should match action_shift_up (multi-char respects modifiers)
         event_shift_up = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.SHIFT, char=None)

@@ -87,7 +87,8 @@ class TestKeyBindingsKeyEvent(unittest.TestCase):
     def test_input_event_no_selection_requirement(self):
         """Test KeyEvent with 'none' selection requirement."""
         # Create KeyEvent for 'M' (create_directory - requires no selection)
-        event = KeyEvent(key_code=ord('M'), modifiers=ModifierKey.NONE, char='M')
+        # Note: For alphabet keys, we use KeyCode.M (not ord('M'))
+        event = KeyEvent(key_code=KeyCode.M, modifiers=ModifierKey.NONE, char='M')
         
         # Should be bound when no files are selected
         self.assertTrue(
@@ -174,11 +175,13 @@ class TestKeyBindingsKeyEvent(unittest.TestCase):
         )
     
     def test_case_sensitivity(self):
-        """Test that case sensitivity is preserved."""
-        # Both 'm' and 'M' are bound to both move_files and create_directory
-        # The difference is in selection requirements
-        event_lower = KeyEvent(key_code=ord('m'), modifiers=ModifierKey.NONE, char='m')
+        """Test that alphabet keys are case-insensitive (both 'm' and 'M' map to KeyCode.M)."""
+        # For alphabet keys, both lowercase and uppercase map to the same KeyCode
+        # The difference between actions is in selection requirements, not case
+        event_lower = KeyEvent(key_code=KeyCode.M, modifiers=ModifierKey.NONE, char='m')
+        event_upper = KeyEvent(key_code=KeyCode.M, modifiers=ModifierKey.NONE, char='M')
         
+        # Both 'm' and 'M' should behave identically since they use KeyCode.M
         # 'm' with selection should work for move_files
         self.assertTrue(
             self.config_manager.is_input_event_bound_to_action_with_selection(
@@ -187,12 +190,28 @@ class TestKeyBindingsKeyEvent(unittest.TestCase):
             "'m' should be bound to move_files with selection"
         )
         
+        # 'M' with selection should also work for move_files (case-insensitive)
+        self.assertTrue(
+            self.config_manager.is_input_event_bound_to_action_with_selection(
+                event_upper, 'move_files', has_selection=True
+            ),
+            "'M' should be bound to move_files with selection (case-insensitive)"
+        )
+        
         # 'm' without selection should work for create_directory
         self.assertTrue(
             self.config_manager.is_input_event_bound_to_action_with_selection(
                 event_lower, 'create_directory', has_selection=False
             ),
             "'m' should be bound to create_directory without selection"
+        )
+        
+        # 'M' without selection should also work for create_directory (case-insensitive)
+        self.assertTrue(
+            self.config_manager.is_input_event_bound_to_action_with_selection(
+                event_upper, 'create_directory', has_selection=False
+            ),
+            "'M' should be bound to create_directory without selection (case-insensitive)"
         )
         
         # But not the other way around

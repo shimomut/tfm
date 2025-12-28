@@ -59,12 +59,15 @@ Initializes the KeyBindings instance with configuration and builds a reverse loo
 Parses a key expression into main key and modifier flags.
 
 **Examples:**
-- `"q"` → `("Q", 0)`
+- `"q"` → `("Q", 0)` (alphabet, uppercased)
+- `"?"` → `("?", 0)` (non-alphabet, preserved)
 - `"Shift-Down"` → `("DOWN", ModifierKey.SHIFT)`
 - `"Command-Shift-X"` → `("X", ModifierKey.COMMAND | ModifierKey.SHIFT)`
 
 **Algorithm:**
-1. If single character, return uppercase with no modifiers
+1. If single character:
+   - If alphabet (a-z, A-Z): return uppercase with no modifiers
+   - If non-alphabet: return as-is with no modifiers
 2. Split on hyphen to separate modifiers from main key
 3. Parse each modifier name (case-insensitive)
 4. Combine modifiers using bitwise OR
@@ -79,9 +82,12 @@ Uses `getattr(KeyCode, key_str, None)` to access KeyCode enum values by name.
 Checks if a KeyEvent matches a key expression.
 
 **Matching logic:**
-1. Check modifiers match exactly
-2. For single-character keys, match against `event.char`
-3. For multi-character keys, match against `event.key_code`
+1. For single-character keys, match against `event.char` (ignore modifiers for backward compatibility):
+   - If alphabet (a-z, A-Z): case-insensitive comparison
+   - If non-alphabet: case-sensitive comparison
+2. For multi-character keys:
+   - Check modifiers match exactly
+   - Match against `event.key_code`
 
 #### `find_action_for_event(event, has_selection: bool) -> Optional[str]`
 Finds the action bound to a KeyEvent, respecting selection requirements.
@@ -237,12 +243,15 @@ keycode_name := "UP" | "DOWN" | "ENTER" | ... (any KeyCode name)
 6. Combine modifiers with bitwise OR
 7. Return `(main_key, modifier_flags)`
 
-### Case Insensitivity
+### Case Sensitivity Rules
 
-All parsing is case-insensitive:
+**Case-insensitive:**
 - Modifier names: `'Shift'`, `'SHIFT'`, `'shift'` all work
 - KeyCode names: `'ENTER'`, `'enter'`, `'Enter'` all work
-- Single characters: matched as uppercase
+- Single alphabet characters: 'a' and 'A' are treated as the same
+
+**Case-sensitive:**
+- Single non-alphabet characters: '?' and '/' are different keys
 
 ### Order Independence
 
@@ -261,13 +270,24 @@ Modifier order doesn't matter:
 
 ### Single Character Matching
 
-Single-character keys match against `KeyEvent.char`:
+Single-character keys match against `KeyEvent.char` with special handling for alphabet vs non-alphabet:
+
 ```python
 if len(main_key) == 1:
-    return event.char and event.char.upper() == main_key
+    if main_key.isalpha():
+        # Alphabet: case-insensitive
+        return event.char and event.char.upper() == main_key
+    else:
+        # Non-alphabet: case-sensitive
+        return event.char == main_key
 ```
 
-This maintains backward compatibility with existing character-based bindings.
+**Rationale:**
+- **Alphabet characters (a-z, A-Z)**: Case-insensitive to avoid redundant bindings ('q' matches both 'q' and 'Q')
+- **Non-alphabet characters (?, /, ., etc.)**: Case-sensitive to allow different bindings for different symbols
+- **Uppercase-specific bindings**: Users must use "Shift-A" instead of just "A"
+
+This maintains backward compatibility while reducing configuration redundancy.
 
 ### KeyCode Matching
 
