@@ -443,7 +443,7 @@ class InfoDialogHelpers:
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('sync_other_to_current')} Sync other pane directory to current pane")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('adjust_pane_left')} Make left pane smaller (adjust boundary left)")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('adjust_pane_right')} Make left pane larger (adjust boundary right)")
-        help_lines.append(f"• {'-'.ljust(12)} Reset pane split to 50% | 50%")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('reset_pane_boundary')} Reset pane split to 50% | 50%")
         help_lines.append("")
         
         # Log Pane Controls (configurable)

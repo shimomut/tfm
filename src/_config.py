@@ -113,6 +113,7 @@ class Config:
         'compare_selection': ['w', 'W'],      # Show file and directory comparison options
         'adjust_pane_left': ['['],            # Make left pane smaller (move boundary left)
         'adjust_pane_right': [']'],           # Make left pane larger (move boundary right)
+        'reset_pane_boundary': ['-'],         # Reset pane split to 50% | 50%
         'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
         'adjust_log_down': ['}'],             # Make log pane smaller (Shift+])
         'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)

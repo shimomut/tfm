@@ -4253,7 +4253,7 @@ class FileManager(UILayer):
             self.mark_dirty()
             self.logger.info(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
             return True
-        elif event.key_code == ord('-'):  # '-' key - reset pane ratio to 50/50
+        elif self.is_key_for_action(event, 'reset_pane_boundary'):  # Reset pane split to 50/50
             self.pane_manager.left_pane_ratio = 0.5
             self.mark_dirty()
             self.logger.info("Pane split reset to 50% | 50%")
