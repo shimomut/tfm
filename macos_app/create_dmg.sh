@@ -108,7 +108,7 @@ If TFM fails to launch:
 2. Ensure you're running macOS 10.13 or later
 3. Try reinstalling by dragging TFM.app to Trash and reinstalling
 
-For more information, visit: https://github.com/yourusername/tfm
+For more information, visit: https://github.com/shimomut/tfm
 
 EOF
     fi
