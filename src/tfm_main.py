@@ -30,7 +30,7 @@ from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, Me
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, is_special_key_bound_to_with_selection, is_input_event_bound_to, is_input_event_bound_to_with_selection, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
+from tfm_config import get_config, is_action_available, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association, find_action_for_event
 from tfm_text_viewer import create_text_viewer, is_text_file
 from tfm_diff_viewer import create_diff_viewer
 from tfm_directory_diff_viewer import DirectoryDiffViewer
@@ -1286,7 +1286,8 @@ class FileManager(UILayer):
         has_selection = len(current_pane['selected_files']) > 0
         
         # Use the new KeyEvent-aware function
-        return is_input_event_bound_to_with_selection(event, action, has_selection)
+        found_action = find_action_for_event(event, has_selection)
+        return found_action == action
         
     def count_files_and_dirs(self, pane_data):
         """Count directories and files in a pane"""

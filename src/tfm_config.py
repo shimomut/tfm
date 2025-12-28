@@ -15,38 +15,267 @@ from ttk import KeyCode
 from tfm_log_manager import getLogger
 
 
-# Special key name to TTK KeyCode mapping
-SPECIAL_KEY_MAP = {
-    'HOME': KeyCode.HOME,
-    'END': KeyCode.END,
-    'PPAGE': KeyCode.PAGE_UP,
-    'NPAGE': KeyCode.PAGE_DOWN,
-    'UP': KeyCode.UP,
-    'DOWN': KeyCode.DOWN,
-    'LEFT': KeyCode.LEFT,
-    'RIGHT': KeyCode.RIGHT,
-    'BACKSPACE': KeyCode.BACKSPACE,
-    'DELETE': KeyCode.DELETE,
-    'INSERT': KeyCode.INSERT,
-    'F1': KeyCode.F1,
-    'F2': KeyCode.F2,
-    'F3': KeyCode.F3,
-    'F4': KeyCode.F4,
-    'F5': KeyCode.F5,
-    'F6': KeyCode.F6,
-    'F7': KeyCode.F7,
-    'F8': KeyCode.F8,
-    'F9': KeyCode.F9,
-    'F10': KeyCode.F10,
-    'F11': KeyCode.F11,
-    'F12': KeyCode.F12,
-}
 
-# Reverse mapping for display purposes
-SPECIAL_KEY_NAMES = {v: k for k, v in SPECIAL_KEY_MAP.items()}
 
 # Module-level logger
 logger = getLogger("Config")
+
+
+class KeyBindings:
+    """
+    Manages key bindings and provides lookup functionality.
+    
+    This class encapsulates all key binding logic, including:
+    - Parsing key expressions with modifiers
+    - Matching KeyEvents against configured bindings
+    - Looking up actions from key events
+    - Looking up key expressions from actions
+    """
+    
+    def __init__(self, key_bindings_config: dict):
+        """
+        Initialize KeyBindings with configuration.
+        
+        Args:
+            key_bindings_config: KEY_BINDINGS dictionary from Config
+        """
+        self.logger = getLogger("KeyBindings")
+        self._bindings = key_bindings_config
+        
+        # Build reverse lookup: (main_key, modifiers) -> [(action, selection_req), ...]
+        self._key_to_actions = self._build_key_lookup()
+    
+    def _parse_key_expression(self, key_expr: str) -> tuple:
+        """
+        Parse a key expression into main key and modifier flags.
+        
+        Args:
+            key_expr: Key expression string (e.g., "Shift-Down", "Command-Shift-X", "q")
+        
+        Returns:
+            Tuple of (main_key, modifier_flags)
+            - main_key: The main key as uppercase string
+            - modifier_flags: Bitwise OR of ModifierKey values
+        
+        Examples:
+            "q" -> ("Q", 0)
+            "Shift-Down" -> ("DOWN", ModifierKey.SHIFT)
+            "Command-Shift-X" -> ("X", ModifierKey.COMMAND | ModifierKey.SHIFT)
+        """
+        # Import ModifierKey here to avoid circular dependency
+        from ttk import ModifierKey
+        
+        # Single character - return as-is with no modifiers
+        if len(key_expr) == 1:
+            return (key_expr.upper(), 0)
+        
+        # Multi-character - parse as key expression
+        parts = key_expr.split('-')
+        
+        # Last part is the main key
+        main_key = parts[-1].upper()
+        
+        # Earlier parts are modifiers
+        modifiers = 0
+        for part in parts[:-1]:
+            modifier_name = part.upper()
+            if modifier_name == 'SHIFT':
+                modifiers |= ModifierKey.SHIFT
+            elif modifier_name == 'CONTROL' or modifier_name == 'CTRL':
+                modifiers |= ModifierKey.CONTROL
+            elif modifier_name == 'ALT' or modifier_name == 'OPTION':
+                modifiers |= ModifierKey.ALT
+            elif modifier_name == 'COMMAND' or modifier_name == 'CMD':
+                modifiers |= ModifierKey.COMMAND
+            else:
+                self.logger.warning(f"Unknown modifier in key expression: {part}")
+        
+        return (main_key, modifiers)
+    
+    def _keycode_from_string(self, key_str: str):
+        """
+        Convert a KeyCode name string to its integer value.
+        
+        Args:
+            key_str: KeyCode name (e.g., "DOWN", "ENTER", "A")
+        
+        Returns:
+            KeyCode integer value, or None if not found
+        """
+        try:
+            # KeyCode is a StrEnum, so we can access by name
+            keycode = getattr(KeyCode, key_str, None)
+            if keycode is None:
+                self.logger.warning(f"Unknown KeyCode name: {key_str}")
+            return keycode
+        except AttributeError:
+            self.logger.warning(f"Invalid KeyCode name: {key_str}")
+            return None
+    
+    def _build_key_lookup(self) -> dict:
+        """
+        Build a reverse lookup table from key expressions to actions.
+        
+        Returns:
+            Dictionary mapping (main_key, modifier_flags) to list of (action, selection_req) tuples
+        """
+        lookup = {}
+        
+        for action, binding in self._bindings.items():
+            # Extract keys and selection requirement
+            if isinstance(binding, list):
+                keys = binding
+                selection_req = 'any'
+            elif isinstance(binding, dict) and 'keys' in binding:
+                keys = binding['keys']
+                selection_req = binding.get('selection', 'any')
+            else:
+                continue
+            
+            # Process each key expression
+            for key_expr in keys:
+                # Parse key expression to get main key and modifiers
+                main_key, modifiers = self._parse_key_expression(key_expr)
+                
+                # Add to lookup table
+                lookup_key = (main_key, modifiers)
+                if lookup_key not in lookup:
+                    lookup[lookup_key] = []
+                lookup[lookup_key].append((action, selection_req))
+        
+        return lookup
+    
+    def _match_key_event(self, event, main_key: str, modifiers: int) -> bool:
+        """
+        Check if a KeyEvent matches a key expression.
+        
+        Args:
+            event: KeyEvent from TTK
+            main_key: Main key string (uppercase)
+            modifiers: Expected modifier flags
+        
+        Returns:
+            True if event matches the key expression
+        """
+        # Check modifiers first
+        if event.modifiers != modifiers:
+            return False
+        
+        # Single character - match against event.char
+        if len(main_key) == 1:
+            return event.char and event.char.upper() == main_key
+        
+        # KeyCode name - match against event.key_code
+        expected_keycode = self._keycode_from_string(main_key)
+        if expected_keycode is None:
+            return False
+        
+        return event.key_code == expected_keycode
+    
+    def _check_selection_requirement(self, requirement: str, has_selection: bool) -> bool:
+        """
+        Check if selection requirement is satisfied.
+        
+        Args:
+            requirement: 'required', 'none', or 'any'
+            has_selection: Whether files are currently selected
+        
+        Returns:
+            True if requirement is satisfied
+        """
+        if requirement == 'required':
+            return has_selection
+        elif requirement == 'none':
+            return not has_selection
+        else:  # 'any'
+            return True
+    
+    def find_action_for_event(self, event, has_selection: bool):
+        """
+        Find the action bound to a KeyEvent, respecting selection requirements.
+        
+        Args:
+            event: KeyEvent from TTK
+            has_selection: Whether files are currently selected
+        
+        Returns:
+            Action name if found, None otherwise
+        """
+        if not event:
+            return None
+        
+        # Try to match against all key bindings
+        for (main_key, modifiers), actions in self._key_to_actions.items():
+            if self._match_key_event(event, main_key, modifiers):
+                # Found a matching key - check selection requirements
+                for action, selection_req in actions:
+                    if self._check_selection_requirement(selection_req, has_selection):
+                        return action
+        
+        return None
+    
+    def get_keys_for_action(self, action: str) -> tuple:
+        """
+        Get the key expressions and selection requirement for an action.
+        
+        Args:
+            action: Action name
+        
+        Returns:
+            Tuple of (key_expressions, selection_requirement)
+            - key_expressions: List of key expression strings
+            - selection_requirement: 'required', 'none', or 'any'
+        """
+        if action not in self._bindings:
+            return ([], 'any')
+        
+        binding = self._bindings[action]
+        
+        # Extract keys and selection requirement
+        if isinstance(binding, list):
+            return (binding, 'any')
+        elif isinstance(binding, dict) and 'keys' in binding:
+            keys = binding['keys']
+            selection_req = binding.get('selection', 'any')
+            return (keys, selection_req)
+        
+        return ([], 'any')
+    
+    def format_key_for_display(self, key_expr: str) -> str:
+        """
+        Format a key expression for display in UI.
+        
+        Args:
+            key_expr: Key expression string
+        
+        Returns:
+            Formatted string suitable for display
+        
+        Examples:
+            "q" -> "q"
+            "Shift-Down" -> "Shift-Down"
+            "Command-Shift-X" -> "Cmd-Shift-X"
+        """
+        # Single character - return as-is
+        if len(key_expr) == 1:
+            return key_expr
+        
+        # Multi-character - format nicely
+        parts = key_expr.split('-')
+        
+        # Format modifiers
+        formatted_parts = []
+        for part in parts[:-1]:
+            modifier = part.capitalize()
+            # Abbreviate Command to Cmd
+            if modifier == 'Command':
+                modifier = 'Cmd'
+            formatted_parts.append(modifier)
+        
+        # Add main key
+        formatted_parts.append(parts[-1].upper())
+        
+        return '-'.join(formatted_parts)
 
 
 class DefaultConfig:
@@ -116,7 +345,7 @@ class DefaultConfig:
         'settings_menu': ['Z'],                # Show settings and configuration menu
         'copy_files': {'keys': ['c', 'C'], 'selection': 'required'},  # Copy selected files to other pane
         'move_files': {'keys': ['m', 'M'], 'selection': 'required'},  # Move selected files to other pane
-        'delete_files': {'keys': ['k', 'K'], 'selection': 'required'}, # Delete selected files/directories
+        'delete_files': {'keys': ['k', 'K', 'DELETE', 'Command-Backspace'], 'selection': 'required'}, # Delete selected files/directories
         'rename_file': ['r', 'R'],            # Rename selected file/directory
         'favorites': ['j'],                   # Show favorite directories dialog
         'jump_to_path': ['J'],                # Jump to path (Shift+J)
@@ -132,6 +361,15 @@ class DefaultConfig:
         'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
         'adjust_log_down': ['}'],             # Make log pane smaller (Shift+])
         'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)
+        # Navigation with modifier keys
+        'move_up': ['UP', 'k'],               # Move cursor up one item
+        'move_down': ['DOWN', 'j'],           # Move cursor down one item
+        'move_left': ['LEFT', 'h'],           # Move to parent directory
+        'move_right': ['RIGHT', 'l'],         # Enter directory or view file
+        'page_up': ['PAGE_UP', 'Shift-UP'],   # Move up one page
+        'page_down': ['PAGE_DOWN', 'Shift-DOWN'],  # Move down one page
+        'jump_to_top': ['Command-UP'],        # Jump to first item in list
+        'jump_to_bottom': ['Command-DOWN'],   # Jump to last item in list
     }
     
     # Favorite directories - list of dictionaries with 'name' and 'path' keys
@@ -233,6 +471,7 @@ class ConfigManager:
         self.config_dir = Path.home() / '.tfm'
         self.config_file = self.config_dir / 'config.py'
         self.config = None
+        self._key_bindings = None
         
     def ensure_config_dir(self):
         """Ensure the configuration directory exists"""
@@ -318,7 +557,25 @@ class ConfigManager:
     def reload_config(self):
         """Reload configuration from file"""
         self.config = None
+        self._key_bindings = None
         return self.load_config()
+    
+    def get_key_bindings(self) -> KeyBindings:
+        """Get the KeyBindings instance for current configuration."""
+        config = self.get_config()
+        
+        # Rebuild if config changed or not yet built
+        if self._key_bindings is None:
+            # Get key bindings config with fallback to defaults
+            if hasattr(config, 'KEY_BINDINGS') and config.KEY_BINDINGS:
+                key_bindings_config = config.KEY_BINDINGS
+            else:
+                self.logger.info("Using default key bindings")
+                key_bindings_config = DefaultConfig.KEY_BINDINGS
+            
+            self._key_bindings = KeyBindings(key_bindings_config)
+        
+        return self._key_bindings
     
     def validate_config(self, config):
         """Validate configuration values"""
@@ -459,9 +716,14 @@ class ConfigManager:
         
         # Check if any of the keys match the special key code
         for key in keys:
-            if isinstance(key, str) and key in SPECIAL_KEY_MAP:
-                if SPECIAL_KEY_MAP[key] == key_code:
-                    return True
+            if isinstance(key, str):
+                # Try to get KeyCode value from string
+                try:
+                    keycode_value = getattr(KeyCode, key, None)
+                    if keycode_value == key_code:
+                        return True
+                except AttributeError:
+                    pass
         
         return False
     
@@ -550,9 +812,14 @@ class ConfigManager:
                             return action
                     elif isinstance(key, int):
                         # Special key code
-                        if isinstance(bound_key, str) and bound_key in SPECIAL_KEY_MAP:
-                            if SPECIAL_KEY_MAP[bound_key] == key:
-                                return action
+                        if isinstance(bound_key, str):
+                            # Try to get KeyCode value from string
+                            try:
+                                keycode_value = getattr(KeyCode, bound_key, None)
+                                if keycode_value == key:
+                                    return action
+                            except AttributeError:
+                                pass
         
         return None
 
@@ -572,12 +839,55 @@ def reload_config():
 
 
 def is_key_bound_to(key_char, action):
-    """Check if a key is bound to a specific action"""
+    """
+    DEPRECATED: Use find_action_for_event() instead.
+    
+    Check if a key is bound to a specific action.
+    
+    This function is deprecated and maintained only for backward compatibility.
+    New code should use find_action_for_event() which supports modifier keys
+    and provides more flexible key binding matching.
+    
+    Args:
+        key_char: Character key to check
+        action: Action name
+    
+    Returns:
+        bool: True if key is bound to action
+    """
+    import warnings
+    warnings.warn(
+        "is_key_bound_to() is deprecated. Use find_action_for_event() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     return config_manager.is_key_bound_to_action(key_char, action)
 
 
 def is_key_bound_to_with_selection(key_char, action, has_selection):
-    """Check if a key is bound to a specific action and available for current selection status"""
+    """
+    DEPRECATED: Use find_action_for_event() instead.
+    
+    Check if a key is bound to a specific action and available for current selection status.
+    
+    This function is deprecated and maintained only for backward compatibility.
+    New code should use find_action_for_event() which supports modifier keys
+    and provides more flexible key binding matching.
+    
+    Args:
+        key_char: Character key to check
+        action: Action name
+        has_selection: Whether files are currently selected
+    
+    Returns:
+        bool: True if key is bound to action and selection requirement is met
+    """
+    import warnings
+    warnings.warn(
+        "is_key_bound_to_with_selection() is deprecated. Use find_action_for_event() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     return config_manager.is_key_bound_to_action_with_selection(key_char, action, has_selection)
 
 
@@ -587,18 +897,67 @@ def is_action_available(action, has_selection):
 
 
 def is_special_key_bound_to(key_code, action):
-    """Check if a special key code is bound to a specific action"""
+    """
+    DEPRECATED: Use find_action_for_event() instead.
+    
+    Check if a special key code is bound to a specific action.
+    
+    This function is deprecated and maintained only for backward compatibility.
+    New code should use find_action_for_event() which supports modifier keys
+    and provides more flexible key binding matching.
+    
+    Args:
+        key_code: KeyCode value to check
+        action: Action name
+    
+    Returns:
+        bool: True if key code is bound to action
+    """
+    import warnings
+    warnings.warn(
+        "is_special_key_bound_to() is deprecated. Use find_action_for_event() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     return config_manager.is_special_key_bound_to_action(key_code, action)
 
 
 def is_special_key_bound_to_with_selection(key_code, action, has_selection):
-    """Check if a special key is bound to a specific action and available for current selection status"""
+    """
+    DEPRECATED: Use find_action_for_event() instead.
+    
+    Check if a special key is bound to a specific action and available for current selection status.
+    
+    This function is deprecated and maintained only for backward compatibility.
+    New code should use find_action_for_event() which supports modifier keys
+    and provides more flexible key binding matching.
+    
+    Args:
+        key_code: KeyCode value to check
+        action: Action name
+        has_selection: Whether files are currently selected
+    
+    Returns:
+        bool: True if key code is bound to action and selection requirement is met
+    """
+    import warnings
+    warnings.warn(
+        "is_special_key_bound_to_with_selection() is deprecated. Use find_action_for_event() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     return config_manager.is_special_key_bound_to_action_with_selection(key_code, action, has_selection)
 
 
 def is_input_event_bound_to(event, action):
     """
+    DEPRECATED: Use find_action_for_event() instead.
+    
     Check if a KeyEvent is bound to a specific action.
+    
+    This function is deprecated and maintained only for backward compatibility.
+    New code should use find_action_for_event() which supports modifier keys
+    and provides more flexible key binding matching.
     
     Args:
         event: KeyEvent from TTK renderer
@@ -607,12 +966,24 @@ def is_input_event_bound_to(event, action):
     Returns:
         bool: True if event is bound to the action
     """
+    import warnings
+    warnings.warn(
+        "is_input_event_bound_to() is deprecated. Use find_action_for_event() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     return config_manager.is_input_event_bound_to_action(event, action)
 
 
 def is_input_event_bound_to_with_selection(event, action, has_selection):
     """
+    DEPRECATED: Use find_action_for_event() instead.
+    
     Check if a KeyEvent is bound to a specific action and respects selection requirements.
+    
+    This function is deprecated and maintained only for backward compatibility.
+    New code should use find_action_for_event() which supports modifier keys
+    and provides more flexible key binding matching.
     
     Args:
         event: KeyEvent from TTK renderer
@@ -622,12 +993,81 @@ def is_input_event_bound_to_with_selection(event, action, has_selection):
     Returns:
         bool: True if event is bound to the action and selection requirement is met
     """
+    import warnings
+    warnings.warn(
+        "is_input_event_bound_to_with_selection() is deprecated. Use find_action_for_event() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     return config_manager.is_input_event_bound_to_action_with_selection(event, action, has_selection)
 
 
 def get_action_for_key(key):
-    """Get the action bound to a key (character or special key code)"""
+    """
+    DEPRECATED: Use find_action_for_event() instead.
+    
+    Get the action bound to a key (character or special key code).
+    
+    This function is deprecated and maintained only for backward compatibility.
+    New code should use find_action_for_event() which supports modifier keys
+    and provides more flexible key binding matching.
+    
+    Args:
+        key: Either a character string or a curses key code (int)
+    
+    Returns:
+        Action name if found, None otherwise
+    """
+    import warnings
+    warnings.warn(
+        "get_action_for_key() is deprecated. Use find_action_for_event() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     return config_manager.get_action_for_key(key)
+
+
+def find_action_for_event(event, has_selection: bool = False):
+    """
+    Find the action bound to a KeyEvent.
+    
+    Args:
+        event: KeyEvent from TTK
+        has_selection: Whether files are currently selected
+    
+    Returns:
+        Action name if found, None otherwise
+    """
+    key_bindings = config_manager.get_key_bindings()
+    return key_bindings.find_action_for_event(event, has_selection)
+
+
+def get_keys_for_action(action: str) -> tuple:
+    """
+    Get the key expressions and selection requirement for an action.
+    
+    Args:
+        action: Action name
+    
+    Returns:
+        Tuple of (key_expressions, selection_requirement)
+    """
+    key_bindings = config_manager.get_key_bindings()
+    return key_bindings.get_keys_for_action(action)
+
+
+def format_key_for_display(key_expr: str) -> str:
+    """
+    Format a key expression for display in UI.
+    
+    Args:
+        key_expr: Key expression string
+    
+    Returns:
+        Formatted string suitable for display
+    """
+    key_bindings = config_manager.get_key_bindings()
+    return key_bindings.format_key_for_display(key_expr)
 
 
 

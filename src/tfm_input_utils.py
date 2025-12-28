@@ -142,11 +142,16 @@ def is_input_event_for_action(event, action, config_manager):
     if not event:
         return False
     
-    key_char = input_event_to_key_char(event)
-    if not key_char:
-        return False
+    # Use new API: find_action_for_event with has_selection=True/False doesn't matter
+    # since we're checking if the action matches regardless of selection
+    key_bindings = config_manager.get_key_bindings()
+    found_action = key_bindings.find_action_for_event(event, has_selection=True)
+    if found_action == action:
+        return True
     
-    return config_manager.is_key_bound_to_action(key_char, action)
+    # Also check with has_selection=False in case selection requirement differs
+    found_action = key_bindings.find_action_for_event(event, has_selection=False)
+    return found_action == action
 
 
 def is_input_event_for_action_with_selection(event, action, has_selection, config_manager):
@@ -172,11 +177,10 @@ def is_input_event_for_action_with_selection(event, action, has_selection, confi
     if not event:
         return False
     
-    key_char = input_event_to_key_char(event)
-    if not key_char:
-        return False
-    
-    return config_manager.is_key_bound_to_action_with_selection(key_char, action, has_selection)
+    # Use new API: find_action_for_event respects selection requirements
+    key_bindings = config_manager.get_key_bindings()
+    found_action = key_bindings.find_action_for_event(event, has_selection)
+    return found_action == action
 
 
 def has_modifier(event, modifier):

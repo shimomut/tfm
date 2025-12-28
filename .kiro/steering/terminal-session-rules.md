@@ -17,6 +17,26 @@ inclusion: always
 
 Activate the virtual environment before running any Python scripts, tests, or demo scripts in the project.
 
+## Python Path Configuration
+
+**When running Python scripts or tests**, always set PYTHONPATH to include the necessary directories:
+
+```bash
+# ✅ CORRECT - Include current directory, src, and ttk
+PYTHONPATH=.:src:ttk python script.py
+PYTHONPATH=.:src:ttk pytest test/test_file.py -v
+
+# ❌ AVOID - Missing PYTHONPATH can cause import errors
+python script.py
+pytest test/test_file.py -v
+```
+
+**Why this is needed:**
+- TFM source code is in `src/` directory
+- TTK library is in `ttk/` directory
+- Tests and scripts need to import from both locations
+- Setting PYTHONPATH ensures imports work correctly
+
 ## Git Command Standards
 
 **Always disable git pager when running git commands** to prevent interactive pager sessions:

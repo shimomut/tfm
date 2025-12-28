@@ -182,15 +182,19 @@ def test_is_input_event_for_action():
     """Test checking if event matches a configured action."""
     print("Testing is_input_event_for_action...")
     
-    # Mock config manager
-    class MockConfigManager:
-        def is_key_bound_to_action(self, key_char, action):
+    # Mock config manager with KeyBindings
+    class MockKeyBindings:
+        def find_action_for_event(self, event, has_selection):
             # Simple mock: 'q' is bound to 'quit', 'c' to 'copy_files'
-            bindings = {
-                'quit': ['q', 'Q'],
-                'copy_files': ['c', 'C'],
-            }
-            return key_char in bindings.get(action, [])
+            if event.char == 'q':
+                return 'quit'
+            elif event.char == 'c':
+                return 'copy_files'
+            return None
+    
+    class MockConfigManager:
+        def get_key_bindings(self):
+            return MockKeyBindings()
     
     config_manager = MockConfigManager()
     
@@ -218,20 +222,24 @@ def test_is_input_event_for_action_with_selection():
     """Test checking if event matches action with selection requirements."""
     print("Testing is_input_event_for_action_with_selection...")
     
-    # Mock config manager
-    class MockConfigManager:
-        def is_key_bound_to_action_with_selection(self, key_char, action, has_selection):
+    # Mock config manager with KeyBindings
+    class MockKeyBindings:
+        def find_action_for_event(self, event, has_selection):
             # Simple mock:
             # - 'copy_files' requires selection
             # - 'quit' works regardless of selection
             # - 'create_directory' requires no selection
-            if action == 'copy_files':
-                return key_char == 'c' and has_selection
-            elif action == 'quit':
-                return key_char == 'q'
-            elif action == 'create_directory':
-                return key_char == 'm' and not has_selection
-            return False
+            if event.char == 'c' and has_selection:
+                return 'copy_files'
+            elif event.char == 'q':
+                return 'quit'
+            elif event.char == 'm' and not has_selection:
+                return 'create_directory'
+            return None
+    
+    class MockConfigManager:
+        def get_key_bindings(self):
+            return MockKeyBindings()
     
     config_manager = MockConfigManager()
     
