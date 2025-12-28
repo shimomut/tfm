@@ -75,14 +75,15 @@ class TestCursesInputHandling(unittest.TestCase):
             expected_keycode = KeyCode.KEY_0 + (char_code - ord('0'))
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
+            self.assertEqual(event.modifiers, ModifierKey.NONE)
         
         # Test space - now maps to KeyCode.SPACE
         event = self.backend._translate_curses_key(32)
         self.assertEqual(event.key_code, KeyCode.SPACE)
         self.assertEqual(event.char, ' ')
         
-        # Test special printable characters - map to their respective KEY_* values
-        symbol_tests = [
+        # Test unshifted symbol keys - no Shift modifier
+        unshifted_symbols = [
             ('-', KeyCode.KEY_MINUS),
             ('=', KeyCode.KEY_EQUAL),
             ('[', KeyCode.KEY_LEFT_BRACKET),
@@ -95,11 +96,43 @@ class TestCursesInputHandling(unittest.TestCase):
             ('/', KeyCode.KEY_SLASH),
             ('`', KeyCode.KEY_GRAVE),
         ]
-        for char, expected_keycode in symbol_tests:
+        for char, expected_keycode in unshifted_symbols:
             char_code = ord(char)
             event = self.backend._translate_curses_key(char_code)
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, char)
+            self.assertEqual(event.modifiers, ModifierKey.NONE)
+        
+        # Test shifted symbol keys - should have Shift modifier
+        shifted_symbols = [
+            ('_', KeyCode.KEY_MINUS),
+            ('+', KeyCode.KEY_EQUAL),
+            ('{', KeyCode.KEY_LEFT_BRACKET),
+            ('}', KeyCode.KEY_RIGHT_BRACKET),
+            ('|', KeyCode.KEY_BACKSLASH),
+            (':', KeyCode.KEY_SEMICOLON),
+            ('"', KeyCode.KEY_QUOTE),
+            ('<', KeyCode.KEY_COMMA),
+            ('>', KeyCode.KEY_PERIOD),
+            ('?', KeyCode.KEY_SLASH),
+            ('~', KeyCode.KEY_GRAVE),
+            ('!', KeyCode.KEY_1),
+            ('@', KeyCode.KEY_2),
+            ('#', KeyCode.KEY_3),
+            ('$', KeyCode.KEY_4),
+            ('%', KeyCode.KEY_5),
+            ('^', KeyCode.KEY_6),
+            ('&', KeyCode.KEY_7),
+            ('*', KeyCode.KEY_8),
+            ('(', KeyCode.KEY_9),
+            (')', KeyCode.KEY_0),
+        ]
+        for char, expected_keycode in shifted_symbols:
+            char_code = ord(char)
+            event = self.backend._translate_curses_key(char_code)
+            self.assertEqual(event.key_code, expected_keycode)
+            self.assertEqual(event.char, char)
+            self.assertEqual(event.modifiers, ModifierKey.SHIFT)
     
     def test_translate_arrow_keys(self):
         """Test translation of arrow keys."""

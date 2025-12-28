@@ -227,6 +227,42 @@ CURSES_ANSI_KEY_MAP = {
     127: KeyCode.BACKSPACE,
 }
 
+# Set of shifted characters for ANSI layout
+# These characters require the Shift key to be pressed
+# Used to detect Shift modifier in _translate_curses_key
+CURSES_ANSI_SHIFTED_CHARS = frozenset({
+    # Uppercase letters
+    ord('A'), ord('B'), ord('C'), ord('D'), ord('E'), ord('F'), ord('G'), ord('H'),
+    ord('I'), ord('J'), ord('K'), ord('L'), ord('M'), ord('N'), ord('O'), ord('P'),
+    ord('Q'), ord('R'), ord('S'), ord('T'), ord('U'), ord('V'), ord('W'), ord('X'),
+    ord('Y'), ord('Z'),
+    
+    # Shifted symbol keys
+    ord('_'),  # Shift + -
+    ord('+'),  # Shift + =
+    ord('{'),  # Shift + [
+    ord('}'),  # Shift + ]
+    ord('|'),  # Shift + \
+    ord(':'),  # Shift + ;
+    ord('"'),  # Shift + '
+    ord('<'),  # Shift + ,
+    ord('>'),  # Shift + .
+    ord('?'),  # Shift + /
+    ord('~'),  # Shift + `
+    
+    # Shifted digit symbols
+    ord('!'),  # Shift + 1
+    ord('@'),  # Shift + 2
+    ord('#'),  # Shift + 3
+    ord('$'),  # Shift + 4
+    ord('%'),  # Shift + 5
+    ord('^'),  # Shift + 6
+    ord('&'),  # Shift + 7
+    ord('*'),  # Shift + 8
+    ord('('),  # Shift + 9
+    ord(')'),  # Shift + 0
+})
+
 
 class UTF8Accumulator:
     """
@@ -352,23 +388,23 @@ class CursesBackend(Renderer):
         self.mouse_enabled = False  # Whether mouse events are enabled
         self.mouse_available = False  # Whether terminal supports mouse events
         self.keyboard_layout = keyboard_layout  # Keyboard layout type
-        self._key_map = self._get_key_map(keyboard_layout)  # Initialize key mapping
+        self._key_map, self._shifted_chars = self._get_key_map(keyboard_layout)  # Initialize key mapping
     
-    def _get_key_map(self, layout: str) -> dict:
+    def _get_key_map(self, layout: str) -> Tuple[dict, frozenset]:
         """
-        Get the appropriate key map for the keyboard layout.
+        Get the appropriate key map and shifted characters set for the keyboard layout.
         
         Args:
             layout: Keyboard layout type ('ANSI', etc.)
         
         Returns:
-            dict: Key mapping dictionary for the specified layout
+            tuple: (Key mapping dictionary, Set of shifted character codes)
         
         Raises:
             ValueError: If layout is unknown
         """
         if layout == 'ANSI':
-            return CURSES_ANSI_KEY_MAP
+            return CURSES_ANSI_KEY_MAP, CURSES_ANSI_SHIFTED_CHARS
         else:
             raise ValueError(f"Unknown keyboard layout: {layout}")
     
@@ -1080,8 +1116,8 @@ class CursesBackend(Renderer):
         elif key in (_KEY_SHIFT_RIGHT_1, _KEY_SHIFT_RIGHT_2):
             return KeyEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.SHIFT)
         
-        # Detect Shift modifier for uppercase letters
-        if ord('A') <= key <= ord('Z'):
+        # Detect Shift modifier using the shifted characters set
+        if key in self._shifted_chars:
             modifiers = ModifierKey.SHIFT
         
         # Look up key in key map
