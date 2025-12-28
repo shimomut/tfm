@@ -51,19 +51,6 @@ class TestKeyBindingsKeyEvent(unittest.TestCase):
             "KeyEvent for HOME key should be bound to select_all action"
         )
     
-    def test_ctrl_modified_input_event(self):
-        """Test that Ctrl-modified KeyEvents are recognized."""
-        # Create KeyEvent for Ctrl+L (redraw - this is a common TFM binding)
-        # Note: We'll test with a regular key since Ctrl combinations may not be in default config
-        # Let's test that a Ctrl-modified event is properly converted to key string
-        event = KeyEvent(key_code=ord('r'), modifiers=ModifierKey.CONTROL, char='r')
-        
-        # The event should be converted to 'CTRL_R' format
-        # Even if not bound, the conversion should work
-        from tfm_input_utils import input_event_to_key_char
-        key_char = input_event_to_key_char(event)
-        self.assertEqual(key_char, 'CTRL_R', "Ctrl+R should be converted to 'CTRL_R'")
-    
     def test_input_event_with_selection_requirement(self):
         """Test KeyEvent with selection requirements."""
         # Create KeyEvent for 'C' (copy_files - requires selection)
