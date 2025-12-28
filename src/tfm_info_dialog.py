@@ -438,7 +438,7 @@ class InfoDialogHelpers:
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('search_content')} Content search dialog")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('file_details')} Show file details")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('diff_files')} View diff between two selected text files")
-        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('directory_diff')} Compare directories recursively")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('diff_directories')} Compare directories recursively")
         help_lines.append("")
         
         # Pane Operations (configurable)

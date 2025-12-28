@@ -4192,7 +4192,7 @@ class FileManager(UILayer):
         elif action == 'diff_files':  # Diff two selected files
             self.diff_selected_files()
             return True
-        elif action == 'directory_diff':  # Compare directories recursively
+        elif action == 'diff_directories':  # Compare directories recursively
             self.show_directory_diff()
             return True
         elif action == 'copy_files':  # Copy selected files

@@ -420,8 +420,8 @@ class DefaultConfig:
         'scroll_log_page_down': ['Shift-RIGHT'], # Scroll log pane down one page (to newer messages)
         
         # File comparison actions
-        'diff_files': ['Shift-D'],             # Compare two selected files side-by-side
-        'directory_diff': ['Shift-W'],         # Compare directories recursively
+        'diff_files': ['EQUAL'],               # Compare two selected files side-by-side
+        'diff_directories': ['Shift-EQUAL'],   # Compare directories recursively
     }
     
     # Favorite directories - list of dictionaries with 'name' and 'path' keys
