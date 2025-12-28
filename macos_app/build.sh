@@ -276,6 +276,15 @@ else
     log_info "Warning: Application icon not found at ${ICON_SOURCE}"
 fi
 
+# Copy LICENSE file
+LICENSE_SOURCE="${PROJECT_ROOT}/LICENSE"
+if [ -f "${LICENSE_SOURCE}" ]; then
+    log_info "Copying LICENSE file..."
+    cp "${LICENSE_SOURCE}" "${RESOURCES_DIR_BUNDLE}/"
+else
+    log_warning "LICENSE file not found at ${LICENSE_SOURCE}"
+fi
+
 log_success "Resources copied successfully"
 
 # ============================================================================

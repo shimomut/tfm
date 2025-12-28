@@ -149,6 +149,14 @@ main() {
     # Create or copy INSTALL.md
     create_install_doc
     
+    # Copy LICENSE file
+    log_info "Copying LICENSE file"
+    if [ -f "${PROJECT_ROOT}/LICENSE" ]; then
+        cp "${PROJECT_ROOT}/LICENSE" "${DMG_TEMP_DIR}/"
+    else
+        log_warning "LICENSE file not found at ${PROJECT_ROOT}/LICENSE"
+    fi
+    
     # Remove any existing DMG with the same name
     if [ -f "${DMG_PATH}" ]; then
         log_info "Removing existing DMG"
