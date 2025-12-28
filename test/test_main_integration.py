@@ -91,11 +91,12 @@ class TestMainIntegration(unittest.TestCase):
         self.assertTrue(self.file_manager.is_key_for_action(ord('k'), 'delete_files'))  # And available
     
     def test_different_keys_same_action(self):
-        """Test that multiple keys bound to the same action work correctly."""
+        """Test that alphabet keys are case-insensitive (both 'c' and 'C' map to KeyCode.C)."""
         # No selection
         self.file_manager.left_pane['selected_files'] = set()
         
-        # Both 'c' and 'C' are bound to copy_files
+        # Both 'c' and 'C' map to KeyCode.C (case-insensitive for alphabet)
+        # So both should be bound to copy_files
         self.assertTrue(self.file_manager.is_key_for_action_original(ord('c'), 'copy_files'))
         self.assertTrue(self.file_manager.is_key_for_action_original(ord('C'), 'copy_files'))
         
@@ -106,7 +107,7 @@ class TestMainIntegration(unittest.TestCase):
         # With selection
         self.file_manager.left_pane['selected_files'] = {'/path/to/file.txt'}
         
-        # Both should be available with selection
+        # Both should be available with selection (case-insensitive)
         self.assertTrue(self.file_manager.is_key_for_action(ord('c'), 'copy_files'))
         self.assertTrue(self.file_manager.is_key_for_action(ord('C'), 'copy_files'))
     

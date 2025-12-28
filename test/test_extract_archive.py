@@ -160,11 +160,11 @@ def test_key_binding():
     
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-    from tfm_config import get_config, is_key_bound_to
+    from tfm_config import get_config, ConfigManager
     
-    # Test that 'u' and 'U' are bound to extract_archive
-    assert is_key_bound_to('u', 'extract_archive')
-    assert is_key_bound_to('U', 'extract_archive')
+    # Test that 'U' is bound to extract_archive (alphabet keys are uppercase in config)
+    config_manager = ConfigManager()
+    assert config_manager.is_key_bound_to_action('U', 'extract_archive')
     
     print("✓ Key bindings configured correctly")
 

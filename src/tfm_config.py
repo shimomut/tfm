@@ -15,38 +15,303 @@ from ttk import KeyCode
 from tfm_log_manager import getLogger
 
 
-# Special key name to TTK KeyCode mapping
-SPECIAL_KEY_MAP = {
-    'HOME': KeyCode.HOME,
-    'END': KeyCode.END,
-    'PPAGE': KeyCode.PAGE_UP,
-    'NPAGE': KeyCode.PAGE_DOWN,
-    'UP': KeyCode.UP,
-    'DOWN': KeyCode.DOWN,
-    'LEFT': KeyCode.LEFT,
-    'RIGHT': KeyCode.RIGHT,
-    'BACKSPACE': KeyCode.BACKSPACE,
-    'DELETE': KeyCode.DELETE,
-    'INSERT': KeyCode.INSERT,
-    'F1': KeyCode.F1,
-    'F2': KeyCode.F2,
-    'F3': KeyCode.F3,
-    'F4': KeyCode.F4,
-    'F5': KeyCode.F5,
-    'F6': KeyCode.F6,
-    'F7': KeyCode.F7,
-    'F8': KeyCode.F8,
-    'F9': KeyCode.F9,
-    'F10': KeyCode.F10,
-    'F11': KeyCode.F11,
-    'F12': KeyCode.F12,
-}
 
-# Reverse mapping for display purposes
-SPECIAL_KEY_NAMES = {v: k for k, v in SPECIAL_KEY_MAP.items()}
 
 # Module-level logger
 logger = getLogger("Config")
+
+
+class KeyBindings:
+    """
+    Manages key bindings and provides lookup functionality.
+    
+    This class encapsulates all key binding logic, including:
+    - Parsing key expressions with modifiers
+    - Matching KeyEvents against configured bindings
+    - Looking up actions from key events
+    - Looking up key expressions from actions
+    """
+    
+    def __init__(self, key_bindings_config: dict):
+        """
+        Initialize KeyBindings with configuration.
+        
+        Args:
+            key_bindings_config: KEY_BINDINGS dictionary from Config
+        """
+        self.logger = getLogger("KeyBindings")
+        self._bindings = key_bindings_config
+        
+        # Build reverse lookup: (main_key, modifiers) -> [(action, selection_req), ...]
+        self._key_to_actions = self._build_key_lookup()
+    
+    def _parse_key_expression(self, key_expr: str) -> tuple:
+        """
+        Parse a key expression into main key and modifier flags.
+        
+        Args:
+            key_expr: Key expression string (e.g., "Shift-Down", "Command-Shift-X", "q", "?")
+        
+        Returns:
+            Tuple of (main_key, modifier_flags)
+            - main_key: The main key as string
+              * Non-alphabet single chars: preserved as-is (e.g., "?" stays "?")
+              * Alphabet single chars: normalized to uppercase (e.g., "q" -> "Q", "A" -> "A")
+              * Multi-char keys: normalized to uppercase (e.g., "Down" -> "DOWN")
+            - modifier_flags: Bitwise OR of ModifierKey values
+              * Single chars (both alphabet and non-alphabet): always 0
+              * Multi-char expressions: parsed from prefix (e.g., "Shift-Down" -> SHIFT)
+        
+        Key Behavior:
+            - Non-alphabet single characters (?, /, ., etc.): Case-sensitive, match on char, ignore modifiers
+            - Alphabet single characters (a-z, A-Z): Case-insensitive (normalized to uppercase), 
+              match on KeyCode, RESPECT modifiers (modifiers=0 means no modifiers)
+            - Multi-character keys (KeyCode names): Match on KeyCode with modifiers
+        
+        Important:
+            To bind uppercase letters separately, users must use "Shift-A" instead of just "A".
+            Just "A" or "a" in config will match KeyCode.A with NO modifiers (lowercase 'a' press).
+        
+        Examples:
+            "q" -> ("Q", 0)  # Matches lowercase 'q' press (no Shift)
+            "A" -> ("A", 0)  # Matches lowercase 'a' press (no Shift) - same as "q"
+            "Shift-A" -> ("A", SHIFT)  # Matches uppercase 'A' press (with Shift)
+            "?" -> ("?", 0)  # Matches '?' character regardless of modifiers
+            "/" -> ("/", 0)  # Matches '/' character regardless of modifiers
+            "Shift-Down" -> ("DOWN", ModifierKey.SHIFT)
+            "Command-Shift-X" -> ("X", ModifierKey.COMMAND | ModifierKey.SHIFT)
+        """
+        # Import ModifierKey here to avoid circular dependency
+        from ttk import ModifierKey
+        
+        # Single non-alphabet character - preserve case for case-sensitive matching
+        if len(key_expr) == 1 and not key_expr.isalpha():
+            return (key_expr, 0)
+        
+        # Multi-character - parse as key expression
+        parts = key_expr.split('-')
+        
+        # Last part is the main key
+        main_key = parts[-1].upper()
+        
+        # Earlier parts are modifiers
+        modifiers = 0
+        for part in parts[:-1]:
+            modifier_name = part.upper()
+            if modifier_name == 'SHIFT':
+                modifiers |= ModifierKey.SHIFT
+            elif modifier_name == 'CONTROL' or modifier_name == 'CTRL':
+                modifiers |= ModifierKey.CONTROL
+            elif modifier_name == 'ALT' or modifier_name == 'OPTION':
+                modifiers |= ModifierKey.ALT
+            elif modifier_name == 'COMMAND' or modifier_name == 'CMD':
+                modifiers |= ModifierKey.COMMAND
+            else:
+                self.logger.warning(f"Unknown modifier in key expression: {part}")
+        
+        return (main_key, modifiers)
+    
+    def _keycode_from_string(self, key_str: str):
+        """
+        Convert a KeyCode name string to its integer value.
+        
+        Args:
+            key_str: KeyCode name (e.g., "DOWN", "ENTER", "A")
+        
+        Returns:
+            KeyCode integer value, or None if not found
+        """
+        try:
+            # KeyCode is a StrEnum, so we can access by name
+            keycode = getattr(KeyCode, key_str, None)
+            if keycode is None:
+                self.logger.warning(f"Unknown KeyCode name: {key_str}")
+            return keycode
+        except AttributeError:
+            self.logger.warning(f"Invalid KeyCode name: {key_str}")
+            return None
+    
+    def _build_key_lookup(self) -> dict:
+        """
+        Build a reverse lookup table from key expressions to actions.
+        
+        Returns:
+            Dictionary mapping (main_key, modifier_flags) to list of (action, selection_req) tuples
+        """
+        lookup = {}
+        
+        for action, binding in self._bindings.items():
+            # Extract keys and selection requirement
+            if isinstance(binding, list):
+                keys = binding
+                selection_req = 'any'
+            elif isinstance(binding, dict) and 'keys' in binding:
+                keys = binding['keys']
+                selection_req = binding.get('selection', 'any')
+            else:
+                continue
+            
+            # Process each key expression
+            for key_expr in keys:
+                # Parse key expression to get main key and modifiers
+                main_key, modifiers = self._parse_key_expression(key_expr)
+                
+                # Add to lookup table
+                lookup_key = (main_key, modifiers)
+                if lookup_key not in lookup:
+                    lookup[lookup_key] = []
+                lookup[lookup_key].append((action, selection_req))
+        
+        return lookup
+    
+    def _match_key_event(self, event, main_key: str, modifiers: int) -> bool:
+        """
+        Check if a KeyEvent matches a key expression.
+        
+        This method implements the key matching logic that distinguishes between:
+        1. Non-alphabet single characters: Match on event.char (case-sensitive, ignore modifiers)
+        2. Alphabet characters: Match on event.key_code (case-insensitive, RESPECT modifiers)
+        3. Multi-character keys: Match on event.key_code (respect modifiers)
+        
+        Args:
+            event: KeyEvent from TTK
+            main_key: Main key string from _parse_key_expression()
+              * Non-alphabet single chars: original case (e.g., "?", "/")
+              * Alphabet chars: uppercase (e.g., "Q", "A")
+              * Multi-char keys: uppercase KeyCode name (e.g., "DOWN", "ENTER")
+            modifiers: Expected modifier flags (0 for non-alphabet single chars, may be non-zero for alphabet)
+        
+        Returns:
+            True if event matches the key expression
+        
+        Examples:
+            - "?" matches KeyEvent(char="?") regardless of modifiers
+            - "q" matches KeyEvent(key_code=KeyCode.Q, modifiers=0) but NOT with Shift
+            - "Shift-A" matches KeyEvent(key_code=KeyCode.A, modifiers=SHIFT)
+        
+        Note:
+            To bind uppercase letters separately from lowercase, users must use "Shift-A" 
+            instead of just "A" in the configuration.
+        """
+        # Single non-alphabet character - match on char field (case-sensitive, ignore modifiers)
+        if len(main_key) == 1 and not main_key.isalpha():
+            return event.char and event.char == main_key
+        
+        # Alphabet or multi-character keys - check modifiers first
+        if event.modifiers != modifiers:
+            return False
+        
+        # Match against KeyCode (case-insensitive for alphabet, exact for multi-char)
+        expected_keycode = self._keycode_from_string(main_key)
+        if expected_keycode is None:
+            return False
+        
+        return event.key_code == expected_keycode
+    
+    def _check_selection_requirement(self, requirement: str, has_selection: bool) -> bool:
+        """
+        Check if selection requirement is satisfied.
+        
+        Args:
+            requirement: 'required', 'none', or 'any'
+            has_selection: Whether files are currently selected
+        
+        Returns:
+            True if requirement is satisfied
+        """
+        if requirement == 'required':
+            return has_selection
+        elif requirement == 'none':
+            return not has_selection
+        else:  # 'any'
+            return True
+    
+    def find_action_for_event(self, event, has_selection: bool):
+        """
+        Find the action bound to a KeyEvent, respecting selection requirements.
+        
+        Args:
+            event: KeyEvent from TTK
+            has_selection: Whether files are currently selected
+        
+        Returns:
+            Action name if found, None otherwise
+        """
+        if not event:
+            return None
+        
+        # Try to match against all key bindings
+        for (main_key, modifiers), actions in self._key_to_actions.items():
+            if self._match_key_event(event, main_key, modifiers):
+                # Found a matching key - check selection requirements
+                for action, selection_req in actions:
+                    if self._check_selection_requirement(selection_req, has_selection):
+                        return action
+        
+        return None
+    
+    def get_keys_for_action(self, action: str) -> tuple:
+        """
+        Get the key expressions and selection requirement for an action.
+        
+        Args:
+            action: Action name
+        
+        Returns:
+            Tuple of (key_expressions, selection_requirement)
+            - key_expressions: List of key expression strings
+            - selection_requirement: 'required', 'none', or 'any'
+        """
+        if action not in self._bindings:
+            return ([], 'any')
+        
+        binding = self._bindings[action]
+        
+        # Extract keys and selection requirement
+        if isinstance(binding, list):
+            return (binding, 'any')
+        elif isinstance(binding, dict) and 'keys' in binding:
+            keys = binding['keys']
+            selection_req = binding.get('selection', 'any')
+            return (keys, selection_req)
+        
+        return ([], 'any')
+    
+    def format_key_for_display(self, key_expr: str) -> str:
+        """
+        Format a key expression for display in UI.
+        
+        Args:
+            key_expr: Key expression string
+        
+        Returns:
+            Formatted string suitable for display
+        
+        Examples:
+            "q" -> "q"
+            "Shift-Down" -> "Shift-Down"
+            "Command-Shift-X" -> "Cmd-Shift-X"
+        """
+        # Single character - return as-is
+        if len(key_expr) == 1:
+            return key_expr
+        
+        # Multi-character - format nicely
+        parts = key_expr.split('-')
+        
+        # Format modifiers
+        formatted_parts = []
+        for part in parts[:-1]:
+            modifier = part.capitalize()
+            # Abbreviate Command to Cmd
+            if modifier == 'Command':
+                modifier = 'Cmd'
+            formatted_parts.append(modifier)
+        
+        # Add main key
+        formatted_parts.append(parts[-1].upper())
+        
+        return '-'.join(formatted_parts)
 
 
 class DefaultConfig:
@@ -85,53 +350,97 @@ class DefaultConfig:
     # Key bindings (can be customized)
     # Each action can have multiple keys assigned to it
     KEY_BINDINGS = {
-        'quit': ['q', 'Q'],                    # Exit TFM application
+        # === Application Control ===
+        'quit': ['Q'],                         # Exit TFM application
         'help': ['?'],                         # Show help dialog with all key bindings
-        'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
-        'toggle_color_scheme': ['t'],          # Switch between dark and light color schemes
-        'search': ['f'],                       # Enter incremental search mode (isearch)
-        'search_dialog': ['F'],                # Show filename search dialog
-        'search_content': ['G'],               # Show content search dialog (grep)
+        
+        # === Navigation ===
+        'cursor_up': ['UP'],                   # Move cursor up one item
+        'cursor_down': ['DOWN'],               # Move cursor down one item
+        'page_up': ['PAGE_UP'],                # Move cursor up one page
+        'page_down': ['PAGE_DOWN'],            # Move cursor down one page
+        'open_item': ['ENTER'],                # Open file/directory or enter directory
+        'go_parent': ['BACKSPACE'],            # Go to parent directory
+        'switch_pane': ['TAB'],                # Switch between left and right panes
+        'nav_left': ['LEFT'],                  # Left pane: go to parent, Right pane: switch to left pane
+        'nav_right': ['RIGHT'],                # Right pane: go to parent, Left pane: switch to right pane
+        
+        # === File Selection ===
+        'select_file': ['SPACE'],              # Toggle selection of current file
+        'select_file_up': ['Shift-SPACE'],     # Toggle selection and move up
+        'select_all': ['HOME'],                # Select all items (Home key)
+        'unselect_all': ['END'],               # Unselect all items (End key)
+        'select_all_files': ['A'],             # Toggle selection of all files in current pane
+        'select_all_items': ['Shift-A'],       # Toggle selection of all items (files + dirs)
+        
+        # === File Operations ===
+        'copy_files': {'keys': ['C'], 'selection': 'required'},  # Copy selected files to other pane
+        'move_files': {'keys': ['M'], 'selection': 'required'},  # Move selected files to other pane
+        'delete_files': {'keys': ['K', 'DELETE', 'Command-Backspace'], 'selection': 'required'}, # Delete selected files/directories
+        'rename_file': ['R'],                  # Rename selected file/directory
+        'create_file': ['Shift-E'],            # Create new file (prompts for filename)
+        'create_directory': {'keys': ['M'], 'selection': 'none'},  # Create new directory (only when no files selected)
+        
+        # === File Viewing & Editing ===
+        'view_file': ['V'],                    # View file using configured viewer
+        'edit_file': ['E'],                    # Edit selected file with configured text editor
+        'file_details': ['I'],                 # Show detailed file information dialog
+        
+        # === File Comparison ===
+        'diff_files': ['EQUAL'],               # Compare two selected files side-by-side
+        'diff_directories': ['Shift-EQUAL'],   # Compare directories recursively
+        
+        # === Archive Operations ===
+        'create_archive': {'keys': ['P'], 'selection': 'required'}, # Create archive from selected files
+        'extract_archive': ['U'],              # Extract selected archive file
+        
+        # === Search & Filter ===
+        'search': ['F'],                       # Enter incremental search mode (isearch)
+        'search_dialog': ['Shift-F'],          # Show filename search dialog
+        'search_content': ['Shift-G'],         # Show content search dialog (grep)
         'filter': [';'],                       # Enter filter mode to show only matching files
         'clear_filter': [':'],                 # Clear current file filter
-        'sort_menu': ['s', 'S'],              # Show sort options menu
-        'file_details': ['i', 'I'],           # Show detailed file information dialog
+        
+        # === Sorting ===
+        'sort_menu': ['S'],                    # Show sort options menu
         'quick_sort_name': ['1'],              # Quick sort by filename
         'quick_sort_ext': ['2'],               # Quick sort by file extension
         'quick_sort_size': ['3'],              # Quick sort by file size
         'quick_sort_date': ['4'],              # Quick sort by modification date
-        'select_file': [' '],                  # Toggle selection of current file (Space)
-        'select_all_files': ['a'],             # Toggle selection of all files in current pane
-        'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
-        'select_all': ['HOME'],                # Select all items (Home key)
-        'unselect_all': ['END'],               # Unselect all items (End key)
-        'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
-        'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
-        'view_file': ['v', 'V'],              # View file using configured viewer
-        'edit_file': ['e'],                    # Edit selected file with configured text editor
-        'create_file': ['E'],                  # Create new file (prompts for filename)
-        'create_directory': {'keys': ['m', 'M'], 'selection': 'none'},  # Create new directory (only when no files selected)
-        'toggle_fallback_colors': ['T'],       # Toggle fallback color mode for compatibility
-        'view_options': ['z'],                 # Show view options menu
-        'settings_menu': ['Z'],                # Show settings and configuration menu
-        'copy_files': {'keys': ['c', 'C'], 'selection': 'required'},  # Copy selected files to other pane
-        'move_files': {'keys': ['m', 'M'], 'selection': 'required'},  # Move selected files to other pane
-        'delete_files': {'keys': ['k', 'K'], 'selection': 'required'}, # Delete selected files/directories
-        'rename_file': ['r', 'R'],            # Rename selected file/directory
-        'favorites': ['j'],                   # Show favorite directories dialog
-        'jump_to_path': ['J'],                # Jump to path (Shift+J)
-        'history': ['h', 'H'],                # Show history for current pane
-        'subshell': ['X'],                     # Enter subshell (command line) mode
-        'programs': ['x'],                     # Show external programs menu
-        'create_archive': {'keys': ['p', 'P'], 'selection': 'required'}, # Create archive from selected files
-        'extract_archive': ['u', 'U'],        # Extract selected archive file
-        'compare_selection': ['w', 'W'],      # Show file and directory comparison options
-        'adjust_pane_left': ['['],            # Make left pane smaller (move boundary left)
-        'adjust_pane_right': [']'],           # Make left pane larger (move boundary right)
-        'reset_pane_boundary': ['-'],         # Reset pane split to 50% | 50%
-        'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
-        'adjust_log_down': ['}'],             # Make log pane smaller (Shift+])
-        'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)
+        
+        # === Directory Navigation ===
+        'favorites': ['J'],                    # Show favorite directories dialog
+        'jump_to_path': ['Shift-J'],           # Jump to path
+        'history': ['H'],                      # Show history for current pane
+        'drives_dialog': ['D'],                # Show drives/volumes dialog
+        
+        # === Pane Management ===
+        'sync_current_to_other': ['O'],        # Sync current pane directory to other pane
+        'sync_other_to_current': ['Shift-O'],  # Sync other pane directory to current pane
+        'compare_selection': ['W'],            # Show file and directory comparison options
+        'adjust_pane_left': ['['],             # Make left pane smaller (move boundary left)
+        'adjust_pane_right': [']'],            # Make left pane larger (move boundary right)
+        'reset_pane_boundary': ['-'],          # Reset pane split to 50% | 50%
+        
+        # === Log Pane Control ===
+        'adjust_log_up': ['{'],                # Make log pane larger (Shift+[)
+        'adjust_log_down': ['}'],              # Make log pane smaller (Shift+])
+        'reset_log_height': ['_'],             # Reset log pane height to default (Shift+-)
+        'scroll_log_up': ['Shift-UP'],         # Scroll log pane up one line
+        'scroll_log_down': ['Shift-DOWN'],     # Scroll log pane down one line
+        'scroll_log_page_up': ['Shift-LEFT'],  # Scroll log pane up one page (to older messages)
+        'scroll_log_page_down': ['Shift-RIGHT'], # Scroll log pane down one page (to newer messages)
+        
+        # === Display & Appearance ===
+        'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
+        'toggle_color_scheme': ['T'],          # Switch between dark and light color schemes
+        'toggle_fallback_colors': ['Shift-T'], # Toggle fallback color mode for compatibility
+        'view_options': ['Z'],                 # Show view options menu
+        'settings_menu': ['Shift-Z'],          # Show settings and configuration menu
+        
+        # === External Programs ===
+        'programs': ['X'],                     # Show external programs menu
+        'subshell': ['Shift-X'],               # Enter subshell (command line) mode
     }
     
     # Favorite directories - list of dictionaries with 'name' and 'path' keys
@@ -233,6 +542,7 @@ class ConfigManager:
         self.config_dir = Path.home() / '.tfm'
         self.config_file = self.config_dir / 'config.py'
         self.config = None
+        self._key_bindings = None
         
     def ensure_config_dir(self):
         """Ensure the configuration directory exists"""
@@ -318,7 +628,25 @@ class ConfigManager:
     def reload_config(self):
         """Reload configuration from file"""
         self.config = None
+        self._key_bindings = None
         return self.load_config()
+    
+    def get_key_bindings(self) -> KeyBindings:
+        """Get the KeyBindings instance for current configuration."""
+        config = self.get_config()
+        
+        # Rebuild if config changed or not yet built
+        if self._key_bindings is None:
+            # Get key bindings config with fallback to defaults
+            if hasattr(config, 'KEY_BINDINGS') and config.KEY_BINDINGS:
+                key_bindings_config = config.KEY_BINDINGS
+            else:
+                self.logger.info("Using default key bindings")
+                key_bindings_config = DefaultConfig.KEY_BINDINGS
+            
+            self._key_bindings = KeyBindings(key_bindings_config)
+        
+        return self._key_bindings
     
     def validate_config(self, config):
         """Validate configuration values"""
@@ -432,129 +760,7 @@ class ConfigManager:
         # Simple format defaults to 'any'
         return 'any'
     
-    def is_action_available(self, action, has_selection):
-        """Check if action is available based on current selection status"""
-        requirement = self.get_selection_requirement(action)
-        if requirement == 'required':
-            return has_selection
-        elif requirement == 'none':
-            return not has_selection
-        else:  # 'any'
-            return True
-    
-    def is_key_bound_to_action(self, key_char, action):
-        """Check if a key is bound to a specific action"""
-        keys = self.get_key_for_action(action)
-        return key_char in keys
-    
-    def is_key_bound_to_action_with_selection(self, key_char, action, has_selection):
-        """Check if a key is bound to a specific action and available for current selection status"""
-        if not self.is_key_bound_to_action(key_char, action):
-            return False
-        return self.is_action_available(action, has_selection)
-    
-    def is_special_key_bound_to_action(self, key_code, action):
-        """Check if a special key code is bound to a specific action"""
-        keys = self.get_key_for_action(action)
-        
-        # Check if any of the keys match the special key code
-        for key in keys:
-            if isinstance(key, str) and key in SPECIAL_KEY_MAP:
-                if SPECIAL_KEY_MAP[key] == key_code:
-                    return True
-        
-        return False
-    
-    def is_special_key_bound_to_action_with_selection(self, key_code, action, has_selection):
-        """Check if a special key is bound to a specific action and available for current selection status"""
-        if not self.is_special_key_bound_to_action(key_code, action):
-            return False
-        return self.is_action_available(action, has_selection)
-    
-    def is_input_event_bound_to_action(self, event, action):
-        """
-        Check if a KeyEvent is bound to a specific action.
-        
-        Args:
-            event: KeyEvent from TTK renderer
-            action: Action name to check
-            
-        Returns:
-            bool: True if event is bound to the action
-        """
-        if not event:
-            return False
-        
-        # Import here to avoid circular dependency
-        from tfm_input_utils import input_event_to_key_char
-        
-        key_char = input_event_to_key_char(event)
-        if not key_char:
-            return False
-        
-        return self.is_key_bound_to_action(key_char, action)
-    
-    def is_input_event_bound_to_action_with_selection(self, event, action, has_selection):
-        """
-        Check if a KeyEvent is bound to a specific action and respects selection requirements.
-        
-        Args:
-            event: KeyEvent from TTK renderer
-            action: Action name to check
-            has_selection: Whether files are currently selected
-            
-        Returns:
-            bool: True if event is bound to the action and selection requirement is met
-        """
-        if not event:
-            return False
-        
-        # Import here to avoid circular dependency
-        from tfm_input_utils import input_event_to_key_char
-        
-        key_char = input_event_to_key_char(event)
-        if not key_char:
-            return False
-        
-        return self.is_key_bound_to_action_with_selection(key_char, action, has_selection)
-    
-    def get_action_for_key(self, key):
-        """
-        Get the action bound to a key (character or special key code).
-        
-        Args:
-            key: Either a character string or a curses key code (int)
-        
-        Returns:
-            Action name if found, None otherwise
-        """
-        config = self.get_config()
-        
-        # Check both user config and default config (user config takes precedence)
-        configs_to_check = []
-        if hasattr(config, 'KEY_BINDINGS') and config.KEY_BINDINGS:
-            configs_to_check.append(config.KEY_BINDINGS)
-        if hasattr(DefaultConfig, 'KEY_BINDINGS'):
-            configs_to_check.append(DefaultConfig.KEY_BINDINGS)
-        
-        for key_bindings in configs_to_check:
-            for action, binding in key_bindings.items():
-                # Get keys list
-                keys = binding if isinstance(binding, list) else binding.get('keys', []) if isinstance(binding, dict) else []
-                
-                # Check if key matches
-                for bound_key in keys:
-                    if isinstance(key, str):
-                        # Character key
-                        if bound_key == key:
-                            return action
-                    elif isinstance(key, int):
-                        # Special key code
-                        if isinstance(bound_key, str) and bound_key in SPECIAL_KEY_MAP:
-                            if SPECIAL_KEY_MAP[bound_key] == key:
-                                return action
-        
-        return None
+
 
 
 # Global configuration manager instance
@@ -571,63 +777,47 @@ def reload_config():
     return config_manager.reload_config()
 
 
-def is_key_bound_to(key_char, action):
-    """Check if a key is bound to a specific action"""
-    return config_manager.is_key_bound_to_action(key_char, action)
-
-
-def is_key_bound_to_with_selection(key_char, action, has_selection):
-    """Check if a key is bound to a specific action and available for current selection status"""
-    return config_manager.is_key_bound_to_action_with_selection(key_char, action, has_selection)
-
-
-def is_action_available(action, has_selection):
-    """Check if action is available based on current selection status"""
-    return config_manager.is_action_available(action, has_selection)
-
-
-def is_special_key_bound_to(key_code, action):
-    """Check if a special key code is bound to a specific action"""
-    return config_manager.is_special_key_bound_to_action(key_code, action)
-
-
-def is_special_key_bound_to_with_selection(key_code, action, has_selection):
-    """Check if a special key is bound to a specific action and available for current selection status"""
-    return config_manager.is_special_key_bound_to_action_with_selection(key_code, action, has_selection)
-
-
-def is_input_event_bound_to(event, action):
+def find_action_for_event(event, has_selection: bool = False):
     """
-    Check if a KeyEvent is bound to a specific action.
+    Find the action bound to a KeyEvent.
     
     Args:
-        event: KeyEvent from TTK renderer
-        action: Action name to check
-        
-    Returns:
-        bool: True if event is bound to the action
-    """
-    return config_manager.is_input_event_bound_to_action(event, action)
-
-
-def is_input_event_bound_to_with_selection(event, action, has_selection):
-    """
-    Check if a KeyEvent is bound to a specific action and respects selection requirements.
-    
-    Args:
-        event: KeyEvent from TTK renderer
-        action: Action name to check
+        event: KeyEvent from TTK
         has_selection: Whether files are currently selected
-        
+    
     Returns:
-        bool: True if event is bound to the action and selection requirement is met
+        Action name if found, None otherwise
     """
-    return config_manager.is_input_event_bound_to_action_with_selection(event, action, has_selection)
+    key_bindings = config_manager.get_key_bindings()
+    return key_bindings.find_action_for_event(event, has_selection)
 
 
-def get_action_for_key(key):
-    """Get the action bound to a key (character or special key code)"""
-    return config_manager.get_action_for_key(key)
+def get_keys_for_action(action: str) -> tuple:
+    """
+    Get the key expressions and selection requirement for an action.
+    
+    Args:
+        action: Action name
+    
+    Returns:
+        Tuple of (key_expressions, selection_requirement)
+    """
+    key_bindings = config_manager.get_key_bindings()
+    return key_bindings.get_keys_for_action(action)
+
+
+def format_key_for_display(key_expr: str) -> str:
+    """
+    Format a key expression for display in UI.
+    
+    Args:
+        key_expr: Key expression string
+    
+    Returns:
+        Formatted string suitable for display
+    """
+    key_bindings = config_manager.get_key_bindings()
+    return key_bindings.format_key_for_display(key_expr)
 
 
 

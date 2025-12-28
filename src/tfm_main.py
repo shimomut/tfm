@@ -30,7 +30,7 @@ from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, Me
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, is_key_bound_to, is_key_bound_to_with_selection, is_action_available, is_special_key_bound_to_with_selection, is_input_event_bound_to, is_input_event_bound_to_with_selection, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association
+from tfm_config import get_config, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association, find_action_for_event
 from tfm_text_viewer import create_text_viewer, is_text_file
 from tfm_diff_viewer import create_diff_viewer
 from tfm_directory_diff_viewer import DirectoryDiffViewer
@@ -1280,14 +1280,6 @@ class FileManager(UILayer):
             self.logger.error(f"Warning: Screen clear with background failed: {e}")
             self.renderer.clear()
 
-    def is_key_for_action(self, event, action):
-        """Check if an input event matches a configured action and respects selection requirements"""
-        current_pane = self.get_current_pane()
-        has_selection = len(current_pane['selected_files']) > 0
-        
-        # Use the new KeyEvent-aware function
-        return is_input_event_bound_to_with_selection(event, action, has_selection)
-        
     def count_files_and_dirs(self, pane_data):
         """Count directories and files in a pane"""
         return self.pane_manager.count_files_and_dirs(pane_data)
@@ -3891,27 +3883,37 @@ class FileManager(UILayer):
         if not isinstance(event, KeyEvent):
             return False
         
-        # Handle Shift+Arrow keys for log scrolling (only when no dialogs are active)
-        if event.key_code == KeyCode.UP and event.modifiers & ModifierKey.SHIFT:  # Shift+Up
+        # Check if there are selected files for action matching
+        has_selection = len(current_pane['selected_files']) > 0
+        
+        # Find action for this key event (optimized single lookup)
+        action = find_action_for_event(event, has_selection)
+        
+        # If no action found, return immediately
+        if action is None:
+            return False
+        
+        # Handle log scrolling actions
+        if action == 'scroll_log_up':
             if self.log_manager.scroll_log_up(1):
                 self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.DOWN and event.modifiers & ModifierKey.SHIFT:  # Shift+Down
+        elif action == 'scroll_log_down':
             if self.log_manager.scroll_log_down(1):
                 self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.LEFT and event.modifiers & ModifierKey.SHIFT:  # Shift+Left - fast scroll to older messages
+        elif action == 'scroll_log_page_up':
             log_height = self._get_log_pane_height()
             if self.log_manager.scroll_log_up(max(1, log_height)):
                 self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.RIGHT and event.modifiers & ModifierKey.SHIFT:  # Shift+Right - fast scroll to newer messages
+        elif action == 'scroll_log_page_down':
             log_height = self._get_log_pane_height()
             if self.log_manager.scroll_log_down(max(1, log_height)):
                 self.mark_dirty()
             return True
         
-        if self.is_key_for_action(event, 'quit'):
+        if action == 'quit':
             def quit_callback(confirmed):
                 if confirmed:
                     # Set the flag to exit the main loop
@@ -3924,27 +3926,73 @@ class FileManager(UILayer):
                 quit_callback(True)
             return True
 
-        elif event.key_code == KeyCode.TAB:  # Tab key - switch panes
+        elif action == 'switch_pane':
             self.pane_manager.active_pane = 'right' if self.pane_manager.active_pane == 'left' else 'left'
             self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.UP and not (event.modifiers & ModifierKey.SHIFT):
+        elif action == 'cursor_up':
             if current_pane['focused_index'] > 0:
                 current_pane['focused_index'] -= 1
                 self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.DOWN and not (event.modifiers & ModifierKey.SHIFT):
+        elif action == 'cursor_down':
             if current_pane['focused_index'] < len(current_pane['files']) - 1:
                 current_pane['focused_index'] += 1
                 self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.ENTER:
+        elif action == 'open_item':
             self.handle_enter()
             self.mark_dirty()
             return True
-        elif self.is_key_for_action(event, 'toggle_hidden'):
+        elif action == 'nav_left':
+            # Context-aware LEFT arrow: go to parent in left pane, switch pane in right pane
+            if self.pane_manager.active_pane == 'left':
+                # Left arrow in left pane - go to parent directory
+                if current_pane['path'] != current_pane['path'].parent:
+                    try:
+                        self.save_cursor_position(current_pane)
+                        current_pane['path'] = current_pane['path'].parent
+                        current_pane['focused_index'] = 0
+                        current_pane['scroll_offset'] = 0
+                        current_pane['selected_files'].clear()
+                        self.refresh_files(current_pane)
+                        if not self.restore_cursor_position(current_pane):
+                            current_pane['focused_index'] = 0
+                            current_pane['scroll_offset'] = 0
+                        self.mark_dirty()
+                    except PermissionError:
+                        self.logger.error("Permission denied")
+            else:
+                # Left arrow in right pane - switch to left pane
+                self.pane_manager.active_pane = 'left'
+                self.mark_dirty()
+            return True
+        elif action == 'nav_right':
+            # Context-aware RIGHT arrow: go to parent in right pane, switch pane in left pane
+            if self.pane_manager.active_pane == 'right':
+                # Right arrow in right pane - go to parent directory
+                if current_pane['path'] != current_pane['path'].parent:
+                    try:
+                        self.save_cursor_position(current_pane)
+                        current_pane['path'] = current_pane['path'].parent
+                        current_pane['focused_index'] = 0
+                        current_pane['scroll_offset'] = 0
+                        current_pane['selected_files'].clear()
+                        self.refresh_files(current_pane)
+                        if not self.restore_cursor_position(current_pane):
+                            current_pane['focused_index'] = 0
+                            current_pane['scroll_offset'] = 0
+                        self.mark_dirty()
+                    except PermissionError:
+                        self.logger.error("Permission denied")
+            else:
+                # Right arrow in left pane - switch to right pane
+                self.pane_manager.active_pane = 'right'
+                self.mark_dirty()
+            return True
+        elif action == 'toggle_hidden':
             self.file_operations.toggle_hidden_files()
             # Refresh file lists for both panes
             self.refresh_files()
@@ -3955,7 +4003,7 @@ class FileManager(UILayer):
             self.pane_manager.right_pane['scroll_offset'] = 0
             self.mark_dirty()
             return True
-        elif self.is_key_for_action(event, 'toggle_color_scheme'):
+        elif action == 'toggle_color_scheme':
             # Toggle between dark and light color schemes
             new_scheme = toggle_color_scheme()
             # Reinitialize colors with the new scheme
@@ -3967,23 +4015,23 @@ class FileManager(UILayer):
             self.clear_screen_with_background()
             self.mark_dirty()
             return True
-        elif self.is_key_for_action(event, 'select_all'):
+        elif action == 'select_all':
             self.select_all()
             return True
-        elif self.is_key_for_action(event, 'unselect_all'):
+        elif action == 'unselect_all':
             self.unselect_all()
             return True
-        elif event.key_code == KeyCode.PAGE_UP:  # Page Up - file navigation only
+        elif action == 'page_up':
             current_pane['focused_index'] = max(0, current_pane['focused_index'] - 10)
             self.adjust_scroll_for_focus(current_pane)
             self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.PAGE_DOWN:  # Page Down - file navigation only
+        elif action == 'page_down':
             current_pane['focused_index'] = min(len(current_pane['files']) - 1, current_pane['focused_index'] + 10)
             self.adjust_scroll_for_focus(current_pane)
             self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.BACKSPACE:  # Backspace - go to parent directory
+        elif action == 'go_parent':
             # Check if we're at the root of an archive
             current_path_str = str(current_pane['path'])
             if current_path_str.startswith('archive://') and current_path_str.endswith('#'):
@@ -4061,204 +4109,148 @@ class FileManager(UILayer):
                     self.logger.error(f"Error navigating to parent directory: {e}")
                     self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'left':  # Left arrow in left pane - go to parent
-            if current_pane['path'] != current_pane['path'].parent:
-                try:
-                    # Save current cursor position before changing directory
-                    self.save_cursor_position(current_pane)
-                    
-                    current_pane['path'] = current_pane['path'].parent
-                    current_pane['focused_index'] = 0
-                    current_pane['scroll_offset'] = 0
-                    current_pane['selected_files'].clear()  # Clear selections when changing directory
-                    self.refresh_files(current_pane)
-                    
-                    # Try to restore cursor position for this directory
-                    if not self.restore_cursor_position(current_pane):
-                        # If no history found, default to first item
-                        current_pane['focused_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                    
-                    self.mark_dirty()
-                except PermissionError:
-                    self.logger.error("Permission denied")
-            return True
-        elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'right':  # Right arrow in right pane - go to parent
-            if current_pane['path'] != current_pane['path'].parent:
-                try:
-                    # Save current cursor position before changing directory
-                    self.save_cursor_position(current_pane)
-                    
-                    current_pane['path'] = current_pane['path'].parent
-                    current_pane['focused_index'] = 0
-                    current_pane['scroll_offset'] = 0
-                    current_pane['selected_files'].clear()  # Clear selections when changing directory
-                    self.refresh_files(current_pane)
-                    
-                    # Try to restore cursor position for this directory
-                    if not self.restore_cursor_position(current_pane):
-                        # If no history found, default to first item
-                        current_pane['focused_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                    
-                    self.mark_dirty()
-                except PermissionError:
-                    self.logger.error("Permission denied")
-            return True
-        elif event.key_code == KeyCode.RIGHT and self.pane_manager.active_pane == 'left' and not (event.modifiers & ModifierKey.SHIFT):  # Right arrow in left pane - switch to right pane
-            self.pane_manager.active_pane = 'right'
-            self.mark_dirty()
-            return True
-        elif event.key_code == KeyCode.LEFT and self.pane_manager.active_pane == 'right' and not (event.modifiers & ModifierKey.SHIFT):  # Left arrow in right pane - switch to left pane
-            self.pane_manager.active_pane = 'left'
-            self.mark_dirty()
-            return True
-        elif event.char == ' ' and event.modifiers & ModifierKey.SHIFT:  # Shift+Space - toggle selection and move up
+        elif action == 'select_file_up':  # Shift+Space - toggle selection and move up
             self.toggle_selection_up()
             self.mark_dirty()
             return True
-        elif self.is_key_for_action(event, 'select_file'):  # Toggle file selection
+        elif action == 'select_file':  # Toggle file selection
             self.toggle_selection()
             self.mark_dirty()
             return True
-        elif event.key_code == KeyCode.ESCAPE:  # ESC key
-            # In callback mode, we can't peek at the next event
-            # Option key sequences are handled by the backend
-            pass
-        elif self.is_key_for_action(event, 'select_all_files'):  # Toggle all files selection
+        elif action == 'select_all_files':  # Toggle all files selection
             self.toggle_all_files_selection()
             return True
-        elif self.is_key_for_action(event, 'select_all_items'):  # Toggle all items selection
+        elif action == 'select_all_items':  # Toggle all items selection
             self.toggle_all_items_selection()
             return True
-        elif self.is_key_for_action(event, 'sync_current_to_other'):  # Sync current pane to other
+        elif action == 'sync_current_to_other':  # Sync current pane to other
             self.sync_current_to_other()
             return True
-        elif self.is_key_for_action(event, 'sync_other_to_current'):  # Sync other pane to current
+        elif action == 'sync_other_to_current':  # Sync other pane to current
             self.sync_other_to_current()
             return True
-        elif self.is_key_for_action(event, 'search_dialog'):  # Show search dialog (filename)
+        elif action == 'search_dialog':  # Show search dialog (filename)
             self.show_search_dialog('filename')
             return True
-        elif self.is_key_for_action(event, 'jump_to_path'):  # Jump to path (Shift+J)
+        elif action == 'jump_to_path':  # Jump to path (Shift+J)
             self.enter_jump_to_path_mode()
             return True
-        elif self.is_key_for_action(event, 'drives_dialog'):  # Show drives dialog
+        elif action == 'drives_dialog':  # Show drives dialog
             self.show_drives_dialog()
             return True
-        elif self.is_key_for_action(event, 'search_content'):  # Show search dialog (content)
+        elif action == 'search_content':  # Show search dialog (content)
             self.show_search_dialog('content')
             return True
-        elif self.is_key_for_action(event, 'edit_file'):  # Edit existing file
+        elif action == 'edit_file':  # Edit existing file
             self.edit_selected_file()
             return True
-        elif self.is_key_for_action(event, 'create_file'):  # Create new file
+        elif action == 'create_file':  # Create new file
             self.enter_create_file_mode()
             return True
-        elif self.is_key_for_action(event, 'create_directory'):  # Create new directory
+        elif action == 'create_directory':  # Create new directory
             self.enter_create_directory_mode()
             return True
-        elif self.is_key_for_action(event, 'toggle_fallback_colors'):  # Toggle fallback color mode
+        elif action == 'toggle_fallback_colors':  # Toggle fallback color mode
             self.toggle_fallback_color_mode()
             return True
-        elif self.is_key_for_action(event, 'view_options'):  # Show view options
+        elif action == 'view_options':  # Show view options
             self.show_view_options()
             return True
-        elif self.is_key_for_action(event, 'settings_menu'):  # Show settings menu
+        elif action == 'settings_menu':  # Show settings menu
             self.show_settings_menu()
             return True
-        elif self.is_key_for_action(event, 'search'):  # Search key - enter isearch mode
+        elif action == 'search':  # Search key - enter isearch mode
             self.enter_isearch_mode()
             return True
-        elif self.is_key_for_action(event, 'filter'):  # Filter key - enter filter mode
+        elif action == 'filter':  # Filter key - enter filter mode
             self.enter_filter_mode()
             return True
-        elif self.is_key_for_action(event, 'clear_filter'):  # Clear filter key
+        elif action == 'clear_filter':  # Clear filter key
             self.clear_filter()
             return True
-        elif self.is_key_for_action(event, 'sort_menu'):  # Sort menu
+        elif action == 'sort_menu':  # Sort menu
             self.show_sort_menu()
             return True
-        elif self.is_key_for_action(event, 'quick_sort_name'):  # Quick sort by name
+        elif action == 'quick_sort_name':  # Quick sort by name
             self.quick_sort('name')
             return True
-        elif self.is_key_for_action(event, 'quick_sort_size'):  # Quick sort by size
+        elif action == 'quick_sort_size':  # Quick sort by size
             self.quick_sort('size')
             return True
-        elif self.is_key_for_action(event, 'quick_sort_date'):  # Quick sort by date
+        elif action == 'quick_sort_date':  # Quick sort by date
             self.quick_sort('date')
             return True
-        elif self.is_key_for_action(event, 'quick_sort_ext'):  # Quick sort by extension
+        elif action == 'quick_sort_ext':  # Quick sort by extension
             self.quick_sort('ext')
             return True
-        elif self.is_key_for_action(event, 'file_details'):  # Show file details
+        elif action == 'file_details':  # Show file details
             self.show_file_details()
             return True
-        elif self.is_key_for_action(event, 'view_file'):  # View file
+        elif action == 'view_file':  # View file
             self.view_selected_file()
             return True
-        elif self.is_key_for_action(event, 'diff_files'):  # Diff two selected files
+        elif action == 'diff_files':  # Diff two selected files
             self.diff_selected_files()
             return True
-        elif self.is_key_for_action(event, 'directory_diff'):  # Compare directories recursively
+        elif action == 'diff_directories':  # Compare directories recursively
             self.show_directory_diff()
             return True
-        elif self.is_key_for_action(event, 'copy_files'):  # Copy selected files
+        elif action == 'copy_files':  # Copy selected files
             self.copy_selected_files()
             return True
-        elif self.is_key_for_action(event, 'move_files'):  # Move selected files
+        elif action == 'move_files':  # Move selected files
             self.move_selected_files()
             return True
-        elif self.is_key_for_action(event, 'delete_files'):  # Delete selected files
+        elif action == 'delete_files':  # Delete selected files
             self.delete_selected_files()
             return True
-        elif self.is_key_for_action(event, 'create_archive'):  # Create archive
+        elif action == 'create_archive':  # Create archive
             self.enter_create_archive_mode()
             return True
-        elif self.is_key_for_action(event, 'extract_archive'):  # Extract archive
+        elif action == 'extract_archive':  # Extract archive
             self.extract_selected_archive()
             return True
-        elif self.is_key_for_action(event, 'rename_file'):  # Rename file
+        elif action == 'rename_file':  # Rename file
             self.enter_rename_mode()
             return True
-        elif self.is_key_for_action(event, 'favorites'):  # Show favorite directories
+        elif action == 'favorites':  # Show favorite directories
             self.show_favorite_directories()
             return True
-        elif self.is_key_for_action(event, 'history'):  # Show history
+        elif action == 'history':  # Show history
             self.show_history()
             return True
-        elif self.is_key_for_action(event, 'programs'):  # Show external programs
+        elif action == 'programs':  # Show external programs
             self.show_programs_dialog()
             return True
-        elif self.is_key_for_action(event, 'compare_selection'):  # Show compare selection menu
+        elif action == 'compare_selection':  # Show compare selection menu
             self.show_compare_selection_dialog()
             return True
-        elif self.is_key_for_action(event, 'help'):  # Show help dialog
+        elif action == 'help':  # Show help dialog
             self.show_help_dialog()
             return True
-        elif self.is_key_for_action(event, 'adjust_pane_left'):  # Adjust pane boundary left
+        elif action == 'adjust_pane_left':  # Adjust pane boundary left
             self.adjust_pane_boundary('left')
             return True
-        elif self.is_key_for_action(event, 'adjust_pane_right'):  # Adjust pane boundary right
+        elif action == 'adjust_pane_right':  # Adjust pane boundary right
             self.adjust_pane_boundary('right')
             return True
-        elif self.is_key_for_action(event, 'adjust_log_up'):  # Adjust log boundary up
+        elif action == 'adjust_log_up':  # Adjust log boundary up
             self.adjust_log_boundary('up')
             return True
-        elif self.is_key_for_action(event, 'adjust_log_down'):  # Adjust log boundary down
+        elif action == 'adjust_log_down':  # Adjust log boundary down
             self.adjust_log_boundary('down')
             return True
-        elif self.is_key_for_action(event, 'reset_log_height'):  # Reset log pane height
+        elif action == 'reset_log_height':  # Reset log pane height
             self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
             self.mark_dirty()
             self.logger.info(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
             return True
-        elif self.is_key_for_action(event, 'reset_pane_boundary'):  # Reset pane split to 50/50
+        elif action == 'reset_pane_boundary':  # Reset pane split to 50/50
             self.pane_manager.left_pane_ratio = 0.5
             self.mark_dirty()
             self.logger.info("Pane split reset to 50% | 50%")
             return True
-        elif self.is_key_for_action(event, 'subshell'):  # Sub-shell mode
+        elif action == 'subshell':  # Sub-shell mode
             self.external_program_manager.enter_subshell_mode(
                 self.pane_manager
             )

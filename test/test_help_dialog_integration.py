@@ -31,7 +31,7 @@ class TestHelpDialogIntegration(unittest.TestCase):
         
         # Verify it has the expected key
         keys = self.config_manager.get_key_for_action('create_directory')
-        self.assertEqual(keys, ['D'])
+        self.assertEqual(keys, ['m', 'M'])
     
     def test_format_key_bindings_function_exists(self):
         """Test that the _format_key_bindings function can handle create_directory."""

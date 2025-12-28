@@ -63,7 +63,16 @@ def demo_shared_key_selection_aware():
                 key_char = chr(key)
                 current_pane = self.get_current_pane()
                 has_selection = len(current_pane['selected_files']) > 0
-                return self.config_manager.is_key_bound_to_action_with_selection(key_char, action, has_selection)
+                
+                # Use the new API: find_action_for_event
+                # Create a mock KeyEvent for the key
+                from ttk import KeyEvent, ModifierKey
+                event = KeyEvent(key_code=key, modifiers=ModifierKey.NONE, char=key_char)
+                
+                from tfm_config import find_action_for_event
+                found_action = find_action_for_event(event, has_selection)
+                
+                return found_action == action
             return False
         
         def simulate_key_press(self, key_char):
@@ -112,9 +121,15 @@ def demo_shared_key_selection_aware():
         other_actions = ['move_files', 'create_directory']
         for action in other_actions:
             if action not in triggered:
-                available = config_manager.is_action_available(action, len(selected_files) > 0)
+                requirement = config_manager.get_selection_requirement(action)
+                has_selection = len(selected_files) > 0
+                
+                # Check if action is available based on requirement
+                available = (requirement == 'any' or 
+                           (requirement == 'required' and has_selection) or
+                           (requirement == 'none' and not has_selection))
+                
                 if not available:
-                    requirement = config_manager.get_selection_requirement(action)
                     print(f"     ✗ {action} not available (requires selection='{requirement}')")
     
     print("\\n5. Benefits of Selection-Aware Key Sharing")

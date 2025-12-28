@@ -635,15 +635,45 @@ TFM creates `~/.tfm/config.py` on first run. Access it via:
 **For comprehensive configuration documentation**, see the **[Configuration Feature Guide](CONFIGURATION_FEATURE.md)** which covers all available options, examples, and best practices.
 
 ### Key Bindings
-Customize any key binding in your config file:
+
+TFM supports powerful key binding customization with modifier keys and multiple keys per action:
+
 ```python
 KEY_BINDINGS = {
-    'quit': ['q'],  # Remove 'Q' binding
-    'search': ['/', 'f'],  # Add '/' for search
-    'copy_files': {'keys': ['c', 'C', 'y'], 'selection': 'required'},
-    # ... customize any action
+    # Simple character keys
+    'quit': ['q', 'Q'],
+    'help': ['?'],
+    
+    # KeyCode names for special keys
+    'move_up': ['UP', 'k'],
+    'move_down': ['DOWN', 'j'],
+    
+    # Modifier key combinations
+    'page_up': ['PAGE_UP', 'Shift-UP'],
+    'page_down': ['PAGE_DOWN', 'Shift-DOWN'],
+    'jump_to_top': ['Command-UP'],
+    'jump_to_bottom': ['Command-DOWN'],
+    
+    # Selection requirements
+    'delete_files': {
+        'keys': ['DELETE', 'Command-Backspace'],
+        'selection': 'required'  # Only when files selected
+    },
+    'create_directory': {
+        'keys': ['m', 'M'],
+        'selection': 'none'  # Only when no files selected
+    },
 }
 ```
+
+**Key features:**
+- **Modifier keys**: Shift, Control, Alt, Command
+- **Multiple keys per action**: Assign several keys to the same action
+- **Selection requirements**: Control when actions are available
+- **Case-insensitive**: 'ENTER', 'enter', 'Enter' all work
+- **Order-independent modifiers**: 'Command-Shift-X' = 'Shift-Command-X'
+
+**See detailed documentation**: [Key Bindings Feature](KEY_BINDINGS_FEATURE.md)
 
 ### Color Schemes
 ```python
@@ -953,7 +983,26 @@ TFM provides extensive keyboard shortcuts for efficient file management. All sho
 
 ### Customizing Key Bindings
 
-All key bindings can be customized in your configuration file (`~/.tfm/config.py`). See the [Configuration](#customization) section and [Key Bindings Selection Feature](KEY_BINDINGS_SELECTION_FEATURE.md) for details.
+All key bindings can be customized in your configuration file (`~/.tfm/config.py`). The enhanced key binding system supports:
+
+- **Modifier keys**: Shift, Control, Alt, Command (e.g., 'Shift-UP', 'Command-Q')
+- **Multiple keys per action**: Assign several keys to the same action
+- **Selection requirements**: Control when actions are available based on file selection
+- **Case-insensitive matching**: 'ENTER', 'enter', 'Enter' all work
+
+**Examples:**
+```python
+KEY_BINDINGS = {
+    'page_up': ['PAGE_UP', 'Shift-UP'],  # Two ways to page up
+    'jump_to_top': ['Command-UP'],       # Modifier combination
+    'delete_files': {
+        'keys': ['DELETE', 'Command-Backspace'],
+        'selection': 'required'          # Only when files selected
+    },
+}
+```
+
+See the [Configuration](#customization) section and [Key Bindings Feature](KEY_BINDINGS_FEATURE.md) for complete documentation.
 
 ---
 
