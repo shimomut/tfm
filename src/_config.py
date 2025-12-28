@@ -84,8 +84,8 @@ class Config:
         'quick_sort_ext': ['2'],               # Quick sort by file extension
         'quick_sort_size': ['3'],              # Quick sort by file size
         'quick_sort_date': ['4'],              # Quick sort by modification date
-        'select_file': ['Space'],              # Toggle selection of current file (Space)
-        'select_file_up': ['Shift-Space'],     # Toggle selection and move up (Shift+Space)
+        'select_file': ['SPACE'],              # Toggle selection of current file (Space)
+        'select_file_up': ['Shift-SPACE'],     # Toggle selection and move up (Shift+Space)
         'select_all_files': ['A'],             # Toggle selection of all files in current pane
         'select_all_items': ['Shift-A'],       # Toggle selection of all items (files + dirs)
         'select_all': ['HOME'],                # Select all items (Home key)
