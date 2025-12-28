@@ -381,6 +381,12 @@ if [ "$USE_FRAMEWORK" = true ]; then
         log_info "  Removed lib/pkgconfig/"
     fi
     
+    # Remove Python test suite (saves ~68MB)
+    if [ -d "${PYTHON_DEST}/lib/python${PYTHON_VERSION}/test" ]; then
+        rm -rf "${PYTHON_DEST}/lib/python${PYTHON_VERSION}/test"
+        log_info "  Removed lib/python${PYTHON_VERSION}/test/"
+    fi
+    
     log_success "Unnecessary files removed"
     
     # Pre-compile Python standard library
@@ -502,6 +508,12 @@ else
     if [ -d "${PYTHON_DEST}/lib/pkgconfig" ]; then
         rm -rf "${PYTHON_DEST}/lib/pkgconfig"
         log_info "  Removed lib/pkgconfig/"
+    fi
+    
+    # Remove Python test suite (saves ~68MB)
+    if [ -d "${PYTHON_DEST}/lib/python${PYTHON_VERSION}/test" ]; then
+        rm -rf "${PYTHON_DEST}/lib/python${PYTHON_VERSION}/test"
+        log_info "  Removed lib/python${PYTHON_VERSION}/test/"
     fi
     
     log_success "Unnecessary files removed"

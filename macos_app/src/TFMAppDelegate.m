@@ -163,6 +163,7 @@
 
 - (void)dealloc {
     // Clean up if needed
+    [super dealloc];
 }
 
 #pragma mark - Window Management
