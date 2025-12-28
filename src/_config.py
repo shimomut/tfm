@@ -69,48 +69,48 @@ class Config:
     #   'F1' through 'F12'
     #
     KEY_BINDINGS = {
-        'quit': ['q'],                         # Exit TFM application
+        'quit': ['Q'],                         # Exit TFM application
         'help': ['?'],                         # Show help dialog with all key bindings
         'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
-        'toggle_color_scheme': ['t'],          # Switch between dark and light color schemes
-        'search': ['f'],                       # Enter incremental search mode (isearch)
+        'toggle_color_scheme': ['T'],          # Switch between dark and light color schemes
+        'search': ['F'],                       # Enter incremental search mode (isearch)
         'search_dialog': ['Shift-F'],          # Show filename search dialog
         'search_content': ['Shift-G'],         # Show content search dialog (grep)
         'filter': [';'],                       # Enter filter mode to show only matching files
         'clear_filter': [':'],                 # Clear current file filter
-        'sort_menu': ['s'],                    # Show sort options menu
-        'file_details': ['i'],                 # Show detailed file information dialog
+        'sort_menu': ['S'],                    # Show sort options menu
+        'file_details': ['I'],                 # Show detailed file information dialog
         'quick_sort_name': ['1'],              # Quick sort by filename
         'quick_sort_ext': ['2'],               # Quick sort by file extension
         'quick_sort_size': ['3'],              # Quick sort by file size
         'quick_sort_date': ['4'],              # Quick sort by modification date
         'select_file': [' '],                  # Toggle selection of current file (Space)
-        'select_all_files': ['a'],             # Toggle selection of all files in current pane
+        'select_all_files': ['A'],             # Toggle selection of all files in current pane
         'select_all_items': ['Shift-A'],       # Toggle selection of all items (files + dirs)
         'select_all': ['HOME'],                # Select all items (Home key)
         'unselect_all': ['END'],               # Unselect all items (End key)
-        'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
+        'sync_current_to_other': ['O'],        # Sync current pane directory to other pane
         'sync_other_to_current': ['Shift-O'],  # Sync other pane directory to current pane
-        'view_file': ['v'],                    # View file using configured viewer
-        'edit_file': ['e'],                    # Edit selected file with configured text editor
+        'view_file': ['V'],                    # View file using configured viewer
+        'edit_file': ['E'],                    # Edit selected file with configured text editor
         'create_file': ['Shift-E'],            # Create new file (prompts for filename)
-        'create_directory': {'keys': ['m'], 'selection': 'none'},  # Create new directory (only when no files selected)
+        'create_directory': {'keys': ['M'], 'selection': 'none'},  # Create new directory (only when no files selected)
         'toggle_fallback_colors': ['Shift-T'], # Toggle fallback color mode for compatibility
-        'view_options': ['z'],                 # Show view options menu
+        'view_options': ['Z'],                 # Show view options menu
         'settings_menu': ['Shift-Z'],          # Show settings and configuration menu
-        'copy_files': {'keys': ['c'], 'selection': 'required'},  # Copy selected files to other pane
-        'move_files': {'keys': ['m'], 'selection': 'required'},  # Move selected files to other pane
-        'delete_files': {'keys': ['k'], 'selection': 'required'}, # Delete selected files/directories
-        'rename_file': ['r'],                  # Rename selected file/directory
-        'favorites': ['j'],                    # Show favorite directories dialog
+        'copy_files': {'keys': ['C'], 'selection': 'required'},  # Copy selected files to other pane
+        'move_files': {'keys': ['M'], 'selection': 'required'},  # Move selected files to other pane
+        'delete_files': {'keys': ['K'], 'selection': 'required'}, # Delete selected files/directories
+        'rename_file': ['R'],                  # Rename selected file/directory
+        'favorites': ['J'],                    # Show favorite directories dialog
         'jump_to_path': ['Shift-J'],           # Jump to path (Shift+J)
-        'drives_dialog': ['d'],                # Show drives/storage selection dialog
-        'history': ['h'],                      # Show history for current pane
+        'drives_dialog': ['D'],                # Show drives/storage selection dialog
+        'history': ['H'],                      # Show history for current pane
         'subshell': ['Shift-X'],               # Enter subshell (command line) mode
-        'programs': ['x'],                     # Show external programs menu
-        'create_archive': {'keys': ['p'], 'selection': 'required'}, # Create archive from selected files
-        'extract_archive': ['u'],              # Extract selected archive file
-        'compare_selection': ['w'],            # Show file and directory comparison options
+        'programs': ['X'],                     # Show external programs menu
+        'create_archive': {'keys': ['P'], 'selection': 'required'}, # Create archive from selected files
+        'extract_archive': ['U'],              # Extract selected archive file
+        'compare_selection': ['W'],            # Show file and directory comparison options
         'adjust_pane_left': ['['],             # Make left pane smaller (move boundary left)
         'adjust_pane_right': [']'],            # Make left pane larger (move boundary right)
         'reset_pane_boundary': ['-'],          # Reset pane split to 50% | 50%

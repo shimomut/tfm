@@ -350,62 +350,53 @@ class DefaultConfig:
     # Key bindings (can be customized)
     # Each action can have multiple keys assigned to it
     KEY_BINDINGS = {
-        'quit': ['q', 'Q'],                    # Exit TFM application
+        'quit': ['Q'],                         # Exit TFM application
         'help': ['?'],                         # Show help dialog with all key bindings
         'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
-        'toggle_color_scheme': ['t'],          # Switch between dark and light color schemes
-        'search': ['f'],                       # Enter incremental search mode (isearch)
-        'search_dialog': ['F'],                # Show filename search dialog
-        'search_content': ['G'],               # Show content search dialog (grep)
+        'toggle_color_scheme': ['T'],          # Switch between dark and light color schemes
+        'search': ['F'],                       # Enter incremental search mode (isearch)
+        'search_dialog': ['Shift-F'],          # Show filename search dialog
+        'search_content': ['Shift-G'],         # Show content search dialog (grep)
         'filter': [';'],                       # Enter filter mode to show only matching files
         'clear_filter': [':'],                 # Clear current file filter
-        'sort_menu': ['s', 'S'],              # Show sort options menu
-        'file_details': ['i', 'I'],           # Show detailed file information dialog
+        'sort_menu': ['S'],                    # Show sort options menu
+        'file_details': ['I'],                 # Show detailed file information dialog
         'quick_sort_name': ['1'],              # Quick sort by filename
         'quick_sort_ext': ['2'],               # Quick sort by file extension
         'quick_sort_size': ['3'],              # Quick sort by file size
         'quick_sort_date': ['4'],              # Quick sort by modification date
         'select_file': [' '],                  # Toggle selection of current file (Space)
-        'select_all_files': ['a'],             # Toggle selection of all files in current pane
-        'select_all_items': ['A'],             # Toggle selection of all items (files + dirs)
+        'select_all_files': ['A'],             # Toggle selection of all files in current pane
+        'select_all_items': ['Shift-A'],       # Toggle selection of all items (files + dirs)
         'select_all': ['HOME'],                # Select all items (Home key)
         'unselect_all': ['END'],               # Unselect all items (End key)
-        'sync_current_to_other': ['o'],        # Sync current pane directory to other pane
-        'sync_other_to_current': ['O'],        # Sync other pane directory to current pane
-        'view_file': ['v', 'V'],              # View file using configured viewer
-        'edit_file': ['e'],                    # Edit selected file with configured text editor
-        'create_file': ['E'],                  # Create new file (prompts for filename)
-        'create_directory': {'keys': ['m', 'M'], 'selection': 'none'},  # Create new directory (only when no files selected)
-        'toggle_fallback_colors': ['T'],       # Toggle fallback color mode for compatibility
-        'view_options': ['z'],                 # Show view options menu
-        'settings_menu': ['Z'],                # Show settings and configuration menu
-        'copy_files': {'keys': ['c', 'C'], 'selection': 'required'},  # Copy selected files to other pane
-        'move_files': {'keys': ['m', 'M'], 'selection': 'required'},  # Move selected files to other pane
-        'delete_files': {'keys': ['k', 'K', 'DELETE', 'Command-Backspace'], 'selection': 'required'}, # Delete selected files/directories
-        'rename_file': ['r', 'R'],            # Rename selected file/directory
-        'favorites': ['j'],                   # Show favorite directories dialog
-        'jump_to_path': ['J'],                # Jump to path (Shift+J)
-        'history': ['h', 'H'],                # Show history for current pane
-        'subshell': ['X'],                     # Enter subshell (command line) mode
-        'programs': ['x'],                     # Show external programs menu
-        'create_archive': {'keys': ['p', 'P'], 'selection': 'required'}, # Create archive from selected files
-        'extract_archive': ['u', 'U'],        # Extract selected archive file
-        'compare_selection': ['w', 'W'],      # Show file and directory comparison options
-        'adjust_pane_left': ['['],            # Make left pane smaller (move boundary left)
-        'adjust_pane_right': [']'],           # Make left pane larger (move boundary right)
-        'reset_pane_boundary': ['-'],         # Reset pane split to 50% | 50%
-        'adjust_log_up': ['{'],               # Make log pane larger (Shift+[)
-        'adjust_log_down': ['}'],             # Make log pane smaller (Shift+])
-        'reset_log_height': ['_'],            # Reset log pane height to default (Shift+-)
-        # Navigation with modifier keys
-        'move_up': ['UP', 'k'],               # Move cursor up one item
-        'move_down': ['DOWN', 'j'],           # Move cursor down one item
-        'move_left': ['LEFT', 'h'],           # Move to parent directory
-        'move_right': ['RIGHT', 'l'],         # Enter directory or view file
-        'page_up': ['PAGE_UP', 'Shift-UP'],   # Move up one page
-        'page_down': ['PAGE_DOWN', 'Shift-DOWN'],  # Move down one page
-        'jump_to_top': ['Command-UP'],        # Jump to first item in list
-        'jump_to_bottom': ['Command-DOWN'],   # Jump to last item in list
+        'sync_current_to_other': ['O'],        # Sync current pane directory to other pane
+        'sync_other_to_current': ['Shift-O'],  # Sync other pane directory to current pane
+        'view_file': ['V'],                    # View file using configured viewer
+        'edit_file': ['E'],                    # Edit selected file with configured text editor
+        'create_file': ['Shift-E'],            # Create new file (prompts for filename)
+        'create_directory': {'keys': ['M'], 'selection': 'none'},  # Create new directory (only when no files selected)
+        'toggle_fallback_colors': ['Shift-T'], # Toggle fallback color mode for compatibility
+        'view_options': ['Z'],                 # Show view options menu
+        'settings_menu': ['Shift-Z'],          # Show settings and configuration menu
+        'copy_files': {'keys': ['C'], 'selection': 'required'},  # Copy selected files to other pane
+        'move_files': {'keys': ['M'], 'selection': 'required'},  # Move selected files to other pane
+        'delete_files': {'keys': ['K', 'DELETE', 'Command-Backspace'], 'selection': 'required'}, # Delete selected files/directories
+        'rename_file': ['R'],                  # Rename selected file/directory
+        'favorites': ['J'],                    # Show favorite directories dialog
+        'jump_to_path': ['Shift-J'],           # Jump to path (Shift+J)
+        'history': ['H'],                      # Show history for current pane
+        'subshell': ['Shift-X'],               # Enter subshell (command line) mode
+        'programs': ['X'],                     # Show external programs menu
+        'create_archive': {'keys': ['P'], 'selection': 'required'}, # Create archive from selected files
+        'extract_archive': ['U'],              # Extract selected archive file
+        'compare_selection': ['W'],            # Show file and directory comparison options
+        'adjust_pane_left': ['['],             # Make left pane smaller (move boundary left)
+        'adjust_pane_right': [']'],            # Make left pane larger (move boundary right)
+        'reset_pane_boundary': ['-'],          # Reset pane split to 50% | 50%
+        'adjust_log_up': ['{'],                # Make log pane larger (Shift+[)
+        'adjust_log_down': ['}'],              # Make log pane smaller (Shift+])
+        'reset_log_height': ['_'],             # Reset log pane height to default (Shift+-)
     }
     
     # Favorite directories - list of dictionaries with 'name' and 'path' keys
