@@ -716,16 +716,6 @@ class ConfigManager:
         # Simple format defaults to 'any'
         return 'any'
     
-    def is_action_available(self, action, has_selection):
-        """Check if action is available based on current selection status"""
-        requirement = self.get_selection_requirement(action)
-        if requirement == 'required':
-            return has_selection
-        elif requirement == 'none':
-            return not has_selection
-        else:  # 'any'
-            return True
-    
 
 
 
@@ -741,11 +731,6 @@ def get_config():
 def reload_config():
     """Reload configuration from file"""
     return config_manager.reload_config()
-
-
-def is_action_available(action, has_selection):
-    """Check if action is available based on current selection status"""
-    return config_manager.is_action_available(action, has_selection)
 
 
 def find_action_for_event(event, has_selection: bool = False):

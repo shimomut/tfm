@@ -121,9 +121,15 @@ def demo_shared_key_selection_aware():
         other_actions = ['move_files', 'create_directory']
         for action in other_actions:
             if action not in triggered:
-                available = config_manager.is_action_available(action, len(selected_files) > 0)
+                requirement = config_manager.get_selection_requirement(action)
+                has_selection = len(selected_files) > 0
+                
+                # Check if action is available based on requirement
+                available = (requirement == 'any' or 
+                           (requirement == 'required' and has_selection) or
+                           (requirement == 'none' and not has_selection))
+                
                 if not available:
-                    requirement = config_manager.get_selection_requirement(action)
                     print(f"     ✗ {action} not available (requires selection='{requirement}')")
     
     print("\\n5. Benefits of Selection-Aware Key Sharing")

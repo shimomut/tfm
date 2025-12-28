@@ -30,7 +30,7 @@ from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, Me
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, is_action_available, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association, find_action_for_event
+from tfm_config import get_config, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association, find_action_for_event
 from tfm_text_viewer import create_text_viewer, is_text_file
 from tfm_diff_viewer import create_diff_viewer
 from tfm_directory_diff_viewer import DirectoryDiffViewer
