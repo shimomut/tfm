@@ -412,6 +412,7 @@ class InfoDialogHelpers:
         # File Operations (configurable)
         help_lines.append("File Operations:")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_file')} Toggle file selection")
+        help_lines.append(f"• {'Shift+Space'.ljust(12)} Toggle file selection and move up")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all')} Select all items")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('unselect_all')} Unselect all items")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('select_all_files')} Toggle all files selection")
