@@ -324,8 +324,6 @@ class TestInterface:
             # Format the input information
             if self.last_input.is_printable():
                 key_str = f"'{self.last_input.char}' (code: {self.last_input.key_code})"
-            elif self.last_input.is_special_key():
-                key_str = f"Special key (code: {self.last_input.key_code})"
             else:
                 key_str = f"Key code: {self.last_input.key_code}"
             
@@ -360,10 +358,8 @@ class TestInterface:
         for i, event in enumerate(self.input_history[-self.max_history:]):
             if event.is_printable():
                 display = f"'{event.char}'"
-            elif event.is_special_key():
-                display = f"<{event.key_code}>"
             else:
-                display = f"[{event.key_code}]"
+                display = f"<{event.key_code}>"
             
             self.renderer.draw_text(row + i, 4, display, 10)
         

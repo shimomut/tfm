@@ -193,7 +193,6 @@ def check_input_event():
         hasattr(ie, 'key_code') and
         hasattr(ie, 'modifiers') and
         hasattr(ie, 'is_printable') and
-        hasattr(ie, 'is_special_key') and
         hasattr(KeyCode, 'UP') and
         hasattr(ModifierKey, 'SHIFT')
     )

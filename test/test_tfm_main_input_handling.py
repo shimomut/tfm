@@ -232,8 +232,8 @@ def test_special_keys_use_keycode_enum():
             (KeyCode.PAGE_UP, "PAGE_UP", True),
             (KeyCode.PAGE_DOWN, "PAGE_DOWN", True),
             (KeyCode.ENTER, "ENTER", False),  # ENTER is not >= 1000
-            (KeyCode.ESCAPE, "ESCAPE", False),  # ESCAPE is not >= 1000
-            (KeyCode.BACKSPACE, "BACKSPACE", False),  # BACKSPACE is not >= 1000
+            (KeyCode.ESCAPE, "ESCAPE", False),  # ESCAPE is a control key
+            (KeyCode.BACKSPACE, "BACKSPACE", False),  # BACKSPACE is a control key
         ]
         
         for key_code, name, is_special in special_keys:
@@ -241,11 +241,6 @@ def test_special_keys_use_keycode_enum():
             # Just verify the event can be created and has the right key_code
             assert event.key_code == key_code, f"{name} key_code should match"
             assert not event.is_printable(), f"{name} should not be printable"
-            if is_special:
-                assert event.is_special_key(), f"{name} should be special key"
-            else:
-                # ENTER, ESCAPE, BACKSPACE are control keys but not "special" (< 1000)
-                assert not event.is_special_key(), f"{name} should not be special key (< 1000)"
         
         print("✓ Special keys KeyCode enum test passed")
 

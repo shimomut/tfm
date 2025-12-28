@@ -22,7 +22,6 @@ from tfm_input_utils import (
     is_alt_key,
     is_shift_key,
     is_printable_char,
-    is_special_key,
 )
 
 
@@ -303,24 +302,21 @@ def test_modifier_checks():
     print("✓ Modifier check test passed")
 
 
-def test_printable_and_special_checks():
-    """Test printable and special key checking functions."""
-    print("Testing printable and special key checks...")
+def test_printable_checks():
+    """Test printable key checking function."""
+    print("Testing printable key checks...")
     
     # Printable character
     event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
     assert is_printable_char(event) is True
-    assert is_special_key(event) is False
     
-    # Special key
+    # Special key (not printable)
     event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
-    assert is_special_key(event) is True
     assert is_printable_char(event) is False
     
     # Both char and key_code (printable takes precedence)
     event = KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE, char='x')
     assert is_printable_char(event) is True
-    assert is_special_key(event) is True
     
     # Empty char
     event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='')
@@ -328,9 +324,8 @@ def test_printable_and_special_checks():
     
     # None event
     assert is_printable_char(None) is False
-    assert is_special_key(None) is False
     
-    print("✓ Printable and special key check test passed")
+    print("✓ Printable key check test passed")
 
 
 def run_all_tests():
@@ -348,7 +343,7 @@ def run_all_tests():
     test_is_input_event_for_action()
     test_is_input_event_for_action_with_selection()
     test_modifier_checks()
-    test_printable_and_special_checks()
+    test_printable_checks()
     
     print()
     print("=" * 60)

@@ -13,43 +13,44 @@ from ttk import KeyCode, ModifierKey, KeyEvent, SystemEventType, MouseEvent
 
 def test_keycode_values():
     """Test that KeyCode enum has expected values."""
-    assert KeyCode.ENTER == 10
-    assert KeyCode.ESCAPE == 27
-    assert KeyCode.BACKSPACE == 127
-    assert KeyCode.TAB == 9
+    # With StrEnum, values are lowercase strings
+    assert KeyCode.ENTER == 'enter'
+    assert KeyCode.ESCAPE == 'escape'
+    assert KeyCode.BACKSPACE == 'backspace'
+    assert KeyCode.TAB == 'tab'
     
     # Space key
-    assert KeyCode.SPACE == 32
+    assert KeyCode.SPACE == 'space'
     
     # Arrow keys
-    assert KeyCode.UP == 1000
-    assert KeyCode.DOWN == 1001
-    assert KeyCode.LEFT == 1002
-    assert KeyCode.RIGHT == 1003
+    assert KeyCode.UP == 'up'
+    assert KeyCode.DOWN == 'down'
+    assert KeyCode.LEFT == 'left'
+    assert KeyCode.RIGHT == 'right'
     
     # Function keys
-    assert KeyCode.F1 == 1100
-    assert KeyCode.F12 == 1111
+    assert KeyCode.F1 == 'f1'
+    assert KeyCode.F12 == 'f12'
     
     # Editing keys
-    assert KeyCode.INSERT == 1200
-    assert KeyCode.DELETE == 1201
-    assert KeyCode.HOME == 1202
-    assert KeyCode.END == 1203
-    assert KeyCode.PAGE_UP == 1204
-    assert KeyCode.PAGE_DOWN == 1205
+    assert KeyCode.INSERT == 'insert'
+    assert KeyCode.DELETE == 'delete'
+    assert KeyCode.HOME == 'home'
+    assert KeyCode.END == 'end'
+    assert KeyCode.PAGE_UP == 'page_up'
+    assert KeyCode.PAGE_DOWN == 'page_down'
     
-    # Letter keys (NEW)
-    assert KeyCode.A == 2000
-    assert KeyCode.Z == 2025
+    # Letter keys
+    assert KeyCode.A == 'a'
+    assert KeyCode.Z == 'z'
     
-    # Digit keys (NEW)
-    assert KeyCode.DIGIT_0 == 2100
-    assert KeyCode.DIGIT_9 == 2109
+    # Digit keys (explicit string values)
+    assert KeyCode.DIGIT_0 == '0'
+    assert KeyCode.DIGIT_9 == '9'
     
-    # Symbol keys (NEW)
-    assert KeyCode.MINUS == 2200
-    assert KeyCode.GRAVE == 2210
+    # Symbol keys
+    assert KeyCode.MINUS == 'minus'
+    assert KeyCode.GRAVE == 'grave'
     
     # System event types (moved from KeyCode)
     assert SystemEventType.RESIZE == 3000
@@ -121,26 +122,6 @@ def test_is_printable():
     assert event.is_printable() is False
 
 
-def test_is_special_key():
-    """Test is_special_key() method."""
-    # Special keys (>= 1000)
-    event = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.NONE)
-    assert event.is_special_key() is True
-    
-    event = KeyEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE)
-    assert event.is_special_key() is True
-    
-    event = KeyEvent(key_code=KeyCode.DELETE, modifiers=ModifierKey.NONE)
-    assert event.is_special_key() is True
-    
-    # Printable characters (< 1000)
-    event = KeyEvent(key_code=ord('a'), modifiers=ModifierKey.NONE, char='a')
-    assert event.is_special_key() is False
-    
-    event = KeyEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE)
-    assert event.is_special_key() is False
-
-
 def test_has_modifier():
     """Test has_modifier() method."""
     # Single modifier
@@ -185,7 +166,6 @@ if __name__ == '__main__':
     test_modifier_key_combinations()
     test_input_event_creation()
     test_is_printable()
-    test_is_special_key()
     test_has_modifier()
     test_input_event_with_all_modifiers()
     

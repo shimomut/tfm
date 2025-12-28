@@ -5,106 +5,103 @@ This module defines the event system for TTK, providing a unified
 representation of user input, system events, and mouse events across all backends.
 """
 
-from enum import IntEnum
+from enum import IntEnum, StrEnum, auto
 from dataclasses import dataclass
 from typing import Optional
 
 
-class KeyCode(IntEnum):
+class KeyCode(StrEnum):
     """Standard key codes for keyboard keys."""
     
     # Special keys
-    ENTER = 10
-    ESCAPE = 27
-    BACKSPACE = 127
-    TAB = 9
+    ENTER = auto()
+    ESCAPE = auto()
+    BACKSPACE = auto()
+    TAB = auto()
     
-    # Space key (using Unicode code point)
-    SPACE = 32
+    # Space key
+    SPACE = auto()
     
     # Arrow keys
-    UP = 1000
-    DOWN = 1001
-    LEFT = 1002
-    RIGHT = 1003
+    UP = auto()
+    DOWN = auto()
+    LEFT = auto()
+    RIGHT = auto()
     
     # Function keys
-    F1 = 1100
-    F2 = 1101
-    F3 = 1102
-    F4 = 1103
-    F5 = 1104
-    F6 = 1105
-    F7 = 1106
-    F8 = 1107
-    F9 = 1108
-    F10 = 1109
-    F11 = 1110
-    F12 = 1111
+    F1 = auto()
+    F2 = auto()
+    F3 = auto()
+    F4 = auto()
+    F5 = auto()
+    F6 = auto()
+    F7 = auto()
+    F8 = auto()
+    F9 = auto()
+    F10 = auto()
+    F11 = auto()
+    F12 = auto()
     
     # Editing keys
-    INSERT = 1200
-    DELETE = 1201
-    HOME = 1202
-    END = 1203
-    PAGE_UP = 1204
-    PAGE_DOWN = 1205
+    INSERT = auto()
+    DELETE = auto()
+    HOME = auto()
+    END = auto()
+    PAGE_UP = auto()
+    PAGE_DOWN = auto()
     
     # Letter keys (physical keys, case handled by Shift modifier)
-    # Range: 2000-2025
-    A = 2000
-    B = 2001
-    C = 2002
-    D = 2003
-    E = 2004
-    F = 2005
-    G = 2006
-    H = 2007
-    I = 2008
-    J = 2009
-    K = 2010
-    L = 2011
-    M = 2012
-    N = 2013
-    O = 2014
-    P = 2015
-    Q = 2016
-    R = 2017
-    S = 2018
-    T = 2019
-    U = 2020
-    V = 2021
-    W = 2022
-    X = 2023
-    Y = 2024
-    Z = 2025
+    A = auto()
+    B = auto()
+    C = auto()
+    D = auto()
+    E = auto()
+    F = auto()
+    G = auto()
+    H = auto()
+    I = auto()
+    J = auto()
+    K = auto()
+    L = auto()
+    M = auto()
+    N = auto()
+    O = auto()
+    P = auto()
+    Q = auto()
+    R = auto()
+    S = auto()
+    T = auto()
+    U = auto()
+    V = auto()
+    W = auto()
+    X = auto()
+    Y = auto()
+    Z = auto()
     
     # Digit keys (physical keys, symbols handled by Shift modifier)
-    # Range: 2100-2109
-    DIGIT_0 = 2100
-    DIGIT_1 = 2101
-    DIGIT_2 = 2102
-    DIGIT_3 = 2103
-    DIGIT_4 = 2104
-    DIGIT_5 = 2105
-    DIGIT_6 = 2106
-    DIGIT_7 = 2107
-    DIGIT_8 = 2108
-    DIGIT_9 = 2109
+    DIGIT_0 = '0'
+    DIGIT_1 = '1'
+    DIGIT_2 = '2'
+    DIGIT_3 = '3'
+    DIGIT_4 = '4'
+    DIGIT_5 = '5'
+    DIGIT_6 = '6'
+    DIGIT_7 = '7'
+    DIGIT_8 = '8'
+    DIGIT_9 = '9'
     
     # Symbol/Punctuation keys (physical keys)
-    # Range: 2200-2299
-    MINUS = 2200          # - and _
-    EQUAL = 2201          # = and +
-    LEFT_BRACKET = 2202   # [ and {
-    RIGHT_BRACKET = 2203  # ] and }
-    BACKSLASH = 2204      # \ and |
-    SEMICOLON = 2205      # ; and :
-    QUOTE = 2206          # ' and "
-    COMMA = 2207          # , and <
-    PERIOD = 2208         # . and >
-    SLASH = 2209          # / and ?
-    GRAVE = 2210          # ` and ~
+    MINUS = auto()          # - and _
+    EQUAL = auto()          # = and +
+    LEFT_BRACKET = auto()   # [ and {
+    RIGHT_BRACKET = auto()  # ] and }
+    BACKSLASH = auto()      # \ and |
+    SEMICOLON = auto()      # ; and :
+    QUOTE = auto()          # ' and "
+    COMMA = auto()          # , and <
+    PERIOD = auto()         # . and >
+    SLASH = auto()          # / and ?
+    GRAVE = auto()          # ` and ~
     
 
 
@@ -186,17 +183,13 @@ class KeyEvent(Event):
             KeyEvent(key_code=KeyCode.F1, modifiers=ModifierKey.NONE, char=None)
             KeyEvent(key_code=KeyCode.ENTER, modifiers=ModifierKey.NONE, char='\n')
     """
-    key_code: int  # KeyCode value or Unicode code point
+    key_code: str  # KeyCode value (string)
     modifiers: int  # Bitwise OR of ModifierKey values
     char: Optional[str] = None  # Character for printable keys (legacy)
     
     def is_printable(self) -> bool:
         """Check if this is a printable character."""
         return self.char is not None and len(self.char) == 1
-    
-    def is_special_key(self) -> bool:
-        """Check if this is a special key (arrow, function, etc.)."""
-        return self.key_code >= 1000
     
     def has_modifier(self, modifier: ModifierKey) -> bool:
         """Check if a specific modifier key is pressed."""

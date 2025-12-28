@@ -258,18 +258,3 @@ def is_printable_char(event):
     if not isinstance(event, KeyEvent):
         return False
     return event.is_printable()
-
-
-def is_special_key(event):
-    """
-    Check if a KeyEvent represents a special key (non-printable).
-    
-    Args:
-        event: KeyEvent from TTK renderer
-        
-    Returns:
-        bool: True if event has a special key code
-    """
-    if not event:
-        return False
-    return event.is_special_key()

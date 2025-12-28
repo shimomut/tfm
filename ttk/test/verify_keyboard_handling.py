@@ -90,7 +90,6 @@ def verify_keyboard_handling():
         
         assert result == True, f"Should continue running for {description}"
         assert interface.last_input.key_code == key_code, f"Should store correct key code for {description}"
-        assert interface.last_input.is_special_key(), f"{description} should be identified as special key"
         print(f"✓ {description} handled correctly (code: {key_code})")
     print()
     

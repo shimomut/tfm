@@ -54,25 +54,35 @@ class TestCursesInputHandling(unittest.TestCase):
     def test_translate_printable_characters(self):
         """Test translation of printable ASCII characters."""
         # Test lowercase letters - now map to A through Z
-        for char_code in range(ord('a'), ord('z') + 1):
+        letter_keycodes = [KeyCode.A, KeyCode.B, KeyCode.C, KeyCode.D, KeyCode.E, KeyCode.F,
+                          KeyCode.G, KeyCode.H, KeyCode.I, KeyCode.J, KeyCode.K, KeyCode.L,
+                          KeyCode.M, KeyCode.N, KeyCode.O, KeyCode.P, KeyCode.Q, KeyCode.R,
+                          KeyCode.S, KeyCode.T, KeyCode.U, KeyCode.V, KeyCode.W, KeyCode.X,
+                          KeyCode.Y, KeyCode.Z]
+        
+        for i, char_code in enumerate(range(ord('a'), ord('z') + 1)):
             event = self.backend._translate_curses_key(char_code)
-            expected_keycode = KeyCode.A + (char_code - ord('a'))
+            expected_keycode = letter_keycodes[i]
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
             self.assertEqual(event.modifiers, ModifierKey.NONE)
         
         # Test uppercase letters - also map to A through Z with SHIFT
-        for char_code in range(ord('A'), ord('Z') + 1):
+        for i, char_code in enumerate(range(ord('A'), ord('Z') + 1)):
             event = self.backend._translate_curses_key(char_code)
-            expected_keycode = KeyCode.A + (char_code - ord('A'))
+            expected_keycode = letter_keycodes[i]
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
             self.assertEqual(event.modifiers, ModifierKey.SHIFT)
         
         # Test digits - now map to DIGIT_0 through DIGIT_9
-        for char_code in range(ord('0'), ord('9') + 1):
+        digit_keycodes = [KeyCode.DIGIT_0, KeyCode.DIGIT_1, KeyCode.DIGIT_2, KeyCode.DIGIT_3,
+                         KeyCode.DIGIT_4, KeyCode.DIGIT_5, KeyCode.DIGIT_6, KeyCode.DIGIT_7,
+                         KeyCode.DIGIT_8, KeyCode.DIGIT_9]
+        
+        for i, char_code in enumerate(range(ord('0'), ord('9') + 1)):
             event = self.backend._translate_curses_key(char_code)
-            expected_keycode = KeyCode.DIGIT_0 + (char_code - ord('0'))
+            expected_keycode = digit_keycodes[i]
             self.assertEqual(event.key_code, expected_keycode)
             self.assertEqual(event.char, chr(char_code))
             self.assertEqual(event.modifiers, ModifierKey.NONE)
@@ -151,9 +161,12 @@ class TestCursesInputHandling(unittest.TestCase):
     
     def test_translate_function_keys(self):
         """Test translation of function keys F1-F12."""
+        function_keycodes = [KeyCode.F1, KeyCode.F2, KeyCode.F3, KeyCode.F4, KeyCode.F5, KeyCode.F6,
+                            KeyCode.F7, KeyCode.F8, KeyCode.F9, KeyCode.F10, KeyCode.F11, KeyCode.F12]
+        
         for i in range(12):
             curses_key = curses.KEY_F1 + i
-            expected_keycode = KeyCode.F1 + i
+            expected_keycode = function_keycodes[i]
             
             event = self.backend._translate_curses_key(curses_key)
             self.assertEqual(event.key_code, expected_keycode)
