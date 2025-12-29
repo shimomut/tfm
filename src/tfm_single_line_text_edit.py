@@ -83,6 +83,120 @@ class SingleLineTextEdit:
             self.cursor_pos = len(self.text)
             return True
         return False
+    
+    def _is_word_char(self, char):
+        """
+        Check if a character is a word character (alphanumeric or underscore).
+        
+        Word characters are letters, digits, and underscores.
+        Everything else (whitespace, punctuation, symbols) is a word boundary.
+        
+        Args:
+            char (str): Character to check
+            
+        Returns:
+            bool: True if character is a word character
+        """
+        return char.isalnum() or char == '_'
+    
+    def _find_previous_word_boundary(self, pos):
+        """
+        Find the position of the previous word boundary from the given position.
+        
+        A word boundary is defined as:
+        - The start of the text
+        - A transition between word characters and non-word characters
+        - Whitespace and punctuation (~`[]-=|\\ etc.) are treated as word boundaries
+        
+        Args:
+            pos (int): Starting position
+            
+        Returns:
+            int: Position of the previous word boundary
+        """
+        if pos <= 0:
+            return 0
+        
+        # Move back one position to start
+        pos -= 1
+        
+        # Skip any non-word characters (whitespace, punctuation, etc.)
+        while pos > 0 and not self._is_word_char(self.text[pos]):
+            pos -= 1
+        
+        # Skip word characters (letters, digits, underscores)
+        while pos > 0 and self._is_word_char(self.text[pos]):
+            pos -= 1
+        
+        # If we stopped on a non-word character, move forward one
+        if pos > 0 or (pos == 0 and not self._is_word_char(self.text[0])):
+            if not self._is_word_char(self.text[pos]):
+                pos += 1
+        
+        return pos
+    
+    def _find_next_word_boundary(self, pos):
+        """
+        Find the position of the next word boundary from the given position.
+        
+        A word boundary is defined as:
+        - The end of the text
+        - A transition between word characters and non-word characters
+        - Whitespace and punctuation (~`[]-=|\\ etc.) are treated as word boundaries
+        
+        Args:
+            pos (int): Starting position
+            
+        Returns:
+            int: Position of the next word boundary
+        """
+        text_len = len(self.text)
+        if pos >= text_len:
+            return text_len
+        
+        # Skip word characters (letters, digits, underscores)
+        while pos < text_len and self._is_word_char(self.text[pos]):
+            pos += 1
+        
+        # Skip any non-word characters (whitespace, punctuation, etc.)
+        while pos < text_len and not self._is_word_char(self.text[pos]):
+            pos += 1
+        
+        return pos
+    
+    def move_cursor_word_left(self):
+        """Move cursor to the beginning of the previous word"""
+        new_pos = self._find_previous_word_boundary(self.cursor_pos)
+        if new_pos != self.cursor_pos:
+            self.cursor_pos = new_pos
+            return True
+        return False
+    
+    def move_cursor_word_right(self):
+        """Move cursor to the beginning of the next word"""
+        new_pos = self._find_next_word_boundary(self.cursor_pos)
+        if new_pos != self.cursor_pos:
+            self.cursor_pos = new_pos
+            return True
+        return False
+    
+    def delete_word_backward(self):
+        """
+        Delete from cursor position to the beginning of the previous word.
+        Similar to Alt+Backspace in many text editors.
+        
+        Returns:
+            bool: True if text was deleted, False if nothing to delete
+        """
+        if self.cursor_pos <= 0:
+            return False
+        
+        new_pos = self._find_previous_word_boundary(self.cursor_pos)
+        if new_pos < self.cursor_pos:
+            self.text = self.text[:new_pos] + self.text[self.cursor_pos:]
+            self.cursor_pos = new_pos
+            return True
+        return False
         
     def insert_char(self, char):
         """
@@ -198,7 +312,16 @@ class SingleLineTextEdit:
             if event.char == 'v' and event.modifiers == ModifierKey.COMMAND:
                 return self.paste_from_clipboard()
             
-            if event.key_code == KeyCode.LEFT:
+            # Word-level navigation with Alt modifier
+            if event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.ALT:
+                return self.move_cursor_word_left()
+            elif event.key_code == KeyCode.RIGHT and event.modifiers == ModifierKey.ALT:
+                return self.move_cursor_word_right()
+            # Word-level deletion with Alt+Backspace
+            elif event.key_code == KeyCode.BACKSPACE and event.modifiers == ModifierKey.ALT:
+                return self.delete_word_backward()
+            # Character-level navigation (no modifiers)
+            elif event.key_code == KeyCode.LEFT:
                 return self.move_cursor_left()
             elif event.key_code == KeyCode.RIGHT:
                 return self.move_cursor_right()
