@@ -2507,6 +2507,9 @@ class ArchiveUI:
         self.progress_manager = file_manager.progress_manager
         self.cache_manager = file_manager.cache_manager
         self.config = file_manager.config
+        # Initialize logger
+        from tfm_log_manager import getLogger
+        self.logger = getLogger("Archive")
     
     def enter_create_archive_mode(self):
         """Enter archive creation mode"""
@@ -2670,31 +2673,31 @@ class ArchiveUI:
             return
         
         # Check if it's an archive file using the archive operations
-        if not self.archive_operations.is_archive(selected_file):
-            self.logger.error(f"'{selected_file.name}' is not a supported archive format")
+        if not self.archive_operations.is_archive(focused_file):
+            self.logger.error(f"'{focused_file.name}' is not a supported archive format")
             self.logger.info("Supported formats: .zip, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .txz, .gz, .bz2, .xz")
             return
         
         # Create extraction directory in the other pane
         # Use the base name of the archive (without extension) as directory name
-        archive_basename = self.get_archive_basename(selected_file.name)
+        archive_basename = self.get_archive_basename(focused_file.name)
         extract_dir = other_pane['path'] / archive_basename
         
         # Check if extract confirmation is enabled
         if getattr(self.config, 'CONFIRM_EXTRACT_ARCHIVE', True):
             # Show confirmation dialog
-            message = f"Extract '{selected_file.name}' to {other_pane['path']}?"
+            message = f"Extract '{focused_file.name}' to {other_pane['path']}?"
             
             def extract_callback(confirmed):
                 if confirmed:
-                    self._proceed_with_extraction(selected_file, extract_dir, other_pane, archive_basename)
+                    self._proceed_with_extraction(focused_file, extract_dir, other_pane, archive_basename)
                 else:
                     self.logger.info("Extraction cancelled")
             
             self.file_manager.show_confirmation(message, extract_callback)
         else:
             # Proceed with extraction without confirmation
-            self._proceed_with_extraction(selected_file, extract_dir, other_pane, archive_basename)
+            self._proceed_with_extraction(focused_file, extract_dir, other_pane, archive_basename)
     
     def _proceed_with_extraction(self, selected_file, extract_dir, other_pane, archive_basename):
         """Proceed with extraction using archive operations"""

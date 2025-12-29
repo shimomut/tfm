@@ -25,6 +25,9 @@ class MenuManager:
     FILE_MOVE_TO_OTHER_PANE = 'file.move_to_other_pane'
     FILE_DELETE = 'file.delete'
     FILE_RENAME = 'file.rename'
+    FILE_VIEW = 'file.view'
+    FILE_EDIT = 'file.edit'
+    FILE_PROPERTIES = 'file.properties'
     
     # Edit menu
     EDIT_SELECT_ALL = 'edit.select_all'
@@ -46,10 +49,22 @@ class MenuManager:
     # Go menu
     GO_PARENT = 'go.parent'
     GO_HOME = 'go.home'
+    GO_DRIVES = 'go.drives'
     GO_FAVORITES = 'go.favorites'
     GO_RECENT = 'go.recent'
     
+    # Tools menu
+    TOOLS_SEARCH_FILES = 'tools.search_files'
+    TOOLS_SEARCH_CONTENT = 'tools.search_content'
+    TOOLS_COMPARE_FILES = 'tools.compare_files'
+    TOOLS_COMPARE_DIRECTORIES = 'tools.compare_directories'
+    TOOLS_COMPARE_SELECTION = 'tools.compare_selection'
+    TOOLS_CREATE_ARCHIVE = 'tools.create_archive'
+    TOOLS_EXTRACT_ARCHIVE = 'tools.extract_archive'
+    TOOLS_EXTERNAL_PROGRAMS = 'tools.external_programs'
+    
     # Help menu
+    HELP_KEYBOARD_SHORTCUTS = 'help.keyboard_shortcuts'
     HELP_ABOUT = 'help.about'
     HELP_REPORT_ISSUE = 'help.report_issue'
     
@@ -91,6 +106,7 @@ class MenuManager:
             self._build_edit_menu(modifier),
             self._build_view_menu(modifier),
             self._build_go_menu(modifier),
+            self._build_tools_menu(modifier),
             self._build_help_menu(modifier)
         ])
         
@@ -158,6 +174,18 @@ class MenuManager:
                     'shortcut': f'{modifier}+O',
                     'enabled': True
                 },
+                {
+                    'id': self.FILE_VIEW,
+                    'label': 'View',
+                    'shortcut': 'F3',
+                    'enabled': True
+                },
+                {
+                    'id': self.FILE_EDIT,
+                    'label': 'Edit',
+                    'shortcut': 'F4',
+                    'enabled': True
+                },
                 {'separator': True},
                 {
                     'id': self.FILE_COPY_TO_OTHER_PANE,
@@ -183,6 +211,13 @@ class MenuManager:
                     'label': 'Rename',
                     'shortcut': f'{modifier}+R',
                     'enabled': False  # Disabled when no selection
+                },
+                {'separator': True},
+                {
+                    'id': self.FILE_PROPERTIES,
+                    'label': 'Properties',
+                    'shortcut': f'{modifier}+I',
+                    'enabled': True
                 }
             ]
         }
@@ -322,6 +357,12 @@ class MenuManager:
                     'shortcut': f'{modifier}+Shift+H',
                     'enabled': True
                 },
+                {
+                    'id': self.GO_DRIVES,
+                    'label': 'Drives',
+                    'shortcut': f'{modifier}+D',
+                    'enabled': True
+                },
                 {'separator': True},
                 {
                     'id': self.GO_FAVORITES,
@@ -333,6 +374,69 @@ class MenuManager:
                     'id': self.GO_RECENT,
                     'label': 'Recent Locations',
                     'shortcut': f'{modifier}+Shift+R',
+                    'enabled': True
+                }
+            ]
+        }
+    
+    def _build_tools_menu(self, modifier):
+        """Build the Tools menu structure.
+        
+        Args:
+            modifier: Keyboard modifier key (Cmd or Ctrl)
+        
+        Returns:
+            dict: Tools menu structure
+        """
+        return {
+            'id': 'tools',
+            'label': 'Tools',
+            'items': [
+                {
+                    'id': self.TOOLS_SEARCH_FILES,
+                    'label': 'Search Files',
+                    'shortcut': f'{modifier}+S',
+                    'enabled': True
+                },
+                {
+                    'id': self.TOOLS_SEARCH_CONTENT,
+                    'label': 'Search Content',
+                    'shortcut': f'{modifier}+Shift+S',
+                    'enabled': True
+                },
+                {'separator': True},
+                {
+                    'id': self.TOOLS_COMPARE_FILES,
+                    'label': 'Compare Files',
+                    'enabled': True
+                },
+                {
+                    'id': self.TOOLS_COMPARE_DIRECTORIES,
+                    'label': 'Compare Directories',
+                    'shortcut': f'{modifier}+Shift+D',
+                    'enabled': True
+                },
+                {
+                    'id': self.TOOLS_COMPARE_SELECTION,
+                    'label': 'Compare Selection',
+                    'enabled': True
+                },
+                {'separator': True},
+                {
+                    'id': self.TOOLS_CREATE_ARCHIVE,
+                    'label': 'Create Archive',
+                    'enabled': True
+                },
+                {
+                    'id': self.TOOLS_EXTRACT_ARCHIVE,
+                    'label': 'Extract Archive',
+                    'enabled': True
+                },
+                {'separator': True},
+                {
+                    'id': self.TOOLS_EXTERNAL_PROGRAMS,
+                    'label': 'External Programs',
+                    'shortcut': f'{modifier}+E',
                     'enabled': True
                 }
             ]
@@ -352,11 +456,17 @@ class MenuManager:
             'label': 'Help',
             'items': [
                 {
+                    'id': self.HELP_KEYBOARD_SHORTCUTS,
+                    'label': 'Keyboard Shortcuts',
+                    'shortcut': f'{modifier}+?',
+                    'enabled': True
+                },
+                {'separator': True},
+                {
                     'id': self.HELP_ABOUT,
                     'label': 'About TFM',
                     'enabled': True
                 },
-                {'separator': True},
                 {
                     'id': self.HELP_REPORT_ISSUE,
                     'label': 'Report Issue',
@@ -400,10 +510,13 @@ class MenuManager:
         states[self.FILE_NEW_FILE] = True
         states[self.FILE_NEW_FOLDER] = True
         states[self.FILE_OPEN] = True
+        states[self.FILE_VIEW] = True
+        states[self.FILE_EDIT] = True
         states[self.FILE_COPY_TO_OTHER_PANE] = has_selection
         states[self.FILE_MOVE_TO_OTHER_PANE] = has_selection
         states[self.FILE_DELETE] = has_selection
         states[self.FILE_RENAME] = has_selection
+        states[self.FILE_PROPERTIES] = True
         
         # Edit menu states
         states[self.EDIT_SELECT_ALL] = True
@@ -425,10 +538,22 @@ class MenuManager:
         # Go menu states
         states[self.GO_PARENT] = not is_at_root
         states[self.GO_HOME] = True
+        states[self.GO_DRIVES] = True
         states[self.GO_FAVORITES] = True
         states[self.GO_RECENT] = True
         
+        # Tools menu states (all always enabled)
+        states[self.TOOLS_SEARCH_FILES] = True
+        states[self.TOOLS_SEARCH_CONTENT] = True
+        states[self.TOOLS_COMPARE_FILES] = True
+        states[self.TOOLS_COMPARE_DIRECTORIES] = True
+        states[self.TOOLS_COMPARE_SELECTION] = True
+        states[self.TOOLS_CREATE_ARCHIVE] = True
+        states[self.TOOLS_EXTRACT_ARCHIVE] = True
+        states[self.TOOLS_EXTERNAL_PROGRAMS] = True
+        
         # Help menu states (all always enabled)
+        states[self.HELP_KEYBOARD_SHORTCUTS] = True
         states[self.HELP_ABOUT] = True
         states[self.HELP_REPORT_ISSUE] = True
         

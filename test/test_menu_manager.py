@@ -38,10 +38,10 @@ class TestMenuManager(unittest.TestCase):
         self.assertIsNotNone(self.menu_manager.menu_structure)
         self.assertIn('menus', self.menu_manager.menu_structure)
     
-    def test_menu_structure_has_four_menus(self):
-        """Test that menu structure contains App, File, Edit, View, Go, and Help menus"""
+    def test_menu_structure_has_all_menus(self):
+        """Test that menu structure contains all expected menus"""
         menus = self.menu_manager.menu_structure['menus']
-        self.assertEqual(len(menus), 6)
+        self.assertEqual(len(menus), 7)  # App, File, Edit, View, Go, Tools, Help
         
         menu_ids = [menu['id'] for menu in menus]
         self.assertIn('app', menu_ids)
@@ -49,6 +49,7 @@ class TestMenuManager(unittest.TestCase):
         self.assertIn('edit', menu_ids)
         self.assertIn('view', menu_ids)
         self.assertIn('go', menu_ids)
+        self.assertIn('tools', menu_ids)
         self.assertIn('help', menu_ids)
     
     def test_file_menu_structure(self):
@@ -106,8 +107,38 @@ class TestMenuManager(unittest.TestCase):
         
         self.assertIn(MenuManager.GO_PARENT, item_ids)
         self.assertIn(MenuManager.GO_HOME, item_ids)
+        self.assertIn(MenuManager.GO_DRIVES, item_ids)
         self.assertIn(MenuManager.GO_FAVORITES, item_ids)
         self.assertIn(MenuManager.GO_RECENT, item_ids)
+    
+    def test_tools_menu_structure(self):
+        """Test Tools menu contains required items"""
+        menus = self.menu_manager.menu_structure['menus']
+        tools_menu = next(m for m in menus if m['id'] == 'tools')
+        
+        items = [item for item in tools_menu['items'] if 'separator' not in item]
+        item_ids = [item['id'] for item in items]
+        
+        self.assertIn(MenuManager.TOOLS_SEARCH_FILES, item_ids)
+        self.assertIn(MenuManager.TOOLS_SEARCH_CONTENT, item_ids)
+        self.assertIn(MenuManager.TOOLS_COMPARE_FILES, item_ids)
+        self.assertIn(MenuManager.TOOLS_COMPARE_DIRECTORIES, item_ids)
+        self.assertIn(MenuManager.TOOLS_COMPARE_SELECTION, item_ids)
+        self.assertIn(MenuManager.TOOLS_CREATE_ARCHIVE, item_ids)
+        self.assertIn(MenuManager.TOOLS_EXTRACT_ARCHIVE, item_ids)
+        self.assertIn(MenuManager.TOOLS_EXTERNAL_PROGRAMS, item_ids)
+    
+    def test_help_menu_structure(self):
+        """Test Help menu contains required items"""
+        menus = self.menu_manager.menu_structure['menus']
+        help_menu = next(m for m in menus if m['id'] == 'help')
+        
+        items = [item for item in help_menu['items'] if 'separator' not in item]
+        item_ids = [item['id'] for item in items]
+        
+        self.assertIn(MenuManager.HELP_KEYBOARD_SHORTCUTS, item_ids)
+        self.assertIn(MenuManager.HELP_ABOUT, item_ids)
+        self.assertIn(MenuManager.HELP_REPORT_ISSUE, item_ids)
     
     def test_menu_item_ids_are_unique(self):
         """Test that all menu item IDs are unique across entire menu structure"""
@@ -238,7 +269,7 @@ class TestMenuManager(unittest.TestCase):
         
         self.assertIsNotNone(structure)
         self.assertIn('menus', structure)
-        self.assertEqual(len(structure['menus']), 6)
+        self.assertEqual(len(structure['menus']), 7)  # App, File, Edit, View, Go, Tools, Help
     
     def test_menu_items_have_required_fields(self):
         """Test that all menu items have required fields"""

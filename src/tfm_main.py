@@ -977,6 +977,10 @@ class FileManager(UILayer):
             return self._action_create_directory()
         elif item_id == MenuManager.FILE_OPEN:
             return self._action_open_file()
+        elif item_id == MenuManager.FILE_VIEW:
+            return self._action_view_file()
+        elif item_id == MenuManager.FILE_EDIT:
+            return self._action_edit_file()
         elif item_id == MenuManager.FILE_COPY_TO_OTHER_PANE:
             return self._action_copy_to_other_pane()
         elif item_id == MenuManager.FILE_MOVE_TO_OTHER_PANE:
@@ -985,6 +989,8 @@ class FileManager(UILayer):
             return self._action_delete()
         elif item_id == MenuManager.FILE_RENAME:
             return self._action_rename()
+        elif item_id == MenuManager.FILE_PROPERTIES:
+            return self._action_show_properties()
         
         # Edit menu
         elif item_id == MenuManager.EDIT_SELECT_ALL:
@@ -993,6 +999,66 @@ class FileManager(UILayer):
             return self._action_copy_names()
         elif item_id == MenuManager.EDIT_COPY_PATHS:
             return self._action_copy_paths()
+        
+        # View menu
+        elif item_id == MenuManager.VIEW_SHOW_HIDDEN:
+            return self._action_toggle_hidden()
+        elif item_id == MenuManager.VIEW_SORT_BY_NAME:
+            return self._action_sort_by('name')
+        elif item_id == MenuManager.VIEW_SORT_BY_SIZE:
+            return self._action_sort_by('size')
+        elif item_id == MenuManager.VIEW_SORT_BY_DATE:
+            return self._action_sort_by('date')
+        elif item_id == MenuManager.VIEW_SORT_BY_EXTENSION:
+            return self._action_sort_by('extension')
+        elif item_id == MenuManager.VIEW_REFRESH:
+            return self._action_refresh()
+        elif item_id == MenuManager.VIEW_MOVE_PANE_DIVIDER_LEFT:
+            return self._action_pane_left()
+        elif item_id == MenuManager.VIEW_MOVE_PANE_DIVIDER_RIGHT:
+            return self._action_pane_right()
+        elif item_id == MenuManager.VIEW_MOVE_LOG_DIVIDER_UP:
+            return self._action_log_up()
+        elif item_id == MenuManager.VIEW_MOVE_LOG_DIVIDER_DOWN:
+            return self._action_log_down()
+        
+        # Go menu
+        elif item_id == MenuManager.GO_PARENT:
+            return self._action_go_parent()
+        elif item_id == MenuManager.GO_HOME:
+            return self._action_go_home()
+        elif item_id == MenuManager.GO_DRIVES:
+            return self._action_show_drives()
+        elif item_id == MenuManager.GO_FAVORITES:
+            return self._action_show_favorites()
+        elif item_id == MenuManager.GO_RECENT:
+            return self._action_show_recent()
+        
+        # Tools menu
+        elif item_id == MenuManager.TOOLS_SEARCH_FILES:
+            return self._action_search_files()
+        elif item_id == MenuManager.TOOLS_SEARCH_CONTENT:
+            return self._action_search_content()
+        elif item_id == MenuManager.TOOLS_COMPARE_FILES:
+            return self._action_compare_files()
+        elif item_id == MenuManager.TOOLS_COMPARE_DIRECTORIES:
+            return self._action_compare_directories()
+        elif item_id == MenuManager.TOOLS_COMPARE_SELECTION:
+            return self._action_compare_selection()
+        elif item_id == MenuManager.TOOLS_CREATE_ARCHIVE:
+            return self._action_create_archive()
+        elif item_id == MenuManager.TOOLS_EXTRACT_ARCHIVE:
+            return self._action_extract_archive()
+        elif item_id == MenuManager.TOOLS_EXTERNAL_PROGRAMS:
+            return self._action_external_programs()
+        
+        # Help menu
+        elif item_id == MenuManager.HELP_KEYBOARD_SHORTCUTS:
+            return self._action_show_help()
+        elif item_id == MenuManager.HELP_ABOUT:
+            return self._action_show_about()
+        elif item_id == MenuManager.HELP_REPORT_ISSUE:
+            return self._action_report_issue()
         
         # View menu
         elif item_id == MenuManager.VIEW_SHOW_HIDDEN:
@@ -1115,6 +1181,71 @@ class FileManager(UILayer):
     def _action_move_to_other_pane(self):
         """Move selected files to the opposite pane's directory."""
         self.file_operations_ui.move_selected_files()
+        return True
+    
+    def _action_view_file(self):
+        """View the selected file."""
+        self.view_file()
+        return True
+    
+    def _action_edit_file(self):
+        """Edit the selected file."""
+        self.edit_file()
+        return True
+    
+    def _action_show_properties(self):
+        """Show file properties."""
+        self.show_file_details()
+        return True
+    
+    def _action_show_drives(self):
+        """Show drives dialog."""
+        self.show_drives_dialog()
+        return True
+    
+    def _action_search_files(self):
+        """Show search files dialog."""
+        self.show_search_dialog('filename')
+        return True
+    
+    def _action_search_content(self):
+        """Show search content dialog."""
+        self.show_search_dialog('content')
+        return True
+    
+    def _action_compare_files(self):
+        """Compare two selected files."""
+        self.diff_selected_files()
+        return True
+    
+    def _action_compare_directories(self):
+        """Compare directories."""
+        self.show_directory_diff()
+        return True
+    
+    def _action_compare_selection(self):
+        """Show compare selection dialog."""
+        self.show_compare_selection_dialog()
+        return True
+    
+    def _action_create_archive(self):
+        """Create archive."""
+        self.enter_create_archive_mode()
+        return True
+    
+    def _action_extract_archive(self):
+        """Extract archive."""
+        self.extract_selected_archive()
+        return True
+    
+    def _action_external_programs(self):
+        """Show external programs dialog."""
+        self.show_programs_dialog()
+        return True
+    
+    def _action_show_help(self):
+        """Show help dialog."""
+        self.show_help_dialog()
         return True
     
     def _action_select_all(self):
