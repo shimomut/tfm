@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Tests for word-level navigation and deletion in SingleLineTextEdit
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_single_line_text_edit_word_navigation.py -v
 """
 
 import pytest

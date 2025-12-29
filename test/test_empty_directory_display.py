@@ -1,16 +1,11 @@
-#!/usr/bin/env python3
 """
 Test empty directory display functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_empty_directory_display.py -v
 """
 
-import sys
-import os
 import tempfile
-from pathlib import Path
 from unittest.mock import Mock
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 
 class MockTFM:
@@ -196,11 +191,3 @@ def test_narrow_pane_handling():
     assert tfm.drawn_text[0]['text'] == "No items to show"
     
     print("✅ Narrow pane handling test passed!")
-
-
-if __name__ == "__main__":
-    test_empty_directory_display()
-    test_non_empty_directory_display()
-    test_message_positioning()
-    test_narrow_pane_handling()
-    print("\n🎉 All empty directory display tests passed!")

@@ -1,14 +1,11 @@
-#!/usr/bin/env python3
 """
 Test for SingleLineTextEdit cursor rendering bug
 
 This test reproduces the issue where cursor stops rendering when
 editing text is longer than the maximum width.
-"""
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_rendering_bug.py -v
+"""
 
 import unittest
 from unittest.mock import Mock, patch
@@ -175,7 +172,3 @@ class TestCursorRenderingBug(unittest.TestCase):
                     f"Cursor should be visible at position {cursor_pos}")
                 self.assertLessEqual(cursor_in_visible, text_max_width,
                     f"Cursor should be within visible window at position {cursor_pos}")
-
-
-if __name__ == '__main__':
-    unittest.main()

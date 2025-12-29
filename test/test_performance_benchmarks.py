@@ -9,18 +9,12 @@ These tests verify that performance requirements from Requirement 8 are met:
 8.5: No operation more than 10% slower than pre-migration
 
 Note: These tests use callback mode for event handling.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_performance_benchmarks.py -v
 """
 
-import sys
 import time
 import platform
-from pathlib import Path
-
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
-# Add ttk to path for test utilities
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def test_rendering_performance():
@@ -301,34 +295,3 @@ def test_coregraphics_availability():
     except ImportError:
         # Not available, but that's okay if PyObjC isn't installed
         pass
-
-
-if __name__ == '__main__':
-    print("Running performance benchmarks...")
-    
-    tests = [
-        ("Rendering Performance", test_rendering_performance),
-        ("Large Directory Performance", test_large_directory_performance),
-        ("Search Update Performance", test_search_update_performance),
-        ("Input Polling Performance", test_input_polling_performance),
-        ("Performance Overhead", test_performance_overhead),
-        ("CoreGraphics Availability", test_coregraphics_availability),
-    ]
-    
-    passed = 0
-    failed = 0
-    
-    for name, test_func in tests:
-        try:
-            test_func()
-            print(f"✓ {name}")
-            passed += 1
-        except AssertionError as e:
-            print(f"✗ {name}: {e}")
-            failed += 1
-        except Exception as e:
-            print(f"✗ {name}: Unexpected error: {e}")
-            failed += 1
-    
-    print(f"\nResults: {passed} passed, {failed} failed")
-    sys.exit(0 if failed == 0 else 1)

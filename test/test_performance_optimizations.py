@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test performance optimizations for logging system.
 
@@ -6,15 +5,14 @@ Tests:
 - Level checking before formatting (Requirement 11.1)
 - Visibility checking for log pane (Requirement 11.3)
 - Message retention limit (Requirement 11.4)
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_performance_optimizations.py -v
 """
 
 import sys
 import logging
 import time
 from collections import deque
-
-# Add src to path
-sys.path.insert(0, 'src')
 
 from tfm_log_manager import LogManager, LoggingConfig
 from tfm_logging_handlers import LogPaneHandler
@@ -34,7 +32,7 @@ def test_level_checking_before_formatting():
         MAX_LOG_MESSAGES = 100
     
     config = SimpleConfig()
-    log_manager = LogManager(config, remote_port=None, debug_mode=False)
+    log_manager = LogManager(config, remote_port=None)
     
     # Get a logger and set its level to WARNING (should skip DEBUG and INFO)
     logger = log_manager.getLogger("TestLogger")
@@ -89,7 +87,7 @@ def test_visibility_checking_for_log_pane():
         MAX_LOG_MESSAGES = 100
     
     config = SimpleConfig()
-    log_manager = LogManager(config, remote_port=None, debug_mode=False)
+    log_manager = LogManager(config, remote_port=None)
     
     # Get a logger
     logger = log_manager.getLogger("TestLogger")
@@ -245,46 +243,3 @@ def test_deque_maxlen_behavior():
     print(f"✓ Multiple oldest items discarded: {list(d)}")
     
     print("✓ Deque maxlen behavior test passed\n")
-
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("Performance Optimizations Test Suite")
-    print("=" * 60)
-    print()
-    
-    try:
-        test_level_checking_before_formatting()
-    except Exception as e:
-        print(f"\n✗ test_level_checking_before_formatting failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-    
-    try:
-        test_visibility_checking_for_log_pane()
-    except Exception as e:
-        print(f"\n✗ test_visibility_checking_for_log_pane failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-    
-    try:
-        test_message_retention_limit()
-    except Exception as e:
-        print(f"\n✗ test_message_retention_limit failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-    
-    try:
-        test_deque_maxlen_behavior()
-    except Exception as e:
-        print(f"\n✗ test_deque_maxlen_behavior failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-    
-    print("=" * 60)
-    print("All performance optimization tests passed!")
-    print("=" * 60)

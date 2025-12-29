@@ -3,6 +3,8 @@ Test suite for AttributeDictCache class.
 
 This module tests the AttributeDictCache implementation which caches
 pre-built NSDictionary objects for NSAttributedString text attributes.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_attribute_dict_cache.py -v
 """
 
 import unittest
@@ -150,7 +152,3 @@ class TestAttributeDictCache(unittest.TestCase):
         # Verify references are still preserved after clear
         self.assertIs(self.cache._font_cache, self.mock_font_cache)
         self.assertIs(self.cache._color_cache, self.mock_color_cache)
-
-
-if __name__ == '__main__':
-    unittest.main()

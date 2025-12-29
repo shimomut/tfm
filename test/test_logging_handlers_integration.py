@@ -1,17 +1,14 @@
-#!/usr/bin/env python3
 """
 Integration tests for TFM logging handlers
 Verifies all requirements from Task 1
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_logging_handlers_integration.py -v
 """
 
 import sys
-import os
 import logging
 import threading
 import time
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
 
@@ -272,22 +269,3 @@ def test_thread_safety():
     assert len(messages) == 50, f"Expected 50 messages, got {len(messages)}"
     
     print("  ✓ Handlers are thread-safe")
-
-
-if __name__ == '__main__':
-    print("Running integration tests for logging handlers...\n")
-    
-    test_requirement_1_1_deque_storage()
-    test_requirement_1_2_is_stream_capture_flag()
-    test_requirement_2_1_log_pane_routing()
-    test_requirement_3_5_original_streams()
-    test_requirement_4_1_tcp_connections()
-    test_thread_safety()
-    
-    print("\n✅ All integration tests passed!")
-    print("\nTask 1 Requirements Verified:")
-    print("  ✓ Requirement 1.1: LogPaneHandler stores messages in a deque")
-    print("  ✓ Requirement 1.2: is_stream_capture flag handling in all handlers")
-    print("  ✓ Requirement 2.1: Messages routed to log pane")
-    print("  ✓ Requirement 3.5: Original streams (sys.__stdout__, sys.__stderr__)")
-    print("  ✓ Requirement 4.1: TCP connections for remote monitoring")

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test TFM with CoreGraphics Backend Integration
 
@@ -9,15 +8,12 @@ Requirements tested:
 - 6.4: Backend initialization and selection
 - 6.5: Feature equivalence between backends
 - 11.5: Error handling and graceful degradation
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_coregraphics_backend_integration.py -v
 """
 
-import sys
 import platform
 import unittest
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 
 class TestCoreGraphicsBackendIntegration(unittest.TestCase):
@@ -83,7 +79,7 @@ class TestCoreGraphicsBackendIntegration(unittest.TestCase):
         try:
             renderer = CoreGraphicsBackend(
                 window_title='TFM Test',
-                font_name='Menlo',
+                font_names=['Menlo'],
                 font_size=14,
                 rows=24,
                 cols=80
@@ -329,32 +325,3 @@ def run_manual_coregraphics_test():
     print()
     print("="*70)
     print()
-
-
-if __name__ == '__main__':
-    # Run automated tests
-    print("Running automated CoreGraphics backend integration tests...")
-    print()
-    
-    # Create test suite
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-    
-    # Add test classes
-    suite.addTests(loader.loadTestsFromTestCase(TestCoreGraphicsBackendIntegration))
-    suite.addTests(loader.loadTestsFromTestCase(TestCoreGraphicsBackendErrorHandling))
-    
-    # Run tests with verbose output
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-    
-    # Print manual test instructions
-    if platform.system() == 'Darwin':
-        try:
-            import objc
-            run_manual_coregraphics_test()
-        except ImportError:
-            print("\n⚠ PyObjC not available - install with: pip install pyobjc-framework-Cocoa")
-    
-    # Exit with appropriate code
-    sys.exit(0 if result.wasSuccessful() else 1)

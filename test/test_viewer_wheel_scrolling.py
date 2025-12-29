@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
 """
 Tests for mouse wheel scrolling in viewers (TextViewer, DiffViewer, DirectoryDiffViewer).
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_viewer_wheel_scrolling.py -v
 """
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 from pathlib import Path
@@ -333,7 +331,3 @@ class TestDirectoryDiffViewerWheelScrolling(unittest.TestCase):
         
         self.viewer.handle_mouse_event(event)
         self.assertTrue(self.viewer._dirty)
-
-
-if __name__ == '__main__':
-    unittest.main()

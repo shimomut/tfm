@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test S3 directory rename restriction functionality.
 
 This test verifies that TFM properly prevents directory renaming on S3
 to avoid expensive copy/delete operations.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_directory_rename_restriction.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_s3 import S3PathImpl
 
@@ -94,7 +90,3 @@ class TestS3DirectoryRenameRestriction(unittest.TestCase):
 def run_test():
     """Run the test"""
     unittest.main(verbosity=2)
-
-
-if __name__ == '__main__':
-    run_test()

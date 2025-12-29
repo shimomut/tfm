@@ -3,6 +3,8 @@ Tests for FileManagerLayer wrapper class.
 
 This test suite verifies that the FileManagerLayer correctly wraps
 FileManager functionality and implements the UILayer interface.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_file_manager_layer.py -v
 """
 
 import pytest
@@ -233,7 +235,3 @@ class TestFileManagerLayerLifecycle:
         # Reactivate (should mark dirty)
         layer.on_activate()
         assert layer._dirty is True
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

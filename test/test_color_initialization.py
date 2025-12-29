@@ -1,23 +1,20 @@
-#!/usr/bin/env python3
 """
 Test suite for the color initialization fix
 
 This test verifies that colors are properly initialized before stdout/stderr
 redirection in the main TFM application.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_color_initialization.py -v
 """
 
 import unittest
 import sys
-import os
 import curses
 from ttk import KeyEvent, KeyCode, ModifierKey
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # Add src directory to path for imports
 src_dir = Path(__file__).parent.parent / 'src'
-sys.path.insert(0, str(src_dir))
-
 class TestColorInitializationFix(unittest.TestCase):
     """Test the color initialization fix"""
     
@@ -198,6 +195,3 @@ class TestColorInitializationIntegration(unittest.TestCase):
         
         # Verify the scheme was set correctly
         self.assertEqual(main_tfm_scheme, 'dark')
-
-if __name__ == '__main__':
-    unittest.main()

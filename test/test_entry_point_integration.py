@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Integration test for TFM entry point with TTK backend selection
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_entry_point_integration.py -v
 """
 
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import argparse
-
-# Add root directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 class TestEntryPointIntegration(unittest.TestCase):
     """Integration tests for entry point with backend selection"""
@@ -133,6 +129,3 @@ class TestEntryPointIntegration(unittest.TestCase):
             for attr, value in expected_attrs.items():
                 self.assertEqual(getattr(args, attr), value,
                                f"Argument {attr} should be {value} for {argv}")
-
-if __name__ == '__main__':
-    unittest.main()

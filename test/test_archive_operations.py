@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test suite for TFM Archive Operations with cross-storage support
 
@@ -7,17 +6,14 @@ This test suite covers:
 2. Local archive creation and extraction
 3. Cross-storage archive operations
 4. Error handling and edge cases
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_operations.py -v
 """
 
 import unittest
 import tempfile
 import shutil
-import os
-import sys
 from pathlib import Path as PathlibPath
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_archive import ArchiveOperations
@@ -393,8 +389,3 @@ def run_tests():
     result = runner.run(suite)
     
     return result.wasSuccessful()
-
-
-if __name__ == "__main__":
-    success = run_tests()
-    sys.exit(0 if success else 1)

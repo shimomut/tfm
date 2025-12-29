@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Integration tests for archive search with FileManager
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_search_integration.py -v
 """
 
-import os
-import sys
 import tempfile
 import zipfile
 from pathlib import Path as PathlibPath
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import pytest
 from tfm_path import Path

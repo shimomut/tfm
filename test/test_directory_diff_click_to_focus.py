@@ -5,12 +5,9 @@ This test verifies that:
 1. Clicking on an item moves the cursor to that item
 2. Clicking outside the tree view area doesn't change cursor
 3. Clicking on invalid indices doesn't crash
-"""
 
-import sys
-import os
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_diff_click_to_focus.py -v
+"""
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
@@ -294,7 +291,3 @@ class TestDirectoryDiffClickToFocus:
         
         # Verify dirty flag was set
         assert viewer._dirty is True
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

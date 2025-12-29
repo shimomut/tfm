@@ -3,6 +3,8 @@ Test that rendering methods have been simplified to use UILayerStack.
 
 This test verifies that the old if-elif chains for dialog rendering have been
 removed and replaced with UILayerStack delegation.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_rendering_simplification.py -v
 """
 
 import pytest

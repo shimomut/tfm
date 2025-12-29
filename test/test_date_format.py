@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test script for flexible date-time formatting in file list panes
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_date_format.py -v
 """
 
-import sys
-import os
 from datetime import datetime, timedelta
 from pathlib import Path as StdPath
-
-# Add src to path
-sys.path.insert(0, str(StdPath(__file__).parent.parent / 'src'))
 
 from tfm_file_operations import FileOperations
 from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
@@ -129,18 +125,3 @@ def test_edge_cases():
     print(f"Noon (full):        {formatted_full:20} (YYYY-MM-DD HH:mm:ss)")
     
     print("=" * 60)
-
-
-if __name__ == '__main__':
-    try:
-        test_date_formats()
-        test_format_cycling()
-        test_edge_cases()
-        
-        print("\n✓ All date format tests completed successfully!")
-        
-    except Exception as e:
-        print(f"\n✗ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

@@ -1,16 +1,11 @@
-#!/usr/bin/env python3
 """
 Test script for the move feature implementation
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_move_feature.py -v
 """
 
-import os
-import sys
 import tempfile
 import shutil
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 def test_move_functionality():
     """Test the move functionality with various scenarios"""
@@ -215,7 +210,3 @@ def main():
         print("💥 SOME TESTS FAILED! Please check the implementation.")
     
     return success
-
-if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)

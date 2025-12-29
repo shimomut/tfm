@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test S3 Cache Fix
 
 This test verifies that the S3 caching fix properly caches stat information
 from directory listings and avoids 404 errors.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_cache_operations.py -v
 """
 
-import sys
-import os
 import time
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
     from tfm_path import Path
@@ -194,7 +190,3 @@ class TestS3CacheFix(unittest.TestCase):
 def main():
     """Run the tests"""
     unittest.main(verbosity=2)
-
-
-if __name__ == '__main__':
-    main()

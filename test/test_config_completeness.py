@@ -1,19 +1,14 @@
-#!/usr/bin/env python3
 """
 Test Configuration Completeness
 Verifies that all configuration parameters are properly defined
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_config_completeness.py -v
 """
 
 import unittest
-import sys
-from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_config import DefaultConfig
 from _config import Config
-
 
 class TestConfigCompleteness(unittest.TestCase):
     """Test that all configuration parameters are properly defined"""
@@ -164,7 +159,6 @@ class TestConfigCompleteness(unittest.TestCase):
         self.assertEqual(jump_dialog_user.max_directories, 
                         self.user_config.MAX_JUMP_DIRECTORIES)
 
-
 def run_config_tests():
     """Run all configuration tests"""
     print("Running Configuration Completeness Tests...")
@@ -191,7 +185,3 @@ def run_config_tests():
             print(traceback)
     
     return result.wasSuccessful()
-
-
-if __name__ == '__main__':
-    run_config_tests()

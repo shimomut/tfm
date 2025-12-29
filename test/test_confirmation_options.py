@@ -1,14 +1,9 @@
-#!/usr/bin/env python3
 """
 Test script for new confirmation options in TFM configuration system
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_confirmation_options.py -v
 """
 
-import sys
-import os
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 def test_confirmation_config_options():
     """Test that new confirmation options are available in configuration"""
@@ -136,7 +131,3 @@ def main():
     else:
         print("✗ Some tests failed!")
         return False
-
-if __name__ == '__main__':
-    success = main()
-    sys.exit(0 if success else 1)

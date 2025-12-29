@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
 """
 Test BatchRenameDialog UILayer interface implementation
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_batch_rename_uilayer.py -v
 """
 
-import sys
 from pathlib import Path as PathLib
-sys.path.insert(0, str(PathLib(__file__).parent.parent / 'src'))
-
 import pytest
 from unittest.mock import Mock
 from ttk import KeyEvent, CharEvent, KeyCode
@@ -189,7 +187,3 @@ class TestBatchRenameDialogUILayer:
         # Should update regex editor
         assert result is True
         assert self.dialog.regex_editor.get_text() == "a"
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

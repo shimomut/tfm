@@ -1,15 +1,10 @@
-#!/usr/bin/env python3
 """
 Complete test for copy operation overwrite dialog fix
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_copy_overwrite_complete.py -v
 """
 
-import sys
 import tempfile
-import os
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_quick_choice_bar import QuickChoiceBar
 from tfm_config import DefaultConfig
@@ -201,13 +196,3 @@ def test_copy_overwrite_flow():
         else:
             print("\n✗ FAILURE: Overwrite dialog is not active!")
             return False
-
-
-if __name__ == "__main__":
-    success = test_copy_overwrite_flow()
-    print(f"\n{'='*50}")
-    if success:
-        print("✓ TEST PASSED: Copy overwrite dialog works correctly")
-    else:
-        print("✗ TEST FAILED: Copy overwrite dialog issue not fixed")
-    print(f"{'='*50}")

@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test S3 TTL Configuration
 
 Tests that S3 cache TTL can be configured through the Config class.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_ttl_configuration.py -v
 """
 
-import sys
-import os
 import unittest
 from unittest.mock import patch, MagicMock
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
     from tfm_config import DefaultConfig
@@ -104,7 +100,3 @@ class TestS3TTLConfiguration(unittest.TestCase):
         
         self.assertIs(cache1, cache2)
         self.assertIsInstance(cache1, S3Cache)
-
-
-if __name__ == '__main__':
-    unittest.main()

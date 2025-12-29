@@ -2,17 +2,15 @@
 Unit tests for DiffEngine class.
 
 Tests the core functionality of building tree structures and classifying differences.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_diff_engine.py -v
 """
 
 import unittest
 import tempfile
-import os
 from pathlib import Path as StdPath
 
 # Add src to path for imports
-import sys
-sys.path.insert(0, str(StdPath(__file__).parent.parent / 'src'))
-
 from tfm_directory_diff_viewer import DiffEngine, FileInfo, DifferenceType, TreeNode
 from tfm_path import Path
 
@@ -242,7 +240,3 @@ class TestDiffEngine(unittest.TestCase):
         )
         
         self.assertFalse(result)
-
-
-if __name__ == '__main__':
-    unittest.main()

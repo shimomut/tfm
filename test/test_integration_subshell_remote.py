@@ -1,21 +1,19 @@
-#!/usr/bin/env python3
 """
 Integration test for subshell remote directory fallback.
 
 This test verifies that the subshell remote fallback feature works correctly
 by testing the actual implementation with mock objects.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_integration_subshell_remote.py -v
 """
 
 import os
-import sys
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path as PathlibPath
 
 # Add src directory to path for imports
 src_dir = PathlibPath(__file__).parent.parent / 'src'
-sys.path.insert(0, str(src_dir))
-
 
 class MockRemotePath:
     """Mock remote path that simulates S3 or other remote storage"""
@@ -218,7 +216,3 @@ class TestSubshellRemoteIntegration(unittest.TestCase):
         # Test with special characters
         special_path = MockRemotePath('s3://bucket/path with spaces/file-name_123.txt')
         self.assertTrue(special_path.is_remote())
-
-
-if __name__ == '__main__':
-    unittest.main()

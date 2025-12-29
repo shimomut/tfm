@@ -1,18 +1,15 @@
-#!/usr/bin/env python3
 """
 Test suite for cursor position saving on TFM quit
 
 Tests that cursor positions are properly saved when TFM quits,
 ensuring they will be available for restoration on next startup.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_quit_cursor_saving.py -v
 """
 
-import sys
 import tempfile
 import time
 from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
@@ -458,8 +455,3 @@ def run_all_tests():
         import traceback
         traceback.print_exc()
         return False
-
-
-if __name__ == "__main__":
-    success = run_all_tests()
-    sys.exit(0 if success else 1)

@@ -4,15 +4,13 @@ Test CoreGraphics backend resize event handling.
 This test verifies that the CoreGraphics backend properly generates
 resize events when the window is resized via the on_resize callback,
 matching the behavior expected in callback mode.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_coregraphics_resize_event.py -v
 """
 
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 import sys
-import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Check if PyObjC is available
 try:
@@ -41,7 +39,7 @@ class TestCoreGraphicsResizeEvent(unittest.TestCase):
         # Create backend with small dimensions for testing
         self.backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=10,
             cols=40
@@ -194,7 +192,3 @@ class TestCoreGraphicsResizeEvent(unittest.TestCase):
         # Caches should still exist but be cleared
         self.assertIsNotNone(self.backend._attr_dict_cache)
         self.assertIsNotNone(self.backend._attr_string_cache)
-
-
-if __name__ == '__main__':
-    unittest.main()

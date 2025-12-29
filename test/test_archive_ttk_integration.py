@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test archive module TTK integration
 
 This test verifies that tfm_archive.py works correctly with TTK renderer
 instead of curses stdscr.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_ttk_integration.py -v
 """
 
-import sys
-import os
 import tempfile
 import zipfile
 from pathlib import Path as PathlibPath
 from unittest.mock import Mock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_archive import ArchiveOperations, ArchiveUI
 from tfm_path import Path
@@ -241,8 +237,3 @@ def run_all_tests():
     print("="*60 + "\n")
     
     return failed == 0
-
-
-if __name__ == '__main__':
-    success = run_all_tests()
-    sys.exit(0 if success else 1)

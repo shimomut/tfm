@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for RemoteMonitoringHandler - Task 9 validation
 
@@ -6,18 +5,15 @@ This test suite validates:
 - Task 9.1: RemoteMonitoringHandler.emit() converts LogRecord to JSON and broadcasts
 - Task 9.2: Server lifecycle (start_server, stop_server, _accept_connections)
 - Task 9.3: Broadcast to all clients with graceful failure handling
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_remote_monitoring_handler.py -v
 """
 
-import sys
-import os
 import logging
 import socket
 import json
 import time
 import threading
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_logging_handlers import RemoteMonitoringHandler
 
@@ -357,19 +353,3 @@ def test_no_clients_no_error():
         handler.emit(record)
     
     print("✓ Task 9.3: Broadcasting with no clients works")
-
-
-if __name__ == '__main__':
-    print("Running RemoteMonitoringHandler tests (Task 9)...\n")
-    
-    test_emit_logger_message()
-    test_emit_stream_message()
-    test_server_lifecycle()
-    test_client_connection()
-    test_broadcast_to_single_client()
-    test_broadcast_to_multiple_clients()
-    test_client_failure_handling()
-    test_stream_capture_broadcast()
-    test_no_clients_no_error()
-    
-    print("\n✅ All Task 9 tests passed!")

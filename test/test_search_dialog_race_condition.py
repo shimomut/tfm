@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test script to verify the race condition fix for SearchDialog content_changed flag
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_race_condition.py -v
 """
 
-import sys
-import os
 import time
 import threading
 from unittest.mock import Mock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_search_dialog import SearchDialog
 from tfm_config import get_config
@@ -157,18 +153,3 @@ def test_thread_safe_access_methods():
     
     print("✓ Thread-safe access methods working correctly")
     return True
-
-
-if __name__ == "__main__":
-    try:
-        test_race_condition_fix()
-        test_thread_safe_access_methods()
-        
-        print("\n🎉 All race condition tests passed!")
-        print("   Thread-safe access to content_changed flag is working correctly.")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test log level filtering functionality.
 
 Tests that log levels are correctly applied to loggers and that
 messages are filtered based on the configured levels.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_log_level_filtering.py -v
 """
 
-import sys
-import os
 import logging
 from io import StringIO
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_log_manager import LogManager, LoggingConfig
 
@@ -28,7 +24,7 @@ def test_default_log_level():
     
     # Create LogManager with default level INFO
     config = MockConfig()
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Create a logger
     logger = log_manager.getLogger("TestLogger")
@@ -49,7 +45,7 @@ def test_set_default_log_level():
     print("\n=== Test: Set Default Log Level ===")
     
     config = MockConfig()
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Change default level to DEBUG
     log_manager.set_default_log_level(logging.DEBUG)
@@ -79,7 +75,7 @@ def test_per_logger_level_override():
     print("\n=== Test: Per-Logger Level Override ===")
     
     config = MockConfig()
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Set default to INFO
     log_manager.set_default_log_level(logging.INFO)
@@ -114,7 +110,7 @@ def test_clear_logger_level_override():
     print("\n=== Test: Clear Logger Level Override ===")
     
     config = MockConfig()
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Set default to INFO
     log_manager.set_default_log_level(logging.INFO)
@@ -142,7 +138,7 @@ def test_get_logger_level():
     print("\n=== Test: Get Logger Level ===")
     
     config = MockConfig()
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Set default to INFO
     log_manager.set_default_log_level(logging.INFO)
@@ -168,7 +164,7 @@ def test_level_filtering_behavior():
     print("\n=== Test: Level Filtering Behavior ===")
     
     config = MockConfig()
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Configure handlers to capture messages
     log_manager.configure_handlers(log_pane_enabled=True, stream_output_enabled=False, remote_enabled=False)
@@ -206,7 +202,7 @@ def test_pre_configured_logger_level():
     print("\n=== Test: Pre-Configured Logger Level ===")
     
     config = MockConfig()
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Set level for a logger that doesn't exist yet
     log_manager.set_logger_level("FutureLogger", logging.DEBUG)
@@ -249,7 +245,3 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

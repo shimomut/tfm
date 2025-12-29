@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test ArchiveCache class functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_cache.py -v
 """
 
 import unittest
@@ -8,12 +9,7 @@ import tempfile
 import zipfile
 import tarfile
 import time
-import os
-import sys
 from pathlib import Path as PathlibPath
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_archive import ArchiveCache, ArchiveHandler, ZipHandler, TarHandler
 from tfm_path import Path
@@ -255,7 +251,3 @@ class TestArchiveCache(unittest.TestCase):
         
         # Verify only one handler was created
         self.assertEqual(len(cache._handlers), 1)
-
-
-if __name__ == '__main__':
-    unittest.main()

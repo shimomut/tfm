@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
 """
 Test view_file fallback behavior for files without associations
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_view_file_fallback.py -v
 """
 
-import sys
-import os
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_config import get_program_for_file, has_action_for_file
 
@@ -125,7 +121,3 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test command line arguments for --left and --right directory specification
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_command_line_arguments.py -v
 """
 
 import unittest
-import sys
 import os
 import tempfile
 import argparse
-from pathlib import Path
-
-# Add src directory to Python path for testing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Import the create_parser function from tfm_main
 from tfm_main import create_parser
@@ -132,6 +128,3 @@ class TestCommandLineArguments(unittest.TestCase):
         help_text = self.parser.format_help()
         self.assertIn('--profile', help_text)
         self.assertIn('profiling', help_text.lower())
-
-if __name__ == '__main__':
-    unittest.main()

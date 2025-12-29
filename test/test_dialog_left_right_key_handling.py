@@ -1,24 +1,19 @@
-#!/usr/bin/env python3
 """
 Comprehensive test for left/right key rendering fix across all BaseListDialog subclasses
 
 This test verifies that all dialogs that extend BaseListDialog properly handle
 left and right keys without causing rendering issues.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_left_right_key_handling.py -v
 """
 
 from ttk import KeyEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_search_dialog import SearchDialog
-from tfm_jump_dialog import JumpDialog
-from tfm_list_dialog import ListDialog
 
+from tfm_list_dialog import ListDialog
 
 class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
     """Test left/right key handling across all BaseListDialog subclasses"""
@@ -104,7 +99,7 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
         """Test that all dialogs have consistent left/right key behavior"""
         dialogs = [
             ('SearchDialog', SearchDialog(self.config)),
-            ('JumpDialog', JumpDialog(self.config)),
+            ('JumpDialog'(self.config)),
             ('ListDialog', ListDialog(self.config))
         ]
         
@@ -137,7 +132,3 @@ class TestAllDialogsLeftRightKeyFix(unittest.TestCase):
                                      f"{dialog_name} should need redraw after {key_name} key")
                         
         print("✓ All dialogs handle left/right keys consistently")
-
-
-if __name__ == '__main__':
-    unittest.main()

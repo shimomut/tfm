@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test SingleLineTextEdit TTK integration
 
 This test verifies that SingleLineTextEdit has been successfully migrated
 to use TTK's Renderer API instead of curses.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_single_line_text_edit_ttk_integration.py -v
 """
 
 import unittest
 from unittest.mock import Mock, MagicMock
-import sys
-import os
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_single_line_text_edit import SingleLineTextEdit
 from ttk import KeyEvent, KeyCode, TextAttribute
@@ -296,7 +292,3 @@ class TestSingleLineTextEditTTKIntegration(unittest.TestCase):
                         "Should not import curses directly")
         self.assertNotIn("from curses", source,
                         "Should not import from curses")
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test character batching logic implementation.
 
@@ -8,13 +7,10 @@ This test verifies that the character batching logic correctly:
 3. Detects batch boundaries on attribute changes
 4. Calculates correct x-coordinates for batch start positions
 5. Handles edge cases (empty rows, single chars, all same/different attrs)
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_character_batching.py -v
 """
 
-import sys
-import os
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 from ttk.renderer import TextAttribute
@@ -27,7 +23,7 @@ def test_batching_with_spaces():
     
     backend = CoreGraphicsBackend(
         window_title="Batching Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -60,7 +56,7 @@ def test_batching_attribute_changes():
     
     backend = CoreGraphicsBackend(
         window_title="Attribute Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -94,7 +90,7 @@ def test_batching_all_same_attributes():
     
     backend = CoreGraphicsBackend(
         window_title="Max Batch Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -123,7 +119,7 @@ def test_batching_all_different_attributes():
     
     backend = CoreGraphicsBackend(
         window_title="No Batch Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -153,7 +149,7 @@ def test_batching_single_character():
     
     backend = CoreGraphicsBackend(
         window_title="Single Char Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -180,7 +176,7 @@ def test_batching_empty_row():
     
     backend = CoreGraphicsBackend(
         window_title="Empty Row Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -205,7 +201,7 @@ def test_batching_leading_trailing_spaces():
     
     backend = CoreGraphicsBackend(
         window_title="Spaces Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -233,7 +229,7 @@ def test_batching_reverse_video():
     
     backend = CoreGraphicsBackend(
         window_title="Reverse Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -286,6 +282,3 @@ def main():
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
-if __name__ == '__main__':
-    main()

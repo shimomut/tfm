@@ -1,13 +1,10 @@
-#!/usr/bin/env python3
 """
 Test inverse selection behavior for select_all_files and select_all_items
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_inverse_selection.py -v
 """
 
-import sys
 from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_file_operations import FileOperations
 
@@ -143,11 +140,3 @@ def test_inverse_items_selection():
     print("  ✓ Selection inversed correctly")
     
     print("\n✓ All inverse items selection tests passed!")
-
-
-if __name__ == '__main__':
-    test_inverse_files_selection()
-    test_inverse_items_selection()
-    print("\n" + "="*50)
-    print("All tests passed successfully!")
-    print("="*50)

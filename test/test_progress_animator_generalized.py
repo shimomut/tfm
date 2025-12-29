@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test file for generalized ProgressAnimator functionality
 Tests the new generalized animation system for various use cases
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_animator_generalized.py -v
 """
 
-import sys
 import time
-from pathlib import Path
-
-# Add src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
 from tfm_config import DefaultConfig
@@ -296,7 +292,3 @@ def main():
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

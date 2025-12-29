@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test script for the help dialog functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_help_dialog.py -v
 """
 
 import curses
 from ttk import KeyEvent, KeyCode, ModifierKey
-import sys
 
 
 
 # Add src directory to Python path
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
 from tfm_main import FileManager
 
 def test_help_dialog(stdscr):
@@ -55,6 +51,3 @@ def test_help_dialog(stdscr):
         # Restore stdout/stderr before handling exception
         fm.restore_stdio()
         raise
-
-if __name__ == "__main__":
-    curses.wrapper(test_help_dialog)

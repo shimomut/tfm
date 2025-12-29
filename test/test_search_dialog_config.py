@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test Search Dialog Configuration Access
 Verifies that search dialog can access MAX_SEARCH_RESULTS configuration
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_config.py -v
 """
 
 import unittest
-import sys
-from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_config import DefaultConfig
 from _config import Config
@@ -80,7 +76,3 @@ def run_search_config_tests():
             print(traceback)
     
     return result.wasSuccessful()
-
-
-if __name__ == '__main__':
-    run_search_config_tests()

@@ -3,6 +3,8 @@ Integration tests for AttributedStringCache with AttributeDictCache.
 
 This module tests the integration between AttributedStringCache and
 AttributeDictCache to ensure they work together correctly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_attributed_string_cache_integration.py -v
 """
 
 import unittest
@@ -177,7 +179,3 @@ class TestAttributedStringCacheIntegration(unittest.TestCase):
         
         # Verify AttributeDictCache was used (it should have cached the attributes)
         self.assertGreater(len(self.attr_string_cache._attr_dict_cache._cache), 0)
-
-
-if __name__ == '__main__':
-    unittest.main()

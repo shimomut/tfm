@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test that single-character keys match regardless of modifiers.
 
@@ -10,15 +9,11 @@ The key insight is that characters like "?" are actually produced by
 Shift-Slash on the keyboard, but the system should match them based on 
 the char field, not the modifiers. This maintains backward compatibility
 with the existing behavior.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_single_char_modifier_independence.py -v
 """
 
 import unittest
-import sys
-import os
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ttk'))
 
 from tfm_config import KeyBindings
 from ttk import KeyEvent, KeyCode, ModifierKey
@@ -141,7 +136,3 @@ class TestSingleCharModifierIndependence(unittest.TestCase):
         event_shift_up = KeyEvent(key_code=KeyCode.UP, modifiers=ModifierKey.SHIFT, char=None)
         action = kb.find_action_for_event(event_shift_up, False)
         self.assertEqual(action, 'action_shift_up', "Shift-UP should match 'action_shift_up'")
-
-
-if __name__ == '__main__':
-    unittest.main()

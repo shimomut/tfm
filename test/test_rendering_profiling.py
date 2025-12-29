@@ -1,17 +1,15 @@
-#!/usr/bin/env python3
 """
 Integration tests for rendering profiling functionality.
 
 Tests that rendering operations are profiled when profiling mode is enabled.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_rendering_profiling.py -v
 """
 
 import sys
 import time
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_profiling import ProfilingManager
 
@@ -284,7 +282,3 @@ def run_all_tests():
             import traceback
             traceback.print_exc()
             sys.exit(1)
-
-
-if __name__ == "__main__":
-    run_all_tests()

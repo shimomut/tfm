@@ -1,12 +1,9 @@
-#!/usr/bin/env python3
 """
 Test suite for SearchDialog TTK integration
 Verifies that SearchDialog works correctly with TTK Renderer API
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_ttk_integration.py -v
+"""
 
 import pytest
 import threading
@@ -334,7 +331,3 @@ def test_thread_safety_with_results(search_dialog):
     
     results = read_results()
     assert len(results) == 1
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

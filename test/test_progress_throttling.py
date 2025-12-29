@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Test progress manager throttling functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_throttling.py -v
 """
 
-import sys
-import os
 import time
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_progress_manager import ProgressManager, OperationType
 
@@ -151,10 +147,3 @@ def test_no_throttling_for_slow_operations():
     assert callback_count == 6, f"Expected 6 callbacks for slow operations (1 initial + 5 updates), got {callback_count}"
     
     print("✅ Slow operations test passed!")
-
-
-if __name__ == "__main__":
-    test_progress_throttling()
-    test_throttling_with_final_update()
-    test_no_throttling_for_slow_operations()
-    print("\n🎉 All throttling tests passed!")

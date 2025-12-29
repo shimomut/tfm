@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Integration test for Task 16: Final checkpoint - Integration testing
 
@@ -8,17 +7,15 @@ This test verifies:
 - Remote monitoring works
 - Configuration changes work dynamically
 - Thread safety under concurrent load
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_integration_final_checkpoint.py -v
 """
 
 import sys
-import os
 import time
 import threading
 import socket
 import json
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_log_manager import LogManager, LoggingConfig
 from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
@@ -401,7 +398,3 @@ def main():
     else:
         test_print(f"\n✗ {total - passed} TESTS FAILED")
         return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

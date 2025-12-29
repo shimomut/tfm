@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test S3 directory rename dialog prevention functionality.
 
 This test verifies that TFM prevents the rename dialog from opening
 for S3 directories, providing immediate feedback to users.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_directory_rename_dialog_prevention.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_s3 import S3PathImpl
 
@@ -162,7 +158,3 @@ class TestS3DirectoryRenameDialogPrevention(unittest.TestCase):
 def run_test():
     """Run the test"""
     unittest.main(verbosity=2)
-
-
-if __name__ == '__main__':
-    run_test()

@@ -4,6 +4,8 @@ Unit tests for AttributedStringCache class.
 This module tests the AttributedStringCache implementation, which caches
 NSAttributedString objects to eliminate redundant instantiation overhead
 during character drawing.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_attributed_string_cache.py -v
 """
 
 import unittest
@@ -219,7 +221,3 @@ class TestAttributedStringCache(unittest.TestCase):
         
         # AttributeDictCache reference should still be valid
         self.assertEqual(self.cache._attr_dict_cache, self.mock_attr_dict_cache)
-
-
-if __name__ == '__main__':
-    unittest.main()

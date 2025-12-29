@@ -1,5 +1,7 @@
 """
 Tests for clipboard copy name/path functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_clipboard_copy.py -v
 """
 
 import unittest
@@ -217,7 +219,3 @@ class TestClipboardCopy(unittest.TestCase):
         # Verify copy name/path items are still enabled (will use focused item)
         self.assertTrue(states[MenuManager.EDIT_COPY_NAMES])
         self.assertTrue(states[MenuManager.EDIT_COPY_PATHS])
-
-
-if __name__ == '__main__':
-    unittest.main()

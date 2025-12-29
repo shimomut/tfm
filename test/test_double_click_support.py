@@ -3,6 +3,8 @@ Test double-click support in TFM.
 
 This test verifies that double-click events trigger the same actions as
 pressing the Enter key in file lists and directory diff viewer.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_double_click_support.py -v
 """
 
 import pytest

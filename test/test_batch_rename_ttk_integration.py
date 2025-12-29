@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
 """
 Test BatchRenameDialog TTK Integration
 
 This test verifies that BatchRenameDialog has been successfully migrated to use
 the TTK Renderer API instead of curses.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_batch_rename_ttk_integration.py -v
 """
 
 import unittest
@@ -28,12 +29,10 @@ class TestBatchRenameDialogTTKIntegration(unittest.TestCase):
         
         # Import after mocking to avoid import-time dependencies
         import sys
-        sys.path.insert(0, 'src')
         from tfm_batch_rename_dialog import BatchRenameDialog
         from tfm_path import Path
         self.BatchRenameDialog = BatchRenameDialog
         self.Path = Path
-        
     def test_init_accepts_renderer(self):
         """Test that BatchRenameDialog accepts renderer parameter"""
         dialog = self.BatchRenameDialog(self.mock_config, renderer=self.mock_renderer)
@@ -251,8 +250,6 @@ class TestBatchRenameDialogTTKIntegration(unittest.TestCase):
     def test_no_curses_imports(self):
         """Test that BatchRenameDialog doesn't import curses"""
         import sys
-        sys.path.insert(0, 'src')
-        
         # Read the source file
         with open('src/tfm_batch_rename_dialog.py', 'r') as f:
             source = f.read()
@@ -260,7 +257,3 @@ class TestBatchRenameDialogTTKIntegration(unittest.TestCase):
         # Check that there's no direct curses import
         self.assertNotIn('import curses', source)
         self.assertNotIn('from curses import', source)
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,15 +1,12 @@
-#!/usr/bin/env python3
 """
 Test TTK integration for tfm_external_programs.py
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_external_programs_ttk_integration.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-import sys
 import os
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_external_programs import ExternalProgramManager, tfm_tool, quote_filenames_with_double_quotes, get_selected_or_cursor_files
 from tfm_path import Path
@@ -180,7 +177,3 @@ class TestHelperFunctions(unittest.TestCase):
         # This is a basic test - the function will return the tool name if not found
         result = tfm_tool('nonexistent_tool.sh')
         self.assertEqual(result, 'nonexistent_tool.sh')
-
-
-if __name__ == '__main__':
-    unittest.main()

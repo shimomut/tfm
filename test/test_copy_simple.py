@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Simple test for copy functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_copy_simple.py -v
 """
 
-import os
-import sys
 import tempfile
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 
@@ -47,8 +43,3 @@ def test_s3_path_creation():
         print("✓ S3 path creation works")
     except ImportError as e:
         print(f"⚠ S3 support not available: {e}")
-
-if __name__ == '__main__':
-    test_copy_method_exists()
-    test_s3_path_creation()
-    print("All tests passed!")

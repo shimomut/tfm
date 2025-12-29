@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test S3 Virtual Directory Optimization
 
 This test verifies that S3PathImpl instances store metadata as properties
 to avoid API calls for is_dir(), is_file(), and stat() methods.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_virtual_directory_optimization.py -v
 """
 
-import sys
-import os
 import time
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
     from tfm_path import Path
@@ -291,7 +287,3 @@ class TestS3VirtualDirectoryOptimization(unittest.TestCase):
 def main():
     """Run the tests"""
     unittest.main(verbosity=2)
-
-
-if __name__ == '__main__':
-    main()

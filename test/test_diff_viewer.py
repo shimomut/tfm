@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test suite for TFM Diff Viewer
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_diff_viewer.py -v
 """
 
 import unittest
-import sys
-import os
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path as StdPath
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_diff_viewer import DiffViewer, create_diff_viewer
@@ -268,7 +264,3 @@ def farewell():
         statuses = [status for _, _, status, _, _, _, _ in viewer.diff_lines]
         has_changes = any(s != 'equal' for s in statuses)
         self.assertTrue(has_changes)
-
-
-if __name__ == '__main__':
-    unittest.main()

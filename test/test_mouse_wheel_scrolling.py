@@ -3,6 +3,8 @@ Tests for mouse wheel scrolling in file lists.
 
 This test suite verifies that mouse wheel events correctly scroll the file list
 in both left and right panes, with proper boundary checking and focus handling.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_mouse_wheel_scrolling.py -v
 """
 
 import unittest
@@ -328,7 +330,3 @@ class TestMouseWheelScrolling(unittest.TestCase):
         # With multiplier of 1, delta of 0.5 should move by 0 lines (rounds down)
         # But delta of 1.0 would move by 1 line
         self.assertGreaterEqual(delta, 0)
-
-
-if __name__ == '__main__':
-    unittest.main()

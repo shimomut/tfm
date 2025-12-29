@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test TextViewer with remote file support
 
 This test verifies that the TextViewer can handle both local and remote files
 using the tfm_path abstraction mechanism.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_text_viewer_remote.py -v
 """
 
-import sys
-import os
 import tempfile
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_text_viewer import TextViewer, is_text_file, create_text_viewer
@@ -185,7 +181,3 @@ class TestTextViewerRemote(unittest.TestCase):
                 # If not found in displayed text, it was likely truncated
                 # Verify at least one header call was made
                 self.assertTrue(len(header_calls) > 0, "Header should be drawn")
-
-
-if __name__ == '__main__':
-    unittest.main()

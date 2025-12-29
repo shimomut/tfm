@@ -6,6 +6,8 @@ including dialog/viewer operations, event routing, rendering optimization,
 and error handling.
 
 Requirements tested: 6.6
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_final_integration.py -v
 """
 
 import pytest
@@ -697,7 +699,3 @@ class TestExistingFunctionality:
         result = stack.check_and_close_top_layer()
         assert result is True
         assert stack.get_layer_count() == 1
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

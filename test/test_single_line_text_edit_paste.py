@@ -1,5 +1,7 @@
 """
 Tests for SingleLineTextEdit clipboard paste functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_single_line_text_edit_paste.py -v
 """
 
 import unittest
@@ -178,7 +180,3 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         # is not handled by handle_key - it would be a CharEvent instead)
         self.assertFalse(result)
         self.assertEqual(editor.get_text(), "hello")
-
-
-if __name__ == '__main__':
-    unittest.main()

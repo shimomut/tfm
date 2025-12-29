@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Performance benchmark for wide character utilities.
 
 This script measures the performance improvements from caching and ASCII optimizations.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_wide_character_performance_benchmark.py -v
 """
 
-import os
-import sys
 import time
 import statistics
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import tfm_wide_char_utils
 
@@ -188,7 +184,3 @@ def main():
         print(f"✓ Performance target met: {actual_files_per_sec:.0f} files/sec >= {target_files_per_sec} files/sec")
     else:
         print(f"✗ Performance target missed: {actual_files_per_sec:.0f} files/sec < {target_files_per_sec} files/sec")
-
-
-if __name__ == '__main__':
-    main()

@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test script for the sub-shell functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_subshell.py -v
 """
 
 import os
@@ -81,6 +82,3 @@ def test_subshell_environment():
             print("ℹ️  Prompt variables set but may not be active in non-interactive mode")
         
         return True
-
-if __name__ == "__main__":
-    test_subshell_environment()

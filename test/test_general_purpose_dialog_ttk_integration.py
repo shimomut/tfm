@@ -1,24 +1,19 @@
-#!/usr/bin/env python3
 """
 Test QuickEditBar TTK integration
 
 This test verifies that QuickEditBar has been successfully migrated
 to use TTK's Renderer API instead of direct curses calls.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_general_purpose_dialog_ttk_integration.py -v
 """
 
 import unittest
 from unittest.mock import Mock, MagicMock
-import sys
-from pathlib import Path
 
 # Add src directory to path
 src_path = Path(__file__).parent.parent / 'src'
-sys.path.insert(0, str(src_path))
-
 # Add ttk directory to path
 ttk_path = Path(__file__).parent.parent / 'ttk'
-sys.path.insert(0, str(ttk_path))
-
 from ttk import KeyEvent, KeyCode, ModifierKey
 from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
 
@@ -148,7 +143,3 @@ class TestQuickEditBarTTKIntegration(unittest.TestCase):
         self.assertFalse(dialog.is_active)
         self.assertEqual(len(callback_called), 1)
         self.assertEqual(callback_called[0], "test text")
-
-
-if __name__ == '__main__':
-    unittest.main()

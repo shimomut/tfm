@@ -3,6 +3,8 @@ Test mouse event timestamp ordering.
 
 This test verifies that MouseEvent objects maintain monotonic timestamp ordering
 as required by Requirement 8.2.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_mouse_event_timestamp_ordering.py -v
 """
 
 import time

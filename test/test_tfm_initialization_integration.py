@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
 """
 Integration test for TFM initialization with TTK renderer
-"""
-import sys
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
 
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_tfm_initialization_integration.py -v
+"""
+from unittest.mock import Mock, MagicMock, patch
 
 def test_tfm_can_initialize_with_curses_backend():
     """Test that TFM can initialize with CursesBackend"""
@@ -72,15 +68,3 @@ def test_renderer_and_stdscr_are_same_object():
                             assert fm.renderer is mock_renderer
     
     print("✓ renderer and stdscr are the same object")
-
-if __name__ == '__main__':
-    print("Testing TFM initialization integration...")
-    print()
-    
-    test_tfm_can_initialize_with_curses_backend()
-    print()
-    
-    test_renderer_and_stdscr_are_same_object()
-    print()
-    
-    print("All integration tests passed! ✓")

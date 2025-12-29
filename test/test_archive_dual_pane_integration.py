@@ -1,18 +1,15 @@
-#!/usr/bin/env python3
 """
 Test dual-pane operations with archive virtual directories
 Tests archive browsing in both panes, copy operations between panes, and pane synchronization
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_dual_pane_integration.py -v
 """
 
-import os
 import sys
 import tempfile
 import zipfile
 import tarfile
 from pathlib import Path as PathlibPath
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_pane_manager import PaneManager
@@ -418,39 +415,3 @@ def test_cursor_sync_with_archives():
             left_selected = pane_manager.left_pane['files'][pane_manager.left_pane['focused_index']]
             assert left_selected.name == "gamma.txt", "Left pane should be on gamma.txt"
             print("  ✓ Synced cursor from filesystem to archive")
-
-
-if __name__ == '__main__':
-    print("Testing dual-pane archive operations...")
-    print()
-    
-    try:
-        test_archive_browsing_in_both_panes()
-        print()
-        test_copy_from_archive_to_filesystem()
-        print()
-        test_copy_from_filesystem_to_archive_pane()
-        print()
-        test_copy_between_two_archives()
-        print()
-        test_pane_sync_with_archives()
-        print()
-        test_archive_navigation_in_dual_pane()
-        print()
-        test_cursor_sync_with_archives()
-        
-        print()
-        print("✅ All dual-pane archive integration tests passed!")
-        sys.exit(0)
-    except AssertionError as e:
-        print()
-        print(f"❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-    except Exception as e:
-        print()
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test that performance metrics are properly tracked during rendering.
 
 This test verifies that metrics counters are incremented when render_frame is called.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_metrics_tracking.py -v
 """
 
-import sys
-import os
-
-# Add root directory to path (where cpp_renderer.so is located)
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 def test_metrics_tracking_during_render():
     """Test that metrics are tracked when rendering frames."""
@@ -137,7 +133,3 @@ def main():
     else:
         print("✗ Some tests failed")
         return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

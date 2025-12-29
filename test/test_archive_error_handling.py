@@ -1,21 +1,18 @@
-#!/usr/bin/env python3
 """
 Test comprehensive error handling for archive virtual directory operations.
 
 This test file validates that all archive operations handle errors gracefully
 with user-friendly error messages and proper logging.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_error_handling.py -v
 """
 
 import pytest
 import tempfile
 import os
-import sys
 import zipfile
 import tarfile
 from pathlib import Path as PathlibPath
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_archive import (
     ArchiveError, ArchiveFormatError, ArchiveCorruptedError,
@@ -272,7 +269,3 @@ class TestErrorRecovery:
         stats = cache.get_stats()
         assert stats['open_archives'] == 0
         assert stats['max_open'] == 5
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

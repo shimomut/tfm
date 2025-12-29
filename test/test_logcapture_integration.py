@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
 """
 Integration test to verify LogCapture works with LogManager
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_logcapture_integration.py -v
 """
 
 import sys
 import logging
 from collections import deque
-
-# Add src to path
-sys.path.insert(0, 'src')
 
 from tfm_log_manager import LogManager
 
@@ -27,7 +25,7 @@ def test_logmanager_with_logcapture():
     original_stderr = sys.stderr
     
     # Create LogManager
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Verify stdout and stderr are LogCapture instances
     assert hasattr(sys.stdout, 'logger')
@@ -54,7 +52,7 @@ def test_print_still_works():
     config = MockConfig()
     
     # Create LogManager
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Test print (should not crash)
     # Note: Since we don't have handlers attached yet, the message won't
@@ -73,7 +71,7 @@ def test_getlogger_returns_logger():
     config = MockConfig()
     
     # Create LogManager
-    log_manager = LogManager(config, debug_mode=False)
+    log_manager = LogManager(config)
     
     # Get a logger
     logger = log_manager.getLogger("Test")
@@ -87,15 +85,3 @@ def test_getlogger_returns_logger():
     
     # Now we can print
     print("✓ getLogger returns logger instance")
-
-
-if __name__ == '__main__':
-    print("Testing LogCapture integration with LogManager...")
-    print()
-    
-    test_logmanager_with_logcapture()
-    test_print_still_works()
-    test_getlogger_returns_logger()
-    
-    print()
-    print("All integration tests passed! ✓")

@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test for parent directory navigation cursor positioning behavior.
 
 This test verifies that when navigating to parent directory using Backspace,
 the cursor is positioned on the child directory we just came from.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_parent_directory_navigation.py -v
 """
 
 import unittest
 import tempfile
-import os
 from pathlib import Path
-import sys
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path as TFMPath
 from tfm_pane_manager import PaneManager
@@ -172,7 +168,3 @@ class TestParentDirectoryNavigation(unittest.TestCase):
         
         # This should not trigger navigation logic since we're at root
         # The condition `if current_pane['path'] != current_pane['path'].parent:` should be False
-
-
-if __name__ == '__main__':
-    unittest.main()

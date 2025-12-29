@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
 """
 Test file extension associations functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_file_associations.py -v
 """
 
-import sys
-import os
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_config import get_file_associations, get_program_for_file, has_action_for_file
 
@@ -122,7 +118,3 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

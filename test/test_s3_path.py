@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
 """
 Test script for S3PathImpl functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_path.py -v
 """
 
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 
@@ -65,15 +61,3 @@ def test_s3_operations_mock():
     print(f"Is absolute: {s3_path.is_absolute()}")
     
     print("✓ S3 operations mock tests passed!")
-
-if __name__ == '__main__':
-    try:
-        test_s3_path_creation()
-        test_local_path_compatibility()
-        test_s3_operations_mock()
-        print("\n🎉 All tests passed!")
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

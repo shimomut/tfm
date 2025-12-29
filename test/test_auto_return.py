@@ -1,14 +1,9 @@
-#!/usr/bin/env python3
 """
 Test script to verify the auto_return option functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_auto_return.py -v
 """
 
-import os
-import sys
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_config import get_programs
 
@@ -70,20 +65,3 @@ echo "Test program completed"
     print("2. Start TFM and press 'x'")
     print("3. Select 'Test Auto Return'")
     print("4. The program should run and automatically return to TFM")
-
-if __name__ == '__main__':
-    print("Auto Return Option Test")
-    print("=" * 30)
-    
-    success = test_options_parsing()
-    
-    if success:
-        print("\n✓ Options parsing test passed!")
-        create_test_program()
-    else:
-        print("\n✗ Options parsing test failed!")
-    
-    print("\nProgram options format:")
-    print("{'name': 'Program Name', 'command': ['command'], 'options': {'auto_return': True}}")
-    
-    sys.exit(0 if success else 1)

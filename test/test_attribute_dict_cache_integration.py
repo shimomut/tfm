@@ -3,6 +3,8 @@ Integration test for AttributeDictCache with CoreGraphicsBackend.
 
 This test verifies that AttributeDictCache is properly integrated into
 the CoreGraphicsBackend and works with real FontCache and ColorCache instances.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_attribute_dict_cache_integration.py -v
 """
 
 import unittest
@@ -78,7 +80,7 @@ class TestAttributeDictCacheIntegration(unittest.TestCase):
         try:
             backend = CoreGraphicsBackend(
                 window_title="Test",
-                font_name="Menlo",
+                font_names=["Menlo"],
                 font_size=12,
                 rows=24,
                 cols=80
@@ -121,7 +123,3 @@ class TestAttributeDictCacheIntegration(unittest.TestCase):
         attrs = attr_cache.get_attributes("0", (255, 255, 255), False)
         self.assertIsNotNone(attrs)
         self.assertEqual(len(attr_cache._cache), 1)
-
-
-if __name__ == '__main__':
-    unittest.main()

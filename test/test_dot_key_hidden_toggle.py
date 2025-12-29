@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Test script to verify that the dot (.) key toggles hidden files visibility
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dot_key_hidden_toggle.py -v
+"""
 
 from tfm_config import get_config, is_key_bound_to
 
@@ -32,6 +29,3 @@ def test_dot_key_binding():
     assert not is_h_bound, "The 'H' key should no longer be bound to toggle_hidden"
     
     print("✓ Test passed: Dot key is correctly bound to toggle hidden files")
-
-if __name__ == "__main__":
-    test_dot_key_binding()

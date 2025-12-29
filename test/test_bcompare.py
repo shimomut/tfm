@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Test script to verify BeyondCompare integration with TFM
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_bcompare.py -v
 """
 
 import os
-import sys
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_config import get_programs
 
@@ -119,32 +115,3 @@ def test_wrapper_scripts():
     
     print("  (Not executing to avoid launching BeyondCompare)")
     return success
-
-if __name__ == '__main__':
-    print("BeyondCompare Integration Test")
-    print("=" * 40)
-    
-    success = True
-    
-    # Test configuration
-    if not test_bcompare_config():
-        success = False
-    
-    # Test wrapper scripts
-    if not test_wrapper_scripts():
-        success = False
-    
-    print("\n" + "=" * 40)
-    if success:
-        print("✓ All tests passed! BeyondCompare is ready to use.")
-        print("\nTo use BeyondCompare in TFM:")
-        print("1. Start TFM: python3 tfm.py")
-        print("2. Press 'x' to open external programs")
-        print("3. Select from:")
-        print("   - 'Compare Directories (BeyondCompare)' - compares left/right pane directories")
-        print("   - 'Compare Files (BeyondCompare)' - compares selected files from both panes")
-        print("4. BeyondCompare will open with the appropriate comparison")
-    else:
-        print("✗ Some tests failed. Please check the configuration.")
-    
-    sys.exit(0 if success else 1)

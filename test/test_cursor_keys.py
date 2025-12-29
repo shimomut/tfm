@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test script to verify cursor key handling in list and search dialogs
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_keys.py -v
 """
 
 import sys
@@ -10,8 +11,6 @@ import unittest.mock
 sys.modules['curses'] = unittest.mock.MagicMock()
 import curses
 from ttk import KeyEvent, KeyCode, ModifierKey
-
-sys.path.insert(0, 'src')
 
 def test_cursor_key_handling():
     """Test that cursor keys are properly handled by the editors"""
@@ -78,7 +77,3 @@ def test_cursor_key_handling():
         import traceback
         traceback.print_exc()
         return False
-
-if __name__ == "__main__":
-    success = test_cursor_key_handling()
-    sys.exit(0 if success else 1)

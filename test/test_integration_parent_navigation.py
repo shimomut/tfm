@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Integration test for parent directory navigation cursor positioning.
 
 This test verifies the complete integration of the parent directory navigation
 feature within the TFM application context.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_integration_parent_navigation.py -v
 """
 
 import unittest
 import tempfile
-import os
-import sys
 from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path as TFMPath
 from tfm_pane_manager import PaneManager
@@ -212,7 +208,3 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         # Verify we're positioned on "deep" directory
         selected_file = left_pane['files'][left_pane['focused_index']]
         self.assertEqual(selected_file.name, "deep")
-
-
-if __name__ == '__main__':
-    unittest.main()

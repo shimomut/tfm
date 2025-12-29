@@ -1,19 +1,16 @@
-#!/usr/bin/env python3
 """
 Test mock storage implementation for extensibility validation.
 
 This test validates that new storage types can be added without any UI changes
 by implementing a MockPathImpl and verifying it works with all UI components.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_mock_storage_extensibility.py -v
 """
 
 import os
-import sys
 import io
 from pathlib import Path as PathlibPath
 from typing import Iterator, List
-
-# Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import PathImpl, Path
 
@@ -632,22 +629,3 @@ def test_extensibility_validation():
     print("\n=== All UI Components Work Without Modifications ===")
     print("✓ Extensibility validation PASSED")
     print("\nConclusion: New storage types require ZERO UI changes!")
-
-
-if __name__ == '__main__':
-    # Run all tests
-    test_mock_path_creation()
-    test_mock_path_display_methods()
-    test_mock_path_content_reading_methods()
-    test_mock_path_metadata()
-    test_mock_path_capability_methods()
-    test_mock_path_file_operations()
-    test_mock_path_with_text_viewer()
-    test_mock_path_with_info_dialog()
-    test_mock_path_with_search_dialog()
-    test_mock_path_with_file_operations()
-    test_extensibility_validation()
-    
-    print("\n" + "="*60)
-    print("ALL TESTS PASSED")
-    print("="*60)

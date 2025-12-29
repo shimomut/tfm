@@ -1,12 +1,9 @@
-#!/usr/bin/env python3
 """
 Test suite for DrivesDialog TTK integration
 Tests the migration from curses to TTK API
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_drives_dialog_ttk_integration.py -v
+"""
 
 import pytest
 import threading
@@ -413,7 +410,3 @@ class TestDrivesDialogHelpers:
         assert print_func.called
         call_args = print_func.call_args[0][0]
         assert "Error" in call_args or "Invalid" in call_args
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

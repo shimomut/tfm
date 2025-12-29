@@ -1,14 +1,10 @@
 """
 Tests for drag payload builder.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_drag_payload.py -v
 """
 
-import os
-import sys
 import pytest
-from pathlib import Path
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_drag_payload import DragPayloadBuilder
 

@@ -1,20 +1,14 @@
-#!/usr/bin/env python3
 """
 Demo: Selection Preservation in Jump Dialog
 Demonstrates that user selection is preserved during filtering and scanning
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_selection_preservation_demo.py -v
 """
 
 import tempfile
 import time
-from pathlib import Path
-import sys
 
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
-from tfm_jump_dialog import JumpDialog
 from tfm_config import DefaultConfig
-
 
 def create_test_directories():
     """Create a test directory structure"""
@@ -37,7 +31,6 @@ def create_test_directories():
         (temp_path / dir_path).mkdir(parents=True, exist_ok=True)
     
     return temp_path
-
 
 def demo_selection_preservation():
     """Demonstrate selection preservation during filtering"""
@@ -149,7 +142,3 @@ def demo_selection_preservation():
             print(f"\nCleaned up test directory: {test_path}")
         except:
             print(f"\nWarning: Could not clean up {test_path}")
-
-
-if __name__ == '__main__':
-    demo_selection_preservation()

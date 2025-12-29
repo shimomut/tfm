@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test dialog scroll symmetry - upward and downward scrolling should be symmetric
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_scroll_symmetry.py -v
 """
 
 import pytest
@@ -123,7 +124,3 @@ class TestDialogScrollSymmetry:
                 f"Window {height}x{width}: Downward scroll failed - scroll={dialog.scroll}, expected={expected_scroll}"
             assert dialog.selected == dialog.scroll + expected_content_height - 1, \
                 f"Window {height}x{width}: Selected not at bottom - selected={dialog.selected}, scroll={dialog.scroll}, content_height={expected_content_height}"
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

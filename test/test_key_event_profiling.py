@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test key event profiling functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_key_event_profiling.py -v
 """
 
-import sys
-import os
 import unittest
 import tempfile
 import shutil
 import time
 from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_profiling import ProfilingManager
 
@@ -195,7 +191,3 @@ class TestKeyEventProfiling(unittest.TestCase):
         self.assertIn("TFM Profiling Output", readme_content)
         self.assertIn("pstats", readme_content)
         self.assertIn("snakeviz", readme_content)
-
-
-if __name__ == '__main__':
-    unittest.main()

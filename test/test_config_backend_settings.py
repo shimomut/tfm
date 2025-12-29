@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test configuration system backend settings for TTK migration.
 
@@ -8,16 +7,12 @@ Tests:
 3. Desktop mode settings
 4. Configuration loading with backend settings
 5. Backend preference persistence
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_config_backend_settings.py -v
 """
 
-import sys
-import os
 import tempfile
 import shutil
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_config import ConfigManager, DefaultConfig
 
@@ -287,7 +282,3 @@ def run_all_tests():
     test_backend_preference_persistence()
     
     print("\n=== All Configuration Backend Tests Passed ===\n")
-
-
-if __name__ == '__main__':
-    run_all_tests()

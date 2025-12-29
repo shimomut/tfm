@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Test file to verify help dialog integration with create_directory key binding.
-"""
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_help_dialog_integration.py -v
+"""
 
 import unittest
 from tfm_config import ConfigManager
@@ -88,7 +85,3 @@ class TestHelpDialogIntegration(unittest.TestCase):
                 self.assertTrue(len(formatted) > 0)
             except Exception as e:
                 self.fail(f"Failed to format key binding for {action}: {e}")
-
-
-if __name__ == '__main__':
-    unittest.main()

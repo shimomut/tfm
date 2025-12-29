@@ -1,18 +1,15 @@
-#!/usr/bin/env python3
 """
 Test script to verify Compare & Select feature works with both files and directories.
 This test creates a temporary directory structure and verifies the compare selection
 functionality handles both files and directories correctly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_compare_selection_directories.py -v
 """
 
-import os
 import sys
 import tempfile
 import shutil
 from pathlib import Path
-
-# Add the src directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_list_dialog import ListDialogHelpers
 
@@ -192,15 +189,3 @@ def test_type_mismatch_handling():
         
     finally:
         shutil.rmtree(temp_dir)
-
-
-if __name__ == "__main__":
-    success = test_compare_selection_with_directories()
-    test_type_mismatch_handling()
-    
-    if success:
-        print("\n🎉 All tests completed successfully!")
-        sys.exit(0)
-    else:
-        print("\n💥 Some tests failed!")
-        sys.exit(1)

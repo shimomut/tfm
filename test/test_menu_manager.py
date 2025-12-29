@@ -1,5 +1,7 @@
 """
 Unit tests for MenuManager class
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_menu_manager.py -v
 """
 
 import unittest
@@ -287,7 +289,3 @@ class TestMenuManager(unittest.TestCase):
         
         # Paste should be enabled when copy_buffer has content
         self.assertTrue(states[MenuManager.EDIT_PASTE])
-
-
-if __name__ == '__main__':
-    unittest.main()

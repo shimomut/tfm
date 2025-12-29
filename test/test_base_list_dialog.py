@@ -1,13 +1,10 @@
-#!/usr/bin/env python3
 """
 Test BaseListDialog and its derived classes
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_base_list_dialog.py -v
 """
 
-import sys
 from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 import unittest
 from unittest.mock import Mock, MagicMock
@@ -16,8 +13,6 @@ from ttk import KeyEvent, KeyCode, ModifierKey
 from tfm_base_list_dialog import BaseListDialog
 from tfm_list_dialog import ListDialog
 from tfm_search_dialog import SearchDialog
-from tfm_jump_dialog import JumpDialog
-
 
 class TestBaseListDialog(unittest.TestCase):
     """Test BaseListDialog functionality"""
@@ -86,7 +81,6 @@ class TestBaseListDialog(unittest.TestCase):
         # Should adjust scroll to keep selected item visible
         self.assertGreaterEqual(self.base_dialog.scroll, 6)  # 15 - 10 + 1
 
-
 class TestListDialog(unittest.TestCase):
     """Test ListDialog functionality"""
     
@@ -145,7 +139,6 @@ class TestListDialog(unittest.TestCase):
         self.assertFalse(self.list_dialog.is_active)  # Should exit
         callback.assert_called_once_with("banana")
 
-
 class TestSearchDialog(unittest.TestCase):
     """Test SearchDialog functionality"""
     
@@ -179,7 +172,6 @@ class TestSearchDialog(unittest.TestCase):
         self.assertEqual(result, ('search', None))
         self.assertEqual(self.search_dialog.search_type, 'content')
 
-
 class TestJumpDialog(unittest.TestCase):
     """Test JumpDialog functionality"""
     
@@ -211,7 +203,3 @@ class TestJumpDialog(unittest.TestCase):
         
         expected = [Path("/home/user/documents")]
         self.assertEqual(self.jump_dialog.filtered_directories, expected)
-
-
-if __name__ == '__main__':
-    unittest.main()

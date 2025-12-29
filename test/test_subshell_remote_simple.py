@@ -1,20 +1,18 @@
-#!/usr/bin/env python3
 """
 Simple test for subshell remote directory fallback functionality.
 
 This test verifies the core logic without dealing with curses complexity.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_subshell_remote_simple.py -v
 """
 
 import os
-import sys
 import unittest
 from unittest.mock import Mock, patch
 from pathlib import Path as PathlibPath
 
 # Add src directory to path for imports
 src_dir = PathlibPath(__file__).parent.parent / 'src'
-sys.path.insert(0, str(src_dir))
-
 from tfm_external_programs import ExternalProgramManager
 
 
@@ -154,7 +152,3 @@ class TestSubshellRemoteLogic(unittest.TestCase):
         
         # Verify os.chdir was called with the pane's directory
         mock_chdir.assert_called_once_with('/home/user/local')
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test archive extraction progress tracking
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_extraction_progress.py -v
 """
 
-import sys
-import os
 import tempfile
 import zipfile
 import tarfile
 from pathlib import Path
 from unittest.mock import Mock, MagicMock
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_progress_manager import ProgressManager, OperationType
 
@@ -279,11 +275,3 @@ def test_progress_text_formatting():
     fm.progress_manager.finish_operation()
     
     print("✅ Progress text formatting test passed!")
-
-
-if __name__ == "__main__":
-    test_zip_extraction_progress()
-    test_tar_extraction_progress()
-    test_single_file_extraction()
-    test_progress_text_formatting()
-    print("\n🎉 All archive extraction progress tests passed!")

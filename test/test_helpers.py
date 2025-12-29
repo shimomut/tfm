@@ -3,6 +3,8 @@ Test helper utilities for TFM tests
 
 This module provides helper functions for creating test fixtures and
 converting between old curses-style key codes and new TTK KeyEvent objects.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_helpers.py -v
 """
 
 from ttk import KeyEvent, KeyCode, ModifierKey

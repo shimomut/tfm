@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Final Integration Tests for Performance Profiling System
 
@@ -12,10 +11,10 @@ Tests cover:
 - Curses backend compatibility
 - Various workloads (file operations, navigation, etc.)
 - Profile file analysis with pstats
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_profiling_final_integration.py -v
 """
 
-import sys
-import os
 import time
 import tempfile
 import shutil
@@ -23,9 +22,6 @@ import pstats
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from io import StringIO
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_profiling import ProfilingManager, FPSTracker, ProfileWriter
 
@@ -519,7 +515,3 @@ def run_all_integration_tests():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == "__main__":
-    sys.exit(run_all_integration_tests())

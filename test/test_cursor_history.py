@@ -1,16 +1,11 @@
-#!/usr/bin/env python3
 """
 Test script for cursor position history feature
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_history.py -v
 """
 
-import os
-import sys
 import tempfile
 import shutil
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, 'src')
 
 def create_test_structure():
     """Create a test directory structure"""
@@ -120,6 +115,3 @@ def test_cursor_history():
     # Cleanup
     shutil.rmtree(test_dir)
     print(f"Cleaned up test directory: {test_dir}")
-
-if __name__ == "__main__":
-    test_cursor_history()

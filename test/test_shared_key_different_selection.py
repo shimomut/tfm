@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Test file demonstrating shared key with different selection requirements.
-"""
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_shared_key_different_selection.py -v
+"""
 
 import unittest
 from tfm_config import ConfigManager
@@ -141,7 +138,3 @@ class TestSharedKeyDifferentSelection(unittest.TestCase):
         # This means they're mutually exclusive - no conflict!
         # When files are selected: only move_files is available
         # When no files are selected: only create_directory is available
-
-
-if __name__ == '__main__':
-    unittest.main()

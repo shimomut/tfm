@@ -1,21 +1,17 @@
-#!/usr/bin/env python3
 """
 Test script to verify search dialog cancellation triggers content changes
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_cancellation.py -v
 """
 
-import sys
 import os
 import time
 import threading
 from unittest.mock import Mock, patch
 
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_search_dialog import SearchDialog
-from tfm_jump_dialog import JumpDialog
-from tfm_config import get_config
 
+from tfm_config import get_config
 
 def test_search_dialog_cancellation():
     """Test that canceling a search marks content as changed"""
@@ -44,7 +40,6 @@ def test_search_dialog_cancellation():
     
     print("✓ Search dialog cancellation correctly marks content as changed")
     return True
-
 
 def test_search_dialog_worker_cancellation():
     """Test that search worker cancellation marks content as changed"""
@@ -97,7 +92,6 @@ def test_search_dialog_worker_cancellation():
     print("✓ Search worker cancellation handling works")
     return True
 
-
 def test_jump_dialog_cancellation():
     """Test that canceling a directory scan marks content as changed"""
     
@@ -125,7 +119,6 @@ def test_jump_dialog_cancellation():
     print("✓ Jump dialog cancellation correctly marks content as changed")
     return True
 
-
 def test_search_completion_marks_content_changed():
     """Test that search completion marks content as changed"""
     
@@ -151,20 +144,3 @@ def test_search_completion_marks_content_changed():
     
     print("✓ Search completion correctly marks content as changed")
     return True
-
-
-if __name__ == "__main__":
-    try:
-        test_search_dialog_cancellation()
-        test_search_dialog_worker_cancellation()
-        test_jump_dialog_cancellation()
-        test_search_completion_marks_content_changed()
-        
-        print("\n🎉 All search/scan cancellation tests passed!")
-        print("   Search and directory scan cancellation now properly trigger redraws.")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

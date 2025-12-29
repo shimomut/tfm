@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test performance metrics functionality in cpp_renderer module.
 
@@ -6,13 +5,10 @@ This test verifies:
 - get_performance_metrics() returns a dictionary with expected keys
 - reset_metrics() resets all counters to zero
 - Metrics are properly tracked during rendering
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_performance_metrics.py -v
 """
 
-import sys
-import os
-
-# Add root directory to path (where cpp_renderer.so is located)
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 def test_metrics_functions_exist():
     """Test that metrics functions are available in the module."""
@@ -170,7 +166,3 @@ def main():
     else:
         print("✗ Some tests failed")
         return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test TextViewer TTK Integration
 
 This test verifies that the TextViewer component has been successfully
 migrated to use the TTK API instead of curses.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_text_viewer_ttk_integration.py -v
 """
 
-import sys
-import os
 import tempfile
 import unittest
 from unittest.mock import Mock, MagicMock, patch
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ttk import KeyEvent, KeyCode, ModifierKey
 from ttk.renderer import TextAttribute
@@ -346,7 +342,3 @@ class TestTextViewerTTKIntegration(unittest.TestCase):
                 self.assertIsInstance(text, str)
                 # Color can be either an int (color pair constant) or tuple (color_pair, attributes)
                 self.assertTrue(isinstance(color, int) or isinstance(color, tuple))
-
-
-if __name__ == '__main__':
-    unittest.main()

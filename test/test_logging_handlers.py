@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Tests for TFM logging handlers
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_logging_handlers.py -v
 """
 
-import sys
-import os
 import logging
 import time
 from datetime import datetime
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
 
@@ -255,18 +251,3 @@ def test_is_stream_capture_flag():
     assert "INFO: Default output" in messages[2][2]
     
     print("✓ is_stream_capture flag test passed")
-
-
-if __name__ == '__main__':
-    print("Running logging handlers tests...\n")
-    
-    test_log_pane_handler_basic()
-    test_log_pane_handler_stream_capture()
-    test_log_pane_handler_multiline()
-    test_log_pane_handler_max_messages()
-    test_stream_output_handler_logger_message()
-    test_stream_output_handler_stream_capture()
-    test_remote_monitoring_handler_basic()
-    test_is_stream_capture_flag()
-    
-    print("\n✅ All tests passed!")

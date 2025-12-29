@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test TFM main rendering migration to TTK API.
 Verifies that tfm_main.py uses TTK renderer API correctly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_tfm_main_ttk_rendering.py -v
 """
 
 import unittest
 from unittest.mock import Mock, MagicMock, patch, call
-import sys
-import os
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_main import FileManager
 from tfm_path import Path
@@ -161,7 +157,3 @@ class TestTFMMainTTKRendering(unittest.TestCase):
         
         # Verify renderer.refresh was called (not stdscr.refresh)
         self.mock_renderer.refresh.assert_called()
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test DrivesDialog UILayer interface implementation
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_drives_dialog_uilayer.py -v
 """
 
-import sys
-import os
 import pytest
 from unittest.mock import Mock, MagicMock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ttk import KeyEvent, CharEvent, KeyCode
 from tfm_drives_dialog import DrivesDialog, DriveEntry
@@ -291,7 +287,3 @@ class TestDrivesDialogUILayerRendering:
         dialog.loading_s3 = False
         
         assert dialog.needs_redraw() is False
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
 """
 Test backend selection functionality in TFM entry point
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_entry_point_backend_selection.py -v
 """
 
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import argparse
 
-# Add root directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 class TestBackendSelection(unittest.TestCase):
     """Test backend selection in entry point"""
@@ -112,6 +109,3 @@ class TestBackendSelection(unittest.TestCase):
         self.assertEqual(args.remote_log_port, 8888)
         self.assertEqual(args.left, '/tmp')
         self.assertEqual(args.right, '/home')
-
-if __name__ == '__main__':
-    unittest.main()

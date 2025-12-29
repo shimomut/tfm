@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test FPS tracking integration in FileManager main loop
 
 This test verifies that FPS tracking is properly integrated into the
 FileManager.run() method and that FPS is calculated and printed correctly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_fps_tracking_integration.py -v
 """
 
 import unittest
 import time
-import sys
-import os
 from unittest.mock import Mock, patch, MagicMock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_profiling import ProfilingManager, FPSTracker
 
@@ -155,7 +151,3 @@ class TestFPSTrackingIntegration(unittest.TestCase):
         # Verify timing
         elapsed = time.time() - start_time
         self.assertGreaterEqual(elapsed, 0.5)
-
-
-if __name__ == '__main__':
-    unittest.main()

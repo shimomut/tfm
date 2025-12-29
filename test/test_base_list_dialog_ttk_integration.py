@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
 """
 Test BaseListDialog TTK Integration
 
 This test verifies that BaseListDialog has been successfully migrated to use
 the TTK Renderer API instead of curses.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_base_list_dialog_ttk_integration.py -v
 """
 
 import unittest
@@ -28,10 +29,8 @@ class TestBaseListDialogTTKIntegration(unittest.TestCase):
         
         # Import after mocking to avoid import-time dependencies
         import sys
-        sys.path.insert(0, 'src')
         from tfm_base_list_dialog import BaseListDialog
         self.BaseListDialog = BaseListDialog
-        
     def test_init_accepts_renderer(self):
         """Test that BaseListDialog accepts renderer parameter"""
         dialog = self.BaseListDialog(self.mock_config, renderer=self.mock_renderer)
@@ -221,7 +220,3 @@ class TestBaseListDialogTTKIntegration(unittest.TestCase):
             if len(call[1]) > 0:
                 self.assertIn('color_pair', call[1])
                 self.assertIn('attributes', call[1])
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
 """
 Test for subshell remote directory fallback functionality.
 
 This test verifies that when subshell is opened while browsing a remote directory
 (like S3), TFM falls back to using TFM's working directory instead of failing.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_subshell_remote_fallback.py -v
 """
 
 import os
-import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch, MagicMock
@@ -15,8 +15,6 @@ from pathlib import Path as PathlibPath
 
 # Add src directory to path for imports
 src_dir = PathlibPath(__file__).parent.parent / 'src'
-sys.path.insert(0, str(src_dir))
-
 from tfm_external_programs import ExternalProgramManager
 from tfm_path import Path
 
@@ -259,7 +257,3 @@ class TestSubshellRemoteFallback(unittest.TestCase):
         self.assertEqual(env['TFM_THIS_DIR'], '/home/user/local')
         self.assertEqual(env['TFM_OTHER_DIR'], 's3://my-bucket/folder/')
         self.assertEqual(env['TFM_ACTIVE'], '1')
-
-
-if __name__ == '__main__':
-    unittest.main()

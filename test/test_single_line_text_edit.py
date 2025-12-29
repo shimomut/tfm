@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
 """
 Test script for SingleLineTextEdit class
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_single_line_text_edit.py -v
 """
 
-import sys
-import os
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_single_line_text_edit import SingleLineTextEdit
 from ttk import KeyEvent, KeyCode
@@ -201,7 +197,3 @@ def main():
         return 1
     
     return 0
-
-
-if __name__ == "__main__":
-    exit(main())

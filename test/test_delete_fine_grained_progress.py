@@ -1,17 +1,14 @@
-#!/usr/bin/env python3
 """
 Test fine-grained progress tracking for delete operations
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_delete_fine_grained_progress.py -v
 """
 
-import sys
 import os
 import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import Mock
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_progress_manager import ProgressManager, OperationType
 
@@ -381,10 +378,3 @@ def test_delete_mixed_selection():
         assert not test_dir.exists()
     
     print("✅ Delete mixed selection test passed!")
-
-
-if __name__ == "__main__":
-    test_fine_grained_delete_progress()
-    test_delete_large_directory()
-    test_delete_mixed_selection()
-    print("\n🎉 All fine-grained delete progress tests passed!")

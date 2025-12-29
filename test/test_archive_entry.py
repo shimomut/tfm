@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Tests for ArchiveEntry dataclass
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_entry.py -v
 """
 
 import os
-import sys
 import stat
 import time
 import zipfile
 import tarfile
 import tempfile
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_archive import ArchiveEntry
 
@@ -224,17 +220,3 @@ def test_archive_entry_name_extraction():
     name = entry3.internal_path.rstrip('/').split('/')[-1]
     assert name == "subfolder"
     print("✓ Directory path name extraction works")
-
-
-if __name__ == '__main__':
-    print("Testing ArchiveEntry dataclass...")
-    print()
-    
-    test_archive_entry_creation()
-    test_archive_entry_to_stat_result()
-    test_archive_entry_from_zip_info()
-    test_archive_entry_from_tar_info()
-    test_archive_entry_name_extraction()
-    
-    print()
-    print("All ArchiveEntry tests passed! ✓")

@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test the integration of SingleLineTextEdit with TFM batch rename
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_integration.py -v
 """
 
 import sys
@@ -53,7 +54,3 @@ def test_integration():
     print("- All text editing handled by SingleLineTextEdit")
     
     return True
-
-if __name__ == "__main__":
-    success = test_integration()
-    exit(0 if success else 1)

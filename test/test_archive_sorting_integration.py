@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Integration test for archive sorting - verifies sorting works in FileManager context
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_sorting_integration.py -v
+"""
 
 import tempfile
 import zipfile
@@ -214,8 +211,3 @@ def run_all_tests():
         import traceback
         traceback.print_exc()
         return False
-
-
-if __name__ == "__main__":
-    success = run_all_tests()
-    sys.exit(0 if success else 1)

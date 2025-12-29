@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test script for the create file feature (Shift-E key)
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_create_file.py -v
 """
 
-import os
 import sys
 import tempfile
 import unittest.mock
-from pathlib import Path
 
 # Mock curses before importing tfm_main
 sys.modules['curses'] = unittest.mock.MagicMock()
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 def test_create_file_functionality():
     """Test the create file functionality"""
@@ -108,7 +104,3 @@ def test_create_file_functionality():
             return False
             
     return True
-
-if __name__ == "__main__":
-    success = test_create_file_functionality()
-    sys.exit(0 if success else 1)

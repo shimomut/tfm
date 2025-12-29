@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test Cross-Storage Move Functionality
 
@@ -7,16 +6,13 @@ This test verifies that TFM can move files and directories between different sto
 - S3 to Local  
 - S3 to S3 (different buckets/paths)
 - Local to Local (same storage verification)
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_cross_storage_move.py -v
 """
 
-import os
-import sys
 import tempfile
 import shutil
 from pathlib import Path as PathlibPath
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 
@@ -294,7 +290,3 @@ def main():
     tester = TestCrossStorageMove()
     success = tester.run_all_tests()
     sys.exit(0 if success else 1)
-
-
-if __name__ == "__main__":
-    main()

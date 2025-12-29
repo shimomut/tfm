@@ -1,5 +1,7 @@
 """
 Tests for SearchDialog clipboard paste functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_paste.py -v
 """
 
 import unittest
@@ -66,7 +68,3 @@ class TestSearchDialogPaste(unittest.TestCase):
         self.assertEqual(dialog.text_editor.get_text(), "test search")
         # Search should be triggered since text changed
         self.assertTrue(dialog.perform_search.called)
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test for SearchDialog left/right key rendering fix
 
@@ -18,16 +17,13 @@ Bug Description:
 Fix:
 - Set content_changed=True for ALL handled keys in the elif result: branch
 - This ensures the dialog continues to be rendered after any key press
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_left_right_key_fix.py -v
 """
 
 from ttk import KeyEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_search_dialog import SearchDialog
 
@@ -160,7 +156,3 @@ class TestSearchDialogLeftRightKeyFix(unittest.TestCase):
                        "Dialog should need redraw after left key (this was the bug)")
         
         print("✓ Regression test passed: Dialog remains visible after left key press")
-
-
-if __name__ == '__main__':
-    unittest.main()

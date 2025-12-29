@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Unit tests for DirectoryScanner class.
 
@@ -7,6 +6,8 @@ Tests the recursive directory scanning functionality including:
 - Progress callback invocation
 - Cancellation support
 - Error handling for inaccessible files
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_scanner.py -v
 """
 
 import unittest
@@ -161,7 +162,3 @@ class TestDirectoryScanner(unittest.TestCase):
         self.assertIn("a/b", left_files)
         self.assertIn("a/b/c", left_files)
         self.assertIn("a/b/c/file.txt", left_files)
-
-
-if __name__ == '__main__':
-    unittest.main()

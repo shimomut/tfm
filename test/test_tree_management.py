@@ -2,6 +2,8 @@
 Unit tests for tree structure management in DirectoryDiffViewer.
 
 Tests the expand_node, collapse_node, and visible node management functionality.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_tree_management.py -v
 """
 
 import unittest
@@ -323,7 +325,3 @@ class TestTreeManagement(unittest.TestCase):
         for node in viewer.visible_nodes:
             index = viewer.node_index_map[id(node)]
             self.assertEqual(viewer.visible_nodes[index], node)
-
-
-if __name__ == '__main__':
-    unittest.main()

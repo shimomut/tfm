@@ -1,21 +1,17 @@
-#!/usr/bin/env python3
 """
 Test TFM startup directory cleanup with real FileManager.
 
 This test verifies that the actual TFM FileManager properly cleans up
 non-existing directories during startup.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_tfm_startup_cleanup.py -v
 """
 
-import os
-import sys
 import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import Mock, patch
 from ttk import KeyEvent, KeyCode, ModifierKey
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_state_manager import TFMStateManager
 
@@ -183,23 +179,3 @@ def test_cleanup_with_mixed_formats():
         print("✓ Cleanup with old dict format working correctly")
         
         return True
-
-
-if __name__ == "__main__":
-    print("Testing TFM startup directory cleanup...")
-    
-    try:
-        test_real_startup_cleanup()
-        print("✓ Real startup cleanup test passed")
-    except Exception as e:
-        print(f"✗ Real startup cleanup test failed: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    try:
-        test_cleanup_with_mixed_formats()
-        print("✓ Mixed formats cleanup test passed")
-    except Exception as e:
-        print(f"✗ Mixed formats cleanup test failed: {e}")
-        import traceback
-        traceback.print_exc()

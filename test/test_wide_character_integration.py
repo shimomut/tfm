@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Comprehensive integration tests for wide character support in TFM.
 
 This test suite verifies that all components work together correctly
 when handling directories containing wide character filenames.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_wide_character_integration.py -v
 """
 
 import os
-import sys
 import tempfile
 import shutil
 import unittest
-from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import tfm_wide_char_utils
 import tfm_main
@@ -399,8 +395,3 @@ Chinese: 你好世界
         
         print(f"Cache performance: {first_pass_time:.3f}s -> {second_pass_time:.3f}s")
         print(f"Cache info: {cache_info}")
-
-
-if __name__ == '__main__':
-    # Run the integration tests
-    unittest.main(verbosity=2)

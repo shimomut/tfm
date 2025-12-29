@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test that log updates trigger redraws
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_log_redraw_trigger.py -v
 """
 
 import unittest
-import sys
-import os
 import tempfile
 import time
 from unittest.mock import Mock, patch
-
-# Add src directory to Python path for testing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_log_manager import LogManager, LogCapture
 
@@ -192,6 +188,3 @@ class TestLogRedrawTrigger(unittest.TestCase):
         # Restore original stdout/stderr if they were modified
         # This is handled by LogManager.__del__ but let's be explicit
         pass
-
-if __name__ == '__main__':
-    unittest.main()

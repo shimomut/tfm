@@ -1,21 +1,17 @@
-#!/usr/bin/env python3
 """
 Test suite for FileOperations and FileOperationsUI TTK integration.
 
 This test verifies that file operations work correctly with the TTK-migrated system.
 Note: FileOperations and FileOperationsUI contain no rendering code - they are pure
 business logic classes. All rendering is handled by tfm_main.py.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_file_operations_ttk_integration.py -v
 """
 
-import sys
-import os
 import tempfile
 import shutil
 from pathlib import Path as StdPath
 import pytest
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_file_operations import FileOperations, FileOperationsUI
 from tfm_path import Path as TFMPath
@@ -465,8 +461,3 @@ class TestFileOperationsIntegration:
             source = inspect.getsource(method)
             for keyword in direct_rendering_keywords:
                 assert keyword not in source, f"Found direct rendering keyword '{keyword}' in FileOperationsUI.{method_name}"
-
-
-if __name__ == "__main__":
-    # Run tests with pytest
-    pytest.main([__file__, '-v'])

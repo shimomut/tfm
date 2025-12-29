@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test PaneManager integration with TTK-based TFM system.
 
 This test verifies that PaneManager works correctly with the TTK-migrated
 tfm_main.py and that all pane management functionality is intact.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_pane_manager_ttk_integration.py -v
 """
 
-import sys
-import os
 import unittest
 import tempfile
 import shutil
 from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Import TFM components
 from tfm_path import Path as TFMPath
@@ -313,7 +309,3 @@ class TestPaneManagerWithoutStateManager(unittest.TestCase):
         # Should return False (no restoration possible)
         result = self.pane_manager.restore_cursor_position(pane, 10)
         self.assertFalse(result)
-
-
-if __name__ == '__main__':
-    unittest.main()

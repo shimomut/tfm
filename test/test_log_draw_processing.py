@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test that log updates are marked as processed when draw_log_pane is called
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_log_draw_processing.py -v
 """
 
 import unittest
-import sys
-import os
 from unittest.mock import Mock, patch
-
-# Add src directory to Python path for testing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 class TestLogDrawProcessing(unittest.TestCase):
     """Test that drawing the log pane marks updates as processed"""
@@ -213,6 +209,3 @@ class TestLogDrawProcessing(unittest.TestCase):
         
         # Clean up
         log_manager.restore_stdio()
-
-if __name__ == '__main__':
-    unittest.main()

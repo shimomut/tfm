@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test S3 file editing capability indicator
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_file_editing_restriction.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_s3 import S3PathImpl
 
@@ -107,7 +103,3 @@ class TestS3FileEditingCapability(unittest.TestCase):
             self.mock_client.put_object.assert_called_once()
         except Exception as e:
             self.fail(f"write_bytes should work: {e}")
-
-
-if __name__ == '__main__':
-    unittest.main()

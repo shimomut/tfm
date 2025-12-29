@@ -4,13 +4,9 @@ Test cache clearing on resize and color scheme change events.
 This test verifies that AttributeDictCache and AttributedStringCache are properly
 cleared when terminal resize or color scheme change events occur, ensuring that
 cached objects are rebuilt with updated dimensions or colors.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_cache_clearing.py -v
 """
-
-import sys
-import os
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import unittest
 from unittest.mock import Mock, MagicMock, patch
@@ -29,7 +25,7 @@ class TestCacheClearing(unittest.TestCase):
         # Create backend instance
         self.backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -98,7 +94,3 @@ class TestCacheClearing(unittest.TestCase):
             self.backend.init_color_pair(1, (255, 0, 0), (0, 0, 0))
         except AttributeError:
             self.fail("init_color_pair raised AttributeError with missing caches")
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test wheel scrolling support for dialogs (InfoDialog and BaseListDialog)
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_wheel_scrolling.py -v
 """
 
 import unittest
@@ -355,7 +356,3 @@ class TestBaseListDialogWheelScrolling(unittest.TestCase):
         result = self.dialog.handle_mouse_event(event, self.items)
         
         self.assertFalse(result)
-
-
-if __name__ == '__main__':
-    unittest.main()

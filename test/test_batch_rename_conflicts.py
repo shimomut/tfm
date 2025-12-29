@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test script for batch rename conflict resolution
 Tests the one-by-one conflict resolution for multiple files
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_batch_rename_conflicts.py -v
 """
 
-import os
-import sys
 import tempfile
 from pathlib import Path as StdPath
-
-# Add src directory to path
-sys.path.insert(0, str(StdPath(__file__).parent.parent / "src"))
 
 from tfm_path import Path
 
@@ -199,7 +195,3 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

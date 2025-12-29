@@ -1,20 +1,15 @@
-#!/usr/bin/env python3
 """
 Test directory existence check during startup.
 
 This test verifies that TFM checks the existence of directories
 before restoring cursor positions and removes non-existing ones
 from the cursor history.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_existence_check.py -v
 """
 
-import os
-import sys
 import tempfile
 import shutil
-from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_state_manager import TFMStateManager
 
@@ -134,20 +129,3 @@ def test_cleanup_non_existing_directories():
         
         print("Cleanup function successfully removed non-existing directories")
         return True
-
-
-if __name__ == "__main__":
-    print("Testing directory existence check...")
-    
-    try:
-        test_directory_existence_check()
-        print("✓ Current behavior test passed")
-    except Exception as e:
-        print(f"✗ Current behavior test failed: {e}")
-    
-    try:
-        test_cleanup_non_existing_directories()
-        print("✓ Cleanup function test passed")
-    except Exception as e:
-        print(f"✗ Cleanup function test failed: {e}")
-        print("This is expected until we implement the cleanup function")

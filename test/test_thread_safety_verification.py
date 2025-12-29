@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Thread Safety Verification Test
 
 This test verifies that the thread safety implementation in LogPaneHandler
 and RemoteMonitoringHandler works correctly under concurrent access.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_thread_safety_verification.py -v
 """
 
-import sys
-import os
 import logging
 import threading
 import time
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.tfm_logging_handlers import LogPaneHandler, RemoteMonitoringHandler
 
@@ -208,15 +204,3 @@ def test_remote_handler_concurrent_client_management():
         thread.join()
     
     print("✓ RemoteMonitoringHandler concurrent client management test passed")
-
-
-if __name__ == '__main__':
-    print("Running thread safety verification tests...")
-    print()
-    
-    test_logpane_handler_concurrent_emit()
-    test_logpane_handler_concurrent_get_messages()
-    test_remote_handler_concurrent_client_management()
-    
-    print()
-    print("All thread safety verification tests passed!")

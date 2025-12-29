@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test: Profiling Optimization
 
 Tests the profiling overhead optimizations to ensure they work correctly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_profiling_optimization.py -v
 """
 
-import sys
 import time
 import unittest
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_profiling import ProfilingManager
 
@@ -132,7 +128,3 @@ class TestProfilingOptimization(unittest.TestCase):
         profiler.end_frame()
         self.assertFalse(profiler.should_print_fps())
         profiler.print_fps()
-
-
-if __name__ == '__main__':
-    unittest.main()

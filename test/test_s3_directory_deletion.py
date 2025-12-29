@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test for S3 directory deletion fix
 
 This test reproduces and verifies the fix for the issue where deleting
 empty S3 directories fails with "No files to delete" error.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_directory_deletion.py -v
 """
 
-import os
-import sys
 import tempfile
 import shutil
 from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
     from tfm_path import Path as TFMPath
@@ -278,7 +274,3 @@ def main():
     else:
         print("Some tests failed!")
         return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

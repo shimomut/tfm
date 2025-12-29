@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test unsupported operations on archive paths
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_unsupported_operations.py -v
 """
 
 import unittest
 from unittest.mock import Mock, MagicMock, patch, call
 from pathlib import Path as PathlibPath
-import sys
-import os
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_file_operations import FileOperationsUI
@@ -271,7 +267,3 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
             self.assertEqual(len(dialog_calls), 1)
             message, choices = dialog_calls[0]
             self.assertIn("Cannot copy files to read-only storage", message)
-
-
-if __name__ == '__main__':
-    unittest.main()

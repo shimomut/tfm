@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Test script to verify that the 'h' key is no longer bound to help action
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_h_key_unassigned.py -v
+"""
 
 from tfm_config import get_config, is_key_bound_to
 
@@ -33,6 +30,3 @@ def test_h_key_unassigned():
     assert bound_keys == ['?'], "Only '?' should be bound to help"
     
     print("✓ Test passed: 'h' key is no longer bound to help, only '?' key remains")
-
-if __name__ == "__main__":
-    test_h_key_unassigned()

@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test S3 Copy Fix - Verify that copying from local filesystem to S3 works correctly
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_copy_operations.py -v
 """
 
-import os
-import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 
@@ -166,7 +162,3 @@ class TestS3CopyIntegration(unittest.TestCase):
             
         except ImportError:
             self.skipTest("boto3 not available for S3 testing")
-
-
-if __name__ == '__main__':
-    unittest.main()

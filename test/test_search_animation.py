@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test file for SearchDialog animation functionality
 Tests the progress indicator animation system
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_animation.py -v
 """
 
-import sys
 import time
 import tempfile
 import shutil
-from pathlib import Path
-
-# Add src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_search_dialog import SearchDialog
 from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
@@ -344,7 +340,3 @@ def main():
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
