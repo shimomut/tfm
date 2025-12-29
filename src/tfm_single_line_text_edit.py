@@ -197,6 +197,22 @@ class SingleLineTextEdit:
             self.cursor_pos = new_pos
             return True
         return False
+    
+    def delete_to_beginning(self):
+        """
+        Delete all text from the beginning to the cursor position.
+        Similar to Command+Backspace on macOS.
+        
+        Returns:
+            bool: True if text was deleted, False if nothing to delete
+        """
+        if self.cursor_pos <= 0:
+            return False
+        
+        # Delete everything before cursor
+        self.text = self.text[self.cursor_pos:]
+        self.cursor_pos = 0
+        return True
         
     def insert_char(self, char):
         """
@@ -312,8 +328,16 @@ class SingleLineTextEdit:
             if event.char == 'v' and event.modifiers == ModifierKey.COMMAND:
                 return self.paste_from_clipboard()
             
+            # Command+Left/Right for home/end (macOS style)
+            if event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.COMMAND:
+                return self.move_cursor_home()
+            elif event.key_code == KeyCode.RIGHT and event.modifiers == ModifierKey.COMMAND:
+                return self.move_cursor_end()
+            # Command+Backspace to delete to beginning
+            elif event.key_code == KeyCode.BACKSPACE and event.modifiers == ModifierKey.COMMAND:
+                return self.delete_to_beginning()
             # Word-level navigation with Alt modifier
-            if event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.ALT:
+            elif event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.ALT:
                 return self.move_cursor_word_left()
             elif event.key_code == KeyCode.RIGHT and event.modifiers == ModifierKey.ALT:
                 return self.move_cursor_word_right()

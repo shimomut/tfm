@@ -15,6 +15,15 @@ Added word-level cursor movement and deletion features to the `SingleLineTextEdi
 
 - **Alt+Backspace**: Delete from cursor position to the beginning of the previous word
 
+### 3. Line-Level Navigation (macOS style)
+
+- **Command+Left**: Move cursor to the beginning of the text
+- **Command+Right**: Move cursor to the end of the text
+
+### 4. Line-Level Deletion (macOS style)
+
+- **Command+Backspace**: Delete all text from the beginning to the cursor position
+
 ## Implementation Details
 
 ### Word Character Definition
@@ -67,13 +76,25 @@ Moves the cursor to the beginning of the next word using `_find_next_word_bounda
 
 Deletes text from the cursor position back to the previous word boundary, combining word boundary detection with text deletion.
 
+#### `delete_to_beginning()`
+
+Deletes all text from the beginning of the line to the cursor position. This is a macOS-style shortcut commonly used with Command+Backspace.
+
 ### Key Event Handling
 
-The `handle_key()` method was updated to check for Alt modifier key combinations before processing standard character-level navigation:
+The `handle_key()` method was updated to check for Command and Alt modifier key combinations before processing standard character-level navigation:
 
 ```python
+# Command+Left/Right for home/end (macOS style)
+if event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.COMMAND:
+    return self.move_cursor_home()
+elif event.key_code == KeyCode.RIGHT and event.modifiers == ModifierKey.COMMAND:
+    return self.move_cursor_end()
+# Command+Backspace to delete to beginning
+elif event.key_code == KeyCode.BACKSPACE and event.modifiers == ModifierKey.COMMAND:
+    return self.delete_to_beginning()
 # Word-level navigation with Alt modifier
-if event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.ALT:
+elif event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.ALT:
     return self.move_cursor_word_left()
 elif event.key_code == KeyCode.RIGHT and event.modifiers == ModifierKey.ALT:
     return self.move_cursor_word_right()
@@ -110,7 +131,12 @@ Comprehensive test suite added in `test/test_single_line_text_edit_word_navigati
   - Deletion with punctuation in paths and hyphenated words
   - Underscore treated as word character
 
-All 27 tests pass, and existing SingleLineTextEdit tests remain unaffected.
+- **TestCommandKeyNavigation**: 5 tests for Command key shortcuts
+  - Delete to beginning from various positions
+  - Edge cases (at start, at end, from middle)
+  - Preservation of text after cursor
+
+All 32 tests pass, and existing SingleLineTextEdit tests remain unaffected.
 
 ## Examples
 
@@ -137,11 +163,22 @@ Alt+Backspace → "hello-" (deleted "world")
 Alt+Backspace → "" (deleted "-" and "hello")
 ```
 
+### Command Key Shortcuts
+
+```
+Text: "hello world test" (cursor at position 11, after "world")
+Command+Backspace → " test" (deleted "hello world")
+Command+Left → cursor at position 0
+Command+Right → cursor at end
+```
+
 ## Demo
 
 Interactive demo available at `demo/demo_single_line_text_edit_word_navigation.py` showcasing:
 - Word-level navigation with Alt+Left/Right
 - Word-level deletion with Alt+Backspace
+- Line-level navigation with Command+Left/Right
+- Line-level deletion with Command+Backspace
 - Visual feedback showing cursor position
 
 ## Files Modified

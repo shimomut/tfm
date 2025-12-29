@@ -73,6 +73,9 @@ class WordNavigationDemo(TtkApplication):
         instructions = [
             "",
             "Keyboard shortcuts:",
+            "  Command+Left   - Move to beginning of text",
+            "  Command+Right  - Move to end of text",
+            "  Command+Backspace - Delete to beginning",
             "  Alt+Left       - Move to previous word",
             "  Alt+Right      - Move to next word", 
             "  Alt+Backspace  - Delete previous word",

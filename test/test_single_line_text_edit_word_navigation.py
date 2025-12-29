@@ -381,3 +381,56 @@ class TestPunctuationWordBoundaries:
         assert editor.delete_word_backward() is True
         assert editor.get_text() == ""
         assert editor.get_cursor_pos() == 0
+
+
+class TestCommandKeyNavigation:
+    """Test Command key shortcuts for navigation and deletion"""
+    
+    def test_delete_to_beginning_basic(self):
+        """Test deleting to beginning of text"""
+        editor = SingleLineTextEdit("hello world test")
+        editor.set_cursor_pos(11)  # After "world"
+        
+        # Delete everything before cursor
+        assert editor.delete_to_beginning() is True
+        assert editor.get_text() == " test"
+        assert editor.get_cursor_pos() == 0
+    
+    def test_delete_to_beginning_at_start(self):
+        """Test deleting to beginning when already at start"""
+        editor = SingleLineTextEdit("hello world")
+        editor.set_cursor_pos(0)
+        
+        # Nothing to delete
+        assert editor.delete_to_beginning() is False
+        assert editor.get_text() == "hello world"
+        assert editor.get_cursor_pos() == 0
+    
+    def test_delete_to_beginning_at_end(self):
+        """Test deleting to beginning from end of text"""
+        editor = SingleLineTextEdit("hello world")
+        editor.set_cursor_pos(11)  # End
+        
+        # Delete everything
+        assert editor.delete_to_beginning() is True
+        assert editor.get_text() == ""
+        assert editor.get_cursor_pos() == 0
+    
+    def test_delete_to_beginning_from_middle(self):
+        """Test deleting to beginning from middle of word"""
+        editor = SingleLineTextEdit("hello world test")
+        editor.set_cursor_pos(8)  # Middle of "world"
+        
+        # Delete "hello wo"
+        assert editor.delete_to_beginning() is True
+        assert editor.get_text() == "rld test"
+        assert editor.get_cursor_pos() == 0
+    
+    def test_delete_to_beginning_preserves_after_cursor(self):
+        """Test that deletion preserves text after cursor"""
+        editor = SingleLineTextEdit("one two three four")
+        editor.set_cursor_pos(8)  # After "two"
+        
+        assert editor.delete_to_beginning() is True
+        assert editor.get_text() == "three four"
+        assert editor.get_cursor_pos() == 0
