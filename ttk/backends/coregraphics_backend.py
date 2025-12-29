@@ -2946,16 +2946,6 @@ if COCOA_AVAILABLE:
                     # Update grid
                     self.backend.grid = new_grid
                     
-                    # Clear attribute dictionary cache on resize
-                    # This ensures cached attribute dictionaries are rebuilt with new dimensions
-                    if hasattr(self.backend, '_attr_dict_cache') and self.backend._attr_dict_cache is not None:
-                        self.backend._attr_dict_cache.clear()
-                    
-                    # Clear attributed string cache on resize
-                    # This ensures cached NSAttributedString objects are rebuilt with new dimensions
-                    if hasattr(self.backend, '_attr_string_cache') and self.backend._attr_string_cache is not None:
-                        self.backend._attr_string_cache.clear()
-                    
                     # Set flag to generate resize event in run_event_loop_iteration()
                     self.backend.resize_pending = True
                     
