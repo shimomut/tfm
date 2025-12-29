@@ -83,6 +83,7 @@ class TFMEventCallback(EventCallback):
         Handle a key event by routing to the UI layer stack.
         
         This method intercepts global keyboard shortcuts before routing to layers.
+        Exceptions are caught to prevent TFM shutdown.
         
         Args:
             event: KeyEvent to handle
@@ -90,35 +91,45 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed, False otherwise
         """
-        # Mark activity for adaptive FPS
-        self.file_manager.adaptive_fps.mark_activity()
-        
-        # Handle global desktop mode shortcuts (work in all contexts)
-        if self.file_manager.is_desktop_mode() and event.has_modifier(ModifierKey.COMMAND):
-            # Cmd-Plus or Cmd-= (increase font size)
-            if event.char == '+' or event.char == '=':
-                if hasattr(self.file_manager.renderer, 'change_font_size'):
-                    if self.file_manager.renderer.change_font_size(1):
-                        self.file_manager.logger.info(f"Font size increased to {self.file_manager.renderer.font_size}pt")
-                        self.file_manager.mark_dirty()
-                        return True
-            # Cmd-Minus (decrease font size)
-            elif event.char == '-':
-                if hasattr(self.file_manager.renderer, 'change_font_size'):
-                    if self.file_manager.renderer.change_font_size(-1):
-                        self.file_manager.logger.info(f"Font size decreased to {self.file_manager.renderer.font_size}pt")
-                        self.file_manager.mark_dirty()
-                        return True
-                    else:
-                        self.file_manager.logger.info("Font size at minimum (8pt)")
-                        return True
-        
-        # Route to UI layer stack
-        return self.file_manager.ui_layer_stack.handle_key_event(event)
+        try:
+            # Mark activity for adaptive FPS
+            self.file_manager.adaptive_fps.mark_activity()
+            
+            # Handle global desktop mode shortcuts (work in all contexts)
+            if self.file_manager.is_desktop_mode() and event.has_modifier(ModifierKey.COMMAND):
+                # Cmd-Plus or Cmd-= (increase font size)
+                if event.char == '+' or event.char == '=':
+                    if hasattr(self.file_manager.renderer, 'change_font_size'):
+                        if self.file_manager.renderer.change_font_size(1):
+                            self.file_manager.logger.info(f"Font size increased to {self.file_manager.renderer.font_size}pt")
+                            self.file_manager.mark_dirty()
+                            return True
+                # Cmd-Minus (decrease font size)
+                elif event.char == '-':
+                    if hasattr(self.file_manager.renderer, 'change_font_size'):
+                        if self.file_manager.renderer.change_font_size(-1):
+                            self.file_manager.logger.info(f"Font size decreased to {self.file_manager.renderer.font_size}pt")
+                            self.file_manager.mark_dirty()
+                            return True
+                        else:
+                            self.file_manager.logger.info("Font size at minimum (8pt)")
+                            return True
+            
+            # Route to UI layer stack
+            return self.file_manager.ui_layer_stack.handle_key_event(event)
+        except Exception as e:
+            # Log error message
+            self.file_manager.logger.error(f"Error handling key event: {e}")
+            # Print stack trace to stderr if debug mode is enabled
+            if os.environ.get('TFM_DEBUG') == '1':
+                traceback.print_exc(file=sys.stderr)
+            return True  # Event consumed to prevent further issues
     
     def on_char_event(self, event: CharEvent) -> bool:
         """
         Handle a character event by routing to the UI layer stack.
+        
+        Exceptions are caught to prevent TFM shutdown.
         
         Args:
             event: CharEvent to handle
@@ -126,11 +137,19 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed, False otherwise
         """
-        # Mark activity for adaptive FPS
-        self.file_manager.adaptive_fps.mark_activity()
-        
-        # Route to UI layer stack
-        return self.file_manager.ui_layer_stack.handle_char_event(event)
+        try:
+            # Mark activity for adaptive FPS
+            self.file_manager.adaptive_fps.mark_activity()
+            
+            # Route to UI layer stack
+            return self.file_manager.ui_layer_stack.handle_char_event(event)
+        except Exception as e:
+            # Log error message
+            self.file_manager.logger.error(f"Error handling char event: {e}")
+            # Print stack trace to stderr if debug mode is enabled
+            if os.environ.get('TFM_DEBUG') == '1':
+                traceback.print_exc(file=sys.stderr)
+            return True  # Event consumed to prevent further issues
     
     def on_system_event(self, event: SystemEvent) -> bool:
         """
@@ -156,6 +175,7 @@ class TFMEventCallback(EventCallback):
         
         Menu events are desktop-mode specific and handled directly by FileManager
         as they affect application-wide state and commands.
+        Exceptions are caught to prevent TFM shutdown.
         
         Args:
             event: MenuEvent to handle
@@ -163,10 +183,18 @@ class TFMEventCallback(EventCallback):
         Returns:
             True if the event was consumed, False otherwise
         """
-        # Mark activity for adaptive FPS
-        self.file_manager.adaptive_fps.mark_activity()
-        
-        return self.file_manager._handle_menu_event(event)
+        try:
+            # Mark activity for adaptive FPS
+            self.file_manager.adaptive_fps.mark_activity()
+            
+            return self.file_manager._handle_menu_event(event)
+        except Exception as e:
+            # Log error message
+            self.file_manager.logger.error(f"Error handling menu event: {e}")
+            # Print stack trace to stderr if debug mode is enabled
+            if os.environ.get('TFM_DEBUG') == '1':
+                traceback.print_exc(file=sys.stderr)
+            return True  # Event consumed to prevent further issues
     
     def on_mouse_event(self, event: 'MouseEvent') -> bool:
         """
