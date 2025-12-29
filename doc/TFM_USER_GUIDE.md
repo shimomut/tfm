@@ -40,18 +40,18 @@ TFM (Terminal File Manager) is a powerful dual-pane file manager for the termina
 ### System Requirements
 
 #### Terminal Mode Requirements (All Platforms)
-- **Python 3.9+**: Core language requirement (3.11+ recommended)
+- **Python 3.9+**: Core language requirement (3.11+ recommended, 3.13 supported)
 - **Terminal**: Any terminal with curses support
 - **Operating System**: macOS, Linux, or Windows
 - **Windows**: `windows-curses` package (automatically installed via setup.py)
 
 #### Desktop Mode Requirements (macOS Only)
-- **Python 3.9+**: Core language requirement (3.11+ recommended)
+- **Python 3.9+**: Core language requirement (3.11+ recommended, 3.13 supported)
 - **macOS**: 10.13 (High Sierra) or later
 - **PyObjC**: Install with `pip install pyobjc-framework-Cocoa`
 
 #### Recommended Setup
-- **Python 3.11+**: For best performance and compatibility
+- **Python 3.11+**: For best performance and compatibility (3.13 fully supported)
 - **Modern Terminal**: Terminal.app (macOS), GNOME Terminal (Linux), Windows Terminal (Windows)
 - **UTF-8 Support**: For proper character display
 

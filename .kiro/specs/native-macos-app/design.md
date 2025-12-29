@@ -497,10 +497,10 @@ if __name__ == '__main__':
     <string>TFM.icns</string>
     
     <key>CFBundleVersion</key>
-    <string>0.98</string>
+    <string>0.99</string>
     
     <key>CFBundleShortVersionString</key>
-    <string>0.98</string>
+    <string>0.99</string>
     
     <key>CFBundlePackageType</key>
     <string>APPL</string>

@@ -26,7 +26,7 @@ DMG_NAME="TFM"
 VOLUME_NAME="TFM Installer"
 
 # Version number (can be overridden by environment variable)
-VERSION="${VERSION:-0.98}"
+VERSION="${VERSION:-0.99}"
 
 # ============================================================================
 # Helper Functions

@@ -255,7 +255,7 @@ python -m ttk.demo.demo_ttk --backend coregraphics
 
 ## Requirements
 
-- **Python**: 3.8 or higher
+- **Python**: 3.9 or higher
 - **Curses backend**: Built-in on Unix-like systems (Linux, macOS, BSD)
 - **CoreGraphics backend**: macOS only, requires PyObjC
 

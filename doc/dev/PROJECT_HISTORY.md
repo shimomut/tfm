@@ -201,7 +201,7 @@ The most transformative period in the project's history:
 - Dialog flickering fixes
 - **File type association system**
 - Microsoft Office and media file associations
-- **Version 0.98 released**
+- **Version 0.99 released**
 
 ### Early December:
 - Threading for file operations
@@ -332,7 +332,7 @@ The TTK migration represents a fundamental shift from a terminal application to 
 
 - **Total Commits**: 402+
 - **Development Period**: ~3 months
-- **Major Versions**: 0.90, 0.98
+- **Major Versions**: 0.90, 0.99
 - **Lines of Code**: Substantial (exact count varies with migration)
 - **Test Coverage**: Comprehensive test suite developed during TTK migration
 

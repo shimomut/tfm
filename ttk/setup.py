@@ -46,7 +46,7 @@ setup(
     long_description_content_type='text/markdown',
     author='TFM Development Team',
     license='MIT',
-    python_requires='>=3.8',
+    python_requires='>=3.9',
     
     # Package configuration
     # This is a flat-layout package where the package root is the current directory
@@ -86,15 +86,15 @@ setup(
     
     # Classifiers
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Software Development :: User Interfaces',
         'Topic :: Terminals',

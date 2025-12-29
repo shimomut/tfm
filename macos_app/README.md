@@ -261,7 +261,7 @@ TFM.app/
     │                           # - Bundle identifier: com.tfm.app
     │                           # - Bundle name: TFM
     │                           # - Executable name: TFM
-    │                           # - Version: 0.98
+    │                           # - Version: 0.99
     │                           # - Icon file: TFM.icns
     │                           # - Minimum macOS: 10.13
     │

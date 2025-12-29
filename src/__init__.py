@@ -8,7 +8,7 @@ import sys
 import os
 
 # Version information
-__version__ = "0.98"
+__version__ = "0.99"
 __author__ = "Tomonori Shimomura"
 
 # Add the package directory to sys.path to support relative imports

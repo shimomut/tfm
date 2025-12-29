@@ -9,7 +9,7 @@ are defined here.
 """
 
 # Version information
-VERSION = "0.98"
+VERSION = "0.99"
 
 # Application metadata
 APP_NAME = "TUI File Manager"

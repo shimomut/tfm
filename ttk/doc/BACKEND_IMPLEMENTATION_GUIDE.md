@@ -568,7 +568,7 @@ class MyBackend(Renderer):
         - Windows (Win32)
     
     Requirements:
-        - Python 3.8+
+        - Python 3.9+
         - platform-specific-library >= 1.0
     
     Example:

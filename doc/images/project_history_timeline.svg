@@ -81,7 +81,7 @@
   <text x="1080" y="224" class="phase-features">• Cross-platform support</text>
   <text x="1080" y="242" class="phase-features">• Renderer architecture</text>
   <text x="1080" y="260" class="phase-features">• Input event system</text>
-  <text x="1080" y="278" class="phase-features">• Version 0.98 released</text>
+  <text x="1080" y="278" class="phase-features">• Version 0.99 released</text>
   <circle cx="1200" cy="400" r="10" class="milestone"/>
   <line x1="1200" y1="300" x2="1200" y2="390" class="arrow"/>
   
@@ -128,7 +128,7 @@
   <rect x="980" y="520" width="360" height="150" class="phase-box" rx="8"/>
   <text x="1000" y="545" class="phase-title" font-size="15">Project Metrics</text>
   <text x="1010" y="568" class="phase-features">• 402+ commits in 3 months</text>
-  <text x="1010" y="586" class="phase-features">• 2 major versions (0.90, 0.98)</text>
+  <text x="1010" y="586" class="phase-features">• 2 major versions (0.90, 0.99)</text>
   <text x="1010" y="604" class="phase-features">• 50+ demo/test files</text>
   <text x="1010" y="622" class="phase-features">• Comprehensive documentation</text>
   <text x="1010" y="640" class="phase-features">• Active development cycle</text>

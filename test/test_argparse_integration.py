@@ -31,7 +31,7 @@ class TestArgparseIntegration(unittest.TestCase):
         
         # Should contain app name and version
         self.assertIn('TUI File Manager', output)
-        self.assertIn('0.98', output)
+        self.assertIn('0.99', output)
         
         # Should be a single line
         lines = output.split('\n')

@@ -223,7 +223,7 @@ tfm/
 ## Dependencies
 
 ### Runtime Dependencies
-- Python 3.9+
+- Python 3.9+ (3.13 supported)
 - Standard library modules (curses, pathlib, etc.)
 
 ### Development Dependencies

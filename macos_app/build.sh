@@ -101,7 +101,7 @@ LDFLAGS="-rpath @executable_path/../Frameworks"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
 
 # Version number (can be overridden by environment variable)
-VERSION="${VERSION:-0.98}"
+VERSION="${VERSION:-0.99}"
 
 # ============================================================================
 # Build Script Entry Point

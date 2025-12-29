@@ -15,7 +15,7 @@ Create package configuration for TTK library to enable distribution as a standal
 - **Purpose**: Modern Python package configuration using PEP 518/621 standards
 - **Key Features**:
   - Package metadata (name, version, description, author, license)
-  - Python version requirement (>=3.8)
+  - Python version requirement (>=3.9)
   - Dependency specifications (optional PyObjC for Metal backend)
   - Development dependencies (pytest, hypothesis)
   - Package structure configuration for flat layout
@@ -71,7 +71,7 @@ ttk/
 - **Version**: 0.1.0
 - **Description**: TUI Toolkit - A generic rendering library for character-grid-based applications
 - **License**: MIT
-- **Python Requirement**: >=3.8
+- **Python Requirement**: >=3.9
 - **Author**: TFM Development Team
 
 ### 4. Dependencies

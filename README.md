@@ -226,12 +226,12 @@ See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desk
 ### Requirements
 
 **Terminal Mode** (all platforms):
-- Python 3.9+ with curses library (built-in on macOS/Linux)
+- Python 3.9+ with curses library (built-in on macOS/Linux, 3.13 supported)
 - Windows: `pip install windows-curses` (automatically installed via setup.py)
 - Terminal with curses support
 
 **Desktop Mode** (macOS only):
-- Python 3.9+
+- Python 3.9+ (3.13 supported)
 - macOS 10.13 (High Sierra) or later
 - PyObjC framework: `pip install pyobjc-framework-Cocoa`
 

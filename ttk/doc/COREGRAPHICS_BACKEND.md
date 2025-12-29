@@ -15,7 +15,7 @@ The CoreGraphics backend provides:
 ## Platform Requirements
 
 - **Operating System**: macOS 10.13 (High Sierra) or later
-- **Python**: Python 3.8 or later
+- **Python**: Python 3.9 or later
 - **Dependencies**: PyObjC framework
 
 ## Installation
