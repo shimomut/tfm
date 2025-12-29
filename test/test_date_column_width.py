@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
 """
 Test script for dynamic date column width adjustment
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_date_column_width.py -v
 """
 
 import sys
 from pathlib import Path as StdPath
-
-# Add src to path
-sys.path.insert(0, str(StdPath(__file__).parent.parent / 'src'))
 
 from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
 
@@ -158,30 +156,3 @@ def test_format_cycling_width_changes():
         prev_width = width
     
     print("=" * 60)
-
-
-if __name__ == '__main__':
-    try:
-        print("\n" + "=" * 60)
-        print("Date Column Width Adjustment Tests")
-        print("=" * 60)
-        
-        passed = test_date_column_widths()
-        test_column_layout_calculation()
-        test_format_cycling_width_changes()
-        
-        if passed:
-            print("\n✓ All tests passed!")
-            print("\nThe date column width now adjusts automatically:")
-            print("  • Short format: 14 characters (YY-MM-DD HH:mm) - Default")
-            print("  • Full format:  19 characters (YYYY-MM-DD HH:mm:ss)")
-            print("\nThis ensures proper column alignment for each format.")
-        else:
-            print("\n✗ Some tests failed!")
-            sys.exit(1)
-        
-    except Exception as e:
-        print(f"\n✗ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

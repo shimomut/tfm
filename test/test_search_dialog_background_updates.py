@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
 """
 Test script to verify search dialog background updates trigger redraws
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_background_updates.py -v
 """
 
-import sys
-import os
+from pathlib import Path
 import time
 import threading
 from unittest.mock import Mock, patch
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_search_dialog import SearchDialog
 from tfm_config import get_config
@@ -106,21 +103,3 @@ def test_main_loop_timeout_handling():
     
     print("✓ Core background update detection works correctly")
     return True
-
-
-if __name__ == "__main__":
-    try:
-        test_background_search_updates()
-        test_search_thread_content_changes()
-        
-        print("Testing main loop timeout handling...")
-        test_main_loop_timeout_handling()
-        
-        print("\n🎉 All search dialog background update tests passed!")
-        print("   Search results from background threads will now trigger redraws correctly.")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

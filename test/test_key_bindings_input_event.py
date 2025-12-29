@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test key bindings with KeyEvent support.
 
 This test verifies that the key binding system correctly handles KeyEvent objects
 from TTK, including both printable characters and special keys with modifiers.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_key_bindings_input_event.py -v
 """
 
-import sys
 import unittest
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from ttk import KeyEvent, KeyCode, ModifierKey
 from tfm_config import (
@@ -194,7 +190,3 @@ class TestKeyBindingsKeyEvent(unittest.TestCase):
             action_upper_no_sel, 'create_directory',
             "'M' should be bound to create_directory without selection (case-insensitive)"
         )
-
-
-if __name__ == '__main__':
-    unittest.main()

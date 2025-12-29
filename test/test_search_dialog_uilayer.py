@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Test SearchDialog UILayer interface implementation
-"""
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_uilayer.py -v
+"""
 
 import pytest
 from unittest.mock import Mock, MagicMock
@@ -149,7 +146,3 @@ class TestSearchDialogUILayer:
         self.search_dialog.content_changed = False
         self.search_dialog.searching = False
         assert self.search_dialog.needs_redraw() is False
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
 """
 Test FileManager integration with archive virtual directories
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_filemanager_archive_integration.py -v
 """
 
-import os
 import sys
 import tempfile
 import zipfile
 from pathlib import Path as PathlibPath
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_archive import ArchiveOperations
@@ -179,35 +176,3 @@ def test_archive_indicator_detection():
         is_archive = regular_path.startswith('archive://')
         assert not is_archive, "Should not detect archive in regular path"
         print(f"  ✓ Regular path not detected as archive")
-
-
-if __name__ == '__main__':
-    print("Testing FileManager archive integration...")
-    print()
-    
-    try:
-        test_enter_archive_simulation()
-        print()
-        test_backspace_exit_archive_simulation()
-        print()
-        test_backspace_within_archive_simulation()
-        print()
-        test_path_display_formatting()
-        print()
-        test_archive_indicator_detection()
-        
-        print()
-        print("✅ All FileManager integration tests passed!")
-        sys.exit(0)
-    except AssertionError as e:
-        print()
-        print(f"❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-    except Exception as e:
-        print()
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

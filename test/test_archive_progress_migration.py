@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Test that archive progress migration works correctly
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_progress_migration.py -v
 """
 
-import sys
-import os
 from unittest.mock import Mock, MagicMock
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_progress_manager import ProgressManager, OperationType
 
@@ -132,9 +128,3 @@ def test_legacy_compatibility():
     assert not fm.progress_manager.is_operation_active()
     
     print("✅ Legacy compatibility test passed!")
-
-
-if __name__ == "__main__":
-    test_archive_progress_migration()
-    test_legacy_compatibility()
-    print("\n🎉 All archive progress migration tests passed!")

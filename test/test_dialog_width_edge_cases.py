@@ -1,14 +1,11 @@
-#!/usr/bin/env python3
 """
 Test edge cases for QuickEditBar width handling
 
 This test verifies that the dialog handles narrow terminals and help text
 display correctly without disappearing elements.
-"""
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_width_edge_cases.py -v
+"""
 
 import unittest
 from unittest.mock import Mock, patch
@@ -226,7 +223,3 @@ class TestDialogWidthEdgeCases(unittest.TestCase):
             
             # Help text should start after input field with gap
             self.assertGreater(help_x, input_end_x + 1, "Help text should not overlap input field")
-
-
-if __name__ == '__main__':
-    unittest.main()

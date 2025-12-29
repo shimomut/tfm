@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Performance tests for archive virtual directory feature.
 
@@ -7,18 +6,16 @@ Tests verify:
 - Lazy loading for archive directory structures
 - Memory usage optimization for large archives
 - Hot path optimization in ArchivePathImpl
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_performance.py -v
 """
 
-import os
 import sys
 import time
 import tempfile
 import zipfile
 import tarfile
 from pathlib import Path as PathlibPath
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_archive import ArchiveCache, get_archive_cache, ArchivePathImpl
@@ -325,7 +322,3 @@ def main():
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
-
-if __name__ == '__main__':
-    main()

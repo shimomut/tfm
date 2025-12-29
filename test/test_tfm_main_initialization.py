@@ -1,14 +1,9 @@
-#!/usr/bin/env python3
 """
 Test TFM main initialization with TTK renderer
-"""
-import sys
-import os
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
 
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_tfm_main_initialization.py -v
+"""
+from unittest.mock import Mock, MagicMock, patch
 
 def test_file_manager_accepts_renderer():
     """Test that FileManager.__init__ accepts a renderer parameter"""
@@ -102,18 +97,3 @@ def test_main_function_passes_renderer_to_file_manager():
     
     print("✓ main() passes renderer to FileManager")
     print("✓ FileManager.run() is called")
-
-if __name__ == '__main__':
-    print("Testing TFM main initialization with TTK renderer...")
-    print()
-    
-    test_file_manager_accepts_renderer()
-    print()
-    
-    test_main_function_accepts_renderer()
-    print()
-    
-    test_main_function_passes_renderer_to_file_manager()
-    print()
-    
-    print("All tests passed! ✓")

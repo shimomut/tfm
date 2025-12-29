@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test error handling - handler failure isolation (Task 12.1)
 
@@ -8,15 +7,13 @@ failures and continue operating even when internal errors occur.
 Requirements tested:
 - 12.1: When a log handler fails, THE System SHALL continue operating with remaining handlers
 - 12.5: When an error occurs in logging, THE System SHALL attempt to log the error using a fallback mechanism
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_error_handling_handler_isolation.py -v
 """
 
 import sys
-import os
 import io
 import logging
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
 
@@ -220,21 +217,3 @@ def test_handler_isolation_from_each_other():
         
     finally:
         sys.__stderr__ = original_stderr
-
-
-if __name__ == "__main__":
-    try:
-        test_logpane_handler_error_isolation()
-        test_stream_handler_error_isolation()
-        test_handler_isolation_from_each_other()
-        print("\n✅ All Task 12.1 tests passed!")
-        print("\nSummary:")
-        print("- LogPaneHandler catches exceptions and logs to stderr")
-        print("- StreamOutputHandler suppresses OSError/IOError")
-        print("- Handlers are isolated from each other's failures")
-        print("- Requirements 12.1 and 12.5 are satisfied")
-    except Exception as e:
-        print(f"\n❌ Test failed with error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

@@ -29,6 +29,8 @@ class MenuManager:
     EDIT_CUT = 'edit.cut'
     EDIT_PASTE = 'edit.paste'
     EDIT_SELECT_ALL = 'edit.select_all'
+    EDIT_COPY_NAMES = 'edit.copy_names'
+    EDIT_COPY_PATHS = 'edit.copy_paths'
     
     # View menu
     VIEW_SHOW_HIDDEN = 'view.show_hidden'
@@ -209,6 +211,19 @@ class MenuManager:
                     'label': 'Select All',
                     'shortcut': f'{modifier}+A',
                     'enabled': True
+                },
+                {'separator': True},
+                {
+                    'id': self.EDIT_COPY_NAMES,
+                    'label': 'Copy Names',
+                    'shortcut': f'{modifier}+C',
+                    'enabled': True  # Always enabled - uses focused item if no selection
+                },
+                {
+                    'id': self.EDIT_COPY_PATHS,
+                    'label': 'Copy Full Paths',
+                    'shortcut': f'{modifier}+Shift+C',
+                    'enabled': True  # Always enabled - uses focused item if no selection
                 }
             ]
         }
@@ -401,6 +416,8 @@ class MenuManager:
         states[self.EDIT_CUT] = has_selection
         states[self.EDIT_PASTE] = has_clipboard
         states[self.EDIT_SELECT_ALL] = True
+        states[self.EDIT_COPY_NAMES] = True  # Always enabled - uses focused item if no selection
+        states[self.EDIT_COPY_PATHS] = True  # Always enabled - uses focused item if no selection
         
         # View menu states (all always enabled)
         states[self.VIEW_SHOW_HIDDEN] = True

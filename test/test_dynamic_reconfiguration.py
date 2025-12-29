@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Test dynamic reconfiguration of handlers
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dynamic_reconfiguration.py -v
 """
 
-import sys
-import os
 import logging
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_log_manager import LogManager, LoggingConfig
 
@@ -21,7 +17,7 @@ class MockConfig:
 def test_configure_handlers_enables_log_pane():
     """Test that configure_handlers can enable log pane handler"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Initially, log pane handler should be None
     assert log_manager._log_pane_handler is None
@@ -44,7 +40,7 @@ def test_configure_handlers_enables_log_pane():
 def test_configure_handlers_disables_log_pane():
     """Test that configure_handlers can disable log pane handler"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Enable log pane first
     log_manager.configure_handlers(log_pane_enabled=True)
@@ -65,7 +61,7 @@ def test_configure_handlers_disables_log_pane():
 def test_configure_handlers_enables_stream_output():
     """Test that configure_handlers can enable stream output handler"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Initially, stream output handler should be None
     assert log_manager._stream_output_handler is None
@@ -88,7 +84,7 @@ def test_configure_handlers_enables_stream_output():
 def test_configure_handlers_disables_stream_output():
     """Test that configure_handlers can disable stream output handler"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Enable stream output first
     log_manager.configure_handlers(stream_output_enabled=True)
@@ -109,7 +105,7 @@ def test_configure_handlers_disables_stream_output():
 def test_configure_handlers_attaches_to_existing_loggers():
     """Test that configure_handlers attaches handlers to existing loggers"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Create a logger before enabling handlers
     logger1 = log_manager.getLogger("TestLogger1")
@@ -135,7 +131,7 @@ def test_configure_handlers_attaches_to_existing_loggers():
 def test_configure_handlers_removes_from_existing_loggers():
     """Test that configure_handlers removes handlers from existing loggers"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Enable log pane handler first
     log_manager.configure_handlers(log_pane_enabled=True)
@@ -166,7 +162,7 @@ def test_configure_handlers_removes_from_existing_loggers():
 def test_configure_handlers_multiple_changes():
     """Test that configure_handlers can handle multiple configuration changes"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Enable both log pane and stream output
     log_manager.configure_handlers(log_pane_enabled=True, stream_output_enabled=True)
@@ -201,7 +197,7 @@ def test_configure_handlers_multiple_changes():
 def test_getlogger_attaches_current_handlers():
     """Test that getLogger attaches currently configured handlers to new loggers"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Enable log pane and stream output
     log_manager.configure_handlers(log_pane_enabled=True, stream_output_enabled=True)
@@ -218,20 +214,3 @@ def test_getlogger_attaches_current_handlers():
     log_manager.restore_stdio()
     
     print("✓ getLogger attaches currently configured handlers to new loggers")
-
-
-if __name__ == '__main__':
-    print("Testing dynamic reconfiguration...")
-    print()
-    
-    test_configure_handlers_enables_log_pane()
-    test_configure_handlers_disables_log_pane()
-    test_configure_handlers_enables_stream_output()
-    test_configure_handlers_disables_stream_output()
-    test_configure_handlers_attaches_to_existing_loggers()
-    test_configure_handlers_removes_from_existing_loggers()
-    test_configure_handlers_multiple_changes()
-    test_getlogger_attaches_current_handlers()
-    
-    print()
-    print("All dynamic reconfiguration tests passed!")

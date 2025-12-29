@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test suite for TFM State Manager
 
@@ -8,17 +7,14 @@ Tests the persistent state management system including:
 - Database locking and concurrency
 - TFM-specific state operations
 - Error handling and recovery
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_state_manager.py -v
 """
 
-import sys
 import tempfile
 import threading
 import time
-import os
 from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_state_manager import StateManager, TFMStateManager
 
@@ -352,8 +348,3 @@ def run_all_tests():
         import traceback
         traceback.print_exc()
         return False
-
-
-if __name__ == "__main__":
-    success = run_all_tests()
-    sys.exit(0 if success else 1)

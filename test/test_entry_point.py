@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Test entry point functionality for TFM
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_entry_point.py -v
 """
 
-import sys
 import unittest
-from pathlib import Path
-
-# Add root directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 class TestEntryPoint(unittest.TestCase):
     """Test entry point functionality"""
@@ -35,6 +31,3 @@ class TestEntryPoint(unittest.TestCase):
             
         except ImportError as e:
             self.fail(f"Failed to import create_parser function: {e}")
-
-if __name__ == '__main__':
-    unittest.main()

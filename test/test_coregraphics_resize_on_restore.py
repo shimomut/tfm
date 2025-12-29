@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Unit tests for CoreGraphics backend resize event on window restoration.
 
@@ -11,14 +10,11 @@ Test Coverage:
 - No resize event when restored size matches default
 - Grid dimension updates on restoration
 - Resize flag setting on restoration
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_coregraphics_resize_on_restore.py -v
 """
 
 import unittest
-import sys
-import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend, COCOA_AVAILABLE
@@ -50,7 +46,7 @@ class TestCoreGraphicsResizeOnRestore(unittest.TestCase):
         """Test that backend can be initialized and callback can be set."""
         self.backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -70,7 +66,7 @@ class TestCoreGraphicsResizeOnRestore(unittest.TestCase):
         """Test that grid dimensions are set correctly after initialization."""
         self.backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -97,7 +93,7 @@ class TestCoreGraphicsResizeOnRestore(unittest.TestCase):
         """Test that resize events are delivered via callback in callback mode."""
         self.backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -123,7 +119,7 @@ class TestCoreGraphicsResizeOnRestore(unittest.TestCase):
         # Create first backend
         backend1 = CoreGraphicsBackend(
             window_title="Test Window 1",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -142,7 +138,7 @@ class TestCoreGraphicsResizeOnRestore(unittest.TestCase):
         # Create second backend with different autosave name
         backend2 = CoreGraphicsBackend(
             window_title="Test Window 2",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=30,
             cols=100,
@@ -180,7 +176,3 @@ def run_tests():
     
     # Return exit code
     return 0 if result.wasSuccessful() else 1
-
-
-if __name__ == '__main__':
-    sys.exit(run_tests())

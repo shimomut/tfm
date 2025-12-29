@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
 """
 Test script for TFM delete functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_delete_feature.py -v
 """
 
-import os
+from pathlib import Path
 import tempfile
 import shutil
-from pathlib import Path
-import sys
 
 # Add the current directory to Python path to import TFM modules
 
@@ -15,10 +14,6 @@ import sys
 
 
 # Add src directory to Python path
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
 from tfm_main import FileManager
 from tfm_config import get_config
 
@@ -179,6 +174,3 @@ def main():
     print("=" * 60)
     
     return success
-
-if __name__ == "__main__":
-    main()

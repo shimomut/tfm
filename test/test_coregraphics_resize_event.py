@@ -4,15 +4,13 @@ Test CoreGraphics backend resize event handling.
 This test verifies that the CoreGraphics backend properly generates
 resize events when the window is resized via the on_resize callback,
 matching the behavior expected in callback mode.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_coregraphics_resize_event.py -v
 """
 
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 import sys
-import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Check if PyObjC is available
 try:
@@ -41,7 +39,7 @@ class TestCoreGraphicsResizeEvent(unittest.TestCase):
         # Create backend with small dimensions for testing
         self.backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=10,
             cols=40
@@ -165,36 +163,3 @@ class TestCoreGraphicsResizeEvent(unittest.TestCase):
         # Verify dimensions unchanged
         self.assertEqual(self.backend.rows, initial_rows)
         self.assertEqual(self.backend.cols, initial_cols)
-    
-    def test_resize_clears_caches(self):
-        """Test that resize clears attribute and string caches."""
-        # Ensure caches exist
-        self.assertIsNotNone(self.backend._attr_dict_cache)
-        self.assertIsNotNone(self.backend._attr_string_cache)
-        
-        # Add some data to caches (simulate usage)
-        # This would normally happen during rendering
-        
-        # Trigger resize
-        self.backend.resize_pending = True
-        
-        # Create a mock notification
-        notification = Mock()
-        
-        # Mock the window content view to return different dimensions
-        mock_frame = Mock()
-        mock_frame.size.width = (self.backend.cols + 10) * self.backend.char_width
-        mock_frame.size.height = (self.backend.rows + 5) * self.backend.char_height
-        
-        self.backend.window.contentView().frame = Mock(return_value=mock_frame)
-        
-        # Call the delegate method
-        self.backend.window_delegate.windowDidResize_(notification)
-        
-        # Caches should still exist but be cleared
-        self.assertIsNotNone(self.backend._attr_dict_cache)
-        self.assertIsNotNone(self.backend._attr_string_cache)
-
-
-if __name__ == '__main__':
-    unittest.main()

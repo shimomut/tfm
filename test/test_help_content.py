@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
 """
 Test script to verify help content generation
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_help_content.py -v
 """
 
 
 
 
 # Add src directory to Python path
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
 from tfm_const import VERSION, GITHUB_URL
 
 def generate_help_content():
@@ -99,15 +96,3 @@ def generate_help_content():
     help_lines.append("• Text viewer (v) supports syntax highlighting")
     
     return help_lines
-
-if __name__ == "__main__":
-    print("TFM Help Dialog Content Test")
-    print("=" * 40)
-    
-    help_content = generate_help_content()
-    
-    for line in help_content:
-        print(line)
-    
-    print(f"\nTotal lines: {len(help_content)}")
-    print("Help content generated successfully!")

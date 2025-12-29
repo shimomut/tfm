@@ -3,15 +3,12 @@ Integration tests for UILayerStack with FileManager.
 
 These tests verify that the UILayerStack is properly integrated into
 the FileManager and that layers can be pushed and popped correctly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_ui_layer_stack_integration.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
-import sys
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_main import FileManager
 from tfm_ui_layer import UILayer, UILayerStack
@@ -205,7 +202,3 @@ class TestUILayerStackIntegration(unittest.TestCase):
         self.assertEqual(self.file_manager.pop_layer(), layer2)
         self.assertEqual(self.file_manager.pop_layer(), layer1)
         self.assertEqual(self.file_manager.ui_layer_stack.get_layer_count(), 1)
-
-
-if __name__ == '__main__':
-    unittest.main()

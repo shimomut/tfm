@@ -2570,6 +2570,132 @@ class CoreGraphicsBackend(Renderer):
                 print(f"CoreGraphicsBackend: Error in drag completion callback: {e}")
                 import traceback
                 traceback.print_exc()
+    
+    def supports_clipboard(self) -> bool:
+        """
+        Query whether this backend supports clipboard operations.
+        
+        The CoreGraphics backend provides full clipboard support through
+        native macOS NSPasteboard APIs. This enables applications to read
+        from and write to the system clipboard.
+        
+        Returns:
+            bool: Always True for CoreGraphics backend (macOS desktop mode)
+        
+        Platform Support:
+            - macOS (CoreGraphics): True - uses NSPasteboard for clipboard access
+            - Terminal (Curses): False - clipboard not supported
+        
+        Example:
+            if renderer.supports_clipboard():
+                print("Clipboard operations enabled")
+                text = renderer.get_clipboard_text()
+            else:
+                print("Clipboard not available")
+        """
+        return True
+    
+    def get_clipboard_text(self) -> str:
+        """
+        Get plain-text content from the system clipboard.
+        
+        This method retrieves the current plain-text content from the macOS
+        system clipboard (pasteboard) using NSPasteboard APIs. If the clipboard
+        is empty, contains no text data, or clipboard access fails, this method
+        returns an empty string.
+        
+        The method handles all error conditions gracefully and never raises
+        exceptions.
+        
+        Returns:
+            str: Plain-text content from clipboard, or empty string if:
+                - Clipboard is empty
+                - Clipboard contains no text data (only images, files, etc.)
+                - Clipboard access fails (permissions, OS error, etc.)
+        
+        Implementation Details:
+            - Uses Cocoa.NSPasteboard.generalPasteboard() to access system clipboard
+            - Retrieves text using stringForType_(Cocoa.NSPasteboardTypeString)
+            - Returns empty string if clipboard is empty or contains no text
+            - Handles errors gracefully (returns empty string, logs error)
+        
+        Example:
+            text = renderer.get_clipboard_text()
+            if text:
+                print(f"Clipboard contains: {text}")
+            else:
+                print("Clipboard is empty")
+        """
+        try:
+            # Access the system clipboard
+            pasteboard = Cocoa.NSPasteboard.generalPasteboard()
+            
+            # Get string content from pasteboard
+            text = pasteboard.stringForType_(Cocoa.NSPasteboardTypeString)
+            
+            # Return text if available, otherwise empty string
+            return text if text else ""
+            
+        except Exception as e:
+            # Log error and return empty string
+            print(f"Error reading clipboard: {e}")
+            return ""
+    
+    def set_clipboard_text(self, text: str) -> bool:
+        """
+        Set plain-text content to the system clipboard.
+        
+        This method writes the specified plain-text string to the macOS
+        system clipboard (pasteboard) using NSPasteboard APIs, replacing
+        any existing content. The text can then be pasted into other
+        applications.
+        
+        The method handles all error conditions gracefully and never raises
+        exceptions.
+        
+        Args:
+            text: Plain-text string to write to clipboard. Can be empty string
+                 to clear the clipboard. All Unicode characters are supported,
+                 including newlines, tabs, and emoji.
+        
+        Returns:
+            bool: True if clipboard was updated successfully, False if:
+                - Clipboard write operation failed (permissions, OS error, etc.)
+        
+        Implementation Details:
+            - Uses Cocoa.NSPasteboard.generalPasteboard() to access system clipboard
+            - Clears existing content with clearContents()
+            - Writes text using setString_forType_(text, Cocoa.NSPasteboardTypeString)
+            - Returns True on success, False on failure
+            - Handles errors gracefully (returns False, logs error)
+        
+        Example:
+            # Copy text to clipboard
+            if renderer.set_clipboard_text("Hello, World!"):
+                print("Text copied to clipboard")
+            else:
+                print("Failed to copy text")
+            
+            # Clear clipboard
+            renderer.set_clipboard_text("")
+        """
+        try:
+            # Access the system clipboard
+            pasteboard = Cocoa.NSPasteboard.generalPasteboard()
+            
+            # Clear existing content
+            pasteboard.clearContents()
+            
+            # Write string to pasteboard
+            success = pasteboard.setString_forType_(text, Cocoa.NSPasteboardTypeString)
+            
+            # Return success status
+            return bool(success)
+            
+        except Exception as e:
+            # Log error and return False
+            print(f"Error writing clipboard: {e}")
+            return False
 
 
 # Define TTKWindowDelegate class for handling window events
@@ -2819,16 +2945,6 @@ if COCOA_AVAILABLE:
                     
                     # Update grid
                     self.backend.grid = new_grid
-                    
-                    # Clear attribute dictionary cache on resize
-                    # This ensures cached attribute dictionaries are rebuilt with new dimensions
-                    if hasattr(self.backend, '_attr_dict_cache') and self.backend._attr_dict_cache is not None:
-                        self.backend._attr_dict_cache.clear()
-                    
-                    # Clear attributed string cache on resize
-                    # This ensures cached NSAttributedString objects are rebuilt with new dimensions
-                    if hasattr(self.backend, '_attr_string_cache') and self.backend._attr_string_cache is not None:
-                        self.backend._attr_string_cache.clear()
                     
                     # Set flag to generate resize event in run_event_loop_iteration()
                     self.backend.resize_pending = True

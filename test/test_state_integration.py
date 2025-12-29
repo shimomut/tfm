@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
 """
 Integration test for TFM State Manager with main application
 
 Tests the integration of state management with the main TFM application.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_state_integration.py -v
 """
 
-import sys
+from pathlib import Path
 import tempfile
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 
@@ -268,8 +265,3 @@ def run_integration_tests():
         import traceback
         traceback.print_exc()
         return False
-
-
-if __name__ == "__main__":
-    success = run_integration_tests()
-    sys.exit(0 if success else 1)

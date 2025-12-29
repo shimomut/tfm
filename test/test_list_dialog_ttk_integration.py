@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
 """
 Test suite for ListDialog TTK integration
 Tests the migration from curses to TTK Renderer API
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_list_dialog_ttk_integration.py -v
 """
 
 import unittest
-import sys
 from unittest.mock import Mock, MagicMock, patch, call
 from ttk import TextAttribute, KeyCode, KeyEvent, ModifierKey, CharEvent
 
@@ -16,12 +16,10 @@ class TestListDialogTTKIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         # Import after setting up path
-        sys.path.insert(0, 'src')
         from tfm_list_dialog import ListDialog
         from tfm_path import Path
         self.ListDialog = ListDialog
         self.Path = Path
-        
         self.config = Mock()
         self.config.LIST_DIALOG_WIDTH_RATIO = 0.6
         self.config.LIST_DIALOG_HEIGHT_RATIO = 0.7
@@ -357,11 +355,9 @@ class TestListDialogHelpers(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         # Import after setting up path
-        sys.path.insert(0, 'src')
         from tfm_list_dialog import ListDialog, ListDialogHelpers
         self.ListDialog = ListDialog
         self.ListDialogHelpers = ListDialogHelpers
-        
         self.config = Mock()
         self.renderer = Mock()
         self.renderer.get_dimensions.return_value = (24, 80)
@@ -430,7 +426,3 @@ class TestListDialogHelpers(unittest.TestCase):
         self.assertTrue(self.list_dialog.is_active)
         self.assertEqual(self.list_dialog.title, "External Programs")
         self.assertEqual(len(self.list_dialog.items), 2)
-
-
-if __name__ == '__main__':
-    unittest.main()

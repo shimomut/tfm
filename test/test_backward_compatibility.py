@@ -1,17 +1,15 @@
-#!/usr/bin/env python3
 """
 Test backward compatibility of add_message() routing through logging infrastructure.
 
 This test verifies that the legacy add_message() method correctly routes messages
 through the new logging infrastructure, ensuring consistent handling with logger messages.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_backward_compatibility.py -v
 """
 
 import sys
 import logging
 from collections import deque
-
-# Add src to path
-sys.path.insert(0, 'src')
 
 from tfm_log_manager import LogManager, LoggingConfig
 
@@ -27,7 +25,7 @@ def test_add_message_routes_through_logging():
     
     # Create LogManager with log pane enabled, no remote monitoring
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None, debug_mode=False)
+    log_manager = LogManager(config, remote_port=None)
     
     # Verify LogPaneHandler is created
     assert log_manager._log_pane_handler is not None, "LogPaneHandler should be created"
@@ -68,7 +66,7 @@ def test_add_message_error_source_uses_warning_level():
     
     # Create LogManager
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None, debug_mode=False)
+    log_manager = LogManager(config, remote_port=None)
     
     # Add an error message
     log_manager.add_message("ERROR", "This is an error message")
@@ -97,7 +95,7 @@ def test_add_message_reaches_all_handlers():
     
     # Create LogManager with stream output enabled
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None, debug_mode=True)
+    log_manager = LogManager(config, remote_port=None)
     
     # Verify both handlers are created
     assert log_manager._log_pane_handler is not None, "LogPaneHandler should be created"
@@ -142,7 +140,7 @@ def test_add_startup_messages_uses_add_message():
     
     # Create LogManager
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None, debug_mode=False)
+    log_manager = LogManager(config, remote_port=None)
     
     # Add startup messages
     log_manager.add_startup_messages("1.0.0", "https://github.com/test/repo", "TestApp")
@@ -179,7 +177,7 @@ def test_backward_compatibility_with_existing_code():
     
     # Create LogManager
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None, debug_mode=False)
+    log_manager = LogManager(config, remote_port=None)
     
     # Simulate existing code patterns
     log_manager.add_message("FileOp", "File copied successfully")
@@ -199,27 +197,3 @@ def test_backward_compatibility_with_existing_code():
     # Clean up
     log_manager.restore_stdio()
     print("✓ Test passed: Backward compatibility maintained")
-
-
-if __name__ == "__main__":
-    print("Testing backward compatibility routing...")
-    
-    try:
-        test_add_message_routes_through_logging()
-        test_add_message_error_source_uses_warning_level()
-        test_add_message_reaches_all_handlers()
-        test_add_startup_messages_uses_add_message()
-        test_backward_compatibility_with_existing_code()
-        
-        print("\n" + "="*70)
-        print("✓ All backward compatibility tests passed!")
-        print("="*70)
-        
-    except AssertionError as e:
-        print(f"\n✗ Test failed: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n✗ Unexpected error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

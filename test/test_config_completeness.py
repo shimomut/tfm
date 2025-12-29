@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test Configuration Completeness
 Verifies that all configuration parameters are properly defined
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_config_completeness.py -v
 """
 
-import unittest
-import sys
 from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+import unittest
 
 from tfm_config import DefaultConfig
 from _config import Config
-
 
 class TestConfigCompleteness(unittest.TestCase):
     """Test that all configuration parameters are properly defined"""
@@ -149,21 +145,6 @@ class TestConfigCompleteness(unittest.TestCase):
                 
                 self.assertEqual(default_value, user_value, 
                                f"{setting} should have same value in both configs")
-    
-    def test_jump_dialog_can_use_config_values(self):
-        """Test that jump dialog can access its configuration values"""
-        from tfm_jump_dialog import JumpDialog
-        
-        # Test with default config
-        jump_dialog_default = JumpDialog(self.default_config)
-        self.assertEqual(jump_dialog_default.max_directories, 
-                        self.default_config.MAX_JUMP_DIRECTORIES)
-        
-        # Test with user config
-        jump_dialog_user = JumpDialog(self.user_config)
-        self.assertEqual(jump_dialog_user.max_directories, 
-                        self.user_config.MAX_JUMP_DIRECTORIES)
-
 
 def run_config_tests():
     """Run all configuration tests"""
@@ -191,7 +172,3 @@ def run_config_tests():
             print(traceback)
     
     return result.wasSuccessful()
-
-
-if __name__ == '__main__':
-    run_config_tests()

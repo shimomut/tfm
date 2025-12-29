@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test script to verify the file operations refactoring works correctly
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_file_operations_refactoring.py -v
 """
 
-import sys
-import os
 import tempfile
 import shutil
 from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_file_operations import FileOperations, FileOperationsUI
 from tfm_path import Path as TFMPath
@@ -214,8 +210,3 @@ def main():
         import traceback
         traceback.print_exc()
         return False
-
-
-if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)

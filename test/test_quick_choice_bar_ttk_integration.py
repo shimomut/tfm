@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Tests for QuickChoiceBar TTK integration
 Verifies that QuickChoiceBar uses TTK Renderer API correctly
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_quick_choice_bar_ttk_integration.py -v
 """
 
 import unittest
-import sys
-from pathlib import Path
 from unittest.mock import Mock, MagicMock, call
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from ttk import KeyCode, TextAttribute, KeyEvent
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
@@ -299,7 +295,3 @@ class TestQuickChoiceBarHelpers(unittest.TestCase):
         args = qcb.show.call_args[0]
         self.assertIn("2", args[0])
         self.assertIn("selected items", args[0])
-
-
-if __name__ == '__main__':
-    unittest.main()

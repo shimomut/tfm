@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test S3 Caching Optimization
 
 This test verifies that the S3 caching optimization reduces API calls
 during directory listing and file stat operations.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_caching_optimization.py -v
 """
 
-import sys
-import os
 import time
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
     from tfm_path import Path
@@ -223,7 +219,3 @@ class TestS3CachingOptimization(unittest.TestCase):
 def main():
     """Run the tests"""
     unittest.main(verbosity=2)
-
-
-if __name__ == '__main__':
-    main()

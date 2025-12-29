@@ -1,17 +1,14 @@
-#!/usr/bin/env python3
 """
 Test file for SearchDialog empty pattern behavior
 Tests that running searches are cancelled when pattern becomes empty
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_empty_pattern.py -v
 """
 
-import sys
+from pathlib import Path
 import time
 import tempfile
 import shutil
-from pathlib import Path
-
-# Add src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_search_dialog import SearchDialog
 from tfm_config import DefaultConfig
@@ -309,7 +306,3 @@ def main():
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

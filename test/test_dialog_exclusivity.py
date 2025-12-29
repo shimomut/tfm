@@ -1,13 +1,10 @@
-#!/usr/bin/env python3
 """
 Test script to verify dialog mode exclusivity
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_exclusivity.py -v
 """
 
 # Add src directory to Python path
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
 def test_dialog_exclusivity_logic():
     """Test the logic for dialog mode exclusivity"""
     print("Dialog Mode Exclusivity Test")
@@ -142,19 +139,3 @@ def test_specific_conflict():
     print("• Help dialog remains focused")
     
     return True
-
-if __name__ == "__main__":
-    print("TFM Dialog Exclusivity Verification")
-    print("=" * 40)
-    
-    success1 = test_dialog_exclusivity_logic()
-    success2 = test_specific_conflict()
-    
-    if success1 and success2:
-        print("\n🎉 All dialog exclusivity tests passed!")
-        print("\nThe fix ensures that:")
-        print("✓ Help dialog and search mode are mutually exclusive")
-        print("✓ No regular key processing when dialogs are open")
-        print("✓ Clean, predictable user experience")
-    else:
-        print("\n❌ Some tests failed!")

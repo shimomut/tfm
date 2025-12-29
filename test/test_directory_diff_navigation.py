@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Unit tests for DirectoryDiffViewer keyboard navigation.
 
 Tests the handle_key_event method to ensure proper cursor movement,
 scrolling, and expand/collapse functionality.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_diff_navigation.py -v
 """
 
 import unittest
-import sys
-import os
 from unittest.mock import Mock, MagicMock
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_directory_diff_viewer import (
     DirectoryDiffViewer,
@@ -391,7 +387,3 @@ class TestDirectoryDiffNavigation(unittest.TestCase):
         self.assertEqual(self.viewer.visible_nodes[0].name, "parent")
         self.assertEqual(self.viewer.visible_nodes[1].name, "identical.txt")
         self.assertEqual(self.viewer.visible_nodes[2].name, "different.txt")
-
-
-if __name__ == '__main__':
-    unittest.main()

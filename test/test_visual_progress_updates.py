@@ -1,17 +1,14 @@
-#!/usr/bin/env python3
 """
 Test visual progress updates during delete operations
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_visual_progress_updates.py -v
 """
 
-import sys
 import os
 import tempfile
 import time
 from pathlib import Path
 from unittest.mock import Mock, MagicMock
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_progress_manager import ProgressManager, OperationType
 
@@ -251,9 +248,3 @@ def test_progress_callback_frequency():
         assert duration > 0.5, f"Operation should take at least 0.5 seconds with delays, took {duration:.2f}"
         
         print("✅ Progress callback frequency test passed!")
-
-
-if __name__ == "__main__":
-    test_visual_progress_updates()
-    test_progress_callback_frequency()
-    print("\n🎉 All visual progress tests passed!")

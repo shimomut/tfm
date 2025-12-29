@@ -4,16 +4,13 @@ Unit tests for drag-and-drop error handling.
 This module tests error scenarios and user feedback for drag-and-drop operations,
 including error messages for remote files, archive contents, missing files, and
 too many files.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_drag_error_handling.py -v
 """
 
-import os
-import sys
-import pytest
 from pathlib import Path
+import pytest
 from unittest.mock import Mock, MagicMock, patch
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_drag_payload import DragPayloadBuilder
 from tfm_drag_session import DragSessionManager, DragState
@@ -301,7 +298,3 @@ class TestDragErrorRecovery:
         # This test would be in the FileManager integration tests
         # but we document the expected behavior here
         pass
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

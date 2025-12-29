@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Tests for ArchivePathImpl class
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_path_impl.py -v
 """
 
-import os
-import sys
 import tempfile
 import zipfile
 import tarfile
 from pathlib import Path as PathlibPath
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_archive import ArchivePathImpl

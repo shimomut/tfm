@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Integration test for log redraw trigger functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_log_redraw_integration.py -v
 """
 
 import unittest
-import sys
-import os
 from unittest.mock import Mock, patch
-
-# Add src directory to Python path for testing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 class TestLogRedrawIntegration(unittest.TestCase):
     """Test integration of log redraw trigger with main application logic"""
@@ -199,6 +195,3 @@ class TestLogRedrawIntegration(unittest.TestCase):
         
         # Clean up
         log_manager.restore_stdio()
-
-if __name__ == '__main__':
-    unittest.main()

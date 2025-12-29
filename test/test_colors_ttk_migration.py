@@ -1,16 +1,8 @@
 """
 Test color system migration to TTK
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_colors_ttk_migration.py -v
 """
-import sys
-from pathlib import Path
-
-# Add src to path
-src_path = Path(__file__).parent.parent / 'src'
-sys.path.insert(0, str(src_path))
-
-# Add ttk to path
-ttk_path = Path(__file__).parent.parent / 'ttk'
-sys.path.insert(0, str(ttk_path))
 
 from tfm_colors import (
     init_colors,
@@ -228,17 +220,3 @@ def test_rgb_color_values():
     assert dir_fg[1] > 150, "Directory color G component should be high"
     
     print("✓ RGB color values test passed")
-
-
-if __name__ == '__main__':
-    print("Testing TFM color system migration to TTK...")
-    print()
-    
-    test_init_colors_dark_scheme()
-    test_init_colors_light_scheme()
-    test_color_helper_functions_return_tuples()
-    test_selected_file_colors()
-    test_rgb_color_values()
-    
-    print()
-    print("All color system tests passed! ✓")

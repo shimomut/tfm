@@ -940,6 +940,188 @@ class Renderer(ABC):
         """
         pass
 
+    @abstractmethod
+    def supports_clipboard(self) -> bool:
+        """
+        Query whether this backend supports clipboard operations.
+        
+        This method allows applications to detect clipboard support capabilities
+        at runtime and adapt their behavior accordingly. Clipboard support is
+        typically only available in desktop mode (e.g., CoreGraphics backend
+        on macOS) and not in terminal mode (e.g., curses backend).
+        
+        Applications should call this method before attempting clipboard operations
+        to determine if clipboard features should be enabled. If this returns False,
+        the application should not attempt to read from or write to the clipboard.
+        
+        Returns:
+            bool: True if clipboard operations are available, False otherwise.
+        
+        Platform Support:
+            - macOS (CoreGraphics): True - uses NSPasteboard for clipboard access
+            - Terminal (Curses): False - clipboard not supported
+            - Windows (future): True - will use Win32 clipboard APIs
+            - Linux (future): True - will use X11/Wayland clipboard protocols
+        
+        Note: The default implementation should return False. Desktop backends
+        that support clipboard should override this to return True.
+        
+        Example:
+            if renderer.supports_clipboard():
+                # Enable copy/paste menu items
+                text = renderer.get_clipboard_text()
+                print(f"Clipboard contains: {text}")
+            else:
+                # Disable clipboard features
+                print("Clipboard not available")
+        """
+        pass
+    
+    @abstractmethod
+    def get_clipboard_text(self) -> str:
+        """
+        Get plain-text content from the system clipboard.
+        
+        This method retrieves the current plain-text content from the system
+        clipboard (pasteboard on macOS). If the clipboard is empty, contains
+        no text data, or clipboard access fails, this method returns an empty
+        string.
+        
+        The method handles all error conditions gracefully and never raises
+        exceptions. Applications can safely call this method without try-except
+        blocks.
+        
+        Returns:
+            str: Plain-text content from clipboard, or empty string if:
+                - Clipboard is empty
+                - Clipboard contains no text data (only images, files, etc.)
+                - Clipboard access fails (permissions, OS error, etc.)
+                - Backend doesn't support clipboard (terminal mode)
+        
+        Platform-Specific Behavior:
+            macOS (CoreGraphics):
+                - Uses NSPasteboard.generalPasteboard() to access system clipboard
+                - Retrieves NSPasteboardTypeString (UTF-8 plain text)
+                - Automatically converts rich text to plain text when available
+                - Returns empty string on error, logs error message
+            
+            Terminal (Curses):
+                - Always returns empty string (clipboard not supported)
+                - No error logging (expected behavior)
+            
+            Windows (future):
+                - Will use GetClipboardData(CF_UNICODETEXT)
+                - Converts UTF-16 to UTF-8
+            
+            Linux (future):
+                - Will use X11 CLIPBOARD selection or Wayland data device
+                - Handles text/plain MIME type
+        
+        Encoding:
+            - All text is returned as UTF-8 encoded Python strings
+            - Line endings are preserved as-is (no normalization)
+            - All Unicode characters are supported (including emoji)
+        
+        Note: This method should be called only if supports_clipboard() returns
+        True. Calling it on backends without clipboard support will return an
+        empty string but is safe and will not raise exceptions.
+        
+        Example:
+            # Check clipboard support first
+            if renderer.supports_clipboard():
+                text = renderer.get_clipboard_text()
+                if text:
+                    print(f"Clipboard contains: {text}")
+                else:
+                    print("Clipboard is empty")
+            
+            # Safe to call without checking (returns empty string if unsupported)
+            text = renderer.get_clipboard_text()
+            if text:
+                paste_text_into_editor(text)
+        """
+        pass
+    
+    @abstractmethod
+    def set_clipboard_text(self, text: str) -> bool:
+        """
+        Set plain-text content to the system clipboard.
+        
+        This method writes the specified plain-text string to the system
+        clipboard (pasteboard on macOS), replacing any existing content.
+        The text can then be pasted into other applications.
+        
+        The method handles all error conditions gracefully and never raises
+        exceptions. Applications can safely call this method without try-except
+        blocks.
+        
+        Args:
+            text: Plain-text string to write to clipboard. Can be empty string
+                 to clear the clipboard. All Unicode characters are supported,
+                 including newlines, tabs, and emoji.
+        
+        Returns:
+            bool: True if clipboard was updated successfully, False if:
+                - Clipboard write operation failed (permissions, OS error, etc.)
+                - Backend doesn't support clipboard (terminal mode)
+        
+        Platform-Specific Behavior:
+            macOS (CoreGraphics):
+                - Uses NSPasteboard.generalPasteboard() to access system clipboard
+                - Clears existing content with clearContents()
+                - Writes text as NSPasteboardTypeString (UTF-8 plain text)
+                - Returns True on success, False on error (logs error message)
+            
+            Terminal (Curses):
+                - Always returns False (clipboard not supported)
+                - No error logging (expected behavior)
+            
+            Windows (future):
+                - Will use SetClipboardData(CF_UNICODETEXT)
+                - Converts UTF-8 to UTF-16
+            
+            Linux (future):
+                - Will use X11 CLIPBOARD selection or Wayland data device
+                - Sets text/plain MIME type
+        
+        Encoding:
+            - Input text should be UTF-8 encoded Python strings
+            - Line endings are preserved as-is (no normalization)
+            - All Unicode characters are supported (including emoji)
+            - Empty string is valid and clears the clipboard
+        
+        Special Characters:
+            - Newlines (\n) are preserved
+            - Tabs (\t) are preserved
+            - Unicode characters (emoji, accented letters, etc.) are preserved
+            - No character escaping or transformation is performed
+        
+        Note: This method should be called only if supports_clipboard() returns
+        True. Calling it on backends without clipboard support will return False
+        but is safe and will not raise exceptions.
+        
+        Example:
+            # Check clipboard support first
+            if renderer.supports_clipboard():
+                if renderer.set_clipboard_text("Hello, World!"):
+                    print("Text copied to clipboard")
+                else:
+                    print("Failed to copy text")
+            
+            # Copy selected text to clipboard
+            selected_text = get_selected_text()
+            if renderer.set_clipboard_text(selected_text):
+                show_status_message("Copied to clipboard")
+            
+            # Clear clipboard
+            renderer.set_clipboard_text("")
+            
+            # Copy text with special characters
+            text_with_newlines = "Line 1\nLine 2\nLine 3"
+            renderer.set_clipboard_text(text_with_newlines)
+        """
+        pass
+
     def is_desktop_mode(self) -> bool:
         """
         Check if the renderer is running in desktop mode.

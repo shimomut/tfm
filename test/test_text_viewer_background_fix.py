@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test for TextViewer background color fix
 
 This test verifies that the TextViewer properly fills empty areas with the 
 background color instead of leaving them with the default terminal background.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_text_viewer_background_fix.py -v
 """
 
 import os
-import sys
 import curses
 from ttk import KeyEvent, KeyCode, ModifierKey
 import tempfile
-from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 def test_text_viewer_background_fix(stdscr):
     """Test that TextViewer fills empty areas with proper background color"""
@@ -112,6 +108,3 @@ def main():
         print(f"✗ TextViewer background color fix test failed: {e}")
         return 1
     return 0
-
-if __name__ == "__main__":
-    sys.exit(main())

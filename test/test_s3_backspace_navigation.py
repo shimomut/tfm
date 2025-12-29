@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Integration test for S3 Backspace key navigation in TFM
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_backspace_navigation.py -v
+"""
 
 from tfm_path import Path
 
@@ -105,7 +102,3 @@ def test_s3_backspace_navigation():
         print("\n💥 Some tests failed!")
         
     return all_passed
-
-if __name__ == "__main__":
-    success = test_s3_backspace_navigation()
-    sys.exit(0 if success else 1)

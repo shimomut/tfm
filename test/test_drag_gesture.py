@@ -1,14 +1,11 @@
 """
 Tests for drag gesture detector.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_drag_gesture.py -v
 """
 
-import os
-import sys
 import pytest
 import time
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_drag_gesture import DragGestureDetector
 

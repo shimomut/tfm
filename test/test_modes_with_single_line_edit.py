@@ -1,21 +1,18 @@
-#!/usr/bin/env python3
 """
 Test script to verify that all modes are using SingleLineTextEdit correctly
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_modes_with_single_line_edit.py -v
 """
 
 import sys
-import os
 import unittest.mock
 
 # Mock curses before importing anything else
 sys.modules['curses'] = unittest.mock.MagicMock()
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_main import FileManager
 from tfm_single_line_text_edit import SingleLineTextEdit
 import tempfile
-from pathlib import Path
 
 def test_modes_use_single_line_edit():
     """Test that all modes are using SingleLineTextEdit instances"""
@@ -83,19 +80,3 @@ def test_modes_use_single_line_edit():
         print("✓ All dialog components properly integrated")
         
         return True
-
-if __name__ == "__main__":
-    try:
-        print("Starting test...")
-        result = test_modes_use_single_line_edit()
-        if result:
-            print("\n🎉 All tests passed! TFM modes successfully updated.")
-        else:
-            print("\n❌ Test failed!")
-            sys.exit(1)
-    except Exception as e:
-        import traceback
-        print(f"\n❌ Test failed: {e}")
-        print("\nFull traceback:")
-        traceback.print_exc()
-        sys.exit(1)

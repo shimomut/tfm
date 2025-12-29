@@ -1,27 +1,25 @@
-#!/usr/bin/env python3
 """
 Test dialog inheritance from BaseListDialog
 
 This test verifies that all list-based dialog classes properly inherit
 from BaseListDialog and have access to common functionality.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_inheritance.py -v
 """
 
+from pathlib import Path
 import sys
-sys.path.insert(0, 'src')
-
 from tfm_base_list_dialog import BaseListDialog
 from tfm_batch_rename_dialog import BatchRenameDialog
 from tfm_info_dialog import InfoDialog
 from tfm_list_dialog import ListDialog
-from tfm_jump_dialog import JumpDialog
+
 from tfm_search_dialog import SearchDialog
 from tfm_drives_dialog import DrivesDialog
-
 
 class MockConfig:
     """Mock configuration for testing"""
     pass
-
 
 def test_dialog_inheritance():
     """Test that all dialog classes inherit from BaseListDialog"""
@@ -32,7 +30,7 @@ def test_dialog_inheritance():
         ('BatchRenameDialog', BatchRenameDialog),
         ('InfoDialog', InfoDialog),
         ('ListDialog', ListDialog),
-        ('JumpDialog', JumpDialog),
+        ('JumpDialog'),
         ('SearchDialog', SearchDialog),
         ('DrivesDialog', DrivesDialog)
     ]
@@ -60,7 +58,6 @@ def test_dialog_inheritance():
         print("✗ Some dialog classes do not inherit from BaseListDialog")
         return False
 
-
 def test_common_attributes():
     """Test that dialogs have common attributes from BaseListDialog"""
     config = MockConfig()
@@ -87,7 +84,6 @@ def test_common_attributes():
     print("=" * 60)
     print("✓ All dialogs have common attributes from BaseListDialog")
     return True
-
 
 def test_exit_method():
     """Test that exit method properly calls parent class"""
@@ -123,22 +119,3 @@ def test_exit_method():
     print("=" * 60)
     print("✓ Exit method properly resets parent class attributes")
     return True
-
-
-if __name__ == '__main__':
-    print("Dialog Inheritance Test Suite")
-    print("=" * 60)
-    print()
-    
-    # Run all tests
-    test1 = test_dialog_inheritance()
-    test2 = test_common_attributes()
-    test3 = test_exit_method()
-    
-    print("\n" + "=" * 60)
-    if test1 and test2 and test3:
-        print("✓ All tests passed!")
-        sys.exit(0)
-    else:
-        print("✗ Some tests failed")
-        sys.exit(1)

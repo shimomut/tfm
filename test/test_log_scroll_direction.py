@@ -1,13 +1,10 @@
-#!/usr/bin/env python3
 """
 Test script to verify log scroll direction fix
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_log_scroll_direction.py -v
 """
 
 import sys
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 def test_log_scroll_direction():
     """Test that log scroll directions work correctly"""
@@ -127,7 +124,3 @@ def main():
     else:
         print("✗ Some tests failed!")
         return False
-
-if __name__ == '__main__':
-    success = main()
-    sys.exit(0 if success else 1)

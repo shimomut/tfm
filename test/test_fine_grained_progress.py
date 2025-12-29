@@ -1,17 +1,14 @@
-#!/usr/bin/env python3
 """
 Test fine-grained progress tracking for file operations
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_fine_grained_progress.py -v
 """
 
-import sys
 import os
 import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import Mock
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_progress_manager import ProgressManager, OperationType
 
@@ -328,10 +325,3 @@ def test_progress_granularity():
         assert len(numbered_files) >= 10, f"Should see multiple numbered files, got {len(numbered_files)}"
     
     print("✅ Progress granularity test passed!")
-
-
-if __name__ == "__main__":
-    test_file_counting()
-    test_fine_grained_copy_progress()
-    test_progress_granularity()
-    print("\n🎉 All fine-grained progress tests passed!")

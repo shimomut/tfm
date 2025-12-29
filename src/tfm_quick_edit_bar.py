@@ -30,7 +30,7 @@ class QuickEditBar:
         self.content_changed = True  # Track if content needs redraw
         
         # Status line input dialog state
-        self.text_editor = SingleLineTextEdit()
+        self.text_editor = SingleLineTextEdit(renderer=renderer)
         self.prompt_text = ""
         self.help_text = ""
         self.callback = None

@@ -1,24 +1,20 @@
-#!/usr/bin/env python3
 """
 Test narrow terminal dialog rendering fixes
 
 This test verifies that all dialogs handle narrow terminals correctly
 after the width calculation fixes.
-"""
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_narrow_terminal_rendering.py -v
+"""
 
 import unittest
 from unittest.mock import Mock, patch
 from tfm_batch_rename_dialog import BatchRenameDialog
 from tfm_drives_dialog import DrivesDialog
 from tfm_list_dialog import ListDialog
-from tfm_jump_dialog import JumpDialog
+
 from tfm_search_dialog import SearchDialog
 from tfm_path import Path as TfmPath
-
 
 class TestAllDialogsNarrowTerminalFix(unittest.TestCase):
     """Test that all dialogs handle narrow terminals correctly"""
@@ -291,7 +287,3 @@ class TestAllDialogsNarrowTerminalFix(unittest.TestCase):
                 
                 # Verify bounds
                 self._verify_drawing_bounds(mock_safe_addstr, terminal_width, terminal_height)
-
-
-if __name__ == '__main__':
-    unittest.main()

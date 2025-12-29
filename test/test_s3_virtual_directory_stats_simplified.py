@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test S3 Virtual Directory Stats Simplified
 
 This test verifies that the simplified _get_virtual_directory_stats() method
 works correctly with the new metadata caching system.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_virtual_directory_stats_simplified.py -v
 """
 
-import sys
-import os
 import time
 import unittest
 from unittest.mock import Mock, patch
 from datetime import datetime
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
     from tfm_path import Path
@@ -212,7 +208,3 @@ class TestS3VirtualDirectoryStatsSimplified(unittest.TestCase):
 def main():
     """Run the tests"""
     unittest.main(verbosity=2)
-
-
-if __name__ == '__main__':
-    main()

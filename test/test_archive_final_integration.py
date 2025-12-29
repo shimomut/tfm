@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Final integration testing for archive virtual directory feature.
 Tests all archive formats, edge cases, and platform compatibility.
@@ -10,18 +9,15 @@ Requirements tested:
 - Archives with many files (>10,000 simulated)
 - Special characters in filenames
 - Cross-platform compatibility
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_final_integration.py -v
 """
 
-import os
-import sys
 import tempfile
 import zipfile
 import tarfile
 import shutil
 from pathlib import Path as PathlibPath
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_archive import ArchiveOperations, ArchivePathImpl, ArchiveHandler
@@ -699,8 +695,3 @@ def run_all_tests():
     
     print()
     return results.summary()
-
-
-if __name__ == '__main__':
-    success = run_all_tests()
-    sys.exit(0 if success else 1)

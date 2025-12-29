@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test for background color fix - verifying bkgd() replacement with addstr() approach
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_background_color.py -v
 """
 
-import sys
-import os
 import curses
 from ttk import KeyEvent, KeyCode, ModifierKey
 import time
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 def test_background_color_fix(stdscr):
     """Test the new background color approach without using bkgd()"""
@@ -75,6 +71,3 @@ def main():
         return 1
     
     return 0
-
-if __name__ == "__main__":
-    sys.exit(main())

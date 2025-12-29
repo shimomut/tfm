@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test script for cursor movement in batch rename functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_movement.py -v
 """
 
 def test_cursor_operations():
@@ -62,7 +63,3 @@ def test_field_switching():
     # Simulate switching fields
     print(f"Switch to dest: cursor bounded to {min(dest_cursor, len(dest_text))}")
     print(f"Switch to regex: cursor bounded to {min(regex_cursor, len(regex_text))}")
-
-if __name__ == "__main__":
-    test_cursor_operations()
-    test_field_switching()

@@ -3,16 +3,13 @@ Test that the simplified handle_input method correctly delegates to UILayerStack
 
 This test verifies that task 14 (Remove if-elif chains from handle_input) was
 completed successfully by ensuring event routing goes through the layer stack.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_handle_input_simplification.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch
-from pathlib import Path
-import sys
 import inspect
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from ttk import KeyEvent, CharEvent, KeyCode
 from tfm_main import FileManager
@@ -219,7 +216,3 @@ class TestHandleInputSimplification(unittest.TestCase):
         """Test that get_active_text_widget method was removed"""
         # Verify the method no longer exists
         self.assertFalse(hasattr(self.file_manager, 'get_active_text_widget'))
-
-
-if __name__ == '__main__':
-    unittest.main()

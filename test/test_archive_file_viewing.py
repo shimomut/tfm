@@ -1,22 +1,19 @@
-#!/usr/bin/env python3
 """
 Tests for archive file viewing support in TextViewer.
 
 This test verifies that the TextViewer can properly display files
 from within archive files using the archive:// URI scheme.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_file_viewing.py -v
 """
 
+import sys
 import unittest
 import tempfile
 import zipfile
 import tarfile
-import os
-import sys
 from pathlib import Path as PathlibPath
 from unittest.mock import Mock, patch, MagicMock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Mock curses before importing tfm modules
 sys.modules['curses'] = MagicMock()
@@ -283,7 +280,3 @@ class TestArchiveFileViewing(unittest.TestCase):
                 self.assertEqual(len(viewer.lines), 1000)
                 self.assertEqual(viewer.lines[0], "Line 0")
                 self.assertEqual(viewer.lines[999], "Line 999")
-
-
-if __name__ == '__main__':
-    unittest.main()

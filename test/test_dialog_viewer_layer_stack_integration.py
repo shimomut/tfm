@@ -5,17 +5,15 @@ This test verifies task 16 of the UI Layer Stack implementation:
 - All show_*_dialog() methods push dialogs onto the layer stack
 - All create_*_viewer() methods push viewers onto the layer stack
 - self.active_viewer variable has been removed
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_viewer_layer_stack_integration.py -v
 """
 
+import os
 import unittest
 from unittest.mock import Mock, MagicMock, patch, PropertyMock
 from pathlib import Path
 import tempfile
-import os
-import sys
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_main import FileManager
 
@@ -234,7 +232,3 @@ class TestDialogViewerLayerStackIntegration(unittest.TestCase):
         # Top layer should be viewer
         top_layer = self.file_manager.ui_layer_stack.get_top_layer()
         self.assertIs(top_layer, viewer)
-
-
-if __name__ == '__main__':
-    unittest.main()

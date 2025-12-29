@@ -1,14 +1,11 @@
 """
 Tests for Adaptive FPS Manager
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_adaptive_fps.py -v
 """
 
 import unittest
 import time
-import sys
-import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.tfm_adaptive_fps import AdaptiveFPSManager
 
@@ -87,7 +84,3 @@ class TestAdaptiveFPSManager(unittest.TestCase):
                     self.assertEqual(level_timeout, expected_timeout,
                                    f"FPS {fps} should have timeout {expected_timeout}ms")
                     break
-
-
-if __name__ == '__main__':
-    unittest.main()

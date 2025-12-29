@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Test file for integration of extended key bindings with TFM main functionality.
-"""
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_main_integration.py -v
+"""
 
 import unittest
 from unittest.mock import Mock, patch
@@ -144,7 +141,3 @@ class TestMainIntegration(unittest.TestCase):
         self.file_manager.left_pane['selected_files'] = {'/path/to/file.txt'}
         self.assertFalse(self.file_manager.is_key_for_action_original(ord('z'), 'copy_files'))
         self.assertFalse(self.file_manager.is_key_for_action(ord('z'), 'copy_files'))
-
-
-if __name__ == '__main__':
-    unittest.main()

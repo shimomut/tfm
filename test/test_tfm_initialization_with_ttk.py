@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Integration tests for TFM initialization with TTK renderer.
 
@@ -7,15 +6,12 @@ Tests Task 6: Test TFM initialization with TTK
 - Verify initialization works
 - Check for errors
 - Run basic smoke tests
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_tfm_initialization_with_ttk.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-import sys
-from pathlib import Path
-
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from ttk.renderer import Renderer
 from ttk import KeyEvent, KeyCode
@@ -345,7 +341,3 @@ class TestTFMWithCursesBackend(unittest.TestCase):
                             # Verify FileManager was created successfully
                             self.assertIsNotNone(fm)
                             self.assertEqual(fm.renderer, backend)
-
-
-if __name__ == '__main__':
-    unittest.main()

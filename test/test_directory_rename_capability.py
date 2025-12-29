@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test directory rename capability functionality.
 
 This test verifies that the new supports_directory_rename() method
 works correctly for different path implementations.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_rename_capability.py -v
 """
 
 import unittest
 from unittest.mock import Mock
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path, LocalPathImpl
 from tfm_s3 import S3PathImpl
@@ -76,7 +72,3 @@ class TestDirectoryRenameCapability(unittest.TestCase):
 def run_test():
     """Run the test"""
     unittest.main(verbosity=2)
-
-
-if __name__ == '__main__':
-    run_test()

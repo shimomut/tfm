@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test for remote path cleanup optimization.
 
 This test verifies that the cleanup_non_existing_directories() function
 skips existence checks for remote storage paths to improve performance.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_remote_path_cleanup_optimization.py -v
 """
 
-import sys
-import os
 import time
 from unittest.mock import patch
-
-# Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_state_manager import TFMStateManager
 from tfm_path import Path
@@ -131,16 +127,3 @@ def test_performance_improvement():
     assert len(cleaned_history) == 20, f"Expected 20 entries, got {len(cleaned_history)}"
     
     print("✓ Performance optimization working - remote paths skipped")
-
-
-if __name__ == "__main__":
-    try:
-        test_remote_path_cleanup_optimization()
-        test_performance_improvement()
-        print("\n✅ All remote path cleanup optimization tests passed!")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test color coding implementation for logging system.
 
@@ -6,16 +5,14 @@ Tests that:
 1. LogPaneHandler.get_color_for_record() returns correct colors for different log levels
 2. LogPaneHandler.get_color_for_record() returns correct colors for stdout/stderr
 3. draw_log_pane() uses colors from records
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_color_coding.py -v
 """
 
 import unittest
 import logging
-import sys
 from unittest.mock import Mock, MagicMock, patch
 from collections import deque
-
-# Add src to path
-sys.path.insert(0, 'src')
 
 from tfm_logging_handlers import LogPaneHandler
 from tfm_log_manager import LogManager
@@ -196,7 +193,7 @@ class TestColorCoding(unittest.TestCase):
         mock_config.MAX_LOG_MESSAGES = 100
         
         # Create LogManager
-        log_manager = LogManager(mock_config, remote_port=None, debug_mode=False)
+        log_manager = LogManager(mock_config, remote_port=None)
         
         # Create a logger and emit a message
         logger = log_manager.getLogger("TestLogger")
@@ -221,7 +218,3 @@ class TestColorCoding(unittest.TestCase):
                 color_pair = call_args.kwargs['color_pair']
                 # ERROR level should use ERROR color (red)
                 self.assertEqual(color_pair, COLOR_ERROR)
-
-
-if __name__ == '__main__':
-    unittest.main()

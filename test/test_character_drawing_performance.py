@@ -6,16 +6,15 @@ creating a maximum workload scenario with a full 24x80 grid of non-space
 characters with various attributes.
 
 Requirements tested: 4.1, 4.2, 4.3, 4.4, 4.5
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_character_drawing_performance.py -v
 """
 
-import sys
 import time
 from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
     from ttk.renderer import TextAttribute
@@ -158,7 +157,7 @@ def run_baseline_test():
     print("Creating CoreGraphics backend...")
     backend = CoreGraphicsBackend(
         window_title="Character Drawing Performance Test",
-        font_name="Menlo",
+        font_names=["Menlo"],
         font_size=12,
         rows=24,
         cols=80
@@ -205,8 +204,3 @@ def run_baseline_test():
         print("\nCleaning up...")
         backend.shutdown()
         print("Test complete.")
-
-
-if __name__ == "__main__":
-    success = run_baseline_test()
-    sys.exit(0 if success else 1)

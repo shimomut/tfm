@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test priority-based matching in FILE_ASSOCIATIONS
 
 FILE_ASSOCIATIONS is checked from top to bottom.
 First matching entry wins.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_priority_matching.py -v
 """
 
-import sys
-import os
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 
 def test_priority_matching():
@@ -215,7 +211,3 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

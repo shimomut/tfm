@@ -991,6 +991,10 @@ class FileManager(UILayer):
             return self._action_paste()
         elif item_id == MenuManager.EDIT_SELECT_ALL:
             return self._action_select_all()
+        elif item_id == MenuManager.EDIT_COPY_NAMES:
+            return self._action_copy_names()
+        elif item_id == MenuManager.EDIT_COPY_PATHS:
+            return self._action_copy_paths()
         
         # View menu
         elif item_id == MenuManager.VIEW_SHOW_HIDDEN:
@@ -1124,6 +1128,92 @@ class FileManager(UILayer):
         """Select all items."""
         self.select_all()
         return True
+    
+    def _action_copy_names(self):
+        """Copy file name(s) of selected files to system clipboard."""
+        if not self.is_desktop_mode():
+            self.logger.error("Clipboard operations only available in desktop mode")
+            return False
+        
+        if not self.renderer.supports_clipboard():
+            self.logger.error("Clipboard not supported on this backend")
+            return False
+        
+        current_pane = self.get_current_pane()
+        
+        # Get selected files or focused file
+        files_to_copy = []
+        if current_pane['selected_files']:
+            # Use files from the pane's file list that match selected_files
+            for file_obj in current_pane['files']:
+                if str(file_obj) in current_pane['selected_files']:
+                    if file_obj.name != '..':
+                        files_to_copy.append(file_obj)
+        elif current_pane['files'] and 0 <= current_pane['focused_index'] < len(current_pane['files']):
+            focused_file = current_pane['files'][current_pane['focused_index']]
+            if focused_file.name != '..':
+                files_to_copy.append(focused_file)
+        
+        if not files_to_copy:
+            self.logger.error("No files to copy names from")
+            return False
+        
+        # Build text with file names (one per line)
+        names = [f.name for f in files_to_copy]
+        text = '\n'.join(names)
+        
+        # Copy to clipboard
+        if self.renderer.set_clipboard_text(text):
+            count = len(files_to_copy)
+            self.logger.info(f"Copied {count} file name{'s' if count > 1 else ''} to clipboard")
+            self.mark_dirty()
+            return True
+        else:
+            self.logger.error("Failed to copy to clipboard")
+            return False
+    
+    def _action_copy_paths(self):
+        """Copy full path(s) of selected files to system clipboard."""
+        if not self.is_desktop_mode():
+            self.logger.error("Clipboard operations only available in desktop mode")
+            return False
+        
+        if not self.renderer.supports_clipboard():
+            self.logger.error("Clipboard not supported on this backend")
+            return False
+        
+        current_pane = self.get_current_pane()
+        
+        # Get selected files or focused file
+        files_to_copy = []
+        if current_pane['selected_files']:
+            # Use files from the pane's file list that match selected_files
+            for file_obj in current_pane['files']:
+                if str(file_obj) in current_pane['selected_files']:
+                    if file_obj.name != '..':
+                        files_to_copy.append(file_obj)
+        elif current_pane['files'] and 0 <= current_pane['focused_index'] < len(current_pane['files']):
+            focused_file = current_pane['files'][current_pane['focused_index']]
+            if focused_file.name != '..':
+                files_to_copy.append(focused_file)
+        
+        if not files_to_copy:
+            self.logger.error("No files to copy paths from")
+            return False
+        
+        # Build text with full paths (one per line)
+        paths = [str(f.resolve()) for f in files_to_copy]
+        text = '\n'.join(paths)
+        
+        # Copy to clipboard
+        if self.renderer.set_clipboard_text(text):
+            count = len(files_to_copy)
+            self.logger.info(f"Copied {count} full path{'s' if count > 1 else ''} to clipboard")
+            self.mark_dirty()
+            return True
+        else:
+            self.logger.error("Failed to copy to clipboard")
+            return False
     
     def _action_toggle_hidden(self):
         """Toggle showing hidden files."""

@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test S3 caching functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_caching.py -v
 """
 
 import unittest
 import time
 from unittest.mock import Mock, patch, MagicMock
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
     from tfm_s3 import S3Cache, S3PathImpl, get_s3_cache, configure_s3_cache, clear_s3_cache, get_s3_cache_stats
@@ -247,7 +243,3 @@ class TestS3PathImplCaching(unittest.TestCase):
         clear_s3_cache()
         stats = get_s3_cache_stats()
         self.assertEqual(stats['total_entries'], 0)
-
-
-if __name__ == '__main__':
-    unittest.main()

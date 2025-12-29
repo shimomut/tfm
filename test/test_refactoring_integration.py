@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Test that the BaseListDialog refactoring doesn't break TFM integration
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_refactoring_integration.py -v
 """
 
-import sys
 from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
 import unittest
 from unittest.mock import Mock
 import tempfile
@@ -16,9 +12,8 @@ import shutil
 
 from tfm_search_dialog import SearchDialog
 from tfm_list_dialog import ListDialog
-from tfm_jump_dialog import JumpDialog
-from _config import Config
 
+from _config import Config
 
 class TestRefactoringIntegration(unittest.TestCase):
     """Test that refactoring doesn't break integration"""
@@ -129,8 +124,7 @@ class TestRefactoringIntegration(unittest.TestCase):
         """Test that common navigation works across all dialogs"""
         dialogs = [
             ListDialog(self.config),
-            SearchDialog(self.config),
-            JumpDialog(self.config)
+            SearchDialog(self.config)(self.config)
         ]
         
         for dialog in dialogs:
@@ -155,7 +149,3 @@ class TestRefactoringIntegration(unittest.TestCase):
             # Test ENTER key
             result = dialog.handle_common_navigation(10, items)  # ENTER
             self.assertEqual(result, 'select')
-
-
-if __name__ == '__main__':
-    unittest.main()

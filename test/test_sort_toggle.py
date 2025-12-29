@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
 """
 Test script for the sort toggle functionality
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_sort_toggle.py -v
+"""
 
 from pathlib import Path
 from tfm_main import FileManager
@@ -107,6 +104,3 @@ def test_sort_toggle():
     fm.quick_sort('name')
     print(f"   Result: sort_mode={fm.left_pane['sort_mode']}, sort_reverse={fm.left_pane['sort_reverse']}")
     print()
-
-if __name__ == "__main__":
-    test_sort_toggle()

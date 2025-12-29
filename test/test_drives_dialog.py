@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test script for DrivesDialog functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_drives_dialog.py -v
 """
 
-import sys
-import os
 from ttk import KeyEvent, KeyCode, ModifierKey
 from unittest.mock import Mock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_drives_dialog import DrivesDialog, DriveEntry, DrivesDialogHelpers
 from tfm_path import Path
@@ -119,7 +115,3 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

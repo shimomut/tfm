@@ -3,6 +3,8 @@ Tests for DirectoryDiffViewer class.
 
 This module tests the DirectoryDiffViewer UILayer implementation,
 including initialization, UILayer interface methods, and scanning.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_diff_viewer.py -v
 """
 
 import unittest
@@ -273,7 +275,3 @@ class TestDirectoryDiffViewerLifecycle(unittest.TestCase):
         # Scanner should be cancelled (if it exists)
         if self.viewer.scanner:
             self.assertTrue(self.viewer.scanner._cancel_flag)
-
-
-if __name__ == '__main__':
-    unittest.main()

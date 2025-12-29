@@ -3,6 +3,8 @@ Tests for file diff viewer integration in DirectoryDiffViewer.
 
 This module tests the functionality of opening a file diff viewer from the
 directory diff viewer when the cursor is on a content-different file node.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_file_diff_integration.py -v
 """
 
 import unittest
@@ -288,7 +290,3 @@ class TestFileDiffIntegration(unittest.TestCase):
         
         # Verify DiffViewer was NOT pushed
         self.layer_stack.push.assert_not_called()
-
-
-if __name__ == '__main__':
-    unittest.main()

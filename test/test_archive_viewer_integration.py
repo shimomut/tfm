@@ -1,21 +1,18 @@
-#!/usr/bin/env python3
 """
 Integration test for archive file viewing in FileManager.
 
 This test verifies that the complete flow of browsing archives and
 viewing files works correctly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_viewer_integration.py -v
 """
 
+import sys
 import unittest
 import tempfile
 import zipfile
-import os
-import sys
 from pathlib import Path as PathlibPath
 from unittest.mock import Mock, patch, MagicMock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Mock curses before importing tfm modules
 sys.modules['curses'] = MagicMock()
@@ -214,7 +211,3 @@ class TestArchiveViewerIntegration(unittest.TestCase):
                 error_found = any('not found' in line.lower() or 'error' in line.lower() 
                                 for line in viewer.lines)
                 self.assertTrue(error_found)
-
-
-if __name__ == '__main__':
-    unittest.main()

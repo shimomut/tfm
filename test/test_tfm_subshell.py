@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test TFM sub-shell functionality by simulating the environment setup
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_tfm_subshell.py -v
 """
 
 import os
@@ -8,9 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Add src directory to Python path
-src_dir = Path(__file__).parent / 'src'
-sys.path.insert(0, str(src_dir))
 
 def simulate_tfm_subshell():
     """Simulate what TFM does when entering sub-shell mode"""
@@ -137,25 +135,3 @@ def test_python_script():
     except Exception as e:
         print(f"❌ Error running Python test: {e}")
         return False
-
-if __name__ == "__main__":
-    print("TFM Sub-shell Functionality Test")
-    print("=" * 60)
-    
-    # Test 1: Shell script verification
-    test1_passed = simulate_tfm_subshell()
-    
-    # Test 2: Python script verification  
-    test2_passed = test_python_script()
-    
-    print("\n" + "=" * 60)
-    print("Test Results:")
-    print(f"  Shell verification: {'✅ PASSED' if test1_passed else '❌ FAILED'}")
-    print(f"  Python verification: {'✅ PASSED' if test2_passed else '❌ FAILED'}")
-    
-    if test1_passed and test2_passed:
-        print("\n🎉 All tests PASSED! Sub-shell functionality is working correctly.")
-        sys.exit(0)
-    else:
-        print("\n❌ Some tests FAILED. Check the implementation.")
-        sys.exit(1)

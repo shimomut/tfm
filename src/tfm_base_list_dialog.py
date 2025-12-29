@@ -4,7 +4,7 @@ TUI File Manager - Base List Dialog Component
 Provides common functionality for list-based dialogs
 """
 
-from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
+from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent, ModifierKey
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, get_safe_functions
@@ -22,7 +22,7 @@ class BaseListDialog:
         self.is_active = False
         self.selected = 0  # Index of currently selected item
         self.scroll = 0  # Scroll offset for the list
-        self.text_editor = SingleLineTextEdit()  # Text editor for input
+        self.text_editor = SingleLineTextEdit(renderer=renderer)  # Text editor for input
         self._last_content_height = None  # Cache actual content height from last draw
         
     def exit(self):
@@ -54,6 +54,12 @@ class BaseListDialog:
         
         # Only handle KeyEvent for navigation below this point
         if not isinstance(event, KeyEvent):
+            return False
+        
+        # Pass command key combinations to text editor (e.g., Cmd+V for paste)
+        if event.has_modifier(ModifierKey.COMMAND) or event.has_modifier(ModifierKey.CONTROL):
+            if self.text_editor.handle_key(event):
+                return 'text_changed'
             return False
             
         # ESC - cancel

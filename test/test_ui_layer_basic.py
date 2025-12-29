@@ -3,6 +3,8 @@ Basic tests for UILayer and UILayerStack implementation.
 
 These tests verify that the core functionality of the UI layer stack system
 works correctly, including stack operations, event routing, and rendering.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_ui_layer_basic.py -v
 """
 
 import pytest
@@ -271,7 +273,3 @@ def test_is_point_inside_default_implementation():
     assert layer.is_point_inside(10, 9) is False   # Above bounds
     assert layer.is_point_inside(30, 15) is False  # Right of bounds
     assert layer.is_point_inside(15, 25) is False  # Below bounds
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

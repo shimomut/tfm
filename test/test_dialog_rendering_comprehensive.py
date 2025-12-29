@@ -1,27 +1,22 @@
-#!/usr/bin/env python3
 """
 Comprehensive test for dialog rendering fixes across all dialog types
 
 This test verifies that all dialogs properly handle keys without causing
 rendering issues (dialogs disappearing due to content_changed not being set).
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_rendering_comprehensive.py -v
 """
 
 from ttk import KeyEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
-import sys
-import os
 from pathlib import Path
 
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_search_dialog import SearchDialog
-from tfm_jump_dialog import JumpDialog
+
 from tfm_list_dialog import ListDialog
 from tfm_info_dialog import InfoDialog
 from tfm_batch_rename_dialog import BatchRenameDialog
-
 
 class TestAllDialogsRenderingFix(unittest.TestCase):
     """Test rendering fixes across all dialog types"""
@@ -199,7 +194,7 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
         """Test that all dialogs have consistent key handling behavior"""
         test_cases = [
             ('SearchDialog', SearchDialog(self.config), lambda d: d.show('filename')),
-            ('JumpDialog', JumpDialog(self.config), lambda d: d.show(Path('/tmp'))),
+            ('JumpDialog'(self.config), lambda d: d.show(Path('/tmp'))),
             ('ListDialog', ListDialog(self.config), lambda d: d.show("Test", ['item1'], Mock())),
             ('InfoDialog', InfoDialog(self.config), lambda d: d.show("Test", ["Line 1"])),
             ('BatchRenameDialog', BatchRenameDialog(self.config), lambda d: d.show([Path('/tmp/file1.txt')])),
@@ -224,11 +219,7 @@ class TestAllDialogsRenderingFix(unittest.TestCase):
                               f"{dialog_name} should need redraw when content_changed=True")
                 
                 dialog.content_changed = False
-                # Note: Some dialogs (SearchDialog, JumpDialog) might still need redraw due to animation
+                # Note: Some dialogs (SearchDialog) might still need redraw due to animation
                 # so we don't test the False case universally
                 
         print("✓ All dialogs have consistent interface and behavior")
-
-
-if __name__ == '__main__':
-    unittest.main()

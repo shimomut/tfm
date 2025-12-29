@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test cursor visibility in DirectoryDiffViewer after wheel scrolling.
 
 This test verifies that when the cursor becomes invisible due to wheel scrolling,
 keyboard navigation (UP/DOWN keys) properly adjusts the scroll position to make
 the cursor visible again.
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_diff_cursor_visibility.py -v
+"""
 
 import unittest
 from unittest.mock import Mock, MagicMock
@@ -151,7 +147,3 @@ class TestDirectoryDiffCursorVisibility(unittest.TestCase):
                                    f"After DOWN press {i+1}: cursor should be at or after scroll_offset")
             self.assertLess(self.viewer.cursor_position, self.viewer.scroll_offset + display_height,
                            f"After DOWN press {i+1}: cursor should be before end of visible range")
-
-
-if __name__ == '__main__':
-    unittest.main()

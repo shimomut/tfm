@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test script for cursor highlighting logic in batch rename functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_highlighting.py -v
 """
 
 def test_cursor_highlighting_logic():
@@ -111,7 +112,3 @@ def test_scrolling_behavior():
             display += "[END]"
         
         print(f"Cursor at {cursor_pos:2}: visible[{visible_start:2}:{visible_end:2}] -> '{display}'")
-
-if __name__ == "__main__":
-    test_cursor_highlighting_logic()
-    test_scrolling_behavior()

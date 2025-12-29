@@ -1,17 +1,14 @@
-#!/usr/bin/env python3
 """
 Test that command line directory arguments prevent history restoration
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_command_line_history_override.py -v
 """
 
 import unittest
-import sys
 import os
 import tempfile
 import shutil
 from pathlib import Path
-
-# Add src directory to Python path for testing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 class TestCommandLineHistoryOverride(unittest.TestCase):
     """Test command line directory behavior and history override logic"""
@@ -205,6 +202,3 @@ class TestCommandLineHistoryOverride(unittest.TestCase):
             fallback_dir = nonexistent_dir
         
         self.assertEqual(fallback_dir, Path.cwd())
-
-if __name__ == '__main__':
-    unittest.main()

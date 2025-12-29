@@ -1,15 +1,13 @@
-#!/usr/bin/env python3
 """
 Test script for text viewer tab width feature.
 
 This test verifies that the tab width can be changed dynamically
 and that tabs are expanded correctly with different widths.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_text_viewer_tab_width.py -v
 """
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_text_viewer import TextViewer
 from tfm_path import Path
 from ttk import KeyEvent, KeyCode
@@ -237,10 +235,3 @@ def test_tab_expansion_alignment():
         # Clean up
         if os.path.exists(test_file):
             os.remove(test_file)
-
-
-if __name__ == "__main__":
-    test_tab_width_change()
-    test_tab_width_display()
-    test_tab_expansion_alignment()
-    print("\n🎉 All tests completed successfully!")

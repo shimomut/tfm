@@ -1,28 +1,23 @@
-#!/usr/bin/env python3
 """
 Comprehensive test to find ALL dialog key handling issues
 
 This test systematically tests all possible keys on all dialogs to find
 any cases where a key returns True but doesn't set content_changed.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_comprehensive_dialog_key_handling.py -v
 """
 
 from ttk import KeyEvent, KeyCode, ModifierKey
 import unittest
 from unittest.mock import Mock, patch
-import sys
-import os
 from pathlib import Path
 
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_search_dialog import SearchDialog
-from tfm_jump_dialog import JumpDialog
+
 from tfm_list_dialog import ListDialog
 from tfm_info_dialog import InfoDialog
 from tfm_batch_rename_dialog import BatchRenameDialog
 from tfm_quick_edit_bar import QuickEditBar
-
 
 class TestComprehensiveDialogKeyHandling(unittest.TestCase):
     """Comprehensive test for dialog key handling issues"""
@@ -197,7 +192,3 @@ class TestComprehensiveDialogKeyHandling(unittest.TestCase):
             self.assertTrue(batch_dialog.content_changed, "BatchRenameDialog LEFT key should set content_changed")
             
         print("✓ All specific regression cases pass")
-
-
-if __name__ == '__main__':
-    unittest.main()

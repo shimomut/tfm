@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test archive metadata display in file details dialog
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_metadata_display.py -v
 """
 
-import os
-import sys
 import tempfile
 import zipfile
 import tarfile
 from pathlib import Path as PathlibPath
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_info_dialog import InfoDialogHelpers
@@ -215,22 +211,3 @@ def test_tar_archive_metadata():
         assert "GZIP" in lines_text or "gzip" in lines_text.lower(), "Should identify compression type"
         
         print("✓ Tar archive metadata test passed")
-
-
-if __name__ == '__main__':
-    print("Testing archive metadata display...")
-    print()
-    
-    test_archive_metadata_display()
-    print()
-    
-    test_archive_directory_metadata()
-    print()
-    
-    test_regular_file_still_works()
-    print()
-    
-    test_tar_archive_metadata()
-    print()
-    
-    print("All archive metadata display tests passed!")

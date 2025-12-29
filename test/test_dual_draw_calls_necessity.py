@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test to demonstrate why both _draw_dialogs_if_needed calls are necessary
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dual_draw_calls_necessity.py -v
 """
 
-import sys
-import os
 import time
 import threading
 from unittest.mock import Mock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_search_dialog import SearchDialog
 from tfm_config import get_config
@@ -142,23 +138,3 @@ def test_single_draw_call_scenario():
     print("  - No unnecessary rendering overhead")
     
     return True
-
-
-if __name__ == "__main__":
-    try:
-        test_dual_draw_calls_necessity()
-        test_single_draw_call_scenario()
-        
-        print("\n" + "=" * 50)
-        print("🎉 Both _draw_dialogs_if_needed() calls are necessary!")
-        print("\nConclusion:")
-        print("  • First call: Handles regular content changes")
-        print("  • Second call: Handles background thread updates during timeout")
-        print("  • Second call is efficient when no background updates occur")
-        print("  • Both calls are needed for real-time background updates")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

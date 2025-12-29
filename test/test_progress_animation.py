@@ -1,21 +1,16 @@
-#!/usr/bin/env python3
 """
 Test script to verify progress animations work with dialog optimization
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_animation.py -v
 """
 
-import sys
-import os
 import time
 import threading
 from unittest.mock import Mock
 
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_search_dialog import SearchDialog
-from tfm_jump_dialog import JumpDialog
-from tfm_config import get_config
 
+from tfm_config import get_config
 
 def test_search_dialog_animation():
     """Test that SearchDialog animation continues during search"""
@@ -71,7 +66,6 @@ def test_search_dialog_animation():
     print("✓ SearchDialog animation works correctly during search")
     return True
 
-
 def test_jump_dialog_animation():
     """Test that JumpDialog animation continues during directory scan"""
     
@@ -124,7 +118,6 @@ def test_jump_dialog_animation():
     
     print("✓ JumpDialog animation works correctly during directory scan")
     return True
-
 
 def test_main_loop_animation_logic():
     """Test the main loop logic for handling animations"""
@@ -211,24 +204,3 @@ def test_main_loop_animation_logic():
     
     print("✓ Main loop animation logic works correctly")
     return True
-
-
-if __name__ == "__main__":
-    try:
-        test_search_dialog_animation()
-        test_jump_dialog_animation()
-        test_main_loop_animation_logic()
-        
-        print("\n" + "=" * 60)
-        print("🎉 Progress animation tests passed!")
-        print("\nConclusion:")
-        print("  • SearchDialog animations work during search operations")
-        print("  • JumpDialog animations work during directory scanning")
-        print("  • Main loop correctly handles animation redraws")
-        print("  • Animations continue smoothly with dialog optimization")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

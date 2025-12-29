@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test script for the create directory feature (M key without selection)
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_create_directory.py -v
 """
 
-import os
 import sys
 import tempfile
 import shutil
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Mock curses before importing tfm_main
 import unittest.mock
@@ -123,7 +119,3 @@ def test_create_directory_functionality():
             return False
             
     return True
-
-if __name__ == "__main__":
-    success = test_create_directory_functionality()
-    sys.exit(0 if success else 1)

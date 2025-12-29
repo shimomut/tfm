@@ -1,14 +1,11 @@
-#!/usr/bin/env python3
 """
 Test script to verify the dot key functionality works in the file manager
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dot_functionality.py -v
 """
 
-import sys
-import os
 import curses
 from ttk import KeyEvent, KeyCode, ModifierKey
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_main import FileManager
 
 def test_dot_key_functionality(stdscr):
@@ -51,9 +48,7 @@ def main():
         # since we can't run a full interactive session in this test
         
         # Test the key binding configuration
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
         from tfm_config import is_key_bound_to
-        
         # Test that dot is bound to toggle_hidden
         is_bound = is_key_bound_to('.', 'toggle_hidden')
         print(f"Dot key bound to toggle_hidden: {is_bound}")
@@ -68,11 +63,3 @@ def main():
     except Exception as e:
         print(f"Test failed with error: {e}")
         return False
-
-if __name__ == "__main__":
-    success = main()
-    if success:
-        print("\n✓ All tests passed! The dot key should now toggle hidden files.")
-    else:
-        print("\n✗ Tests failed!")
-        sys.exit(1)

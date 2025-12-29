@@ -1,12 +1,7 @@
-#!/usr/bin/env python3
 
-import sys
 import tempfile
 import time
 from pathlib import Path
-
-# Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
@@ -224,8 +219,3 @@ def test_cursor_history_tab_switching():
         # Clean up
         state_manager.cleanup_session()
         print("✅ Cursor history TAB switching test completed\n")
-
-
-if __name__ == "__main__":
-    test_cursor_history_tab_switching()
-    print("All cursor history TAB switching tests passed!")

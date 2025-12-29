@@ -3,15 +3,13 @@ Test backend-specific behavior for window geometry persistence.
 
 This test verifies that window geometry persistence is only enabled in the
 CoreGraphics backend and that the curses backend is unaffected.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_backend_specific_window_geometry.py -v
 """
 
-import sys
 import os
 import unittest
 from unittest.mock import Mock, MagicMock, patch
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
@@ -47,7 +45,7 @@ class TestBackendSpecificWindowGeometry(unittest.TestCase):
         # Create and initialize backend
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -79,7 +77,7 @@ class TestBackendSpecificWindowGeometry(unittest.TestCase):
         # Create CoreGraphics backend instance (without initializing)
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -103,7 +101,7 @@ class TestBackendSpecificWindowGeometry(unittest.TestCase):
         # Create backend without initializing
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -124,7 +122,7 @@ class TestBackendSpecificWindowGeometry(unittest.TestCase):
         # Create instances of both backends
         cg_backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -143,7 +141,3 @@ class TestBackendSpecificWindowGeometry(unittest.TestCase):
         
         self.assertTrue(has_cg_geometry, "CoreGraphics should have window geometry support")
         self.assertFalse(has_curses_geometry, "Curses should not have window geometry support")
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test TextViewer UILayer interface implementation
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_text_viewer_uilayer.py -v
 """
 
 import unittest
-import sys
-import os
 from pathlib import Path as StdPath
 from unittest.mock import Mock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_text_viewer import TextViewer
 from tfm_path import Path
@@ -168,7 +164,3 @@ class TestTextViewerUILayer(unittest.TestCase):
         event = KeyEvent(key_code=0, modifiers=ModifierKey.NONE, char='n')
         viewer.handle_key_event(event)
         self.assertTrue(viewer.needs_redraw())
-
-
-if __name__ == '__main__':
-    unittest.main()

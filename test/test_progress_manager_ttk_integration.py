@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test suite for ProgressManager TTK integration verification
 
@@ -7,13 +6,12 @@ This test suite verifies that ProgressManager and ProgressAnimator:
 2. Work correctly as pure business logic components
 3. Integrate properly with TTK-migrated tfm_main.py
 4. Provide correct progress data through callbacks
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_manager_ttk_integration.py -v
 """
 
-import sys
 from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+import sys
 
 import pytest
 import time
@@ -448,7 +446,3 @@ class TestProgressManagerOperationTypes:
         pm.update_operation_total(15, "data.zip")
         text = pm.get_progress_text(80)
         assert "Extracting archive" in text
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
 """
 Test FileManager S3 file editing restriction
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_filemanager_s3_edit_restriction.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 
 class TestFileManagerS3EditRestriction(unittest.TestCase):
@@ -109,7 +105,3 @@ class TestFileManagerS3EditRestriction(unittest.TestCase):
             
             # Verify supports_file_editing was called
             mock_local_file.supports_file_editing.assert_called_once()
-
-
-if __name__ == '__main__':
-    unittest.main()

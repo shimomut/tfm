@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Test that progress display takes priority over quick choice bar
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_priority.py -v
 """
 
-import sys
-import os
 from unittest.mock import Mock
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_progress_manager import ProgressManager, OperationType
 
@@ -132,9 +128,3 @@ def test_progress_without_quick_choice():
     tfm.progress_manager.finish_operation()
     
     print("✅ Progress without interference test passed!")
-
-
-if __name__ == "__main__":
-    test_progress_takes_priority()
-    test_progress_without_quick_choice()
-    print("\n🎉 All progress priority tests passed!")

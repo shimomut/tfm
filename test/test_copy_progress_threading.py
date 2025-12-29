@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
 """
 Test: Enhanced Copy Progress with Threading
 
 Tests the improved copy operation progress tracking system.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_copy_progress_threading.py -v
 """
 
-import os
-import sys
 import time
 import tempfile
 import unittest
 import threading
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_progress_manager import ProgressManager, OperationType
@@ -397,8 +393,3 @@ def run_tests():
     result = runner.run(suite)
     
     return result.wasSuccessful()
-
-
-if __name__ == "__main__":
-    success = run_tests()
-    sys.exit(0 if success else 1)

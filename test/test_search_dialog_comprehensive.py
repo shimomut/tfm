@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Comprehensive test for SearchDialog thread-safe content_changed handling
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_comprehensive.py -v
 """
 
-import sys
-import os
 import time
 import threading
 from unittest.mock import Mock, patch
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_search_dialog import SearchDialog
 from tfm_config import get_config
@@ -194,19 +190,3 @@ def test_user_interaction_during_search():
     
     print("✓ User interaction during search test passed")
     return True
-
-
-if __name__ == "__main__":
-    try:
-        test_comprehensive_search_dialog()
-        test_user_interaction_during_search()
-        
-        print("\n🎉 All comprehensive SearchDialog tests passed!")
-        print("   Thread-safe content_changed handling is working correctly")
-        print("   for both background search updates and user interactions.")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

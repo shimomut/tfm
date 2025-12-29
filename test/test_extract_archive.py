@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
 """
 Test script for the archive extraction feature implementation
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_extract_archive.py -v
 """
 
-import os
 import tempfile
 import zipfile
 import tarfile
@@ -51,9 +51,7 @@ def test_archive_detection():
     
     # Import the FileManager class to test its methods
     import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
     from tfm_main import FileManager
-    
     # Create a mock FileManager instance for testing
     class MockFileManager:
         def detect_archive_format(self, filename):
@@ -159,9 +157,7 @@ def test_key_binding():
     print("\nTesting key binding configuration...")
     
     import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
     from tfm_config import get_config, ConfigManager
-    
     # Test that 'U' is bound to extract_archive (alphabet keys are uppercase in config)
     config_manager = ConfigManager()
     assert config_manager.is_key_bound_to_action('U', 'extract_archive')
@@ -188,7 +184,3 @@ def run_all_tests():
         import traceback
         traceback.print_exc()
         return False
-
-if __name__ == "__main__":
-    success = run_all_tests()
-    exit(0 if success else 1)

@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Tests for mouse wheel scrolling in the log pane.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_log_pane_wheel_scrolling.py -v
 """
 
 import unittest
@@ -217,7 +218,3 @@ class TestLogPaneWheelScrolling(unittest.TestCase):
         
         # Event should not be handled (no log pane visible)
         self.assertFalse(result)
-
-
-if __name__ == '__main__':
-    unittest.main()

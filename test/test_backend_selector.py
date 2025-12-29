@@ -9,15 +9,14 @@ Note: These tests use subprocess isolation to avoid PyObjC class redefinition
 errors. PyObjC registers Objective-C classes globally, and they cannot be
 redefined even after module deletion. Running each test in a separate process
 ensures a clean environment.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_backend_selector.py -v
 """
 
 import os
 import sys
 import subprocess
 import unittest
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 
 class TestBackendSelector(unittest.TestCase):
@@ -53,14 +52,10 @@ class TestBackendSelector(unittest.TestCase):
         """Test that PyObjC is used by default."""
         code = """
 import sys
-import os
-# Add project root to path (current working directory when running tests)
-sys.path.insert(0, os.getcwd())
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
 """
         returncode, stdout, stderr = self._run_in_subprocess(code)
-        
         # Verify subprocess succeeded
         self.assertEqual(returncode, 0, f"Subprocess failed: {stderr}")
         
@@ -71,8 +66,6 @@ print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
         """Test that TTK_USE_CPP_RENDERING=true enables C++ rendering."""
         code = """
 import sys
-import os
-sys.path.insert(0, os.getcwd())
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
 """
@@ -80,7 +73,6 @@ print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
             code,
             env={'TTK_USE_CPP_RENDERING': 'true'}
         )
-        
         # Verify subprocess succeeded
         self.assertEqual(returncode, 0, f"Subprocess failed: {stderr}")
         
@@ -93,12 +85,9 @@ print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
         
         code = """
 import sys
-import os
-sys.path.insert(0, os.getcwd())
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
 """
-        
         for value in test_cases:
             with self.subTest(value=value):
                 returncode, stdout, stderr = self._run_in_subprocess(
@@ -119,12 +108,9 @@ print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
         
         code = """
 import sys
-import os
-sys.path.insert(0, os.getcwd())
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
 """
-        
         for value in test_cases:
             with self.subTest(value=value):
                 returncode, stdout, stderr = self._run_in_subprocess(
@@ -143,10 +129,7 @@ print(f"USE_CPP_RENDERING={CoreGraphicsBackend.USE_CPP_RENDERING}")
         """Test successful C++ module import."""
         code = """
 import sys
-import os
-sys.path.insert(0, os.getcwd())
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
-
 # Check if C++ renderer was successfully imported
 if CoreGraphicsBackend.USE_CPP_RENDERING:
     try:
@@ -174,7 +157,6 @@ else:
         """Test fallback to PyObjC when C++ module import fails."""
         code = """
 import sys
-import os
 
 # Block cpp_renderer import to simulate unavailability
 class ImportBlocker:
@@ -187,8 +169,6 @@ class ImportBlocker:
         raise ImportError("cpp_renderer not available (simulated)")
 
 sys.meta_path.insert(0, ImportBlocker())
-sys.path.insert(0, os.getcwd())
-
 from ttk.backends.coregraphics_backend import CoreGraphicsBackend
 
 # Verify fallback occurred
@@ -210,7 +190,3 @@ print(f"HAS_CPP_RENDERER={hasattr(CoreGraphicsBackend, '_cpp_renderer') and Core
         # Note: The fallback message may be printed to stdout or stderr, or may not
         # be printed at all if the import happens at a different time
         self.assertIn("HAS_CPP_RENDERER=", stdout)
-
-
-if __name__ == '__main__':
-    unittest.main()

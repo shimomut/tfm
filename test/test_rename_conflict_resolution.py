@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test script for rename conflict resolution feature
 Tests the new "Rename" option in copy/move/extract operations
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_rename_conflict_resolution.py -v
 """
 
-import os
-import sys
 import tempfile
 import shutil
 from pathlib import Path as StdPath
-
-# Add src directory to path to import tfm modules
-sys.path.insert(0, str(StdPath(__file__).parent.parent / "src"))
 
 from tfm_path import Path
 
@@ -217,7 +213,3 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

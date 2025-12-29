@@ -6,12 +6,9 @@ This test verifies that:
 2. Clicking in right pane switches focus to right pane
 3. Clicking outside pane area doesn't change focus
 4. Visual indicators update when focus changes
-"""
 
-import sys
-import os
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_mouse_pane_focus_switching.py -v
+"""
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
@@ -327,7 +324,3 @@ class TestPaneFocusSwitching:
         
         # Verify mark_dirty was called
         fm.mark_dirty.assert_called_once()
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

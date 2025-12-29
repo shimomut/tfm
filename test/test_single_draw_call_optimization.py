@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test to verify that background updates still work with single _draw_dialogs_if_needed call
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_single_draw_call_optimization.py -v
 """
 
-import sys
-import os
 import time
 import threading
 from unittest.mock import Mock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_search_dialog import SearchDialog
 from tfm_config import get_config
@@ -172,25 +168,3 @@ def test_efficiency_improvement():
     print("✓ Single call approach is 50% more efficient")
     
     return True
-
-
-if __name__ == "__main__":
-    try:
-        test_single_call_background_updates()
-        test_timing_comparison()
-        test_efficiency_improvement()
-        
-        print("\n" + "=" * 60)
-        print("🎉 Single _draw_dialogs_if_needed() call optimization verified!")
-        print("\nConclusion:")
-        print("  • Background updates still work correctly")
-        print("  • Timing characteristics remain the same")
-        print("  • 50% reduction in function call overhead")
-        print("  • Simpler, cleaner code")
-        print("  • Second call was indeed redundant")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

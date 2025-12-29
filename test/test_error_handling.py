@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test error handling in logging system.
 
@@ -6,18 +5,16 @@ This test verifies that:
 1. Handler failures are isolated (one handler failing doesn't prevent others)
 2. Remote client failures are handled gracefully
 3. Stream write failures are suppressed
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_error_handling.py -v
 """
 
 import sys
-import os
 import logging
 import socket
 import threading
 import time
 from io import StringIO
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
 
@@ -270,19 +267,3 @@ def test_error_logging_to_fallback():
     finally:
         # Restore sys.__stderr__
         sys.__stderr__ = original_stderr
-
-
-if __name__ == '__main__':
-    print("=" * 60)
-    print("Error Handling Tests")
-    print("=" * 60)
-    
-    test_handler_failure_isolation()
-    test_stream_write_failure_suppression()
-    test_remote_client_failure_recovery()
-    test_multiple_handler_failures()
-    test_error_logging_to_fallback()
-    
-    print("\n" + "=" * 60)
-    print("All error handling tests passed!")
-    print("=" * 60)

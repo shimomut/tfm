@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test S3 iterdir Caching Improvement
 
 This test verifies that the improved iterdir() method properly caches
 complete directory listings and avoids API calls when cache exists.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_iterdir_caching_improvement.py -v
 """
 
-import sys
-import os
 import time
 import unittest
 from unittest.mock import Mock, patch, call
 from datetime import datetime
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
     from tfm_path import Path
@@ -318,7 +314,3 @@ class TestS3IterdirCachingImprovement(unittest.TestCase):
 def main():
     """Run the tests"""
     unittest.main(verbosity=2)
-
-
-if __name__ == '__main__':
-    main()

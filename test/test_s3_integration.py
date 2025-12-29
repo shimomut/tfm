@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
 """
 Integration test for S3PathImpl with actual AWS operations
 This test requires AWS credentials to be configured
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_integration.py -v
 """
 
 import sys
 import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_s3 import S3PathImpl
@@ -177,13 +175,3 @@ def main():
     else:
         print("\n⚠ Some integration tests had issues (see above)")
         return True
-
-if __name__ == '__main__':
-    try:
-        success = main()
-        sys.exit(0 if success else 1)
-    except Exception as e:
-        print(f"\n❌ Integration test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

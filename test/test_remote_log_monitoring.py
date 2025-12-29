@@ -1,20 +1,16 @@
-#!/usr/bin/env python3
 """
 Test Remote Log Monitoring Feature
 
 This test verifies that the LogManager can broadcast log messages
 to remote clients via TCP socket connections.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_remote_log_monitoring.py -v
 """
 
-import sys
 import time
 import socket
 import json
 import threading
-from pathlib import Path
-
-# Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_log_manager import LogManager
 from tfm_config import get_config
@@ -166,6 +162,3 @@ def main():
         print(f"\n✗ Test failed with error: {e}")
         import traceback
         traceback.print_exc()
-
-if __name__ == "__main__":
-    main()

@@ -1,16 +1,11 @@
-#!/usr/bin/env python3
 """
 Test suite for the color fix that ensures headers, footers, and status bars
 display correctly in curses mode with visible contrast.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_color_system.py -v
 """
 
-import sys
-import os
 import unittest
-
-# Add paths
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ttk'))
 
 from ttk.backends.curses_backend import CursesBackend
 
@@ -192,7 +187,3 @@ def run_tests():
     result = runner.run(suite)
     
     return 0 if result.wasSuccessful() else 1
-
-
-if __name__ == '__main__':
-    sys.exit(run_tests())

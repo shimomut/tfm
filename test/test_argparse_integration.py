@@ -1,15 +1,13 @@
-#!/usr/bin/env python3
 """
 Integration tests for TFM command line argument parsing
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_argparse_integration.py -v
 """
 
-import sys
 import subprocess
+import sys
 import unittest
 from pathlib import Path
-
-# Add src directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 class TestArgparseIntegration(unittest.TestCase):
     """Integration tests for command line argument parsing"""
@@ -33,7 +31,7 @@ class TestArgparseIntegration(unittest.TestCase):
         
         # Should contain app name and version
         self.assertIn('TUI File Manager', output)
-        self.assertIn('0.95', output)
+        self.assertIn('0.98', output)
         
         # Should be a single line
         lines = output.split('\n')
@@ -107,6 +105,3 @@ class TestArgparseIntegration(unittest.TestCase):
         # Should show help, not version
         self.assertIn('usage:', result.stdout)
         self.assertIn('options:', result.stdout)
-
-if __name__ == '__main__':
-    unittest.main()

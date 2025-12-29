@@ -4,16 +4,12 @@ Integration tests for window geometry persistence.
 This test suite verifies the complete window geometry persistence behavior
 across application sessions, including first launch, persistence, multi-monitor
 support, and reset functionality.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_window_geometry_persistence_integration.py -v
 """
 
-import sys
-import os
 import unittest
 from unittest.mock import Mock, MagicMock, patch, call
-from pathlib import Path
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
@@ -55,7 +51,7 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         # Create backend with specific default geometry
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -99,7 +95,7 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         # Create backend (simulating relaunch)
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -151,7 +147,7 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         # Create backend (simulating relaunch with multi-monitor setup)
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -193,7 +189,7 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         # Create and initialize backend
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -239,7 +235,7 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         # Create backend
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -285,7 +281,7 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         # Create backend
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -331,7 +327,7 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         # Create and initialize backend
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80,
@@ -374,8 +370,3 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         print("  ✓ Requirement 6.1: Reset mechanism")
         print("  ✓ Requirement 6.4: Missing data handling")
         print("\n" + "=" * 60)
-
-
-if __name__ == '__main__':
-    # Run tests with verbose output
-    unittest.main(verbosity=2)

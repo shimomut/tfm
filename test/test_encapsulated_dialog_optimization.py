@@ -1,24 +1,20 @@
-#!/usr/bin/env python3
 """
 Test script to verify the encapsulated dialog optimization approach
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_encapsulated_dialog_optimization.py -v
 """
 
-import sys
-import os
+from pathlib import Path
 import time
 from unittest.mock import Mock
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_quick_edit_bar import QuickEditBar
 from tfm_list_dialog import ListDialog
 from tfm_info_dialog import InfoDialog
 from tfm_search_dialog import SearchDialog
-from tfm_jump_dialog import JumpDialog
+
 from tfm_batch_rename_dialog import BatchRenameDialog
 from tfm_config import get_config
-
 
 def test_quick_edit_bar_encapsulation():
     """Test QuickEditBar encapsulated optimization"""
@@ -45,7 +41,6 @@ def test_quick_edit_bar_encapsulation():
     print("✓ draw() automatically resets content_changed flag")
     
     return True
-
 
 def test_search_dialog_animation_encapsulation():
     """Test SearchDialog animation encapsulation"""
@@ -114,7 +109,6 @@ def test_search_dialog_animation_encapsulation():
     
     return True
 
-
 def test_main_loop_integration():
     """Test integration with main loop logic"""
     
@@ -175,7 +169,6 @@ def test_main_loop_integration():
     
     return True
 
-
 def test_all_dialogs_have_methods():
     """Test that all dialog classes have the required methods"""
     
@@ -189,7 +182,7 @@ def test_all_dialogs_have_methods():
         ("ListDialog", ListDialog(config)),
         ("InfoDialog", InfoDialog(config)),
         ("SearchDialog", SearchDialog(config)),
-        ("JumpDialog", JumpDialog(config)),
+        ("JumpDialog"(config)),
         ("BatchRenameDialog", BatchRenameDialog(config)),
     ]
     
@@ -201,26 +194,3 @@ def test_all_dialogs_have_methods():
         print(f"✓ {name} has required methods")
     
     return True
-
-
-if __name__ == "__main__":
-    try:
-        test_quick_edit_bar_encapsulation()
-        test_search_dialog_animation_encapsulation()
-        test_main_loop_integration()
-        test_all_dialogs_have_methods()
-        
-        print("\n" + "=" * 60)
-        print("🎉 Encapsulated dialog optimization tests passed!")
-        print("\nBenefits of the new approach:")
-        print("  • Better encapsulation: Internal state hidden from main loop")
-        print("  • Cleaner interface: Single needs_redraw() method per dialog")
-        print("  • Automatic management: draw() methods handle flag reset")
-        print("  • Animation support: Built into needs_redraw() logic")
-        print("  • Maintainable: Each dialog manages its own redraw logic")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

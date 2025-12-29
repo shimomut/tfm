@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 """
 Test archive copy operations - copying files from archive virtual directories
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_copy_operations.py -v
 """
 
-import os
-import sys
 import tempfile
 import zipfile
 import tarfile
 from pathlib import Path as PathlibPath
-
-# Add src directory to path
-sys.path.insert(0, str(PathlibPath(__file__).parent.parent / 'src'))
 
 from tfm_path import Path
 from tfm_file_operations import FileOperations, FileOperationsUI
@@ -347,8 +343,3 @@ def run_all_tests():
         import traceback
         traceback.print_exc()
         return False
-
-
-if __name__ == '__main__':
-    success = run_all_tests()
-    sys.exit(0 if success else 1)

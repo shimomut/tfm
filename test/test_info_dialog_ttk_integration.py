@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
 """
 Test InfoDialog TTK Integration
 
 This test verifies that InfoDialog has been successfully migrated to use
 the TTK Renderer API instead of curses.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_info_dialog_ttk_integration.py -v
 """
 
 import unittest
@@ -30,10 +31,8 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         
         # Import after mocking to avoid import-time dependencies
         import sys
-        sys.path.insert(0, 'src')
         from tfm_info_dialog import InfoDialog
         self.InfoDialog = InfoDialog
-        
     def test_init_accepts_renderer(self):
         """Test that InfoDialog accepts renderer parameter"""
         dialog = self.InfoDialog(self.mock_config, renderer=self.mock_renderer)
@@ -171,8 +170,6 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
     def test_no_curses_imports(self):
         """Test that InfoDialog does not import curses"""
         import sys
-        sys.path.insert(0, 'src')
-        
         # Read the source file
         with open('src/tfm_info_dialog.py', 'r') as f:
             source = f.read()
@@ -186,8 +183,6 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
     def test_uses_ttk_enums(self):
         """Test that InfoDialog uses TTK enums"""
         import sys
-        sys.path.insert(0, 'src')
-        
         # Read the source file
         with open('src/tfm_info_dialog.py', 'r') as f:
             source = f.read()
@@ -215,7 +210,3 @@ class TestInfoDialogTTKIntegration(unittest.TestCase):
         # Check that at least one call uses color_pair parameter
         has_color_pair = any('color_pair' in str(call) for call in calls)
         self.assertTrue(has_color_pair, "draw_text should use color_pair parameter")
-
-
-if __name__ == '__main__':
-    unittest.main()

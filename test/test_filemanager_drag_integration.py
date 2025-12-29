@@ -4,16 +4,12 @@ Tests for FileManager drag-and-drop integration.
 This module tests the integration of drag-and-drop components into the
 FileManager class, including gesture detection, payload building, and
 session management.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_filemanager_drag_integration.py -v
 """
 
-import os
-import sys
 import pytest
-from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ttk.ttk_mouse_event import MouseEvent, MouseEventType, MouseButton
 
@@ -216,7 +212,3 @@ class TestFileManagerDragIntegration:
         # Gesture detector should be reset
         assert file_manager.drag_gesture_detector.state.button_down is False
         assert file_manager.drag_gesture_detector.state.dragging is False
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

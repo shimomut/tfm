@@ -1,14 +1,11 @@
-#!/usr/bin/env python3
 """
 Test the progress manager functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_manager.py -v
 """
 
-import sys
-import os
 
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
+from pathlib import Path
 from tfm_progress_manager import ProgressManager, OperationType
 
 
@@ -116,10 +113,3 @@ def test_progress_text_formatting():
     progress_manager.finish_operation()
     
     print("✅ Progress text formatting tests passed!")
-
-
-if __name__ == "__main__":
-    test_progress_manager()
-    test_operation_types()
-    test_progress_text_formatting()
-    print("\n🎉 All Progress Manager tests passed!")

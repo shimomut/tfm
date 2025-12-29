@@ -3,15 +3,12 @@ Test error handling for window geometry persistence.
 
 This test verifies that the CoreGraphics backend handles errors gracefully
 when window geometry persistence operations fail.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_window_geometry_error_handling.py -v
 """
 
-import sys
-import os
 import unittest
 from unittest.mock import Mock, MagicMock, patch
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 try:
     from ttk.backends.coregraphics_backend import CoreGraphicsBackend
@@ -44,7 +41,7 @@ class TestWindowGeometryErrorHandling(unittest.TestCase):
         # Create backend - should not raise exception
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -73,7 +70,7 @@ class TestWindowGeometryErrorHandling(unittest.TestCase):
         # Create backend - should not raise exception
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -101,7 +98,7 @@ class TestWindowGeometryErrorHandling(unittest.TestCase):
         # Create a minimal backend with mocked window
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -126,7 +123,7 @@ class TestWindowGeometryErrorHandling(unittest.TestCase):
         # Create backend with mocked window
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -150,7 +147,7 @@ class TestWindowGeometryErrorHandling(unittest.TestCase):
         # Create backend without initializing
         backend = CoreGraphicsBackend(
             window_title="Test Window",
-            font_name="Menlo",
+            font_names=["Menlo"],
             font_size=12,
             rows=24,
             cols=80
@@ -164,7 +161,3 @@ class TestWindowGeometryErrorHandling(unittest.TestCase):
         
         # Should return False because window doesn't exist
         self.assertFalse(result, "Reset should return False when window is not initialized")
-
-
-if __name__ == '__main__':
-    unittest.main()

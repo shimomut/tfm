@@ -1,6 +1,7 @@
-#!/usr/bin/env python3
 """
 Test dialog scroll threshold respects actual content height
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_scroll_threshold.py -v
 """
 
 import pytest
@@ -167,7 +168,3 @@ class TestDialogScrollThreshold:
         
         # Scroll should adjust: selected (16) >= scroll (0) + content_height (16), so scroll = 16 - 16 + 1 = 1
         assert dialog.scroll == 1, f"Expected scroll=1, got scroll={dialog.scroll}"
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

@@ -1,13 +1,10 @@
-#!/usr/bin/env python3
 """
 Test TAB character handling in text viewer with horizontal scrolling
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_text_viewer_tab_handling.py -v
 """
 
 import sys
-import os
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_text_viewer import TextViewer
 from tfm_path import Path
@@ -158,26 +155,3 @@ def test_tab_column_alignment():
     finally:
         if test_file.exists():
             test_file.unlink()
-
-
-if __name__ == '__main__':
-    print("=" * 60)
-    print("Text Viewer TAB Handling Test")
-    print("=" * 60)
-    
-    try:
-        test_tab_expansion()
-        test_tab_column_alignment()
-        
-        print("\n" + "=" * 60)
-        print("ALL TESTS PASSED ✓")
-        print("=" * 60)
-        
-    except AssertionError as e:
-        print(f"\n✗ TEST FAILED: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n✗ UNEXPECTED ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

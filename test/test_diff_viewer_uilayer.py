@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test suite for DiffViewer UILayer interface implementation
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_diff_viewer_uilayer.py -v
 """
 
 import unittest
-import sys
-import os
 from unittest.mock import Mock
 from pathlib import Path as StdPath
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_diff_viewer import DiffViewer
@@ -183,7 +179,3 @@ class TestDiffViewerUILayer(unittest.TestCase):
         
         # Should be marked dirty
         self.assertTrue(viewer._dirty)
-
-
-if __name__ == '__main__':
-    unittest.main()

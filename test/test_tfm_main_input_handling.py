@@ -1,14 +1,11 @@
-#!/usr/bin/env python3
 """
 Test TFM main input handling migration to TTK API.
 
 This test verifies that tfm_main.py correctly uses TTK's KeyEvent
 for input handling instead of curses key codes.
-"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_tfm_main_input_handling.py -v
+"""
 
 from unittest.mock import Mock, MagicMock, patch
 from ttk import KeyEvent, KeyCode, ModifierKey
@@ -238,19 +235,3 @@ def test_special_keys_use_keycode_enum():
             assert not event.is_printable(), f"{name} should not be printable"
         
         print("✓ Special keys KeyCode enum test passed")
-
-
-if __name__ == '__main__':
-    print("Testing TFM main input handling migration...")
-    print()
-    
-    test_input_event_handling()
-    test_is_key_for_action_with_input_event()
-    test_handle_isearch_input_with_input_event()
-    test_main_loop_uses_callback_mode()
-    test_special_keys_use_keycode_enum()
-    
-    print()
-    print("=" * 60)
-    print("All input handling migration tests passed!")
-    print("=" * 60)

@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
 """
 Test S3 Cache Invalidation - Tests cache invalidation after file operations
 
 This test verifies that S3 cache is properly invalidated after file/archive operations
 to ensure directory listings are refreshed correctly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_cache_invalidation.py -v
 """
 
 import unittest
@@ -13,10 +14,6 @@ from pathlib import Path as PathlibPath
 from unittest.mock import Mock, patch, MagicMock
 
 # Add src to path for imports
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_cache_manager import CacheManager
 from tfm_path import Path
 
@@ -239,7 +236,3 @@ class TestS3CacheInvalidation(unittest.TestCase):
             warning_calls = [call for call in self.log_manager.add_message.call_args_list 
                            if len(call[0]) > 1 and call[0][1] == "WARNING"]
             self.assertTrue(len(warning_calls) > 0)
-
-
-if __name__ == '__main__':
-    unittest.main()

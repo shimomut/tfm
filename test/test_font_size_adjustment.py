@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test: Dynamic Font Size Adjustment
 
 Tests the dynamic font size adjustment feature in CoreGraphics backend.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_font_size_adjustment.py -v
 """
 
-import sys
-import os
 import pytest
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Check if CoreGraphics backend is available
 try:
@@ -196,7 +192,3 @@ class TestFontSizeAdjustment:
             
         finally:
             backend.shutdown()
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

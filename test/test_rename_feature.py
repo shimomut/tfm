@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
 """
 Test script for the rename feature in TFM
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_rename_feature.py -v
 """
 
-import os
-import sys
+from pathlib import Path
 import tempfile
 import shutil
-from pathlib import Path
-
-# Add the src directory to the path so we can import tfm modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 def test_rename_functionality():
     """Test the rename functionality"""
@@ -132,13 +128,3 @@ def test_key_binding():
         print(f"✗ Could not import configuration modules: {e}")
     except Exception as e:
         print(f"✗ Error testing key binding: {e}")
-
-if __name__ == "__main__":
-    print("TFM Rename Feature Test")
-    print("=" * 40)
-    
-    test_rename_functionality()
-    test_key_binding()
-    
-    print("\n" + "=" * 40)
-    print("Test completed!")

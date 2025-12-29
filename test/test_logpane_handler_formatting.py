@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test LogPaneHandler message formatting functionality.
 
@@ -7,15 +6,12 @@ This test verifies that:
 2. Stdout/stderr messages are displayed as-is with minimal formatting
 3. Multi-line output is preserved correctly
 4. The emit() method dispatches to the correct formatter based on is_stream_capture flag
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_logpane_handler_formatting.py -v
 """
 
 import logging
-import sys
-import os
 from datetime import datetime
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_logging_handlers import LogPaneHandler
 from tfm_const import LOG_TIME_FORMAT
@@ -273,19 +269,3 @@ def test_mixed_messages():
     assert "ERROR: File not found" == message, f"Message 3: Expected 'ERROR: File not found', got '{message}'"
     
     print("✓ Handler correctly handles mixed logger and stream messages")
-
-
-if __name__ == '__main__':
-    print("Testing LogPaneHandler message formatting...")
-    print()
-    
-    test_format_logger_message()
-    test_format_stream_message_single_line()
-    test_format_stream_message_multi_line()
-    test_emit_logger_message()
-    test_emit_stream_message()
-    test_emit_stream_message_multi_line()
-    test_mixed_messages()
-    
-    print()
-    print("All tests passed! ✓")

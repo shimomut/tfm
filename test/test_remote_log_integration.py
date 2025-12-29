@@ -1,18 +1,19 @@
-#!/usr/bin/env python3
 """
 Integration Test: Remote Log Monitoring with Command Line
 
 This test verifies that the command line option works correctly
 and that the LogManager is properly initialized with remote monitoring.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_remote_log_integration.py -v
 """
 
+from pathlib import Path
 import sys
 import subprocess
 import time
 import socket
 import json
 import threading
-from pathlib import Path
 
 def test_command_line_option():
     """Test that the --remote-log-port option is recognized"""
@@ -86,9 +87,7 @@ def test_demo_script():
         # Test that the demo script can be imported
         result = subprocess.run([
             sys.executable, '-c', 
-            'import sys; sys.path.insert(0, "demo"); import demo_remote_log; print("Demo script imports successfully")'
         ], capture_output=True, text=True, timeout=10)
-        
         if result.returncode == 0:
             print("✓ Demo script imports successfully")
         else:
@@ -132,6 +131,3 @@ def main():
     
     print("\n" + "=" * 50)
     print("Integration tests completed")
-
-if __name__ == "__main__":
-    main()

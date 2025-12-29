@@ -1,15 +1,12 @@
-#!/usr/bin/env python3
 """
 Test LogCapture.write() creates LogRecords correctly
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_logcapture_logrecord_creation.py -v
 """
 
-import sys
 import logging
 from collections import deque
 from datetime import datetime
-
-# Add src to path
-sys.path.insert(0, 'src')
 
 from tfm_log_manager import LogCapture
 from tfm_const import LOG_TIME_FORMAT
@@ -191,19 +188,3 @@ def test_is_stream_capture_flag():
     assert record.is_stream_capture is True
     
     print("✓ is_stream_capture flag set correctly")
-
-
-if __name__ == '__main__':
-    print("Testing LogCapture LogRecord creation...")
-    print()
-    
-    test_stdout_creates_info_logrecord()
-    test_stderr_creates_warning_logrecord()
-    test_raw_text_preserved()
-    test_multiline_text_preserved()
-    test_empty_text_not_logged()
-    test_fallback_without_logger()
-    test_is_stream_capture_flag()
-    
-    print()
-    print("All tests passed! ✓")

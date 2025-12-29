@@ -1,12 +1,9 @@
-#!/usr/bin/env python3
 """
 Test horizontal scroll behavior in text viewer
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_horizontal_scroll_behavior.py -v
 """
 
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_text_viewer import TextViewer
 from tfm_path import Path
@@ -133,22 +130,3 @@ def test_horizontal_scroll_with_syntax():
     finally:
         if test_file.exists():
             test_file.unlink()
-
-
-if __name__ == '__main__':
-    print("Horizontal Scroll Behavior Test")
-    print("=" * 60)
-    
-    try:
-        test_horizontal_scroll()
-        test_horizontal_scroll_with_syntax()
-        
-        print("\n" + "=" * 60)
-        print("Tests completed")
-        print("=" * 60)
-        
-    except Exception as e:
-        print(f"\n✗ ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

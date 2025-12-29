@@ -1,14 +1,11 @@
-#!/usr/bin/env python3
 """
 Test for QuickEditBar width calculation fix
 
 This test verifies that the input field width is calculated correctly
 and doesn't truncate text unnecessarily due to incorrect width calculation.
-"""
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+Run with: PYTHONPATH=.:src:ttk pytest test/test_general_purpose_dialog_width_fix.py -v
+"""
 
 import unittest
 from unittest.mock import Mock, patch
@@ -218,7 +215,3 @@ class TestQuickEditBarWidthFix(unittest.TestCase):
         # Available text space
         available_text_space_no_help = new_fixed_width_no_help - len(prompt_text)
         self.assertEqual(available_text_space_no_help, 68)
-
-
-if __name__ == '__main__':
-    unittest.main()

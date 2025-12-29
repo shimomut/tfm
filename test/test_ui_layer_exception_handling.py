@@ -3,6 +3,8 @@ Tests for exception handling in UILayerStack.
 
 These tests verify that the layer stack handles exceptions gracefully
 during event processing and rendering, continuing operation despite errors.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_ui_layer_exception_handling.py -v
 """
 
 import pytest
@@ -183,7 +185,3 @@ def test_rendering_continues_after_exception():
     # Both layers should have been attempted
     assert bottom.render_called is True
     assert len(log_manager.messages) == 1  # Exception was logged
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """
 Test S3 Move Fix - Verify that S3 file move operations work correctly
 
 This test verifies that the fix for S3 file moving operations works properly
 by testing the rename method on S3 paths.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_move_operations.py -v
 """
 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-import sys
-import os
-
-# Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_s3 import S3PathImpl
@@ -124,8 +120,3 @@ def main():
     else:
         print(f"\n❌ {len(result.failures)} test(s) failed, {len(result.errors)} error(s)")
         return False
-
-
-if __name__ == '__main__':
-    success = main()
-    sys.exit(0 if success else 1)

@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
 """
 Test FileManager integration with DirectoryDiffViewer.
 
 This test verifies that the directory diff viewer can be invoked from
 FileManager and properly integrates with the UI layer stack.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_diff_filemanager_integration.py -v
 """
 
 import unittest
@@ -13,9 +14,6 @@ from pathlib import Path as StdPath
 from unittest.mock import Mock, MagicMock, patch
 
 # Import from src for test modules
-import sys
-sys.path.insert(0, 'src')
-
 from tfm_path import Path
 from tfm_main import FileManager
 from tfm_directory_diff_viewer import DirectoryDiffViewer
@@ -164,7 +162,3 @@ class TestDirectoryDiffFileManagerIntegration(unittest.TestCase):
         # Verify we're back to FileManager only
         self.assertEqual(len(fm.ui_layer_stack._layers), 1)
         self.assertIsInstance(fm.ui_layer_stack.get_top_layer(), FileManager)
-
-
-if __name__ == '__main__':
-    unittest.main()

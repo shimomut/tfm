@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
 """
 Test suite for ArchiveHandler classes
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_handler.py -v
 """
 
-import os
 import tempfile
 import zipfile
 import tarfile
@@ -11,9 +11,6 @@ from pathlib import Path as PathlibPath
 import pytest
 
 # Add src to path
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_archive import (
     ArchiveHandler, ZipHandler, TarHandler, ArchiveEntry,
     ArchiveError, ArchiveFormatError, ArchiveCorruptedError,
@@ -309,7 +306,3 @@ class TestArchiveErrors:
         handler = TarHandler(Path(corrupted_tar), compression=None)
         with pytest.raises(ArchiveCorruptedError):
             handler.open()
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
 """
 Test archive virtual directory integration with FileManager
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_virtual_directory_integration.py -v
 """
 
-import os
 import sys
 import tempfile
 import zipfile
 from pathlib import Path as PathlibPath
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_archive import ArchiveOperations, ArchivePathImpl
@@ -159,29 +156,3 @@ def test_archive_parent_navigation():
         # Should navigate to root
         assert grandparent_str.endswith('#'), f"Grandparent should be root, got {grandparent_str}"
         print(f"✓ Grandparent navigation (root): {grandparent_str}")
-
-
-if __name__ == '__main__':
-    print("Testing archive virtual directory integration...")
-    print()
-    
-    try:
-        test_archive_detection()
-        test_archive_uri_creation()
-        test_archive_path_navigation()
-        test_archive_path_display_formatting()
-        test_archive_parent_navigation()
-        
-        print()
-        print("✅ All tests passed!")
-        sys.exit(0)
-    except AssertionError as e:
-        print()
-        print(f"❌ Test failed: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print()
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

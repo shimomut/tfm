@@ -3,6 +3,8 @@ Test progress feedback during directory scanning.
 
 This test verifies that progress indicators are displayed correctly
 and that scan cancellation works properly.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_feedback.py -v
 """
 
 import unittest
@@ -180,7 +182,3 @@ class TestProgressFeedback(unittest.TestCase):
         # Verify scan was cancelled (returns empty dicts)
         self.assertEqual(len(left_files), 0)
         self.assertEqual(len(right_files), 0)
-
-
-if __name__ == '__main__':
-    unittest.main()

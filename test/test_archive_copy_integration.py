@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
 """
 Integration test for archive copy operations within FileManager
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_copy_integration.py -v
 """
 
 import os
-import sys
 import tempfile
 import zipfile
 from pathlib import Path as PathlibPath
-
-# Add src directory to path
-sys.path.insert(0, str(PathlibPath(__file__).parent.parent / 'src'))
 
 from tfm_path import Path
 from tfm_file_operations import FileOperations, FileOperationsUI
@@ -283,7 +280,3 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

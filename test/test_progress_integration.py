@@ -1,17 +1,12 @@
-#!/usr/bin/env python3
 """
 Integration test for the progress system with TFM operations
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_integration.py -v
 """
 
-import sys
-import os
 import tempfile
 import shutil
-from pathlib import Path
 from unittest.mock import Mock
-
-# Add the src directory to the path so we can import TFM modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_progress_manager import ProgressManager, OperationType
 
@@ -211,10 +206,3 @@ def test_legacy_compatibility():
     assert not tfm.progress_manager.is_operation_active()
     
     print("✅ Legacy compatibility test passed!")
-
-
-if __name__ == "__main__":
-    test_progress_integration()
-    test_progress_display_integration()
-    test_legacy_compatibility()
-    print("\n🎉 All progress integration tests passed!")

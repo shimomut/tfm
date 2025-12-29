@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
 """
 Test configuration management for LogManager
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_configuration_management.py -v
 """
 
-import sys
-import os
 import logging
-
-# Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_log_manager import LogManager, LoggingConfig
 
@@ -72,7 +68,7 @@ def test_logging_config_custom_values():
 def test_configure_handlers_method_exists():
     """Test that configure_handlers method exists and is callable"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Check method exists
     assert hasattr(log_manager, 'configure_handlers')
@@ -97,7 +93,7 @@ def test_configure_handlers_method_exists():
 def test_log_manager_has_config():
     """Test that LogManager stores configuration"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Check that LogManager has _config attribute
     assert hasattr(log_manager, '_config')
@@ -115,7 +111,7 @@ def test_log_manager_has_config():
 def test_handler_attributes_exist():
     """Test that LogManager has handler attributes"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config, debug_mode=False)
+    log_manager = LogManager(mock_config)
     
     # Check handler attributes exist
     assert hasattr(log_manager, '_log_pane_handler')
@@ -131,17 +127,3 @@ def test_handler_attributes_exist():
     log_manager.restore_stdio()
     
     print("✓ LogManager has handler attributes")
-
-
-if __name__ == '__main__':
-    print("Testing configuration management...")
-    print()
-    
-    test_logging_config_defaults()
-    test_logging_config_custom_values()
-    test_configure_handlers_method_exists()
-    test_log_manager_has_config()
-    test_handler_attributes_exist()
-    
-    print()
-    print("All configuration management tests passed!")

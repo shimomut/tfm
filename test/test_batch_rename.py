@@ -1,13 +1,10 @@
-#!/usr/bin/env python3
 """
 Test script for batch rename functionality
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_batch_rename.py -v
 """
 
 import re
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from tfm_path import Path
 
 def test_batch_rename_logic():
@@ -85,6 +82,3 @@ def test_rename(files, regex_pattern, destination_pattern):
             print(f"  {original_name} → {new_name}")
         else:
             print(f"  {original_name} → (no match)")
-
-if __name__ == "__main__":
-    test_batch_rename_logic()
