@@ -7,6 +7,7 @@ viewing files works correctly.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_viewer_integration.py -v
 """
 
+import sys
 import unittest
 import tempfile
 import zipfile

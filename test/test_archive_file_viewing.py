@@ -7,6 +7,7 @@ from within archive files using the archive:// URI scheme.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_file_viewing.py -v
 """
 
+import sys
 import unittest
 import tempfile
 import zipfile

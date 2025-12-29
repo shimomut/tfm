@@ -8,6 +8,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_general_purpose_dialog_ttk_integ
 """
 
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, MagicMock
 
 # Add src directory to path

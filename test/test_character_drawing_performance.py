@@ -11,6 +11,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_character_drawing_performance.py
 """
 
 import time
+from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent.parent

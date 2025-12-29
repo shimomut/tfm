@@ -10,6 +10,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_color_initialization.py -v
 import unittest
 import sys
 import curses
+from pathlib import Path
 from ttk import KeyEvent, KeyCode, ModifierKey
 from unittest.mock import patch, MagicMock
 
