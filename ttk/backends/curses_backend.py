@@ -1542,3 +1542,78 @@ class CursesBackend(Renderer):
         """
         # No-op: Terminal backend does not support drag-and-drop
         pass
+    
+    def supports_clipboard(self) -> bool:
+        """
+        Query whether this backend supports clipboard operations.
+        
+        The Curses backend does not support clipboard operations as it runs in
+        terminal mode where system clipboard access is not available. Applications
+        should check this method and gracefully disable clipboard features when
+        running in terminal mode.
+        
+        Returns:
+            bool: Always False for Curses backend (terminal mode)
+        
+        Platform Support:
+            - macOS (CoreGraphics): True - uses NSPasteboard APIs
+            - Terminal (Curses): False - clipboard not supported
+            - Windows (future): True - will use Win32 clipboard APIs
+            - Linux (future): True - will use X11/Wayland clipboard
+        
+        Example:
+            if renderer.supports_clipboard():
+                text = renderer.get_clipboard_text()
+            else:
+                print("Clipboard not available in terminal mode")
+        """
+        return False
+    
+    def get_clipboard_text(self) -> str:
+        """
+        Get plain-text content from the system clipboard (stub implementation).
+        
+        This method always returns an empty string for the Curses backend as
+        clipboard access is not available in terminal mode. Applications should
+        check supports_clipboard() before attempting to read from the clipboard.
+        
+        Returns:
+            str: Always returns empty string (clipboard not supported in terminal mode)
+        
+        Note: This method is provided for interface compatibility but always
+        returns an empty string in terminal mode. Use supports_clipboard() to
+        check availability before calling this method.
+        
+        Example:
+            if renderer.supports_clipboard():
+                text = renderer.get_clipboard_text()
+            else:
+                text = ""  # Fallback for terminal mode
+        """
+        return ""
+    
+    def set_clipboard_text(self, text: str) -> bool:
+        """
+        Set plain-text content to the system clipboard (stub implementation).
+        
+        This method always returns False for the Curses backend as clipboard
+        access is not available in terminal mode. Applications should check
+        supports_clipboard() before attempting to write to the clipboard.
+        
+        Args:
+            text: Plain-text string to write to clipboard (ignored)
+        
+        Returns:
+            bool: Always returns False (clipboard not supported in terminal mode)
+        
+        Note: This method is provided for interface compatibility but always
+        returns False in terminal mode. Use supports_clipboard() to check
+        availability before calling this method.
+        
+        Example:
+            if renderer.supports_clipboard():
+                success = renderer.set_clipboard_text("Hello")
+            else:
+                print("Clipboard not available in terminal mode")
+        """
+        return False
