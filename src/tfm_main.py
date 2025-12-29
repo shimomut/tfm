@@ -1134,7 +1134,6 @@ class FileManager(UILayer):
         from tfm_const import VERSION, GITHUB_URL
         
         # Add empty line and separator before
-        print("")
         print("─" * 80)
         
         # TFM ASCII art logo (filled block style) with version and GitHub on the right
@@ -1154,6 +1153,7 @@ class FileManager(UILayer):
             f"Version: {VERSION}",
             f"GitHub: {GITHUB_URL}",
             "",
+            "",
         ]
         
         # Print logo with info on the right
@@ -1165,7 +1165,6 @@ class FileManager(UILayer):
         
         # Add empty line and separator after
         print("─" * 80)
-        print("")
         
         # Trigger redraw to show the messages
         self.mark_dirty()
