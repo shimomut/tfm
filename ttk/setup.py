@@ -81,7 +81,6 @@ setup(
         'dev': [
             'pytest>=7.0',
             'pytest-cov>=4.0',
-            'hypothesis>=6.0',
         ],
     },
     
