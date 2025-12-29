@@ -37,15 +37,17 @@ class TestMenuManager(unittest.TestCase):
         self.assertIn('menus', self.menu_manager.menu_structure)
     
     def test_menu_structure_has_four_menus(self):
-        """Test that menu structure contains File, Edit, View, and Go menus"""
+        """Test that menu structure contains App, File, Edit, View, Go, and Help menus"""
         menus = self.menu_manager.menu_structure['menus']
-        self.assertEqual(len(menus), 4)
+        self.assertEqual(len(menus), 6)
         
         menu_ids = [menu['id'] for menu in menus]
+        self.assertIn('app', menu_ids)
         self.assertIn('file', menu_ids)
         self.assertIn('edit', menu_ids)
         self.assertIn('view', menu_ids)
         self.assertIn('go', menu_ids)
+        self.assertIn('help', menu_ids)
     
     def test_file_menu_structure(self):
         """Test File menu contains required items"""
@@ -62,7 +64,6 @@ class TestMenuManager(unittest.TestCase):
         self.assertIn(MenuManager.FILE_OPEN, item_ids)
         self.assertIn(MenuManager.FILE_DELETE, item_ids)
         self.assertIn(MenuManager.FILE_RENAME, item_ids)
-        self.assertIn(MenuManager.FILE_QUIT, item_ids)
     
     def test_edit_menu_structure(self):
         """Test Edit menu contains required items"""
@@ -147,7 +148,7 @@ class TestMenuManager(unittest.TestCase):
         # Always-enabled items should be enabled
         self.assertTrue(states[MenuManager.FILE_NEW_FILE])
         self.assertTrue(states[MenuManager.FILE_NEW_FOLDER])
-        self.assertTrue(states[MenuManager.FILE_QUIT])
+        self.assertTrue(states[MenuManager.APP_QUIT])
         self.assertTrue(states[MenuManager.EDIT_SELECT_ALL])
     
     def test_update_menu_states_with_selection(self):
@@ -239,7 +240,7 @@ class TestMenuManager(unittest.TestCase):
         
         self.assertIsNotNone(structure)
         self.assertIn('menus', structure)
-        self.assertEqual(len(structure['menus']), 4)
+        self.assertEqual(len(structure['menus']), 6)
     
     def test_menu_items_have_required_fields(self):
         """Test that all menu items have required fields"""
@@ -274,7 +275,7 @@ class TestMenuManager(unittest.TestCase):
         
         # Always-enabled items should still be enabled
         self.assertTrue(states[MenuManager.FILE_NEW_FILE])
-        self.assertTrue(states[MenuManager.FILE_QUIT])
+        self.assertTrue(states[MenuManager.APP_QUIT])
     
     def test_clipboard_with_copy_buffer_attribute(self):
         """Test clipboard detection with copy_buffer attribute"""
