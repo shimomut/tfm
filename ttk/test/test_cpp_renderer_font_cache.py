@@ -10,17 +10,23 @@ This test verifies that the FontCache class properly:
 
 import sys
 import os
+import pytest
 
 # Add project root to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     import cpp_renderer
-    print(f"✓ cpp_renderer module imported successfully (version {cpp_renderer.__version__})")
+    CPP_RENDERER_AVAILABLE = True
 except ImportError as e:
-    print(f"✗ Failed to import cpp_renderer: {e}")
-    print("  Make sure to build the extension first: python setup.py build_ext --inplace")
-    sys.exit(1)
+    CPP_RENDERER_AVAILABLE = False
+    CPP_RENDERER_ERROR = str(e)
+
+# Skip all tests in this module if cpp_renderer is not available
+pytestmark = pytest.mark.skipif(
+    not CPP_RENDERER_AVAILABLE,
+    reason="cpp_renderer module not available - build with: python setup.py build_ext --inplace"
+)
 
 # Note: FontCache is an internal C++ class and cannot be directly tested from Python
 # However, we can verify the module structure and that it compiles correctly

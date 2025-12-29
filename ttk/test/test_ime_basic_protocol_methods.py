@@ -8,6 +8,7 @@ variables that were initialized in task 1.
 
 import sys
 import os
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
@@ -17,8 +18,12 @@ try:
     COCOA_AVAILABLE = True
 except ImportError:
     COCOA_AVAILABLE = False
-    print("PyObjC not available - skipping test")
-    sys.exit(0)
+
+# Skip all tests in this module if PyObjC is not available
+pytestmark = pytest.mark.skipif(
+    not COCOA_AVAILABLE,
+    reason="PyObjC not available - IME tests require macOS"
+)
 
 from ttk.backends.coregraphics_backend import TTKView, CoreGraphicsBackend
 

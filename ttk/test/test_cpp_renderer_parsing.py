@@ -6,19 +6,23 @@ This is a manual verification test, not part of the automated test suite.
 
 import sys
 import os
+import pytest
 
 # Add src directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 try:
     import cpp_renderer
-    print("✓ cpp_renderer module imported successfully")
-    print(f"  Version: {cpp_renderer.__version__}")
+    CPP_RENDERER_AVAILABLE = True
 except ImportError as e:
-    print(f"✗ Failed to import cpp_renderer: {e}")
-    print("  Make sure to build the extension first:")
-    print("  python setup.py build_ext --inplace")
-    sys.exit(1)
+    CPP_RENDERER_AVAILABLE = False
+    CPP_RENDERER_ERROR = str(e)
+
+# Skip all tests in this module if cpp_renderer is not available
+pytestmark = pytest.mark.skipif(
+    not CPP_RENDERER_AVAILABLE,
+    reason="cpp_renderer module not available - build with: python setup.py build_ext --inplace"
+)
 
 def test_basic_functionality():
     """Test that the module has expected functions."""

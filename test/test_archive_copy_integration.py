@@ -38,7 +38,7 @@ class MockFileManager:
         self.left_pane = {
             'path': Path.cwd(),
             'files': [],
-            'selected_index': 0,
+            'focused_index': 0,
             'scroll_offset': 0,
             'selected_files': set(),
             'sort_mode': 'name',
@@ -48,7 +48,7 @@ class MockFileManager:
         self.right_pane = {
             'path': Path.cwd(),
             'files': [],
-            'selected_index': 0,
+            'focused_index': 0,
             'scroll_offset': 0,
             'selected_files': set(),
             'sort_mode': 'name',
@@ -56,6 +56,10 @@ class MockFileManager:
             'filter_pattern': ''
         }
         self.active_pane = 'left'
+    
+    def mark_dirty(self):
+        """Mark the UI as needing a redraw"""
+        self.needs_full_redraw = True
     
     def get_current_pane(self):
         return self.left_pane if self.active_pane == 'left' else self.right_pane

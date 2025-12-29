@@ -6,16 +6,24 @@ Tests that S3 cache TTL can be configured through the Config class.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_ttl_configuration.py -v
 """
 
+import sys
 import unittest
 from unittest.mock import patch, MagicMock
+import pytest
 
 try:
     from tfm_config import DefaultConfig
     from tfm_s3 import get_s3_cache, S3Cache
+    S3_AVAILABLE = True
 except ImportError as e:
-    print(f"Import error: {e}")
-    print("This test requires the TFM modules to be available")
-    sys.exit(1)
+    S3_AVAILABLE = False
+    S3_ERROR = str(e)
+
+# Skip all tests in this module if S3 modules are not available
+pytestmark = pytest.mark.skipif(
+    not S3_AVAILABLE,
+    reason="S3 modules not available"
+)
 
 
 class TestS3TTLConfiguration(unittest.TestCase):

@@ -8,6 +8,7 @@ drawing backgrounds, and rendering characters with attributes.
 
 import sys
 import os
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -19,8 +20,12 @@ try:
     COCOA_AVAILABLE = True
 except ImportError:
     COCOA_AVAILABLE = False
-    print("PyObjC not available - skipping CoreGraphics tests")
-    sys.exit(0)
+
+# Skip all tests in this module if PyObjC is not available
+pytestmark = pytest.mark.skipif(
+    not COCOA_AVAILABLE,
+    reason="PyObjC not available - CoreGraphics tests require macOS"
+)
 
 from backends.coregraphics_backend import CoreGraphicsBackend, TTKView
 from renderer import TextAttribute

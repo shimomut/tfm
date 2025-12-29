@@ -11,15 +11,23 @@ Requirements tested:
 
 import sys
 import os
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 try:
     from backends.coregraphics_backend import CoreGraphicsBackend, COCOA_AVAILABLE
+    BACKEND_AVAILABLE = True
 except ImportError as e:
-    print(f"Error importing CoreGraphics backend: {e}")
-    sys.exit(1)
+    BACKEND_AVAILABLE = False
+    BACKEND_ERROR = str(e)
+
+# Skip all tests in this module if backend is not available
+pytestmark = pytest.mark.skipif(
+    not BACKEND_AVAILABLE,
+    reason="CoreGraphics backend not available"
+)
 
 
 def test_get_dimensions_default():

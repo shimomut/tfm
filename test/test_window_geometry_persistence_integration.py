@@ -26,6 +26,17 @@ class TestWindowGeometryPersistenceIntegration(unittest.TestCase):
         """Set up test fixtures."""
         if not COREGRAPHICS_AVAILABLE:
             self.skipTest("CoreGraphics backend not available")
+        self.backends = []  # Track backends for cleanup
+    
+    def tearDown(self):
+        """Clean up test backends."""
+        for backend in self.backends:
+            if backend:
+                try:
+                    backend.shutdown()
+                except Exception:
+                    pass  # Ignore errors during cleanup
+        self.backends = []
     
     @patch('Cocoa.NSUserDefaults')
     @patch('Cocoa.NSWindow')
