@@ -21,13 +21,12 @@ class MenuManager:
     FILE_NEW_FILE = 'file.new_file'
     FILE_NEW_FOLDER = 'file.new_folder'
     FILE_OPEN = 'file.open'
+    FILE_COPY_TO_OTHER_PANE = 'file.copy_to_other_pane'
+    FILE_MOVE_TO_OTHER_PANE = 'file.move_to_other_pane'
     FILE_DELETE = 'file.delete'
     FILE_RENAME = 'file.rename'
     
     # Edit menu
-    EDIT_COPY = 'edit.copy'
-    EDIT_CUT = 'edit.cut'
-    EDIT_PASTE = 'edit.paste'
     EDIT_SELECT_ALL = 'edit.select_all'
     EDIT_COPY_NAMES = 'edit.copy_names'
     EDIT_COPY_PATHS = 'edit.copy_paths'
@@ -159,10 +158,24 @@ class MenuManager:
                     'shortcut': f'{modifier}+O',
                     'enabled': True
                 },
+                {'separator': True},
+                {
+                    'id': self.FILE_COPY_TO_OTHER_PANE,
+                    'label': 'Copy to Other Pane',
+                    'shortcut': 'F5',
+                    'enabled': False  # Disabled when no selection
+                },
+                {
+                    'id': self.FILE_MOVE_TO_OTHER_PANE,
+                    'label': 'Move to Other Pane',
+                    'shortcut': 'F6',
+                    'enabled': False  # Disabled when no selection
+                },
+                {'separator': True},
                 {
                     'id': self.FILE_DELETE,
                     'label': 'Delete',
-                    'shortcut': f'{modifier}+D',
+                    'shortcut': 'F8',
                     'enabled': False  # Disabled when no selection
                 },
                 {
@@ -188,25 +201,6 @@ class MenuManager:
             'label': 'Edit',
             'items': [
                 {
-                    'id': self.EDIT_COPY,
-                    'label': 'Copy',
-                    'shortcut': f'{modifier}+C',
-                    'enabled': False  # Disabled when no selection
-                },
-                {
-                    'id': self.EDIT_CUT,
-                    'label': 'Cut',
-                    'shortcut': f'{modifier}+X',
-                    'enabled': False  # Disabled when no selection
-                },
-                {
-                    'id': self.EDIT_PASTE,
-                    'label': 'Paste',
-                    'shortcut': f'{modifier}+V',
-                    'enabled': False  # Disabled when clipboard empty
-                },
-                {'separator': True},
-                {
                     'id': self.EDIT_SELECT_ALL,
                     'label': 'Select All',
                     'shortcut': f'{modifier}+A',
@@ -215,13 +209,13 @@ class MenuManager:
                 {'separator': True},
                 {
                     'id': self.EDIT_COPY_NAMES,
-                    'label': 'Copy Names',
+                    'label': 'Copy Names to Clipboard',
                     'shortcut': f'{modifier}+C',
                     'enabled': True  # Always enabled - uses focused item if no selection
                 },
                 {
                     'id': self.EDIT_COPY_PATHS,
-                    'label': 'Copy Full Paths',
+                    'label': 'Copy Full Paths to Clipboard',
                     'shortcut': f'{modifier}+Shift+C',
                     'enabled': True  # Always enabled - uses focused item if no selection
                 }
@@ -393,12 +387,10 @@ class MenuManager:
             has_selection = len(current_pane['selected_files']) > 0
             current_dir = current_pane['path']
             is_at_root = self._is_at_root(current_dir)
-            has_clipboard = self._has_clipboard_content()
         except Exception as e:
             # If we can't get pane info, disable selection-dependent items
             has_selection = False
             is_at_root = True
-            has_clipboard = False
         
         # App menu states
         states[self.APP_ABOUT] = True
@@ -408,13 +400,12 @@ class MenuManager:
         states[self.FILE_NEW_FILE] = True
         states[self.FILE_NEW_FOLDER] = True
         states[self.FILE_OPEN] = True
+        states[self.FILE_COPY_TO_OTHER_PANE] = has_selection
+        states[self.FILE_MOVE_TO_OTHER_PANE] = has_selection
         states[self.FILE_DELETE] = has_selection
         states[self.FILE_RENAME] = has_selection
         
         # Edit menu states
-        states[self.EDIT_COPY] = has_selection
-        states[self.EDIT_CUT] = has_selection
-        states[self.EDIT_PASTE] = has_clipboard
         states[self.EDIT_SELECT_ALL] = True
         states[self.EDIT_COPY_NAMES] = True  # Always enabled - uses focused item if no selection
         states[self.EDIT_COPY_PATHS] = True  # Always enabled - uses focused item if no selection
@@ -470,20 +461,3 @@ class MenuManager:
             return parent == current_dir
         except Exception:
             return True
-    
-    def _has_clipboard_content(self):
-        """Check if clipboard has content.
-        
-        Returns:
-            bool: True if clipboard has files to paste
-        """
-        try:
-            # Check if file_manager has clipboard attribute and it's not empty
-            if hasattr(self.file_manager, 'clipboard'):
-                return len(self.file_manager.clipboard) > 0
-            # Check for copy_buffer attribute (alternative name)
-            if hasattr(self.file_manager, 'copy_buffer'):
-                return len(self.file_manager.copy_buffer) > 0
-            return False
-        except Exception:
-            return False

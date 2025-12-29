@@ -977,18 +977,16 @@ class FileManager(UILayer):
             return self._action_create_directory()
         elif item_id == MenuManager.FILE_OPEN:
             return self._action_open_file()
+        elif item_id == MenuManager.FILE_COPY_TO_OTHER_PANE:
+            return self._action_copy_to_other_pane()
+        elif item_id == MenuManager.FILE_MOVE_TO_OTHER_PANE:
+            return self._action_move_to_other_pane()
         elif item_id == MenuManager.FILE_DELETE:
             return self._action_delete()
         elif item_id == MenuManager.FILE_RENAME:
             return self._action_rename()
         
         # Edit menu
-        elif item_id == MenuManager.EDIT_COPY:
-            return self._action_copy()
-        elif item_id == MenuManager.EDIT_CUT:
-            return self._action_cut()
-        elif item_id == MenuManager.EDIT_PASTE:
-            return self._action_paste()
         elif item_id == MenuManager.EDIT_SELECT_ALL:
             return self._action_select_all()
         elif item_id == MenuManager.EDIT_COPY_NAMES:
@@ -1109,19 +1107,14 @@ class FileManager(UILayer):
         self.should_quit = True
         return True
     
-    def _action_copy(self):
-        """Copy selected files."""
-        self.file_operations_ui.copy_files()
+    def _action_copy_to_other_pane(self):
+        """Copy selected files to the opposite pane's directory."""
+        self.file_operations_ui.copy_selected_files()
         return True
     
-    def _action_cut(self):
-        """Cut selected files."""
-        self.file_operations_ui.cut_files()
-        return True
-    
-    def _action_paste(self):
-        """Paste files from clipboard."""
-        self.file_operations_ui.paste_files()
+    def _action_move_to_other_pane(self):
+        """Move selected files to the opposite pane's directory."""
+        self.file_operations_ui.move_selected_files()
         return True
     
     def _action_select_all(self):

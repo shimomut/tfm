@@ -64,6 +64,8 @@ class TestMenuManager(unittest.TestCase):
         self.assertIn(MenuManager.FILE_NEW_FILE, item_ids)
         self.assertIn(MenuManager.FILE_NEW_FOLDER, item_ids)
         self.assertIn(MenuManager.FILE_OPEN, item_ids)
+        self.assertIn(MenuManager.FILE_COPY_TO_OTHER_PANE, item_ids)
+        self.assertIn(MenuManager.FILE_MOVE_TO_OTHER_PANE, item_ids)
         self.assertIn(MenuManager.FILE_DELETE, item_ids)
         self.assertIn(MenuManager.FILE_RENAME, item_ids)
     
@@ -75,10 +77,9 @@ class TestMenuManager(unittest.TestCase):
         items = [item for item in edit_menu['items'] if 'separator' not in item]
         item_ids = [item['id'] for item in items]
         
-        self.assertIn(MenuManager.EDIT_COPY, item_ids)
-        self.assertIn(MenuManager.EDIT_CUT, item_ids)
-        self.assertIn(MenuManager.EDIT_PASTE, item_ids)
         self.assertIn(MenuManager.EDIT_SELECT_ALL, item_ids)
+        self.assertIn(MenuManager.EDIT_COPY_NAMES, item_ids)
+        self.assertIn(MenuManager.EDIT_COPY_PATHS, item_ids)
     
     def test_view_menu_structure(self):
         """Test View menu contains required items"""
@@ -130,6 +131,9 @@ class TestMenuManager(unittest.TestCase):
         for menu in menus:
             for item in menu['items']:
                 if 'shortcut' in item and item['shortcut']:
+                    # F-keys don't need modifier prefix
+                    if item['shortcut'].startswith('F'):
+                        continue
                     self.assertTrue(
                         item['shortcut'].startswith(expected_modifier),
                         f"Shortcut '{item['shortcut']}' should start with '{expected_modifier}'"
@@ -142,10 +146,10 @@ class TestMenuManager(unittest.TestCase):
         states = self.menu_manager.update_menu_states()
         
         # Selection-dependent items should be disabled
+        self.assertFalse(states[MenuManager.FILE_COPY_TO_OTHER_PANE])
+        self.assertFalse(states[MenuManager.FILE_MOVE_TO_OTHER_PANE])
         self.assertFalse(states[MenuManager.FILE_DELETE])
         self.assertFalse(states[MenuManager.FILE_RENAME])
-        self.assertFalse(states[MenuManager.EDIT_COPY])
-        self.assertFalse(states[MenuManager.EDIT_CUT])
         
         # Always-enabled items should be enabled
         self.assertTrue(states[MenuManager.FILE_NEW_FILE])
@@ -160,28 +164,20 @@ class TestMenuManager(unittest.TestCase):
         states = self.menu_manager.update_menu_states()
         
         # Selection-dependent items should be enabled
+        self.assertTrue(states[MenuManager.FILE_COPY_TO_OTHER_PANE])
+        self.assertTrue(states[MenuManager.FILE_MOVE_TO_OTHER_PANE])
         self.assertTrue(states[MenuManager.FILE_DELETE])
         self.assertTrue(states[MenuManager.FILE_RENAME])
-        self.assertTrue(states[MenuManager.EDIT_COPY])
-        self.assertTrue(states[MenuManager.EDIT_CUT])
     
-    def test_update_menu_states_with_clipboard(self):
-        """Test paste menu state when clipboard has content"""
-        self.mock_file_manager.clipboard = ['file1.txt']
+    def test_update_menu_states_copy_names_always_enabled(self):
+        """Test that copy names/paths are always enabled"""
+        self.mock_pane['selected_files'] = set()
         
         states = self.menu_manager.update_menu_states()
         
-        # Paste should be enabled when clipboard has content
-        self.assertTrue(states[MenuManager.EDIT_PASTE])
-    
-    def test_update_menu_states_empty_clipboard(self):
-        """Test paste menu state when clipboard is empty"""
-        self.mock_file_manager.clipboard = []
-        
-        states = self.menu_manager.update_menu_states()
-        
-        # Paste should be disabled when clipboard is empty
-        self.assertFalse(states[MenuManager.EDIT_PASTE])
+        # Copy names and paths should always be enabled (uses focused item if no selection)
+        self.assertTrue(states[MenuManager.EDIT_COPY_NAMES])
+        self.assertTrue(states[MenuManager.EDIT_COPY_PATHS])
     
     def test_update_menu_states_at_root(self):
         """Test parent directory menu state when at root"""
@@ -231,10 +227,10 @@ class TestMenuManager(unittest.TestCase):
         
         # Should return True for items that should be enabled
         self.assertTrue(self.menu_manager.should_enable_item(MenuManager.FILE_DELETE))
-        self.assertTrue(self.menu_manager.should_enable_item(MenuManager.EDIT_COPY))
+        self.assertTrue(self.menu_manager.should_enable_item(MenuManager.FILE_COPY_TO_OTHER_PANE))
         
-        # Should return False for items that should be disabled
-        self.assertFalse(self.menu_manager.should_enable_item(MenuManager.EDIT_PASTE))
+        # Should return True for always-enabled items
+        self.assertTrue(self.menu_manager.should_enable_item(MenuManager.EDIT_COPY_NAMES))
     
     def test_get_menu_structure(self):
         """Test get_menu_structure returns the menu structure"""
@@ -273,19 +269,8 @@ class TestMenuManager(unittest.TestCase):
         
         # Selection-dependent items should be disabled
         self.assertFalse(states[MenuManager.FILE_DELETE])
-        self.assertFalse(states[MenuManager.EDIT_COPY])
+        self.assertFalse(states[MenuManager.FILE_COPY_TO_OTHER_PANE])
         
         # Always-enabled items should still be enabled
         self.assertTrue(states[MenuManager.FILE_NEW_FILE])
         self.assertTrue(states[MenuManager.APP_QUIT])
-    
-    def test_clipboard_with_copy_buffer_attribute(self):
-        """Test clipboard detection with copy_buffer attribute"""
-        # Remove clipboard attribute and add copy_buffer
-        delattr(self.mock_file_manager, 'clipboard')
-        self.mock_file_manager.copy_buffer = ['file1.txt']
-        
-        states = self.menu_manager.update_menu_states()
-        
-        # Paste should be enabled when copy_buffer has content
-        self.assertTrue(states[MenuManager.EDIT_PASTE])
