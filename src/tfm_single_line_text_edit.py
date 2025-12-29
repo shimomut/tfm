@@ -194,8 +194,8 @@ class SingleLineTextEdit:
         
         # Handle KeyEvent - navigation and editing commands
         if isinstance(event, KeyEvent):
-            # Check for Cmd+V / Ctrl+V paste
-            if event.char == 'v' and event.has_modifier(ModifierKey.COMMAND):
+            # Check for Cmd+V / Ctrl+V paste (exact modifier match)
+            if event.char == 'v' and event.modifiers == ModifierKey.COMMAND:
                 return self.paste_from_clipboard()
             
             if event.key_code == KeyCode.LEFT:

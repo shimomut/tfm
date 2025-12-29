@@ -17,6 +17,15 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         self.mock_renderer = Mock()
         self.mock_renderer.supports_clipboard.return_value = True
         self.mock_renderer.get_clipboard_text.return_value = "pasted text"
+    
+    def _create_paste_event(self):
+        """Create a mock Cmd+V / Ctrl+V KeyEvent"""
+        from ttk import ModifierKey
+        event = Mock(spec=KeyEvent)
+        event.char = 'v'
+        event.key_code = None
+        event.modifiers = ModifierKey.COMMAND
+        return event
         
     def test_paste_simple_text(self):
         """Test pasting simple text at cursor position"""
@@ -24,10 +33,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         editor.set_cursor_pos(6)  # After "hello "
         
         # Create Cmd+V event
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         # Paste
         result = editor.handle_key(event)
@@ -41,10 +47,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         editor = SingleLineTextEdit("world", renderer=self.mock_renderer)
         editor.set_cursor_pos(0)
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -57,10 +60,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         editor = SingleLineTextEdit("helloworld", renderer=self.mock_renderer)
         editor.set_cursor_pos(5)  # Between "hello" and "world"
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -74,10 +74,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         
         editor = SingleLineTextEdit("", renderer=self.mock_renderer)
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -92,10 +89,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         editor = SingleLineTextEdit("hello", max_length=15, renderer=self.mock_renderer)
         editor.set_cursor_pos(5)
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -110,10 +104,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         
         editor = SingleLineTextEdit("hello", renderer=self.mock_renderer)
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -124,10 +115,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         """Test paste fails gracefully when no renderer provided"""
         editor = SingleLineTextEdit("hello")  # No renderer
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -140,10 +128,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         
         editor = SingleLineTextEdit("hello", renderer=self.mock_renderer)
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -156,10 +141,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         
         editor = SingleLineTextEdit("hello", max_length=5, renderer=self.mock_renderer)
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -172,10 +154,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         
         editor = SingleLineTextEdit("", renderer=self.mock_renderer)
         
-        event = Mock(spec=KeyEvent)
-        event.char = 'v'
-        event.has_modifier = Mock(return_value=True)
-        event.key_code = None
+        event = self._create_paste_event()
         
         result = editor.handle_key(event)
         
@@ -190,7 +169,7 @@ class TestSingleLineTextEditPaste(unittest.TestCase):
         # Regular 'v' key without modifier
         event = Mock(spec=KeyEvent)
         event.char = 'v'
-        event.has_modifier = Mock(return_value=False)
+        event.modifiers = ModifierKey.NONE
         event.key_code = None
         
         result = editor.handle_key(event)

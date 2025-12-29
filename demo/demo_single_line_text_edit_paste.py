@@ -82,7 +82,7 @@ def main():
     event = Mock(spec=KeyEvent)
     event.char = 'v'
     event.key_code = None
-    event.has_modifier = Mock(return_value=True)
+    event.modifiers = ModifierKey.COMMAND
     
     result = editor.handle_key(event)
     
