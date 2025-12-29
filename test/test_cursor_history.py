@@ -4,6 +4,7 @@ Test script for cursor position history feature
 Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_history.py -v
 """
 
+from pathlib import Path
 import tempfile
 import shutil
 

@@ -4,6 +4,7 @@ Test file for threaded SearchDialog functionality
 Run with: PYTHONPATH=.:src:ttk pytest test/test_threaded_search_dialog.py -v
 """
 
+from pathlib import Path
 import threading
 import time
 import tempfile

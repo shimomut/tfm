@@ -4,6 +4,7 @@ Test script to verify the encapsulated dialog optimization approach
 Run with: PYTHONPATH=.:src:ttk pytest test/test_encapsulated_dialog_optimization.py -v
 """
 
+from pathlib import Path
 import time
 from unittest.mock import Mock
 

@@ -7,6 +7,7 @@ using the tfm_path abstraction mechanism.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_text_viewer_remote.py -v
 """
 
+import os
 import tempfile
 import unittest
 from unittest.mock import Mock, patch, MagicMock

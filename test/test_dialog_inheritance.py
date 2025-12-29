@@ -7,6 +7,7 @@ from BaseListDialog and have access to common functionality.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_inheritance.py -v
 """
 
+from pathlib import Path
 import sys
 from tfm_base_list_dialog import BaseListDialog
 from tfm_batch_rename_dialog import BatchRenameDialog

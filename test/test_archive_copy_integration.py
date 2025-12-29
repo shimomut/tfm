@@ -4,6 +4,7 @@ Integration test for archive copy operations within FileManager
 Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_copy_integration.py -v
 """
 
+import os
 import tempfile
 import zipfile
 from pathlib import Path as PathlibPath

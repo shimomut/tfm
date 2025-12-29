@@ -6,6 +6,7 @@ Tests the integration of state management with the main TFM application.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_state_integration.py -v
 """
 
+from pathlib import Path
 import tempfile
 
 from tfm_path import Path

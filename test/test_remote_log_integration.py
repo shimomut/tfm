@@ -7,6 +7,7 @@ and that the LogManager is properly initialized with remote monitoring.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_remote_log_integration.py -v
 """
 
+from pathlib import Path
 import sys
 import subprocess
 import time

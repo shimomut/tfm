@@ -8,6 +8,7 @@ from the cursor history.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_existence_check.py -v
 """
 
+from pathlib import Path
 import tempfile
 import shutil
 

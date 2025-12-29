@@ -8,6 +8,7 @@ too many files.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_drag_error_handling.py -v
 """
 
+from pathlib import Path
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 

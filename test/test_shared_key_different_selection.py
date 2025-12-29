@@ -4,6 +4,7 @@ Test file demonstrating shared key with different selection requirements.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_shared_key_different_selection.py -v
 """
 
+from pathlib import Path
 import unittest
 from tfm_config import ConfigManager
 from _config import Config

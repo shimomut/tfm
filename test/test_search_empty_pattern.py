@@ -5,6 +5,7 @@ Tests that running searches are cancelled when pattern becomes empty
 Run with: PYTHONPATH=.:src:ttk pytest test/test_search_empty_pattern.py -v
 """
 
+from pathlib import Path
 import time
 import tempfile
 import shutil

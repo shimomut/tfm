@@ -13,6 +13,7 @@ ensures a clean environment.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_backend_selector.py -v
 """
 
+import os
 import sys
 import subprocess
 import unittest

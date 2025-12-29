@@ -7,6 +7,7 @@ editing text is longer than the maximum width.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_cursor_rendering_bug.py -v
 """
 
+from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
 from tfm_single_line_text_edit import SingleLineTextEdit

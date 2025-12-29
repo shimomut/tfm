@@ -4,6 +4,7 @@ Test script for TFM delete functionality
 Run with: PYTHONPATH=.:src:ttk pytest test/test_delete_feature.py -v
 """
 
+from pathlib import Path
 import tempfile
 import shutil
 

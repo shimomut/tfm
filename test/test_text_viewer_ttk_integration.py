@@ -7,6 +7,7 @@ migrated to use the TTK API instead of curses.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_text_viewer_ttk_integration.py -v
 """
 
+import os
 import tempfile
 import unittest
 from unittest.mock import Mock, MagicMock, patch

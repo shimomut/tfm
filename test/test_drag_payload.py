@@ -4,6 +4,7 @@ Tests for drag payload builder.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_drag_payload.py -v
 """
 
+from pathlib import Path
 import pytest
 
 from tfm_drag_payload import DragPayloadBuilder

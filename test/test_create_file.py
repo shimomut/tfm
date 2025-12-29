@@ -4,6 +4,7 @@ Test script for the create file feature (Shift-E key)
 Run with: PYTHONPATH=.:src:ttk pytest test/test_create_file.py -v
 """
 
+from pathlib import Path
 import sys
 import tempfile
 import unittest.mock

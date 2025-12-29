@@ -9,6 +9,7 @@ This test verifies task 16 of the UI Layer Stack implementation:
 Run with: PYTHONPATH=.:src:ttk pytest test/test_dialog_viewer_layer_stack_integration.py -v
 """
 
+import os
 import unittest
 from unittest.mock import Mock, MagicMock, patch, PropertyMock
 from pathlib import Path

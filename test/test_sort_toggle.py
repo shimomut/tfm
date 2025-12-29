@@ -4,6 +4,7 @@ Test script for the sort toggle functionality
 Run with: PYTHONPATH=.:src:ttk pytest test/test_sort_toggle.py -v
 """
 
+from pathlib import Path
 from tfm_main import FileManager
 import curses
 from ttk import KeyEvent, KeyCode, ModifierKey

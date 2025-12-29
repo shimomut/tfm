@@ -4,6 +4,7 @@ Test script to verify search dialog background updates trigger redraws
 Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_background_updates.py -v
 """
 
+from pathlib import Path
 import time
 import threading
 from unittest.mock import Mock, patch

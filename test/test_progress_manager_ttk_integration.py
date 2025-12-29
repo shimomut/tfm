@@ -10,6 +10,7 @@ This test suite verifies that ProgressManager and ProgressAnimator:
 Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_manager_ttk_integration.py -v
 """
 
+from pathlib import Path
 import sys
 
 import pytest

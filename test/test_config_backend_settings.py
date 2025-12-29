@@ -11,6 +11,7 @@ Tests:
 Run with: PYTHONPATH=.:src:ttk pytest test/test_config_backend_settings.py -v
 """
 
+from pathlib import Path
 import tempfile
 import shutil
 

@@ -7,6 +7,7 @@ CoreGraphics backend and that the curses backend is unaffected.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_backend_specific_window_geometry.py -v
 """
 
+import os
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 

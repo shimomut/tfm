@@ -12,6 +12,7 @@ Requirements tested:
 Run with: PYTHONPATH=.:src:ttk pytest test/test_coregraphics_backend_integration.py -v
 """
 
+from pathlib import Path
 import platform
 import unittest
 

@@ -4,6 +4,7 @@ Tests for drag session manager.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_drag_session.py -v
 """
 
+from pathlib import Path
 import pytest
 
 from tfm_drag_session import DragSessionManager, DragState

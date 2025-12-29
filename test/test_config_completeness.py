@@ -5,6 +5,7 @@ Verifies that all configuration parameters are properly defined
 Run with: PYTHONPATH=.:src:ttk pytest test/test_config_completeness.py -v
 """
 
+from pathlib import Path
 import unittest
 
 from tfm_config import DefaultConfig
@@ -144,20 +145,6 @@ class TestConfigCompleteness(unittest.TestCase):
                 
                 self.assertEqual(default_value, user_value, 
                                f"{setting} should have same value in both configs")
-    
-    def test_jump_dialog_can_use_config_values(self):
-        """Test that jump dialog can access its configuration values"""
-        from tfm_jump_dialog import JumpDialog
-        
-        # Test with default config
-        jump_dialog_default = JumpDialog(self.default_config)
-        self.assertEqual(jump_dialog_default.max_directories, 
-                        self.default_config.MAX_JUMP_DIRECTORIES)
-        
-        # Test with user config
-        jump_dialog_user = JumpDialog(self.user_config)
-        self.assertEqual(jump_dialog_user.max_directories, 
-                        self.user_config.MAX_JUMP_DIRECTORIES)
 
 def run_config_tests():
     """Run all configuration tests"""

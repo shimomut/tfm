@@ -4,6 +4,7 @@ Test that the BaseListDialog refactoring doesn't break TFM integration
 Run with: PYTHONPATH=.:src:ttk pytest test/test_refactoring_integration.py -v
 """
 
+from pathlib import Path
 import unittest
 from unittest.mock import Mock
 import tempfile

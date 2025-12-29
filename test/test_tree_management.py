@@ -6,6 +6,7 @@ Tests the expand_node, collapse_node, and visible node management functionality.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_tree_management.py -v
 """
 
+from pathlib import Path
 import unittest
 from src.tfm_directory_diff_viewer import TreeNode, DifferenceType
 

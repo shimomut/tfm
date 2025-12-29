@@ -5,6 +5,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_manager.py -v
 """
 
 
+from pathlib import Path
 from tfm_progress_manager import ProgressManager, OperationType
 
 

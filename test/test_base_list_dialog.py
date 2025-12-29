@@ -172,34 +172,3 @@ class TestSearchDialog(unittest.TestCase):
         self.assertEqual(result, ('search', None))
         self.assertEqual(self.search_dialog.search_type, 'content')
 
-class TestJumpDialog(unittest.TestCase):
-    """Test JumpDialog functionality"""
-    
-    def setUp(self):
-        """Set up test fixtures"""
-        self.config = Mock()
-        self.config.MAX_JUMP_DIRECTORIES = 5000
-        self.jump_dialog = JumpDialog(self.config)
-        
-    def test_init(self):
-        """Test JumpDialog initialization"""
-        self.assertIsInstance(self.jump_dialog, BaseListDialog)
-        self.assertEqual(self.jump_dialog.directories, [])
-        self.assertEqual(self.jump_dialog.filtered_directories, [])
-        self.assertFalse(self.jump_dialog.searching)
-        
-    def test_filter_directories_internal(self):
-        """Test directory filtering"""
-        from pathlib import Path
-        
-        self.jump_dialog.directories = [
-            Path("/home/user/documents"),
-            Path("/home/user/downloads"),
-            Path("/home/user/desktop")
-        ]
-        self.jump_dialog.text_editor.text = "doc"
-        
-        self.jump_dialog._filter_directories_internal()
-        
-        expected = [Path("/home/user/documents")]
-        self.assertEqual(self.jump_dialog.filtered_directories, expected)

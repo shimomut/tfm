@@ -5,6 +5,7 @@ Tests that animation works correctly in the full application context
 Run with: PYTHONPATH=.:src:ttk pytest test/test_search_animation_integration.py -v
 """
 
+from pathlib import Path
 import time
 import tempfile
 import shutil

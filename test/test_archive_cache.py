@@ -4,6 +4,7 @@ Test ArchiveCache class functionality
 Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_cache.py -v
 """
 
+import os
 import unittest
 import tempfile
 import zipfile
