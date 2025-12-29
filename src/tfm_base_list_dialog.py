@@ -22,7 +22,7 @@ class BaseListDialog:
         self.is_active = False
         self.selected = 0  # Index of currently selected item
         self.scroll = 0  # Scroll offset for the list
-        self.text_editor = SingleLineTextEdit()  # Text editor for input
+        self.text_editor = SingleLineTextEdit(renderer=renderer)  # Text editor for input
         self._last_content_height = None  # Cache actual content height from last draw
         
     def exit(self):

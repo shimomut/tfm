@@ -25,8 +25,8 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         super().__init__(config, renderer)
         
         # Batch rename dialog specific state
-        self.regex_editor = SingleLineTextEdit()
-        self.destination_editor = SingleLineTextEdit()
+        self.regex_editor = SingleLineTextEdit(renderer=renderer)
+        self.destination_editor = SingleLineTextEdit(renderer=renderer)
         self.active_field = 'regex'  # 'regex' or 'destination'
         self.files = []  # List of selected files to rename
         self.preview = []  # List of preview results

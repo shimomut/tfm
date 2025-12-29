@@ -11,7 +11,7 @@ This module provides a reusable SingleLineTextEdit class that handles:
 - Wide character support for proper display and editing
 """
 
-from ttk import TextAttribute, KeyCode
+from ttk import TextAttribute, KeyCode, ModifierKey
 from ttk.input_event import CharEvent, KeyEvent
 from tfm_colors import get_status_color
 from tfm_wide_char_utils import get_display_width, truncate_to_width, get_safe_functions
@@ -20,17 +20,19 @@ from tfm_wide_char_utils import get_display_width, truncate_to_width, get_safe_f
 class SingleLineTextEdit:
     """A single-line text editor with cursor control and visual feedback"""
     
-    def __init__(self, initial_text="", max_length=None):
+    def __init__(self, initial_text="", max_length=None, renderer=None):
         """
         Initialize the text editor
         
         Args:
             initial_text (str): Initial text content
             max_length (int, optional): Maximum allowed text length
+            renderer: TTK Renderer instance for clipboard access (optional)
         """
         self.text = initial_text
         self.cursor_pos = len(initial_text)
         self.max_length = max_length
+        self.renderer = renderer
         
     def get_text(self):
         """Get the current text content"""
@@ -128,6 +130,49 @@ class SingleLineTextEdit:
             self.cursor_pos -= 1
             return True
         return False
+    
+    def paste_from_clipboard(self):
+        """
+        Paste text from system clipboard at cursor position.
+        
+        Only works if renderer was provided during initialization and
+        clipboard is supported by the backend.
+        
+        Returns:
+            bool: True if text was pasted, False otherwise
+        """
+        if not self.renderer:
+            return False
+        
+        if not hasattr(self.renderer, 'supports_clipboard') or not self.renderer.supports_clipboard():
+            return False
+        
+        if not hasattr(self.renderer, 'get_clipboard_text'):
+            return False
+        
+        # Get text from clipboard
+        clipboard_text = self.renderer.get_clipboard_text()
+        if not clipboard_text:
+            return False
+        
+        # Only paste the first line (single-line editor)
+        # Replace newlines with spaces
+        paste_text = clipboard_text.replace('\n', ' ').replace('\r', ' ')
+        
+        # Check max_length constraint
+        if self.max_length:
+            available_space = self.max_length - len(self.text)
+            if available_space <= 0:
+                return False
+            # Truncate paste text if needed
+            paste_text = paste_text[:available_space]
+        
+        # Insert text at cursor position
+        self.text = (self.text[:self.cursor_pos] + 
+                    paste_text + 
+                    self.text[self.cursor_pos:])
+        self.cursor_pos += len(paste_text)
+        return True
         
     def handle_key(self, event, handle_vertical_nav=False):
         """
@@ -149,6 +194,10 @@ class SingleLineTextEdit:
         
         # Handle KeyEvent - navigation and editing commands
         if isinstance(event, KeyEvent):
+            # Check for Cmd+V / Ctrl+V paste
+            if event.char == 'v' and event.has_modifier(ModifierKey.COMMAND):
+                return self.paste_from_clipboard()
+            
             if event.key_code == KeyCode.LEFT:
                 return self.move_cursor_left()
             elif event.key_code == KeyCode.RIGHT:
