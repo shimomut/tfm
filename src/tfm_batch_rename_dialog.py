@@ -6,12 +6,13 @@ Provides batch file renaming functionality with regex patterns
 
 import re
 from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
+from ttk.wide_char_utils import get_display_width, get_safe_functions
+
 from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
 from tfm_ui_layer import UILayer
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color, COLOR_ERROR
-from tfm_wide_char_utils import get_display_width, get_safe_functions
 from tfm_log_manager import getLogger
 
 # Module-level logger

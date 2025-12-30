@@ -8,9 +8,10 @@ in the status bar area (filter, rename, create file/directory, etc.)
 
 from ttk import TextAttribute, KeyCode
 from ttk.input_event import KeyEvent
+from ttk.wide_char_utils import get_display_width, get_safe_functions
+
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
-from tfm_wide_char_utils import get_display_width, get_safe_functions
 
 
 class QuickEditBar:

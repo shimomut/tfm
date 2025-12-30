@@ -8,13 +8,13 @@ for popular file formats using pygments (optional dependency).
 
 import os
 import traceback
-from tfm_path import Path
-from typing import List, Tuple, Optional, Dict, Any
 import re
+from typing import List, Tuple, Optional, Dict, Any
+
+# TTK imports
 from ttk import KeyEvent, KeyCode, CharEvent, SystemEvent
 from ttk.renderer import TextAttribute
-from tfm_log_manager import getLogger
-from tfm_log_manager import getLogger
+from ttk.wide_char_utils import get_display_width, truncate_to_width, split_at_width, safe_get_display_width
 
 # Try to import pygments for syntax highlighting
 try:
@@ -26,9 +26,11 @@ try:
 except ImportError:
     PYGMENTS_AVAILABLE = False
 
+# TFM imports
+from tfm_path import Path
+from tfm_log_manager import getLogger
 from tfm_colors import *
 from tfm_const import *
-from tfm_wide_char_utils import get_display_width, truncate_to_width, split_at_width, safe_get_display_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_ui_layer import UILayer
 from tfm_info_dialog import InfoDialog

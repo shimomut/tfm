@@ -11,10 +11,13 @@ This module provides a reusable SingleLineTextEdit class that handles:
 - Wide character support for proper display and editing
 """
 
+# TTK imports
 from ttk import TextAttribute, KeyCode, ModifierKey
 from ttk.input_event import CharEvent, KeyEvent
+from ttk.wide_char_utils import get_display_width, truncate_to_width, get_safe_functions
+
+# TFM imports
 from tfm_colors import get_status_color
-from tfm_wide_char_utils import get_display_width, truncate_to_width, get_safe_functions
 
 
 class SingleLineTextEdit:

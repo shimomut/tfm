@@ -5,11 +5,12 @@ Provides scrollable information dialog functionality
 """
 
 from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
+from ttk.wide_char_utils import get_display_width, get_safe_functions
+
 from tfm_base_list_dialog import BaseListDialog
 from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_config import config_manager
-from tfm_wide_char_utils import get_display_width, get_safe_functions
 from tfm_scrollbar import draw_scrollbar
 
 

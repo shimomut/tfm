@@ -15,6 +15,8 @@ from threading import Thread
 from tfm_path import Path
 from tfm_ui_layer import UILayer
 from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent, SystemEvent, TextAttribute
+from ttk.wide_char_utils import get_display_width, truncate_to_width
+
 from tfm_colors import (
     get_color_with_attrs,
     get_status_color,
@@ -29,7 +31,6 @@ from tfm_colors import (
     COLOR_TREE_LINES,
     COLOR_ERROR
 )
-from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_diff_viewer import DiffViewer
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_info_dialog import InfoDialog

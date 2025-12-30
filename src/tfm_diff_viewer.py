@@ -7,11 +7,15 @@ between two text files with syntax highlighting support.
 """
 
 import difflib
-from tfm_path import Path
 from typing import List, Tuple, Optional
+
+# TTK imports
 from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent, SystemEvent
+from ttk.wide_char_utils import get_display_width, truncate_to_width
+
+# TFM imports
+from tfm_path import Path
 from tfm_colors import *
-from tfm_wide_char_utils import get_display_width, truncate_to_width
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_ui_layer import UILayer
 from tfm_info_dialog import InfoDialog

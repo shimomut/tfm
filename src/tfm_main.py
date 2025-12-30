@@ -40,10 +40,11 @@ from tfm_log_manager import LogManager
 from tfm_pane_manager import PaneManager
 from tfm_file_operations import FileOperations, FileOperationsUI
 from tfm_list_dialog import ListDialog, ListDialogHelpers
+from ttk.wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
+
 from tfm_info_dialog import InfoDialog, InfoDialogHelpers
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_drives_dialog import DrivesDialog, DrivesDialogHelpers
-from tfm_wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
 from tfm_quick_choice_bar import QuickChoiceBar, QuickChoiceBarHelpers
 from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers

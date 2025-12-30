@@ -5,9 +5,10 @@ Provides common functionality for list-based dialogs
 """
 
 from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent, ModifierKey
+from ttk.wide_char_utils import get_display_width, get_safe_functions
+
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
-from tfm_wide_char_utils import get_display_width, get_safe_functions
 from tfm_scrollbar import draw_scrollbar
 
 
