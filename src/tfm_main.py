@@ -30,7 +30,7 @@ from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, Me
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association, find_action_for_event
+from tfm_config import get_config, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association, find_action_for_event, get_keys_for_action, format_key_for_display
 from tfm_text_viewer import create_text_viewer, is_text_file
 from tfm_diff_viewer import create_diff_viewer
 from tfm_directory_diff_viewer import DirectoryDiffViewer
@@ -2354,8 +2354,20 @@ class FileManager(UILayer):
 
         left_status = f"({', '.join(status_parts)})" if status_parts else ""
         
-        # Simple help message - detailed controls available in help dialog
-        controls = "Press ? for help  •  Tab:switch panes  •  Enter:open  •  q:quit"
+        # Build help message dynamically from config - detailed controls available in help dialog
+        help_keys, _ = get_keys_for_action('help')
+        help_key = format_key_for_display(help_keys[0]) if help_keys else '?'
+        
+        switch_keys, _ = get_keys_for_action('switch_pane')
+        switch_key = format_key_for_display(switch_keys[0]) if switch_keys else 'Tab'
+        
+        open_keys, _ = get_keys_for_action('open_item')
+        open_key = format_key_for_display(open_keys[0]) if open_keys else 'Enter'
+        
+        quit_keys, _ = get_keys_for_action('quit')
+        quit_key = format_key_for_display(quit_keys[0]) if quit_keys else 'q'
+        
+        controls = f"Press {help_key} for help  •  {switch_key}:switch panes  •  {open_key}:open  •  {quit_key}:quit"
         
         # Draw status line with background color
         # Fill entire status line with background color
