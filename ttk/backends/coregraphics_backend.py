@@ -1302,6 +1302,10 @@ class CoreGraphicsBackend(Renderer):
         
         Normalizes text to NFC to handle macOS NFD filenames correctly.
         
+        When overwriting cells, checks if we're overwriting the right half
+        (placeholder) of a wide character and clears the left half to prevent
+        partial rendering of wide characters.
+        
         Args:
             row: Row position (0-based from top)
             col: Column position (0-based from left)
@@ -1317,6 +1321,20 @@ class CoreGraphicsBackend(Renderer):
             # Ignore if starting position is out of bounds
             if row < 0 or row >= self.rows or col < 0 or col >= self.cols:
                 return
+            
+            # Check if we're starting by overwriting the right half of a wide character
+            # If so, clear the left half first
+            if col > 0:
+                current_char, current_color, current_attrs, current_is_wide = self.grid[row][col]
+                
+                # If current cell is a placeholder (empty string), check the previous cell
+                if current_char == '':
+                    prev_char, prev_color, prev_attrs, prev_is_wide = self.grid[row][col - 1]
+                    
+                    # If previous cell has a wide character, clear it
+                    if prev_is_wide and prev_char != '':
+                        # Replace the wide character with a space using its background color
+                        self.grid[row][col - 1] = (' ', prev_color, prev_attrs, False)
             
             # Draw each character in the text, accounting for wide characters
             current_col = col
@@ -1355,6 +1373,10 @@ class CoreGraphicsBackend(Renderer):
         
         Handles out-of-bounds coordinates gracefully by clamping to valid ranges.
         
+        When overwriting cells, checks if we're overwriting the right half
+        (placeholder) of a wide character and clears the left half to prevent
+        partial rendering of wide characters.
+        
         Args:
             row: Row position for the line
             col: Starting column position
@@ -1384,6 +1406,20 @@ class CoreGraphicsBackend(Renderer):
             # Draw the horizontal line
             is_wide = _is_wide_character(char)
             for c in range(start_col, end_col):
+                # Check if we're overwriting the right half (placeholder) of a wide character
+                # If so, we need to clear the left half to prevent partial rendering
+                current_char, current_color, current_attrs, current_is_wide = self.grid[row][c]
+                
+                # If current cell is a placeholder (empty string), check the previous cell
+                if c > 0 and current_char == '':
+                    prev_char, prev_color, prev_attrs, prev_is_wide = self.grid[row][c - 1]
+                    
+                    # If previous cell has a wide character, clear it
+                    if prev_is_wide and prev_char != '':
+                        # Replace the wide character with a space using its background color
+                        self.grid[row][c - 1] = (' ', prev_color, prev_attrs, False)
+                
+                # Write the new character
                 self.grid[row][c] = (char, color_pair, 0, is_wide)
         except Exception as e:
             # Log warning but continue execution without crashing
