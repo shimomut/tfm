@@ -332,36 +332,28 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                 is_active=(self.active_field == 'regex')
             )
         
-        # Draw destination input
+        # Draw replacement input
         dest_y = start_y + 3
-        dest_label = "Destination:   "
+        dest_label = "Replacement:   "
         
         if dest_y < height:
-            # Draw destination input field using SingleLineTextEdit
+            # Draw replacement input field using SingleLineTextEdit
             self.destination_editor.draw(
                 self.renderer, dest_y, content_start_x, content_width,
                 dest_label,
                 is_active=(self.active_field == 'destination')
             )
         
-        # Draw navigation help
-        nav_help_y = start_y + 4
-        if nav_help_y < height:
-            nav_help_text = "Navigation: ↑/↓=Switch fields, Tab=Alt switch, PgUp/PgDn=Scroll preview"
-            status_color_pair, _ = get_status_color()
-            self.renderer.draw_text(nav_help_y, content_start_x, nav_help_text[:content_width], 
-                             color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
-        
         # Draw help for macros
-        help_y = start_y + 5
+        help_y = start_y + 4
         if help_y < height:
-            help_text = "Macros: \\0=full name, \\1-\\9=regex groups, \\d=index"
+            help_text = "Macros: \\0=matched text, \\1-\\9=regex groups, \\d=index"
             status_color_pair, _ = get_status_color()
             self.renderer.draw_text(help_y, content_start_x, help_text[:content_width], 
                              color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw separator line
-        sep_y = start_y + 6
+        sep_y = start_y + 5
         if sep_y < height:
             sep_line = "├" + "─" * (dialog_width - 2) + "┤"
             # Use BOLD for separator lines (horizontal dividers) for emphasis
@@ -370,7 +362,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                              color_pair=border_color_pair, attributes=sep_attributes)
         
         # Draw preview header
-        preview_header_y = start_y + 7
+        preview_header_y = start_y + 6
         if preview_header_y < height:
             header_text = "Preview:"
             header_color_pair, _ = get_status_color()
@@ -378,7 +370,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                              color_pair=header_color_pair, attributes=TextAttribute.BOLD)
         
         # Calculate preview area
-        preview_start_y = start_y + 8
+        preview_start_y = start_y + 7
         preview_end_y = start_y + dialog_height - 3
         preview_height = preview_end_y - preview_start_y + 1
         
@@ -524,7 +516,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         # Draw help text with safe positioning
         help_y = start_y + dialog_height - 2
         if help_y < height and help_y >= 0:
-            help_text = "Tab: Switch input | ←→: Move cursor | Home/End: Start/End | Enter: Rename | ESC: Cancel"
+            help_text = "Tab/↑↓: Switch | PgUp/PgDn: Scroll | Enter: Rename | ESC: Cancel"
             help_width = get_width(help_text)
             
             if help_width <= dialog_width:
