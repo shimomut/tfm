@@ -77,7 +77,21 @@ def draw_hline(self, row: int, col: int, char: str, ...):
     # ... rest of implementation
 ```
 
-#### 2. TFM Wide Character Utils (`src/tfm_wide_char_utils.py`)
+#### 2. TTK Curses Backend (`ttk/backends/curses_backend.py`)
+
+**Method: `CursesBackend.draw_text()`**
+- Added NFC normalization before rendering
+- Ensures text is displayed with correct width in terminal
+- Normalizes once at string level before passing to curses
+
+```python
+def draw_text(self, row: int, col: int, text: str, ...):
+    # Normalize to NFC to handle macOS NFD decomposition
+    text = unicodedata.normalize('NFC', text)
+    # ... pass to curses for rendering
+```
+
+#### 3. TFM Wide Character Utils (`src/tfm_wide_char_utils.py`)
 
 **Function: `_cached_get_display_width()`**
 - Added NFC normalization before width calculation
@@ -143,7 +157,7 @@ macOS HFS+ and APFS filesystems automatically convert filenames to NFD:
 ## Related Files
 
 - `ttk/backends/coregraphics_backend.py` - CoreGraphics rendering implementation
-- `ttk/backends/curses_backend.py` - Curses backend (no changes needed)
+- `ttk/backends/curses_backend.py` - Curses backend (NFD normalization added to draw_text)
 - `src/tfm_wide_char_utils.py` - Width calculation utilities
   - `_is_wide_character()` - Internal function for wide character detection
   - `_cached_is_wide_character()` - Cached version used by `_is_wide_character()`

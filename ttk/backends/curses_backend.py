@@ -7,6 +7,7 @@ and window management for terminal applications.
 """
 
 import curses
+import unicodedata
 from typing import Tuple, Optional
 
 from ttk.renderer import Renderer, TextAttribute
@@ -576,6 +577,8 @@ class CursesBackend(Renderer):
         and attributes. Text that extends beyond the window is clipped.
         Out-of-bounds coordinates are handled gracefully.
         
+        Normalizes text to NFC to handle macOS NFD filenames correctly.
+        
         Args:
             row: Row position (0-based)
             col: Column position (0-based)
@@ -590,6 +593,10 @@ class CursesBackend(Renderer):
             raise ValueError(f"Color pair must be in range 0-255, got {color_pair}")
         
         try:
+            # Normalize to NFC to handle macOS NFD decomposition (e.g., "が" -> "か" + combining mark)
+            # This ensures proper display width calculation and rendering
+            text = unicodedata.normalize('NFC', text)
+            
             # Build curses attributes
             attr = curses.color_pair(color_pair)
             if attributes & TextAttribute.BOLD:
