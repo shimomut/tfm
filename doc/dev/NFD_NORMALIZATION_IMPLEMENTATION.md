@@ -98,6 +98,7 @@ def draw_text(self, row: int, col: int, text: str, ...):
 - Ensures accurate display width for all text
 - Normalization happens once at the string level, not per-character
 - Calls internal `_is_wide_character()` for each character
+- After NFC normalization, combining characters are composed, so no separate handling needed
 
 **Note on `_cached_is_wide_character()` and `_is_wide_character()`**
 - `_cached_is_wide_character()` does NOT normalize (optimization)

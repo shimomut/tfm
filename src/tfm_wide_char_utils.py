@@ -119,26 +119,22 @@ def _cached_get_display_width(text: str) -> int:
     filenames that appear repeatedly in directory listings.
     
     Normalizes to NFC to handle macOS NFD filenames correctly.
+    After NFC normalization, all combining characters are composed,
+    so no separate combining character handling is needed.
     """
     if not text:
         return 0
     
     # Normalize to NFC to handle macOS NFD decomposition (e.g., "が" -> "か" + combining mark)
     # This ensures proper display width calculation for decomposed characters
+    # After NFC normalization, combining characters are composed into base characters
     text = unicodedata.normalize('NFC', text)
     
     width = 0
-    i = 0
     
-    while i < len(text):
+    for char in text:
         try:
-            char = text[i]
-            
-            # Handle combining characters (they don't add width)
-            if unicodedata.combining(char):
-                # Combining characters don't add to display width
-                pass
-            elif _is_wide_character(char):
+            if _is_wide_character(char):
                 # Wide characters take 2 columns
                 width += 2
             else:
@@ -150,8 +146,6 @@ def _cached_get_display_width(text: str) -> int:
         except Exception:
             # For any other unexpected error, assume single-width and continue
             width += 1
-        
-        i += 1
     
     return width
 
@@ -161,8 +155,10 @@ def get_display_width(text: str) -> int:
     Calculate the display width of a string, accounting for wide characters.
     
     This function properly measures the visual width that text will occupy
-    in a terminal, where wide characters take 2 columns and combining
-    characters take 0 columns.
+    in a terminal, where wide characters take 2 columns.
+    
+    The function normalizes text to NFC, which composes all combining
+    characters into their base characters, so no separate handling is needed.
     
     Args:
         text: The text string to measure
