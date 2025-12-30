@@ -152,7 +152,13 @@ TFM supports remote log monitoring, allowing you to view logs from another termi
 
 ### Enabling Remote Monitoring
 
-Enable in configuration:
+Start TFM with the `--remote-log-port` option:
+
+```bash
+tfm --remote-log-port 9999
+```
+
+Or enable in configuration:
 
 ```python
 # In config file
@@ -184,6 +190,110 @@ Logs are sent as JSON:
     "message": "File operation completed"
 }
 ```
+
+## File Logging
+
+### Overview
+
+TFM can write all log messages to a file for persistent storage and later analysis. This is useful for:
+
+- Debugging issues that occur over time
+- Keeping a permanent record of operations
+- Analyzing patterns in errors or warnings
+- Sharing logs with others for troubleshooting
+
+### Enabling File Logging
+
+Start TFM with the `--log-file` option:
+
+```bash
+# Write logs to a specific file
+tfm --log-file /tmp/tfm.log
+
+# Write logs to a file in your home directory
+tfm --log-file ~/tfm-$(date +%Y%m%d).log
+```
+
+### Log File Format
+
+The log file contains the same formatted messages shown in the log pane:
+
+```
+14:23:45 [Main] INFO: TFM started
+14:23:46 [FileOp] INFO: Copying file.txt to backup/
+14:23:47 [FileOp] INFO: Copy completed successfully
+14:23:48 [STDOUT] Processing complete
+```
+
+### What Gets Logged
+
+File logging captures:
+
+- **Logger Messages**: All messages from TFM components (INFO, WARNING, ERROR)
+- **stdout Output**: Output from print() statements and external programs
+- **stderr Output**: Error output from external programs
+
+### Log File Behavior
+
+- **Append Mode**: Logs are appended to existing files (not overwritten)
+- **Automatic Flushing**: Messages are written immediately for reliability
+- **Error Handling**: File write errors are logged to stderr but don't crash TFM
+- **Cleanup**: Log file is automatically closed when TFM exits
+
+### Common Use Cases
+
+#### Daily Log Files
+
+Create a new log file each day:
+
+```bash
+tfm --log-file ~/logs/tfm-$(date +%Y-%m-%d).log
+```
+
+#### Session-Specific Logs
+
+Create a unique log file for each session:
+
+```bash
+tfm --log-file /tmp/tfm-session-$(date +%s).log
+```
+
+#### Debugging Issues
+
+Enable file logging when troubleshooting:
+
+```bash
+tfm --log-file /tmp/tfm-debug.log
+```
+
+Then review the log file after reproducing the issue:
+
+```bash
+cat /tmp/tfm-debug.log | grep ERROR
+```
+
+#### Monitoring Long Operations
+
+Log file operations for later review:
+
+```bash
+tfm --log-file ~/tfm-backup.log
+# Perform backup operations
+# Review log later: less ~/tfm-backup.log
+```
+
+### Combining with Remote Monitoring
+
+You can use both file logging and remote monitoring simultaneously:
+
+```bash
+tfm --log-file /tmp/tfm.log --remote-log-port 9999
+```
+
+This allows you to:
+- Monitor logs in real-time via remote connection
+- Keep a persistent record in the log file
+- Review logs later even after TFM exits
 
 ## Tips and Tricks
 
@@ -247,10 +357,20 @@ Logs are sent as JSON:
 **Problem:** Cannot connect to remote monitoring.
 
 **Solution:**
-- Verify `REMOTE_MONITORING_ENABLED = True`
+- Verify `--remote-log-port` option was used
 - Check port is not in use: `netstat -an | grep 9999`
 - Verify firewall allows connections
 - Try different port number
+
+### File Logging Not Working
+
+**Problem:** Log file is not created or empty.
+
+**Solution:**
+- Verify `--log-file` option was used with valid path
+- Check directory exists and is writable
+- Check disk space is available
+- Review stderr for file write errors
 
 ## Benefits
 

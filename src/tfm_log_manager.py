@@ -13,7 +13,7 @@ from typing import Dict, Optional
 from tfm_const import LOG_TIME_FORMAT, MAX_LOG_MESSAGES
 from tfm_colors import get_log_color, get_status_color
 from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
-from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
+from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler, FileLoggingHandler
 
 
 @dataclass
@@ -32,6 +32,10 @@ class LoggingConfig:
     # Remote monitoring settings
     remote_monitoring_enabled: bool = False
     remote_monitoring_port: Optional[int] = None
+    
+    # File logging settings
+    file_logging_enabled: bool = False
+    file_logging_path: Optional[str] = None
     
     # Log level settings
     default_log_level: int = logging.INFO
@@ -104,7 +108,7 @@ class LogCapture:
 class LogManager:
     """Manages logging system and log display"""
     
-    def __init__(self, config, remote_port=None, is_desktop_mode=False):
+    def __init__(self, config, remote_port=None, is_desktop_mode=False, log_file=None):
         # Log scroll state
         self.log_scroll_offset = 0
         
@@ -129,6 +133,9 @@ class LogManager:
         self._config.remote_monitoring_port = remote_port
         # Enable stream output in desktop mode, disable in terminal mode
         self._config.stream_output_enabled = is_desktop_mode
+        # Configure file logging
+        self._config.file_logging_enabled = log_file is not None
+        self._config.file_logging_path = log_file
         
         # Log level configuration
         # Global default level (defaults to INFO)
@@ -140,6 +147,7 @@ class LogManager:
         self._log_pane_handler = None
         self._stream_output_handler = None
         self._remote_monitoring_handler = None
+        self._file_logging_handler = None
         
         # Store desktop mode flag
         self.is_desktop_mode = is_desktop_mode
@@ -249,6 +257,31 @@ class LogManager:
                     if self._remote_monitoring_handler in logger.handlers:
                         logger.removeHandler(self._remote_monitoring_handler)
                 self._remote_monitoring_handler = None
+        
+        # Configure file logging handler
+        if self._config.file_logging_enabled:
+            if self._file_logging_handler is None and self._config.file_logging_path:
+                # Create new handler
+                self._file_logging_handler = FileLoggingHandler(self._config.file_logging_path)
+                # Add to stream logger
+                if self._file_logging_handler not in self._stream_logger.handlers:
+                    self._stream_logger.addHandler(self._file_logging_handler)
+                # Add to all existing loggers
+                for logger in self._loggers.values():
+                    if self._file_logging_handler not in logger.handlers:
+                        logger.addHandler(self._file_logging_handler)
+        else:
+            if self._file_logging_handler is not None:
+                # Close the file
+                self._file_logging_handler.close()
+                # Remove from stream logger
+                if self._file_logging_handler in self._stream_logger.handlers:
+                    self._stream_logger.removeHandler(self._file_logging_handler)
+                # Remove from all existing loggers
+                for logger in self._loggers.values():
+                    if self._file_logging_handler in logger.handlers:
+                        logger.removeHandler(self._file_logging_handler)
+                self._file_logging_handler = None
     
     def getLogger(self, name: str) -> logging.Logger:
         """
@@ -294,6 +327,8 @@ class LogManager:
             logger.addHandler(self._stream_output_handler)
         if self._remote_monitoring_handler is not None:
             logger.addHandler(self._remote_monitoring_handler)
+        if self._file_logging_handler is not None:
+            logger.addHandler(self._file_logging_handler)
         
         # Cache the logger
         self._loggers[name] = logger
@@ -606,6 +641,10 @@ class LogManager:
         # Stop remote monitoring handler if active
         if hasattr(self, '_remote_monitoring_handler') and self._remote_monitoring_handler:
             self._remote_monitoring_handler.stop_server()
+        
+        # Close file logging handler if active
+        if hasattr(self, '_file_logging_handler') and self._file_logging_handler:
+            self._file_logging_handler.close()
         
         # Restore stdout/stderr
         self.restore_stdio()

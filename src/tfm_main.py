@@ -224,7 +224,7 @@ class TFMEventCallback(EventCallback):
 
 
 class FileManager(UILayer):
-    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None):
+    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None):
         self.renderer = renderer
         self.stdscr = renderer  # Keep stdscr as alias for compatibility during migration
         
@@ -253,7 +253,7 @@ class FileManager(UILayer):
         # Enable stream output in desktop mode (CoreGraphics), disable in terminal mode (Curses)
         is_desktop = renderer.is_desktop_mode()
         self.log_manager = LogManager(self.config, remote_port=remote_log_port, 
-                                     is_desktop_mode=is_desktop)
+                                     is_desktop_mode=is_desktop, log_file=log_file)
         
         # Set the global LogManager instance for module-level getLogger() calls
         from tfm_log_manager import set_log_manager
@@ -4729,12 +4729,12 @@ class FileManager(UILayer):
             self.logger.warning(f"Warning: Could not load search history: {e}")
             return []
 
-def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None):
+def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None):
     """Main function to run the file manager"""
     fm = None
     try:
         fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, 
-                        profiling_targets=profiling_targets or set())
+                        profiling_targets=profiling_targets or set(), log_file=log_file)
         fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
@@ -4807,6 +4807,13 @@ def create_parser():
         type=int,
         metavar='PORT',
         help='Enable remote log monitoring on specified port (e.g., --remote-log-port 8888)'
+    )
+    
+    parser.add_argument(
+        '--log-file',
+        type=str,
+        metavar='PATH',
+        help='Write logs to specified file (e.g., --log-file /tmp/tfm.log)'
     )
     
     parser.add_argument(
@@ -4902,7 +4909,8 @@ def cli_main():
                  remote_log_port=args.remote_log_port,
                  left_dir=args.left,
                  right_dir=args.right,
-                 profiling_targets=profile_targets)
+                 profiling_targets=profile_targets,
+                 log_file=args.log_file)
         finally:
             # Ensure renderer is properly shut down
             renderer.shutdown()

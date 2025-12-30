@@ -271,6 +271,97 @@ class StreamOutputHandler(logging.Handler):
                 pass
 
 
+class FileLoggingHandler(logging.Handler):
+    """
+    Custom handler that writes log messages to a file.
+    
+    This handler:
+    - Writes formatted messages to a specified file
+    - Handles file I/O errors gracefully
+    - Formats messages consistently with other handlers
+    """
+    
+    def __init__(self, filename: str):
+        """
+        Initialize file logging handler.
+        
+        Args:
+            filename: Path to log file
+        """
+        super().__init__()
+        self.filename = filename
+        self.file_handle = None
+        self.lock = threading.RLock()
+        
+        # Open file for writing (append mode)
+        try:
+            self.file_handle = open(filename, 'a', encoding='utf-8')
+        except (OSError, IOError) as e:
+            # Log error to fallback stream
+            try:
+                sys.__stderr__.write(f"[FileLoggingHandler] Failed to open log file '{filename}': {e}\n")
+                sys.__stderr__.flush()
+            except:
+                pass
+    
+    def emit(self, record: logging.LogRecord):
+        """
+        Write log record to file.
+        
+        Formatting is determined by record source:
+        - Logger API: Write with full formatting (timestamp, name, level, message)
+        - stdout/stderr: Write raw message without any formatting
+        
+        Error handling: File write failures are logged to fallback stream.
+        The handler continues operating with remaining handlers even if this one fails.
+        
+        Args:
+            record: Log record to write
+        """
+        if self.file_handle is None:
+            return
+        
+        try:
+            with self.lock:
+                if should_format_record(record):
+                    # Logger API: write with full formatting
+                    timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
+                    formatted = f"{timestamp} [{record.name}] {record.levelname}: {record.getMessage()}"
+                    self.file_handle.write(formatted + '\n')
+                else:
+                    # stdout/stderr: write raw message without any formatting
+                    msg = record.getMessage()
+                    self.file_handle.write(msg)
+                    if not msg.endswith('\n'):
+                        self.file_handle.write('\n')
+                self.file_handle.flush()
+        except (OSError, IOError) as e:
+            # File write error - log to fallback stream
+            try:
+                sys.__stderr__.write(f"[FileLoggingHandler] Error writing to log file: {e}\n")
+                sys.__stderr__.flush()
+            except:
+                pass
+        except Exception as e:
+            # Unexpected error - log to fallback stream
+            try:
+                sys.__stderr__.write(f"[FileLoggingHandler] Unexpected error: {e}\n")
+                sys.__stderr__.flush()
+            except:
+                pass
+    
+    def close(self):
+        """Close the log file."""
+        with self.lock:
+            if self.file_handle is not None:
+                try:
+                    self.file_handle.close()
+                except Exception:
+                    pass
+                self.file_handle = None
+        super().close()
+
+
 class RemoteMonitoringHandler(logging.Handler):
     """
     Custom handler that broadcasts log messages to TCP clients.
