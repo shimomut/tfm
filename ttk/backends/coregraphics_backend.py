@@ -322,8 +322,13 @@ def _is_wide_character(char: str) -> bool:
     Wide characters (zenkaku) take up 2 display columns in terminal output,
     including most East Asian characters (Chinese, Japanese, Korean).
     
+    Note: Assumes input is a single character (length 1). Callers must ensure
+    this constraint. NFD normalization is not needed because:
+    - draw_text() normalizes the entire string to NFC before iterating
+    - draw_hline() and draw_vline() verify char length is 1
+    
     Args:
-        char: A single Unicode character
+        char: A single Unicode character (must have length 1)
         
     Returns:
         True if the character is wide (double-width), False otherwise
@@ -1323,6 +1328,8 @@ class CoreGraphicsBackend(Renderer):
         Handles out-of-bounds coordinates gracefully by ignoring characters
         that would be placed outside the grid.
         
+        Normalizes text to NFC to handle macOS NFD filenames correctly.
+        
         Args:
             row: Row position (0-based from top)
             col: Column position (0-based from left)
@@ -1331,6 +1338,10 @@ class CoreGraphicsBackend(Renderer):
             attributes: Text attributes (bold, underline, reverse) as bitwise OR
         """
         try:
+            # Normalize to NFC to handle macOS NFD decomposition (e.g., "が" -> "か" + combining mark)
+            # This ensures proper display width calculation and rendering
+            text = unicodedata.normalize('NFC', text)
+            
             # Ignore if starting position is out of bounds
             if row < 0 or row >= self.rows or col < 0 or col >= self.cols:
                 return
@@ -1376,10 +1387,18 @@ class CoreGraphicsBackend(Renderer):
             row: Row position for the line
             col: Starting column position
             char: Character to use for the line (typically '-' or '─')
+                  Must be a single character (length 1)
             length: Length of the line in characters
             color_pair: Color pair ID to use (default: 0)
+            
+        Raises:
+            ValueError: If char is not a single character
         """
         try:
+            # Verify char is a single character
+            if len(char) != 1:
+                raise ValueError(f"char must be a single character, got length {len(char)}")
+            
             # Ignore if row is out of bounds
             if row < 0 or row >= self.rows:
                 return
@@ -1412,10 +1431,18 @@ class CoreGraphicsBackend(Renderer):
             row: Starting row position
             col: Column position for the line
             char: Character to use for the line (typically '|' or '│')
+                  Must be a single character (length 1)
             length: Length of the line in characters
             color_pair: Color pair ID to use (default: 0)
+            
+        Raises:
+            ValueError: If char is not a single character
         """
         try:
+            # Verify char is a single character
+            if len(char) != 1:
+                raise ValueError(f"char must be a single character, got length {len(char)}")
+            
             # Ignore if column is out of bounds
             if col < 0 or col >= self.cols:
                 return

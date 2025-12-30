@@ -63,6 +63,8 @@ def _cached_is_wide_character(char: str) -> bool:
     
     This function caches results to avoid repeated Unicode database lookups
     for the same characters, which is common when processing file lists.
+    
+    Note: Assumes input is already NFC normalized (done by caller).
     """
     if len(char) != 1:
         return False
@@ -112,9 +114,15 @@ def _cached_get_display_width(text: str) -> int:
     
     This function caches results for frequently accessed strings like
     filenames that appear repeatedly in directory listings.
+    
+    Normalizes to NFC to handle macOS NFD filenames correctly.
     """
     if not text:
         return 0
+    
+    # Normalize to NFC to handle macOS NFD decomposition (e.g., "が" -> "か" + combining mark)
+    # This ensures proper display width calculation for decomposed characters
+    text = unicodedata.normalize('NFC', text)
     
     width = 0
     i = 0
