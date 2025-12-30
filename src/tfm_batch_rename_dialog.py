@@ -47,8 +47,8 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         self.regex_editor.clear()
         self.destination_editor.clear()
         self.active_field = 'regex'
-        self.preview = []
         self.scroll = 0
+        self.update_preview()  # Initialize preview with all files
         self.content_changed = True  # Mark content as changed when showing
         return True
         
@@ -80,13 +80,28 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         regex_pattern = self.regex_editor.get_text()
         destination_pattern = self.destination_editor.get_text()
         
+        # If no patterns specified, show all files as unchanged
         if not regex_pattern or not destination_pattern:
+            for file_path in self.files:
+                self.preview.append({
+                    'original': file_path.name,
+                    'new': file_path.name,
+                    'valid': True,
+                    'conflict': False
+                })
             return
         
         try:
             pattern = re.compile(regex_pattern)
         except re.error:
-            # Invalid regex pattern
+            # Invalid regex pattern - show all files as unchanged
+            for file_path in self.files:
+                self.preview.append({
+                    'original': file_path.name,
+                    'new': file_path.name,
+                    'valid': True,
+                    'conflict': False
+                })
             return
         
         for i, file_path in enumerate(self.files):
@@ -409,14 +424,6 @@ class BatchRenameDialog(UILayer, BaseListDialog):
             if len(self.preview) > preview_height:
                 scrollbar_x = start_x + dialog_width - 2
                 self.draw_scrollbar(self.preview, preview_start_y, preview_height, scrollbar_x)
-        else:
-            # No preview available
-            no_preview_y = preview_start_y + 2
-            if no_preview_y < height:
-                no_preview_text = "Enter regex pattern and destination to see preview"
-                status_color_pair, _ = get_status_color()
-                self.renderer.draw_text(no_preview_y, content_start_x, no_preview_text, 
-                                 color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw help text with safe positioning
         help_y = start_y + dialog_height - 2
