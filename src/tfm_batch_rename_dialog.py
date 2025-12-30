@@ -80,8 +80,8 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         regex_pattern = self.regex_editor.get_text()
         destination_pattern = self.destination_editor.get_text()
         
-        # If no patterns specified, show all files as unchanged
-        if not regex_pattern or not destination_pattern:
+        # If no regex pattern specified, show all files as unchanged
+        if not regex_pattern:
             for file_path in self.files:
                 self.preview.append({
                     'original': file_path.name,
@@ -610,12 +610,12 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         # Enter - perform batch rename
         elif event.key_code == KeyCode.ENTER:
             regex_text = self.regex_editor.get_text()
-            dest_text = self.destination_editor.get_text()
-            if regex_text and dest_text:
+            # Destination can be empty (to delete matched portion)
+            if regex_text:
                 # Don't close here - let the caller handle the execution
                 return True
             else:
-                # Error: missing pattern - but event was handled
+                # Error: missing regex pattern - but event was handled
                 return True
             
         else:

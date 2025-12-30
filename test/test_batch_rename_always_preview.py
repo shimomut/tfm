@@ -69,14 +69,15 @@ class TestBatchRenameAlwaysPreview:
         
         self.dialog.show(files)
         
-        # Set only regex (no destination)
+        # Set only regex (no destination) - should delete matched portion
         self.dialog.regex_editor.set_text("file")
         self.dialog.update_preview()
         
-        # Preview should still show all files as unchanged
+        # Preview should show files with "file" removed
         assert len(self.dialog.preview) == 2
-        for preview in self.dialog.preview:
-            assert preview['original'] == preview['new']
+        for i, preview in enumerate(self.dialog.preview):
+            assert preview['original'] == f'file{i}.txt'
+            assert preview['new'] == f'{i}.txt'  # "file" removed
     
     def test_preview_shown_with_invalid_regex(self, tmp_path):
         """Test that preview is shown even when regex is invalid"""
