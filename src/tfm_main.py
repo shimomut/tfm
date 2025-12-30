@@ -2881,10 +2881,14 @@ class FileManager(UILayer):
             return
         
         # Get selected files using helper (only files, not directories for safety)
+        # Preserve order from the file list for consistent \d numbering
         selected_files = []
-        for file_path_str in current_pane['selected_files']:
-            file_path = Path(file_path_str)
-            if file_path.exists() and file_path.is_file():
+        selected_files_set = current_pane['selected_files']
+        
+        # Iterate through files in display order and collect selected ones
+        for file_path in current_pane['files']:
+            file_path_str = str(file_path)
+            if file_path_str in selected_files_set and file_path.exists() and file_path.is_file():
                 selected_files.append(file_path)
         
         if not selected_files:
