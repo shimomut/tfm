@@ -20,7 +20,7 @@ import unicodedata
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ttk'))
 
-from tfm_wide_char_utils import get_display_width
+from ttk.wide_char_utils import get_display_width
 
 
 def print_separator(char='=', width=70):

@@ -253,10 +253,6 @@ class FileManager(UILayer):
         color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
         init_colors(renderer, color_scheme)
         
-        # Initialize Unicode handling from configuration
-        from tfm_wide_char_utils import initialize_from_config
-        initialize_from_config()
-        
         # Create TFM user directories if they don't exist
         self._create_user_directories()
         
@@ -4883,8 +4879,16 @@ def cli_main():
         backend_name, backend_options = select_backend(args)
         
         # Set Unicode mode based on backend (desktop backends always use full Unicode)
-        from tfm_wide_char_utils import set_unicode_mode_for_backend
-        set_unicode_mode_for_backend(backend_name)
+        from ttk.wide_char_utils import initialize_from_config as ttk_initialize
+        
+        if backend_name == 'coregraphics':
+            # Desktop backends always use full Unicode
+            ttk_initialize(unicode_mode='full')
+        else:
+            # Terminal backends use configured mode
+            config = get_config()
+            unicode_mode = getattr(config, 'UNICODE_MODE', 'full')
+            ttk_initialize(unicode_mode=unicode_mode)
         
         # Create TTK renderer directly based on selected backend
         if backend_name == 'curses':
