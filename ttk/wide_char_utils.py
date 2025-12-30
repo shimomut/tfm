@@ -941,15 +941,14 @@ def get_safe_functions():
         }
 
 
-def initialize_from_config(
+def initialize_wide_char_utils(
     unicode_mode: Optional[str] = None,
-    force_fallback: bool = False,
     show_warnings: bool = True,
     terminal_detection: bool = True,
     fallback_char: str = '?'
 ):
     """
-    Initialize Unicode handling mode from application configuration.
+    Initialize wide character utilities with Unicode handling mode.
     
     This function should be called after the configuration system is loaded
     to apply user-configured Unicode handling preferences.
@@ -957,7 +956,6 @@ def initialize_from_config(
     Args:
         unicode_mode: Unicode handling mode ('full', 'basic', 'ascii', 'auto', or None).
                      None means keep backend-determined mode.
-        force_fallback: If True, force ASCII fallback mode regardless of unicode_mode
         show_warnings: Whether to show Unicode-related warnings
         terminal_detection: Whether to auto-detect terminal Unicode support
         fallback_char: Character to use for unrepresentable characters
@@ -968,10 +966,6 @@ def initialize_from_config(
     (unicode_mode is not None).
     """
     try:
-        # Check if fallback mode is forced
-        if force_fallback:
-            unicode_mode = 'ascii'
-        
         # Only override mode if explicitly configured
         if unicode_mode is not None:
             set_unicode_mode(unicode_mode)

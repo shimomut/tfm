@@ -493,9 +493,7 @@ class DefaultConfig:
     UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
     UNICODE_WARNINGS = True  # Show warnings for Unicode processing errors
     UNICODE_FALLBACK_CHAR = '?'  # Character to use for unrepresentable characters in ASCII mode
-    # Note: Caching is always enabled via @lru_cache and cannot be disabled
     UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
-    UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
     
     # File extension associations
     # Maps file patterns to programs for different actions (open, view, edit)

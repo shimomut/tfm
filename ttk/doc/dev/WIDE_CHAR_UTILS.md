@@ -88,22 +88,21 @@ set_unicode_mode('auto')  # Auto-detect based on terminal capabilities
 Applications can provide configuration by passing values as arguments:
 
 ```python
-from ttk.wide_char_utils import initialize_from_config
+from ttk.wide_char_utils import initialize_wide_char_utils
 
 # Initialize with explicit configuration values
-initialize_from_config(
+initialize_wide_char_utils(
     unicode_mode='full',           # or 'basic', 'ascii', 'auto', None
-    force_fallback=False,          # Force ASCII mode if True
     show_warnings=True,            # Show Unicode warnings
     terminal_detection=True,       # Auto-detect terminal support
     fallback_char='?'              # Character for unrepresentable chars
 )
 
 # Or use defaults (all parameters are optional)
-initialize_from_config()
+initialize_wide_char_utils()
 ```
 
-Note: Caching is always enabled via `@lru_cache` decorators and cannot be disabled at runtime. The cache is automatically cleared when `initialize_from_config()` is called to ensure fresh behavior with new settings.
+Note: Caching is always enabled via `@lru_cache` decorators and cannot be disabled at runtime. The cache is automatically cleared when `initialize_wide_char_utils()` is called to ensure fresh behavior with new settings.
 
 ## Backend Integration
 
