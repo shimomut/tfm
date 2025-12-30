@@ -134,7 +134,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                 # Keep the parts before and after the match intact
                 new_name = original_name[:match.start()] + replacement + original_name[match.end():]
                 
-                # Check if new name is valid and doesn't conflict
+                # Check if new name is valid and doesn't conflict with existing files
                 valid = self._is_valid_filename(new_name)
                 new_path = file_path.parent / new_name
                 conflict = new_path.exists() and new_path != file_path
@@ -153,7 +153,8 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                     'match_start': match_start,
                     'match_end': match_end,
                     'replace_start': replace_start,
-                    'replace_end': replace_end
+                    'replace_end': replace_end,
+                    'file_path': file_path  # Store file path for later conflict detection
                 })
             else:
                 # No match - keep original name
@@ -165,8 +166,34 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                     'match_start': None,
                     'match_end': None,
                     'replace_start': None,
-                    'replace_end': None
+                    'replace_end': None,
+                    'file_path': file_path  # Store file path for later conflict detection
                 })
+        
+        # Second pass: detect conflicts within the batch rename operation
+        # Build a map of new names to their preview entries
+        new_name_map = {}
+        for preview in self.preview:
+            new_name = preview['new']
+            file_path = preview['file_path']
+            
+            # Skip unchanged files - they don't cause conflicts
+            if preview['original'] == new_name:
+                continue
+            
+            # Create a key that includes parent directory to handle files in different directories
+            key = (file_path.parent, new_name)
+            
+            if key not in new_name_map:
+                new_name_map[key] = []
+            new_name_map[key].append(preview)
+        
+        # Mark all entries with duplicate new names as conflicts
+        for key, entries in new_name_map.items():
+            if len(entries) > 1:
+                # Multiple files will have the same new name - mark all as conflicts
+                for entry in entries:
+                    entry['conflict'] = True
                 
     def _is_valid_filename(self, filename):
         """Check if a filename is valid"""
