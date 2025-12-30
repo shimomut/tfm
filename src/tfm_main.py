@@ -4881,14 +4881,27 @@ def cli_main():
         # Set Unicode mode based on backend (desktop backends always use full Unicode)
         from ttk.wide_char_utils import initialize_wide_char_utils
         
+        # Get configuration values
+        config = get_config()
+        show_warnings = getattr(config, 'UNICODE_WARNINGS', True)
+        terminal_detection = getattr(config, 'UNICODE_TERMINAL_DETECTION', True)
+        fallback_char = getattr(config, 'UNICODE_FALLBACK_CHAR', '?')
+        
+        # Determine Unicode mode based on backend
         if backend_name == 'coregraphics':
             # Desktop backends always use full Unicode
-            initialize_wide_char_utils(unicode_mode='full')
+            unicode_mode = 'full'
         else:
             # Terminal backends use configured mode
-            config = get_config()
             unicode_mode = getattr(config, 'UNICODE_MODE', 'full')
-            initialize_wide_char_utils(unicode_mode=unicode_mode)
+        
+        # Initialize wide character utilities with all configuration
+        initialize_wide_char_utils(
+            unicode_mode=unicode_mode,
+            show_warnings=show_warnings,
+            terminal_detection=terminal_detection,
+            fallback_char=fallback_char
+        )
         
         # Create TTK renderer directly based on selected backend
         if backend_name == 'curses':
