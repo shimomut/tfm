@@ -902,6 +902,24 @@ def set_unicode_mode(mode: str):
         _fallback_functions = create_fallback_functions('ascii')
 
 
+def set_unicode_mode_for_backend(backend_name: str):
+    """
+    Set the Unicode handling mode based on the backend being used.
+    
+    Desktop backends (CoreGraphics) always use full Unicode support.
+    Terminal backends (Curses) use auto-detection.
+    
+    Args:
+        backend_name: Name of the backend ('coregraphics', 'curses', etc.)
+    """
+    if backend_name == 'coregraphics':
+        # Desktop mode always supports full Unicode
+        set_unicode_mode('full')
+    else:
+        # Terminal mode uses auto-detection
+        set_unicode_mode('auto')
+
+
 def get_current_unicode_mode() -> str:
     """
     Get the current Unicode handling mode.
@@ -948,21 +966,26 @@ def initialize_from_config():
     
     This function should be called after the configuration system is loaded
     to apply user-configured Unicode handling preferences.
+    
+    Note: If set_unicode_mode_for_backend() was already called, this will
+    only override the mode if explicitly configured in the config file.
     """
     try:
         # Try to import config - may not be available during early initialization
         from tfm_config import get_config
         config = get_config()
         
-        # Get Unicode mode from config
-        unicode_mode = getattr(config, 'UNICODE_MODE', 'auto')
+        # Get Unicode mode from config (None means use backend-determined mode)
+        unicode_mode = getattr(config, 'UNICODE_MODE', None)
         
         # Check if fallback mode is forced
         force_fallback = getattr(config, 'UNICODE_FORCE_FALLBACK', False)
         if force_fallback:
             unicode_mode = 'ascii'
         
-        set_unicode_mode(unicode_mode)
+        # Only override mode if explicitly configured
+        if unicode_mode is not None:
+            set_unicode_mode(unicode_mode)
         
         # Configure warning behavior
         global _show_warnings
@@ -990,11 +1013,10 @@ def initialize_from_config():
             set_unicode_mode('basic')
         
     except ImportError:
-        # Config system not available, use auto-detection
-        set_unicode_mode('auto')
+        # Config system not available, keep current mode (set by backend)
+        pass
     except Exception as e:
-        warnings.warn(f"Error loading Unicode settings from config: {e}. Using auto-detection.", UserWarning)
-        set_unicode_mode('auto')
+        warnings.warn(f"Error loading Unicode settings from config: {e}. Keeping current mode.", UserWarning)
 
 
 def get_fallback_char():

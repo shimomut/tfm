@@ -4881,6 +4881,10 @@ def cli_main():
         from tfm_backend_selector import select_backend
         backend_name, backend_options = select_backend(args)
         
+        # Set Unicode mode based on backend (desktop backends always use full Unicode)
+        from tfm_wide_char_utils import set_unicode_mode_for_backend
+        set_unicode_mode_for_backend(backend_name)
+        
         # Create TTK renderer directly based on selected backend
         if backend_name == 'curses':
             from ttk.backends.curses_backend import CursesBackend
