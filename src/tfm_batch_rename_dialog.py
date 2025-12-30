@@ -12,7 +12,7 @@ from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
 from tfm_ui_layer import UILayer
 from tfm_single_line_text_edit import SingleLineTextEdit
-from tfm_colors import get_status_color, COLOR_ERROR
+from tfm_colors import get_status_color, COLOR_ERROR, COLOR_SEARCH_MATCH
 from tfm_log_manager import getLogger
 
 # Module-level logger
@@ -139,11 +139,21 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                 new_path = file_path.parent / new_name
                 conflict = new_path.exists() and new_path != file_path
                 
+                # Store match and replacement positions for highlighting
+                match_start = match.start()
+                match_end = match.end()
+                replace_start = match.start()
+                replace_end = match.start() + len(replacement)
+                
                 self.preview.append({
                     'original': original_name,
                     'new': new_name,
                     'valid': valid,
-                    'conflict': conflict
+                    'conflict': conflict,
+                    'match_start': match_start,
+                    'match_end': match_end,
+                    'replace_start': replace_start,
+                    'replace_end': replace_end
                 })
             else:
                 # No match - keep original name
@@ -151,7 +161,11 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                     'original': original_name,
                     'new': original_name,
                     'valid': True,
-                    'conflict': False
+                    'conflict': False,
+                    'match_start': None,
+                    'match_end': None,
+                    'replace_start': None,
+                    'replace_end': None
                 })
                 
     def _is_valid_filename(self, filename):
@@ -379,6 +393,10 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                     new = preview['new']
                     conflict = preview['conflict']
                     valid = preview['valid']
+                    match_start = preview.get('match_start')
+                    match_end = preview.get('match_end')
+                    replace_start = preview.get('replace_start')
+                    replace_end = preview.get('replace_end')
                     
                     # Format preview line
                     if original == new:
@@ -396,32 +414,106 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                         status = "OK"
                         status_color_pair, status_attributes = get_status_color()
                     
-                    # Create preview line using wide character utilities
+                    # Create preview line with underlined matched/replaced portions
                     max_name_width = (content_width - 20) // 2
                     truncate_text = safe_funcs['truncate_to_width']
                     pad_text = safe_funcs['pad_to_width']
                     
-                    if get_width(original) > max_name_width:
-                        original_display = truncate_text(original, max_name_width, "")
-                    else:
-                        original_display = original
+                    # Draw original filename with underlined match
+                    x_pos = content_start_x
+                    if match_start is not None and match_end is not None:
+                        # Draw in three parts: before match, match (underlined), after match
+                        before_match = original[:match_start]
+                        matched_part = original[match_start:match_end]
+                        after_match = original[match_end:]
                         
-                    if get_width(new) > max_name_width:
-                        new_display = truncate_text(new, max_name_width, "")
+                        # Truncate if needed
+                        if get_width(original) > max_name_width:
+                            original_display = truncate_text(original, max_name_width, "")
+                            # Simple display when truncated
+                            original_padded = pad_text(original_display, max_name_width, 'left')
+                            self.renderer.draw_text(y, x_pos, original_padded, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                        else:
+                            # Draw before match
+                            self.renderer.draw_text(y, x_pos, before_match, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                            x_pos += get_width(before_match)
+                            
+                            # Draw matched part with search match highlighting
+                            self.renderer.draw_text(y, x_pos, matched_part, 
+                                             color_pair=COLOR_SEARCH_MATCH, 
+                                             attributes=TextAttribute.NORMAL)
+                            x_pos += get_width(matched_part)
+                            
+                            # Draw after match
+                            remaining_width = max_name_width - get_width(before_match) - get_width(matched_part)
+                            after_padded = pad_text(after_match, remaining_width, 'left')
+                            self.renderer.draw_text(y, x_pos, after_padded, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                            x_pos = content_start_x + max_name_width
                     else:
-                        new_display = new
+                        # No match - display normally
+                        if get_width(original) > max_name_width:
+                            original_display = truncate_text(original, max_name_width, "")
+                        else:
+                            original_display = original
+                        original_padded = pad_text(original_display, max_name_width, 'left')
+                        self.renderer.draw_text(y, x_pos, original_padded, 
+                                         color_pair=status_color_pair, attributes=status_attributes)
+                        x_pos = content_start_x + max_name_width
                     
-                    # Use wide character utilities for proper alignment
-                    original_padded = pad_text(original_display, max_name_width, 'left')
-                    new_padded = pad_text(new_display, max_name_width, 'left')
+                    # Draw arrow
+                    self.renderer.draw_text(y, x_pos, " → ", 
+                                     color_pair=status_color_pair, attributes=status_attributes)
+                    x_pos += 3
                     
-                    preview_line = f"{original_padded} → {new_padded} [{status}]"
+                    # Draw new filename with underlined replacement
+                    if replace_start is not None and replace_end is not None and original != new:
+                        # Draw in three parts: before replacement, replacement (underlined), after replacement
+                        before_replace = new[:replace_start]
+                        replaced_part = new[replace_start:replace_end]
+                        after_replace = new[replace_end:]
+                        
+                        # Truncate if needed
+                        if get_width(new) > max_name_width:
+                            new_display = truncate_text(new, max_name_width, "")
+                            # Simple display when truncated
+                            new_padded = pad_text(new_display, max_name_width, 'left')
+                            self.renderer.draw_text(y, x_pos, new_padded, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                        else:
+                            # Draw before replacement
+                            self.renderer.draw_text(y, x_pos, before_replace, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                            x_pos += get_width(before_replace)
+                            
+                            # Draw replaced part with search match highlighting
+                            self.renderer.draw_text(y, x_pos, replaced_part, 
+                                             color_pair=COLOR_SEARCH_MATCH, 
+                                             attributes=TextAttribute.NORMAL)
+                            x_pos += get_width(replaced_part)
+                            
+                            # Draw after replacement
+                            remaining_width = max_name_width - get_width(before_replace) - get_width(replaced_part)
+                            after_padded = pad_text(after_replace, remaining_width, 'left')
+                            self.renderer.draw_text(y, x_pos, after_padded, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                            x_pos += remaining_width
+                    else:
+                        # No replacement or unchanged - display normally
+                        if get_width(new) > max_name_width:
+                            new_display = truncate_text(new, max_name_width, "")
+                        else:
+                            new_display = new
+                        new_padded = pad_text(new_display, max_name_width, 'left')
+                        self.renderer.draw_text(y, x_pos, new_padded, 
+                                         color_pair=status_color_pair, attributes=status_attributes)
+                        x_pos += max_name_width
                     
-                    # Truncate the entire line if it's too long
-                    if get_width(preview_line) > content_width:
-                        preview_line = truncate_text(preview_line, content_width, "")
-                    
-                    self.renderer.draw_text(y, content_start_x, preview_line, 
+                    # Draw status
+                    status_text = f" [{status}]"
+                    self.renderer.draw_text(y, x_pos, status_text, 
                                      color_pair=status_color_pair, attributes=status_attributes)
             
             # Draw scrollbar if needed
