@@ -417,24 +417,26 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                     replace_start = preview.get('replace_start')
                     replace_end = preview.get('replace_end')
                     
-                    # Format preview line
+                    # Format preview line with colored emoji status
                     if original == new:
-                        status = "UNCHANGED"
+                        status = " "  # Just space for unchanged (no icon)
                         status_color_pair, status_attributes = get_status_color()
                     elif conflict:
-                        status = "CONFLICT!"
+                        status = "🔴"  # Red circle for conflict
                         status_color_pair = COLOR_ERROR
                         status_attributes = TextAttribute.BOLD
                     elif not valid:
-                        status = "INVALID!"
+                        status = "🔴"  # Red circle for invalid
                         status_color_pair = COLOR_ERROR
                         status_attributes = TextAttribute.BOLD
                     else:
-                        status = "OK"
+                        status = "🟢"  # Green circle for OK
                         status_color_pair, status_attributes = get_status_color()
                     
                     # Create preview line with underlined matched/replaced portions
-                    max_name_width = (content_width - 20) // 2
+                    # Layout: original → status  new
+                    # Status emoji is 1-2 chars + 2 spaces, arrow is 3 chars, total separator = 8 chars
+                    max_name_width = (content_width - 8) // 2
                     truncate_text = safe_funcs['truncate_to_width']
                     pad_text = safe_funcs['pad_to_width']
                     
@@ -487,6 +489,13 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                                      color_pair=status_color_pair, attributes=status_attributes)
                     x_pos += 3
                     
+                    # Draw status emoji (moved to center between arrow and new name)
+                    # Add extra space after status for better separation
+                    status_text = f"{status}  "
+                    self.renderer.draw_text(y, x_pos, status_text, 
+                                     color_pair=status_color_pair, attributes=status_attributes)
+                    x_pos += 3  # Status (1-2 chars) + 2 spaces = 3 chars total
+                    
                     # Draw new filename with underlined replacement
                     if replace_start is not None and replace_end is not None and original != new:
                         # Draw in three parts: before replacement, replacement (underlined), after replacement
@@ -529,11 +538,6 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                         self.renderer.draw_text(y, x_pos, new_padded, 
                                          color_pair=status_color_pair, attributes=status_attributes)
                         x_pos += max_name_width
-                    
-                    # Draw status
-                    status_text = f" [{status}]"
-                    self.renderer.draw_text(y, x_pos, status_text, 
-                                     color_pair=status_color_pair, attributes=status_attributes)
             
             # Draw scrollbar if needed
             if len(self.preview) > preview_height:
