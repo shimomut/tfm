@@ -73,7 +73,6 @@ def initialize_from_config():
         unicode_mode = getattr(config, 'UNICODE_MODE', None)
         force_fallback = getattr(config, 'UNICODE_FORCE_FALLBACK', False)
         show_warnings = getattr(config, 'UNICODE_WARNINGS', True)
-        enable_caching = getattr(config, 'UNICODE_ENABLE_CACHING', True)
         terminal_detection = getattr(config, 'UNICODE_TERMINAL_DETECTION', True)
         fallback_char = getattr(config, 'UNICODE_FALLBACK_CHAR', '?')
         
@@ -82,7 +81,6 @@ def initialize_from_config():
             unicode_mode=unicode_mode,
             force_fallback=force_fallback,
             show_warnings=show_warnings,
-            enable_caching=enable_caching,
             terminal_detection=terminal_detection,
             fallback_char=fallback_char
         )

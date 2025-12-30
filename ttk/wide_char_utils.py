@@ -963,7 +963,6 @@ def initialize_from_config(
     unicode_mode: Optional[str] = None,
     force_fallback: bool = False,
     show_warnings: bool = True,
-    enable_caching: bool = True,
     terminal_detection: bool = True,
     fallback_char: str = '?'
 ):
@@ -978,7 +977,6 @@ def initialize_from_config(
                      None means keep backend-determined mode.
         force_fallback: If True, force ASCII fallback mode regardless of unicode_mode
         show_warnings: Whether to show Unicode-related warnings
-        enable_caching: Whether to enable LRU caching for performance
         terminal_detection: Whether to auto-detect terminal Unicode support
         fallback_char: Character to use for unrepresentable characters
     
@@ -998,15 +996,9 @@ def initialize_from_config(
         global _show_warnings
         _show_warnings = show_warnings
         
-        # Configure caching behavior
-        if enable_caching:
-            # Clear caches to ensure fresh start
-            _cached_is_wide_character.cache_clear()
-            _cached_get_display_width.cache_clear()
-        else:
-            # Disable caching by clearing caches
-            _cached_is_wide_character.cache_clear()
-            _cached_get_display_width.cache_clear()
+        # Clear caches to ensure fresh start with new configuration
+        _cached_is_wide_character.cache_clear()
+        _cached_get_display_width.cache_clear()
         
         # Configure terminal detection
         if not terminal_detection and unicode_mode == 'auto':

@@ -211,8 +211,7 @@ class Config:
     # - 'ascii': ASCII-only fallback mode for limited terminals
     UNICODE_WARNINGS = True  # Show warnings for Unicode processing errors
     UNICODE_FALLBACK_CHAR = '?'  # Character to use for unrepresentable characters in ASCII mode
-    UNICODE_ENABLE_CACHING = True  # Enable caching of display width calculations for performance
-    UNICODE_CACHE_SIZE = 1000  # Maximum number of cached width calculations
+    # Note: Caching is always enabled via @lru_cache and cannot be disabled
     UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
     UNICODE_FORCE_FALLBACK = False  # Force ASCII fallback mode regardless of terminal capabilities
     

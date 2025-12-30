@@ -98,7 +98,6 @@ initialize_from_config(
     unicode_mode='full',           # or 'basic', 'ascii', 'auto', None
     force_fallback=False,          # Force ASCII mode if True
     show_warnings=True,            # Show Unicode warnings
-    enable_caching=True,           # Enable LRU caching
     terminal_detection=True,       # Auto-detect terminal support
     fallback_char='?'              # Character for unrepresentable chars
 )
@@ -106,6 +105,8 @@ initialize_from_config(
 # Or use defaults (all parameters are optional)
 initialize_from_config()
 ```
+
+Note: Caching is always enabled via `@lru_cache` decorators and cannot be disabled at runtime. The cache is automatically cleared when `initialize_from_config()` is called to ensure fresh behavior with new settings.
 
 ## Backend Integration
 
