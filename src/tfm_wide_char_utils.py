@@ -22,7 +22,7 @@ def safe_is_wide_character(char: str, warn_on_error: bool = None) -> bool:
     """
     Safely check if a character is a wide (double-width) character with error handling.
     
-    This function provides a safe wrapper around is_wide_character() that
+    This function provides a safe wrapper around _is_wide_character() that
     handles Unicode errors gracefully by falling back to False.
     
     Args:
@@ -41,17 +41,17 @@ def safe_is_wide_character(char: str, warn_on_error: bool = None) -> bool:
         return False
     
     try:
-        return is_wide_character(char)
+        return _is_wide_character(char)
     except (UnicodeError, ValueError, TypeError) as e:
         if warn_on_error:
             safe_repr = repr(char)[:20] + ('...' if len(repr(char)) > 20 else '')
-            warnings.warn(f"Unicode error in is_wide_character for {safe_repr}: {e}. "
+            warnings.warn(f"Unicode error in _is_wide_character for {safe_repr}: {e}. "
                          f"Falling back to False.", UserWarning)
         return False
     except Exception as e:
         if warn_on_error:
             safe_repr = repr(char)[:20] + ('...' if len(repr(char)) > 20 else '')
-            warnings.warn(f"Unexpected error in is_wide_character for {safe_repr}: {e}. "
+            warnings.warn(f"Unexpected error in _is_wide_character for {safe_repr}: {e}. "
                          f"Falling back to False.", UserWarning)
         return False
 
@@ -79,12 +79,15 @@ def _cached_is_wide_character(char: str) -> bool:
         return False
 
 
-def is_wide_character(char: str) -> bool:
+def _is_wide_character(char: str) -> bool:
     """
     Check if a character is a wide (double-width) character.
     
     Wide characters typically take up 2 display columns in terminal output,
     including most East Asian characters (Chinese, Japanese, Korean).
+    
+    This is an internal function. External code should use get_display_width()
+    or the safe wrapper functions from get_safe_functions().
     
     Args:
         char: A single Unicode character
@@ -93,11 +96,11 @@ def is_wide_character(char: str) -> bool:
         True if the character is wide (double-width), False otherwise
         
     Examples:
-        >>> is_wide_character('A')
+        >>> _is_wide_character('A')
         False
-        >>> is_wide_character('あ')
+        >>> _is_wide_character('あ')
         True
-        >>> is_wide_character('中')
+        >>> _is_wide_character('中')
         True
     """
     # Fast path for ASCII characters (most common case)
@@ -135,7 +138,7 @@ def _cached_get_display_width(text: str) -> int:
             if unicodedata.combining(char):
                 # Combining characters don't add to display width
                 pass
-            elif is_wide_character(char):
+            elif _is_wide_character(char):
                 # Wide characters take 2 columns
                 width += 2
             else:
@@ -733,8 +736,7 @@ def create_fallback_functions(mode: str = None):
             'get_display_width': safe_get_display_width,
             'truncate_to_width': safe_truncate_to_width,
             'pad_to_width': safe_pad_to_width,
-            'split_at_width': safe_split_at_width,
-            'is_wide_character': safe_is_wide_character
+            'split_at_width': safe_split_at_width
         }
     elif mode == 'basic':
         # Basic Unicode but treat all characters as single-width
@@ -789,15 +791,11 @@ def create_fallback_functions(mode: str = None):
             except Exception:
                 return ("", text if isinstance(text, str) else "")
         
-        def basic_is_wide_character(char: str) -> bool:
-            return False
-        
         return {
             'get_display_width': basic_get_display_width,
             'truncate_to_width': basic_truncate_to_width,
             'pad_to_width': basic_pad_to_width,
-            'split_at_width': basic_split_at_width,
-            'is_wide_character': basic_is_wide_character
+            'split_at_width': basic_split_at_width
         }
     else:  # ascii mode
         # ASCII-safe fallback functions
@@ -866,15 +864,11 @@ def create_fallback_functions(mode: str = None):
             except Exception:
                 return ("", text if isinstance(text, str) else "")
         
-        def ascii_is_wide_character(char: str) -> bool:
-            return False
-        
         return {
             'get_display_width': ascii_get_display_width,
             'truncate_to_width': ascii_truncate_to_width,
             'pad_to_width': ascii_pad_to_width,
-            'split_at_width': ascii_split_at_width,
-            'is_wide_character': ascii_is_wide_character
+            'split_at_width': ascii_split_at_width
         }
 
 
@@ -944,8 +938,7 @@ def get_safe_functions():
             'get_display_width': lambda text: len(text) if isinstance(text, str) else 0,
             'truncate_to_width': lambda text, width, ellipsis="…": text[:width] if isinstance(text, str) and width > 0 else "",
             'pad_to_width': lambda text, width, align='left', fill_char=' ': text + (' ' * max(0, width - len(text))) if isinstance(text, str) else "",
-            'split_at_width': lambda text, width: (text[:width], text[width:]) if isinstance(text, str) and width > 0 else ("", text),
-            'is_wide_character': lambda char: False
+            'split_at_width': lambda text, width: (text[:width], text[width:]) if isinstance(text, str) and width > 0 else ("", text)
         }
 
 

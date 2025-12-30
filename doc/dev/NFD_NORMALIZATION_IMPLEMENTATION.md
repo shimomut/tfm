@@ -83,11 +83,14 @@ def draw_hline(self, row: int, col: int, char: str, ...):
 - Added NFC normalization before width calculation
 - Ensures accurate display width for all text
 - Normalization happens once at the string level, not per-character
+- Calls internal `_is_wide_character()` for each character
 
-**Note on `_cached_is_wide_character()`**
-- Does NOT normalize to NFC (optimization)
+**Note on `_cached_is_wide_character()` and `_is_wide_character()`**
+- `_cached_is_wide_character()` does NOT normalize (optimization)
 - Relies on caller (`_cached_get_display_width()`) to normalize the entire string first
 - This avoids redundant normalization for each character
+- `_is_wide_character()` is the internal function that calls `_cached_is_wide_character()`
+- It is not part of the public API and is only used internally within the module
 
 ### Why This Approach?
 
@@ -142,6 +145,9 @@ macOS HFS+ and APFS filesystems automatically convert filenames to NFD:
 - `ttk/backends/coregraphics_backend.py` - CoreGraphics rendering implementation
 - `ttk/backends/curses_backend.py` - Curses backend (no changes needed)
 - `src/tfm_wide_char_utils.py` - Width calculation utilities
+  - `_is_wide_character()` - Internal function for wide character detection
+  - `_cached_is_wide_character()` - Cached version used by `_is_wide_character()`
+  - Note: `_is_wide_character` is internal-only and NOT included in fallback function dictionaries
 - `test/test_nfd_normalization.py` - Test suite
 
 ## References

@@ -15,7 +15,7 @@ import unicodedata
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ttk'))
 
-from tfm_wide_char_utils import get_display_width, is_wide_character
+from tfm_wide_char_utils import get_display_width, _is_wide_character
 
 
 def test_nfd_vs_nfc_width_calculation():
@@ -63,9 +63,9 @@ def test_nfd_vs_nfc_width_calculation():
 
 
 def test_nfd_is_wide_character():
-    """Test that is_wide_character works correctly with NFD forms."""
+    """Test that _is_wide_character works correctly with NFD forms."""
     
-    print("Testing is_wide_character with NFD:")
+    print("Testing _is_wide_character with NFD:")
     print("=" * 60)
     
     # Test character
@@ -73,13 +73,13 @@ def test_nfd_is_wide_character():
     char_nfd = unicodedata.normalize('NFD', char_nfc)
     
     # Check if recognized as wide
-    is_wide_nfc = is_wide_character(char_nfc)
-    is_wide_nfd = is_wide_character(char_nfd)
+    is_wide_nfc = _is_wide_character(char_nfc)
+    is_wide_nfd = _is_wide_character(char_nfd)
     
     print(f"NFC '{char_nfc}' (len={len(char_nfc)}): is_wide={is_wide_nfc}")
     print(f"NFD '{char_nfd}' (len={len(char_nfd)}): is_wide={is_wide_nfd}")
     
-    # Note: NFD form has length > 1, so is_wide_character returns False
+    # Note: NFD form has length > 1, so _is_wide_character returns False
     # This is expected - the normalization happens in get_display_width
     passed = is_wide_nfc == True
     
@@ -162,7 +162,7 @@ def main():
     
     # Run tests
     results.append(("NFD vs NFC width", test_nfd_vs_nfc_width_calculation()))
-    results.append(("is_wide_character", test_nfd_is_wide_character()))
+    results.append(("_is_wide_character", test_nfd_is_wide_character()))
     results.append(("Mixed NFD/NFC", test_mixed_nfd_nfc_string()))
     results.append(("Filename with NFD", test_filename_with_nfd()))
     
