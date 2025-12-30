@@ -42,7 +42,6 @@ from ttk.wide_char_utils import (
     
     # Configuration
     set_unicode_mode,
-    set_unicode_mode_for_backend,
     get_current_unicode_mode,
     get_safe_functions,
     set_fallback_char,
@@ -54,6 +53,27 @@ from ttk.wide_char_utils import (
     get_cache_info,
     optimize_for_ascii_only,
 )
+
+# TFM-specific backend mode configuration
+def set_unicode_mode_for_backend(backend_name: str):
+    """
+    Set the Unicode handling mode based on the backend being used.
+    
+    Desktop backends (CoreGraphics) always use full Unicode support.
+    Terminal backends (Curses) use auto-detection.
+    
+    Args:
+        backend_name: Name of the backend ('coregraphics', 'curses', etc.)
+    """
+    from ttk.wide_char_utils import set_unicode_mode
+    
+    if backend_name == 'coregraphics':
+        # Desktop mode always supports full Unicode
+        set_unicode_mode('full')
+    else:
+        # Terminal mode uses auto-detection
+        set_unicode_mode('auto')
+
 
 # TFM-specific initialization wrapper
 def initialize_from_config():

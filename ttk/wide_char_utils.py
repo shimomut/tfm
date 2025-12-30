@@ -901,24 +901,6 @@ def set_unicode_mode(mode: str):
         _fallback_functions = create_fallback_functions('ascii')
 
 
-def set_unicode_mode_for_backend(backend_name: str):
-    """
-    Set the Unicode handling mode based on the backend being used.
-    
-    Desktop backends (CoreGraphics) always use full Unicode support.
-    Terminal backends (Curses) use auto-detection.
-    
-    Args:
-        backend_name: Name of the backend ('coregraphics', 'curses', etc.)
-    """
-    if backend_name == 'coregraphics':
-        # Desktop mode always supports full Unicode
-        set_unicode_mode('full')
-    else:
-        # Terminal mode uses auto-detection
-        set_unicode_mode('auto')
-
-
 def get_current_unicode_mode() -> str:
     """
     Get the current Unicode handling mode.
@@ -980,8 +962,10 @@ def initialize_from_config(
         terminal_detection: Whether to auto-detect terminal Unicode support
         fallback_char: Character to use for unrepresentable characters
     
-    Note: If set_unicode_mode_for_backend() was already called, this will
-    only override the mode if explicitly configured (unicode_mode is not None).
+    Note: Applications should set the Unicode mode before calling this function
+    if they want to ensure a specific mode (e.g., 'full' for desktop apps).
+    This function will only override the mode if explicitly configured
+    (unicode_mode is not None).
     """
     try:
         # Check if fallback mode is forced

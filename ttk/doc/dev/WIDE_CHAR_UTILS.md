@@ -76,14 +76,11 @@ The module supports three Unicode handling modes:
 - **ascii**: ASCII-only fallback mode
 
 ```python
-from ttk.wide_char_utils import set_unicode_mode, set_unicode_mode_for_backend
+from ttk.wide_char_utils import set_unicode_mode
 
 # Set mode explicitly
 set_unicode_mode('full')
-
-# Set mode based on backend (recommended)
-set_unicode_mode_for_backend('coregraphics')  # Sets 'full'
-set_unicode_mode_for_backend('curses')        # Auto-detects
+set_unicode_mode('auto')  # Auto-detect based on terminal capabilities
 ```
 
 ### Application Configuration
@@ -109,6 +106,20 @@ initialize_from_config()
 Note: Caching is always enabled via `@lru_cache` decorators and cannot be disabled at runtime. The cache is automatically cleared when `initialize_from_config()` is called to ensure fresh behavior with new settings.
 
 ## Backend Integration
+
+### General Pattern
+
+TTK backends should not need to interact with wide character utilities directly. Applications using TTK should configure the Unicode mode based on their needs:
+
+```python
+from ttk.wide_char_utils import set_unicode_mode
+
+# Desktop applications
+set_unicode_mode('full')
+
+# Terminal applications
+set_unicode_mode('auto')  # Auto-detects terminal capabilities
+```
 
 ### CoreGraphics Backend
 
@@ -172,8 +183,12 @@ from ttk.wide_char_utils import (
     get_display_width,
     truncate_to_width,
     pad_to_width,
-    set_unicode_mode_for_backend
+    set_unicode_mode
 )
+
+# Set Unicode mode based on your application's needs
+set_unicode_mode('full')  # For desktop applications
+set_unicode_mode('auto')  # For terminal applications (auto-detect)
 ```
 
 ## Testing
