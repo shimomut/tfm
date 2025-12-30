@@ -230,7 +230,9 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         
         # Draw border with safe drawing
         border_color_pair, _ = get_status_color()
-        border_attributes = TextAttribute.BOLD
+        # Use NORMAL instead of BOLD to avoid gaps in box-drawing characters
+        # BOLD can cause rendering issues with vertical lines in some terminals/fonts
+        border_attributes = TextAttribute.NORMAL
         
         # Top border
         if start_y >= 0 and start_y < height:
@@ -329,8 +331,10 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         sep_y = start_y + 6
         if sep_y < height:
             sep_line = "├" + "─" * (dialog_width - 2) + "┤"
+            # Use BOLD for separator lines (horizontal dividers) for emphasis
+            sep_attributes = TextAttribute.BOLD
             self.renderer.draw_text(sep_y, start_x, sep_line[:dialog_width], 
-                             color_pair=border_color_pair, attributes=border_attributes)
+                             color_pair=border_color_pair, attributes=sep_attributes)
         
         # Draw preview header
         preview_header_y = start_y + 7
