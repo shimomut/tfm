@@ -109,26 +109,30 @@ class BatchRenameDialog(UILayer, BaseListDialog):
             match = pattern.search(original_name)
             
             if match:
-                # Apply substitution with macro support
-                new_name = destination_pattern
+                # Apply substitution with macro support to the destination pattern
+                replacement = destination_pattern
                 
                 # Replace regex groups (\1, \2, etc.)
                 for group_num in range(10):  # Support up to 9 groups
                     group_placeholder = f"\\{group_num}"
-                    if group_placeholder in new_name:
+                    if group_placeholder in replacement:
                         if group_num == 0:
                             # \0 = full match
-                            new_name = new_name.replace(group_placeholder, match.group(0))
+                            replacement = replacement.replace(group_placeholder, match.group(0))
                         elif group_num <= len(match.groups()):
                             # \1-\9 = regex groups
                             group_value = match.group(group_num) or ""
-                            new_name = new_name.replace(group_placeholder, group_value)
+                            replacement = replacement.replace(group_placeholder, group_value)
                         else:
                             # Group doesn't exist, replace with empty string
-                            new_name = new_name.replace(group_placeholder, "")
+                            replacement = replacement.replace(group_placeholder, "")
                 
                 # Replace index macro (\d)
-                new_name = new_name.replace("\\d", str(i + 1))
+                replacement = replacement.replace("\\d", str(i + 1))
+                
+                # Replace only the matched portion of the filename
+                # Keep the parts before and after the match intact
+                new_name = original_name[:match.start()] + replacement + original_name[match.end():]
                 
                 # Check if new name is valid and doesn't conflict
                 valid = self._is_valid_filename(new_name)

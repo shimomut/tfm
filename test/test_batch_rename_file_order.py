@@ -30,15 +30,16 @@ class TestBatchRenameFileOrder:
         # Show dialog with files in specific order
         self.dialog.show(files)
         
-        # Set regex and destination with \d numbering (preserve extension)
-        self.dialog.regex_editor.set_text("file_(\\d)\\.txt")
-        self.dialog.destination_editor.set_text("renamed_\\1_num_\\d.txt")
+        # Set regex and destination with \d numbering
+        # Match entire filename to replace it completely
+        self.dialog.regex_editor.set_text(".*")
+        self.dialog.destination_editor.set_text("renamed_\\d.txt")
         self.dialog.update_preview()
         
         # Verify preview maintains order
         assert len(self.dialog.preview) == 5
         for i, preview in enumerate(self.dialog.preview):
-            expected_new_name = f"renamed_{i}_num_{i+1}.txt"
+            expected_new_name = f"renamed_{i+1}.txt"
             assert preview['new'] == expected_new_name, \
                 f"File {i} should be renamed to {expected_new_name}, got {preview['new']}"
     
@@ -54,8 +55,8 @@ class TestBatchRenameFileOrder:
         # Pass files in specific order (simulating selection from file list)
         self.dialog.show(files)
         
-        # Use \d for numbering (preserve extension)
-        self.dialog.regex_editor.set_text("test_(\\d)\\.txt")
+        # Use \d for numbering - match entire filename
+        self.dialog.regex_editor.set_text(".*")
         self.dialog.destination_editor.set_text("item_\\d.txt")
         self.dialog.update_preview()
         
@@ -75,8 +76,8 @@ class TestBatchRenameFileOrder:
         
         self.dialog.show(files)
         
-        # Use only \d for numbering (preserve extension)
-        self.dialog.regex_editor.set_text("file\\d\\.txt")
+        # Use only \d for numbering - match entire filename
+        self.dialog.regex_editor.set_text(".*")
         self.dialog.destination_editor.set_text("renamed_\\d.txt")
         self.dialog.update_preview()
         
@@ -96,7 +97,7 @@ class TestBatchRenameFileOrder:
         
         self.dialog.show(files)
         
-        # Use both regex group and \d (preserve extension)
+        # Use both regex group and \d - match entire filename
         self.dialog.regex_editor.set_text("(\\w+)_old\\.txt")
         self.dialog.destination_editor.set_text("\\d_\\1_new.txt")
         self.dialog.update_preview()

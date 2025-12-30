@@ -113,14 +113,14 @@ class TestBatchRenameAlwaysPreview:
         # Initially all unchanged
         assert all(p['original'] == p['new'] for p in self.dialog.preview)
         
-        # Add patterns
-        self.dialog.regex_editor.set_text(r"test(\d)\.txt")
-        self.dialog.destination_editor.set_text(r"renamed_\1.txt")
+        # Add patterns - match entire filename
+        self.dialog.regex_editor.set_text(r".*")
+        self.dialog.destination_editor.set_text(r"renamed_\d.txt")
         self.dialog.update_preview()
         
         # Now should show changes
-        assert self.dialog.preview[0]['new'] == "renamed_0.txt"
-        assert self.dialog.preview[1]['new'] == "renamed_1.txt"
+        assert self.dialog.preview[0]['new'] == "renamed_1.txt"
+        assert self.dialog.preview[1]['new'] == "renamed_2.txt"
     
     def test_preview_shows_non_matching_files_as_unchanged(self, tmp_path):
         """Test that files not matching regex are shown as unchanged"""
@@ -137,11 +137,11 @@ class TestBatchRenameAlwaysPreview:
         self.dialog.show(files)
         
         # Set pattern that only matches first file
-        self.dialog.regex_editor.set_text(r"match_(\d)\.txt")
-        self.dialog.destination_editor.set_text(r"renamed_\1.txt")
+        self.dialog.regex_editor.set_text(r"match_(\d)")
+        self.dialog.destination_editor.set_text(r"renamed_\1")
         self.dialog.update_preview()
         
-        # First file should change, second should be unchanged
+        # First file should change (only matched portion), second should be unchanged
         assert self.dialog.preview[0]['new'] == "renamed_1.txt"
         assert self.dialog.preview[1]['original'] == "nomatch.txt"
         assert self.dialog.preview[1]['new'] == "nomatch.txt"
