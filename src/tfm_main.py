@@ -231,25 +231,11 @@ class FileManager(UILayer):
         # Store profiling targets
         self.profiling_targets = profiling_targets or set()
         
-        # Initialize adaptive FPS manager for CPU optimization
-        self.adaptive_fps = AdaptiveFPSManager()
-        
-        # Load configuration
+        # Load configuration early (needed for LogManager and colors)
         self.config = get_config()
         
-        # Initialize Unicode handling from configuration
-        from tfm_wide_char_utils import initialize_from_config
-        initialize_from_config()
-        
-        # Create TFM user directories if they don't exist
-        self._create_user_directories()
-        
-        # Initialize colors BEFORE any stdout/stderr redirection
-        # This prevents issues where LogManager's stdout redirection interferes with color detection
-        color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
-        init_colors(renderer, color_scheme)
-        
-        # Initialize modular components
+        # Initialize LogManager as early as possible to start capturing logs
+        # This must happen before any operations that might generate log messages
         # Enable stream output in desktop mode (CoreGraphics), disable in terminal mode (Curses)
         is_desktop = renderer.is_desktop_mode()
         self.log_manager = LogManager(self.config, remote_port=remote_log_port, 
@@ -261,6 +247,20 @@ class FileManager(UILayer):
         
         # Create logger for main application
         self.logger = self.log_manager.getLogger("Main")
+        
+        # Initialize colors (can happen after LogManager since it doesn't use stdout/stderr)
+        color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+        init_colors(renderer, color_scheme)
+        
+        # Initialize Unicode handling from configuration
+        from tfm_wide_char_utils import initialize_from_config
+        initialize_from_config()
+        
+        # Create TFM user directories if they don't exist
+        self._create_user_directories()
+        
+        # Initialize adaptive FPS manager for CPU optimization
+        self.adaptive_fps = AdaptiveFPSManager()
         
         self.state_manager = get_state_manager()
         
