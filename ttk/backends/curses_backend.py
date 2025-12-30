@@ -13,6 +13,7 @@ from typing import Tuple, Optional
 from ttk.renderer import Renderer, TextAttribute
 from ttk.input_event import Event, KeyEvent, CharEvent, SystemEvent, KeyCode, SystemEventType, ModifierKey
 from ttk.ttk_mouse_event import MouseEvent, MouseEventType, MouseButton
+from ttk.wide_char_utils import _is_wide_character
 
 
 # Curses key code to TTK KeyCode mapping (ANSI layout)
@@ -390,6 +391,14 @@ class CursesBackend(Renderer):
         self.mouse_available = False  # Whether terminal supports mouse events
         self.keyboard_layout = keyboard_layout  # Keyboard layout type
         self._key_map, self._shifted_chars = self._get_key_map(keyboard_layout)  # Initialize key mapping
+        
+        # Grid for tracking wide characters
+        # Each cell stores: (char, color_pair, attributes, is_wide)
+        # This is necessary because curses inch() only returns 8-bit characters,
+        # which cannot represent Unicode wide characters (e.g., Japanese text)
+        self.grid = None  # Will be initialized in initialize() when we know terminal size
+        self.rows = 0
+        self.cols = 0
     
     def _get_key_map(self, layout: str) -> Tuple[dict, frozenset]:
         """
@@ -419,6 +428,7 @@ class CursesBackend(Renderer):
         - Configures terminal modes (no echo, cbreak, keypad)
         - Hides the cursor by default
         - Sets black background for the terminal
+        - Initializes the grid for tracking wide characters
         
         Raises:
             RuntimeError: If curses initialization fails
@@ -445,6 +455,11 @@ class CursesBackend(Renderer):
             # Set black background for the entire terminal window
             # This ensures all areas have black background, not terminal default
             self.stdscr.bkgd(' ', curses.color_pair(1))
+            
+            # Initialize grid for tracking wide characters
+            # This is necessary because curses inch() only returns 8-bit characters
+            self.rows, self.cols = self.stdscr.getmaxyx()
+            self.grid = [[(' ', 0, 0, False) for _ in range(self.cols)] for _ in range(self.rows)]
         except Exception as e:
             raise RuntimeError(f"Failed to initialize curses: {e}")
     
@@ -537,6 +552,12 @@ class CursesBackend(Renderer):
         screen redraw, which can cause flickering.
         """
         self.stdscr.erase()
+        
+        # Reset grid to empty state
+        if self.grid:
+            for row in range(self.rows):
+                for col in range(self.cols):
+                    self.grid[row][col] = (' ', 0, 0, False)
     
     def clear_region(self, row: int, col: int, height: int, width: int) -> None:
         """
@@ -563,7 +584,13 @@ class CursesBackend(Renderer):
             try:
                 self.stdscr.move(r, col)
                 # Clear from current position to end of specified width
-                self.stdscr.addstr(' ' * min(width, max_cols - col))
+                clear_width = min(width, max_cols - col)
+                self.stdscr.addstr(' ' * clear_width)
+                
+                # Update grid to reflect clearing
+                for c in range(col, min(col + clear_width, self.cols)):
+                    if r < self.rows:
+                        self.grid[r][c] = (' ', 0, 0, False)
             except curses.error:
                 # Ignore out-of-bounds errors
                 pass
@@ -578,6 +605,11 @@ class CursesBackend(Renderer):
         Out-of-bounds coordinates are handled gracefully.
         
         Normalizes text to NFC to handle macOS NFD filenames correctly.
+        
+        Uses grid-based tracking to detect when overwriting wide character placeholders
+        and clears both halves with the original background color to prevent
+        layout breakage. Grid tracking is necessary because curses inch() only
+        returns 8-bit characters, which cannot represent Unicode wide characters.
         
         Args:
             row: Row position (0-based)
@@ -597,6 +629,33 @@ class CursesBackend(Renderer):
             # This ensures proper display width calculation and rendering
             text = unicodedata.normalize('NFC', text)
             
+            # Check if we're starting by overwriting the right half of a wide character
+            # Use grid to detect this (inch() doesn't work for Unicode wide characters)
+            if 0 <= row < self.rows and 0 < col < self.cols:
+                current_char, current_color, current_attrs, current_is_wide = self.grid[row][col]
+                
+                # If current position is a placeholder (empty string), check if previous cell has a wide char
+                if current_char == '':
+                    prev_char, prev_color, prev_attrs, prev_is_wide = self.grid[row][col - 1]
+                    
+                    # If previous character is wide, clear both cells with original background color
+                    if prev_is_wide and prev_char != '':
+                        # Build curses attributes for clearing
+                        prev_attr = curses.color_pair(prev_color)
+                        if prev_attrs & TextAttribute.BOLD:
+                            prev_attr |= curses.A_BOLD
+                        if prev_attrs & TextAttribute.UNDERLINE:
+                            prev_attr |= curses.A_UNDERLINE
+                        if prev_attrs & TextAttribute.REVERSE:
+                            prev_attr |= curses.A_REVERSE
+                        
+                        # Clear both cells with spaces using original background color
+                        self.stdscr.addstr(row, col - 1, '  ', prev_attr)
+                        
+                        # Update grid to reflect clearing
+                        self.grid[row][col - 1] = (' ', prev_color, prev_attrs, False)
+                        self.grid[row][col] = (' ', prev_color, prev_attrs, False)
+            
             # Build curses attributes
             attr = curses.color_pair(color_pair)
             if attributes & TextAttribute.BOLD:
@@ -606,7 +665,26 @@ class CursesBackend(Renderer):
             if attributes & TextAttribute.REVERSE:
                 attr |= curses.A_REVERSE
             
+            # Draw the text and update grid
             self.stdscr.addstr(row, col, text, attr)
+            
+            # Update grid to track what we drew
+            current_col = col
+            for char in text:
+                if current_col >= self.cols:
+                    break
+                
+                is_wide = _is_wide_character(char)
+                self.grid[row][current_col] = (char, color_pair, attributes, is_wide)
+                
+                if is_wide:
+                    # Wide character occupies 2 cells
+                    current_col += 1
+                    if current_col < self.cols:
+                        # Mark the second cell as a placeholder
+                        self.grid[row][current_col] = ('', color_pair, attributes, False)
+                
+                current_col += 1
         except curses.error:
             # Ignore out-of-bounds errors
             pass
@@ -1020,6 +1098,13 @@ class CursesBackend(Renderer):
             
             # Handle resize event separately (it's a system event, not a key event)
             if key == curses.KEY_RESIZE:
+                # Update grid dimensions on resize
+                new_rows, new_cols = self.stdscr.getmaxyx()
+                if new_rows != self.rows or new_cols != self.cols:
+                    self.rows = new_rows
+                    self.cols = new_cols
+                    self.grid = [[(' ', 0, 0, False) for _ in range(self.cols)] for _ in range(self.rows)]
+                
                 event = SystemEvent(event_type=SystemEventType.RESIZE)
                 self.event_callback.on_system_event(event)
                 return
