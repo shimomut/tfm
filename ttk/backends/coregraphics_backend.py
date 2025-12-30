@@ -109,6 +109,9 @@ import unicodedata
 import warnings
 from functools import lru_cache
 
+# Import TTK wide character utilities
+from ttk.wide_char_utils import _is_wide_character
+
 # Check PyObjC availability
 try:
     import Cocoa
@@ -314,39 +317,8 @@ MACOS_ANSI_KEY_MAP = {
 }
 
 
-@lru_cache(maxsize=1024)
-def _is_wide_character(char: str) -> bool:
-    """
-    Check if a character is a wide (double-width) character.
-    
-    Wide characters (zenkaku) take up 2 display columns in terminal output,
-    including most East Asian characters (Chinese, Japanese, Korean).
-    
-    Note: Assumes input is a single character (length 1). Callers must ensure
-    this constraint. NFD normalization is not needed because:
-    - draw_text() normalizes the entire string to NFC before iterating
-    - draw_hline() and draw_vline() verify char length is 1
-    
-    Args:
-        char: A single Unicode character (must have length 1)
-        
-    Returns:
-        True if the character is wide (double-width), False otherwise
-    """
-    if len(char) != 1:
-        return False
-    
-    # Fast path for ASCII characters (most common case)
-    if ord(char) < 128:
-        return False
-    
-    try:
-        # Use East Asian Width property from Unicode database
-        width = unicodedata.east_asian_width(char)
-        # 'F' = Fullwidth, 'W' = Wide
-        return width in ('F', 'W')
-    except (UnicodeError, ValueError):
-        return False
+# Wide character detection is now imported from ttk.wide_char_utils
+# This ensures consistent behavior across all TTK backends
 
 
 class CoreGraphicsBackend(Renderer):
