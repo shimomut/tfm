@@ -13,7 +13,7 @@ from pathlib import Path
 
 from tfm_path import Path as TFMPath
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileOperations
+from tfm_file_operations import FileListManager
 
 
 class MockConfig:
@@ -64,7 +64,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
             TFMPath(self.temp_dir),
             state_manager=None
         )
-        self.file_operations = FileOperations(self.config)
+        self.file_operations = FileListManager(self.config)
     
     def tearDown(self):
         """Clean up test environment"""

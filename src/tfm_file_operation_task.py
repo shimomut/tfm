@@ -88,25 +88,35 @@ class FileOperationTask(BaseTask):
     - User confirmations (if configured)
     - Conflict detection for copy/move operations
     - Conflict resolution (overwrite, rename, skip)
-    - Background thread execution
+    - Background thread execution via FileOperationsExecutor
     - Progress tracking and error handling
     - Operation completion and cleanup
     
+    Architecture:
+        The task delegates responsibilities to specialized components:
+        - UI interactions → FileOperationsUI (via self.ui)
+        - I/O operations → FileOperationsExecutor (via self.executor)
+        - State machine logic → FileOperationTask (this class)
+    
     Example usage:
-        task = FileOperationTask(file_manager, file_operations_ui)
+        task = FileOperationTask(file_manager, file_operations_ui, executor)
         task.start_operation('copy', files, destination)
         file_manager.start_task(task)
     """
     
-    def __init__(self, file_manager, file_operations_ui):
+    def __init__(self, file_manager, ui, executor=None):
         """Initialize file operation task.
         
         Args:
-            file_manager: Reference to FileManager for UI interactions
-            file_operations_ui: Reference to FileOperationsUI for operation execution
+            file_manager: Reference to FileManager for task management
+            ui: Reference to FileOperationsUI for UI interactions
+            executor: Reference to FileOperationsExecutor for I/O operations
+                     (optional for backward compatibility during migration)
         """
         super().__init__(file_manager)
-        self.file_operations_ui = file_operations_ui
+        self.ui = ui
+        self.executor = executor
+        self.file_operations_ui = ui  # Keep for backward compatibility during migration
         self.state = State.IDLE
         self.context: Optional[OperationContext] = None
     
@@ -187,11 +197,13 @@ class FileOperationTask(BaseTask):
             # Transition to CONFIRMING state and show confirmation dialog
             self._transition_to_state(State.CONFIRMING)
             
-            # Build confirmation message
-            message = self._build_confirmation_message()
-            
-            # Show confirmation dialog
-            self.file_manager.show_confirmation(message, self.on_confirmed)
+            # Show confirmation dialog via UI
+            self.ui.show_confirmation_dialog(
+                operation_type,
+                files,
+                destination,
+                self.on_confirmed
+            )
         else:
             # Skip confirmation and proceed directly to conflict checking
             self.logger.info(f"{operation_type.capitalize()} confirmation disabled, proceeding directly")
@@ -386,28 +398,13 @@ class FileOperationTask(BaseTask):
         Args:
             source_file: The source file to be renamed
         """
-        # Build prompt with current filename
-        prompt = f"Rename '{source_file.name}' to: "
-        
-        # Define callback for confirmation
-        def on_confirm(new_name: str):
-            self.on_renamed(source_file, new_name)
-        
-        # Define callback for cancellation
-        def on_cancel():
-            self.on_rename_cancelled()
-        
-        # Show QuickEditBar with current filename as initial text
-        self.file_manager.quick_edit_bar.show_status_line_input(
-            prompt=prompt,
-            help_text="ESC:cancel Enter:confirm",
-            initial_text=source_file.name,
-            callback=on_confirm,
-            cancel_callback=on_cancel
+        # Show rename dialog via UI
+        self.ui.show_rename_dialog(
+            source_file,
+            self.context.destination,
+            self.on_renamed,
+            self.on_rename_cancelled
         )
-        
-        # Mark UI as dirty to trigger redraw
-        self.file_manager.mark_dirty()
     
     def _transition_to_state(self, new_state: State):
         """Transition to a new state with hooks.
@@ -617,24 +614,17 @@ class FileOperationTask(BaseTask):
         # Get current conflict
         source_file, dest_path = self.context.conflicts[self.context.current_conflict_index]
         
-        # Build conflict message
+        # Calculate conflict numbers
         conflict_num = self.context.current_conflict_index + 1
         total_conflicts = len(self.context.conflicts)
-        message = f"File exists: {dest_path.name} ({conflict_num}/{total_conflicts})"
         
-        # Build choices for conflict resolution
-        choices = [
-            {"text": "Overwrite", "key": "o", "value": "overwrite"},
-            {"text": "Rename", "key": "r", "value": "rename"},
-            {"text": "Skip", "key": "s", "value": "skip"}
-        ]
-        
-        # Show conflict dialog with shift modifier enabled for apply-to-all
-        self.file_manager.show_dialog(
-            message,
-            choices,
-            lambda choice, apply_to_all=False: self.on_conflict_resolved(choice, apply_to_all),
-            enable_shift_modifier=True
+        # Show conflict dialog via UI
+        self.ui.show_conflict_dialog(
+            source_file,
+            dest_path,
+            conflict_num,
+            total_conflicts,
+            lambda choice, apply_to_all=False: self.on_conflict_resolved(choice, apply_to_all)
         )
     
     def _execute_operation(self):
@@ -688,8 +678,7 @@ class FileOperationTask(BaseTask):
     def _execute_copy(self, files_to_copy):
         """Execute copy operation in background thread.
         
-        Creates a background worker thread, sets operation_in_progress flag,
-        starts progress tracking, and calls the existing perform_copy_operation
+        Delegates to FileOperationsExecutor to perform the actual copy operation
         with pre-resolved files.
         
         Args:
@@ -706,13 +695,6 @@ class FileOperationTask(BaseTask):
         # Create background worker thread
         def copy_worker():
             try:
-                # Process each file with the existing copy logic
-                # We need to group files by overwrite flag and call perform_copy_operation
-                # for each group, or process them individually
-                
-                # For now, we'll process files in groups by overwrite flag
-                # to minimize calls to perform_copy_operation
-                
                 # Separate files by overwrite flag
                 files_no_overwrite = []
                 files_with_overwrite = []
@@ -727,9 +709,12 @@ class FileOperationTask(BaseTask):
                 if files_to_copy:
                     destination_dir = files_to_copy[0][1].parent
                     
+                    # Use executor if available, otherwise fall back to file_operations_ui
+                    operation_handler = self.executor if self.executor else self.file_operations_ui
+                    
                     # Copy files without overwrite
                     if files_no_overwrite:
-                        self.file_operations_ui.perform_copy_operation(
+                        operation_handler.perform_copy_operation(
                             files_no_overwrite,
                             destination_dir,
                             overwrite=False,
@@ -738,7 +723,7 @@ class FileOperationTask(BaseTask):
                     
                     # Copy files with overwrite
                     if files_with_overwrite:
-                        self.file_operations_ui.perform_copy_operation(
+                        operation_handler.perform_copy_operation(
                             files_with_overwrite,
                             destination_dir,
                             overwrite=True,
@@ -778,8 +763,7 @@ class FileOperationTask(BaseTask):
     def _execute_move(self, files_to_move):
         """Execute move operation in background thread.
         
-        Creates a background worker thread, sets operation_in_progress flag,
-        starts progress tracking, and calls the existing perform_move_operation
+        Delegates to FileOperationsExecutor to perform the actual move operation
         with pre-resolved files.
         
         Args:
@@ -796,7 +780,6 @@ class FileOperationTask(BaseTask):
         # Create background worker thread
         def move_worker():
             try:
-                # Process each file with the existing move logic
                 # Separate files by overwrite flag
                 files_no_overwrite = []
                 files_with_overwrite = []
@@ -811,9 +794,12 @@ class FileOperationTask(BaseTask):
                 if files_to_move:
                     destination_dir = files_to_move[0][1].parent
                     
+                    # Use executor if available, otherwise fall back to file_operations_ui
+                    operation_handler = self.executor if self.executor else self.file_operations_ui
+                    
                     # Move files without overwrite
                     if files_no_overwrite:
-                        self.file_operations_ui.perform_move_operation(
+                        operation_handler.perform_move_operation(
                             files_no_overwrite,
                             destination_dir,
                             overwrite=False,
@@ -822,7 +808,7 @@ class FileOperationTask(BaseTask):
                     
                     # Move files with overwrite
                     if files_with_overwrite:
-                        self.file_operations_ui.perform_move_operation(
+                        operation_handler.perform_move_operation(
                             files_with_overwrite,
                             destination_dir,
                             overwrite=True,
@@ -862,84 +848,42 @@ class FileOperationTask(BaseTask):
     def _execute_delete(self, files_to_delete):
         """Execute delete operation in background thread.
         
-        Creates a background worker thread, sets operation_in_progress flag,
-        starts progress tracking, and calls the existing perform_delete_operation.
+        Delegates to FileOperationsExecutor to perform the actual delete operation.
         
         Args:
             files_to_delete: List of Path objects to delete
         """
-        import threading
-        
         # Set operation in progress flag
         self.file_manager.operation_in_progress = True
         self.file_manager.operation_cancelled = False
         
         self.logger.info(f"Starting delete operation with {len(files_to_delete)} files")
         
-        # Create background worker thread
-        def delete_worker():
-            try:
-                # Call the existing delete operation
-                # Note: perform_delete_operation doesn't have a completion_callback parameter
-                # so we'll need to handle completion differently
-                
-                # For now, we'll call it directly and then handle completion
-                # The perform_delete_operation method will handle its own threading
-                # and progress tracking, so we just need to wait for it to complete
-                
-                # Actually, looking at the code, perform_delete_operation creates its own
-                # thread, so we should call it and then monitor for completion
-                # For now, we'll call it and assume it completes
-                
-                self.file_operations_ui.perform_delete_operation(files_to_delete)
-                
-                # Since perform_delete_operation doesn't have a callback,
-                # we need to wait for operation_in_progress to become False
-                # or implement a different approach
-                
-                # For now, we'll transition to COMPLETED immediately after calling
-                # This is not ideal but will work for the initial implementation
-                # TODO: Add completion callback support to perform_delete_operation
-                
-                # Wait a bit for the operation to start
-                import time
-                time.sleep(0.1)
-                
-                # The operation will complete asynchronously, so we need to
-                # monitor the operation_in_progress flag
-                # For now, we'll just transition to COMPLETED
-                # The actual completion will be handled by the existing code
-                
-            except Exception as e:
-                self.logger.error(f"Error in delete worker thread: {e}")
-                # Ensure we clean up even on error
-                self.file_manager.operation_in_progress = False
-                self._transition_to_state(State.COMPLETED)
-                self._complete_operation()
+        # Use executor if available, otherwise fall back to file_operations_ui
+        operation_handler = self.executor if self.executor else self.file_operations_ui
         
-        # Start the worker thread
-        worker_thread = threading.Thread(target=delete_worker, daemon=True)
-        worker_thread.start()
+        # Call operation handler to perform delete operation
+        # The handler will handle threading, progress tracking, and completion
+        operation_handler.perform_delete_operation(
+            files_to_delete,
+            completion_callback=self._on_delete_complete
+        )
+    
+    def _on_delete_complete(self, deleted_count, error_count):
+        """Callback when delete operation completes.
         
-        # Note: For delete operations, we need to handle completion differently
-        # since perform_delete_operation doesn't have a completion callback
-        # For now, we'll rely on the existing completion handling in perform_delete_operation
-        # and transition to COMPLETED state after a delay
-        # This is a temporary solution until we add callback support
+        Args:
+            deleted_count: Number of files successfully deleted
+            error_count: Number of files that failed to delete
+        """
+        # Store results in context
+        if self.context:
+            # Update error count in results
+            self.context.results['errors'].extend([None] * error_count)
         
-        # Schedule completion check
-        def check_delete_complete():
-            import time
-            # Wait for operation to complete (poll operation_in_progress flag)
-            while self.file_manager.operation_in_progress:
-                time.sleep(0.1)
-            
-            # Operation complete, transition to COMPLETED
-            self._transition_to_state(State.COMPLETED)
-            self._complete_operation()
-        
-        completion_thread = threading.Thread(target=check_delete_complete, daemon=True)
-        completion_thread.start()
+        # Transition to COMPLETED state
+        self._transition_to_state(State.COMPLETED)
+        self._complete_operation()
 
 
     

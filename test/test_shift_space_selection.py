@@ -5,7 +5,13 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_shift_space_selection.py -v
 
 import pytest
 from pathlib import Path
-from src.tfm_file_operations import FileOperations
+from src.tfm_file_operations import FileListManager
+
+
+class MockConfig:
+    """Mock configuration for testing"""
+    SHOW_HIDDEN_FILES = False
+    MAX_EXTENSION_LENGTH = 5
 
 
 class TestShiftSpaceSelection:
@@ -25,7 +31,7 @@ class TestShiftSpaceSelection:
             'selected_files': set()
         }
         
-        file_ops = FileOperations()
+        file_ops = FileListManager(MockConfig())
         
         # Toggle selection and move up
         success, message = file_ops.toggle_selection(pane_data, move_cursor=True, direction=-1)
@@ -48,7 +54,7 @@ class TestShiftSpaceSelection:
             'selected_files': set()
         }
         
-        file_ops = FileOperations()
+        file_ops = FileListManager(MockConfig())
         
         # Toggle selection and try to move up
         success, message = file_ops.toggle_selection(pane_data, move_cursor=True, direction=-1)
@@ -71,7 +77,7 @@ class TestShiftSpaceSelection:
             'selected_files': set()
         }
         
-        file_ops = FileOperations()
+        file_ops = FileListManager(MockConfig())
         
         # Toggle selection and move down
         success, message = file_ops.toggle_selection(pane_data, move_cursor=True, direction=1)
@@ -94,7 +100,7 @@ class TestShiftSpaceSelection:
             'selected_files': set()
         }
         
-        file_ops = FileOperations()
+        file_ops = FileListManager(MockConfig())
         
         # First press - select and move up
         success1, message1 = file_ops.toggle_selection(pane_data, move_cursor=True, direction=-1)

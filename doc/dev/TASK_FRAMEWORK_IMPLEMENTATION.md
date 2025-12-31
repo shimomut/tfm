@@ -8,6 +8,72 @@ The first concrete implementation, `FileOperationTask`, replaces the previous ca
 
 ## Architecture
 
+### Refactored Architecture (Post-Refactoring)
+
+The file operations architecture has been refactored to achieve clean separation of concerns with four distinct layers:
+
+```
+Layer 1: File List Management
+┌─────────────────────────────────────────┐
+│ FileListManager                         │
+│ - refresh_files()                       │
+│ - sort_entries()                        │
+│ - toggle_selection()                    │
+│ - apply_filter()                        │
+└─────────────────────────────────────────┘
+
+Layer 2: UI Interactions
+┌─────────────────────────────────────────┐
+│ FileOperationsUI                        │
+│ - show_confirmation_dialog()            │
+│ - show_conflict_dialog()                │
+│ - show_rename_dialog()                  │
+│ - Entry points (copy/move/delete)      │
+└──────────────┬──────────────────────────┘
+               │ creates & provides callbacks
+               ↓
+Layer 3: Orchestration
+┌─────────────────────────────────────────┐
+│ FileOperationTask                       │
+│ - State machine logic                   │
+│ - Conflict detection                    │
+│ - Workflow coordination                 │
+│ - Calls ui.show_*() methods             │
+│ - Calls executor.perform_*() methods    │
+└──────────────┬──────────────────────────┘
+               │ delegates I/O
+               ↓
+Layer 4: I/O Operations
+┌─────────────────────────────────────────┐
+│ FileOperationsExecutor                  │
+│ - perform_copy_operation()              │
+│ - perform_move_operation()              │
+│ - perform_delete_operation()            │
+│ - Progress tracking                     │
+│ - Error handling                        │
+└─────────────────────────────────────────┘
+```
+
+### Dependency Flow
+
+```
+FileManager
+    ├── creates FileListManager (renamed from FileOperations)
+    ├── creates FileOperationsExecutor (new class)
+    └── creates FileOperationsUI
+            └── creates FileOperationTask(ui=self, executor=executor)
+                    ├── calls ui.show_*() for UI
+                    └── calls executor.perform_*() for I/O
+```
+
+### Key Improvements
+
+1. **Clear Naming**: `FileOperations` → `FileListManager` accurately reflects responsibilities
+2. **No Boundary Violations**: Each layer has distinct responsibilities
+3. **No Circular Dependencies**: One-way dependency flow
+4. **Testable**: Each component can be tested independently
+5. **Maintainable**: Changes localized to appropriate layer
+
 ### High-Level Architecture
 
 ```
@@ -20,6 +86,12 @@ The first concrete implementation, `FileOperationTask`, replaces the previous ca
 │  │  - cancel_current_task()                               │  │
 │  │  - _clear_task()                                       │  │
 │  │  - Future: task_queue: List[BaseTask]                  │  │
+│  └───────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │         Component Instances                            │  │
+│  │  - file_list_manager: FileListManager                  │  │
+│  │  - file_operations_executor: FileOperationsExecutor    │  │
+│  │  - file_operations_ui: FileOperationsUI                │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                           ↕                                  │
 │  ┌───────────────────────────────────────────────────────┐  │
@@ -40,12 +112,25 @@ The first concrete implementation, `FileOperationTask`, replaces the previous ca
 │  │                                                         │  │
 │  │  Context: {operation_type, files, destination,        │  │
 │  │            conflicts, results, options}                │  │
+│  │                                                         │  │
+│  │  Dependencies:                                         │  │
+│  │  - ui: FileOperationsUI (for UI interactions)         │  │
+│  │  - executor: FileOperationsExecutor (for I/O)         │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                           ↕                                  │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │         FileOperationsUI                               │  │
 │  │  - Creates and starts FileOperationTask                │  │
-│  │  - Delegates to task for all operations                │  │
+│  │  - Provides UI methods (dialogs, confirmations)        │  │
+│  │  - NO I/O operations                                   │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                           ↕                                  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │         FileOperationsExecutor                         │  │
+│  │  - Executes file I/O operations                        │  │
+│  │  - Progress tracking                                   │  │
+│  │  - Background threading                                │  │
+│  │  - NO UI code                                          │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -70,6 +155,10 @@ The first concrete implementation, `FileOperationTask`, replaces the previous ca
 ┌──────────────────────────┐
 │  FileOperationTask       │
 │                          │
+│  Dependencies:           │
+│  - ui: FileOperationsUI  │
+│  - executor: Executor    │
+│                          │
 │  + start_operation()     │
 │  + on_confirmed()        │
 │  + on_conflict_resolved()│
@@ -85,6 +174,37 @@ Future tasks:
 │  ArchiveExtractionTask   │
 │  ...                     │
 └──────────────────────────┘
+```
+
+### Component Responsibilities
+
+```
+┌─────────────────────────────────────────┐
+│ FileListManager                         │  Layer 1: File List Management
+│ - File list operations ONLY             │
+│ - NO UI, NO I/O, NO orchestration       │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│ FileOperationsUI                        │  Layer 2: UI Interactions
+│ - UI dialogs and confirmations ONLY     │
+│ - NO I/O operations                     │
+│ - Creates FileOperationTask             │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│ FileOperationTask                       │  Layer 3: Orchestration
+│ - State machine logic ONLY              │
+│ - NO UI code (delegates to ui)          │
+│ - NO I/O code (delegates to executor)   │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│ FileOperationsExecutor                  │  Layer 4: I/O Operations
+│ - File I/O operations ONLY              │
+│ - NO UI code                            │
+│ - Background threading                  │
+└─────────────────────────────────────────┘
 ```
 
 ## BaseTask Design
@@ -151,6 +271,27 @@ class BaseTask(ABC):
 5. **Thread Safety**: Tasks coordinate between UI and worker threads
 
 ## FileOperationTask Design
+
+### Dependencies
+
+FileOperationTask now uses dependency injection for clean separation:
+
+```python
+class FileOperationTask(BaseTask):
+    def __init__(self, file_manager, ui, executor):
+        """Initialize task with dependencies.
+        
+        Args:
+            file_manager: FileManager for task management
+            ui: FileOperationsUI for UI interactions
+            executor: FileOperationsExecutor for I/O operations
+        """
+        super().__init__(file_manager)
+        self.ui = ui
+        self.executor = executor
+        self.state = State.IDLE
+        self.context = None
+```
 
 ### State Machine
 
@@ -231,16 +372,16 @@ def start_operation(self, operation_type, files, destination=None):
     """
 
 def on_confirmed(self, confirmed):
-    """Handle confirmation response"""
+    """Handle confirmation response from UI"""
 
 def on_conflict_resolved(self, choice, apply_to_all=False):
-    """Handle conflict resolution choice"""
+    """Handle conflict resolution choice from UI"""
 
 def on_renamed(self, source_file, new_name):
-    """Handle rename confirmation"""
+    """Handle rename confirmation from UI"""
 
 def on_rename_cancelled(self):
-    """Handle rename cancellation"""
+    """Handle rename cancellation from UI"""
 ```
 
 #### Internal Methods
@@ -250,16 +391,58 @@ def _check_conflicts(self):
     """Detect file conflicts"""
 
 def _resolve_next_conflict(self):
-    """Show conflict dialog for next conflict"""
+    """Show conflict dialog via ui.show_conflict_dialog()"""
 
 def _show_rename_dialog(self, source_file):
-    """Show rename dialog"""
+    """Show rename dialog via ui.show_rename_dialog()"""
 
 def _execute_operation(self):
-    """Execute the file operation in background thread"""
+    """Execute operation via executor.perform_*_operation()"""
 
 def _complete_operation(self):
     """Complete the operation and return to IDLE"""
+```
+
+### UI Delegation
+
+All UI interactions are delegated to FileOperationsUI:
+
+```python
+# Confirmation
+self.ui.show_confirmation_dialog(
+    operation_type, files, destination, self.on_confirmed
+)
+
+# Conflict resolution
+self.ui.show_conflict_dialog(
+    source_file, dest_file, choices, self.on_conflict_resolved
+)
+
+# Rename
+self.ui.show_rename_dialog(
+    source_file, destination, self.on_renamed, self.on_rename_cancelled
+)
+```
+
+### I/O Delegation
+
+All I/O operations are delegated to FileOperationsExecutor:
+
+```python
+# Copy
+self.executor.perform_copy_operation(
+    files_to_copy, destination, overwrite, self._complete_operation
+)
+
+# Move
+self.executor.perform_move_operation(
+    files_to_move, destination, overwrite, self._complete_operation
+)
+
+# Delete
+self.executor.perform_delete_operation(
+    files_to_delete, self._complete_operation
+)
 ```
 
 ## Task Management
@@ -334,6 +517,48 @@ The migration from callback-based to task-based architecture was done incrementa
 - Removed all old callback-based code
 - Removed temporary context objects from `file_manager`
 - Updated documentation
+
+## Architecture Refactoring (Post-Task Framework)
+
+After the task framework was implemented, a second refactoring addressed naming confusion and boundary violations:
+
+### Phase 1: Create FileOperationsExecutor
+- Created new `FileOperationsExecutor` class in `src/tfm_file_operations_executor.py`
+- Moved I/O methods from `FileOperationsUI` to executor
+- Added tests for executor
+
+### Phase 2: Extract UI Methods from Task
+- Added UI methods to `FileOperationsUI` (show_confirmation_dialog, etc.)
+- Updated `FileOperationTask` to accept ui parameter
+- Replaced direct UI calls in task with ui.show_*() calls
+
+### Phase 3: Rename FileOperations to FileListManager
+- Renamed `FileOperations` class to `FileListManager`
+- Updated all imports and references
+- Updated tests
+
+### Phase 4: Update Task to Use Executor
+- Updated `FileOperationTask` to accept executor parameter
+- Replaced I/O calls with executor.perform_*() calls
+- Updated tests
+
+### Phase 5: Update FileManager Integration
+- Created `file_list_manager` instance
+- Created `file_operations_executor` instance
+- Updated `file_operations_ui` initialization
+- Removed old I/O methods from `FileOperationsUI`
+
+### Phase 6: Update Tests
+- Updated test imports for renamed classes
+- Updated test mocks for new structure
+- Added comprehensive executor tests
+- Verified all tests pass
+
+### Phase 7: Update Documentation
+- Updated this document with refactored architecture
+- Updated class docstrings
+- Added architecture diagrams
+- Added migration notes
 
 ## Benefits
 
@@ -431,14 +656,20 @@ class CompositeTask(BaseTask):
 - `src/tfm_base_task.py`: BaseTask abstract class
 - `src/tfm_file_operation_task.py`: FileOperationTask implementation
 
+### Refactored Components
+- `src/tfm_file_operations.py`: FileListManager (renamed from FileOperations)
+- `src/tfm_file_operations_executor.py`: FileOperationsExecutor (new class for I/O)
+- `src/tfm_main.py`: FileManager with refactored component initialization
+
 ### Integration Points
-- `src/tfm_main.py`: FileManager task management
-- `src/tfm_file_operations.py`: FileOperationsUI integration
+- `src/tfm_main.py`: FileManager task management and component wiring
 
 ### Tests
 - `test/test_base_task.py`: BaseTask interface tests
 - `test/test_file_operation_task.py`: FileOperationTask tests
-- `test/test_task_integration.py`: Integration tests
+- `test/test_file_operations_executor.py`: FileOperationsExecutor tests
+- `test/test_file_operations_integration.py`: Integration tests
+- `test/test_file_operations_refactoring.py`: Refactoring verification tests
 
 ## Usage Examples
 
@@ -446,22 +677,29 @@ class CompositeTask(BaseTask):
 
 ```python
 # In FileOperationsUI.copy_selected_files()
-task = FileOperationTask(self.file_manager, self)
+task = FileOperationTask(
+    self.file_manager,
+    ui=self,
+    executor=self.file_manager.file_operations_executor
+)
 task.start_operation('copy', files_to_copy, destination_dir)
 self.file_manager.start_task(task)
 ```
 
-### Handling Task Callbacks
+### Task Delegates to UI and Executor
 
 ```python
-# Task calls back to FileOperationsUI for execution
+# Task delegates UI interactions to FileOperationsUI
+def _resolve_next_conflict(self):
+    self.ui.show_conflict_dialog(
+        source_file, dest_file, choices, self.on_conflict_resolved
+    )
+
+# Task delegates I/O operations to FileOperationsExecutor
 def _execute_operation(self):
     if self.context.operation_type == 'copy':
-        self.file_operations_ui.perform_copy_operation(
-            files_to_copy=files,
-            destination_dir=destination,
-            overwrite=overwrite,
-            completion_callback=self._on_operation_complete
+        self.executor.perform_copy_operation(
+            files_to_copy, destination, overwrite, self._complete_operation
         )
 ```
 
@@ -532,8 +770,96 @@ The task framework maintains backward compatibility by:
 6. Supporting existing keyboard shortcuts
 7. FileOperationsUI remains the public interface
 
+The architecture refactoring also maintains backward compatibility:
+1. All file operations work identically
+2. All UI interactions unchanged
+3. All configuration options preserved
+4. All keyboard shortcuts preserved
+5. No performance degradation
+
+## Refactoring Notes
+
+### What Changed
+
+1. **FileOperations → FileListManager**: Class renamed to accurately reflect its responsibility (file list management, not file operations)
+
+2. **FileOperationsExecutor Created**: New class extracts all I/O operations from FileOperationsUI into a dedicated executor
+
+3. **FileOperationTask Dependencies**: Task now receives `ui` and `executor` parameters for clean dependency injection
+
+4. **FileOperationsUI Simplified**: Removed all I/O methods, now only handles UI interactions
+
+5. **Boundary Violations Fixed**: Each class now has a single, clear responsibility with no mixed concerns
+
+### Why It Changed
+
+1. **Naming Confusion**: `FileOperations` was misleading - it managed file lists, not file operations
+2. **Mixed Responsibilities**: `FileOperationsUI` contained both UI code and I/O code
+3. **Boundary Violations**: `FileOperationTask` contained UI code (show_dialog calls)
+4. **Circular Dependencies**: Task called back to UI for I/O operations
+5. **Testing Difficulty**: Mixed responsibilities made unit testing complex
+
+### How to Adapt Code
+
+If you're working with the file operations system:
+
+1. **Import Changes**:
+   ```python
+   # Old
+   from tfm_file_operations import FileOperations
+   
+   # New
+   from tfm_file_operations import FileListManager
+   ```
+
+2. **Variable Names**:
+   ```python
+   # Old
+   self.file_operations = FileOperations(config)
+   
+   # New
+   self.file_list_manager = FileListManager(config)
+   ```
+
+3. **Task Creation**:
+   ```python
+   # Old
+   task = FileOperationTask(file_manager, file_operations_ui)
+   
+   # New
+   task = FileOperationTask(
+       file_manager,
+       ui=file_operations_ui,
+       executor=file_manager.file_operations_executor
+   )
+   ```
+
+4. **I/O Operations**:
+   ```python
+   # Old (in FileOperationsUI)
+   self.perform_copy_operation(files, dest, callback)
+   
+   # New (use executor)
+   self.file_manager.file_operations_executor.perform_copy_operation(
+       files, dest, callback
+   )
+   ```
+
+### Architecture Benefits
+
+The refactored architecture provides:
+
+1. **Clear Responsibilities**: Each class has one job
+2. **Easy Testing**: Components can be tested independently
+3. **No Circular Dependencies**: Clean one-way dependency flow
+4. **Better Maintainability**: Changes localized to appropriate layer
+5. **Accurate Naming**: Class names reflect actual responsibilities
+
 ## References
 
-- **Design Document**: `.kiro/specs/file-operations-state-machine/design.md`
-- **Requirements Document**: `.kiro/specs/file-operations-state-machine/requirements.md`
-- **Implementation Tasks**: `.kiro/specs/file-operations-state-machine/tasks.md`
+- **Task Framework Design**: `.kiro/specs/file-operations-state-machine/design.md`
+- **Task Framework Requirements**: `.kiro/specs/file-operations-state-machine/requirements.md`
+- **Task Framework Tasks**: `.kiro/specs/file-operations-state-machine/tasks.md`
+- **Refactoring Design**: `.kiro/specs/file-operations-refactoring/design.md`
+- **Refactoring Requirements**: `.kiro/specs/file-operations-refactoring/requirements.md`
+- **Refactoring Tasks**: `.kiro/specs/file-operations-refactoring/tasks.md`

@@ -40,7 +40,8 @@ from tfm_directory_diff_viewer import DirectoryDiffViewer
 # Import new modular components
 from tfm_log_manager import LogManager
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileOperations, FileOperationsUI
+from tfm_file_operations import FileListManager, FileOperationsUI
+from tfm_file_operations_executor import FileOperationsExecutor
 from tfm_list_dialog import ListDialog, ListDialogHelpers
 from ttk.wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 
@@ -303,10 +304,10 @@ class FileManager(UILayer):
         
         # Use simple defaults since TFM loads previous state anyway
         self.pane_manager = PaneManager(self.config, initial_left_dir, initial_right_dir, self.state_manager)
-        self.file_operations = FileOperations(self.config)
-        self.file_operations.log_manager = self.log_manager  # Set log_manager for error reporting
-        self.file_operations.logger = self.log_manager.getLogger("FileOp")  # Set logger for file operations
-        self.pane_manager.file_operations = self.file_operations  # Set file_operations for refresh_files
+        self.file_list_manager = FileListManager(self.config)
+        self.file_list_manager.log_manager = self.log_manager  # Set log_manager for error reporting
+        self.file_list_manager.logger = self.log_manager.getLogger("FileOp")  # Set logger for file operations
+        self.pane_manager.file_operations = self.file_list_manager  # Set file_operations for refresh_files
         self.list_dialog = ListDialog(self.config, renderer)
         self.info_dialog = InfoDialog(self.config, renderer)
         self.search_dialog = SearchDialog(self.config, renderer)
@@ -317,9 +318,10 @@ class FileManager(UILayer):
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager, renderer)
         self.progress_manager = ProgressManager()
         self.cache_manager = CacheManager(self.log_manager)
+        self.file_operations_executor = FileOperationsExecutor(self)
         self.archive_operations = ArchiveOperations(self.log_manager, self.cache_manager, self.progress_manager)
         self.archive_ui = ArchiveUI(self, self.archive_operations)
-        self.file_operations_ui = FileOperationsUI(self, self.file_operations)
+        self.file_operations_ui = FileOperationsUI(self, self.file_list_manager)
         
         # Initialize drag-and-drop components
         self.drag_gesture_detector = DragGestureDetector()
@@ -1419,10 +1421,10 @@ class FileManager(UILayer):
     
     def _action_toggle_hidden(self):
         """Toggle showing hidden files."""
-        self.file_operations.show_hidden = not self.file_operations.show_hidden
+        self.file_list_manager.show_hidden = not self.file_list_manager.show_hidden
         self.refresh_files()
         self.mark_dirty()
-        status = "showing" if self.file_operations.show_hidden else "hiding"
+        status = "showing" if self.file_list_manager.show_hidden else "hiding"
         self.logger.info(f"Now {status} hidden files")
         return True
     
@@ -1630,7 +1632,7 @@ class FileManager(UILayer):
     def toggle_selection(self):
         """Toggle selection of current file/directory and move to next item"""
         current_pane = self.get_current_pane()
-        success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=1)
+        success, message = self.file_list_manager.toggle_selection(current_pane, move_cursor=True, direction=1)
         if success:
             self.logger.info(message)
             self.adjust_scroll_for_focus(current_pane)
@@ -1638,7 +1640,7 @@ class FileManager(UILayer):
     def toggle_selection_up(self):
         """Toggle selection of current file/directory and move to previous item"""
         current_pane = self.get_current_pane()
-        success, message = self.file_operations.toggle_selection(current_pane, move_cursor=True, direction=-1)
+        success, message = self.file_list_manager.toggle_selection(current_pane, move_cursor=True, direction=-1)
         if success:
             self.logger.info(message)
             self.adjust_scroll_for_focus(current_pane)
@@ -1646,7 +1648,7 @@ class FileManager(UILayer):
     def toggle_all_files_selection(self):
         """Toggle selection status of all files (not directories) in current pane"""
         current_pane = self.get_current_pane()
-        success, message = self.file_operations.toggle_all_files_selection(current_pane)
+        success, message = self.file_list_manager.toggle_all_files_selection(current_pane)
         if success:
             self.logger.info(message)
             self.mark_dirty()
@@ -1654,7 +1656,7 @@ class FileManager(UILayer):
     def toggle_all_items_selection(self):
         """Toggle selection status of all items (files and directories) in current pane"""
         current_pane = self.get_current_pane()
-        success, message = self.file_operations.toggle_all_items_selection(current_pane)
+        success, message = self.file_list_manager.toggle_all_items_selection(current_pane)
         if success:
             self.logger.info(message)
             self.mark_dirty()
@@ -1875,7 +1877,7 @@ class FileManager(UILayer):
         """Apply filter - wrapper for file_operations method"""
         current_pane = self.get_current_pane()
         filter_pattern = self.filter_editor.get_text()
-        count = self.file_operations.apply_filter(current_pane, filter_pattern)
+        count = self.file_list_manager.apply_filter(current_pane, filter_pattern)
         
         # Log the filter action
         pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
@@ -1890,7 +1892,7 @@ class FileManager(UILayer):
         """Clear filter - wrapper for file_operations method"""
         current_pane = self.get_current_pane()
         
-        if self.file_operations.clear_filter(current_pane):
+        if self.file_list_manager.clear_filter(current_pane):
             # Log the clear action
             pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
             
@@ -1991,19 +1993,19 @@ class FileManager(UILayer):
         panes_to_refresh = [pane] if pane else [self.pane_manager.left_pane, self.pane_manager.right_pane]
         
         for pane_data in panes_to_refresh:
-            self.file_operations.refresh_files(pane_data)
+            self.file_list_manager.refresh_files(pane_data)
     
     def sort_entries(self, entries, sort_mode, reverse=False):
         """Sort file entries based on the specified mode"""
-        return self.file_operations.sort_entries(entries, sort_mode, reverse)
+        return self.file_list_manager.sort_entries(entries, sort_mode, reverse)
     
     def get_sort_description(self, pane_data):
         """Get a human-readable description of the current sort mode"""
-        return self.file_operations.get_sort_description(pane_data)
+        return self.file_list_manager.get_sort_description(pane_data)
             
     def get_file_info(self, path):
         """Get file information for display"""
-        return self.file_operations.get_file_info(path)
+        return self.file_list_manager.get_file_info(path)
             
     def format_path_display(self, path_obj):
         """
@@ -2391,7 +2393,7 @@ class FileManager(UILayer):
         if current_path_str.startswith('archive://'):
             status_parts.append("📦 archive")
         
-        if self.file_operations.show_hidden:
+        if self.file_list_manager.show_hidden:
             status_parts.append("showing hidden")
 
         left_status = f"({', '.join(status_parts)})" if status_parts else ""
@@ -2567,7 +2569,7 @@ class FileManager(UILayer):
         For example: "ab*c 12?3" will match files that contain both "*ab*c*" and "*12?3*"
         """
         current_pane = self.get_current_pane()
-        return self.file_operations.find_matches(current_pane, pattern, match_all=True, return_indices_only=True)
+        return self.file_list_manager.find_matches(current_pane, pattern, match_all=True, return_indices_only=True)
         
     def update_isearch_matches(self):
         """Update isearch matches and move cursor to nearest match"""
@@ -2624,7 +2626,7 @@ class FileManager(UILayer):
     def on_filter_confirm(self, filter_text):
         """Handle filter confirmation"""
         current_pane = self.get_current_pane()
-        count = self.file_operations.apply_filter(current_pane, filter_text)
+        count = self.file_list_manager.apply_filter(current_pane, filter_text)
         
         # Log the filter action
         pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
@@ -3268,8 +3270,8 @@ class FileManager(UILayer):
                 return  # User cancelled
             
             if option == "Toggle hidden files":
-                old_state = self.file_operations.show_hidden
-                new_state = self.file_operations.toggle_hidden_files()
+                old_state = self.file_list_manager.show_hidden
+                new_state = self.file_list_manager.toggle_hidden_files()
                 # Refresh file lists for both panes
                 self.refresh_files()
                 # Reset both panes
@@ -3401,7 +3403,7 @@ class FileManager(UILayer):
                         self.logger.info(f"Applied color scheme: {self.config.COLOR_SCHEME}")
                     
                     if hasattr(self.config, 'SHOW_HIDDEN_FILES'):
-                        self.file_operations.show_hidden = self.config.SHOW_HIDDEN_FILES
+                        self.file_list_manager.show_hidden = self.config.SHOW_HIDDEN_FILES
                         self.logger.info(f"Hidden files setting: {'shown' if self.config.SHOW_HIDDEN_FILES else 'hidden'}")
                     
                     if hasattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO'):
@@ -3728,7 +3730,7 @@ class FileManager(UILayer):
         
         # Create and launch directory diff viewer
         try:
-            viewer = DirectoryDiffViewer(self.renderer, left_path, right_path, self.ui_layer_stack, self.file_operations)
+            viewer = DirectoryDiffViewer(self.renderer, left_path, right_path, self.ui_layer_stack, self.file_list_manager)
             if viewer:
                 # Push viewer onto layer stack
                 self.push_layer(viewer)
@@ -4067,7 +4069,7 @@ class FileManager(UILayer):
 
     def _navigate_to_search_result(self, result):
         """Navigate to the selected search result - wrapper for search dialog helper"""
-        SearchDialogHelpers.navigate_to_result(result, self.pane_manager, self.file_operations, print)
+        SearchDialogHelpers.navigate_to_result(result, self.pane_manager, self.file_list_manager, print)
         
         # Adjust scroll with proper display height
         current_pane = self.get_current_pane()
@@ -4321,7 +4323,7 @@ class FileManager(UILayer):
                 self.mark_dirty()
             return True
         elif action == 'toggle_hidden':
-            self.file_operations.toggle_hidden_files()
+            self.file_list_manager.toggle_hidden_files()
             # Refresh file lists for both panes
             self.refresh_files()
             # Reset both panes

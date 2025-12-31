@@ -587,7 +587,7 @@ class DirectoryDiffViewer(UILayer):
             left_path: Path to left directory
             right_path: Path to right directory
             layer_stack: Optional UILayerStack for pushing new layers (e.g., DiffViewer)
-            file_operations: Optional FileOperations instance for accessing show_hidden setting
+            file_operations: Optional FileListManager instance for accessing show_hidden setting
         """
         self.logger = getLogger("DirDiff")
         self.renderer = renderer

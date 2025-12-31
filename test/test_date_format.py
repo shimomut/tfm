@@ -7,7 +7,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_date_format.py -v
 from datetime import datetime, timedelta
 from pathlib import Path as StdPath
 
-from tfm_file_operations import FileOperations
+from tfm_file_operations import FileListManager
 from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
 
 
@@ -50,7 +50,7 @@ def test_date_formats():
         print("-" * 60)
         
         config = MockConfig(date_format=format_type)
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         
         for label, timestamp in timestamps:
             formatted = file_ops._format_date(timestamp)
@@ -107,13 +107,13 @@ def test_edge_cases():
     
     # Test with short format
     config_short = MockConfig(date_format=DATE_FORMAT_SHORT)
-    file_ops_short = FileOperations(config_short)
+    file_ops_short = FileListManager(config_short)
     formatted_short = file_ops_short._format_date(midnight.timestamp())
     print(f"Midnight (short):   {formatted_short:20} (YY-MM-DD HH:mm)")
     
     # Test with full format
     config_full = MockConfig(date_format=DATE_FORMAT_FULL)
-    file_ops_full = FileOperations(config_full)
+    file_ops_full = FileListManager(config_full)
     formatted_full = file_ops_full._format_date(midnight.timestamp())
     print(f"Midnight (full):    {formatted_full:20} (YYYY-MM-DD HH:mm:ss)")
     

@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path as PathlibPath
 
 from tfm_path import Path
-from tfm_file_operations import FileOperations, FileOperationsUI
+from tfm_file_operations import FileListManager, FileOperationsUI
 from tfm_progress_manager import ProgressManager
 from tfm_cache_manager import CacheManager
 
@@ -93,7 +93,7 @@ def test_copy_from_archive_to_local():
         
         # Set up file manager
         fm = MockFileManager()
-        file_ops = FileOperations(fm.config)
+        file_ops = FileListManager(fm.config)
         file_ops_ui = FileOperationsUI(fm, file_ops)
         fm.file_ops = file_ops
         
@@ -150,7 +150,7 @@ def test_copy_directory_from_archive():
         
         # Set up file manager
         fm = MockFileManager()
-        file_ops = FileOperations(fm.config)
+        file_ops = FileListManager(fm.config)
         file_ops_ui = FileOperationsUI(fm, file_ops)
         fm.file_ops = file_ops
         
@@ -220,7 +220,7 @@ def test_copy_multiple_files_from_archive():
         
         # Set up file manager
         fm = MockFileManager()
-        file_ops = FileOperations(fm.config)
+        file_ops = FileListManager(fm.config)
         file_ops_ui = FileOperationsUI(fm, file_ops)
         fm.file_ops = file_ops
         

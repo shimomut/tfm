@@ -14,7 +14,7 @@ from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_progress_animator import ProgressAnimator
 from tfm_config import DefaultConfig
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileOperations
+from tfm_file_operations import FileListManager
 
 
 class IntegrationTestConfig(DefaultConfig):
@@ -53,7 +53,7 @@ def test_animation_with_full_integration():
         # Initialize all components like in real TFM
         search_dialog = SearchDialog(config)
         pane_manager = PaneManager(config, test_dir, test_dir, None)
-        file_operations = FileOperations(config)
+        file_operations = FileListManager(config)
         
         # Verify animation system is properly initialized
         assert hasattr(search_dialog, 'progress_animator')

@@ -10,7 +10,7 @@ import tarfile
 from pathlib import Path as PathlibPath
 
 from tfm_path import Path
-from tfm_file_operations import FileOperations, FileOperationsUI
+from tfm_file_operations import FileListManager, FileOperationsUI
 from tfm_progress_manager import ProgressManager
 from tfm_cache_manager import CacheManager
 
@@ -231,7 +231,7 @@ def test_copy_with_file_operations():
         
         # Set up file manager and operations
         file_manager = MockFileManager()
-        file_ops = FileOperations(file_manager.config)
+        file_ops = FileListManager(file_manager.config)
         file_ops_ui = FileOperationsUI(file_manager, file_ops)
         
         # Set up panes

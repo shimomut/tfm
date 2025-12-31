@@ -680,7 +680,7 @@ class SearchDialogHelpers:
         Args:
             result: Search result dictionary
             pane_manager: PaneManager instance
-            file_operations: FileOperations instance  
+            file_operations: FileListManager instance  
             print_func: Function to print messages
         """
         current_pane = pane_manager.get_current_pane()

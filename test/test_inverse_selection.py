@@ -6,7 +6,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_inverse_selection.py -v
 
 from pathlib import Path
 
-from tfm_file_operations import FileOperations
+from tfm_file_operations import FileListManager
 
 
 def test_inverse_files_selection():
@@ -17,7 +17,7 @@ def test_inverse_files_selection():
     class MockConfig:
         pass
     
-    file_ops = FileOperations(MockConfig())
+    file_ops = FileListManager(MockConfig())
     
     # Create mock Path objects
     class MockPath:
@@ -85,7 +85,7 @@ def test_inverse_items_selection():
     class MockConfig:
         pass
     
-    file_ops = FileOperations(MockConfig())
+    file_ops = FileListManager(MockConfig())
     
     # Create mock Path objects
     class MockPath:

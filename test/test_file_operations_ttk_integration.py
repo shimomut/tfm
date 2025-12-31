@@ -13,7 +13,7 @@ import shutil
 from pathlib import Path as StdPath
 import pytest
 
-from tfm_file_operations import FileOperations, FileOperationsUI
+from tfm_file_operations import FileListManager, FileOperationsUI
 from tfm_path import Path as TFMPath
 
 
@@ -128,21 +128,21 @@ class MockFileManager:
         self.dialog_callback = callback
 
 
-class TestFileOperations:
-    """Test FileOperations class"""
+class TestFileListManager:
+    """Test FileListManager class"""
     
     def setup_method(self):
         """Set up test fixtures"""
         self.config = MockConfig()
-        self.file_ops = FileOperations(self.config)
+        self.file_ops = FileListManager(self.config)
         self.temp_dir = tempfile.mkdtemp()
     
     def teardown_method(self):
         """Clean up test fixtures"""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
     
-    def test_file_operations_initialization(self):
-        """Test that FileOperations initializes correctly"""
+    def test_file_list_manager_initialization(self):
+        """Test that FileListManager initializes correctly"""
         assert self.file_ops.config == self.config
         assert self.file_ops.show_hidden == False
         assert self.file_ops.log_manager is None
@@ -231,7 +231,7 @@ class TestFileOperations:
         
         pane_data = {
             'files': [TFMPath(file1)],
-            'selected_index': 0,
+            'focused_index': 0,
             'selected_files': set()
         }
         
@@ -287,7 +287,7 @@ class TestFileOperationsUI:
     def setup_method(self):
         """Set up test fixtures"""
         self.mock_fm = MockFileManager()
-        self.file_ops = FileOperations(MockConfig())
+        self.file_ops = FileListManager(MockConfig())
         self.file_ops_ui = FileOperationsUI(self.mock_fm, self.file_ops)
     
     def test_file_operations_ui_initialization(self):
@@ -298,11 +298,6 @@ class TestFileOperationsUI:
         assert self.file_ops_ui.progress_manager == self.mock_fm.progress_manager
         assert self.file_ops_ui.cache_manager == self.mock_fm.cache_manager
         assert self.file_ops_ui.config == self.mock_fm.config
-    
-    def test_count_files_recursively_empty(self):
-        """Test counting files in empty list"""
-        count = self.file_ops_ui._count_files_recursively([])
-        assert count == 0
     
     def test_validate_operation_capabilities_delete(self):
         """Test validating delete operation capabilities"""
@@ -396,15 +391,15 @@ class TestFileOperationsUI:
 
 
 class TestFileOperationsIntegration:
-    """Test integration between FileOperations and FileOperationsUI"""
+    """Test integration between FileListManager and FileOperationsUI"""
     
-    def test_file_operations_ui_uses_file_operations(self):
-        """Test that FileOperationsUI can use FileOperations methods"""
+    def test_file_operations_ui_uses_file_list_manager(self):
+        """Test that FileOperationsUI can use FileListManager methods"""
         mock_fm = MockFileManager()
-        file_ops = FileOperations(MockConfig())
+        file_ops = FileListManager(MockConfig())
         file_ops_ui = FileOperationsUI(mock_fm, file_ops)
         
-        # Verify UI can access file operations methods
+        # Verify UI can access file list manager methods
         assert hasattr(file_ops_ui.file_operations, 'get_file_info')
         assert hasattr(file_ops_ui.file_operations, 'sort_entries')
         assert hasattr(file_ops_ui.file_operations, 'refresh_files')
@@ -414,23 +409,25 @@ class TestFileOperationsIntegration:
     def test_file_operations_ui_has_operation_methods(self):
         """Test that FileOperationsUI has operation methods"""
         mock_fm = MockFileManager()
-        file_ops = FileOperations(MockConfig())
+        file_ops = FileListManager(MockConfig())
         file_ops_ui = FileOperationsUI(mock_fm, file_ops)
         
-        # Verify UI has its own operation methods
+        # Verify UI has entry point methods
         assert hasattr(file_ops_ui, 'copy_selected_files')
         assert hasattr(file_ops_ui, 'move_selected_files')
         assert hasattr(file_ops_ui, 'delete_selected_files')
-        assert hasattr(file_ops_ui, 'perform_copy_operation')
-        assert hasattr(file_ops_ui, 'perform_move_operation')
-        assert hasattr(file_ops_ui, 'perform_delete_operation')
+        
+        # Verify UI has dialog methods
+        assert hasattr(file_ops_ui, 'show_confirmation_dialog')
+        assert hasattr(file_ops_ui, 'show_conflict_dialog')
+        assert hasattr(file_ops_ui, 'show_rename_dialog')
     
     def test_no_rendering_code_in_file_operations(self):
-        """Verify that FileOperations contains no rendering code"""
+        """Verify that FileListManager contains no rendering code"""
         import inspect
         
-        # Get all methods of FileOperations
-        methods = inspect.getmembers(FileOperations, predicate=inspect.isfunction)
+        # Get all methods of FileListManager
+        methods = inspect.getmembers(FileListManager, predicate=inspect.isfunction)
         
         # Check that no method contains rendering-related code
         rendering_keywords = ['stdscr', 'addstr', 'hline', 'vline', 'curses', 'draw_text', 'renderer']
@@ -441,7 +438,7 @@ class TestFileOperationsIntegration:
             
             source = inspect.getsource(method)
             for keyword in rendering_keywords:
-                assert keyword not in source, f"Found rendering keyword '{keyword}' in FileOperations.{method_name}"
+                assert keyword not in source, f"Found rendering keyword '{keyword}' in FileListManager.{method_name}"
     
     def test_no_rendering_code_in_file_operations_ui(self):
         """Verify that FileOperationsUI contains no rendering code"""

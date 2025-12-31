@@ -8,13 +8,13 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from tfm_file_operations import FileOperations, FileOperationsUI
+from tfm_file_operations import FileListManager, FileOperationsUI
 from tfm_path import Path as TFMPath
 
 
-def test_file_operations():
-    """Test basic file operations functionality"""
-    print("Testing FileOperations class...")
+def test_file_list_manager():
+    """Test basic file list manager functionality"""
+    print("Testing FileListManager class...")
     
     # Create a temporary directory for testing
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -32,7 +32,7 @@ def test_file_operations():
             MAX_EXTENSION_LENGTH = 5
             SEPARATE_EXTENSIONS = True
         
-        file_ops = FileOperations(MockConfig())
+        file_ops = FileListManager(MockConfig())
         
         # Test file info
         size_str, date_str = file_ops.get_file_info(TFMPath(test_file1))
@@ -49,7 +49,7 @@ def test_file_operations():
         desc = file_ops.get_sort_description(pane_data)
         assert 'Name' in desc
         
-        print("✓ FileOperations tests passed")
+        print("✓ FileListManager tests passed")
 
 
 def test_file_operations_ui_initialization():
@@ -96,7 +96,7 @@ def test_file_operations_ui_initialization():
         CONFIRM_MOVE = False
         CONFIRM_DELETE = False
     
-    file_ops = FileOperations(MockConfig())
+    file_ops = FileListManager(MockConfig())
     mock_fm = MockFileManager()
     
     # Test FileOperationsUI initialization
@@ -104,10 +104,6 @@ def test_file_operations_ui_initialization():
     
     assert file_ops_ui.file_manager == mock_fm
     assert file_ops_ui.file_operations == file_ops
-    
-    # Test utility methods
-    count = file_ops_ui._count_files_recursively([])
-    assert count == 0
     
     print("✓ FileOperationsUI initialization tests passed")
 
@@ -119,12 +115,12 @@ def test_backward_compatibility():
     # This test would require a full FileManager instance which needs curses
     # For now, just test that the classes can be imported and initialized
     try:
-        from tfm_file_operations import FileOperations, FileOperationsUI
+        from tfm_file_operations import FileListManager, FileOperationsUI
         
         class MockConfig:
             SHOW_HIDDEN_FILES = False
         
-        file_ops = FileOperations(MockConfig())
+        file_ops = FileListManager(MockConfig())
         
         # Test that basic methods still work
         pane_data = {
@@ -150,11 +146,11 @@ def test_backward_compatibility():
 
 
 def test_file_operations_integration():
-    """Test integration between FileOperations and FileOperationsUI"""
+    """Test integration between FileListManager and FileOperationsUI"""
     print("Testing file operations integration...")
     
     try:
-        # Test that FileOperationsUI can use FileOperations methods
+        # Test that FileOperationsUI can use FileListManager methods
         class MockConfig:
             SHOW_HIDDEN_FILES = False
             CONFIRM_COPY = False
@@ -169,11 +165,11 @@ def test_file_operations_integration():
                 self.cache_manager = None
                 self.needs_full_redraw = False
         
-        file_ops = FileOperations(MockConfig())
+        file_ops = FileListManager(MockConfig())
         mock_fm = MockFileManager()
         file_ops_ui = FileOperationsUI(mock_fm, file_ops)
         
-        # Test that UI can access file operations methods
+        # Test that UI can access file list manager methods
         assert hasattr(file_ops_ui.file_operations, 'get_file_info')
         assert hasattr(file_ops_ui.file_operations, 'sort_entries')
         assert hasattr(file_ops_ui.file_operations, 'refresh_files')
@@ -197,7 +193,7 @@ def main():
     print("Running file operations refactoring tests...\n")
     
     try:
-        test_file_operations()
+        test_file_list_manager()
         test_file_operations_ui_initialization()
         test_backward_compatibility()
         test_file_operations_integration()

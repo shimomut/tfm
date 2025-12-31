@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileOperations
+from tfm_file_operations import FileListManager
 
 
 class MockConfig:
@@ -185,7 +185,7 @@ def demo_copy_from_archive_to_filesystem():
                 break
         
         if source_file:
-            file_ops = FileOperations(log_manager, None, None)
+            file_ops = FileListManager(log_manager, None, None)
             dest_path = Path(str(dest_dir)) / "document.txt"
             
             success = file_ops.copy_file(source_file, dest_path)
@@ -295,7 +295,7 @@ def demo_archive_to_archive_operations():
         
         if source_file:
             log_manager = MockLogManager()
-            file_ops = FileOperations(log_manager, None, None)
+            file_ops = FileListManager(log_manager, None, None)
             dest_path = Path(str(temp_extract)) / "file1.txt"
             
             success = file_ops.copy_file(source_file, dest_path)

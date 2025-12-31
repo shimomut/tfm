@@ -18,7 +18,7 @@ from pathlib import Path as StdPath
 # Add src to path
 sys.path.insert(0, str(StdPath(__file__).parent.parent / 'src'))
 
-from tfm_file_operations import FileOperations
+from tfm_file_operations import FileListManager
 from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
 
 
@@ -60,7 +60,7 @@ def create_demo_files():
 
 def display_file_list(files, config, format_name):
     """Display file list with specified date format"""
-    file_ops = FileOperations(config)
+    file_ops = FileListManager(config)
     
     print(f"\n{'='*70}")
     print(f"Format: {format_name}")
@@ -163,7 +163,7 @@ def demo_format_cycling():
         format_type, format_name = formats[format_idx]
         
         config = MockConfig(date_format=format_type)
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         
         formatted = file_ops._format_date(sample_file.timestamp())
         
