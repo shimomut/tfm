@@ -6,7 +6,7 @@ This implementation plan outlines the tasks for creating a task-based framework 
 
 ## Tasks
 
-- [ ] 1. Create BaseTask abstract class
+- [x] 1. Create BaseTask abstract class
   - Create `src/tfm_base_task.py` module
   - Define BaseTask abstract class with abstract methods
   - Implement start(), cancel(), is_active(), get_state() as abstract methods
@@ -20,25 +20,25 @@ This implementation plan outlines the tasks for creating a task-based framework 
   - Test hook methods can be overridden
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 2. Add task management to FileManager
-  - [ ] 2.1 Add current_task attribute to FileManager.__init__()
+- [x] 2. Add task management to FileManager
+  - [x] 2.1 Add current_task attribute to FileManager.__init__()
     - Initialize as None
     - Add type hint: Optional[BaseTask]
     - _Requirements: 2.1_
 
-  - [ ] 2.2 Implement start_task() method
+  - [x] 2.2 Implement start_task() method
     - Check if task is already active
     - Raise RuntimeError if task already active
     - Store task reference
     - Call task.start()
     - _Requirements: 2.2, 2.3_
 
-  - [ ] 2.3 Implement cancel_current_task() method
+  - [x] 2.3 Implement cancel_current_task() method
     - Check if task exists and is active
     - Call task.cancel()
     - _Requirements: 2.4_
 
-  - [ ] 2.4 Implement _clear_task() method
+  - [x] 2.4 Implement _clear_task() method
     - Clear current_task reference
     - Called by tasks when they complete
     - _Requirements: 2.5_
@@ -58,7 +58,7 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - **Property 13: Task Start Exclusivity**
     - **Validates: Requirements 2.3**
 
-- [ ] 3. Create FileOperationTask infrastructure
+- [x] 3. Create FileOperationTask infrastructure
   - Create `src/tfm_file_operation_task.py` module
   - Define State enum with all required states
   - Define OperationContext dataclass
@@ -76,9 +76,9 @@ This implementation plan outlines the tasks for creating a task-based framework 
   - **Property 1: Task Lifecycle Validity**
   - **Validates: Requirements 1.6, 3.6**
 
+- [x] 4. Implement state transition logic
 - [ ] 4. Implement state transition logic
-- [ ] 4. Implement state transition logic
-  - [ ] 4.1 Implement start_operation() method
+  - [x] 4.1 Implement start_operation() method
     - Validate operation type
     - Create operation context
     - Transition to CONFIRMING state
@@ -89,7 +89,7 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - **Property 4: State Transition Validity**
     - **Validates: Requirements 3.6**
 
-  - [ ] 4.3 Implement on_confirmed() callback
+  - [x] 4.3 Implement on_confirmed() callback
     - Handle confirmation acceptance
     - Handle confirmation cancellation
     - Transition to CHECKING_CONFLICTS or IDLE
@@ -101,8 +101,8 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - Test confirmation cancellation
     - _Requirements: 4.1, 4.3, 4.4_
 
-- [ ] 5. Implement conflict detection
-  - [ ] 5.1 Implement _check_conflicts() method
+- [x] 5. Implement conflict detection
+  - [x] 5.1 Implement _check_conflicts() method
     - Detect file conflicts for copy operations
     - Detect file conflicts for move operations
     - Store conflicts in context
@@ -119,14 +119,14 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - **Property 6: Conflict Resolution Completeness**
     - **Validates: Requirements 6.6**
 
-- [ ] 6. Implement conflict resolution
-  - [ ] 6.1 Implement _resolve_next_conflict() method
+- [x] 6. Implement conflict resolution
+  - [x] 6.1 Implement _resolve_next_conflict() method
     - Show conflict dialog for current conflict
     - Handle apply-to-all options
     - Process all conflicts sequentially
     - _Requirements: 6.1, 6.5, 6.6_
 
-  - [ ] 6.2 Implement on_conflict_resolved() callback
+  - [x] 6.2 Implement on_conflict_resolved() callback
     - Handle overwrite choice
     - Handle skip choice
     - Handle rename choice
@@ -145,20 +145,20 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - **Property 7: Apply-to-All Consistency**
     - **Validates: Requirements 6.5**
 
-- [ ] 7. Implement rename handling
-  - [ ] 7.1 Implement _show_rename_dialog() method
+- [x] 7. Implement rename handling
+  - [x] 7.1 Implement _show_rename_dialog() method
     - Display QuickEditBar with current filename
     - Set up callbacks for confirmation and cancellation
     - _Requirements: 7.1_
 
-  - [ ] 7.2 Implement on_renamed() callback
+  - [x] 7.2 Implement on_renamed() callback
     - Validate new name is not empty
     - Check if new name conflicts
     - Handle secondary conflict
     - Update results with renamed file
     - _Requirements: 7.2, 7.3, 7.4_
 
-  - [ ] 7.3 Implement on_rename_cancelled() callback
+  - [x] 7.3 Implement on_rename_cancelled() callback
     - Transition to IDLE state
     - Log cancellation
     - _Requirements: 7.5_
@@ -174,31 +174,31 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - **Property 8: Rename Uniqueness**
     - **Validates: Requirements 7.3**
 
-- [ ] 8. Checkpoint - Ensure all tests pass
+- [x] 8. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Implement operation execution
-  - [ ] 9.1 Implement _execute_operation() method
+- [x] 9. Implement operation execution
+  - [x] 9.1 Implement _execute_operation() method
     - Prepare file list for execution
     - Combine non-conflicting files with resolved conflicts
     - Delegate to operation-specific execution methods
     - _Requirements: 8.2, 8.3_
 
-  - [ ] 9.2 Implement _execute_copy() method
+  - [x] 9.2 Implement _execute_copy() method
     - Create background worker thread
     - Set operation_in_progress flag
     - Start progress tracking
     - Call existing perform_copy_operation with pre-resolved files
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-  - [ ] 9.3 Implement _execute_move() method
+  - [x] 9.3 Implement _execute_move() method
     - Create background worker thread
     - Set operation_in_progress flag
     - Start progress tracking
     - Call existing perform_move_operation with pre-resolved files
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-  - [ ] 9.4 Implement _execute_delete() method
+  - [x] 9.4 Implement _execute_delete() method
     - Create background worker thread
     - Set operation_in_progress flag
     - Start progress tracking
@@ -215,8 +215,8 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - **Property 11: Error Isolation**
     - **Validates: Requirements 12.2**
 
-- [ ] 10. Implement completion handling
-  - [ ] 10.1 Implement _complete_operation() method
+- [x] 10. Implement completion handling
+  - [x] 10.1 Implement _complete_operation() method
     - Build summary message
     - Log summary with counts
     - Transition to IDLE state
@@ -238,14 +238,14 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - **Property 3: Task Cleanup**
     - **Validates: Requirements 2.5, 11.5**
 
-- [ ] 11. Implement helper methods
-  - [ ] 11.1 Implement _build_confirmation_message() method
+- [x] 11. Implement helper methods
+  - [x] 11.1 Implement _build_confirmation_message() method
     - Build message for single file operations
     - Build message for multiple file operations
     - Handle copy, move, and delete operations
     - _Requirements: 4.5_
 
-  - [ ] 11.2 Implement _validate_operation() method
+  - [x] 11.2 Implement _validate_operation() method
     - Check storage capabilities
     - Validate source and destination paths
     - Return validation result
@@ -256,11 +256,11 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - Test operation validation
     - _Requirements: 4.5, 14.1_
 
-- [ ] 12. Checkpoint - Ensure all tests pass
+- [x] 12. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. Integrate FileOperationTask with FileOperationsUI for copy operations
-  - [ ] 13.1 Refactor copy_selected_files() to use FileOperationTask
+- [x] 13. Integrate FileOperationTask with FileOperationsUI for copy operations
+  - [x] 13.1 Refactor copy_selected_files() to use FileOperationTask
     - Get files to copy
     - Validate operation capabilities
     - Create FileOperationTask instance
@@ -269,7 +269,7 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - Remove old callback-based code
     - _Requirements: 16.2_
 
-  - [ ] 13.2 Remove old copy conflict resolution methods
+  - [x] 13.2 Remove old copy conflict resolution methods
     - Remove _handle_copy_rename_batch()
     - Remove _process_next_copy_conflict()
     - Remove _handle_copy_rename()
@@ -286,8 +286,8 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - Test copy cancellation
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6_
 
-- [ ] 14. Integrate FileOperationTask with FileOperationsUI for move operations
-  - [ ] 14.1 Refactor move_selected_files() to use FileOperationTask
+- [x] 14. Integrate FileOperationTask with FileOperationsUI for move operations
+  - [x] 14.1 Refactor move_selected_files() to use FileOperationTask
     - Get files to move
     - Validate operation capabilities
     - Check for cross-storage moves
@@ -297,7 +297,7 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - Remove old callback-based code
     - _Requirements: 16.3_
 
-  - [ ] 14.2 Remove old move conflict resolution methods
+  - [x] 14.2 Remove old move conflict resolution methods
     - Remove _handle_move_rename_batch()
     - Remove _process_next_move_conflict()
     - Remove _handle_move_rename()
@@ -315,8 +315,8 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - Test cross-storage move
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6_
 
-- [ ] 15. Integrate FileOperationTask with FileOperationsUI for delete operations
-  - [ ] 15.1 Refactor delete_selected_files() to use FileOperationTask
+- [x] 15. Integrate FileOperationTask with FileOperationsUI for delete operations
+  - [x] 15.1 Refactor delete_selected_files() to use FileOperationTask
     - Get files to delete
     - Validate operation capabilities
     - Create FileOperationTask instance
@@ -332,24 +332,24 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - Test delete cancellation
     - _Requirements: 14.1, 14.3, 14.4_
 
-- [ ] 16. Checkpoint - Ensure all tests pass
+- [x] 16. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 17. Clean up and finalize
-  - [ ] 17.1 Remove temporary context objects from FileManager
+- [x] 17. Clean up and finalize
+  - [x] 17.1 Remove temporary context objects from FileManager
     - Remove _copy_rename_batch_context
     - Remove _copy_rename_context
     - Remove _move_rename_batch_context
     - Remove _move_rename_context
     - _Requirements: 11.2_
 
-  - [ ] 17.2 Update FileOperationsUI documentation
+  - [x] 17.2 Update FileOperationsUI documentation
     - Document task usage
     - Update method docstrings
     - Add architecture notes
     - _Requirements: 15.4_
 
-  - [ ] 17.3 Add developer documentation
+  - [x] 17.3 Add developer documentation
     - Create doc/dev/TASK_FRAMEWORK_IMPLEMENTATION.md
     - Document BaseTask design
     - Document FileOperationTask design
@@ -371,7 +371,7 @@ This implementation plan outlines the tasks for creating a task-based framework 
     - **Property 12: Cancellation Responsiveness**
     - **Validates: Requirements 8.5**
 
-- [ ] 18. Final checkpoint - Ensure all tests pass
+- [x] 18. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

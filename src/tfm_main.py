@@ -22,7 +22,9 @@ from pathlib import Path as StdPath
 from tfm_path import Path
 from datetime import datetime
 from collections import deque
+from typing import Optional
 from tfm_single_line_text_edit import SingleLineTextEdit
+from tfm_base_task import BaseTask
 
 # Import TTK input event system
 from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, MenuEvent, CharEvent, EventCallback, TextAttribute
@@ -347,6 +349,9 @@ class FileManager(UILayer):
         # Operation state flags
         self.operation_in_progress = False  # Flag to block input during operations
         self.operation_cancelled = False  # Flag to signal operation cancellation
+        
+        # Task management
+        self.current_task: Optional[BaseTask] = None
 
         self.should_quit = False  # Flag to control main loop exit
         
@@ -378,6 +383,32 @@ class FileManager(UILayer):
         
         # Load saved state
         self.load_application_state()
+    
+    # Task management methods
+    
+    def start_task(self, task: BaseTask):
+        """Start a new task
+        
+        Args:
+            task: The task to start
+            
+        Raises:
+            RuntimeError: If a task is already active
+        """
+        if self.current_task and self.current_task.is_active():
+            raise RuntimeError("Cannot start task: another task is already active")
+        
+        self.current_task = task
+        task.start()
+    
+    def cancel_current_task(self):
+        """Cancel the currently active task"""
+        if self.current_task and self.current_task.is_active():
+            self.current_task.cancel()
+    
+    def _clear_task(self):
+        """Clear the current task reference (called by task when complete)"""
+        self.current_task = None
     
     def _create_user_directories(self):
         """Create TFM user directories if they don't exist."""
@@ -3791,10 +3822,6 @@ class FileManager(UILayer):
     def copy_selected_files(self):
         """Copy selected files to the opposite pane's directory - delegated to FileOperationsUI"""
         self.file_operations_ui.copy_selected_files()
-    
-    def copy_files_to_directory(self, files_to_copy, destination_dir):
-        """Copy files to directory - delegated to FileOperationsUI"""
-        self.file_operations_ui.copy_files_to_directory(files_to_copy, destination_dir)
     
     def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False):
         """Perform copy operation - delegated to FileOperationsUI"""

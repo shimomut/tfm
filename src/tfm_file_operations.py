@@ -418,10 +418,51 @@ class FileOperations:
 
 
 class FileOperationsUI:
-    """Handles file operation UI interactions for the file manager"""
+    """Handles file operation UI interactions for the file manager
+    
+    This class provides the user interface layer for file operations (copy, move, delete).
+    It uses a task-based architecture where operations are managed by FileOperationTask
+    instances that handle state transitions, user confirmations, conflict resolution,
+    and background execution.
+    
+    Architecture:
+        FileOperationsUI creates and starts FileOperationTask instances for each operation.
+        The task manages the complete workflow including:
+        - User confirmation dialogs
+        - Conflict detection and resolution
+        - Rename handling
+        - Background execution with progress tracking
+        - Completion and cleanup
+    
+    Task Usage:
+        1. User initiates operation (copy/move/delete)
+        2. FileOperationsUI creates FileOperationTask
+        3. Task is started via file_manager.start_task()
+        4. Task manages all UI interactions and state transitions
+        5. Task calls back to FileOperationsUI for actual file operations
+        6. Task completes and cleans up
+    
+    Key Methods:
+        - copy_selected_files(): Initiates copy operation via FileOperationTask
+        - move_selected_files(): Initiates move operation via FileOperationTask
+        - delete_selected_files(): Initiates delete operation via FileOperationTask
+        - perform_copy_operation(): Executes copy in background thread (called by task)
+        - perform_move_operation(): Executes move in background thread (called by task)
+        - perform_delete_operation(): Executes delete in background thread (called by task)
+    
+    See Also:
+        - tfm_file_operation_task.py: FileOperationTask implementation
+        - tfm_base_task.py: BaseTask abstract class
+        - doc/dev/TASK_FRAMEWORK_IMPLEMENTATION.md: Complete architecture documentation
+    """
     
     def __init__(self, file_manager, file_operations):
-        """Initialize file operations UI with file manager and file operations"""
+        """Initialize file operations UI with file manager and file operations
+        
+        Args:
+            file_manager: FileManager instance for UI interactions and task management
+            file_operations: FileOperations instance for file system operations
+        """
         self.file_manager = file_manager
         self.file_operations = file_operations
         self.log_manager = file_manager.log_manager
@@ -476,7 +517,23 @@ class FileOperationsUI:
         self.file_manager.show_dialog(message, choices, lambda _: None)
     
     def copy_selected_files(self):
-        """Copy selected files to the opposite pane's directory"""
+        """Copy selected files to the opposite pane's directory
+        
+        This method initiates a copy operation using the task-based architecture.
+        It creates a FileOperationTask and starts it via file_manager.start_task().
+        The task handles all user interactions including confirmation, conflict
+        resolution, and progress tracking.
+        
+        Workflow:
+            1. Gather files to copy (selected files or current file)
+            2. Validate operation capabilities (read-only storage checks)
+            3. Create FileOperationTask with 'copy' operation
+            4. Start task via file_manager.start_task()
+            5. Task manages confirmation, conflicts, and execution
+        
+        The actual file copying is performed by perform_copy_operation() which
+        is called by the task during the EXECUTING state.
+        """
         current_pane = self.file_manager.get_current_pane()
         other_pane = self.file_manager.get_inactive_pane()
         
@@ -512,50 +569,42 @@ class FileOperationsUI:
             self.logger.error(f"Permission denied: Cannot write to {destination_dir}")
             return
         
-        # Check if copy confirmation is enabled
-        if getattr(self.config, 'CONFIRM_COPY', True):
-            # Show confirmation dialog
-            if len(files_to_copy) == 1:
-                message = f"Copy '{files_to_copy[0].name}' to {destination_dir}?"
-            else:
-                message = f"Copy {len(files_to_copy)} items to {destination_dir}?"
-            
-            def copy_callback(confirmed):
-                if confirmed:
-                    self.copy_files_to_directory(files_to_copy, destination_dir)
-                else:
-                    self.logger.info("Copy operation cancelled")
-            
-            self.file_manager.show_confirmation(message, copy_callback)
-        else:
-            # Start copying files without confirmation
-            self.copy_files_to_directory(files_to_copy, destination_dir)
+        # Create FileOperationTask and start the operation
+        from tfm_file_operation_task import FileOperationTask
+        task = FileOperationTask(self.file_manager, self)
+        task.start_operation('copy', files_to_copy, destination_dir)
+        self.file_manager.start_task(task)
     
-    def copy_files_to_directory(self, files_to_copy, destination_dir):
-        """Copy a list of files to the destination directory with conflict resolution"""
-        conflicts = []
-        
-        # Check for conflicts first
-        for source_file in files_to_copy:
-            dest_path = destination_dir / source_file.name
-            if dest_path.exists():
-                conflicts.append((source_file, dest_path))
-        
-        if conflicts:
-            # Process conflicts one by one with per-file dialogs
-            self._handle_copy_rename_batch(files_to_copy, destination_dir, conflicts)
-        else:
-            # No conflicts, copy directly
-            self.perform_copy_operation(files_to_copy, destination_dir)
-            # Success message will be printed by the operation thread
     
     def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, completion_callback=None):
         """Perform the actual copy operation with fine-grained progress tracking in a background thread
         
+        This method is called by FileOperationTask during the EXECUTING state. It runs
+        the copy operation in a background thread with progress tracking and cancellation
+        support.
+        
         Args:
+            files_to_copy: List of Path objects to copy
+            destination_dir: Destination directory Path
+            overwrite: If True, overwrite existing files without prompting
             completion_callback: Optional callback function called when operation completes.
                                 Receives (copied_count, error_count) as arguments.
                                 If provided, suppresses the default summary logging.
+        
+        Threading:
+            - Runs in background thread to keep UI responsive
+            - Uses operation_in_progress flag to block user input
+            - Uses operation_cancelled flag for cancellation
+            - Updates progress via progress_manager
+            - Triggers UI refresh via mark_dirty()
+        
+        Progress Tracking:
+            - Shows "Preparing..." message during file counting
+            - Updates progress for each file copied
+            - Tracks errors separately
+            - Shows completion summary
+        
+        Note: This method is called by FileOperationTask, not directly by user code.
         """
         # Set operation in progress flag to block user input
         self.file_manager.operation_in_progress = True
@@ -709,7 +758,27 @@ class FileOperationsUI:
         thread.start()
     
     def move_selected_files(self):
-        """Move selected files to the opposite pane's directory"""
+        """Move selected files to the opposite pane's directory
+        
+        This method initiates a move operation using the task-based architecture.
+        It creates a FileOperationTask and starts it via file_manager.start_task().
+        The task handles all user interactions including confirmation, conflict
+        resolution, and progress tracking.
+        
+        Workflow:
+            1. Gather files to move (selected files or current file)
+            2. Validate operation capabilities (read-only storage checks)
+            3. Check for cross-storage moves (requires copy+delete)
+            4. Create FileOperationTask with 'move' operation
+            5. Start task via file_manager.start_task()
+            6. Task manages confirmation, conflicts, and execution
+        
+        The actual file moving is performed by perform_move_operation() which
+        is called by the task during the EXECUTING state.
+        
+        Note: Cross-storage moves (e.g., local to S3) are implemented as
+        copy followed by delete, which is handled transparently by the task.
+        """
         current_pane = self.file_manager.get_current_pane()
         other_pane = self.file_manager.get_inactive_pane()
         
@@ -768,50 +837,47 @@ class FileOperationsUI:
                 files_to_move = [f for f in files_to_move if f.parent != destination_dir]
                 self.logger.info(f"Skipping {len(same_dir_files)} files already in destination directory")
         
-        # Check if move confirmation is enabled
-        if getattr(self.config, 'CONFIRM_MOVE', True):
-            # Show confirmation dialog
-            if len(files_to_move) == 1:
-                message = f"Move '{files_to_move[0].name}' to {destination_dir}?"
-            else:
-                message = f"Move {len(files_to_move)} items to {destination_dir}?"
-            
-            def move_callback(confirmed):
-                if confirmed:
-                    self.move_files_to_directory(files_to_move, destination_dir)
-                else:
-                    self.logger.info("Move operation cancelled")
-            
-            self.file_manager.show_confirmation(message, move_callback)
-        else:
-            # Start moving files without confirmation
-            self.move_files_to_directory(files_to_move, destination_dir)
+        # Create FileOperationTask and start the operation
+        from tfm_file_operation_task import FileOperationTask
+        task = FileOperationTask(self.file_manager, self)
+        task.start_operation('move', files_to_move, destination_dir)
+        self.file_manager.start_task(task)
     
-    def move_files_to_directory(self, files_to_move, destination_dir):
-        """Move a list of files to the destination directory with conflict resolution"""
-        conflicts = []
-        
-        # Check for conflicts first
-        for source_file in files_to_move:
-            dest_path = destination_dir / source_file.name
-            if dest_path.exists():
-                conflicts.append((source_file, dest_path))
-        
-        if conflicts:
-            # Process conflicts one by one with per-file dialogs
-            self._handle_move_rename_batch(files_to_move, destination_dir, conflicts)
-        else:
-            # No conflicts, move directly
-            self.perform_move_operation(files_to_move, destination_dir)
-            # Success message will be printed by the operation thread
     
     def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, completion_callback=None):
         """Perform the actual move operation with fine-grained progress tracking in a background thread
         
+        This method is called by FileOperationTask during the EXECUTING state. It runs
+        the move operation in a background thread with progress tracking and cancellation
+        support.
+        
         Args:
+            files_to_move: List of Path objects to move
+            destination_dir: Destination directory Path
+            overwrite: If True, overwrite existing files without prompting
             completion_callback: Optional callback function called when operation completes.
                                 Receives (moved_count, error_count) as arguments.
                                 If provided, suppresses the default summary logging.
+        
+        Threading:
+            - Runs in background thread to keep UI responsive
+            - Uses operation_in_progress flag to block user input
+            - Uses operation_cancelled flag for cancellation
+            - Updates progress via progress_manager
+            - Triggers UI refresh via mark_dirty()
+        
+        Progress Tracking:
+            - Shows "Preparing..." message during file counting
+            - Updates progress for each file moved
+            - Tracks errors separately
+            - Shows completion summary
+        
+        Cross-Storage Moves:
+            - Detects cross-storage moves (e.g., local to S3)
+            - Implements as copy followed by delete
+            - Handles both same-storage and cross-storage transparently
+        
+        Note: This method is called by FileOperationTask, not directly by user code.
         """
         # Set operation in progress flag to block user input
         self.file_manager.operation_in_progress = True
@@ -986,7 +1052,25 @@ class FileOperationsUI:
         thread.start()
     
     def delete_selected_files(self):
-        """Delete selected files or current file with confirmation"""
+        """Delete selected files or current file with confirmation
+        
+        This method initiates a delete operation using the task-based architecture.
+        It creates a FileOperationTask and starts it via file_manager.start_task().
+        The task handles user confirmation and progress tracking.
+        
+        Workflow:
+            1. Gather files to delete (selected files or current file)
+            2. Validate operation capabilities (read-only storage checks)
+            3. Create FileOperationTask with 'delete' operation
+            4. Start task via file_manager.start_task()
+            5. Task manages confirmation and execution
+        
+        The actual file deletion is performed by perform_delete_operation() which
+        is called by the task during the EXECUTING state.
+        
+        Note: Delete operations require confirmation based on the CONFIRM_DELETE
+        configuration setting. The task handles this automatically.
+        """
         current_pane = self.file_manager.get_current_pane()
         
         # Get files to delete - either selected files or current file if none selected
@@ -1014,43 +1098,37 @@ class FileOperationsUI:
             self._show_unsupported_operation_error(error_msg)
             return
         
-        def handle_delete_confirmation(confirmed):
-            if confirmed:
-                self.perform_delete_operation(files_to_delete)
-            else:
-                self.logger.info("Delete operation cancelled")
-        
-        # Check if delete confirmation is enabled
-        if getattr(self.config, 'CONFIRM_DELETE', True):
-            # Show confirmation dialog
-            if len(files_to_delete) == 1:
-                file_name = files_to_delete[0].name
-                if files_to_delete[0].is_dir():
-                    message = f"Delete directory '{file_name}' and all its contents?"
-                else:
-                    message = f"Delete file '{file_name}'?"
-            else:
-                dir_count = sum(1 for f in files_to_delete if f.is_dir())
-                file_count = len(files_to_delete) - dir_count
-                if dir_count > 0 and file_count > 0:
-                    message = f"Delete {len(files_to_delete)} items ({dir_count} directories, {file_count} files)?"
-                elif dir_count > 0:
-                    message = f"Delete {dir_count} directories and all their contents?"
-                else:
-                    message = f"Delete {file_count} files?"
-            
-            choices = [
-                {"text": "Yes", "key": "y", "value": True},
-                {"text": "No", "key": "n", "value": False}
-            ]
-            
-            self.file_manager.show_dialog(message, choices, handle_delete_confirmation)
-        else:
-            # Delete without confirmation
-            handle_delete_confirmation(True)
+        # Create FileOperationTask and start the operation
+        from tfm_file_operation_task import FileOperationTask
+        task = FileOperationTask(self.file_manager, self)
+        task.start_operation('delete', files_to_delete)
+        self.file_manager.start_task(task)
     
     def perform_delete_operation(self, files_to_delete):
-        """Perform the actual delete operation with fine-grained progress tracking in a background thread"""
+        """Perform the actual delete operation with fine-grained progress tracking in a background thread
+        
+        This method is called by FileOperationTask during the EXECUTING state. It runs
+        the delete operation in a background thread with progress tracking and cancellation
+        support.
+        
+        Args:
+            files_to_delete: List of Path objects to delete
+        
+        Threading:
+            - Runs in background thread to keep UI responsive
+            - Uses operation_in_progress flag to block user input
+            - Uses operation_cancelled flag for cancellation
+            - Updates progress via progress_manager
+            - Triggers UI refresh via mark_dirty()
+        
+        Progress Tracking:
+            - Shows "Preparing..." message during file counting
+            - Updates progress for each file deleted
+            - Tracks errors separately
+            - Shows completion summary
+        
+        Note: This method is called by FileOperationTask, not directly by user code.
+        """
         # Set operation in progress flag to block user input
         self.file_manager.operation_in_progress = True
         self.file_manager.operation_cancelled = False
@@ -1672,409 +1750,6 @@ class FileOperationsUI:
                 self.progress_manager.increment_errors()
             return processed_files
     
-    def _handle_copy_rename_batch(self, files_to_copy, destination_dir, conflicts):
-        """Handle rename operation for multiple file conflicts - process one by one"""
-        # Store the batch context
-        self.file_manager._copy_rename_batch_context = {
-            'files_to_copy': files_to_copy,
-            'destination_dir': destination_dir,
-            'conflicts': conflicts,
-            'conflict_index': 0,
-            'copied_files': [],
-            'skipped_files': [],
-            'rename_all': False  # Flag to auto-rename remaining conflicts
-        }
-        
-        # Start processing the first conflict
-        self._process_next_copy_conflict()
-    
-    def _process_next_copy_conflict(self):
-        """Process the next file in the copy conflict batch"""
-        context = self.file_manager._copy_rename_batch_context
-        
-        # Check if we've processed all conflicts
-        if context['conflict_index'] >= len(context['conflicts']):
-            # All conflicts processed, copy remaining non-conflicting files
-            non_conflicting = [f for f in context['files_to_copy'] 
-                             if f not in [c[0] for c in context['conflicts']]]
-            
-            if non_conflicting:
-                # Define callback to log comprehensive summary after copy completes
-                def on_copy_complete(copied_count, error_count):
-                    total_copied = len(context['copied_files']) + copied_count
-                    total_skipped = len(context['skipped_files'])
-                    
-                    if total_copied > 0:
-                        self.logger.info(f"Copied {total_copied} items, skipped {total_skipped} conflicts")
-                    else:
-                        self.logger.info(f"No items copied, skipped {total_skipped} conflicts")
-                
-                # Copy non-conflicting files with callback for summary
-                self.perform_copy_operation(non_conflicting, context['destination_dir'], 
-                                           completion_callback=on_copy_complete)
-            else:
-                # No non-conflicting files, log summary immediately
-                total_copied = len(context['copied_files'])
-                total_skipped = len(context['skipped_files'])
-                
-                if total_copied > 0:
-                    self.logger.info(f"Copied {total_copied} items, skipped {total_skipped} conflicts")
-                else:
-                    self.logger.info(f"No items copied, skipped {total_skipped} conflicts")
-            
-            return
-        
-        # Get the current conflict
-        source_file, dest_path = context['conflicts'][context['conflict_index']]
-        
-        # If rename_all flag is set, skip choice dialog and go directly to rename
-        if context.get('rename_all', False):
-            self._handle_copy_rename(source_file, context['destination_dir'])
-            return
-        
-        # Show dialog for this specific file
-        message = f"'{source_file.name}' already exists in destination."
-        choices = [
-            {"text": "Overwrite", "key": "o", "value": "overwrite"},
-            {"text": "Rename", "key": "r", "value": "rename"},
-            {"text": "Skip", "key": "s", "value": "skip"}
-        ]
-        
-        def handle_single_conflict(choice, apply_to_all=False):
-            if choice is None:
-                # ESC pressed - cancel operation
-                self.logger.info("Copy operation cancelled")
-                return
-                
-            if choice == "overwrite":
-                if apply_to_all:
-                    # Overwrite this file and all remaining conflicts
-                    self._perform_single_copy(source_file, dest_path, overwrite=True)
-                    context['copied_files'].append(source_file)
-                    # Overwrite all remaining conflicts
-                    for i in range(context['conflict_index'] + 1, len(context['conflicts'])):
-                        src, dst = context['conflicts'][i]
-                        self._perform_single_copy(src, dst, overwrite=True)
-                        context['copied_files'].append(src)
-                    context['conflict_index'] = len(context['conflicts'])
-                    self._process_next_copy_conflict()
-                else:
-                    # Copy this file with overwrite
-                    self._perform_single_copy(source_file, dest_path, overwrite=True)
-                    context['copied_files'].append(source_file)
-                    context['conflict_index'] += 1
-                    self._process_next_copy_conflict()
-            elif choice == "rename":
-                if apply_to_all:
-                    # Set rename_all flag to skip choice dialog for remaining conflicts
-                    context['rename_all'] = True
-                # Ask for new name for this file
-                self._handle_copy_rename(source_file, context['destination_dir'])
-            elif choice == "skip":
-                if apply_to_all:
-                    # Skip this file and all remaining conflicts
-                    for i in range(context['conflict_index'], len(context['conflicts'])):
-                        skipped_file = context['conflicts'][i][0]
-                        context['skipped_files'].append(skipped_file)
-                        self.logger.info(f"Skipped {skipped_file.name}")
-                    context['conflict_index'] = len(context['conflicts'])
-                    self._process_next_copy_conflict()
-                else:
-                    # Skip this file and continue
-                    context['skipped_files'].append(source_file)
-                    self.logger.info(f"Skipped {source_file.name}")
-                    context['conflict_index'] += 1
-                    self._process_next_copy_conflict()
-        
-        self.file_manager.show_dialog(message, choices, handle_single_conflict, enable_shift_modifier=True)
-    
-    def _handle_copy_rename(self, source_file, destination_dir):
-        """Handle rename operation for copy conflict"""
-        # Store context for the rename callback
-        self.file_manager._copy_rename_context = {
-            'source_file': source_file,
-            'destination_dir': destination_dir
-        }
-        
-        # Use the general dialog for input
-        from tfm_quick_edit_bar import QuickEditBarHelpers
-        QuickEditBarHelpers.create_rename_dialog(
-            self.file_manager.quick_edit_bar,
-            source_file.name,
-            source_file.name
-        )
-        self.file_manager.quick_edit_bar.callback = self._on_copy_rename_confirm
-        self.file_manager.quick_edit_bar.cancel_callback = self._on_copy_rename_cancel
-        self.file_manager.mark_dirty()
-    
-    def _on_copy_rename_confirm(self, new_name):
-        """Handle copy rename confirmation"""
-        if not new_name or new_name.strip() == "":
-            self.logger.info("Copy cancelled: empty filename")
-            self.file_manager.quick_edit_bar.hide()
-            self.file_manager.mark_dirty()
-            return
-        
-        context = self.file_manager._copy_rename_context
-        source_file = context['source_file']
-        destination_dir = context['destination_dir']
-        new_name = new_name.strip()
-        new_dest_path = destination_dir / new_name
-        
-        # Hide the dialog first
-        self.file_manager.quick_edit_bar.hide()
-        self.file_manager.mark_dirty()
-        
-        # Check if the new name also conflicts
-        if new_dest_path.exists():
-            # Show conflict dialog again with the new name
-            message = f"'{new_name}' already exists in destination."
-            choices = [
-                {"text": "Overwrite", "key": "o", "value": "overwrite"},
-                {"text": "Rename", "key": "r", "value": "rename"},
-                {"text": "Cancel", "key": "c", "value": "cancel"}
-            ]
-            
-            def handle_rename_conflict(choice):
-                if choice == "overwrite":
-                    # Copy with the new name, overwriting
-                    self._perform_single_copy(source_file, new_dest_path, overwrite=True, suppress_log=True)
-                    self.logger.info(f"Copied {source_file.name} as {new_name} (overwrote existing)")
-                    # Continue with batch if in batch mode
-                    if hasattr(self.file_manager, '_copy_rename_batch_context'):
-                        batch_context = self.file_manager._copy_rename_batch_context
-                        batch_context['copied_files'].append(source_file)
-                        batch_context['conflict_index'] += 1
-                        self._process_next_copy_conflict()
-                elif choice == "rename":
-                    # Ask for another name
-                    self._handle_copy_rename(source_file, destination_dir)
-                else:
-                    self.logger.info("Copy operation cancelled")
-                    # Cancel batch if in batch mode
-                    if hasattr(self.file_manager, '_copy_rename_batch_context'):
-                        delattr(self.file_manager, '_copy_rename_batch_context')
-            
-            self.file_manager.show_dialog(message, choices, handle_rename_conflict)
-        else:
-            # No conflict, proceed with copy
-            self._perform_single_copy(source_file, new_dest_path, overwrite=False, suppress_log=True)
-            self.logger.info(f"Copied {source_file.name} as {new_name}")
-            
-            # Continue with batch if in batch mode
-            if hasattr(self.file_manager, '_copy_rename_batch_context'):
-                batch_context = self.file_manager._copy_rename_batch_context
-                batch_context['copied_files'].append(source_file)
-                batch_context['conflict_index'] += 1
-                self._process_next_copy_conflict()
-    
-    def _on_copy_rename_cancel(self):
-        """Handle copy rename cancellation"""
-        self.logger.info("Copy operation cancelled")
-        self.file_manager.quick_edit_bar.hide()
-        self.file_manager.mark_dirty()
-    
-    def _handle_move_rename_batch(self, files_to_move, destination_dir, conflicts):
-        """Handle rename operation for multiple file conflicts - process one by one"""
-        # Store the batch context
-        self.file_manager._move_rename_batch_context = {
-            'files_to_move': files_to_move,
-            'destination_dir': destination_dir,
-            'conflicts': conflicts,
-            'conflict_index': 0,
-            'moved_files': [],
-            'skipped_files': [],
-            'rename_all': False  # Flag to auto-rename remaining conflicts
-        }
-        
-        # Start processing the first conflict
-        self._process_next_move_conflict()
-    
-    def _process_next_move_conflict(self):
-        """Process the next file in the move conflict batch"""
-        context = self.file_manager._move_rename_batch_context
-        
-        # Check if we've processed all conflicts
-        if context['conflict_index'] >= len(context['conflicts']):
-            # All conflicts processed, move remaining non-conflicting files
-            non_conflicting = [f for f in context['files_to_move'] 
-                             if f not in [c[0] for c in context['conflicts']]]
-            
-            if non_conflicting:
-                # Define callback to log comprehensive summary after move completes
-                def on_move_complete(moved_count, error_count):
-                    total_moved = len(context['moved_files']) + moved_count
-                    total_skipped = len(context['skipped_files'])
-                    
-                    if total_moved > 0:
-                        self.logger.info(f"Moved {total_moved} items, skipped {total_skipped} conflicts")
-                    else:
-                        self.logger.info(f"No items moved, skipped {total_skipped} conflicts")
-                
-                # Move non-conflicting files with callback for summary
-                self.perform_move_operation(non_conflicting, context['destination_dir'], 
-                                           completion_callback=on_move_complete)
-            else:
-                # No non-conflicting files, log summary immediately
-                total_moved = len(context['moved_files'])
-                total_skipped = len(context['skipped_files'])
-                
-                if total_moved > 0:
-                    self.logger.info(f"Moved {total_moved} items, skipped {total_skipped} conflicts")
-                else:
-                    self.logger.info(f"No items moved, skipped {total_skipped} conflicts")
-            
-            return
-        
-        # Get the current conflict
-        source_file, dest_path = context['conflicts'][context['conflict_index']]
-        
-        # If rename_all flag is set, skip choice dialog and go directly to rename
-        if context.get('rename_all', False):
-            self._handle_move_rename(source_file, context['destination_dir'])
-            return
-        
-        # Show dialog for this specific file
-        message = f"'{source_file.name}' already exists in destination."
-        choices = [
-            {"text": "Overwrite", "key": "o", "value": "overwrite"},
-            {"text": "Rename", "key": "r", "value": "rename"},
-            {"text": "Skip", "key": "s", "value": "skip"}
-        ]
-        
-        def handle_single_conflict(choice, apply_to_all=False):
-            if choice is None:
-                # ESC pressed - cancel operation
-                self.logger.info("Move operation cancelled")
-                return
-                
-            if choice == "overwrite":
-                if apply_to_all:
-                    # Overwrite this file and all remaining conflicts
-                    self._perform_single_move(source_file, dest_path, overwrite=True)
-                    context['moved_files'].append(source_file)
-                    # Overwrite all remaining conflicts
-                    for i in range(context['conflict_index'] + 1, len(context['conflicts'])):
-                        src, dst = context['conflicts'][i]
-                        self._perform_single_move(src, dst, overwrite=True)
-                        context['moved_files'].append(src)
-                    context['conflict_index'] = len(context['conflicts'])
-                    self._process_next_move_conflict()
-                else:
-                    # Move this file with overwrite
-                    self._perform_single_move(source_file, dest_path, overwrite=True)
-                    context['moved_files'].append(source_file)
-                    context['conflict_index'] += 1
-                    self._process_next_move_conflict()
-            elif choice == "rename":
-                if apply_to_all:
-                    # Set rename_all flag to skip choice dialog for remaining conflicts
-                    context['rename_all'] = True
-                # Ask for new name for this file
-                self._handle_move_rename(source_file, context['destination_dir'])
-            elif choice == "skip":
-                if apply_to_all:
-                    # Skip this file and all remaining conflicts
-                    for i in range(context['conflict_index'], len(context['conflicts'])):
-                        skipped_file = context['conflicts'][i][0]
-                        context['skipped_files'].append(skipped_file)
-                        self.logger.info(f"Skipped {skipped_file.name}")
-                    context['conflict_index'] = len(context['conflicts'])
-                    self._process_next_move_conflict()
-                else:
-                    # Skip this file and continue
-                    context['skipped_files'].append(source_file)
-                    self.logger.info(f"Skipped {source_file.name}")
-                    context['conflict_index'] += 1
-                    self._process_next_move_conflict()
-        
-        self.file_manager.show_dialog(message, choices, handle_single_conflict, enable_shift_modifier=True)
-    
-    def _handle_move_rename(self, source_file, destination_dir):
-        """Handle rename operation for move conflict"""
-        # Store context for the rename callback
-        self.file_manager._move_rename_context = {
-            'source_file': source_file,
-            'destination_dir': destination_dir
-        }
-        
-        # Use the general dialog for input
-        from tfm_quick_edit_bar import QuickEditBarHelpers
-        QuickEditBarHelpers.create_rename_dialog(
-            self.file_manager.quick_edit_bar,
-            source_file.name,
-            source_file.name
-        )
-        self.file_manager.quick_edit_bar.callback = self._on_move_rename_confirm
-        self.file_manager.quick_edit_bar.cancel_callback = self._on_move_rename_cancel
-        self.file_manager.mark_dirty()
-    
-    def _on_move_rename_confirm(self, new_name):
-        """Handle move rename confirmation"""
-        if not new_name or new_name.strip() == "":
-            self.logger.info("Move cancelled: empty filename")
-            self.file_manager.quick_edit_bar.hide()
-            self.file_manager.mark_dirty()
-            return
-        
-        context = self.file_manager._move_rename_context
-        source_file = context['source_file']
-        destination_dir = context['destination_dir']
-        new_name = new_name.strip()
-        new_dest_path = destination_dir / new_name
-        
-        # Hide the dialog first
-        self.file_manager.quick_edit_bar.hide()
-        self.file_manager.mark_dirty()
-        
-        # Check if the new name also conflicts
-        if new_dest_path.exists():
-            # Show conflict dialog again with the new name
-            message = f"'{new_name}' already exists in destination."
-            choices = [
-                {"text": "Overwrite", "key": "o", "value": "overwrite"},
-                {"text": "Rename", "key": "r", "value": "rename"},
-                {"text": "Cancel", "key": "c", "value": "cancel"}
-            ]
-            
-            def handle_rename_conflict(choice):
-                if choice == "overwrite":
-                    # Move with the new name, overwriting
-                    self._perform_single_move(source_file, new_dest_path, overwrite=True, suppress_log=True)
-                    self.logger.info(f"Moved {source_file.name} as {new_name} (overwrote existing)")
-                    # Continue with batch if in batch mode
-                    if hasattr(self.file_manager, '_move_rename_batch_context'):
-                        batch_context = self.file_manager._move_rename_batch_context
-                        batch_context['moved_files'].append(source_file)
-                        batch_context['conflict_index'] += 1
-                        self._process_next_move_conflict()
-                elif choice == "rename":
-                    # Ask for another name
-                    self._handle_move_rename(source_file, destination_dir)
-                else:
-                    self.logger.info("Move operation cancelled")
-                    # Cancel batch if in batch mode
-                    if hasattr(self.file_manager, '_move_rename_batch_context'):
-                        delattr(self.file_manager, '_move_rename_batch_context')
-            
-            self.file_manager.show_dialog(message, choices, handle_rename_conflict)
-        else:
-            # No conflict, proceed with move
-            self._perform_single_move(source_file, new_dest_path, overwrite=False, suppress_log=True)
-            self.logger.info(f"Moved {source_file.name} as {new_name}")
-            
-            # Continue with batch if in batch mode
-            if hasattr(self.file_manager, '_move_rename_batch_context'):
-                batch_context = self.file_manager._move_rename_batch_context
-                batch_context['moved_files'].append(source_file)
-                batch_context['conflict_index'] += 1
-                self._process_next_move_conflict()
-    
-    def _on_move_rename_cancel(self):
-        """Handle move rename cancellation"""
-        self.logger.info("Move operation cancelled")
-        self.file_manager.quick_edit_bar.hide()
-        self.file_manager.mark_dirty()
     
     def _perform_single_copy(self, source_file, dest_path, overwrite=False, suppress_log=False):
         """Perform copy operation for a single file
