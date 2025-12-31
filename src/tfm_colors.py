@@ -42,6 +42,7 @@ COLOR_ERROR = 11        # Error messages
 # Log colors
 COLOR_LOG_STDOUT = 12   # Stdout log messages
 COLOR_LOG_SYSTEM = 13   # System log messages
+COLOR_LOG_WARNING = 31  # Warning log messages
 COLOR_LINE_NUMBERS = 14 # Line numbers in text viewer
 
 # Syntax highlighting colors
@@ -128,6 +129,10 @@ COLOR_SCHEMES = {
         'LOG_SYSTEM_FG': {
             'color_num': 109,
             'rgb': (100, 200, 255)  # Light blue for system logs
+        },
+        'LOG_WARNING_FG': {
+            'color_num': 158,
+            'rgb': (255, 165, 0)    # Orange for warning logs
         },
         'LINE_NUMBERS_FG': {
             'color_num': 110,
@@ -254,6 +259,10 @@ COLOR_SCHEMES = {
         'LOG_SYSTEM_FG': {
             'color_num': 129,
             'rgb': (50, 100, 160)  # Dark blue for system logs
+        },
+        'LOG_WARNING_FG': {
+            'color_num': 159,
+            'rgb': (255, 140, 0)    # Dark orange for warning logs
         },
         'LINE_NUMBERS_FG': {
             'color_num': 130,
@@ -394,6 +403,7 @@ def init_colors(renderer, color_scheme=None):
     regular_file_fg = rgb_colors['REGULAR_FILE_FG']['rgb']
     log_stdout_fg = rgb_colors['LOG_STDOUT_FG']['rgb']
     log_system_fg = rgb_colors['LOG_SYSTEM_FG']['rgb']
+    log_warning_fg = rgb_colors['LOG_WARNING_FG']['rgb']
     line_numbers_fg = rgb_colors['LINE_NUMBERS_FG']['rgb']
     # Syntax highlighting colors
     syntax_keyword_fg = rgb_colors['SYNTAX_KEYWORD_FG']['rgb']
@@ -442,6 +452,7 @@ def init_colors(renderer, color_scheme=None):
     # Log colors
     renderer.init_color_pair(COLOR_LOG_STDOUT, log_stdout_fg, default_bg)
     renderer.init_color_pair(COLOR_LOG_SYSTEM, log_system_fg, default_bg)
+    renderer.init_color_pair(COLOR_LOG_WARNING, log_warning_fg, default_bg)
     renderer.init_color_pair(COLOR_LINE_NUMBERS, line_numbers_fg, default_bg)
     
     # Syntax highlighting color pairs

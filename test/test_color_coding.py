@@ -16,7 +16,7 @@ from collections import deque
 
 from tfm_logging_handlers import LogPaneHandler
 from tfm_log_manager import LogManager
-from tfm_colors import COLOR_ERROR, COLOR_LOG_SYSTEM, COLOR_LOG_STDOUT
+from tfm_colors import COLOR_ERROR, COLOR_LOG_WARNING, COLOR_LOG_STDOUT
 from ttk import TextAttribute
 
 
@@ -81,8 +81,8 @@ class TestColorCoding(unittest.TestCase):
         
         color_pair, attributes = self.handler.get_color_for_record(record)
         
-        # WARNING should use SYSTEM color (light blue)
-        self.assertEqual(color_pair, COLOR_LOG_SYSTEM)
+        # WARNING should use WARNING color (orange)
+        self.assertEqual(color_pair, COLOR_LOG_WARNING)
         self.assertEqual(attributes, TextAttribute.NORMAL)
     
     def test_get_color_for_logger_error(self):

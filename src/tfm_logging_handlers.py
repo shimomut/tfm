@@ -181,7 +181,7 @@ class LogPaneHandler(logging.Handler):
             (color_pair, attributes) tuple
         """
         # Import here to avoid circular dependency
-        from tfm_colors import get_log_color, COLOR_ERROR, COLOR_LOG_SYSTEM
+        from tfm_colors import get_log_color, COLOR_ERROR, COLOR_LOG_WARNING
         from ttk import TextAttribute
         
         # Check if this is a stream capture (stdout/stderr) or logger message
@@ -193,14 +193,14 @@ class LogPaneHandler(logging.Handler):
             # Map log levels to colors:
             # DEBUG (10) -> STDOUT color (gray)
             # INFO (20) -> STDOUT color (gray)
-            # WARNING (30) -> SYSTEM color (light blue)
+            # WARNING (30) -> WARNING color (orange)
             # ERROR (40) -> ERROR color (red)
             # CRITICAL (50) -> ERROR color (red)
             
             if record.levelno >= logging.ERROR:  # ERROR (40) or CRITICAL (50)
                 return COLOR_ERROR, TextAttribute.NORMAL
             elif record.levelno >= logging.WARNING:  # WARNING (30)
-                return COLOR_LOG_SYSTEM, TextAttribute.NORMAL
+                return COLOR_LOG_WARNING, TextAttribute.NORMAL
             else:  # DEBUG (10) or INFO (20)
                 return get_log_color("STDOUT")
 

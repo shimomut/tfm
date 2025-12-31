@@ -16,7 +16,7 @@ import logging
 sys.path.insert(0, 'src')
 
 from tfm_logging_handlers import LogPaneHandler
-from tfm_colors import COLOR_ERROR, COLOR_LOG_SYSTEM, COLOR_LOG_STDOUT
+from tfm_colors import COLOR_ERROR, COLOR_LOG_WARNING, COLOR_LOG_STDOUT
 from ttk import TextAttribute
 
 
@@ -58,7 +58,7 @@ def main():
     record.levelno = logging.WARNING  # Need to set levelno as well
     record.msg = "This is a WARNING message"
     color_pair, attributes = handler.get_color_for_record(record)
-    print(f"WARNING:  color_pair={color_pair}, expected={COLOR_LOG_SYSTEM} (light blue) - {'✓' if color_pair == COLOR_LOG_SYSTEM else '✗'}")
+    print(f"WARNING:  color_pair={color_pair}, expected={COLOR_LOG_WARNING} (orange) - {'✓' if color_pair == COLOR_LOG_WARNING else '✗'}")
     
     # ERROR level
     record.level = logging.ERROR
