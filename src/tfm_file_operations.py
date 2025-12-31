@@ -549,8 +549,13 @@ class FileOperationsUI:
             self.perform_copy_operation(files_to_copy, destination_dir)
             # Success message will be printed by the operation thread
     
-    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False):
-        """Perform the actual copy operation with fine-grained progress tracking in a background thread"""
+    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, suppress_summary=False, suppress_individual_logs=False, completion_callback=None):
+        """Perform the actual copy operation with fine-grained progress tracking in a background thread
+        
+        Args:
+            completion_callback: Optional callback function called when operation completes.
+                                Receives (copied_count, error_count) as arguments.
+        """
         # Set operation in progress flag to block user input
         self.file_manager.operation_in_progress = True
         self.file_manager.operation_cancelled = False
@@ -630,14 +635,16 @@ class FileOperationsUI:
                                     source_file, dest_path, processed_files, total_individual_files, overwrite
                                 )
                             
-                            self.logger.info(f"Copied directory: {source_file.name}")
+                            if not suppress_individual_logs:
+                                self.logger.info(f"Copied directory: {source_file.name}")
                         else:
                             # Copy single file with progress tracking
                             processed_files += 1
                             self.progress_manager.update_progress(source_file.name, processed_files)
                             
                             self._copy_file_with_progress(source_file, dest_path, overwrite)
-                            self.logger.info(f"Copied file: {source_file.name}")
+                            if not suppress_individual_logs:
+                                self.logger.info(f"Copied file: {source_file.name}")
                         
                         copied_count += 1
                         
@@ -684,14 +691,19 @@ class FileOperationsUI:
                 current_pane['selected_files'].clear()
             
             # Print completion message
-            if self.file_manager.operation_cancelled:
-                self.logger.info(f"Copy cancelled: {copied_count} files copied before cancellation")
-            elif error_count > 0:
-                self.logger.warning(f"Copy completed: {copied_count} files copied, {error_count} errors")
-            elif copied_count > 0:
-                self.logger.info(f"Successfully copied {copied_count} files")
-            else:
-                self.logger.info("No files copied")
+            if not suppress_summary:
+                if self.file_manager.operation_cancelled:
+                    self.logger.info(f"Copy cancelled: {copied_count} files copied before cancellation")
+                elif error_count > 0:
+                    self.logger.warning(f"Copy completed: {copied_count} files copied, {error_count} errors")
+                elif copied_count > 0:
+                    self.logger.info(f"Successfully copied {copied_count} files")
+                else:
+                    self.logger.info("No files copied")
+            
+            # Call completion callback if provided
+            if completion_callback:
+                completion_callback(copied_count, error_count)
         
         # Start the copy thread
         thread = threading.Thread(target=copy_thread, daemon=True)
@@ -794,8 +806,13 @@ class FileOperationsUI:
             self.perform_move_operation(files_to_move, destination_dir)
             # Success message will be printed by the operation thread
     
-    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False):
-        """Perform the actual move operation with fine-grained progress tracking in a background thread"""
+    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, suppress_summary=False, suppress_individual_logs=False, completion_callback=None):
+        """Perform the actual move operation with fine-grained progress tracking in a background thread
+        
+        Args:
+            completion_callback: Optional callback function called when operation completes.
+                                Receives (moved_count, error_count) as arguments.
+        """
         # Set operation in progress flag to block user input
         self.file_manager.operation_in_progress = True
         self.file_manager.operation_cancelled = False
@@ -886,7 +903,8 @@ class FileOperationsUI:
                             processed_files = self._move_directory_with_progress(
                                 source_file, dest_path, processed_files, total_individual_files, is_cross_storage
                             )
-                            self.logger.info(f"Moved directory: {source_file.name}")
+                            if not suppress_individual_logs:
+                                self.logger.info(f"Moved directory: {source_file.name}")
                         else:
                             # Move single file
                             processed_files += 1
@@ -897,11 +915,13 @@ class FileOperationsUI:
                                 # Cross-storage move: copy then delete
                                 source_file.copy_to(dest_path, overwrite=overwrite)
                                 source_file.unlink()
-                                self.logger.info(f"Moved file (cross-storage): {source_file.name}")
+                                if not suppress_individual_logs:
+                                    self.logger.info(f"Moved file (cross-storage): {source_file.name}")
                             else:
                                 # Same-storage move: use rename
                                 source_file.rename(dest_path)
-                                self.logger.info(f"Moved file: {source_file.name}")
+                                if not suppress_individual_logs:
+                                    self.logger.info(f"Moved file: {source_file.name}")
                         
                         moved_count += 1
                         
@@ -949,15 +969,20 @@ class FileOperationsUI:
                     current_pane = self.file_manager.get_current_pane()
                     current_pane['selected_files'].clear()
                 
-                # Print completion message
-                if self.file_manager.operation_cancelled:
-                    self.logger.info(f"Move cancelled: {moved_count} files moved before cancellation")
-                elif error_count > 0:
-                    self.logger.warning(f"Move completed: {moved_count} files moved, {error_count} errors")
-                elif moved_count > 0:
-                    self.logger.info(f"Successfully moved {moved_count} files")
-                else:
-                    self.logger.info("No files moved")
+                # Print completion message (unless suppressed for batch operations)
+                if not suppress_summary:
+                    if self.file_manager.operation_cancelled:
+                        self.logger.info(f"Move cancelled: {moved_count} files moved before cancellation")
+                    elif error_count > 0:
+                        self.logger.warning(f"Move completed: {moved_count} files moved, {error_count} errors")
+                    elif moved_count > 0:
+                        self.logger.info(f"Successfully moved {moved_count} files")
+                    else:
+                        self.logger.info("No files moved")
+                
+                # Call completion callback if provided
+                if completion_callback:
+                    completion_callback(moved_count, error_count)
         
         # Start the thread
         thread = threading.Thread(target=move_thread, daemon=True)
@@ -1677,16 +1702,29 @@ class FileOperationsUI:
                              if f not in [c[0] for c in context['conflicts']]]
             
             if non_conflicting:
-                self.perform_copy_operation(non_conflicting, context['destination_dir'])
-            
-            # Report results
-            total_copied = len(context['copied_files']) + len(non_conflicting)
-            total_skipped = len(context['skipped_files'])
-            
-            if total_copied > 0:
-                self.logger.info(f"Copied {total_copied} files, skipped {total_skipped} conflicts")
+                # Define callback to log comprehensive summary after copy completes
+                def on_copy_complete(copied_count, error_count):
+                    total_copied = len(context['copied_files']) + copied_count
+                    total_skipped = len(context['skipped_files'])
+                    
+                    if total_copied > 0:
+                        self.logger.info(f"Copied {total_copied} files, skipped {total_skipped} conflicts")
+                    else:
+                        self.logger.info(f"No files copied, skipped {total_skipped} conflicts")
+                
+                # Copy non-conflicting files with callback for summary
+                self.perform_copy_operation(non_conflicting, context['destination_dir'], 
+                                           suppress_summary=True, suppress_individual_logs=False,
+                                           completion_callback=on_copy_complete)
             else:
-                self.logger.info(f"No files copied, skipped {total_skipped} conflicts")
+                # No non-conflicting files, log summary immediately
+                total_copied = len(context['copied_files'])
+                total_skipped = len(context['skipped_files'])
+                
+                if total_copied > 0:
+                    self.logger.info(f"Copied {total_copied} files, skipped {total_skipped} conflicts")
+                else:
+                    self.logger.info(f"No files copied, skipped {total_skipped} conflicts")
             
             return
         
@@ -1864,16 +1902,29 @@ class FileOperationsUI:
                              if f not in [c[0] for c in context['conflicts']]]
             
             if non_conflicting:
-                self.perform_move_operation(non_conflicting, context['destination_dir'])
-            
-            # Report results
-            total_moved = len(context['moved_files']) + len(non_conflicting)
-            total_skipped = len(context['skipped_files'])
-            
-            if total_moved > 0:
-                self.logger.info(f"Moved {total_moved} files, skipped {total_skipped} conflicts")
+                # Define callback to log comprehensive summary after move completes
+                def on_move_complete(moved_count, error_count):
+                    total_moved = len(context['moved_files']) + moved_count
+                    total_skipped = len(context['skipped_files'])
+                    
+                    if total_moved > 0:
+                        self.logger.info(f"Moved {total_moved} files, skipped {total_skipped} conflicts")
+                    else:
+                        self.logger.info(f"No files moved, skipped {total_skipped} conflicts")
+                
+                # Move non-conflicting files with callback for summary
+                self.perform_move_operation(non_conflicting, context['destination_dir'], 
+                                           suppress_summary=True, suppress_individual_logs=False,
+                                           completion_callback=on_move_complete)
             else:
-                self.logger.info(f"No files moved, skipped {total_skipped} conflicts")
+                # No non-conflicting files, log summary immediately
+                total_moved = len(context['moved_files'])
+                total_skipped = len(context['skipped_files'])
+                
+                if total_moved > 0:
+                    self.logger.info(f"Moved {total_moved} files, skipped {total_skipped} conflicts")
+                else:
+                    self.logger.info(f"No files moved, skipped {total_skipped} conflicts")
             
             return
         
