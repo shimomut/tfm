@@ -491,6 +491,11 @@ class MenuManager:
         """
         states = {}
         
+        # Check if FileManager is the top-most layer and not in input mode
+        # All menu items except "Quit TFM" and "Report Issue" should be disabled
+        # when dialogs/viewers are open or when in modal input mode
+        is_file_manager_active = self._is_file_manager_active()
+        
         # Get current pane and selection info
         try:
             current_pane = self.file_manager.get_current_pane()
@@ -503,59 +508,59 @@ class MenuManager:
             is_at_root = True
         
         # App menu states
-        states[self.APP_ABOUT] = True
-        states[self.APP_QUIT] = True
+        states[self.APP_ABOUT] = is_file_manager_active  # Disabled when dialogs open
+        states[self.APP_QUIT] = True  # Always enabled
         
-        # File menu states
-        states[self.FILE_NEW_FILE] = True
-        states[self.FILE_NEW_FOLDER] = True
-        states[self.FILE_OPEN] = True
-        states[self.FILE_VIEW] = True
-        states[self.FILE_EDIT] = True
-        states[self.FILE_COPY_TO_OTHER_PANE] = has_selection
-        states[self.FILE_MOVE_TO_OTHER_PANE] = has_selection
-        states[self.FILE_DELETE] = has_selection
-        states[self.FILE_RENAME] = has_selection
-        states[self.FILE_PROPERTIES] = True
+        # File menu states - disabled when FileManager is not active
+        states[self.FILE_NEW_FILE] = is_file_manager_active
+        states[self.FILE_NEW_FOLDER] = is_file_manager_active
+        states[self.FILE_OPEN] = is_file_manager_active
+        states[self.FILE_VIEW] = is_file_manager_active
+        states[self.FILE_EDIT] = is_file_manager_active
+        states[self.FILE_COPY_TO_OTHER_PANE] = is_file_manager_active and has_selection
+        states[self.FILE_MOVE_TO_OTHER_PANE] = is_file_manager_active and has_selection
+        states[self.FILE_DELETE] = is_file_manager_active and has_selection
+        states[self.FILE_RENAME] = is_file_manager_active and has_selection
+        states[self.FILE_PROPERTIES] = is_file_manager_active
         
-        # Edit menu states
-        states[self.EDIT_SELECT_ALL] = True
-        states[self.EDIT_COPY_NAMES] = True  # Always enabled - uses focused item if no selection
-        states[self.EDIT_COPY_PATHS] = True  # Always enabled - uses focused item if no selection
+        # Edit menu states - disabled when FileManager is not active
+        states[self.EDIT_SELECT_ALL] = is_file_manager_active
+        states[self.EDIT_COPY_NAMES] = is_file_manager_active
+        states[self.EDIT_COPY_PATHS] = is_file_manager_active
         
-        # View menu states (all always enabled)
-        states[self.VIEW_SHOW_HIDDEN] = True
-        states[self.VIEW_SORT_BY_NAME] = True
-        states[self.VIEW_SORT_BY_SIZE] = True
-        states[self.VIEW_SORT_BY_DATE] = True
-        states[self.VIEW_SORT_BY_EXTENSION] = True
-        states[self.VIEW_REFRESH] = True
-        states[self.VIEW_MOVE_PANE_DIVIDER_LEFT] = True
-        states[self.VIEW_MOVE_PANE_DIVIDER_RIGHT] = True
-        states[self.VIEW_MOVE_LOG_DIVIDER_UP] = True
-        states[self.VIEW_MOVE_LOG_DIVIDER_DOWN] = True
+        # View menu states - disabled when FileManager is not active
+        states[self.VIEW_SHOW_HIDDEN] = is_file_manager_active
+        states[self.VIEW_SORT_BY_NAME] = is_file_manager_active
+        states[self.VIEW_SORT_BY_SIZE] = is_file_manager_active
+        states[self.VIEW_SORT_BY_DATE] = is_file_manager_active
+        states[self.VIEW_SORT_BY_EXTENSION] = is_file_manager_active
+        states[self.VIEW_REFRESH] = is_file_manager_active
+        states[self.VIEW_MOVE_PANE_DIVIDER_LEFT] = is_file_manager_active
+        states[self.VIEW_MOVE_PANE_DIVIDER_RIGHT] = is_file_manager_active
+        states[self.VIEW_MOVE_LOG_DIVIDER_UP] = is_file_manager_active
+        states[self.VIEW_MOVE_LOG_DIVIDER_DOWN] = is_file_manager_active
         
-        # Go menu states
-        states[self.GO_PARENT] = not is_at_root
-        states[self.GO_HOME] = True
-        states[self.GO_DRIVES] = True
-        states[self.GO_FAVORITES] = True
-        states[self.GO_RECENT] = True
+        # Go menu states - disabled when FileManager is not active
+        states[self.GO_PARENT] = is_file_manager_active and not is_at_root
+        states[self.GO_HOME] = is_file_manager_active
+        states[self.GO_DRIVES] = is_file_manager_active
+        states[self.GO_FAVORITES] = is_file_manager_active
+        states[self.GO_RECENT] = is_file_manager_active
         
-        # Tools menu states (all always enabled)
-        states[self.TOOLS_SEARCH_FILES] = True
-        states[self.TOOLS_SEARCH_CONTENT] = True
-        states[self.TOOLS_COMPARE_FILES] = True
-        states[self.TOOLS_COMPARE_DIRECTORIES] = True
-        states[self.TOOLS_COMPARE_SELECTION] = True
-        states[self.TOOLS_CREATE_ARCHIVE] = True
-        states[self.TOOLS_EXTRACT_ARCHIVE] = True
-        states[self.TOOLS_EXTERNAL_PROGRAMS] = True
+        # Tools menu states - disabled when FileManager is not active
+        states[self.TOOLS_SEARCH_FILES] = is_file_manager_active
+        states[self.TOOLS_SEARCH_CONTENT] = is_file_manager_active
+        states[self.TOOLS_COMPARE_FILES] = is_file_manager_active
+        states[self.TOOLS_COMPARE_DIRECTORIES] = is_file_manager_active
+        states[self.TOOLS_COMPARE_SELECTION] = is_file_manager_active
+        states[self.TOOLS_CREATE_ARCHIVE] = is_file_manager_active
+        states[self.TOOLS_EXTRACT_ARCHIVE] = is_file_manager_active
+        states[self.TOOLS_EXTERNAL_PROGRAMS] = is_file_manager_active
         
-        # Help menu states (all always enabled)
-        states[self.HELP_KEYBOARD_SHORTCUTS] = True
-        states[self.HELP_ABOUT] = True
-        states[self.HELP_REPORT_ISSUE] = True
+        # Help menu states
+        states[self.HELP_KEYBOARD_SHORTCUTS] = is_file_manager_active
+        states[self.HELP_ABOUT] = is_file_manager_active
+        states[self.HELP_REPORT_ISSUE] = True  # Always enabled
         
         return states
     
@@ -586,3 +591,34 @@ class MenuManager:
             return parent == current_dir
         except Exception:
             return True
+    
+    def _is_file_manager_active(self):
+        """Check if FileManager is the top-most layer and not in input mode.
+        
+        Menu items (except "Quit TFM" and "Report Issue") should only be enabled
+        when FileManager is the active top layer and not in modal input mode
+        (quick choice, quick edit, i-search).
+        
+        Returns:
+            bool: True if FileManager is active and ready for menu commands
+        """
+        try:
+            # Check if FileManager is the top layer
+            if not hasattr(self.file_manager, 'ui_layer_stack'):
+                return False
+            
+            top_layer = self.file_manager.ui_layer_stack.get_top_layer()
+            
+            # Check if top layer is FileManager (not a dialog or viewer)
+            if top_layer is not self.file_manager:
+                return False
+            
+            # Check if FileManager is in input mode (quick choice, quick edit, i-search)
+            if hasattr(self.file_manager, 'is_in_input_mode'):
+                if self.file_manager.is_in_input_mode():
+                    return False
+            
+            return True
+        except Exception:
+            # If we can't determine state, disable menu items for safety
+            return False

@@ -197,6 +197,26 @@ class TFMEventCallback(EventCallback):
                 traceback.print_exc(file=sys.stderr)
             return True  # Event consumed to prevent further issues
     
+    def on_menu_will_open(self) -> None:
+        """
+        Called when a menu is about to open.
+        
+        This callback updates menu item states right before the menu is displayed,
+        ensuring that enabled/disabled states reflect the current application state.
+        
+        This is more efficient than continuously updating menu states, as it only
+        updates when the user is about to interact with the menu.
+        """
+        try:
+            # Update menu states to reflect current application state
+            self.file_manager._update_menu_states()
+        except Exception as e:
+            # Log error message
+            self.file_manager.logger.error(f"Error updating menu states: {e}")
+            # Print stack trace to stderr if debug mode is enabled
+            if os.environ.get('TFM_DEBUG') == '1':
+                traceback.print_exc(file=sys.stderr)
+    
     def on_mouse_event(self, event: 'MouseEvent') -> bool:
         """
         Handle a mouse event by routing to the UI layer stack.
@@ -955,6 +975,9 @@ class FileManager(UILayer):
             menu_structure = self.menu_manager.get_menu_structure()
             self.renderer.set_menu_bar(menu_structure)
             self.logger.info("Menu bar initialized for desktop mode")
+            
+            # Set initial menu states to reflect current application state
+            self._update_menu_states()
         except Exception as e:
             self.logger.error(f"Failed to initialize menu bar: {e}")
     
@@ -1885,18 +1908,6 @@ class FileManager(UILayer):
             # Check for log updates
             if self.log_manager.has_log_updates():
                 self.mark_dirty()
-            
-            # Update menu states if needed
-            if self.is_desktop_mode():
-                current_pane = self.get_current_pane()
-                current_selection_count = len(current_pane['selected_files'])
-                
-                if not hasattr(self, '_last_selection_count'):
-                    self._last_selection_count = current_selection_count
-                    self._update_menu_states()
-                elif self._last_selection_count != current_selection_count:
-                    self._last_selection_count = current_selection_count
-                    self._update_menu_states()
             
             # Get adaptive timeout based on activity level
             timeout_ms = self.adaptive_fps.get_timeout_ms()
@@ -2881,21 +2892,37 @@ class FileManager(UILayer):
             return
         
         # Get selected files using helper (only files, not directories for safety)
+        # Preserve order from the file list for consistent \d numbering
         selected_files = []
-        for file_path_str in current_pane['selected_files']:
-            file_path = Path(file_path_str)
-            if file_path.exists() and file_path.is_file():
+        selected_files_set = current_pane['selected_files']
+        
+        # Iterate through files in display order and collect selected ones
+        for file_path in current_pane['files']:
+            file_path_str = str(file_path)
+            if file_path_str in selected_files_set and file_path.exists() and file_path.is_file():
                 selected_files.append(file_path)
         
         if not selected_files:
             self.logger.info("No files selected for batch rename")
             return
         
-        if self.batch_rename_dialog.show(selected_files):
+        if self.batch_rename_dialog.show(selected_files, on_rename_callback=self.on_batch_rename_complete):
             # Push dialog onto layer stack
             self.push_layer(self.batch_rename_dialog)
             self._force_immediate_redraw()
             self.logger.info(f"Batch rename mode: {len(selected_files)} files selected")
+    
+    def on_batch_rename_complete(self, success_count, errors):
+        """Handle post-rename actions after batch rename completes
+        
+        Args:
+            success_count: Number of successfully renamed files
+            errors: List of error messages
+        """
+        # Refresh the current pane to show new names if any files were renamed
+        if success_count > 0:
+            current_pane = self.get_current_pane()
+            self.refresh_files(current_pane)
     
     def exit_batch_rename_mode(self):
         """Exit batch rename mode - wrapper for batch rename dialog component"""

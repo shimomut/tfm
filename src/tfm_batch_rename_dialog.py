@@ -12,7 +12,7 @@ from tfm_path import Path
 from tfm_base_list_dialog import BaseListDialog
 from tfm_ui_layer import UILayer
 from tfm_single_line_text_edit import SingleLineTextEdit
-from tfm_colors import get_status_color, COLOR_ERROR
+from tfm_colors import get_status_color, COLOR_ERROR, COLOR_SEARCH_MATCH
 from tfm_log_manager import getLogger
 
 # Module-level logger
@@ -32,12 +32,15 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         self.files = []  # List of selected files to rename
         self.preview = []  # List of preview results
         self.content_changed = True  # Track if content needs redraw
+        self.on_rename_callback = None  # Callback for post-rename actions
         
-    def show(self, selected_files):
+    def show(self, selected_files, on_rename_callback=None):
         """Show the batch rename dialog for multiple selected files
         
         Args:
             selected_files: List of Path objects representing files to rename
+            on_rename_callback: Optional callback function(success_count, errors) 
+                              called after rename completes for post-rename actions
         """
         if not selected_files:
             return False
@@ -47,8 +50,9 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         self.regex_editor.clear()
         self.destination_editor.clear()
         self.active_field = 'regex'
-        self.preview = []
         self.scroll = 0
+        self.on_rename_callback = on_rename_callback
+        self.update_preview()  # Initialize preview with all files
         self.content_changed = True  # Mark content as changed when showing
         return True
         
@@ -80,13 +84,28 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         regex_pattern = self.regex_editor.get_text()
         destination_pattern = self.destination_editor.get_text()
         
-        if not regex_pattern or not destination_pattern:
+        # If no regex pattern specified, show all files as unchanged
+        if not regex_pattern:
+            for file_path in self.files:
+                self.preview.append({
+                    'original': file_path.name,
+                    'new': file_path.name,
+                    'valid': True,
+                    'conflict': False
+                })
             return
         
         try:
             pattern = re.compile(regex_pattern)
         except re.error:
-            # Invalid regex pattern
+            # Invalid regex pattern - show all files as unchanged
+            for file_path in self.files:
+                self.preview.append({
+                    'original': file_path.name,
+                    'new': file_path.name,
+                    'valid': True,
+                    'conflict': False
+                })
             return
         
         for i, file_path in enumerate(self.files):
@@ -94,37 +113,52 @@ class BatchRenameDialog(UILayer, BaseListDialog):
             match = pattern.search(original_name)
             
             if match:
-                # Apply substitution with macro support
-                new_name = destination_pattern
+                # Apply substitution with macro support to the destination pattern
+                replacement = destination_pattern
                 
                 # Replace regex groups (\1, \2, etc.)
                 for group_num in range(10):  # Support up to 9 groups
                     group_placeholder = f"\\{group_num}"
-                    if group_placeholder in new_name:
+                    if group_placeholder in replacement:
                         if group_num == 0:
                             # \0 = full match
-                            new_name = new_name.replace(group_placeholder, match.group(0))
+                            replacement = replacement.replace(group_placeholder, match.group(0))
                         elif group_num <= len(match.groups()):
                             # \1-\9 = regex groups
                             group_value = match.group(group_num) or ""
-                            new_name = new_name.replace(group_placeholder, group_value)
+                            replacement = replacement.replace(group_placeholder, group_value)
                         else:
                             # Group doesn't exist, replace with empty string
-                            new_name = new_name.replace(group_placeholder, "")
+                            replacement = replacement.replace(group_placeholder, "")
                 
                 # Replace index macro (\d)
-                new_name = new_name.replace("\\d", str(i + 1))
+                replacement = replacement.replace("\\d", str(i + 1))
                 
-                # Check if new name is valid and doesn't conflict
+                # Replace only the matched portion of the filename
+                # Keep the parts before and after the match intact
+                new_name = original_name[:match.start()] + replacement + original_name[match.end():]
+                
+                # Check if new name is valid and doesn't conflict with existing files
                 valid = self._is_valid_filename(new_name)
                 new_path = file_path.parent / new_name
                 conflict = new_path.exists() and new_path != file_path
+                
+                # Store match and replacement positions for highlighting
+                match_start = match.start()
+                match_end = match.end()
+                replace_start = match.start()
+                replace_end = match.start() + len(replacement)
                 
                 self.preview.append({
                     'original': original_name,
                     'new': new_name,
                     'valid': valid,
-                    'conflict': conflict
+                    'conflict': conflict,
+                    'match_start': match_start,
+                    'match_end': match_end,
+                    'replace_start': replace_start,
+                    'replace_end': replace_end,
+                    'file_path': file_path  # Store file path for later conflict detection
                 })
             else:
                 # No match - keep original name
@@ -132,8 +166,38 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                     'original': original_name,
                     'new': original_name,
                     'valid': True,
-                    'conflict': False
+                    'conflict': False,
+                    'match_start': None,
+                    'match_end': None,
+                    'replace_start': None,
+                    'replace_end': None,
+                    'file_path': file_path  # Store file path for later conflict detection
                 })
+        
+        # Second pass: detect conflicts within the batch rename operation
+        # Build a map of new names to their preview entries
+        new_name_map = {}
+        for preview in self.preview:
+            new_name = preview['new']
+            file_path = preview['file_path']
+            
+            # Skip unchanged files - they don't cause conflicts
+            if preview['original'] == new_name:
+                continue
+            
+            # Create a key that includes parent directory to handle files in different directories
+            key = (file_path.parent, new_name)
+            
+            if key not in new_name_map:
+                new_name_map[key] = []
+            new_name_map[key].append(preview)
+        
+        # Mark all entries with duplicate new names as conflicts
+        for key, entries in new_name_map.items():
+            if len(entries) > 1:
+                # Multiple files will have the same new name - mark all as conflicts
+                for entry in entries:
+                    entry['conflict'] = True
                 
     def _is_valid_filename(self, filename):
         """Check if a filename is valid"""
@@ -175,13 +239,18 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         
         for i, preview in enumerate(self.preview):
             if preview['original'] != preview['new']:
+                old_name = preview['original']
+                new_name = preview['new']
                 try:
                     old_path = self.files[i]
-                    new_path = old_path.parent / preview['new']
+                    new_path = old_path.parent / new_name
                     old_path.rename(new_path)
                     success_count += 1
+                    logger.info(f"Renamed: {old_name} → {new_name}")
                 except Exception as e:
-                    errors.append(f"Failed to rename {preview['original']}: {str(e)}")
+                    error_msg = f"Failed to rename {old_name}: {str(e)}"
+                    errors.append(error_msg)
+                    logger.error(error_msg)
         
         return success_count, errors
         
@@ -299,36 +368,28 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                 is_active=(self.active_field == 'regex')
             )
         
-        # Draw destination input
+        # Draw replacement input
         dest_y = start_y + 3
-        dest_label = "Destination:   "
+        dest_label = "Replacement:   "
         
         if dest_y < height:
-            # Draw destination input field using SingleLineTextEdit
+            # Draw replacement input field using SingleLineTextEdit
             self.destination_editor.draw(
                 self.renderer, dest_y, content_start_x, content_width,
                 dest_label,
                 is_active=(self.active_field == 'destination')
             )
         
-        # Draw navigation help
-        nav_help_y = start_y + 4
-        if nav_help_y < height:
-            nav_help_text = "Navigation: ↑/↓=Switch fields, Tab=Alt switch, PgUp/PgDn=Scroll preview"
-            status_color_pair, _ = get_status_color()
-            self.renderer.draw_text(nav_help_y, content_start_x, nav_help_text[:content_width], 
-                             color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
-        
         # Draw help for macros
-        help_y = start_y + 5
+        help_y = start_y + 4
         if help_y < height:
-            help_text = "Macros: \\0=full name, \\1-\\9=regex groups, \\d=index"
+            help_text = "Macros: \\0=matched text, \\1-\\9=regex groups, \\d=index"
             status_color_pair, _ = get_status_color()
             self.renderer.draw_text(help_y, content_start_x, help_text[:content_width], 
                              color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw separator line
-        sep_y = start_y + 6
+        sep_y = start_y + 5
         if sep_y < height:
             sep_line = "├" + "─" * (dialog_width - 2) + "┤"
             # Use BOLD for separator lines (horizontal dividers) for emphasis
@@ -337,7 +398,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                              color_pair=border_color_pair, attributes=sep_attributes)
         
         # Draw preview header
-        preview_header_y = start_y + 7
+        preview_header_y = start_y + 6
         if preview_header_y < height:
             header_text = "Preview:"
             header_color_pair, _ = get_status_color()
@@ -345,7 +406,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                              color_pair=header_color_pair, attributes=TextAttribute.BOLD)
         
         # Calculate preview area
-        preview_start_y = start_y + 8
+        preview_start_y = start_y + 7
         preview_end_y = start_y + dialog_height - 3
         preview_height = preview_end_y - preview_start_y + 1
         
@@ -360,68 +421,142 @@ class BatchRenameDialog(UILayer, BaseListDialog):
                     new = preview['new']
                     conflict = preview['conflict']
                     valid = preview['valid']
+                    match_start = preview.get('match_start')
+                    match_end = preview.get('match_end')
+                    replace_start = preview.get('replace_start')
+                    replace_end = preview.get('replace_end')
                     
-                    # Format preview line
+                    # Format preview line with colored emoji status
                     if original == new:
-                        status = "UNCHANGED"
+                        status = " "  # Just space for unchanged (no icon)
                         status_color_pair, status_attributes = get_status_color()
                     elif conflict:
-                        status = "CONFLICT!"
+                        status = "🔴"  # Red circle for conflict
                         status_color_pair = COLOR_ERROR
                         status_attributes = TextAttribute.BOLD
                     elif not valid:
-                        status = "INVALID!"
+                        status = "🔴"  # Red circle for invalid
                         status_color_pair = COLOR_ERROR
                         status_attributes = TextAttribute.BOLD
                     else:
-                        status = "OK"
+                        status = "🟢"  # Green circle for OK
                         status_color_pair, status_attributes = get_status_color()
                     
-                    # Create preview line using wide character utilities
-                    max_name_width = (content_width - 20) // 2
+                    # Create preview line with underlined matched/replaced portions
+                    # Layout: original → status  new
+                    # Status emoji is 1-2 chars + 2 spaces, arrow is 3 chars, total separator = 8 chars
+                    max_name_width = (content_width - 8) // 2
                     truncate_text = safe_funcs['truncate_to_width']
                     pad_text = safe_funcs['pad_to_width']
                     
-                    if get_width(original) > max_name_width:
-                        original_display = truncate_text(original, max_name_width, "")
-                    else:
-                        original_display = original
+                    # Draw original filename with underlined match
+                    x_pos = content_start_x
+                    if match_start is not None and match_end is not None:
+                        # Draw in three parts: before match, match (underlined), after match
+                        before_match = original[:match_start]
+                        matched_part = original[match_start:match_end]
+                        after_match = original[match_end:]
                         
-                    if get_width(new) > max_name_width:
-                        new_display = truncate_text(new, max_name_width, "")
+                        # Truncate if needed
+                        if get_width(original) > max_name_width:
+                            original_display = truncate_text(original, max_name_width, "")
+                            # Simple display when truncated
+                            original_padded = pad_text(original_display, max_name_width, 'left')
+                            self.renderer.draw_text(y, x_pos, original_padded, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                        else:
+                            # Draw before match
+                            self.renderer.draw_text(y, x_pos, before_match, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                            x_pos += get_width(before_match)
+                            
+                            # Draw matched part with search match highlighting
+                            self.renderer.draw_text(y, x_pos, matched_part, 
+                                             color_pair=COLOR_SEARCH_MATCH, 
+                                             attributes=TextAttribute.NORMAL)
+                            x_pos += get_width(matched_part)
+                            
+                            # Draw after match
+                            remaining_width = max_name_width - get_width(before_match) - get_width(matched_part)
+                            after_padded = pad_text(after_match, remaining_width, 'left')
+                            self.renderer.draw_text(y, x_pos, after_padded, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                            x_pos = content_start_x + max_name_width
                     else:
-                        new_display = new
+                        # No match - display normally
+                        if get_width(original) > max_name_width:
+                            original_display = truncate_text(original, max_name_width, "")
+                        else:
+                            original_display = original
+                        original_padded = pad_text(original_display, max_name_width, 'left')
+                        self.renderer.draw_text(y, x_pos, original_padded, 
+                                         color_pair=status_color_pair, attributes=status_attributes)
+                        x_pos = content_start_x + max_name_width
                     
-                    # Use wide character utilities for proper alignment
-                    original_padded = pad_text(original_display, max_name_width, 'left')
-                    new_padded = pad_text(new_display, max_name_width, 'left')
-                    
-                    preview_line = f"{original_padded} → {new_padded} [{status}]"
-                    
-                    # Truncate the entire line if it's too long
-                    if get_width(preview_line) > content_width:
-                        preview_line = truncate_text(preview_line, content_width, "")
-                    
-                    self.renderer.draw_text(y, content_start_x, preview_line, 
+                    # Draw arrow
+                    self.renderer.draw_text(y, x_pos, " → ", 
                                      color_pair=status_color_pair, attributes=status_attributes)
+                    x_pos += 3
+                    
+                    # Draw status emoji (moved to center between arrow and new name)
+                    # Add extra space after status for better separation
+                    status_text = f"{status}  "
+                    self.renderer.draw_text(y, x_pos, status_text, 
+                                     color_pair=status_color_pair, attributes=status_attributes)
+                    x_pos += 3  # Status (1-2 chars) + 2 spaces = 3 chars total
+                    
+                    # Draw new filename with underlined replacement
+                    if replace_start is not None and replace_end is not None and original != new:
+                        # Draw in three parts: before replacement, replacement (underlined), after replacement
+                        before_replace = new[:replace_start]
+                        replaced_part = new[replace_start:replace_end]
+                        after_replace = new[replace_end:]
+                        
+                        # Truncate if needed
+                        if get_width(new) > max_name_width:
+                            new_display = truncate_text(new, max_name_width, "")
+                            # Simple display when truncated
+                            new_padded = pad_text(new_display, max_name_width, 'left')
+                            self.renderer.draw_text(y, x_pos, new_padded, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                        else:
+                            # Draw before replacement
+                            self.renderer.draw_text(y, x_pos, before_replace, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                            x_pos += get_width(before_replace)
+                            
+                            # Draw replaced part with search match highlighting
+                            self.renderer.draw_text(y, x_pos, replaced_part, 
+                                             color_pair=COLOR_SEARCH_MATCH, 
+                                             attributes=TextAttribute.NORMAL)
+                            x_pos += get_width(replaced_part)
+                            
+                            # Draw after replacement
+                            remaining_width = max_name_width - get_width(before_replace) - get_width(replaced_part)
+                            after_padded = pad_text(after_replace, remaining_width, 'left')
+                            self.renderer.draw_text(y, x_pos, after_padded, 
+                                             color_pair=status_color_pair, attributes=status_attributes)
+                            x_pos += remaining_width
+                    else:
+                        # No replacement or unchanged - display normally
+                        if get_width(new) > max_name_width:
+                            new_display = truncate_text(new, max_name_width, "")
+                        else:
+                            new_display = new
+                        new_padded = pad_text(new_display, max_name_width, 'left')
+                        self.renderer.draw_text(y, x_pos, new_padded, 
+                                         color_pair=status_color_pair, attributes=status_attributes)
+                        x_pos += max_name_width
             
             # Draw scrollbar if needed
             if len(self.preview) > preview_height:
                 scrollbar_x = start_x + dialog_width - 2
                 self.draw_scrollbar(self.preview, preview_start_y, preview_height, scrollbar_x)
-        else:
-            # No preview available
-            no_preview_y = preview_start_y + 2
-            if no_preview_y < height:
-                no_preview_text = "Enter regex pattern and destination to see preview"
-                status_color_pair, _ = get_status_color()
-                self.renderer.draw_text(no_preview_y, content_start_x, no_preview_text, 
-                                 color_pair=status_color_pair, attributes=TextAttribute.NORMAL)
         
         # Draw help text with safe positioning
         help_y = start_y + dialog_height - 2
         if help_y < height and help_y >= 0:
-            help_text = "Tab: Switch input | ←→: Move cursor | Home/End: Start/End | Enter: Rename | ESC: Cancel"
+            help_text = "Tab/↑↓: Switch | PgUp/PgDn: Scroll | Enter: Rename | ESC: Cancel"
             help_width = get_width(help_text)
             
             if help_width <= dialog_width:
@@ -507,12 +642,32 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         # Enter - perform batch rename
         elif event.key_code == KeyCode.ENTER:
             regex_text = self.regex_editor.get_text()
-            dest_text = self.destination_editor.get_text()
-            if regex_text and dest_text:
-                # Don't close here - let the caller handle the execution
+            # Destination can be empty (to delete matched portion)
+            if regex_text:
+                # Perform the rename operation
+                success_count, errors = self.perform_rename()
+                
+                # Show result message
+                if errors:
+                    error_summary = f"Errors: {'; '.join(errors[:3])}"
+                    if len(errors) > 3:
+                        error_summary += f" (and {len(errors) - 3} more)"
+                    logger.error(f"Renamed {success_count} files. {error_summary}")
+                elif success_count > 0:
+                    logger.info(f"Successfully renamed {success_count} files")
+                else:
+                    logger.info("No files were renamed")
+                
+                # Close the dialog
+                self.exit()
+                
+                # Call the callback if provided (for post-rename actions like refresh)
+                if self.on_rename_callback:
+                    self.on_rename_callback(success_count, errors)
+                
                 return True
             else:
-                # Error: missing pattern - but event was handled
+                # Error: missing regex pattern - but event was handled
                 return True
             
         else:

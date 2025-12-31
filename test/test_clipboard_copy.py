@@ -49,6 +49,14 @@ class TestClipboardCopy(unittest.TestCase):
         
         self.mock_fm.get_current_pane.return_value = self.mock_pane
         
+        # Mock ui_layer_stack to make FileManager appear as top layer
+        mock_ui_layer_stack = Mock()
+        mock_ui_layer_stack.get_top_layer.return_value = self.mock_fm
+        self.mock_fm.ui_layer_stack = mock_ui_layer_stack
+        
+        # Mock is_in_input_mode to return False (not in input mode)
+        self.mock_fm.is_in_input_mode.return_value = False
+        
         # Bind action methods to mock
         self.mock_fm._action_copy_names = lambda: FileManager._action_copy_names(self.mock_fm)
         self.mock_fm._action_copy_paths = lambda: FileManager._action_copy_paths(self.mock_fm)
