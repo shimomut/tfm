@@ -73,7 +73,7 @@ class FileOperationExecutor:
         self.file_manager = file_manager
         self.progress_manager = file_manager.progress_manager
         self.cache_manager = file_manager.cache_manager
-        self.logger = getLogger("FileExec")
+        self.logger = getLogger("FileOp")
 
     def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, completion_callback=None):
         """Perform the actual copy operation with fine-grained progress tracking in a background thread

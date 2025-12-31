@@ -24,7 +24,7 @@ class FileListManager:
         self.log_manager = None  # Will be set by FileManager if available
         # Use module-level getLogger - no need to check if log_manager exists
         from tfm_log_manager import getLogger
-        self.logger = getLogger("FileOp")
+        self.logger = getLogger("FileList")
     
     def refresh_files(self, pane_data):
         """Refresh the file list for specified pane.
