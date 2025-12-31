@@ -542,42 +542,8 @@ class FileOperationsUI:
                 conflicts.append((source_file, dest_path))
         
         if conflicts:
-            # Show conflict resolution dialog
-            conflict_names = [f.name for f, _ in conflicts]
-            if len(conflicts) == 1:
-                message = f"'{conflict_names[0]}' already exists in destination."
-            else:
-                message = f"{len(conflicts)} files already exist in destination."
-            
-            choices = [
-                {"text": "Overwrite", "key": "o", "value": "overwrite"},
-                {"text": "Skip", "key": "s", "value": "skip"},
-                {"text": "Rename", "key": "r", "value": "rename"},
-                {"text": "Cancel", "key": "c", "value": "cancel"}
-            ]
-            
-            def handle_conflict_choice(choice):
-                if choice == "cancel":
-                    self.logger.info("Copy operation cancelled")
-                    return
-                elif choice == "skip":
-                    # Copy only non-conflicting files
-                    non_conflicting = [f for f in files_to_copy 
-                                     if not (destination_dir / f.name).exists()]
-                    if non_conflicting:
-                        self.perform_copy_operation(non_conflicting, destination_dir)
-                        # Success message will be printed by the operation thread
-                    else:
-                        self.logger.info("No files copied (all had conflicts)")
-                elif choice == "overwrite":
-                    # Copy all files, overwriting conflicts
-                    self.perform_copy_operation(files_to_copy, destination_dir, overwrite=True)
-                    # Success message will be printed by the operation thread
-                elif choice == "rename":
-                    # Handle rename - process conflicts one by one
-                    self._handle_copy_rename_batch(files_to_copy, destination_dir, conflicts)
-            
-            self.file_manager.show_dialog(message, choices, handle_conflict_choice)
+            # Process conflicts one by one with per-file dialogs
+            self._handle_copy_rename_batch(files_to_copy, destination_dir, conflicts)
         else:
             # No conflicts, copy directly
             self.perform_copy_operation(files_to_copy, destination_dir)
@@ -821,42 +787,8 @@ class FileOperationsUI:
                 conflicts.append((source_file, dest_path))
         
         if conflicts:
-            # Show conflict resolution dialog
-            conflict_names = [f.name for f, _ in conflicts]
-            if len(conflicts) == 1:
-                message = f"'{conflict_names[0]}' already exists in destination."
-            else:
-                message = f"{len(conflicts)} files already exist in destination."
-            
-            choices = [
-                {"text": "Overwrite", "key": "o", "value": "overwrite"},
-                {"text": "Skip", "key": "s", "value": "skip"},
-                {"text": "Rename", "key": "r", "value": "rename"},
-                {"text": "Cancel", "key": "c", "value": "cancel"}
-            ]
-            
-            def handle_conflict_choice(choice):
-                if choice == "cancel":
-                    self.logger.info("Move operation cancelled")
-                    return
-                elif choice == "skip":
-                    # Move only non-conflicting files
-                    non_conflicting = [f for f in files_to_move 
-                                     if not (destination_dir / f.name).exists()]
-                    if non_conflicting:
-                        self.perform_move_operation(non_conflicting, destination_dir)
-                        # Success message will be printed by the operation thread
-                    else:
-                        self.logger.info("No files moved (all had conflicts)")
-                elif choice == "overwrite":
-                    # Move all files, overwriting conflicts
-                    self.perform_move_operation(files_to_move, destination_dir, overwrite=True)
-                    # Success message will be printed by the operation thread
-                elif choice == "rename":
-                    # Handle rename - process conflicts one by one
-                    self._handle_move_rename_batch(files_to_move, destination_dir, conflicts)
-            
-            self.file_manager.show_dialog(message, choices, handle_conflict_choice)
+            # Process conflicts one by one with per-file dialogs
+            self._handle_move_rename_batch(files_to_move, destination_dir, conflicts)
         else:
             # No conflicts, move directly
             self.perform_move_operation(files_to_move, destination_dir)
