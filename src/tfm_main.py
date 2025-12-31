@@ -2895,11 +2895,23 @@ class FileManager(UILayer):
             self.logger.info("No files selected for batch rename")
             return
         
-        if self.batch_rename_dialog.show(selected_files):
+        if self.batch_rename_dialog.show(selected_files, on_rename_callback=self.on_batch_rename_complete):
             # Push dialog onto layer stack
             self.push_layer(self.batch_rename_dialog)
             self._force_immediate_redraw()
             self.logger.info(f"Batch rename mode: {len(selected_files)} files selected")
+    
+    def on_batch_rename_complete(self, success_count, errors):
+        """Handle post-rename actions after batch rename completes
+        
+        Args:
+            success_count: Number of successfully renamed files
+            errors: List of error messages
+        """
+        # Refresh the current pane to show new names if any files were renamed
+        if success_count > 0:
+            current_pane = self.get_current_pane()
+            self.refresh_files(current_pane)
     
     def exit_batch_rename_mode(self):
         """Exit batch rename mode - wrapper for batch rename dialog component"""

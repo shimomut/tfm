@@ -283,6 +283,37 @@ class LogManager:
                         logger.removeHandler(self._file_logging_handler)
                 self._file_logging_handler = None
     
+    def _configure_pending_logger(self, name: str, logger: logging.Logger):
+        """
+        Configure a pending logger with handlers.
+        
+        This is called by set_log_manager() to attach handlers to loggers
+        that were created before LogManager initialization.
+        
+        Args:
+            name: Logger name
+            logger: Logger instance to configure
+        """
+        # Set level based on configuration
+        # Check for per-logger override first, then use default
+        if name in self._logger_levels:
+            logger.setLevel(self._logger_levels[name])
+        else:
+            logger.setLevel(self._default_log_level)
+        
+        # Attach configured handlers based on current configuration
+        if self._log_pane_handler is not None:
+            logger.addHandler(self._log_pane_handler)
+        if self._stream_output_handler is not None:
+            logger.addHandler(self._stream_output_handler)
+        if self._remote_monitoring_handler is not None:
+            logger.addHandler(self._remote_monitoring_handler)
+        if self._file_logging_handler is not None:
+            logger.addHandler(self._file_logging_handler)
+        
+        # Cache the logger
+        self._loggers[name] = logger
+    
     def getLogger(self, name: str) -> logging.Logger:
         """
         Get or create a logger with TFM handlers configured.
@@ -653,18 +684,31 @@ class LogManager:
 # Module-level singleton instance
 _log_manager_instance: Optional[LogManager] = None
 
+# Pending loggers dictionary - stores loggers created before LogManager initialization
+# Key: logger name, Value: logger instance
+_pending_loggers: Dict[str, logging.Logger] = {}
+
 
 def set_log_manager(log_manager: LogManager):
     """
     Set the global LogManager instance.
     
     This should be called once during application initialization.
+    When called, all pending loggers will have their handlers attached.
     
     Args:
         log_manager: The LogManager instance to use globally
     """
     global _log_manager_instance
     _log_manager_instance = log_manager
+    
+    # Attach handlers to all pending loggers
+    for name, logger in _pending_loggers.items():
+        # Configure the pending logger with handlers
+        _log_manager_instance._configure_pending_logger(name, logger)
+    
+    # Clear pending loggers dictionary since they're now configured
+    _pending_loggers.clear()
 
 
 def getLogger(name: str) -> logging.Logger:
@@ -673,20 +717,33 @@ def getLogger(name: str) -> logging.Logger:
     
     This is a module-level function that can be called without a LogManager instance.
     If a LogManager has been set via set_log_manager(), it will use that instance.
-    Otherwise, it creates a basic NullHandler logger.
+    Otherwise, it creates a "pending" logger without handlers that will be configured
+    when LogManager is initialized.
+    
+    Pending loggers are stored in a dictionary so that multiple calls with the same
+    name return the same logger instance, ensuring consistency.
     
     Args:
         name: Logger name (e.g., "Main", "FileOp", "Archive")
         
     Returns:
-        Configured logging.Logger instance
+        Configured logging.Logger instance (or pending logger if LogManager not yet initialized)
     """
     if _log_manager_instance is not None:
         return _log_manager_instance.getLogger(name)
     else:
-        # No LogManager available - create a basic logger with NullHandler
+        # No LogManager available yet - create or return pending logger
+        if name in _pending_loggers:
+            # Return existing pending logger
+            return _pending_loggers[name]
+        
+        # Create new pending logger without handlers
         logger = logging.getLogger(name)
-        if not logger.handlers:
-            logger.addHandler(logging.NullHandler())
-            logger.setLevel(logging.CRITICAL + 1)  # Disable all logging
+        logger.setLevel(logging.INFO)  # Default level, will be updated when LogManager is created
+        logger.propagate = False
+        # Don't add any handlers - they will be added when LogManager is initialized
+        
+        # Store in pending loggers dictionary
+        _pending_loggers[name] = logger
+        
         return logger

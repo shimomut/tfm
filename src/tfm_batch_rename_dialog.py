@@ -32,12 +32,15 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         self.files = []  # List of selected files to rename
         self.preview = []  # List of preview results
         self.content_changed = True  # Track if content needs redraw
+        self.on_rename_callback = None  # Callback for post-rename actions
         
-    def show(self, selected_files):
+    def show(self, selected_files, on_rename_callback=None):
         """Show the batch rename dialog for multiple selected files
         
         Args:
             selected_files: List of Path objects representing files to rename
+            on_rename_callback: Optional callback function(success_count, errors) 
+                              called after rename completes for post-rename actions
         """
         if not selected_files:
             return False
@@ -48,6 +51,7 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         self.destination_editor.clear()
         self.active_field = 'regex'
         self.scroll = 0
+        self.on_rename_callback = on_rename_callback
         self.update_preview()  # Initialize preview with all files
         self.content_changed = True  # Mark content as changed when showing
         return True
@@ -235,13 +239,18 @@ class BatchRenameDialog(UILayer, BaseListDialog):
         
         for i, preview in enumerate(self.preview):
             if preview['original'] != preview['new']:
+                old_name = preview['original']
+                new_name = preview['new']
                 try:
                     old_path = self.files[i]
-                    new_path = old_path.parent / preview['new']
+                    new_path = old_path.parent / new_name
                     old_path.rename(new_path)
                     success_count += 1
+                    logger.info(f"Renamed: {old_name} → {new_name}")
                 except Exception as e:
-                    errors.append(f"Failed to rename {preview['original']}: {str(e)}")
+                    error_msg = f"Failed to rename {old_name}: {str(e)}"
+                    errors.append(error_msg)
+                    logger.error(error_msg)
         
         return success_count, errors
         
@@ -635,7 +644,27 @@ class BatchRenameDialog(UILayer, BaseListDialog):
             regex_text = self.regex_editor.get_text()
             # Destination can be empty (to delete matched portion)
             if regex_text:
-                # Don't close here - let the caller handle the execution
+                # Perform the rename operation
+                success_count, errors = self.perform_rename()
+                
+                # Show result message
+                if errors:
+                    error_summary = f"Errors: {'; '.join(errors[:3])}"
+                    if len(errors) > 3:
+                        error_summary += f" (and {len(errors) - 3} more)"
+                    logger.error(f"Renamed {success_count} files. {error_summary}")
+                elif success_count > 0:
+                    logger.info(f"Successfully renamed {success_count} files")
+                else:
+                    logger.info("No files were renamed")
+                
+                # Close the dialog
+                self.exit()
+                
+                # Call the callback if provided (for post-rename actions like refresh)
+                if self.on_rename_callback:
+                    self.on_rename_callback(success_count, errors)
+                
                 return True
             else:
                 # Error: missing regex pattern - but event was handled
