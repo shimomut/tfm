@@ -242,11 +242,19 @@ class FileOperationTask(BaseTask):
         shows a rename dialog.
         
         Args:
-            choice: User's choice ('overwrite', 'rename', or 'skip')
+            choice: User's choice ('overwrite', 'rename', 'skip', or None for cancel)
             apply_to_all: If True, apply choice to all remaining conflicts
         """
         if not self.context:
             self.logger.error("on_conflict_resolved called with no operation context")
+            return
+        
+        # Handle cancellation (ESC key pressed)
+        if choice is None:
+            self.logger.info(f"{self.context.operation_type.capitalize()} operation cancelled during conflict resolution")
+            self._transition_to_state(State.IDLE)
+            self.context = None
+            self.file_manager._clear_task()
             return
         
         # Get current conflict
