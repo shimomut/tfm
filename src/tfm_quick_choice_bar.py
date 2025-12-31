@@ -21,8 +21,9 @@ class QuickChoiceBar:
         self.choices = []  # List of choice dictionaries: [{"text": "Yes", "key": "y", "value": True}, ...]
         self.callback = None
         self.selected = 0  # Index of currently selected choice
+        self.enable_shift_modifier = False  # Whether Shift modifier is enabled for "apply to all"
         
-    def show(self, message, choices, callback):
+    def show(self, message, choices, callback, enable_shift_modifier=False):
         """Show a quick choice dialog
         
         Args:
@@ -32,12 +33,14 @@ class QuickChoiceBar:
                       {"text": "No", "key": "n", "value": False},
                       {"text": "Cancel", "key": "c", "value": None}]
             callback: Function to call with the selected choice's value
+            enable_shift_modifier: If True, Shift key applies choice to all remaining items
         """
         self.is_active = True
         self.message = message
         self.choices = choices
         self.callback = callback
         self.selected = 0  # Default to first choice
+        self.enable_shift_modifier = enable_shift_modifier
         
     def exit(self):
         """Exit quick choice mode"""
@@ -46,6 +49,7 @@ class QuickChoiceBar:
         self.choices = []
         self.callback = None
         self.selected = 0
+        self.enable_shift_modifier = False
         
     def handle_input(self, event):
         """Handle input while in quick choice mode
@@ -78,9 +82,11 @@ class QuickChoiceBar:
             
         elif event.key_code == KeyCode.ENTER:
             # Execute selected action
-            # Check if Shift modifier is pressed
-            from ttk import ModifierKey
-            apply_to_all = hasattr(event, 'modifiers') and (event.modifiers & ModifierKey.SHIFT)
+            # Check if Shift modifier is pressed (only if enabled)
+            apply_to_all = False
+            if self.enable_shift_modifier:
+                from ttk import ModifierKey
+                apply_to_all = hasattr(event, 'modifiers') and (event.modifiers & ModifierKey.SHIFT)
             
             if self.choices and 0 <= self.selected < len(self.choices):
                 selected_choice = self.choices[self.selected]
@@ -90,9 +96,11 @@ class QuickChoiceBar:
         else:
             # Check for quick key matches with character input (only from KeyEvent)
             if isinstance(event, KeyEvent) and event.char:
-                # Check if Shift modifier is pressed
-                from ttk import ModifierKey
-                apply_to_all = hasattr(event, 'modifiers') and (event.modifiers & ModifierKey.SHIFT)
+                # Check if Shift modifier is pressed (only if enabled)
+                apply_to_all = False
+                if self.enable_shift_modifier:
+                    from ttk import ModifierKey
+                    apply_to_all = hasattr(event, 'modifiers') and (event.modifiers & ModifierKey.SHIFT)
                 
                 key_char = event.char.lower()
                 for choice in self.choices:
@@ -146,7 +154,9 @@ class QuickChoiceBar:
             if "key" in choice and choice["key"]:
                 quick_keys.append(choice["key"].upper())
         
-        help_parts = ["←→:select", "Enter:confirm", "Shift:all"]
+        help_parts = ["←→:select", "Enter:confirm"]
+        if self.enable_shift_modifier:
+            help_parts.append("Shift:all")
         if quick_keys:
             help_parts.append(f"{'/'.join(quick_keys)}:quick")
         help_parts.append("ESC:cancel")

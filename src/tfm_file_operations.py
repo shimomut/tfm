@@ -1745,7 +1745,7 @@ class FileOperationsUI:
                     context['conflict_index'] += 1
                     self._process_next_copy_conflict()
         
-        self.file_manager.show_dialog(message, choices, handle_single_conflict)
+        self.file_manager.show_dialog(message, choices, handle_single_conflict, enable_shift_modifier=True)
     
     def _handle_copy_rename(self, source_file, destination_dir):
         """Handle rename operation for copy conflict"""
@@ -1928,7 +1928,7 @@ class FileOperationsUI:
                     context['conflict_index'] += 1
                     self._process_next_move_conflict()
         
-        self.file_manager.show_dialog(message, choices, handle_single_conflict)
+        self.file_manager.show_dialog(message, choices, handle_single_conflict, enable_shift_modifier=True)
     
     def _handle_move_rename(self, source_file, destination_dir):
         """Handle rename operation for move conflict"""
