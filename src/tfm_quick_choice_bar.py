@@ -149,16 +149,15 @@ class QuickChoiceBarHelpers:
     """Helper functions for common quick choice bar use cases"""
     
     @staticmethod
-    def create_yes_no_cancel_choices():
-        """Create standard Yes/No/Cancel choices
+    def create_yes_no_choices():
+        """Create standard Yes/No choices (ESC to cancel)
         
         Returns:
-            List of choice dictionaries for Yes/No/Cancel
+            List of choice dictionaries for Yes/No
         """
         return [
             {"text": "Yes", "key": "y", "value": True},
-            {"text": "No", "key": "n", "value": False},
-            {"text": "Cancel", "key": "c", "value": None}
+            {"text": "No", "key": "n", "value": False}
         ]
     
     @staticmethod
@@ -237,15 +236,18 @@ class QuickChoiceBarHelpers:
         return choices
     
     @staticmethod
-    def show_confirmation(quick_choice_bar, message, callback):
-        """Show a standard confirmation dialog
+    def show_yes_no_confirmation(quick_choice_bar, message, callback):
+        """Show a Yes/No confirmation dialog (ESC to cancel)
         
         Args:
             quick_choice_bar: QuickChoiceBar instance
             message: Message to display
             callback: Function to call with result (True/False/None)
+                     - True: User selected Yes
+                     - False: User selected No
+                     - None: User pressed ESC to cancel
         """
-        choices = QuickChoiceBarHelpers.create_yes_no_cancel_choices()
+        choices = QuickChoiceBarHelpers.create_yes_no_choices()
         quick_choice_bar.show(message, choices, callback)
     
     @staticmethod

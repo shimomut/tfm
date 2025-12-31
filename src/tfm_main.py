@@ -2944,8 +2944,8 @@ class FileManager(UILayer):
         self.mark_dirty()
     
     def show_confirmation(self, message, callback):
-        """Show confirmation dialog with Yes/No/Cancel options (backward compatibility)"""
-        QuickChoiceBarHelpers.show_confirmation(self.quick_choice_bar, message, callback)
+        """Show confirmation dialog with Yes/No options (ESC to cancel)"""
+        QuickChoiceBarHelpers.show_yes_no_confirmation(self.quick_choice_bar, message, callback)
         self.mark_dirty()
         
     def exit_quick_choice_mode(self):
@@ -2967,7 +2967,13 @@ class FileManager(UILayer):
         elif isinstance(result, tuple):
             action, data = result
             if action == 'cancel':
+                # Store callback before exiting mode
+                callback = self.quick_choice_bar.callback
+                # Exit quick choice mode first to allow new dialogs to be shown
                 self.exit_quick_choice_mode()
+                # Call callback with None to indicate cancellation
+                if callback:
+                    callback(None)
                 return True
             elif action == 'selection_changed':
                 self.mark_dirty()

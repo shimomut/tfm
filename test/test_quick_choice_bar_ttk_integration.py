@@ -230,16 +230,17 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
 class TestQuickChoiceBarHelpers(unittest.TestCase):
     """Test QuickChoiceBarHelpers utility functions"""
     
-    def test_create_yes_no_cancel_choices(self):
-        """Test creating Yes/No/Cancel choices"""
-        choices = QuickChoiceBarHelpers.create_yes_no_cancel_choices()
+    def test_create_yes_no_choices(self):
+        """Test creating Yes/No choices (ESC to cancel)"""
+        choices = QuickChoiceBarHelpers.create_yes_no_choices()
         
-        self.assertEqual(len(choices), 3)
+        self.assertEqual(len(choices), 2)
         self.assertEqual(choices[0]["text"], "Yes")
         self.assertEqual(choices[0]["key"], "y")
         self.assertEqual(choices[0]["value"], True)
         self.assertEqual(choices[1]["text"], "No")
-        self.assertEqual(choices[2]["text"], "Cancel")
+        self.assertEqual(choices[1]["key"], "n")
+        self.assertEqual(choices[1]["value"], False)
     
     def test_create_ok_cancel_choices(self):
         """Test creating OK/Cancel choices"""
@@ -260,17 +261,17 @@ class TestQuickChoiceBarHelpers(unittest.TestCase):
         self.assertEqual(choices[2]["text"], "Rename")
         self.assertEqual(choices[3]["text"], "Cancel")
     
-    def test_show_confirmation(self):
-        """Test showing confirmation dialog"""
+    def test_show_yes_no_confirmation(self):
+        """Test showing Yes/No confirmation dialog"""
         qcb = Mock()
         callback = Mock()
         
-        QuickChoiceBarHelpers.show_confirmation(qcb, "Are you sure?", callback)
+        QuickChoiceBarHelpers.show_yes_no_confirmation(qcb, "Are you sure?", callback)
         
         qcb.show.assert_called_once()
         args = qcb.show.call_args[0]
         self.assertEqual(args[0], "Are you sure?")
-        self.assertEqual(len(args[1]), 3)  # Yes/No/Cancel
+        self.assertEqual(len(args[1]), 2)  # Yes/No (ESC to cancel)
         self.assertEqual(args[2], callback)
     
     def test_show_delete_confirmation_single_item(self):
