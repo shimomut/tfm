@@ -692,13 +692,13 @@ class FileOperationsUI:
             # Print completion message (unless callback will handle it)
             if not completion_callback:
                 if self.file_manager.operation_cancelled:
-                    self.logger.info(f"Copy cancelled: {copied_count} files copied before cancellation")
+                    self.logger.info(f"Copy cancelled: {copied_count} items copied before cancellation")
                 elif error_count > 0:
-                    self.logger.warning(f"Copy completed: {copied_count} files copied, {error_count} errors")
+                    self.logger.warning(f"Copy completed: {copied_count} items copied, {error_count} errors")
                 elif copied_count > 0:
-                    self.logger.info(f"Successfully copied {copied_count} files")
+                    self.logger.info(f"Successfully copied {copied_count} items")
                 else:
-                    self.logger.info("No files copied")
+                    self.logger.info("No items copied")
             
             # Call completion callback if provided
             if completion_callback:
@@ -969,13 +969,13 @@ class FileOperationsUI:
                 # Print completion message (unless callback will handle it)
                 if not completion_callback:
                     if self.file_manager.operation_cancelled:
-                        self.logger.info(f"Move cancelled: {moved_count} files moved before cancellation")
+                        self.logger.info(f"Move cancelled: {moved_count} items moved before cancellation")
                     elif error_count > 0:
-                        self.logger.warning(f"Move completed: {moved_count} files moved, {error_count} errors")
+                        self.logger.warning(f"Move completed: {moved_count} items moved, {error_count} errors")
                     elif moved_count > 0:
-                        self.logger.info(f"Successfully moved {moved_count} files")
+                        self.logger.info(f"Successfully moved {moved_count} items")
                     else:
-                        self.logger.info("No files moved")
+                        self.logger.info("No items moved")
                 
                 # Call completion callback if provided
                 if completion_callback:
@@ -1705,9 +1705,9 @@ class FileOperationsUI:
                     total_skipped = len(context['skipped_files'])
                     
                     if total_copied > 0:
-                        self.logger.info(f"Copied {total_copied} files, skipped {total_skipped} conflicts")
+                        self.logger.info(f"Copied {total_copied} items, skipped {total_skipped} conflicts")
                     else:
-                        self.logger.info(f"No files copied, skipped {total_skipped} conflicts")
+                        self.logger.info(f"No items copied, skipped {total_skipped} conflicts")
                 
                 # Copy non-conflicting files with callback for summary
                 self.perform_copy_operation(non_conflicting, context['destination_dir'], 
@@ -1718,9 +1718,9 @@ class FileOperationsUI:
                 total_skipped = len(context['skipped_files'])
                 
                 if total_copied > 0:
-                    self.logger.info(f"Copied {total_copied} files, skipped {total_skipped} conflicts")
+                    self.logger.info(f"Copied {total_copied} items, skipped {total_skipped} conflicts")
                 else:
-                    self.logger.info(f"No files copied, skipped {total_skipped} conflicts")
+                    self.logger.info(f"No items copied, skipped {total_skipped} conflicts")
             
             return
         
@@ -1907,9 +1907,9 @@ class FileOperationsUI:
                     total_skipped = len(context['skipped_files'])
                     
                     if total_moved > 0:
-                        self.logger.info(f"Moved {total_moved} files, skipped {total_skipped} conflicts")
+                        self.logger.info(f"Moved {total_moved} items, skipped {total_skipped} conflicts")
                     else:
-                        self.logger.info(f"No files moved, skipped {total_skipped} conflicts")
+                        self.logger.info(f"No items moved, skipped {total_skipped} conflicts")
                 
                 # Move non-conflicting files with callback for summary
                 self.perform_move_operation(non_conflicting, context['destination_dir'], 
@@ -1920,9 +1920,9 @@ class FileOperationsUI:
                 total_skipped = len(context['skipped_files'])
                 
                 if total_moved > 0:
-                    self.logger.info(f"Moved {total_moved} files, skipped {total_skipped} conflicts")
+                    self.logger.info(f"Moved {total_moved} items, skipped {total_skipped} conflicts")
                 else:
-                    self.logger.info(f"No files moved, skipped {total_skipped} conflicts")
+                    self.logger.info(f"No items moved, skipped {total_skipped} conflicts")
             
             return
         
@@ -2083,7 +2083,9 @@ class FileOperationsUI:
             suppress_log: If True, suppresses the default log message (caller will log instead)
         """
         try:
-            if source_file.is_dir():
+            is_directory = source_file.is_dir()
+            
+            if is_directory:
                 # Copy directory recursively
                 if dest_path.exists() and overwrite:
                     if dest_path.is_dir():
@@ -2098,7 +2100,8 @@ class FileOperationsUI:
             
             if not suppress_log:
                 action = "Overwrote" if overwrite else "Copied"
-                self.logger.info(f"{action} {source_file.name}")
+                item_type = "directory" if is_directory else "file"
+                self.logger.info(f"{action} {item_type}: {source_file.name}")
             
             # Invalidate cache
             self.cache_manager.invalidate_cache_for_copy_operation([source_file], dest_path.parent)
@@ -2121,6 +2124,8 @@ class FileOperationsUI:
             suppress_log: If True, suppresses the default log message (caller will log instead)
         """
         try:
+            is_directory = source_file.is_dir()
+            
             # Remove destination if it exists and we're overwriting
             if dest_path.exists() and overwrite:
                 if dest_path.is_dir():
@@ -2134,7 +2139,7 @@ class FileOperationsUI:
             is_cross_storage = source_scheme != dest_scheme
             
             # Move the file/directory
-            if source_file.is_dir():
+            if is_directory:
                 if is_cross_storage:
                     source_file.copy_to(dest_path, overwrite=overwrite)
                     if hasattr(source_file._impl, 'rmtree'):
@@ -2153,7 +2158,8 @@ class FileOperationsUI:
             
             if not suppress_log:
                 action = "Overwrote" if overwrite else "Moved"
-                self.logger.info(f"{action} {source_file.name}")
+                item_type = "directory" if is_directory else "file"
+                self.logger.info(f"{action} {item_type}: {source_file.name}")
             
             # Invalidate cache
             self.cache_manager.invalidate_cache_for_move_operation([source_file], dest_path.parent)
