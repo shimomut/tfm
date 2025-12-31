@@ -1890,12 +1890,22 @@ class FileManager(UILayer):
             if self.is_desktop_mode():
                 current_pane = self.get_current_pane()
                 current_selection_count = len(current_pane['selected_files'])
+                current_layer_count = self.ui_layer_stack.get_layer_count()
+                current_input_mode = self.is_in_input_mode()
                 
+                # Initialize tracking variables on first run
                 if not hasattr(self, '_last_selection_count'):
                     self._last_selection_count = current_selection_count
+                    self._last_layer_count = current_layer_count
+                    self._last_input_mode = current_input_mode
                     self._update_menu_states()
-                elif self._last_selection_count != current_selection_count:
+                # Update menu states if any relevant state changed
+                elif (self._last_selection_count != current_selection_count or
+                      self._last_layer_count != current_layer_count or
+                      self._last_input_mode != current_input_mode):
                     self._last_selection_count = current_selection_count
+                    self._last_layer_count = current_layer_count
+                    self._last_input_mode = current_input_mode
                     self._update_menu_states()
             
             # Get adaptive timeout based on activity level

@@ -29,6 +29,14 @@ class TestMenuManager(unittest.TestCase):
         self.mock_file_manager.get_current_pane.return_value = self.mock_pane
         self.mock_file_manager.clipboard = []
         
+        # Mock ui_layer_stack to make FileManager appear as top layer
+        mock_ui_layer_stack = Mock()
+        mock_ui_layer_stack.get_top_layer.return_value = self.mock_file_manager
+        self.mock_file_manager.ui_layer_stack = mock_ui_layer_stack
+        
+        # Mock is_in_input_mode to return False (not in input mode)
+        self.mock_file_manager.is_in_input_mode.return_value = False
+        
         # Create MenuManager instance
         self.menu_manager = MenuManager(self.mock_file_manager)
     
@@ -303,5 +311,50 @@ class TestMenuManager(unittest.TestCase):
         self.assertFalse(states[MenuManager.FILE_COPY_TO_OTHER_PANE])
         
         # Always-enabled items should still be enabled
-        self.assertTrue(states[MenuManager.FILE_NEW_FILE])
         self.assertTrue(states[MenuManager.APP_QUIT])
+        self.assertTrue(states[MenuManager.HELP_REPORT_ISSUE])
+    
+    def test_menu_items_disabled_when_dialog_open(self):
+        """Test that menu items are disabled when a dialog is open (FileManager not top layer)"""
+        # Mock a dialog being on top of the layer stack
+        mock_dialog = Mock()
+        self.mock_file_manager.ui_layer_stack.get_top_layer.return_value = mock_dialog
+        
+        states = self.menu_manager.update_menu_states()
+        
+        # All menu items except Quit and Report Issue should be disabled
+        self.assertFalse(states[MenuManager.APP_ABOUT])
+        self.assertFalse(states[MenuManager.FILE_NEW_FILE])
+        self.assertFalse(states[MenuManager.FILE_OPEN])
+        self.assertFalse(states[MenuManager.EDIT_SELECT_ALL])
+        self.assertFalse(states[MenuManager.VIEW_SHOW_HIDDEN])
+        self.assertFalse(states[MenuManager.GO_HOME])
+        self.assertFalse(states[MenuManager.TOOLS_SEARCH_FILES])
+        self.assertFalse(states[MenuManager.HELP_KEYBOARD_SHORTCUTS])
+        self.assertFalse(states[MenuManager.HELP_ABOUT])
+        
+        # Quit and Report Issue should still be enabled
+        self.assertTrue(states[MenuManager.APP_QUIT])
+        self.assertTrue(states[MenuManager.HELP_REPORT_ISSUE])
+    
+    def test_menu_items_disabled_when_in_input_mode(self):
+        """Test that menu items are disabled when in input mode (quick choice, quick edit, i-search)"""
+        # Mock FileManager being in input mode
+        self.mock_file_manager.is_in_input_mode.return_value = True
+        
+        states = self.menu_manager.update_menu_states()
+        
+        # All menu items except Quit and Report Issue should be disabled
+        self.assertFalse(states[MenuManager.APP_ABOUT])
+        self.assertFalse(states[MenuManager.FILE_NEW_FILE])
+        self.assertFalse(states[MenuManager.FILE_OPEN])
+        self.assertFalse(states[MenuManager.EDIT_SELECT_ALL])
+        self.assertFalse(states[MenuManager.VIEW_SHOW_HIDDEN])
+        self.assertFalse(states[MenuManager.GO_HOME])
+        self.assertFalse(states[MenuManager.TOOLS_SEARCH_FILES])
+        self.assertFalse(states[MenuManager.HELP_KEYBOARD_SHORTCUTS])
+        self.assertFalse(states[MenuManager.HELP_ABOUT])
+        
+        # Quit and Report Issue should still be enabled
+        self.assertTrue(states[MenuManager.APP_QUIT])
+        self.assertTrue(states[MenuManager.HELP_REPORT_ISSUE])
