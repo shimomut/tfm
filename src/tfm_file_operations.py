@@ -1697,34 +1697,53 @@ class FileOperationsUI:
         choices = [
             {"text": "Overwrite", "key": "o", "value": "overwrite"},
             {"text": "Rename", "key": "r", "value": "rename"},
-            {"text": "Skip", "key": "s", "value": "skip"},
-            {"text": "Skip All", "key": "a", "value": "skip_all"},
-            {"text": "Cancel", "key": "c", "value": "cancel"}
+            {"text": "Skip", "key": "s", "value": "skip"}
         ]
         
-        def handle_single_conflict(choice):
-            if choice == "overwrite":
-                # Copy this file with overwrite
-                self._perform_single_copy(source_file, dest_path, overwrite=True)
-                context['copied_files'].append(source_file)
-                context['conflict_index'] += 1
-                self._process_next_copy_conflict()
-            elif choice == "rename":
-                # Ask for new name for this file
-                self._handle_copy_rename(source_file, context['destination_dir'])
-            elif choice == "skip":
-                # Skip this file and continue
-                context['skipped_files'].append(source_file)
-                context['conflict_index'] += 1
-                self._process_next_copy_conflict()
-            elif choice == "skip_all":
-                # Skip all remaining conflicts
-                for i in range(context['conflict_index'], len(context['conflicts'])):
-                    context['skipped_files'].append(context['conflicts'][i][0])
-                context['conflict_index'] = len(context['conflicts'])
-                self._process_next_copy_conflict()
-            else:  # cancel
+        def handle_single_conflict(choice, apply_to_all=False):
+            if choice is None:
+                # ESC pressed - cancel operation
                 self.logger.info("Copy operation cancelled")
+                return
+                
+            if choice == "overwrite":
+                if apply_to_all:
+                    # Overwrite this file and all remaining conflicts
+                    self._perform_single_copy(source_file, dest_path, overwrite=True)
+                    context['copied_files'].append(source_file)
+                    # Overwrite all remaining conflicts
+                    for i in range(context['conflict_index'] + 1, len(context['conflicts'])):
+                        src, dst = context['conflicts'][i]
+                        self._perform_single_copy(src, dst, overwrite=True)
+                        context['copied_files'].append(src)
+                    context['conflict_index'] = len(context['conflicts'])
+                    self._process_next_copy_conflict()
+                else:
+                    # Copy this file with overwrite
+                    self._perform_single_copy(source_file, dest_path, overwrite=True)
+                    context['copied_files'].append(source_file)
+                    context['conflict_index'] += 1
+                    self._process_next_copy_conflict()
+            elif choice == "rename":
+                if apply_to_all:
+                    # For "rename all", we still need to ask for each name individually
+                    # So just treat it as regular rename for now
+                    self._handle_copy_rename(source_file, context['destination_dir'])
+                else:
+                    # Ask for new name for this file
+                    self._handle_copy_rename(source_file, context['destination_dir'])
+            elif choice == "skip":
+                if apply_to_all:
+                    # Skip this file and all remaining conflicts
+                    for i in range(context['conflict_index'], len(context['conflicts'])):
+                        context['skipped_files'].append(context['conflicts'][i][0])
+                    context['conflict_index'] = len(context['conflicts'])
+                    self._process_next_copy_conflict()
+                else:
+                    # Skip this file and continue
+                    context['skipped_files'].append(source_file)
+                    context['conflict_index'] += 1
+                    self._process_next_copy_conflict()
         
         self.file_manager.show_dialog(message, choices, handle_single_conflict)
     
@@ -1861,34 +1880,53 @@ class FileOperationsUI:
         choices = [
             {"text": "Overwrite", "key": "o", "value": "overwrite"},
             {"text": "Rename", "key": "r", "value": "rename"},
-            {"text": "Skip", "key": "s", "value": "skip"},
-            {"text": "Skip All", "key": "a", "value": "skip_all"},
-            {"text": "Cancel", "key": "c", "value": "cancel"}
+            {"text": "Skip", "key": "s", "value": "skip"}
         ]
         
-        def handle_single_conflict(choice):
-            if choice == "overwrite":
-                # Move this file with overwrite
-                self._perform_single_move(source_file, dest_path, overwrite=True)
-                context['moved_files'].append(source_file)
-                context['conflict_index'] += 1
-                self._process_next_move_conflict()
-            elif choice == "rename":
-                # Ask for new name for this file
-                self._handle_move_rename(source_file, context['destination_dir'])
-            elif choice == "skip":
-                # Skip this file and continue
-                context['skipped_files'].append(source_file)
-                context['conflict_index'] += 1
-                self._process_next_move_conflict()
-            elif choice == "skip_all":
-                # Skip all remaining conflicts
-                for i in range(context['conflict_index'], len(context['conflicts'])):
-                    context['skipped_files'].append(context['conflicts'][i][0])
-                context['conflict_index'] = len(context['conflicts'])
-                self._process_next_move_conflict()
-            else:  # cancel
+        def handle_single_conflict(choice, apply_to_all=False):
+            if choice is None:
+                # ESC pressed - cancel operation
                 self.logger.info("Move operation cancelled")
+                return
+                
+            if choice == "overwrite":
+                if apply_to_all:
+                    # Overwrite this file and all remaining conflicts
+                    self._perform_single_move(source_file, dest_path, overwrite=True)
+                    context['moved_files'].append(source_file)
+                    # Overwrite all remaining conflicts
+                    for i in range(context['conflict_index'] + 1, len(context['conflicts'])):
+                        src, dst = context['conflicts'][i]
+                        self._perform_single_move(src, dst, overwrite=True)
+                        context['moved_files'].append(src)
+                    context['conflict_index'] = len(context['conflicts'])
+                    self._process_next_move_conflict()
+                else:
+                    # Move this file with overwrite
+                    self._perform_single_move(source_file, dest_path, overwrite=True)
+                    context['moved_files'].append(source_file)
+                    context['conflict_index'] += 1
+                    self._process_next_move_conflict()
+            elif choice == "rename":
+                if apply_to_all:
+                    # For "rename all", we still need to ask for each name individually
+                    # So just treat it as regular rename for now
+                    self._handle_move_rename(source_file, context['destination_dir'])
+                else:
+                    # Ask for new name for this file
+                    self._handle_move_rename(source_file, context['destination_dir'])
+            elif choice == "skip":
+                if apply_to_all:
+                    # Skip this file and all remaining conflicts
+                    for i in range(context['conflict_index'], len(context['conflicts'])):
+                        context['skipped_files'].append(context['conflicts'][i][0])
+                    context['conflict_index'] = len(context['conflicts'])
+                    self._process_next_move_conflict()
+                else:
+                    # Skip this file and continue
+                    context['skipped_files'].append(source_file)
+                    context['conflict_index'] += 1
+                    self._process_next_move_conflict()
         
         self.file_manager.show_dialog(message, choices, handle_single_conflict)
     

@@ -52,41 +52,55 @@ class QuickChoiceBar:
         
         Args:
             event: KeyEvent from TTK renderer
+            
+        Returns:
+            Tuple of (action, value, apply_to_all) where:
+            - action: 'cancel', 'selection_changed', 'execute', or False
+            - value: The choice value or None
+            - apply_to_all: True if Shift modifier was pressed
         """
         if event.key_code == KeyCode.ESCAPE:
-            return ('cancel', None)
+            return ('cancel', None, False)
             
         elif event.key_code == KeyCode.LEFT:
             # Move selection left
             if self.choices:
                 self.selected = (self.selected - 1) % len(self.choices)
-                return ('selection_changed', None)
-            return True
+                return ('selection_changed', None, False)
+            return (True, None, False)
             
         elif event.key_code == KeyCode.RIGHT:
             # Move selection right
             if self.choices:
                 self.selected = (self.selected + 1) % len(self.choices)
-                return ('selection_changed', None)
-            return True
+                return ('selection_changed', None, False)
+            return (True, None, False)
             
         elif event.key_code == KeyCode.ENTER:
             # Execute selected action
+            # Check if Shift modifier is pressed
+            from ttk import ModifierKey
+            apply_to_all = hasattr(event, 'modifiers') and (event.modifiers & ModifierKey.SHIFT)
+            
             if self.choices and 0 <= self.selected < len(self.choices):
                 selected_choice = self.choices[self.selected]
-                return ('execute', selected_choice["value"])
-            return ('execute', None)
+                return ('execute', selected_choice["value"], apply_to_all)
+            return ('execute', None, False)
             
         else:
             # Check for quick key matches with character input (only from KeyEvent)
             if isinstance(event, KeyEvent) and event.char:
+                # Check if Shift modifier is pressed
+                from ttk import ModifierKey
+                apply_to_all = hasattr(event, 'modifiers') and (event.modifiers & ModifierKey.SHIFT)
+                
                 key_char = event.char.lower()
                 for choice in self.choices:
                     if "key" in choice and choice["key"] and choice["key"].lower() == key_char:
                         # Found matching quick key
-                        return ('execute', choice["value"])
+                        return ('execute', choice["value"], apply_to_all)
         
-        return False
+        return (False, None, False)
         
     def draw(self, status_y, width):
         """Draw the quick choice bar in the status line
@@ -132,7 +146,7 @@ class QuickChoiceBar:
             if "key" in choice and choice["key"]:
                 quick_keys.append(choice["key"].upper())
         
-        help_parts = ["←→:select", "Enter:confirm"]
+        help_parts = ["←→:select", "Enter:confirm", "Shift:all"]
         if quick_keys:
             help_parts.append(f"{'/'.join(quick_keys)}:quick")
         help_parts.append("ESC:cancel")

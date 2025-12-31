@@ -2961,11 +2961,17 @@ class FileManager(UILayer):
         """Handle input while in quick choice mode - wrapper for quick choice bar component"""
         result = self.quick_choice_bar.handle_input(key)
         
-        if result == True:
+        if result == True or (isinstance(result, tuple) and result[0] == True):
             self.mark_dirty()
             return True
         elif isinstance(result, tuple):
-            action, data = result
+            # Handle both old 2-tuple and new 3-tuple formats
+            if len(result) == 3:
+                action, data, apply_to_all = result
+            else:
+                action, data = result
+                apply_to_all = False
+                
             if action == 'cancel':
                 # Store callback before exiting mode
                 callback = self.quick_choice_bar.callback
@@ -2985,7 +2991,13 @@ class FileManager(UILayer):
                 self.exit_quick_choice_mode()
                 # Then execute the callback
                 if callback:
-                    callback(data)
+                    # Pass apply_to_all flag if callback accepts it
+                    import inspect
+                    sig = inspect.signature(callback)
+                    if len(sig.parameters) >= 2:
+                        callback(data, apply_to_all)
+                    else:
+                        callback(data)
                 return True
         
         return False
