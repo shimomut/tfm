@@ -1659,7 +1659,8 @@ class FileOperationsUI:
             'conflicts': conflicts,
             'conflict_index': 0,
             'copied_files': [],
-            'skipped_files': []
+            'skipped_files': [],
+            'rename_all': False  # Flag to auto-rename remaining conflicts
         }
         
         # Start processing the first conflict
@@ -1691,6 +1692,11 @@ class FileOperationsUI:
         
         # Get the current conflict
         source_file, dest_path = context['conflicts'][context['conflict_index']]
+        
+        # If rename_all flag is set, skip choice dialog and go directly to rename
+        if context.get('rename_all', False):
+            self._handle_copy_rename(source_file, context['destination_dir'])
+            return
         
         # Show dialog for this specific file
         message = f"'{source_file.name}' already exists in destination."
@@ -1726,12 +1732,10 @@ class FileOperationsUI:
                     self._process_next_copy_conflict()
             elif choice == "rename":
                 if apply_to_all:
-                    # For "rename all", we still need to ask for each name individually
-                    # So just treat it as regular rename for now
-                    self._handle_copy_rename(source_file, context['destination_dir'])
-                else:
-                    # Ask for new name for this file
-                    self._handle_copy_rename(source_file, context['destination_dir'])
+                    # Set rename_all flag to skip choice dialog for remaining conflicts
+                    context['rename_all'] = True
+                # Ask for new name for this file
+                self._handle_copy_rename(source_file, context['destination_dir'])
             elif choice == "skip":
                 if apply_to_all:
                     # Skip this file and all remaining conflicts
@@ -1842,7 +1846,8 @@ class FileOperationsUI:
             'conflicts': conflicts,
             'conflict_index': 0,
             'moved_files': [],
-            'skipped_files': []
+            'skipped_files': [],
+            'rename_all': False  # Flag to auto-rename remaining conflicts
         }
         
         # Start processing the first conflict
@@ -1874,6 +1879,11 @@ class FileOperationsUI:
         
         # Get the current conflict
         source_file, dest_path = context['conflicts'][context['conflict_index']]
+        
+        # If rename_all flag is set, skip choice dialog and go directly to rename
+        if context.get('rename_all', False):
+            self._handle_move_rename(source_file, context['destination_dir'])
+            return
         
         # Show dialog for this specific file
         message = f"'{source_file.name}' already exists in destination."
@@ -1909,12 +1919,10 @@ class FileOperationsUI:
                     self._process_next_move_conflict()
             elif choice == "rename":
                 if apply_to_all:
-                    # For "rename all", we still need to ask for each name individually
-                    # So just treat it as regular rename for now
-                    self._handle_move_rename(source_file, context['destination_dir'])
-                else:
-                    # Ask for new name for this file
-                    self._handle_move_rename(source_file, context['destination_dir'])
+                    # Set rename_all flag to skip choice dialog for remaining conflicts
+                    context['rename_all'] = True
+                # Ask for new name for this file
+                self._handle_move_rename(source_file, context['destination_dir'])
             elif choice == "skip":
                 if apply_to_all:
                     # Skip this file and all remaining conflicts
