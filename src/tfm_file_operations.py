@@ -549,12 +549,13 @@ class FileOperationsUI:
             self.perform_copy_operation(files_to_copy, destination_dir)
             # Success message will be printed by the operation thread
     
-    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, suppress_summary=False, suppress_individual_logs=False, completion_callback=None):
+    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, completion_callback=None):
         """Perform the actual copy operation with fine-grained progress tracking in a background thread
         
         Args:
             completion_callback: Optional callback function called when operation completes.
                                 Receives (copied_count, error_count) as arguments.
+                                If provided, suppresses the default summary logging.
         """
         # Set operation in progress flag to block user input
         self.file_manager.operation_in_progress = True
@@ -635,16 +636,14 @@ class FileOperationsUI:
                                     source_file, dest_path, processed_files, total_individual_files, overwrite
                                 )
                             
-                            if not suppress_individual_logs:
-                                self.logger.info(f"Copied directory: {source_file.name}")
+                            self.logger.info(f"Copied directory: {source_file.name}")
                         else:
                             # Copy single file with progress tracking
                             processed_files += 1
                             self.progress_manager.update_progress(source_file.name, processed_files)
                             
                             self._copy_file_with_progress(source_file, dest_path, overwrite)
-                            if not suppress_individual_logs:
-                                self.logger.info(f"Copied file: {source_file.name}")
+                            self.logger.info(f"Copied file: {source_file.name}")
                         
                         copied_count += 1
                         
@@ -690,8 +689,8 @@ class FileOperationsUI:
                 current_pane = self.file_manager.get_current_pane()
                 current_pane['selected_files'].clear()
             
-            # Print completion message
-            if not suppress_summary:
+            # Print completion message (unless callback will handle it)
+            if not completion_callback:
                 if self.file_manager.operation_cancelled:
                     self.logger.info(f"Copy cancelled: {copied_count} files copied before cancellation")
                 elif error_count > 0:
@@ -806,12 +805,13 @@ class FileOperationsUI:
             self.perform_move_operation(files_to_move, destination_dir)
             # Success message will be printed by the operation thread
     
-    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, suppress_summary=False, suppress_individual_logs=False, completion_callback=None):
+    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, completion_callback=None):
         """Perform the actual move operation with fine-grained progress tracking in a background thread
         
         Args:
             completion_callback: Optional callback function called when operation completes.
                                 Receives (moved_count, error_count) as arguments.
+                                If provided, suppresses the default summary logging.
         """
         # Set operation in progress flag to block user input
         self.file_manager.operation_in_progress = True
@@ -903,8 +903,7 @@ class FileOperationsUI:
                             processed_files = self._move_directory_with_progress(
                                 source_file, dest_path, processed_files, total_individual_files, is_cross_storage
                             )
-                            if not suppress_individual_logs:
-                                self.logger.info(f"Moved directory: {source_file.name}")
+                            self.logger.info(f"Moved directory: {source_file.name}")
                         else:
                             # Move single file
                             processed_files += 1
@@ -915,13 +914,11 @@ class FileOperationsUI:
                                 # Cross-storage move: copy then delete
                                 source_file.copy_to(dest_path, overwrite=overwrite)
                                 source_file.unlink()
-                                if not suppress_individual_logs:
-                                    self.logger.info(f"Moved file (cross-storage): {source_file.name}")
+                                self.logger.info(f"Moved file (cross-storage): {source_file.name}")
                             else:
                                 # Same-storage move: use rename
                                 source_file.rename(dest_path)
-                                if not suppress_individual_logs:
-                                    self.logger.info(f"Moved file: {source_file.name}")
+                                self.logger.info(f"Moved file: {source_file.name}")
                         
                         moved_count += 1
                         
@@ -969,8 +966,8 @@ class FileOperationsUI:
                     current_pane = self.file_manager.get_current_pane()
                     current_pane['selected_files'].clear()
                 
-                # Print completion message (unless suppressed for batch operations)
-                if not suppress_summary:
+                # Print completion message (unless callback will handle it)
+                if not completion_callback:
                     if self.file_manager.operation_cancelled:
                         self.logger.info(f"Move cancelled: {moved_count} files moved before cancellation")
                     elif error_count > 0:
@@ -1714,7 +1711,6 @@ class FileOperationsUI:
                 
                 # Copy non-conflicting files with callback for summary
                 self.perform_copy_operation(non_conflicting, context['destination_dir'], 
-                                           suppress_summary=True, suppress_individual_logs=False,
                                            completion_callback=on_copy_complete)
             else:
                 # No non-conflicting files, log summary immediately
@@ -1914,7 +1910,6 @@ class FileOperationsUI:
                 
                 # Move non-conflicting files with callback for summary
                 self.perform_move_operation(non_conflicting, context['destination_dir'], 
-                                           suppress_summary=True, suppress_individual_logs=False,
                                            completion_callback=on_move_complete)
             else:
                 # No non-conflicting files, log summary immediately
@@ -2078,9 +2073,6 @@ class FileOperationsUI:
     def _perform_single_copy(self, source_file, dest_path, overwrite=False):
         """Perform copy operation for a single file"""
         try:
-            action = "Overwriting" if overwrite else "Copying"
-            self.logger.info(f"{action} {source_file.name} to {dest_path.parent.name}/")
-            
             if source_file.is_dir():
                 # Copy directory recursively
                 if dest_path.exists() and overwrite:
@@ -2094,7 +2086,8 @@ class FileOperationsUI:
                 # Copy single file
                 source_file.copy_to(dest_path, overwrite=overwrite)
             
-            self.logger.info(f"Successfully copied {source_file.name}")
+            action = "Overwrote" if overwrite else "Copied"
+            self.logger.info(f"{action} {source_file.name}")
             
             # Invalidate cache
             self.cache_manager.invalidate_cache_for_copy_operation([source_file], dest_path.parent)
@@ -2113,9 +2106,6 @@ class FileOperationsUI:
     def _perform_single_move(self, source_file, dest_path, overwrite=False):
         """Perform move operation for a single file"""
         try:
-            action = "Overwriting" if overwrite else "Moving"
-            self.logger.info(f"{action} {source_file.name} to {dest_path.parent.name}/")
-            
             # Remove destination if it exists and we're overwriting
             if dest_path.exists() and overwrite:
                 if dest_path.is_dir():
@@ -2146,7 +2136,8 @@ class FileOperationsUI:
                 else:
                     source_file.rename(dest_path)
             
-            self.logger.info(f"Successfully moved {source_file.name}")
+            action = "Overwrote" if overwrite else "Moved"
+            self.logger.info(f"{action} {source_file.name}")
             
             # Invalidate cache
             self.cache_manager.invalidate_cache_for_move_operation([source_file], dest_path.parent)
