@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-TFM File Operations Executor - Executes file operations with progress tracking
+TFM File Operation Executor - Executes file operations with progress tracking
 
-This module provides the FileOperationsExecutor class which handles the actual
+This module provides the FileOperationExecutor class which handles the actual
 file I/O operations (copy, move, delete) in background threads with fine-grained
 progress tracking and error handling.
 
@@ -16,12 +16,12 @@ The executor is responsible for:
 This class is part of the file operations architecture refactoring that separates
 concerns into distinct layers:
 - FileListManager: File list management (sorting, filtering, selection)
-- FileOperationsUI: UI interactions (dialogs, confirmations)
+- FileOperationUI: UI interactions (dialogs, confirmations)
 - FileOperationTask: Orchestration (state machine, workflow)
-- FileOperationsExecutor: I/O operations (copy, move, delete)
+- FileOperationExecutor: I/O operations (copy, move, delete)
 
 See Also:
-    - tfm_file_operations.py: FileListManager and FileOperationsUI
+    - tfm_file_operation_ui.py: FileOperationUI implementation
     - tfm_file_operation_task.py: FileOperationTask implementation
     - doc/dev/TASK_FRAMEWORK_IMPLEMENTATION.md: Complete architecture documentation
 """
@@ -34,7 +34,7 @@ from tfm_progress_manager import OperationType
 from tfm_log_manager import getLogger
 
 
-class FileOperationsExecutor:
+class FileOperationExecutor:
     """Executes file operations with progress tracking.
     
     This class handles the actual file I/O operations (copy, move, delete)
@@ -45,7 +45,7 @@ class FileOperationsExecutor:
     operation_cancelled flag.
     
     Architecture:
-        FileOperationsExecutor is created by FileManager and used by FileOperationTask
+        FileOperationExecutor is created by FileManager and used by FileOperationTask
         to execute the actual file operations. It has no knowledge of UI or state
         machine logic - it simply performs I/O operations and reports progress.
     

@@ -11,7 +11,7 @@ from pathlib import Path as PathlibPath
 
 from tfm_path import Path
 from tfm_file_list_manager import FileListManager
-from tfm_file_operations_ui import FileOperationsUI
+from tfm_file_operation_ui import FileOperationUI
 from tfm_progress_manager import ProgressManager
 from tfm_cache_manager import CacheManager
 
@@ -95,7 +95,7 @@ def test_copy_from_archive_to_local():
         # Set up file manager
         fm = MockFileManager()
         file_ops = FileListManager(fm.config)
-        file_ops_ui = FileOperationsUI(fm, file_ops)
+        file_ops_ui = FileOperationUI(fm, file_ops)
         fm.file_ops = file_ops
         
         # Set left pane to archive root
@@ -152,7 +152,7 @@ def test_copy_directory_from_archive():
         # Set up file manager
         fm = MockFileManager()
         file_ops = FileListManager(fm.config)
-        file_ops_ui = FileOperationsUI(fm, file_ops)
+        file_ops_ui = FileOperationUI(fm, file_ops)
         fm.file_ops = file_ops
         
         # Set left pane to archive root
@@ -222,7 +222,7 @@ def test_copy_multiple_files_from_archive():
         # Set up file manager
         fm = MockFileManager()
         file_ops = FileListManager(fm.config)
-        file_ops_ui = FileOperationsUI(fm, file_ops)
+        file_ops_ui = FileOperationUI(fm, file_ops)
         fm.file_ops = file_ops
         
         # Set left pane to archive root

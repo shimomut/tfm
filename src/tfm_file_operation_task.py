@@ -88,14 +88,14 @@ class FileOperationTask(BaseTask):
     - User confirmations (if configured)
     - Conflict detection for copy/move operations
     - Conflict resolution (overwrite, rename, skip)
-    - Background thread execution via FileOperationsExecutor
+    - Background thread execution via FileOperationExecutor
     - Progress tracking and error handling
     - Operation completion and cleanup
     
     Architecture:
         The task delegates responsibilities to specialized components:
-        - UI interactions → FileOperationsUI (via self.ui)
-        - I/O operations → FileOperationsExecutor (via self.executor)
+        - UI interactions → FileOperationUI (via self.ui)
+        - I/O operations → FileOperationExecutor (via self.executor)
         - State machine logic → FileOperationTask (this class)
     
     Example usage:
@@ -109,8 +109,8 @@ class FileOperationTask(BaseTask):
         
         Args:
             file_manager: Reference to FileManager for task management
-            ui: Reference to FileOperationsUI for UI interactions
-            executor: Reference to FileOperationsExecutor for I/O operations
+            ui: Reference to FileOperationUI for UI interactions
+            executor: Reference to FileOperationExecutor for I/O operations
                      (optional for backward compatibility during migration)
         """
         super().__init__(file_manager)
@@ -124,7 +124,7 @@ class FileOperationTask(BaseTask):
         """Start the task (called by FileManager).
         
         Note: The task is actually started via start_operation() which is
-        called by FileOperationsUI. This method exists to satisfy the
+        called by FileOperationUI. This method exists to satisfy the
         BaseTask interface but doesn't need to do anything.
         """
         pass
@@ -678,7 +678,7 @@ class FileOperationTask(BaseTask):
     def _execute_copy(self, files_to_copy):
         """Execute copy operation in background thread.
         
-        Delegates to FileOperationsExecutor to perform the actual copy operation
+        Delegates to FileOperationExecutor to perform the actual copy operation
         with pre-resolved files.
         
         Args:
@@ -763,7 +763,7 @@ class FileOperationTask(BaseTask):
     def _execute_move(self, files_to_move):
         """Execute move operation in background thread.
         
-        Delegates to FileOperationsExecutor to perform the actual move operation
+        Delegates to FileOperationExecutor to perform the actual move operation
         with pre-resolved files.
         
         Args:
@@ -848,7 +848,7 @@ class FileOperationTask(BaseTask):
     def _execute_delete(self, files_to_delete):
         """Execute delete operation in background thread.
         
-        Delegates to FileOperationsExecutor to perform the actual delete operation.
+        Delegates to FileOperationExecutor to perform the actual delete operation.
         
         Args:
             files_to_delete: List of Path objects to delete

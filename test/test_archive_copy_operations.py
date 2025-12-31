@@ -11,7 +11,7 @@ from pathlib import Path as PathlibPath
 
 from tfm_path import Path
 from tfm_file_list_manager import FileListManager
-from tfm_file_operations_ui import FileOperationsUI
+from tfm_file_operation_ui import FileOperationUI
 from tfm_progress_manager import ProgressManager
 from tfm_cache_manager import CacheManager
 
@@ -233,7 +233,7 @@ def test_copy_with_file_operations():
         # Set up file manager and operations
         file_manager = MockFileManager()
         file_ops = FileListManager(file_manager.config)
-        file_ops_ui = FileOperationsUI(file_manager, file_ops)
+        file_ops_ui = FileOperationUI(file_manager, file_ops)
         
         # Set up panes
         file_manager.left_pane['path'] = Path(f"archive://{zip_path}#")

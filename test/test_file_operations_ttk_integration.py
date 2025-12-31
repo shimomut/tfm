@@ -1,8 +1,8 @@
 """
-Test suite for FileOperations and FileOperationsUI TTK integration.
+Test suite for FileOperations and FileOperationUI TTK integration.
 
 This test verifies that file operations work correctly with the TTK-migrated system.
-Note: FileOperations and FileOperationsUI contain no rendering code - they are pure
+Note: FileOperations and FileOperationUI contain no rendering code - they are pure
 business logic classes. All rendering is handled by tfm_main.py.
 
 Run with: PYTHONPATH=.:src:ttk pytest test/test_file_operations_ttk_integration.py -v
@@ -14,7 +14,7 @@ from pathlib import Path as StdPath
 import pytest
 
 from tfm_file_list_manager import FileListManager
-from tfm_file_operations_ui import FileOperationsUI
+from tfm_file_operation_ui import FileOperationUI
 from tfm_path import Path as TFMPath
 
 
@@ -282,17 +282,17 @@ class TestFileListManager:
         assert len(matches) == 2  # example.txt and test_example.txt
 
 
-class TestFileOperationsUI:
-    """Test FileOperationsUI class"""
+class TestFileOperationUI:
+    """Test FileOperationUI class"""
     
     def setup_method(self):
         """Set up test fixtures"""
         self.mock_fm = MockFileManager()
         self.file_ops = FileListManager(MockConfig())
-        self.file_ops_ui = FileOperationsUI(self.mock_fm, self.file_ops)
+        self.file_ops_ui = FileOperationUI(self.mock_fm, self.file_ops)
     
     def test_file_operations_ui_initialization(self):
-        """Test that FileOperationsUI initializes correctly"""
+        """Test that FileOperationUI initializes correctly"""
         assert self.file_ops_ui.file_manager == self.mock_fm
         assert self.file_ops_ui.file_list_manager == self.file_ops
         assert self.file_ops_ui.log_manager == self.mock_fm.log_manager
@@ -392,13 +392,13 @@ class TestFileOperationsUI:
 
 
 class TestFileOperationsIntegration:
-    """Test integration between FileListManager and FileOperationsUI"""
+    """Test integration between FileListManager and FileOperationUI"""
     
     def test_file_operations_ui_uses_file_list_manager(self):
-        """Test that FileOperationsUI can use FileListManager methods"""
+        """Test that FileOperationUI can use FileListManager methods"""
         mock_fm = MockFileManager()
         file_ops = FileListManager(MockConfig())
-        file_ops_ui = FileOperationsUI(mock_fm, file_ops)
+        file_ops_ui = FileOperationUI(mock_fm, file_ops)
         
         # Verify UI can access file list manager methods
         assert hasattr(file_ops_ui.file_list_manager, 'get_file_info')
@@ -408,10 +408,10 @@ class TestFileOperationsIntegration:
         assert hasattr(file_ops_ui.file_list_manager, 'find_matches')
     
     def test_file_operations_ui_has_operation_methods(self):
-        """Test that FileOperationsUI has operation methods"""
+        """Test that FileOperationUI has operation methods"""
         mock_fm = MockFileManager()
         file_ops = FileListManager(MockConfig())
-        file_ops_ui = FileOperationsUI(mock_fm, file_ops)
+        file_ops_ui = FileOperationUI(mock_fm, file_ops)
         
         # Verify UI has entry point methods
         assert hasattr(file_ops_ui, 'copy_selected_files')
@@ -442,14 +442,14 @@ class TestFileOperationsIntegration:
                 assert keyword not in source, f"Found rendering keyword '{keyword}' in FileListManager.{method_name}"
     
     def test_no_rendering_code_in_file_operations_ui(self):
-        """Verify that FileOperationsUI contains no rendering code"""
+        """Verify that FileOperationUI contains no rendering code"""
         import inspect
         
-        # Get all methods of FileOperationsUI
-        methods = inspect.getmembers(FileOperationsUI, predicate=inspect.isfunction)
+        # Get all methods of FileOperationUI
+        methods = inspect.getmembers(FileOperationUI, predicate=inspect.isfunction)
         
         # Check that no method contains direct rendering calls
-        # Note: FileOperationsUI can set needs_full_redraw flag and call show_dialog
+        # Note: FileOperationUI can set needs_full_redraw flag and call show_dialog
         direct_rendering_keywords = ['stdscr', 'addstr', 'hline', 'vline', 'curses.']
         
         for method_name, method in methods:
@@ -458,4 +458,4 @@ class TestFileOperationsIntegration:
             
             source = inspect.getsource(method)
             for keyword in direct_rendering_keywords:
-                assert keyword not in source, f"Found direct rendering keyword '{keyword}' in FileOperationsUI.{method_name}"
+                assert keyword not in source, f"Found direct rendering keyword '{keyword}' in FileOperationUI.{method_name}"

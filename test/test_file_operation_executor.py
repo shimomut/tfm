@@ -1,7 +1,7 @@
 """
-Test FileOperationsExecutor - Tests for the new executor class
+Test FileOperationExecutor - Tests for the new executor class
 
-This test verifies that FileOperationsExecutor correctly handles file I/O operations
+This test verifies that FileOperationExecutor correctly handles file I/O operations
 independently from UI and orchestration logic.
 
 Run with: PYTHONPATH=.:src:ttk pytest test/test_file_operations_executor.py -v
@@ -12,7 +12,7 @@ import shutil
 import time
 from pathlib import Path as StdPath
 
-from tfm_file_operations_executor import FileOperationsExecutor
+from tfm_file_operation_executor import FileOperationExecutor
 from tfm_path import Path as TFMPath
 from tfm_progress_manager import ProgressManager
 from tfm_cache_manager import CacheManager
@@ -57,11 +57,11 @@ class MockFileManager:
 
 
 def test_executor_initialization():
-    """Test that FileOperationsExecutor initializes correctly"""
+    """Test that FileOperationExecutor initializes correctly"""
     print("\n=== Test: Executor Initialization ===")
     
     mock_fm = MockFileManager()
-    executor = FileOperationsExecutor(mock_fm)
+    executor = FileOperationExecutor(mock_fm)
     
     assert executor.file_manager == mock_fm
     assert executor.progress_manager == mock_fm.progress_manager
@@ -93,7 +93,7 @@ def test_copy_operation():
         
         # Initialize executor
         mock_fm = MockFileManager()
-        executor = FileOperationsExecutor(mock_fm)
+        executor = FileOperationExecutor(mock_fm)
         
         # Prepare files to copy
         files_to_copy = [TFMPath(test_file1), TFMPath(test_file2)]
@@ -159,7 +159,7 @@ def test_move_operation():
         
         # Initialize executor
         mock_fm = MockFileManager()
-        executor = FileOperationsExecutor(mock_fm)
+        executor = FileOperationExecutor(mock_fm)
         
         # Prepare files to move
         files_to_move = [TFMPath(test_file1), TFMPath(test_file2)]
@@ -220,7 +220,7 @@ def test_delete_operation():
         
         # Initialize executor
         mock_fm = MockFileManager()
-        executor = FileOperationsExecutor(mock_fm)
+        executor = FileOperationExecutor(mock_fm)
         
         # Prepare files to delete
         files_to_delete = [TFMPath(test_file1), TFMPath(test_file2)]
@@ -279,7 +279,7 @@ def test_helper_methods():
         
         # Initialize executor
         mock_fm = MockFileManager()
-        executor = FileOperationsExecutor(mock_fm)
+        executor = FileOperationExecutor(mock_fm)
         
         # Test _count_files_recursively
         paths = [TFMPath(test_file1), TFMPath(test_file2), TFMPath(test_dir)]
@@ -311,7 +311,7 @@ def test_progress_tracking():
         
         # Initialize executor
         mock_fm = MockFileManager()
-        executor = FileOperationsExecutor(mock_fm)
+        executor = FileOperationExecutor(mock_fm)
         
         # Track progress updates
         progress_updates = []
@@ -375,7 +375,7 @@ def test_error_handling():
         
         # Initialize executor
         mock_fm = MockFileManager()
-        executor = FileOperationsExecutor(mock_fm)
+        executor = FileOperationExecutor(mock_fm)
         
         # Prepare files to copy - include a non-existent file
         nonexistent_file = TFMPath(source_dir / "nonexistent.txt")
@@ -443,7 +443,7 @@ def test_operation_cancellation():
         
         # Initialize executor
         mock_fm = MockFileManager()
-        executor = FileOperationsExecutor(mock_fm)
+        executor = FileOperationExecutor(mock_fm)
         
         # Prepare files to copy
         files_to_copy = [TFMPath(source_dir / f"test{i}.txt") for i in range(100)]
@@ -484,7 +484,7 @@ def test_operation_cancellation():
 
 def main():
     """Run all tests"""
-    print("Running FileOperationsExecutor tests...\n")
+    print("Running FileOperationExecutor tests...\n")
     
     try:
         test_executor_initialization()
@@ -496,7 +496,7 @@ def main():
         test_error_handling()
         test_operation_cancellation()
         
-        print("\n✅ All FileOperationsExecutor tests passed!")
+        print("\n✅ All FileOperationExecutor tests passed!")
         return True
         
     except AssertionError as e:

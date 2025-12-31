@@ -13,7 +13,7 @@ from src.tfm_path import Path as TFMPath
 
 
 class TestFileOperationTaskUIInterface(unittest.TestCase):
-    """Test FileOperationTask UI delegation to FileOperationsUI."""
+    """Test FileOperationTask UI delegation to FileOperationUI."""
     
     def setUp(self):
         """Set up test fixtures."""

@@ -3,7 +3,7 @@ Integration tests for file operations refactoring
 
 This test module verifies that the complete file operations flow works correctly
 with the new architecture: FileListManager, FileOperationsUI, FileOperationTask,
-and FileOperationsExecutor.
+and FileOperationExecutor.
 
 Run with: PYTHONPATH=.:src:ttk pytest test/test_file_operations_integration.py -v
 """
@@ -15,9 +15,9 @@ from pathlib import Path as StdPath
 from unittest.mock import Mock, MagicMock
 
 from tfm_file_list_manager import FileListManager
-from tfm_file_operations_ui import FileOperationsUI
+from tfm_file_operation_ui import FileOperationUI
 from tfm_file_operation_task import FileOperationTask, State
-from tfm_file_operations_executor import FileOperationsExecutor
+from tfm_file_operation_executor import FileOperationExecutor
 from tfm_path import Path as TFMPath
 from tfm_progress_manager import ProgressManager
 from tfm_cache_manager import CacheManager
@@ -49,10 +49,10 @@ class MockFileManager:
         self.file_list_manager = FileListManager(self.config)
         
         # Create executor
-        self.file_operations_executor = FileOperationsExecutor(self)
+        self.file_operations_executor = FileOperationExecutor(self)
         
         # Create UI
-        self.file_operations_ui = FileOperationsUI(self, self.file_list_manager)
+        self.file_operations_ui = FileOperationUI(self, self.file_list_manager)
         
         # Mock panes
         self.active_pane = 'left'
@@ -373,7 +373,7 @@ def test_architecture_boundaries():
     assert hasattr(file_ops_ui, 'show_rename_dialog')
     assert hasattr(file_ops_ui, 'copy_selected_files')
     
-    # Verify FileOperationsExecutor has I/O methods but no UI code
+    # Verify FileOperationExecutor has I/O methods but no UI code
     executor = mock_fm.file_operations_executor
     assert hasattr(executor, 'perform_copy_operation')
     assert hasattr(executor, 'perform_move_operation')
@@ -410,7 +410,7 @@ def test_no_circular_dependencies():
     assert task.ui == file_ops_ui
     assert task.executor == executor
     
-    # FileOperationsExecutor should not depend on Task or UI
+    # FileOperationExecutor should not depend on Task or UI
     assert not hasattr(executor, 'task')
     assert not hasattr(executor, 'ui')
     

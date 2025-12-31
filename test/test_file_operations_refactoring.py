@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from tfm_file_list_manager import FileListManager
-from tfm_file_operations_ui import FileOperationsUI
+from tfm_file_operation_ui import FileOperationUI
 from tfm_path import Path as TFMPath
 
 
@@ -100,8 +100,8 @@ def test_file_operations_ui_initialization():
     file_ops = FileListManager(MockConfig())
     mock_fm = MockFileManager()
     
-    # Test FileOperationsUI initialization
-    file_ops_ui = FileOperationsUI(mock_fm, file_ops)
+    # Test FileOperationUI initialization
+    file_ops_ui = FileOperationUI(mock_fm, file_ops)
     
     assert file_ops_ui.file_manager == mock_fm
     assert file_ops_ui.file_list_manager == file_ops
@@ -117,7 +117,7 @@ def test_backward_compatibility():
     # For now, just test that the classes can be imported and initialized
     try:
         from tfm_file_list_manager import FileListManager
-        from tfm_file_operations_ui import FileOperationsUI
+        from tfm_file_operation_ui import FileOperationUI
         
         class MockConfig:
             SHOW_HIDDEN_FILES = False
@@ -169,7 +169,7 @@ def test_file_operations_integration():
         
         file_ops = FileListManager(MockConfig())
         mock_fm = MockFileManager()
-        file_ops_ui = FileOperationsUI(mock_fm, file_ops)
+        file_ops_ui = FileOperationUI(mock_fm, file_ops)
         
         # Test that UI can access file list manager methods
         assert hasattr(file_ops_ui.file_list_manager, 'get_file_info')

@@ -265,7 +265,7 @@ class TestCopyProgressIntegration(unittest.TestCase):
                 f.write(f"Sub file {i}\n")
         
         # Count files
-        from tfm_file_operations_ui import FileOperationsUI
+        from tfm_file_operation_ui import FileOperationUI
         
         # Create a mock file manager
         class MockFileManager:
@@ -276,7 +276,7 @@ class TestCopyProgressIntegration(unittest.TestCase):
                 self.config = None
         
         file_manager = MockFileManager()
-        file_ops_ui = FileOperationsUI(file_manager, None)
+        file_ops_ui = FileOperationUI(file_manager, None)
         
         total_files = file_ops_ui._count_files_recursively([self.source_dir])
         

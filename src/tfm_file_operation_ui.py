@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-TFM File Operations UI - Handles file operation UI interactions
+TFM File Operation UI - Handles file operation UI interactions
 """
 
 import os
 from tfm_path import Path
 
 
-class FileOperationsUI:
+class FileOperationUI:
     """Handles file operation UI interactions.
     
     This class provides the user interface layer for file operations,
@@ -15,11 +15,11 @@ class FileOperationsUI:
     rename dialogs. It creates and starts FileOperationTask instances.
     
     Architecture (Post-Refactoring):
-        FileOperationsUI is part of a clean four-layer architecture:
+        FileOperationUI is part of a clean four-layer architecture:
         - Layer 1: FileListManager - File list management
-        - Layer 2: FileOperationsUI - UI interactions (this class)
+        - Layer 2: FileOperationUI - UI interactions (this class)
         - Layer 3: FileOperationTask - Orchestration (state machine)
-        - Layer 4: FileOperationsExecutor - I/O operations
+        - Layer 4: FileOperationExecutor - I/O operations
     
     Responsibilities:
         - Entry points for file operations (copy/move/delete)
@@ -28,14 +28,14 @@ class FileOperationsUI:
         - Conflict resolution dialogs
         - Rename dialogs
         - Creating FileOperationTask instances
-        - NO I/O operations (delegated to FileOperationsExecutor)
+        - NO I/O operations (delegated to FileOperationExecutor)
     
     Task Usage:
         1. User initiates operation (copy/move/delete)
-        2. FileOperationsUI creates FileOperationTask with ui=self and executor
+        2. FileOperationUI creates FileOperationTask with ui=self and executor
         3. Task is started via file_manager.start_task()
         4. Task manages workflow and calls back to UI for dialogs
-        5. Task delegates I/O to FileOperationsExecutor
+        5. Task delegates I/O to FileOperationExecutor
         6. Task completes and cleans up
     
     Key Methods:
@@ -48,7 +48,7 @@ class FileOperationsUI:
     
     See Also:
         - tfm_file_operation_task.py: FileOperationTask implementation
-        - tfm_file_operations_executor.py: FileOperationsExecutor implementation
+        - tfm_file_operation_executor.py: FileOperationExecutor implementation
         - tfm_file_list_manager.py: FileListManager implementation
         - doc/dev/TASK_FRAMEWORK_IMPLEMENTATION.md: Complete architecture documentation
     """

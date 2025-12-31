@@ -41,8 +41,8 @@ from tfm_directory_diff_viewer import DirectoryDiffViewer
 from tfm_log_manager import LogManager
 from tfm_pane_manager import PaneManager
 from tfm_file_list_manager import FileListManager
-from tfm_file_operations_ui import FileOperationsUI
-from tfm_file_operations_executor import FileOperationsExecutor
+from tfm_file_operation_ui import FileOperationUI
+from tfm_file_operation_executor import FileOperationExecutor
 from tfm_list_dialog import ListDialog, ListDialogHelpers
 from ttk.wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 
@@ -319,10 +319,10 @@ class FileManager(UILayer):
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager, renderer)
         self.progress_manager = ProgressManager()
         self.cache_manager = CacheManager(self.log_manager)
-        self.file_operations_executor = FileOperationsExecutor(self)
+        self.file_operations_executor = FileOperationExecutor(self)
         self.archive_operations = ArchiveOperations(self.log_manager, self.cache_manager, self.progress_manager)
         self.archive_ui = ArchiveUI(self, self.archive_operations)
-        self.file_operations_ui = FileOperationsUI(self, self.file_list_manager)
+        self.file_operations_ui = FileOperationUI(self, self.file_list_manager)
         
         # Initialize drag-and-drop components
         self.drag_gesture_detector = DragGestureDetector()
@@ -3823,41 +3823,41 @@ class FileManager(UILayer):
                 self.logger.error(f"Error launching editor: {e}")
     
     def copy_selected_files(self):
-        """Copy selected files to the opposite pane's directory - delegated to FileOperationsUI"""
+        """Copy selected files to the opposite pane's directory - delegated to FileOperationUI"""
         self.file_operations_ui.copy_selected_files()
     
     def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False):
-        """Perform copy operation - delegated to FileOperationsUI"""
+        """Perform copy operation - delegated to FileOperationUI"""
         self.file_operations_ui.perform_copy_operation(files_to_copy, destination_dir, overwrite)
     
-    # Legacy helper method - functionality moved to FileOperationsUI
+    # Legacy helper method - functionality moved to FileOperationUI
     def _copy_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files):
-        """Copy directory with progress - delegated to FileOperationsUI"""
+        """Copy directory with progress - delegated to FileOperationUI"""
         return self.file_operations_ui._copy_directory_with_progress(source_dir, dest_dir, processed_files, total_files)
     
     def move_selected_files(self):
-        """Move selected files to the opposite pane's directory - delegated to FileOperationsUI"""
+        """Move selected files to the opposite pane's directory - delegated to FileOperationUI"""
         self.file_operations_ui.move_selected_files()
     
     def move_files_to_directory(self, files_to_move, destination_dir):
-        """Move files to directory - delegated to FileOperationsUI"""
+        """Move files to directory - delegated to FileOperationUI"""
         self.file_operations_ui.move_files_to_directory(files_to_move, destination_dir)
     
     def perform_move_operation(self, files_to_move, destination_dir, overwrite=False):
-        """Perform move operation - delegated to FileOperationsUI"""
+        """Perform move operation - delegated to FileOperationUI"""
         self.file_operations_ui.perform_move_operation(files_to_move, destination_dir, overwrite)
     
-    # Legacy move operation methods - functionality moved to FileOperationsUI
+    # Legacy move operation methods - functionality moved to FileOperationUI
     
     def delete_selected_files(self):
-        """Delete selected files or current file with confirmation - delegated to FileOperationsUI"""
+        """Delete selected files or current file with confirmation - delegated to FileOperationUI"""
         self.file_operations_ui.delete_selected_files()
     
     def perform_delete_operation(self, files_to_delete):
-        """Perform delete operation - delegated to FileOperationsUI"""
+        """Perform delete operation - delegated to FileOperationUI"""
         self.file_operations_ui.perform_delete_operation(files_to_delete)
     
-    # Legacy file operation methods - functionality moved to FileOperationsUI
+    # Legacy file operation methods - functionality moved to FileOperationUI
     
     def enter_create_archive_mode(self):
         """Enter archive creation mode - delegated to ArchiveUI"""
