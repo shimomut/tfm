@@ -2027,6 +2027,9 @@ class FileOperationsUI:
     def _perform_single_copy(self, source_file, dest_path, overwrite=False):
         """Perform copy operation for a single file"""
         try:
+            action = "Overwriting" if overwrite else "Copying"
+            self.logger.info(f"{action} {source_file.name} to {dest_path.parent.name}/")
+            
             if source_file.is_dir():
                 # Copy directory recursively
                 if dest_path.exists() and overwrite:
@@ -2039,6 +2042,8 @@ class FileOperationsUI:
             else:
                 # Copy single file
                 source_file.copy_to(dest_path, overwrite=overwrite)
+            
+            self.logger.info(f"Successfully copied {source_file.name}")
             
             # Invalidate cache
             self.cache_manager.invalidate_cache_for_copy_operation([source_file], dest_path.parent)
@@ -2057,6 +2062,9 @@ class FileOperationsUI:
     def _perform_single_move(self, source_file, dest_path, overwrite=False):
         """Perform move operation for a single file"""
         try:
+            action = "Overwriting" if overwrite else "Moving"
+            self.logger.info(f"{action} {source_file.name} to {dest_path.parent.name}/")
+            
             # Remove destination if it exists and we're overwriting
             if dest_path.exists() and overwrite:
                 if dest_path.is_dir():
@@ -2086,6 +2094,8 @@ class FileOperationsUI:
                     source_file.unlink()
                 else:
                     source_file.rename(dest_path)
+            
+            self.logger.info(f"Successfully moved {source_file.name}")
             
             # Invalidate cache
             self.cache_manager.invalidate_cache_for_move_operation([source_file], dest_path.parent)
