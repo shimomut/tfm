@@ -427,7 +427,7 @@ class FileOperationTask(BaseTask):
         self.on_state_exit(old_state)
         self.state = new_state
         self.on_state_enter(new_state)
-        self.logger.info(f"State transition: {old_state.value} → {new_state.value}")
+        self.logger.debug(f"State transition: {old_state.value} → {new_state.value}")
     
     def _check_conflicts(self):
         """Check for file conflicts.

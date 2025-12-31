@@ -249,7 +249,7 @@ class TFMEventCallback(EventCallback):
 
 
 class FileManager(UILayer):
-    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None):
+    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None, debug=False):
         self.renderer = renderer
         self.stdscr = renderer  # Keep stdscr as alias for compatibility during migration
         
@@ -270,8 +270,17 @@ class FileManager(UILayer):
         from tfm_log_manager import set_log_manager
         set_log_manager(self.log_manager)
         
+        # Set log level to DEBUG if debug mode is enabled
+        if debug:
+            import logging
+            self.log_manager.set_default_log_level(logging.DEBUG)
+        
         # Create logger for main application
         self.logger = self.log_manager.getLogger("Main")
+        
+        # Log debug mode status
+        if debug:
+            self.logger.debug("Debug logging enabled - showing detailed diagnostic information")
         
         # Initialize colors (can happen after LogManager since it doesn't use stdout/stderr)
         color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
@@ -4814,12 +4823,12 @@ class FileManager(UILayer):
             self.logger.warning(f"Warning: Could not load search history: {e}")
             return []
 
-def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None):
+def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None, debug=False):
     """Main function to run the file manager"""
     fm = None
     try:
         fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, 
-                        profiling_targets=profiling_targets or set(), log_file=log_file)
+                        profiling_targets=profiling_targets or set(), log_file=log_file, debug=debug)
         fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
@@ -4918,7 +4927,7 @@ def create_parser():
     parser.add_argument(
         '--debug',
         action='store_true',
-        help='Enable debug mode (print full stack traces for uncaught exceptions)'
+        help='Enable debug mode (show DEBUG level logs and full stack traces for uncaught exceptions)'
     )
     
     parser.add_argument(
@@ -5020,7 +5029,8 @@ def cli_main():
                  left_dir=args.left,
                  right_dir=args.right,
                  profiling_targets=profile_targets,
-                 log_file=args.log_file)
+                 log_file=args.log_file,
+                 debug=args.debug)
         finally:
             # Ensure renderer is properly shut down
             renderer.shutdown()
