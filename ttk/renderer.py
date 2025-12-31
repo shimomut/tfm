@@ -83,6 +83,22 @@ class EventCallback:
             True if the event was consumed (handled), False otherwise
         """
         return False
+    
+    def on_menu_will_open(self) -> None:
+        """
+        Called when a menu is about to open.
+        
+        This callback is invoked right before a menu is displayed, giving the
+        application a chance to update menu item states (enabled/disabled) based
+        on current application state.
+        
+        This is more efficient than continuously updating menu states, as it only
+        updates when the user is about to interact with the menu.
+        
+        Note: This is only called in desktop mode (macOS). Terminal mode does not
+        have native menus.
+        """
+        pass
 
 
 class Renderer(ABC):

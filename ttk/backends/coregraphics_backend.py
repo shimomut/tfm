@@ -1925,6 +1925,10 @@ class CoreGraphicsBackend(Renderer):
         if not hasattr(self, 'menu_items'):
             self.menu_items = {}
         
+        # Create menu delegate if not already done
+        if not hasattr(self, 'menu_delegate'):
+            self.menu_delegate = TTKMenuDelegate.alloc().initWithBackend_(self)
+        
         # Create main menu bar
         main_menu = Cocoa.NSMenu.alloc().init()
         
@@ -1935,6 +1939,9 @@ class CoreGraphicsBackend(Renderer):
             
             # Disable auto-enabling - we'll manage states manually
             submenu.setAutoenablesItems_(False)
+            
+            # Set delegate to receive menuNeedsUpdate: callbacks
+            submenu.setDelegate_(self.menu_delegate)
             
             # Create menu item to hold the submenu
             menu_item = Cocoa.NSMenuItem.alloc().init()
@@ -2091,6 +2098,17 @@ class CoreGraphicsBackend(Renderer):
         
         if item_id in self.menu_items:
             self.menu_items[item_id].setEnabled_(enabled)
+    
+    def _on_menu_will_open(self):
+        """
+        Called by menu delegate when a menu is about to open.
+        
+        This method notifies the event callback that menu states should be updated,
+        allowing the application to refresh menu item enabled/disabled states
+        right before the menu is displayed to the user.
+        """
+        if self.event_callback and hasattr(self.event_callback, 'on_menu_will_open'):
+            self.event_callback.on_menu_will_open()
     
     def set_caret_position(self, x: int, y: int) -> None:
         """
@@ -2991,6 +3009,54 @@ else:
     class TTKWindowDelegate:
         """Dummy TTKWindowDelegate class when PyObjC is not available."""
         pass
+
+
+# Define TTKMenuDelegate class for handling menu events
+if COCOA_AVAILABLE:
+    # ALWAYS create a new class to ensure we have the latest implementation
+    class TTKMenuDelegate(Cocoa.NSObject):
+        """
+        Menu delegate for handling menu open events.
+        
+        This delegate handles menuNeedsUpdate: events, allowing the application
+        to update menu item states right before a menu is displayed.
+        """
+        
+        def initWithBackend_(self, backend):
+            """
+            Initialize the menu delegate with a backend reference.
+            
+            Args:
+                backend: CoreGraphicsBackend instance
+            
+            Returns:
+                self: The initialized delegate instance
+            """
+            self = objc.super(TTKMenuDelegate, self).init()
+            if self is None:
+                return None
+            self.backend = backend
+            return self
+        
+        def menuNeedsUpdate_(self, menu):
+            """
+            Called when a menu is about to be displayed.
+            
+            This method is invoked by macOS right before a menu opens,
+            giving us a chance to update menu item states.
+            
+            Args:
+                menu: NSMenu that is about to be displayed
+            """
+            # Notify the backend that a menu is about to open
+            if hasattr(self.backend, '_on_menu_will_open'):
+                self.backend._on_menu_will_open()
+else:
+    # Provide a dummy class when PyObjC is not available
+    class TTKMenuDelegate:
+        """Dummy TTKMenuDelegate class when PyObjC is not available."""
+        pass
+
 
 # Define TTKView class with proper PyObjC registration
 # Create TTKView class

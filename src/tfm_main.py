@@ -197,6 +197,26 @@ class TFMEventCallback(EventCallback):
                 traceback.print_exc(file=sys.stderr)
             return True  # Event consumed to prevent further issues
     
+    def on_menu_will_open(self) -> None:
+        """
+        Called when a menu is about to open.
+        
+        This callback updates menu item states right before the menu is displayed,
+        ensuring that enabled/disabled states reflect the current application state.
+        
+        This is more efficient than continuously updating menu states, as it only
+        updates when the user is about to interact with the menu.
+        """
+        try:
+            # Update menu states to reflect current application state
+            self.file_manager._update_menu_states()
+        except Exception as e:
+            # Log error message
+            self.file_manager.logger.error(f"Error updating menu states: {e}")
+            # Print stack trace to stderr if debug mode is enabled
+            if os.environ.get('TFM_DEBUG') == '1':
+                traceback.print_exc(file=sys.stderr)
+    
     def on_mouse_event(self, event: 'MouseEvent') -> bool:
         """
         Handle a mouse event by routing to the UI layer stack.
@@ -955,6 +975,9 @@ class FileManager(UILayer):
             menu_structure = self.menu_manager.get_menu_structure()
             self.renderer.set_menu_bar(menu_structure)
             self.logger.info("Menu bar initialized for desktop mode")
+            
+            # Set initial menu states to reflect current application state
+            self._update_menu_states()
         except Exception as e:
             self.logger.error(f"Failed to initialize menu bar: {e}")
     
@@ -1885,28 +1908,6 @@ class FileManager(UILayer):
             # Check for log updates
             if self.log_manager.has_log_updates():
                 self.mark_dirty()
-            
-            # Update menu states if needed
-            if self.is_desktop_mode():
-                current_pane = self.get_current_pane()
-                current_selection_count = len(current_pane['selected_files'])
-                current_layer_count = self.ui_layer_stack.get_layer_count()
-                current_input_mode = self.is_in_input_mode()
-                
-                # Initialize tracking variables on first run
-                if not hasattr(self, '_last_selection_count'):
-                    self._last_selection_count = current_selection_count
-                    self._last_layer_count = current_layer_count
-                    self._last_input_mode = current_input_mode
-                    self._update_menu_states()
-                # Update menu states if any relevant state changed
-                elif (self._last_selection_count != current_selection_count or
-                      self._last_layer_count != current_layer_count or
-                      self._last_input_mode != current_input_mode):
-                    self._last_selection_count = current_selection_count
-                    self._last_layer_count = current_layer_count
-                    self._last_input_mode = current_input_mode
-                    self._update_menu_states()
             
             # Get adaptive timeout based on activity level
             timeout_ms = self.adaptive_fps.get_timeout_ms()
