@@ -166,7 +166,7 @@ def test_no_tfm_concepts_in_api():
         # Check for TFM-specific names
         tfm_specific = [
             'pane', 'file_manager', 'tfm', 'selection', 'cursor',
-            'directory', 'file_operations', 'state_manager'
+            'directory', 'file_list_manager', 'state_manager'
         ]
         
         found_tfm_concepts = []

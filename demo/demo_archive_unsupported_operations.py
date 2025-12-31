@@ -24,7 +24,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
-from tfm_file_operations import FileOperationsUI
+from tfm_file_operation_ui import FileOperationUI
 from unittest.mock import Mock
 
 
@@ -47,10 +47,10 @@ def demo_validation_logic():
     print("=" * 70)
     print()
     
-    # Create FileOperationsUI instance
+    # Create FileOperationUI instance
     mock_fm = create_mock_file_manager()
     mock_fo = Mock()
-    file_ops_ui = FileOperationsUI(mock_fm, mock_fo)
+    file_ops_ui = FileOperationUI(mock_fm, mock_fo)
     
     # Test cases
     test_cases = [

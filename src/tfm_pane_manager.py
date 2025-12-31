@@ -10,11 +10,11 @@ from collections import deque
 class PaneManager:
     """Manages dual pane functionality and navigation"""
     
-    def __init__(self, config, left_startup_path, right_startup_path, state_manager=None, file_operations=None):
+    def __init__(self, config, left_startup_path, right_startup_path, state_manager=None, file_list_manager=None):
         # Store reference to state manager for persistent history
         self.state_manager = state_manager
         self.config = config
-        self.file_operations = file_operations
+        self.file_list_manager = file_list_manager
         
         # Dual pane setup with configuration
         self.left_pane = {
@@ -317,8 +317,8 @@ class PaneManager:
         Args:
             pane_data: Pane dictionary to refresh, or None to refresh current pane
         """
-        if not self.file_operations:
+        if not self.file_list_manager:
             return
         
         target_pane = pane_data if pane_data else self.get_current_pane()
-        self.file_operations.refresh_files(target_pane)
+        self.file_list_manager.refresh_files(target_pane)

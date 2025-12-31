@@ -22,7 +22,7 @@ import tarfile
 import time
 from pathlib import Path as PathlibPath
 from tfm_path import Path
-from tfm_file_operations import FileOperations
+from tfm_file_list_manager import FileListManager
 from tfm_config import get_config
 from datetime import datetime
 
@@ -132,7 +132,7 @@ def demo_archive_sorting():
         
         # Initialize file operations
         config = get_config()
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         
         # Demonstrate each sort mode
         print("\n" + "=" * 80)

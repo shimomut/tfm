@@ -14,7 +14,7 @@ from pathlib import Path as PathlibPath
 from tfm_path import Path
 from tfm_pane_manager import PaneManager
 from tfm_archive import ArchiveOperations
-from tfm_file_operations import FileOperations
+from tfm_file_list_manager import FileListManager
 
 
 class MockConfig:

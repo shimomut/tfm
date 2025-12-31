@@ -10,7 +10,7 @@ import tarfile
 import time
 from pathlib import Path as PathlibPath
 from tfm_path import Path
-from tfm_file_operations import FileOperations
+from tfm_file_list_manager import FileListManager
 from tfm_config import get_config
 
 
@@ -117,7 +117,7 @@ def test_archive_sort_by_name():
         
         # Sort by name
         config = get_config()
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         sorted_entries = file_ops.sort_entries(entries, 'name', reverse=False)
         
         # Verify directories come first
@@ -159,7 +159,7 @@ def test_archive_sort_by_size():
         
         # Sort by size
         config = get_config()
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         sorted_entries = file_ops.sort_entries(entries, 'size', reverse=False)
         
         # Verify directories come first (size 0)
@@ -202,7 +202,7 @@ def test_archive_sort_by_date():
         
         # Sort by date
         config = get_config()
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         sorted_entries = file_ops.sort_entries(entries, 'date', reverse=False)
         
         # Verify directories come first
@@ -243,7 +243,7 @@ def test_archive_sort_by_extension():
         
         # Sort by extension
         config = get_config()
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         sorted_entries = file_ops.sort_entries(entries, 'ext', reverse=False)
         
         # Verify directories come first (no extension)
@@ -283,7 +283,7 @@ def test_archive_sort_by_type():
         
         # Sort by type (same as extension for files)
         config = get_config()
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         sorted_entries = file_ops.sort_entries(entries, 'type', reverse=False)
         
         # Verify directories come first
@@ -313,7 +313,7 @@ def test_archive_directories_first():
         entries = list(archive_root.iterdir())
         
         config = get_config()
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         
         # Test all sort modes
         for sort_mode in ['name', 'size', 'date', 'ext', 'type']:
@@ -355,7 +355,7 @@ def test_archive_sort_with_tar():
         
         # Sort by name
         config = get_config()
-        file_ops = FileOperations(config)
+        file_ops = FileListManager(config)
         sorted_entries = file_ops.sort_entries(entries, 'name', reverse=False)
         
         # Verify directories come first

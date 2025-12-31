@@ -149,7 +149,7 @@ def test_navigate_to_search_result_in_archive(test_archive_structure):
     
     # Test navigation helper
     pane_manager = MockPaneManager(archive_path)
-    file_operations = MockFileOperations()
+    file_list_manager = MockFileOperations()
     messages = []
     
     def mock_print(msg):
@@ -157,7 +157,7 @@ def test_navigate_to_search_result_in_archive(test_archive_structure):
     
     # Navigate to result
     SearchDialogHelpers.navigate_to_result(
-        result, pane_manager, file_operations, mock_print
+        result, pane_manager, file_list_manager, mock_print
     )
     
     # Verify navigation occurred

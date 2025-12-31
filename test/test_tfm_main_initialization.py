@@ -30,7 +30,7 @@ def test_file_manager_accepts_renderer():
             with patch('tfm_main.LogManager'):
                 with patch('tfm_main.get_state_manager'):
                     with patch('tfm_main.PaneManager'):
-                        with patch('tfm_main.FileOperations'):
+                        with patch('tfm_main.FileListManager'):
                             # Create FileManager with renderer
                             fm = FileManager(mock_renderer)
                             

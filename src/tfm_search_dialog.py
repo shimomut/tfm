@@ -674,13 +674,13 @@ class SearchDialogHelpers:
     """Helper functions for search dialog navigation and integration"""
     
     @staticmethod
-    def navigate_to_result(result, pane_manager, file_operations, print_func):
+    def navigate_to_result(result, pane_manager, file_list_manager, print_func):
         """Navigate to the selected search result
         
         Args:
             result: Search result dictionary
             pane_manager: PaneManager instance
-            file_operations: FileOperations instance  
+            file_list_manager: FileListManager instance  
             print_func: Function to print messages
         """
         current_pane = pane_manager.get_current_pane()
@@ -700,7 +700,7 @@ class SearchDialogHelpers:
             current_pane['selected_files'].clear()
             
             # Refresh files and find the target file
-            file_operations.refresh_files(current_pane)
+            file_list_manager.refresh_files(current_pane)
             
             # Find and select the target file
             for i, file_path in enumerate(current_pane['files']):

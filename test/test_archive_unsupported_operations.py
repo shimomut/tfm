@@ -9,7 +9,7 @@ from unittest.mock import Mock, MagicMock, patch, call
 from pathlib import Path as PathlibPath
 
 from tfm_path import Path
-from tfm_file_operations import FileOperationsUI
+from tfm_file_operation_ui import FileOperationUI
 
 
 class TestArchiveUnsupportedOperations(unittest.TestCase):
@@ -29,8 +29,8 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
         # Create mock file operations
         self.mock_file_operations = Mock()
         
-        # Create FileOperationsUI instance
-        self.file_ops_ui = FileOperationsUI(self.mock_file_manager, self.mock_file_operations)
+        # Create FileOperationUI instance
+        self.file_ops_ui = FileOperationUI(self.mock_file_manager, self.mock_file_operations)
     
     def test_capability_detection(self):
         """Test that storage capabilities are correctly detected"""

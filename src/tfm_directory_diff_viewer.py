@@ -578,7 +578,7 @@ class DirectoryDiffViewer(UILayer):
     navigation between different views.
     """
     
-    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_operations=None):
+    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None):
         """
         Initialize the directory diff viewer.
         
@@ -587,14 +587,14 @@ class DirectoryDiffViewer(UILayer):
             left_path: Path to left directory
             right_path: Path to right directory
             layer_stack: Optional UILayerStack for pushing new layers (e.g., DiffViewer)
-            file_operations: Optional FileOperations instance for accessing show_hidden setting
+            file_list_manager: Optional FileListManager instance for accessing show_hidden setting
         """
         self.logger = getLogger("DirDiff")
         self.renderer = renderer
         self.left_path = left_path
         self.right_path = right_path
         self.layer_stack = layer_stack
-        self.file_operations = file_operations
+        self.file_list_manager = file_list_manager
         
         # Tree structure
         self.root_node: Optional[TreeNode] = None
@@ -2271,7 +2271,7 @@ class DirectoryDiffViewer(UILayer):
                 filename = child_path.name
                 
                 # Filter hidden files if show_hidden is False
-                if self.file_operations and not self.file_operations.show_hidden:
+                if self.file_list_manager and not self.file_list_manager.show_hidden:
                     if filename.startswith('.'):
                         continue  # Skip hidden files
                 

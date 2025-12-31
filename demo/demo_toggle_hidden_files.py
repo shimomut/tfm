@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from pathlib import Path
 from unittest.mock import Mock
-from src.tfm_file_operations import FileOperations
+from src.tfm_file_operations import FileListManager
 
 
 def test_toggle_hidden_files_refresh():
@@ -32,7 +32,7 @@ def test_toggle_hidden_files_refresh():
     # Create file operations with proper config
     config = Mock()
     config.SHOW_HIDDEN_FILES = False  # Set default value
-    file_ops = FileOperations(config)
+    file_ops = FileListManager(config)
     
     # Create a test pane with a directory that has hidden files
     test_dir = Path.home()  # Home directory typically has hidden files
@@ -116,7 +116,7 @@ def test_toggle_hidden_files_method():
     # Create file operations with proper config
     config = Mock()
     config.SHOW_HIDDEN_FILES = False  # Set default value
-    file_ops = FileOperations(config)
+    file_ops = FileListManager(config)
     
     print(f"\nInitial state: show_hidden = {file_ops.show_hidden}")
     

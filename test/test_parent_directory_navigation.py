@@ -77,7 +77,7 @@ class TestParentDirectoryNavigation(unittest.TestCase):
         left_pane = self.pane_manager.left_pane
         left_pane['path'] = TFMPath(self.child2_path)
         
-        # Simulate file refresh (normally done by file_operations.refresh_files)
+        # Simulate file refresh (normally done by file_list_manager.refresh_files)
         left_pane['files'] = [TFMPath(self.child2_path / "subfile.txt")]
         left_pane['focused_index'] = 0
         

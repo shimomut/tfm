@@ -11,7 +11,7 @@ from pathlib import Path
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_config import DefaultConfig
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileOperations
+from tfm_file_list_manager import FileListManager
 from tfm_path import Path as TFMPath
 
 
@@ -47,7 +47,7 @@ def test_search_integration():
         # Initialize components
         search_dialog = SearchDialog(config)
         pane_manager = PaneManager(config, test_dir, test_dir, None)
-        file_operations = FileOperations(config)
+        file_list_manager = FileListManager(config)
         
         # Test filename search
         search_dialog.show('filename')
@@ -77,7 +77,7 @@ def test_search_integration():
             
             # Test navigation
             SearchDialogHelpers.navigate_to_result(
-                result, pane_manager, file_operations, mock_print
+                result, pane_manager, file_list_manager, mock_print
             )
             
             # Verify navigation message was printed
