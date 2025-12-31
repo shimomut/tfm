@@ -517,15 +517,15 @@ class FileOperationsUI:
         - doc/dev/TASK_FRAMEWORK_IMPLEMENTATION.md: Complete architecture documentation
     """
     
-    def __init__(self, file_manager, file_operations):
+    def __init__(self, file_manager, file_list_manager):
         """Initialize file operations UI with file manager and file list manager
         
         Args:
             file_manager: FileManager instance for UI interactions and task management
-            file_operations: FileListManager instance for file list operations
+            file_list_manager: FileListManager instance for file list operations
         """
         self.file_manager = file_manager
-        self.file_operations = file_operations
+        self.file_list_manager = file_list_manager
         self.log_manager = file_manager.log_manager
         self.progress_manager = file_manager.progress_manager
         self.cache_manager = file_manager.cache_manager

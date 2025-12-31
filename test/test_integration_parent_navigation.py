@@ -64,7 +64,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
             TFMPath(self.temp_dir),
             state_manager=None
         )
-        self.file_operations = FileListManager(self.config)
+        self.file_list_manager = FileListManager(self.config)
     
     def tearDown(self):
         """Clean up test environment"""
@@ -77,7 +77,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         left_pane = self.pane_manager.left_pane
         
         # Refresh files to populate the pane
-        self.file_operations.refresh_files(left_pane)
+        self.file_list_manager.refresh_files(left_pane)
         
         # Verify we're in beta directory
         self.assertEqual(str(left_pane['path']), str(self.beta_path))
@@ -97,7 +97,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         left_pane['selected_files'].clear()
         
         # 4. Refresh files in parent directory
-        self.file_operations.refresh_files(left_pane)
+        self.file_list_manager.refresh_files(left_pane)
         
         # 5. Try to set cursor to the child directory we came from
         cursor_set = False
@@ -123,7 +123,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
             left_pane['focused_index'] = 0
             left_pane['scroll_offset'] = 0
             left_pane['selected_files'].clear()
-            self.file_operations.refresh_files(left_pane)
+            self.file_list_manager.refresh_files(left_pane)
         
         # Verify we're back in beta directory
         self.assertEqual(str(left_pane['path']), str(self.beta_path))
@@ -134,7 +134,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         
         # Start in alpha directory
         left_pane['path'] = TFMPath(self.alpha_path)
-        self.file_operations.refresh_files(left_pane)
+        self.file_list_manager.refresh_files(left_pane)
         
         # Verify initial state
         self.assertEqual(str(left_pane['path']), str(self.alpha_path))
@@ -147,7 +147,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         left_pane['selected_files'].clear()
         
         # Use file operations to refresh
-        self.file_operations.refresh_files(left_pane)
+        self.file_list_manager.refresh_files(left_pane)
         
         # Find and select the child directory
         for i, file_path in enumerate(left_pane['files']):
@@ -171,7 +171,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         
         # Start in the deepest directory
         left_pane['path'] = TFMPath(deep_path)
-        self.file_operations.refresh_files(left_pane)
+        self.file_list_manager.refresh_files(left_pane)
         
         # Navigate up one level (deeper -> deep)
         child_name = left_pane['path'].name  # "deeper"
@@ -179,7 +179,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         left_pane['focused_index'] = 0
         left_pane['scroll_offset'] = 0
         left_pane['selected_files'].clear()
-        self.file_operations.refresh_files(left_pane)
+        self.file_list_manager.refresh_files(left_pane)
         
         # Find the child directory
         for i, file_path in enumerate(left_pane['files']):
@@ -197,7 +197,7 @@ class TestIntegrationParentNavigation(unittest.TestCase):
         left_pane['focused_index'] = 0
         left_pane['scroll_offset'] = 0
         left_pane['selected_files'].clear()
-        self.file_operations.refresh_files(left_pane)
+        self.file_list_manager.refresh_files(left_pane)
         
         # Find the child directory
         for i, file_path in enumerate(left_pane['files']):

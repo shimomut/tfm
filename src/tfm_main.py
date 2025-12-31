@@ -307,7 +307,7 @@ class FileManager(UILayer):
         self.file_list_manager = FileListManager(self.config)
         self.file_list_manager.log_manager = self.log_manager  # Set log_manager for error reporting
         self.file_list_manager.logger = self.log_manager.getLogger("FileOp")  # Set logger for file operations
-        self.pane_manager.file_operations = self.file_list_manager  # Set file_operations for refresh_files
+        self.pane_manager.file_list_manager = self.file_list_manager  # Set file_list_manager for refresh_files
         self.list_dialog = ListDialog(self.config, renderer)
         self.info_dialog = InfoDialog(self.config, renderer)
         self.search_dialog = SearchDialog(self.config, renderer)
@@ -1874,7 +1874,7 @@ class FileManager(UILayer):
             return 14
 
     def apply_filter(self):
-        """Apply filter - wrapper for file_operations method"""
+        """Apply filter - wrapper for file_list_manager method"""
         current_pane = self.get_current_pane()
         filter_pattern = self.filter_editor.get_text()
         count = self.file_list_manager.apply_filter(current_pane, filter_pattern)
@@ -1889,7 +1889,7 @@ class FileManager(UILayer):
         self.mark_dirty()
     
     def clear_filter(self):
-        """Clear filter - wrapper for file_operations method"""
+        """Clear filter - wrapper for file_list_manager method"""
         current_pane = self.get_current_pane()
         
         if self.file_list_manager.clear_filter(current_pane):

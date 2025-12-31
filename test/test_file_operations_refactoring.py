@@ -103,7 +103,7 @@ def test_file_operations_ui_initialization():
     file_ops_ui = FileOperationsUI(mock_fm, file_ops)
     
     assert file_ops_ui.file_manager == mock_fm
-    assert file_ops_ui.file_operations == file_ops
+    assert file_ops_ui.file_list_manager == file_ops
     
     print("✓ FileOperationsUI initialization tests passed")
 
@@ -170,9 +170,9 @@ def test_file_operations_integration():
         file_ops_ui = FileOperationsUI(mock_fm, file_ops)
         
         # Test that UI can access file list manager methods
-        assert hasattr(file_ops_ui.file_operations, 'get_file_info')
-        assert hasattr(file_ops_ui.file_operations, 'sort_entries')
-        assert hasattr(file_ops_ui.file_operations, 'refresh_files')
+        assert hasattr(file_ops_ui.file_list_manager, 'get_file_info')
+        assert hasattr(file_ops_ui.file_list_manager, 'sort_entries')
+        assert hasattr(file_ops_ui.file_list_manager, 'refresh_files')
         
         # Test that UI has its own methods
         assert hasattr(file_ops_ui, 'copy_selected_files')

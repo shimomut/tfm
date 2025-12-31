@@ -293,7 +293,7 @@ class TestFileOperationsUI:
     def test_file_operations_ui_initialization(self):
         """Test that FileOperationsUI initializes correctly"""
         assert self.file_ops_ui.file_manager == self.mock_fm
-        assert self.file_ops_ui.file_operations == self.file_ops
+        assert self.file_ops_ui.file_list_manager == self.file_ops
         assert self.file_ops_ui.log_manager == self.mock_fm.log_manager
         assert self.file_ops_ui.progress_manager == self.mock_fm.progress_manager
         assert self.file_ops_ui.cache_manager == self.mock_fm.cache_manager
@@ -400,11 +400,11 @@ class TestFileOperationsIntegration:
         file_ops_ui = FileOperationsUI(mock_fm, file_ops)
         
         # Verify UI can access file list manager methods
-        assert hasattr(file_ops_ui.file_operations, 'get_file_info')
-        assert hasattr(file_ops_ui.file_operations, 'sort_entries')
-        assert hasattr(file_ops_ui.file_operations, 'refresh_files')
-        assert hasattr(file_ops_ui.file_operations, 'toggle_selection')
-        assert hasattr(file_ops_ui.file_operations, 'find_matches')
+        assert hasattr(file_ops_ui.file_list_manager, 'get_file_info')
+        assert hasattr(file_ops_ui.file_list_manager, 'sort_entries')
+        assert hasattr(file_ops_ui.file_list_manager, 'refresh_files')
+        assert hasattr(file_ops_ui.file_list_manager, 'toggle_selection')
+        assert hasattr(file_ops_ui.file_list_manager, 'find_matches')
     
     def test_file_operations_ui_has_operation_methods(self):
         """Test that FileOperationsUI has operation methods"""
