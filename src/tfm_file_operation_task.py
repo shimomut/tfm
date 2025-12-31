@@ -720,22 +720,35 @@ class FileOperationTask(BaseTask):
                     # Use executor if available, otherwise fall back to file_operations_ui
                     operation_handler = self.executor if self.executor else self.file_operations_ui
                     
-                    # Copy files without overwrite
+                    # Track pending batches to know when all operations are complete
+                    pending_batches = 0
+                    if files_no_overwrite:
+                        pending_batches += 1
+                    if files_with_overwrite:
+                        pending_batches += 1
+                    
+                    # Store pending count in context for tracking
+                    if self.context:
+                        self.context.pending_batches = pending_batches
+                    
+                    # Copy files without overwrite first
                     if files_no_overwrite:
                         operation_handler.perform_copy_operation(
                             files_no_overwrite,
                             destination_dir,
                             overwrite=False,
-                            completion_callback=self._on_copy_complete
+                            completion_callback=self._on_copy_complete,
+                            continue_progress=False  # Start new progress
                         )
                     
-                    # Copy files with overwrite
+                    # Copy files with overwrite, continuing the same progress operation
                     if files_with_overwrite:
                         operation_handler.perform_copy_operation(
                             files_with_overwrite,
                             destination_dir,
                             overwrite=True,
-                            completion_callback=self._on_copy_complete
+                            completion_callback=self._on_copy_complete,
+                            continue_progress=True  # Continue existing progress
                         )
                 else:
                     # No files to copy, complete immediately
@@ -763,8 +776,17 @@ class FileOperationTask(BaseTask):
         if self.context:
             # Update error count in results
             self.context.results['errors'].extend([None] * error_count)
+            
+            # Decrement pending batches
+            if hasattr(self.context, 'pending_batches'):
+                self.context.pending_batches -= 1
+                
+                # Only complete when all batches are done
+                if self.context.pending_batches > 0:
+                    self.logger.debug(f"Batch completed, {self.context.pending_batches} batch(es) remaining")
+                    return
         
-        # Transition to COMPLETED state
+        # All batches complete - transition to COMPLETED state
         self._transition_to_state(State.COMPLETED)
         self._complete_operation()
     
@@ -805,22 +827,35 @@ class FileOperationTask(BaseTask):
                     # Use executor if available, otherwise fall back to file_operations_ui
                     operation_handler = self.executor if self.executor else self.file_operations_ui
                     
-                    # Move files without overwrite
+                    # Track pending batches to know when all operations are complete
+                    pending_batches = 0
+                    if files_no_overwrite:
+                        pending_batches += 1
+                    if files_with_overwrite:
+                        pending_batches += 1
+                    
+                    # Store pending count in context for tracking
+                    if self.context:
+                        self.context.pending_batches = pending_batches
+                    
+                    # Move files without overwrite first
                     if files_no_overwrite:
                         operation_handler.perform_move_operation(
                             files_no_overwrite,
                             destination_dir,
                             overwrite=False,
-                            completion_callback=self._on_move_complete
+                            completion_callback=self._on_move_complete,
+                            continue_progress=False  # Start new progress
                         )
                     
-                    # Move files with overwrite
+                    # Move files with overwrite, continuing the same progress operation
                     if files_with_overwrite:
                         operation_handler.perform_move_operation(
                             files_with_overwrite,
                             destination_dir,
                             overwrite=True,
-                            completion_callback=self._on_move_complete
+                            completion_callback=self._on_move_complete,
+                            continue_progress=True  # Continue existing progress
                         )
                 else:
                     # No files to move, complete immediately
@@ -848,8 +883,17 @@ class FileOperationTask(BaseTask):
         if self.context:
             # Update error count in results
             self.context.results['errors'].extend([None] * error_count)
+            
+            # Decrement pending batches
+            if hasattr(self.context, 'pending_batches'):
+                self.context.pending_batches -= 1
+                
+                # Only complete when all batches are done
+                if self.context.pending_batches > 0:
+                    self.logger.debug(f"Batch completed, {self.context.pending_batches} batch(es) remaining")
+                    return
         
-        # Transition to COMPLETED state
+        # All batches complete - transition to COMPLETED state
         self._transition_to_state(State.COMPLETED)
         self._complete_operation()
     

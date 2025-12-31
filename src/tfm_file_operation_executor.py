@@ -75,7 +75,7 @@ class FileOperationExecutor:
         self.cache_manager = file_manager.cache_manager
         self.logger = getLogger("FileOp")
 
-    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, completion_callback=None):
+    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, completion_callback=None, continue_progress=False):
         """Perform the actual copy operation with fine-grained progress tracking in a background thread
         
         This method runs the copy operation in a background thread with progress tracking
@@ -88,6 +88,7 @@ class FileOperationExecutor:
             completion_callback: Optional callback function called when operation completes.
                                 Receives (copied_count, error_count) as arguments.
                                 If provided, suppresses the default summary logging.
+            continue_progress: If True, continue existing progress operation instead of starting new one
         
         Threading:
             - Runs in background thread to keep UI responsive
@@ -102,41 +103,64 @@ class FileOperationExecutor:
             - Tracks errors separately
             - Shows completion summary
         """
-        # Set operation in progress flag to block user input
-        self.file_manager.operation_in_progress = True
-        self.file_manager.operation_cancelled = False
-        
-        # Show "Preparing..." message immediately
-        self.progress_manager.start_operation(
-            OperationType.COPY,
-            1,
-            f"Preparing to copy to {destination_dir.name}",
-            self._progress_callback
-        )
-        
-        # Start animation refresh thread so "Preparing" animates
-        animation_stop_event = threading.Event()
-        animation_thread = threading.Thread(
-            target=self._animation_refresh_loop,
-            args=(animation_stop_event,),
-            daemon=True
-        )
-        animation_thread.start()
+        # Set operation in progress flag to block user input (only if not continuing)
+        if not continue_progress:
+            self.file_manager.operation_in_progress = True
+            self.file_manager.operation_cancelled = False
+            
+            # Show "Preparing..." message immediately
+            self.progress_manager.start_operation(
+                OperationType.COPY,
+                1,
+                f"Preparing to copy to {destination_dir.name}",
+                self._progress_callback
+            )
+            
+            # Start animation refresh thread so "Preparing" animates
+            animation_stop_event = threading.Event()
+            animation_thread = threading.Thread(
+                target=self._animation_refresh_loop,
+                args=(animation_stop_event,),
+                daemon=True
+            )
+            animation_thread.start()
+        else:
+            # Continuing existing progress - no animation thread needed
+            animation_stop_event = None
+            animation_thread = None
         
         # Run the copy operation in a background thread
         def copy_thread():
-            # Count files in background thread so "Preparing" message displays
-            total_individual_files = self._count_files_recursively(files_to_copy)
-            
-            # Update progress with correct total
-            self.progress_manager.update_operation_total(
-                total_individual_files if total_individual_files > 0 else 1,
-                f"to {destination_dir.name}"
-            )
+            # Count files and update total (only if not continuing)
+            if not continue_progress:
+                # Count files in background thread so "Preparing" message displays
+                total_individual_files = self._count_files_recursively(files_to_copy)
+                
+                # Update progress with correct total
+                self.progress_manager.update_operation_total(
+                    total_individual_files if total_individual_files > 0 else 1,
+                    f"to {destination_dir.name}"
+                )
+                processed_files = 0
+            else:
+                # Continuing - get current progress count
+                if self.progress_manager.current_operation:
+                    processed_files = self.progress_manager.current_operation['processed_items']
+                    # Add files from this batch to the total
+                    additional_files = self._count_files_recursively(files_to_copy)
+                    current_total = self.progress_manager.current_operation['total_items']
+                    self.progress_manager.update_operation_total(
+                        current_total + additional_files,
+                        f"to {destination_dir.name}"
+                    )
+                    # Set total_individual_files for use in progress tracking
+                    total_individual_files = current_total + additional_files
+                else:
+                    processed_files = 0
+                    total_individual_files = self._count_files_recursively(files_to_copy)
             
             copied_count = 0
             error_count = 0
-            processed_files = 0
             
             try:
                 for source_file in files_to_copy:
@@ -212,14 +236,16 @@ class FileOperationExecutor:
                             processed_files += self._count_files_recursively([source_file])
             
             finally:
-                # Stop animation refresh thread
-                animation_stop_event.set()
+                # Stop animation refresh thread (only if we started one)
+                if animation_stop_event:
+                    animation_stop_event.set()
                 
-                # Finish progress tracking
-                self.progress_manager.finish_operation()
-                
-                # Clear operation in progress flag
-                self.file_manager.operation_in_progress = False
+                # Finish progress tracking (only if not continuing - let the last batch finish it)
+                if not continue_progress:
+                    self.progress_manager.finish_operation()
+                    
+                    # Clear operation in progress flag
+                    self.file_manager.operation_in_progress = False
             
             # Invalidate cache for affected directories
             if copied_count > 0:
@@ -253,7 +279,7 @@ class FileOperationExecutor:
         thread = threading.Thread(target=copy_thread, daemon=True)
         thread.start()
 
-    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, completion_callback=None):
+    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, completion_callback=None, continue_progress=False):
         """Perform the actual move operation with fine-grained progress tracking in a background thread
         
         This method runs the move operation in a background thread with progress tracking
@@ -266,6 +292,7 @@ class FileOperationExecutor:
             completion_callback: Optional callback function called when operation completes.
                                 Receives (moved_count, error_count) as arguments.
                                 If provided, suppresses the default summary logging.
+            continue_progress: If True, continue existing progress operation instead of starting new one
         
         Threading:
             - Runs in background thread to keep UI responsive
@@ -285,41 +312,64 @@ class FileOperationExecutor:
             - Implements as copy followed by delete
             - Handles both same-storage and cross-storage transparently
         """
-        # Set operation in progress flag to block user input
-        self.file_manager.operation_in_progress = True
-        self.file_manager.operation_cancelled = False
-        
-        # Show "Preparing..." message immediately
-        self.progress_manager.start_operation(
-            OperationType.MOVE,
-            1,
-            f"Preparing to move to {destination_dir.name}",
-            self._progress_callback
-        )
-        
-        # Start animation refresh thread
-        animation_stop_event = threading.Event()
-        animation_thread = threading.Thread(
-            target=self._animation_refresh_loop,
-            args=(animation_stop_event,),
-            daemon=True
-        )
-        animation_thread.start()
+        # Set operation in progress flag to block user input (only if not continuing)
+        if not continue_progress:
+            self.file_manager.operation_in_progress = True
+            self.file_manager.operation_cancelled = False
+            
+            # Show "Preparing..." message immediately
+            self.progress_manager.start_operation(
+                OperationType.MOVE,
+                1,
+                f"Preparing to move to {destination_dir.name}",
+                self._progress_callback
+            )
+            
+            # Start animation refresh thread
+            animation_stop_event = threading.Event()
+            animation_thread = threading.Thread(
+                target=self._animation_refresh_loop,
+                args=(animation_stop_event,),
+                daemon=True
+            )
+            animation_thread.start()
+        else:
+            # Continuing existing progress - no animation thread needed
+            animation_stop_event = None
+            animation_thread = None
         
         # Run the move operation in a background thread
         def move_thread():
-            # Count files in background thread
-            total_individual_files = self._count_files_recursively(files_to_move)
-            
-            # Update progress with correct total
-            self.progress_manager.update_operation_total(
-                total_individual_files if total_individual_files > 0 else 1,
-                f"to {destination_dir.name}"
-            )
+            # Count files and update total (only if not continuing)
+            if not continue_progress:
+                # Count files in background thread
+                total_individual_files = self._count_files_recursively(files_to_move)
+                
+                # Update progress with correct total
+                self.progress_manager.update_operation_total(
+                    total_individual_files if total_individual_files > 0 else 1,
+                    f"to {destination_dir.name}"
+                )
+                processed_files = 0
+            else:
+                # Continuing - get current progress count
+                if self.progress_manager.current_operation:
+                    processed_files = self.progress_manager.current_operation['processed_items']
+                    # Add files from this batch to the total
+                    additional_files = self._count_files_recursively(files_to_move)
+                    current_total = self.progress_manager.current_operation['total_items']
+                    self.progress_manager.update_operation_total(
+                        current_total + additional_files,
+                        f"to {destination_dir.name}"
+                    )
+                    # Set total_individual_files for use in progress tracking
+                    total_individual_files = current_total + additional_files
+                else:
+                    processed_files = 0
+                    total_individual_files = self._count_files_recursively(files_to_move)
             
             moved_count = 0
             error_count = 0
-            processed_files = 0
             
             try:
                 for source_file in files_to_move:
@@ -416,14 +466,16 @@ class FileOperationExecutor:
                                 processed_files += self._count_files_recursively([source_file])
             
             finally:
-                # Stop animation refresh thread
-                animation_stop_event.set()
+                # Stop animation refresh thread (only if we started one)
+                if animation_stop_event:
+                    animation_stop_event.set()
                 
-                # Always finish progress tracking
-                self.progress_manager.finish_operation()
-                
-                # Clear operation in progress flag
-                self.file_manager.operation_in_progress = False
+                # Finish progress tracking (only if not continuing - let the last batch finish it)
+                if not continue_progress:
+                    self.progress_manager.finish_operation()
+                    
+                    # Clear operation in progress flag
+                    self.file_manager.operation_in_progress = False
                 
                 # Invalidate cache for affected directories
                 if moved_count > 0:
