@@ -1774,12 +1774,15 @@ class FileOperationsUI:
                 if apply_to_all:
                     # Skip this file and all remaining conflicts
                     for i in range(context['conflict_index'], len(context['conflicts'])):
-                        context['skipped_files'].append(context['conflicts'][i][0])
+                        skipped_file = context['conflicts'][i][0]
+                        context['skipped_files'].append(skipped_file)
+                        self.logger.info(f"Skipped {skipped_file.name}")
                     context['conflict_index'] = len(context['conflicts'])
                     self._process_next_copy_conflict()
                 else:
                     # Skip this file and continue
                     context['skipped_files'].append(source_file)
+                    self.logger.info(f"Skipped {source_file.name}")
                     context['conflict_index'] += 1
                     self._process_next_copy_conflict()
         
@@ -1835,8 +1838,8 @@ class FileOperationsUI:
             def handle_rename_conflict(choice):
                 if choice == "overwrite":
                     # Copy with the new name, overwriting
-                    self._perform_single_copy(source_file, new_dest_path, overwrite=True)
-                    self.logger.info(f"Copied as '{new_name}' (overwrote existing)")
+                    self._perform_single_copy(source_file, new_dest_path, overwrite=True, suppress_log=True)
+                    self.logger.info(f"Copied {source_file.name} as {new_name} (overwrote existing)")
                     # Continue with batch if in batch mode
                     if hasattr(self.file_manager, '_copy_rename_batch_context'):
                         batch_context = self.file_manager._copy_rename_batch_context
@@ -1855,8 +1858,8 @@ class FileOperationsUI:
             self.file_manager.show_dialog(message, choices, handle_rename_conflict)
         else:
             # No conflict, proceed with copy
-            self._perform_single_copy(source_file, new_dest_path, overwrite=False)
-            self.logger.info(f"Copied as '{new_name}'")
+            self._perform_single_copy(source_file, new_dest_path, overwrite=False, suppress_log=True)
+            self.logger.info(f"Copied {source_file.name} as {new_name}")
             
             # Continue with batch if in batch mode
             if hasattr(self.file_manager, '_copy_rename_batch_context'):
@@ -1973,12 +1976,15 @@ class FileOperationsUI:
                 if apply_to_all:
                     # Skip this file and all remaining conflicts
                     for i in range(context['conflict_index'], len(context['conflicts'])):
-                        context['skipped_files'].append(context['conflicts'][i][0])
+                        skipped_file = context['conflicts'][i][0]
+                        context['skipped_files'].append(skipped_file)
+                        self.logger.info(f"Skipped {skipped_file.name}")
                     context['conflict_index'] = len(context['conflicts'])
                     self._process_next_move_conflict()
                 else:
                     # Skip this file and continue
                     context['skipped_files'].append(source_file)
+                    self.logger.info(f"Skipped {source_file.name}")
                     context['conflict_index'] += 1
                     self._process_next_move_conflict()
         
@@ -2034,8 +2040,8 @@ class FileOperationsUI:
             def handle_rename_conflict(choice):
                 if choice == "overwrite":
                     # Move with the new name, overwriting
-                    self._perform_single_move(source_file, new_dest_path, overwrite=True)
-                    self.logger.info(f"Moved as '{new_name}' (overwrote existing)")
+                    self._perform_single_move(source_file, new_dest_path, overwrite=True, suppress_log=True)
+                    self.logger.info(f"Moved {source_file.name} as {new_name} (overwrote existing)")
                     # Continue with batch if in batch mode
                     if hasattr(self.file_manager, '_move_rename_batch_context'):
                         batch_context = self.file_manager._move_rename_batch_context
@@ -2054,8 +2060,8 @@ class FileOperationsUI:
             self.file_manager.show_dialog(message, choices, handle_rename_conflict)
         else:
             # No conflict, proceed with move
-            self._perform_single_move(source_file, new_dest_path, overwrite=False)
-            self.logger.info(f"Moved as '{new_name}'")
+            self._perform_single_move(source_file, new_dest_path, overwrite=False, suppress_log=True)
+            self.logger.info(f"Moved {source_file.name} as {new_name}")
             
             # Continue with batch if in batch mode
             if hasattr(self.file_manager, '_move_rename_batch_context'):
@@ -2070,8 +2076,12 @@ class FileOperationsUI:
         self.file_manager.quick_edit_bar.hide()
         self.file_manager.mark_dirty()
     
-    def _perform_single_copy(self, source_file, dest_path, overwrite=False):
-        """Perform copy operation for a single file"""
+    def _perform_single_copy(self, source_file, dest_path, overwrite=False, suppress_log=False):
+        """Perform copy operation for a single file
+        
+        Args:
+            suppress_log: If True, suppresses the default log message (caller will log instead)
+        """
         try:
             if source_file.is_dir():
                 # Copy directory recursively
@@ -2086,8 +2096,9 @@ class FileOperationsUI:
                 # Copy single file
                 source_file.copy_to(dest_path, overwrite=overwrite)
             
-            action = "Overwrote" if overwrite else "Copied"
-            self.logger.info(f"{action} {source_file.name}")
+            if not suppress_log:
+                action = "Overwrote" if overwrite else "Copied"
+                self.logger.info(f"{action} {source_file.name}")
             
             # Invalidate cache
             self.cache_manager.invalidate_cache_for_copy_operation([source_file], dest_path.parent)
@@ -2103,8 +2114,12 @@ class FileOperationsUI:
         except Exception as e:
             self.logger.error(f"Error copying {source_file.name}: {e}")
     
-    def _perform_single_move(self, source_file, dest_path, overwrite=False):
-        """Perform move operation for a single file"""
+    def _perform_single_move(self, source_file, dest_path, overwrite=False, suppress_log=False):
+        """Perform move operation for a single file
+        
+        Args:
+            suppress_log: If True, suppresses the default log message (caller will log instead)
+        """
         try:
             # Remove destination if it exists and we're overwriting
             if dest_path.exists() and overwrite:
@@ -2136,8 +2151,9 @@ class FileOperationsUI:
                 else:
                     source_file.rename(dest_path)
             
-            action = "Overwrote" if overwrite else "Moved"
-            self.logger.info(f"{action} {source_file.name}")
+            if not suppress_log:
+                action = "Overwrote" if overwrite else "Moved"
+                self.logger.info(f"{action} {source_file.name}")
             
             # Invalidate cache
             self.cache_manager.invalidate_cache_for_move_operation([source_file], dest_path.parent)
