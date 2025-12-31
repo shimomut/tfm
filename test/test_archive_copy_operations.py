@@ -10,7 +10,8 @@ import tarfile
 from pathlib import Path as PathlibPath
 
 from tfm_path import Path
-from tfm_file_operations import FileListManager, FileOperationsUI
+from tfm_file_list_manager import FileListManager
+from tfm_file_operations_ui import FileOperationsUI
 from tfm_progress_manager import ProgressManager
 from tfm_cache_manager import CacheManager
 

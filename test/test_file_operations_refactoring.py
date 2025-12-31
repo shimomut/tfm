@@ -8,7 +8,8 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from tfm_file_operations import FileListManager, FileOperationsUI
+from tfm_file_list_manager import FileListManager
+from tfm_file_operations_ui import FileOperationsUI
 from tfm_path import Path as TFMPath
 
 
@@ -115,7 +116,8 @@ def test_backward_compatibility():
     # This test would require a full FileManager instance which needs curses
     # For now, just test that the classes can be imported and initialized
     try:
-        from tfm_file_operations import FileListManager, FileOperationsUI
+        from tfm_file_list_manager import FileListManager
+        from tfm_file_operations_ui import FileOperationsUI
         
         class MockConfig:
             SHOW_HIDDEN_FILES = False

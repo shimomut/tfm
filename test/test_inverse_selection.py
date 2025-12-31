@@ -6,7 +6,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_inverse_selection.py -v
 
 from pathlib import Path
 
-from tfm_file_operations import FileListManager
+from tfm_file_list_manager import FileListManager
 
 
 def test_inverse_files_selection():

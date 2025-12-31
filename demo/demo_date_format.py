@@ -18,7 +18,7 @@ from pathlib import Path as StdPath
 # Add src to path
 sys.path.insert(0, str(StdPath(__file__).parent.parent / 'src'))
 
-from tfm_file_operations import FileListManager
+from tfm_file_list_manager import FileListManager
 from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
 
 

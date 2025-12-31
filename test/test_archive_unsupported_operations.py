@@ -9,7 +9,7 @@ from unittest.mock import Mock, MagicMock, patch, call
 from pathlib import Path as PathlibPath
 
 from tfm_path import Path
-from tfm_file_operations import FileOperationsUI
+from tfm_file_operations_ui import FileOperationsUI
 
 
 class TestArchiveUnsupportedOperations(unittest.TestCase):

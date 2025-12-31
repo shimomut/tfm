@@ -11,7 +11,7 @@ from pathlib import Path
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_config import DefaultConfig
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileListManager
+from tfm_file_list_manager import FileListManager
 from tfm_path import Path as TFMPath
 
 

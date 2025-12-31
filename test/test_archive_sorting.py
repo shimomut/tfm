@@ -10,7 +10,7 @@ import tarfile
 import time
 from pathlib import Path as PathlibPath
 from tfm_path import Path
-from tfm_file_operations import FileListManager
+from tfm_file_list_manager import FileListManager
 from tfm_config import get_config
 
 

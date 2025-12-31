@@ -7,7 +7,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_date_format.py -v
 from datetime import datetime, timedelta
 from pathlib import Path as StdPath
 
-from tfm_file_operations import FileListManager
+from tfm_file_list_manager import FileListManager
 from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
 
 

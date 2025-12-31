@@ -64,7 +64,7 @@ def test_pane_sorting_with_archives():
         print(f"Created pane with {len(pane_data['files'])} archive entries")
         
         # Test sorting with different modes
-        from tfm_file_operations import FileListManager
+        from tfm_file_list_manager import FileListManager
         config = get_config()
         file_ops = FileListManager(config)
         
@@ -162,7 +162,7 @@ def test_sort_description():
     """Test that sort description works with archive panes"""
     print("\n=== Integration Test: Sort Description ===")
     
-    from tfm_file_operations import FileListManager
+    from tfm_file_list_manager import FileListManager
     config = get_config()
     file_ops = FileListManager(config)
     

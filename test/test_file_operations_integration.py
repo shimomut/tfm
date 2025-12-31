@@ -14,7 +14,8 @@ import time
 from pathlib import Path as StdPath
 from unittest.mock import Mock, MagicMock
 
-from tfm_file_operations import FileListManager, FileOperationsUI
+from tfm_file_list_manager import FileListManager
+from tfm_file_operations_ui import FileOperationsUI
 from tfm_file_operation_task import FileOperationTask, State
 from tfm_file_operations_executor import FileOperationsExecutor
 from tfm_path import Path as TFMPath

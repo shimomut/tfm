@@ -24,7 +24,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
-from tfm_file_operations import FileOperationsUI
+from tfm_file_operations_ui import FileOperationsUI
 from unittest.mock import Mock
 
 

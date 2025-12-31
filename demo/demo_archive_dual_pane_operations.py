@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileListManager
+from tfm_file_list_manager import FileListManager
 
 
 class MockConfig:

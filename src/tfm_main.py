@@ -40,7 +40,8 @@ from tfm_directory_diff_viewer import DirectoryDiffViewer
 # Import new modular components
 from tfm_log_manager import LogManager
 from tfm_pane_manager import PaneManager
-from tfm_file_operations import FileListManager, FileOperationsUI
+from tfm_file_list_manager import FileListManager
+from tfm_file_operations_ui import FileOperationsUI
 from tfm_file_operations_executor import FileOperationsExecutor
 from tfm_list_dialog import ListDialog, ListDialogHelpers
 from ttk.wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width

@@ -13,7 +13,8 @@ import shutil
 from pathlib import Path as StdPath
 import pytest
 
-from tfm_file_operations import FileListManager, FileOperationsUI
+from tfm_file_list_manager import FileListManager
+from tfm_file_operations_ui import FileOperationsUI
 from tfm_path import Path as TFMPath
 
 
