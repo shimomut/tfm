@@ -3892,19 +3892,9 @@ class FileManager(UILayer):
                     total_files += 1
         return total_files
     
-    # Legacy methods - delegated to ArchiveUI for backward compatibility
-    def detect_archive_format(self, filename):
-        """Detect archive format from filename extension - delegated to ArchiveUI"""
-        return self.archive_ui.detect_archive_format(filename)
-    
     def extract_selected_archive(self):
         """Extract the selected archive file to the other pane - delegated to ArchiveUI"""
         self.archive_ui.extract_selected_archive()
-    
-    # Legacy methods - delegated to ArchiveUI for backward compatibility
-    def get_archive_basename(self, filename):
-        """Get the base name of an archive file - delegated to ArchiveUI"""
-        return self.archive_ui.get_archive_basename(filename)
     
     def handle_isearch_input(self, event):
         """Handle input while in isearch mode"""

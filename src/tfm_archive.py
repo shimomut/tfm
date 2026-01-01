@@ -2901,17 +2901,3 @@ class ArchiveUI:
             self.file_manager.mark_dirty()
         except Exception as e:
             self.logger.warning(f"Warning: Progress callback display update failed: {e}")
-    
-    # Legacy methods for backward compatibility
-    def detect_archive_format(self, filename):
-        """Detect archive format from filename extension (legacy method)"""
-        filename_lower = filename.lower()
-        
-        if filename_lower.endswith('.zip'):
-            return 'zip'
-        elif filename_lower.endswith('.tar.gz'):
-            return 'tar.gz'
-        elif filename_lower.endswith('.tgz'):
-            return 'tgz'
-        else:
-            return None

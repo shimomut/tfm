@@ -557,24 +557,8 @@ def get_status_color():
     
     Returns:
         Tuple[int, int]: (color_pair, attributes)
-    
-    Note: During migration, some code may still expect a single integer.
-    Use get_status_color_legacy() for backward compatibility.
     """
     return COLOR_STATUS, TextAttribute.NORMAL
-
-def get_status_color_legacy():
-    """
-    Legacy function that returns color as a single integer for backward compatibility.
-    
-    This function is deprecated and will be removed after migration is complete.
-    Use get_status_color() instead which returns (color_pair, attributes) tuple.
-    
-    Returns:
-        int: Combined color pair and attributes (curses-style)
-    """
-    # Return just the color pair for backward compatibility
-    return COLOR_STATUS
 
 def get_error_color():
     """
