@@ -229,11 +229,29 @@ class DiffViewer(UILayer):
             tokens = list(lexer.get_tokens(content))
             
             # Convert tokens to highlighted lines
-            return self._tokens_to_highlighted_lines(tokens)
+            highlighted_lines = self._tokens_to_highlighted_lines(tokens)
+            
+            # Pygments may skip leading empty lines - add them back if needed
+            leading_empty = 0
+            for line in lines:
+                if line.strip():
+                    break
+                leading_empty += 1
+            
+            if leading_empty > 0 and (not highlighted_lines or highlighted_lines[0]):
+                # Pygments skipped leading empty lines, add them back
+                highlighted_lines = [[]] * leading_empty + highlighted_lines
+            
+            # Ensure line count matches (fallback to plain highlighting if mismatch)
+            if len(highlighted_lines) != len(lines):
+                self.logger.warning(f"Syntax highlighting line count mismatch for {file_path.name}: expected {len(lines)}, got {len(highlighted_lines)}. Falling back to plain highlighting.")
+                return [[(line, COLOR_REGULAR_FILE)] for line in lines]
+            
+            return highlighted_lines
             
         except Exception as e:
             # If highlighting fails, create plain highlighted lines
-            self.logger.warning(f"Syntax highlighting failed: {e}")
+            self.logger.warning(f"Syntax highlighting failed for {file_path.name}: {e}")
             return [[(line, COLOR_REGULAR_FILE)] for line in lines]
     
     def _tokens_to_highlighted_lines(self, tokens) -> List[List[Tuple[str, int]]]:
@@ -242,38 +260,22 @@ class DiffViewer(UILayer):
         current_line = []
         
         for token_type, text in tokens:
-            # Get the appropriate color for this token type
             color = get_syntax_color(token_type)
             
-            # Handle newlines - split tokens that contain newlines
             if '\n' in text:
                 parts = text.split('\n')
-                
-                # Add the first part to current line
-                if parts[0]:
-                    current_line.append((parts[0], color))
-                
-                # Finish current line
-                highlighted_lines.append(current_line)
-                
-                # Add intermediate complete lines
-                for part in parts[1:-1]:
+                for i, part in enumerate(parts):
+                    if i > 0:
+                        highlighted_lines.append(current_line)
+                        current_line = []
                     if part:
-                        highlighted_lines.append([(part, color)])
-                    else:
-                        highlighted_lines.append([])  # Empty line
-                
-                # Start new line with last part
-                current_line = []
-                if parts[-1]:
-                    current_line.append((parts[-1], color))
+                        current_line.append((part, color))
             else:
-                # No newlines, just add to current line
                 if text:
                     current_line.append((text, color))
         
-        # Add final line if not empty
-        if current_line:
+        # Add final line if non-empty or if no lines were added
+        if current_line or not highlighted_lines:
             highlighted_lines.append(current_line)
         
         return highlighted_lines
@@ -1297,11 +1299,16 @@ class DiffViewer(UILayer):
         # Handle wheel events for scrolling
         if event.event_type == MouseEventType.WHEEL:
             # Get display dimensions for boundary checking
-            _, _, display_height, _ = self.get_display_dimensions()
+            _, _, display_height, display_width = self.get_display_dimensions()
             
             # Get max scroll based on diff lines or wrapped lines
             if self.wrap_lines:
-                display_lines, _ = self.get_wrapped_lines_with_mapping()
+                # Calculate wrapped lines to get correct count
+                pane_width = (display_width - 1) // 2
+                line_num_width = self.line_number_width if self.show_line_numbers else 0
+                scroll_bar_width = calculate_scrollbar_width(len(self.diff_lines), display_height)
+                content_width = pane_width - scroll_bar_width - line_num_width
+                display_lines = self._get_wrapped_diff_lines(content_width)
                 max_scroll = max(0, len(display_lines) - display_height)
             else:
                 max_scroll = max(0, len(self.diff_lines) - display_height)
