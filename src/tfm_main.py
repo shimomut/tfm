@@ -3000,7 +3000,7 @@ class FileManager(UILayer):
     def exit_confirmation_mode(self):
         """Exit confirmation mode (backward compatibility)"""
         self.exit_quick_choice_mode()
-        
+    
     def handle_quick_choice_input(self, key):
         """Handle input while in quick choice mode - wrapper for quick choice bar component"""
         result = self.quick_choice_bar.handle_input(key)
@@ -3046,15 +3046,6 @@ class FileManager(UILayer):
         
         return False
     
-    def handle_dialog_input(self, key):
-        """Handle input while in dialog mode (backward compatibility)"""
-        return self.handle_quick_choice_input(key)
-    
-    def handle_confirmation_input(self, key):
-        """Handle input while in confirmation mode (backward compatibility)"""
-        return self.handle_quick_choice_input(key)
-    
-
     def show_info_dialog(self, title, info_lines):
         """Show an information dialog with scrollable content - wrapper for info dialog component"""
         self.info_dialog.show(title, info_lines)
@@ -3839,11 +3830,6 @@ class FileManager(UILayer):
         """Perform copy operation - delegated to FileOperationUI"""
         self.file_operations_ui.perform_copy_operation(files_to_copy, destination_dir, overwrite)
     
-    # Legacy helper method - functionality moved to FileOperationUI
-    def _copy_directory_with_progress(self, source_dir, dest_dir, processed_files, total_files):
-        """Copy directory with progress - delegated to FileOperationUI"""
-        return self.file_operations_ui._copy_directory_with_progress(source_dir, dest_dir, processed_files, total_files)
-    
     def move_selected_files(self):
         """Move selected files to the opposite pane's directory - delegated to FileOperationUI"""
         self.file_operations_ui.move_selected_files()
@@ -3856,8 +3842,6 @@ class FileManager(UILayer):
         """Perform move operation - delegated to FileOperationUI"""
         self.file_operations_ui.perform_move_operation(files_to_move, destination_dir, overwrite)
     
-    # Legacy move operation methods - functionality moved to FileOperationUI
-    
     def delete_selected_files(self):
         """Delete selected files or current file with confirmation - delegated to FileOperationUI"""
         self.file_operations_ui.delete_selected_files()
@@ -3865,8 +3849,6 @@ class FileManager(UILayer):
     def perform_delete_operation(self, files_to_delete):
         """Perform delete operation - delegated to FileOperationUI"""
         self.file_operations_ui.perform_delete_operation(files_to_delete)
-    
-    # Legacy file operation methods - functionality moved to FileOperationUI
     
     def enter_create_archive_mode(self):
         """Enter archive creation mode - delegated to ArchiveUI"""
@@ -3879,12 +3861,6 @@ class FileManager(UILayer):
     def on_create_archive_cancel(self):
         """Handle create archive cancellation - delegated to ArchiveUI"""
         self.archive_ui.on_create_archive_cancel()
-    
-    # Legacy method - no longer used with new UI approach
-    def perform_create_archive(self):
-        """Create the archive file - legacy method, functionality moved to ArchiveUI"""
-        self.logger.info("Legacy archive creation method called - this should not happen")
-        pass
     
     def _progress_callback(self, progress_data):
         """Callback for progress manager updates"""
@@ -3921,17 +3897,6 @@ class FileManager(UILayer):
         """Detect archive format from filename extension - delegated to ArchiveUI"""
         return self.archive_ui.detect_archive_format(filename)
     
-    # Legacy methods - functionality moved to ArchiveOperations class
-    def create_zip_archive(self, archive_path, files_to_archive):
-        """Create a ZIP archive - legacy method, functionality moved to ArchiveOperations"""
-        self.logger.info("Legacy ZIP creation method called - this should not happen")
-        pass
-    
-    def create_tar_archive(self, archive_path, files_to_archive):
-        """Create a TAR.GZ archive - legacy method, functionality moved to ArchiveOperations"""
-        self.logger.info("Legacy TAR creation method called - this should not happen")
-        pass
-    
     def extract_selected_archive(self):
         """Extract the selected archive file to the other pane - delegated to ArchiveUI"""
         self.archive_ui.extract_selected_archive()
@@ -3941,22 +3906,6 @@ class FileManager(UILayer):
         """Get the base name of an archive file - delegated to ArchiveUI"""
         return self.archive_ui.get_archive_basename(filename)
     
-    # Legacy extraction methods - functionality moved to ArchiveUI and ArchiveOperations
-    def perform_extraction(self, archive_file, extract_dir, archive_format, other_pane):
-        """Perform extraction - legacy method, functionality moved to ArchiveUI"""
-        self.logger.info("Legacy extraction method called - this should not happen")
-        pass
-    
-    def extract_zip_archive(self, archive_file, extract_dir):
-        """Extract ZIP archive - legacy method, functionality moved to ArchiveOperations"""
-        self.logger.info("Legacy ZIP extraction method called - this should not happen")
-        pass
-    
-    def extract_tar_archive(self, archive_file, extract_dir):
-        """Extract TAR archive - legacy method, functionality moved to ArchiveOperations"""
-        self.logger.info("Legacy TAR extraction method called - this should not happen")
-        pass
-        
     def handle_isearch_input(self, event):
         """Handle input while in isearch mode"""
         if event.key_code == KeyCode.ESCAPE:
