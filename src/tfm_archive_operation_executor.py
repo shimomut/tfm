@@ -163,38 +163,44 @@ class ArchiveOperationExecutor:
                     completion_callback(success_count, error_count)
                 return
             
-            # Count total files for progress tracking
-            total_files = self._count_files_recursively(source_paths)
-            
-            # Check for cancellation after counting
-            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
-                self.logger.info("Archive creation cancelled before starting")
-                if completion_callback:
-                    completion_callback(success_count, error_count)
-                return
-            
-            # Start progress tracking
+            # Start progress tracking with unknown total (use 0 for unknown total)
+            # Progress will update as files are added
             self.progress_manager.start_operation(
                 OperationType.ARCHIVE_CREATE,
-                total_files,
+                0,  # Unknown total - will show count instead of percentage
                 f"Creating {archive_path.name}",
                 self._progress_callback
             )
             
-            # Handle cross-storage scenarios
-            source_schemes = {path.get_scheme() for path in source_paths}
-            dest_scheme = archive_path.get_scheme()
+            # Start animation refresh loop
+            import time
+            stop_animation = threading.Event()
+            animation_thread = threading.Thread(
+                target=self._animation_refresh_loop,
+                args=(stop_animation,),
+                daemon=True
+            )
+            animation_thread.start()
             
-            # If all sources and destination are local, create directly
-            if all(scheme == 'file' for scheme in source_schemes) and dest_scheme == 'file':
-                success_count, error_count = self._create_archive_local(
-                    source_paths, archive_path, format_info, completion_callback
-                )
-            else:
-                # For cross-storage, use temporary file approach
-                success_count, error_count = self._create_archive_cross_storage(
-                    source_paths, archive_path, format_info
-                )
+            try:
+                # Handle cross-storage scenarios
+                source_schemes = {path.get_scheme() for path in source_paths}
+                dest_scheme = archive_path.get_scheme()
+                
+                # If all sources and destination are local, create directly
+                if all(scheme == 'file' for scheme in source_schemes) and dest_scheme == 'file':
+                    success_count, error_count = self._create_archive_local(
+                        source_paths, archive_path, format_info, completion_callback
+                    )
+                else:
+                    # For cross-storage, use temporary file approach
+                    success_count, error_count = self._create_archive_cross_storage(
+                        source_paths, archive_path, format_info
+                    )
+            finally:
+                # Stop animation loop
+                stop_animation.set()
+                animation_thread.join(timeout=0.5)
             
             # Finish progress tracking
             self.progress_manager.finish_operation()
@@ -241,38 +247,44 @@ class ArchiveOperationExecutor:
             
             self.logger.info(f"Extracting archive: {archive_path} to {destination_dir}")
             
-            # Count files in archive for progress tracking
-            total_files = self._count_archive_files(archive_path, format_info)
-            
-            # Check for cancellation after counting
-            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
-                self.logger.info("Archive extraction cancelled before starting")
-                if completion_callback:
-                    completion_callback(success_count, error_count)
-                return
-            
-            # Start progress tracking
+            # Start progress tracking with unknown total (use 0 for unknown total)
+            # Progress will update as files are extracted
             self.progress_manager.start_operation(
                 OperationType.ARCHIVE_EXTRACT,
-                total_files,
+                0,  # Unknown total - will show count instead of percentage
                 f"Extracting {archive_path.name}",
                 self._progress_callback
             )
             
-            # Handle cross-storage scenarios
-            archive_scheme = archive_path.get_scheme()
-            dest_scheme = destination_dir.get_scheme()
+            # Start animation refresh loop
+            import time
+            stop_animation = threading.Event()
+            animation_thread = threading.Thread(
+                target=self._animation_refresh_loop,
+                args=(stop_animation,),
+                daemon=True
+            )
+            animation_thread.start()
             
-            # If both are local, extract directly
-            if archive_scheme == 'file' and dest_scheme == 'file':
-                success_count, error_count, skipped_count = self._extract_archive_local(
-                    archive_path, destination_dir, format_info, overwrite, skip_files, completion_callback
-                )
-            else:
-                # For cross-storage, use temporary file approach
-                success_count, error_count, skipped_count = self._extract_archive_cross_storage(
-                    archive_path, destination_dir, format_info, overwrite, skip_files
-                )
+            try:
+                # Handle cross-storage scenarios
+                archive_scheme = archive_path.get_scheme()
+                dest_scheme = destination_dir.get_scheme()
+                
+                # If both are local, extract directly
+                if archive_scheme == 'file' and dest_scheme == 'file':
+                    success_count, error_count, skipped_count = self._extract_archive_local(
+                        archive_path, destination_dir, format_info, overwrite, skip_files, completion_callback
+                    )
+                else:
+                    # For cross-storage, use temporary file approach
+                    success_count, error_count, skipped_count = self._extract_archive_cross_storage(
+                        archive_path, destination_dir, format_info, overwrite, skip_files
+                    )
+            finally:
+                # Stop animation loop
+                stop_animation.set()
+                animation_thread.join(timeout=0.5)
             
             # Finish progress tracking
             self.progress_manager.finish_operation()
@@ -374,6 +386,22 @@ class ArchiveOperationExecutor:
         """Callback for progress manager to trigger UI refresh"""
         if hasattr(self.file_manager, 'mark_dirty'):
             self.file_manager.mark_dirty()
+    
+    def _animation_refresh_loop(self, stop_event):
+        """Background loop to refresh animation periodically
+        
+        Args:
+            stop_event: Threading event to signal when to stop
+        """
+        import time
+        
+        while not stop_event.is_set():
+            # Refresh animation to keep spinner moving
+            self.progress_manager.refresh_animation()
+            
+            # Sleep for a short time (100ms) to keep animation smooth
+            # This is independent of progress updates
+            time.sleep(0.1)
     
     def _check_conflicts(self, operation_type: str, source_paths: List[Path], 
                         destination: Path) -> List[ConflictInfo]:
@@ -639,21 +667,65 @@ class ArchiveOperationExecutor:
                             break
                         
                         try:
-                            # Use relative path for archive member name
-                            arcname = source_path.name
-                            tar.add(str(source_path), arcname=arcname)
-                            self.logger.info(f"Added to archive: {arcname}")
-                            
-                            # Update progress
                             if source_path.is_file():
+                                # Update progress before adding file
                                 success_count += 1
-                                self.progress_manager.update_progress(arcname, success_count)
+                                self.progress_manager.update_progress(source_path.name, success_count)
+                                
+                                # Add single file
+                                tar.add(str(source_path), arcname=source_path.name)
+                                self.logger.info(f"Added to archive: {source_path.name}")
                             elif source_path.is_dir():
-                                # Count files added from directory
-                                for item in source_path.rglob('*'):
-                                    if item.is_file():
-                                        success_count += 1
-                                        self.progress_manager.update_progress(str(item.relative_to(source_path.parent)), success_count)
+                                # Update progress immediately to show we're processing this directory
+                                success_count += 1
+                                self.progress_manager.update_progress(f"{source_path.name}/", success_count)
+                                
+                                # Add directory recursively with progress updates per file
+                                for file_path in source_path.rglob('*'):
+                                    # Check for cancellation
+                                    if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                                        break
+                                    
+                                    if file_path.is_file():
+                                        try:
+                                            # Create relative path within the directory
+                                            rel_path = file_path.relative_to(source_path.parent)
+                                            
+                                            # Update progress before adding file
+                                            success_count += 1
+                                            self.progress_manager.update_progress(str(rel_path), success_count)
+                                            
+                                            # Add file to archive
+                                            tar.add(str(file_path), arcname=str(rel_path))
+                                            self.logger.info(f"Added to archive: {rel_path}")
+                                        except PermissionError as e:
+                                            self.logger.error(f"Permission denied adding {file_path.name} to archive: {e}")
+                                            error_count += 1
+                                            self.progress_manager.increment_errors()
+                                            # Continue with next file
+                                        except OSError as e:
+                                            # Check for disk space exhaustion
+                                            if "No space left" in str(e) or "Disk quota exceeded" in str(e):
+                                                self.logger.error(f"Disk space exhausted during archive creation: {e}")
+                                                error_count += 1
+                                                self.progress_manager.increment_errors()
+                                                # Stop operation - cannot continue
+                                                break
+                                            else:
+                                                self.logger.error(f"OS error adding {file_path.name} to archive: {e}")
+                                                error_count += 1
+                                                self.progress_manager.increment_errors()
+                                                # Continue with next file
+                                        except ArchiveError as e:
+                                            self.logger.error(f"Archive error adding {file_path.name}: {e.user_message if hasattr(e, 'user_message') and e.user_message else str(e)}")
+                                            error_count += 1
+                                            self.progress_manager.increment_errors()
+                                            # Continue with next file
+                                        except Exception as e:
+                                            self.logger.error(f"Unexpected error adding {file_path.name} to archive: {e}")
+                                            error_count += 1
+                                            self.progress_manager.increment_errors()
+                                            # Continue with next file
                         except PermissionError as e:
                             self.logger.error(f"Permission denied adding {source_path.name} to archive: {e}")
                             error_count += 1
@@ -694,11 +766,16 @@ class ArchiveOperationExecutor:
                         
                         try:
                             if source_path.is_file():
-                                zip_file.write(str(source_path), source_path.name)
-                                self.logger.info(f"Added to archive: {source_path.name}")
+                                # Update progress before writing
                                 success_count += 1
                                 self.progress_manager.update_progress(source_path.name, success_count)
+                                zip_file.write(str(source_path), source_path.name)
+                                self.logger.info(f"Added to archive: {source_path.name}")
                             elif source_path.is_dir():
+                                # Update progress immediately to show we're processing this directory
+                                success_count += 1
+                                self.progress_manager.update_progress(f"{source_path.name}/", success_count)
+                                
                                 # Add directory recursively
                                 for file_path in source_path.rglob('*'):
                                     # Check for cancellation
@@ -709,10 +786,13 @@ class ArchiveOperationExecutor:
                                         try:
                                             # Create relative path within the directory
                                             rel_path = file_path.relative_to(source_path.parent)
-                                            zip_file.write(str(file_path), str(rel_path))
-                                            self.logger.info(f"Added to archive: {rel_path}")
+                                            
+                                            # Update progress before writing
                                             success_count += 1
                                             self.progress_manager.update_progress(str(rel_path), success_count)
+                                            
+                                            zip_file.write(str(file_path), str(rel_path))
+                                            self.logger.info(f"Added to archive: {rel_path}")
                                         except PermissionError as e:
                                             self.logger.error(f"Permission denied adding {file_path.name} to archive: {e}")
                                             error_count += 1
