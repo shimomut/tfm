@@ -163,11 +163,10 @@ class ArchiveOperationExecutor:
                     completion_callback(success_count, error_count)
                 return
             
-            # Start progress tracking with unknown total (use 0 for unknown total)
-            # Progress will update as files are added
+            # Start progress tracking with animation
             self.progress_manager.start_operation(
                 OperationType.ARCHIVE_CREATE,
-                0,  # Unknown total - will show count instead of percentage
+                0,  # Will update after counting
                 f"Creating {archive_path.name}",
                 self._progress_callback
             )
@@ -181,6 +180,22 @@ class ArchiveOperationExecutor:
                 daemon=True
             )
             animation_thread.start()
+            
+            # Count files for progress tracking (animation keeps UI responsive)
+            total_files = self._count_files_recursively(source_paths)
+            
+            # Update progress with actual total
+            self.progress_manager.update_operation_total(
+                total_files if total_files > 0 else 1,
+                f"Creating {archive_path.name}"
+            )
+            
+            # Check for cancellation after counting
+            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                self.logger.info("Archive creation cancelled before starting")
+                if completion_callback:
+                    completion_callback(success_count, error_count)
+                return
             
             try:
                 # Handle cross-storage scenarios
@@ -247,11 +262,10 @@ class ArchiveOperationExecutor:
             
             self.logger.info(f"Extracting archive: {archive_path} to {destination_dir}")
             
-            # Start progress tracking with unknown total (use 0 for unknown total)
-            # Progress will update as files are extracted
+            # Start progress tracking with animation
             self.progress_manager.start_operation(
                 OperationType.ARCHIVE_EXTRACT,
-                0,  # Unknown total - will show count instead of percentage
+                0,  # Will update after counting
                 f"Extracting {archive_path.name}",
                 self._progress_callback
             )
@@ -265,6 +279,22 @@ class ArchiveOperationExecutor:
                 daemon=True
             )
             animation_thread.start()
+            
+            # Count files in archive for progress tracking (animation keeps UI responsive)
+            total_files = self._count_archive_files(archive_path, format_info)
+            
+            # Update progress with actual total
+            self.progress_manager.update_operation_total(
+                total_files if total_files > 0 else 1,
+                f"Extracting {archive_path.name}"
+            )
+            
+            # Check for cancellation after counting
+            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                self.logger.info("Archive extraction cancelled before starting")
+                if completion_callback:
+                    completion_callback(success_count, error_count)
+                return
             
             try:
                 # Handle cross-storage scenarios
