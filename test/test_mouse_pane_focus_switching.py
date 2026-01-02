@@ -61,7 +61,6 @@ class TestPaneFocusSwitching:
              patch('tfm_main.ProgressManager'), \
              patch('tfm_main.CacheManager'), \
              patch('tfm_main.ArchiveOperations'), \
-             patch('tfm_main.ArchiveUI'), \
              patch('tfm_main.FileOperationsUI'), \
              patch('tfm_main.UILayerStack'), \
              patch('tfm_main.Path'):

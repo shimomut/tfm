@@ -10,62 +10,9 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_archive_ttk_integration.py -v
 import tempfile
 import zipfile
 from pathlib import Path as PathlibPath
-from unittest.mock import Mock
 
-from tfm_archive import ArchiveOperations, ArchiveUI
+from tfm_archive import ArchiveOperations
 from tfm_path import Path
-from tfm_progress_manager import ProgressManager
-
-
-class MockFileManager:
-    """Mock file manager for testing ArchiveUI"""
-    
-    def __init__(self, renderer):
-        self.renderer = renderer
-        self.log_manager = None
-        self.progress_manager = ProgressManager()
-        self.cache_manager = None
-        self.config = type('Config', (), {
-            'CONFIRM_EXTRACT_ARCHIVE': False
-        })()
-        self.needs_full_redraw = False
-        self.quick_edit_bar = type('Dialog', (), {
-            'hide': lambda: None,
-            'show_status_line_input': lambda *args, **kwargs: None
-        })()
-        
-        # Mock panes
-        self.left_pane = {
-            'path': Path(tempfile.gettempdir()),
-            'files': [],
-            'selected_index': 0,
-            'selected_files': []
-        }
-        self.right_pane = {
-            'path': Path(tempfile.gettempdir()),
-            'files': [],
-            'selected_index': 0,
-            'selected_files': []
-        }
-        self.active_pane = 'left'
-    
-    def get_current_pane(self):
-        return self.left_pane if self.active_pane == 'left' else self.right_pane
-    
-    def get_inactive_pane(self):
-        return self.right_pane if self.active_pane == 'left' else self.left_pane
-    
-    def draw_status(self):
-        """Mock draw_status method"""
-        pass
-    
-    def refresh_files(self, pane):
-        """Mock refresh_files method"""
-        pass
-    
-    def adjust_scroll_for_selection(self, pane):
-        """Mock adjust_scroll_for_selection method"""
-        pass
 
 
 def test_archive_operations_initialization():
@@ -80,60 +27,6 @@ def test_archive_operations_initialization():
     assert archive_ops.progress_manager is None
     
     print("✓ ArchiveOperations initialized successfully")
-
-
-def test_archive_ui_initialization_with_renderer():
-    """Test that ArchiveUI can be initialized with TTK renderer"""
-    print("Testing ArchiveUI initialization with TTK renderer...")
-    
-    # Create mock renderer
-    renderer = Mock()
-    
-    # Create mock file manager with renderer
-    file_manager = MockFileManager(renderer)
-    
-    # Create archive operations
-    archive_ops = ArchiveOperations(
-        log_manager=file_manager.log_manager,
-        cache_manager=file_manager.cache_manager,
-        progress_manager=file_manager.progress_manager
-    )
-    
-    # Create archive UI
-    archive_ui = ArchiveUI(file_manager, archive_ops)
-    
-    assert archive_ui is not None
-    assert archive_ui.file_manager == file_manager
-    assert archive_ui.archive_operations == archive_ops
-    
-    print("✓ ArchiveUI initialized successfully with TTK renderer")
-
-
-def test_archive_ui_progress_callback_uses_renderer():
-    """Test that progress callback uses renderer.refresh() instead of stdscr.refresh()"""
-    print("Testing ArchiveUI progress callback uses renderer...")
-    
-    # Create mock renderer
-    renderer = Mock()
-    
-    # Create mock file manager with renderer
-    file_manager = MockFileManager(renderer)
-    
-    # Create archive operations and UI
-    archive_ops = ArchiveOperations(
-        log_manager=file_manager.log_manager,
-        cache_manager=file_manager.cache_manager,
-        progress_manager=file_manager.progress_manager
-    )
-    archive_ui = ArchiveUI(file_manager, archive_ops)
-    
-    # Call progress callback
-    archive_ui._progress_callback({})
-    
-    # Verify renderer.refresh() was called
-    renderer.refresh.assert_called_once()
-    
-    print("✓ Progress callback correctly uses renderer.refresh()")
 
 
 def test_archive_format_detection():
@@ -211,8 +104,6 @@ def run_all_tests():
     
     tests = [
         test_archive_operations_initialization,
-        test_archive_ui_initialization_with_renderer,
-        test_archive_ui_progress_callback_uses_renderer,
         test_archive_format_detection,
         test_archive_operations_with_real_archive,
         test_no_curses_imports,

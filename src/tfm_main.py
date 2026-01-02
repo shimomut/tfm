@@ -55,7 +55,7 @@ from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
 from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
-from tfm_archive import ArchiveOperations, ArchiveUI
+from tfm_archive import ArchiveOperations
 from tfm_archive_operation_task import ArchiveOperationTask
 from tfm_archive_operation_executor import ArchiveOperationExecutor
 from tfm_archive_operation_ui import ArchiveOperationUI
@@ -335,7 +335,6 @@ class FileManager(UILayer):
         self.archive_operations_executor = ArchiveOperationExecutor(self, self.progress_manager, self.cache_manager)
         self.archive_operations = ArchiveOperations(self.log_manager, self.cache_manager, self.progress_manager)
         self.archive_operations.set_file_manager(self)  # Enable task-based operations
-        self.archive_ui = ArchiveUI(self, self.archive_operations)
         self.archive_operation_ui = ArchiveOperationUI(self)
         self.file_operations_ui = FileOperationUI(self, self.file_list_manager)
         
