@@ -82,10 +82,10 @@ class CacheManager:
             for bucket, keys in buckets_to_invalidate.items():
                 for key in keys:
                     s3_cache.invalidate_key(bucket, key)
-                    self.logger.info(f"Invalidated S3 cache for {operation}: s3://{bucket}/{key}")
+                    self.logger.debug(f"Invalidated S3 cache for {operation}: s3://{bucket}/{key}")
             
             if buckets_to_invalidate:
-                self.logger.info(f"S3 cache invalidation completed for {operation} on {len(s3_paths)} paths")
+                self.logger.debug(f"S3 cache invalidation completed for {operation} on {len(s3_paths)} paths")
         
         except Exception as e:
             self.logger.warning(f"Warning: S3 cache invalidation failed for {operation}: {e}")

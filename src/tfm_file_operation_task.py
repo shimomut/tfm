@@ -113,7 +113,7 @@ class FileOperationTask(BaseTask):
             executor: Reference to FileOperationExecutor for I/O operations
                      (optional for backward compatibility during migration)
         """
-        super().__init__(file_manager)
+        super().__init__(file_manager, logger_name="FileOp")
         self.ui = ui
         self.executor = executor
         self.file_operations_ui = ui  # Keep for backward compatibility during migration

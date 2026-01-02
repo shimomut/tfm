@@ -52,14 +52,15 @@ class BaseTask(ABC):
                 return self.state
     """
     
-    def __init__(self, file_manager):
+    def __init__(self, file_manager, logger_name=None):
         """Initialize base task.
         
         Args:
             file_manager: Reference to FileManager for UI interactions
+            logger_name: Optional custom logger name (defaults to class name if not provided)
         """
         self.file_manager = file_manager
-        self.logger = getLogger(self.__class__.__name__)
+        self.logger = getLogger(logger_name if logger_name else self.__class__.__name__)
     
     @abstractmethod
     def start(self):

@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from tfm_base_task import BaseTask
-from tfm_log_manager import getLogger
 
 
 class State(Enum):
@@ -113,12 +112,11 @@ class ArchiveOperationTask(BaseTask):
             ui: Reference to ArchiveOperationUI for UI interactions
             executor: Reference to ArchiveOperationExecutor for I/O operations
         """
-        super().__init__(file_manager)
+        super().__init__(file_manager, logger_name="ArchiveOp")
         self.ui = ui
         self.executor = executor
         self.state = State.IDLE
         self.context: Optional[ArchiveOperationContext] = None
-        self.logger = getLogger("ArchiveOp")
     
     def start(self):
         """Start the task (called by FileManager).

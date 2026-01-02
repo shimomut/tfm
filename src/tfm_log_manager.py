@@ -483,7 +483,7 @@ class LogManager:
         new logging infrastructure to ensure consistent handling.
         
         Args:
-            source: Message source identifier (e.g., "SYSTEM", "CONFIG", "FileOp")
+            source: Message source identifier (e.g., "System", "Config", "FileOp")
             message: Message text
         """
         # Route through logging infrastructure for consistent handling
@@ -531,10 +531,10 @@ class LogManager:
             app_name: Application name
         """
         # Use add_message() which now routes through logging infrastructure
-        self.add_message("SYSTEM", f"TFM {version}")
-        self.add_message("SYSTEM", f"GitHub: {github_url}")
-        self.add_message("SYSTEM", f"{app_name} started successfully")
-        self.add_message("CONFIG", "Configuration loaded")
+        self.add_message("System", f"TFM {version}")
+        self.add_message("System", f"GitHub: {github_url}")
+        self.add_message("System", f"{app_name} started successfully")
+        self.add_message("Config", "Configuration loaded")
     
     def get_log_scroll_percentage(self, display_height=None):
         """Calculate the current log scroll position as a percentage"""
