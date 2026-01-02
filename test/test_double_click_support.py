@@ -98,7 +98,7 @@ class TestFileManagerDoubleClick:
         # Mock is_dir to return False for file
         with patch.object(Path, 'is_dir', return_value=False):
             # Mock archive check
-            fm.archive_operations.is_archive = Mock(return_value=False)
+            fm.archive_operations_executor.is_archive = Mock(return_value=False)
             
             # Mock get_program_for_file to return None (no association)
             with patch('src.tfm_main.get_program_for_file', return_value=None):
@@ -157,7 +157,7 @@ class TestFileManagerDoubleClick:
         
         # Mock is_dir and archive check
         with patch.object(Path, 'is_dir', return_value=False):
-            fm.archive_operations.is_archive = Mock(return_value=False)
+            fm.archive_operations_executor.is_archive = Mock(return_value=False)
             fm.external_program_manager.open_file = Mock()
             
             # Double-click in right pane (column 40 is in right pane)

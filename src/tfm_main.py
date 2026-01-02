@@ -55,7 +55,9 @@ from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
 from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
-from tfm_archive import ArchiveOperations, ArchiveUI
+from tfm_archive_operation_task import ArchiveOperationTask
+from tfm_archive_operation_executor import ArchiveOperationExecutor
+from tfm_archive_operation_ui import ArchiveOperationUI
 from tfm_cache_manager import CacheManager
 from tfm_menu_manager import MenuManager
 from tfm_ui_layer import UILayerStack, UILayer
@@ -329,9 +331,13 @@ class FileManager(UILayer):
         self.progress_manager = ProgressManager()
         self.cache_manager = CacheManager(self.log_manager)
         self.file_operations_executor = FileOperationExecutor(self)
-        self.archive_operations = ArchiveOperations(self.log_manager, self.cache_manager, self.progress_manager)
-        self.archive_ui = ArchiveUI(self, self.archive_operations)
+        self.archive_operations_executor = ArchiveOperationExecutor(self, self.progress_manager, self.cache_manager)
+        self.archive_operation_ui = ArchiveOperationUI(self)
         self.file_operations_ui = FileOperationUI(self, self.file_list_manager)
+        
+        # Create ArchiveOperationTask for task-based archive operations
+        from tfm_archive_operation_task import ArchiveOperationTask
+        self.archive_operation_task = ArchiveOperationTask(self, self.archive_operation_ui, self.archive_operations_executor)
         
         # Initialize drag-and-drop components
         self.drag_gesture_detector = DragGestureDetector()
@@ -2476,7 +2482,7 @@ class FileManager(UILayer):
                 self.mark_dirty()
             except PermissionError:
                 self.logger.error("ERROR: Permission denied")
-        elif self.archive_operations.is_archive(focused_file):
+        elif self.archive_operations_executor.is_archive(focused_file):
             # Navigate into archive as virtual directory
             try:
                 # Import archive exceptions for specific error handling
@@ -3851,16 +3857,100 @@ class FileManager(UILayer):
         self.file_operations_ui.perform_delete_operation(files_to_delete)
     
     def enter_create_archive_mode(self):
-        """Enter archive creation mode - delegated to ArchiveUI"""
-        self.archive_ui.enter_create_archive_mode()
+        """Enter archive creation mode - uses task-based system"""
+        current_pane = self.get_current_pane()
+        
+        # Check if there are files to archive
+        files_to_archive = []
+        
+        if current_pane['selected_files']:
+            # Archive selected files
+            for file_path_str in current_pane['selected_files']:
+                file_path = Path(file_path_str)
+                if file_path.exists():
+                    files_to_archive.append(file_path)
+        else:
+            # Archive current file if no files are selected
+            if current_pane['files']:
+                focused_file = current_pane['files'][current_pane['focused_index']]
+                files_to_archive.append(focused_file)
+        
+        if not files_to_archive:
+            self.logger.info("No files to archive")
+            return
+        
+        # Determine default filename for single file/directory
+        default_filename = ""
+        if len(files_to_archive) == 1:
+            # Use basename of the single file/directory with a dot for extension
+            basename = files_to_archive[0].stem if files_to_archive[0].is_file() else files_to_archive[0].name
+            default_filename = f"{basename}."
+        
+        # Store files_to_archive for later use in confirmation callback
+        self._pending_archive_files = files_to_archive
+        
+        # Enter archive creation mode using general dialog with default filename
+        self.quick_edit_bar.show_status_line_input(
+            prompt="Archive filename: ",
+            help_text="ESC:cancel Enter:create (.zip/.tar.gz/.tgz)",
+            initial_text=default_filename,
+            callback=self.on_create_archive_confirm,
+            cancel_callback=self.on_create_archive_cancel
+        )
+        self.mark_dirty()
+        
+        # Log what we're about to archive
+        if len(files_to_archive) == 1:
+            self.logger.info(f"Creating archive from: {files_to_archive[0].name}")
+        else:
+            self.logger.info(f"Creating archive from {len(files_to_archive)} selected items")
+        self.logger.info("Enter archive filename (with .zip, .tar.gz, or .tgz extension):")
     
     def on_create_archive_confirm(self, archive_name):
-        """Handle create archive confirmation - delegated to ArchiveUI"""
-        self.archive_ui.on_create_archive_confirm(archive_name)
+        """Handle create archive confirmation - uses task-based system"""
+        if not archive_name.strip():
+            self.logger.info("Invalid archive name")
+            self.quick_edit_bar.hide()
+            self.mark_dirty()
+            return
+        
+        other_pane = self.get_inactive_pane()
+        
+        # Determine archive format from extension
+        archive_name = archive_name.strip()
+        if not any(archive_name.endswith(ext) for ext in ['.zip', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz', '.tar']):
+            # Default to .tar.gz if no recognized extension
+            archive_name += '.tar.gz'
+        
+        # Determine format type
+        if archive_name.endswith('.zip'):
+            format_type = 'zip'
+        elif archive_name.endswith(('.tar.gz', '.tgz')):
+            format_type = 'tar.gz'
+        elif archive_name.endswith(('.tar.bz2', '.tbz2')):
+            format_type = 'tar.bz2'
+        elif archive_name.endswith(('.tar.xz', '.txz')):
+            format_type = 'tar.xz'
+        elif archive_name.endswith('.tar'):
+            format_type = 'tar'
+        else:
+            format_type = 'tar.gz'
+        
+        # Create archive path in the other pane
+        archive_path = other_pane['path'] / archive_name
+        
+        # Hide the input bar
+        self.quick_edit_bar.hide()
+        
+        # Start the archive operation task
+        self.archive_operation_task.start_operation('create', self._pending_archive_files, archive_path, format_type)
+        self.start_task(self.archive_operation_task)
     
     def on_create_archive_cancel(self):
-        """Handle create archive cancellation - delegated to ArchiveUI"""
-        self.archive_ui.on_create_archive_cancel()
+        """Handle create archive cancellation"""
+        self.logger.info("Archive creation cancelled")
+        self.quick_edit_bar.hide()
+        self.mark_dirty()
     
     def _progress_callback(self, progress_data):
         """Callback for progress manager updates"""
@@ -3893,8 +3983,45 @@ class FileManager(UILayer):
         return total_files
     
     def extract_selected_archive(self):
-        """Extract the selected archive file to the other pane - delegated to ArchiveUI"""
-        self.archive_ui.extract_selected_archive()
+        """Extract the selected archive file to the other pane - uses task-based system"""
+        current_pane = self.get_current_pane()
+        other_pane = self.get_inactive_pane()
+        
+        if not current_pane['files']:
+            self.logger.info("No files in current directory")
+            return
+        
+        # Get the selected file
+        focused_file = current_pane['files'][current_pane['focused_index']]
+        
+        if not focused_file.is_file():
+            self.logger.info("Focused item is not a file")
+            return
+        
+        # Check if it's an archive file
+        supported_extensions = ['.zip', '.tar.gz', '.tar.bz2', '.tar.xz', '.tgz', '.tbz2', '.txz', '.tar']
+        is_archive = any(str(focused_file).endswith(ext) for ext in supported_extensions)
+        
+        if not is_archive:
+            self.logger.error(f"'{focused_file.name}' is not a supported archive format")
+            self.logger.info("Supported formats: .zip, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .txz, .tar")
+            return
+        
+        # Determine archive basename (without extension)
+        archive_name = focused_file.name
+        if archive_name.endswith('.tar.gz') or archive_name.endswith('.tar.bz2') or archive_name.endswith('.tar.xz'):
+            archive_basename = archive_name.rsplit('.', 2)[0]
+        elif archive_name.endswith(('.tgz', '.tbz2', '.txz', '.zip', '.tar')):
+            archive_basename = archive_name.rsplit('.', 1)[0]
+        else:
+            archive_basename = archive_name
+        
+        # Create extraction directory in the other pane
+        extract_dir = other_pane['path'] / archive_basename
+        
+        # Start the archive operation task
+        self.archive_operation_task.start_operation('extract', [focused_file], extract_dir)
+        self.start_task(self.archive_operation_task)
     
     def handle_isearch_input(self, event):
         """Handle input while in isearch mode"""
