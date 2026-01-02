@@ -519,17 +519,23 @@ class ArchiveOperationTask(BaseTask):
         self.logger.info(f"Starting archive extraction to {self.context.destination}")
         
         # Determine if we should overwrite based on conflict resolution
-        overwrite = self.context.options.get('overwrite_all', False)
+        # If overwrite_all is True, overwrite everything
+        # If individual files were marked for overwrite, we need to pass them separately
+        overwrite_all = self.context.options.get('overwrite_all', False)
         
         # Build list of files to skip (those marked as skipped during conflict resolution)
         skip_files = [path.name for path in self.context.results.get('skipped', [])]
+        
+        # Build list of files to overwrite (those marked for overwrite during conflict resolution)
+        overwrite_files = [path.name for path in self.context.results.get('success', [])]
         
         # Call executor to perform extraction operation
         self.executor.perform_extract_operation(
             self.context.source_paths[0],  # Archive file is first (and only) source path
             self.context.destination,
-            overwrite,
+            overwrite_all,
             skip_files=skip_files,
+            overwrite_files=overwrite_files,
             completion_callback=self._on_operation_complete
         )
     

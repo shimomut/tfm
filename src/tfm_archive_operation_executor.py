@@ -123,6 +123,7 @@ class ArchiveOperationExecutor:
     
     def perform_extract_operation(self, archive_path: Path, destination_dir: Path,
                                  overwrite: bool, skip_files: List[str] = None,
+                                 overwrite_files: List[str] = None,
                                  completion_callback: Optional[Callable] = None):
         """
         Extract archive in background thread with progress tracking.
@@ -132,14 +133,15 @@ class ArchiveOperationExecutor:
         Args:
             archive_path: Path to the archive file
             destination_dir: Directory to extract to
-            overwrite: Whether to overwrite existing files
+            overwrite: Whether to overwrite all existing files
             skip_files: List of filenames to skip during extraction (optional)
+            overwrite_files: List of filenames to overwrite even if overwrite=False (optional)
             completion_callback: Optional callback(success_count, error_count) on completion
         """
         # Create and start background thread
         thread = threading.Thread(
             target=self._extract_archive_thread,
-            args=(archive_path, destination_dir, overwrite, skip_files or [], completion_callback),
+            args=(archive_path, destination_dir, overwrite, skip_files or [], overwrite_files or [], completion_callback),
             daemon=True
         )
         self._current_thread = thread
@@ -238,6 +240,7 @@ class ArchiveOperationExecutor:
 
     def _extract_archive_thread(self, archive_path: Path, destination_dir: Path,
                                overwrite: bool, skip_files: List[str],
+                               overwrite_files: List[str],
                                completion_callback: Optional[Callable]):
         """Background thread for archive extraction"""
         success_count = 0
@@ -304,12 +307,12 @@ class ArchiveOperationExecutor:
                 # If both are local, extract directly
                 if archive_scheme == 'file' and dest_scheme == 'file':
                     success_count, error_count, skipped_count = self._extract_archive_local(
-                        archive_path, destination_dir, format_info, overwrite, skip_files, completion_callback
+                        archive_path, destination_dir, format_info, overwrite, skip_files, overwrite_files, completion_callback
                     )
                 else:
                     # For cross-storage, use temporary file approach
                     success_count, error_count, skipped_count = self._extract_archive_cross_storage(
-                        archive_path, destination_dir, format_info, overwrite, skip_files
+                        archive_path, destination_dir, format_info, overwrite, skip_files, overwrite_files
                     )
             finally:
                 # Stop animation loop
@@ -510,6 +513,9 @@ class ArchiveOperationExecutor:
         """
         Get list of files in archive that would conflict with existing files.
         
+        This method applies the same path adjustment logic as extraction to ensure
+        conflict detection matches actual extraction behavior.
+        
         Args:
             archive_path: Path to archive file
             destination_dir: Destination directory for extraction
@@ -537,6 +543,33 @@ class ArchiveOperationExecutor:
                 temp_dir = None
             
             try:
+                # Check archive structure to determine path adjustments (same as extraction)
+                should_strip, strip_name, is_single_file = self._get_archive_top_level_structure(archive_path, format_info)
+                
+                # Determine actual extraction directory (same logic as _extract_archive_local)
+                if should_strip:
+                    # Archive has single top-level directory - strip it
+                    extract_dir = destination_dir
+                    strip_prefix = strip_name + '/'
+                elif is_single_file:
+                    # Archive has single top-level file - extract to parent to avoid wrapper directory
+                    archive_stem = archive_path.stem
+                    if archive_stem.endswith('.tar'):  # Handle .tar.gz, .tar.bz2, etc.
+                        archive_stem = archive_stem[:-4]
+                    
+                    if destination_dir.name == archive_stem:
+                        # Destination is auto-created wrapper directory - extract to parent instead
+                        extract_dir = destination_dir.parent
+                        strip_prefix = None
+                    else:
+                        # Destination is user-specified - use it as-is
+                        extract_dir = destination_dir
+                        strip_prefix = None
+                else:
+                    # Archive has multiple top-level items - use destination as-is
+                    extract_dir = destination_dir
+                    strip_prefix = None
+                
                 if format_info['type'] == 'tar':
                     mode = self._get_tar_mode(format_info, 'r')
                     with tarfile.open(archive_to_check, mode) as tar:
@@ -549,8 +582,16 @@ class ArchiveOperationExecutor:
                             if member.isdir():
                                 continue
                             
-                            # Check if file would conflict
-                            dest_path = destination_dir / member.name
+                            # Adjust member name if stripping prefix (same as extraction)
+                            member_name = member.name
+                            if strip_prefix and member_name.startswith(strip_prefix):
+                                member_name = member_name[len(strip_prefix):]
+                                # Skip if this results in empty name
+                                if not member_name:
+                                    continue
+                            
+                            # Check if file would conflict using adjusted path
+                            dest_path = extract_dir / member_name
                             if dest_path.exists():
                                 conflicting_files.append(dest_path)
                 
@@ -565,8 +606,16 @@ class ArchiveOperationExecutor:
                             if member.endswith('/'):
                                 continue
                             
-                            # Check if file would conflict
-                            dest_path = destination_dir / member
+                            # Adjust member name if stripping prefix (same as extraction)
+                            member_name = member
+                            if strip_prefix and member_name.startswith(strip_prefix):
+                                member_name = member_name[len(strip_prefix):]
+                                # Skip if this results in empty name
+                                if not member_name:
+                                    continue
+                            
+                            # Check if file would conflict using adjusted path
+                            dest_path = extract_dir / member_name
                             if dest_path.exists():
                                 conflicting_files.append(dest_path)
             
@@ -1267,6 +1316,7 @@ class ArchiveOperationExecutor:
 
     def _extract_archive_local(self, archive_path: Path, destination_dir: Path,
                               format_info: Dict, overwrite: bool, skip_files: List[str] = None,
+                              overwrite_files: List[str] = None,
                               completion_callback: Optional[Callable] = None) -> tuple:
         """
         Extract archive when both paths are local.
@@ -1277,8 +1327,9 @@ class ArchiveOperationExecutor:
             archive_path: Path to archive file
             destination_dir: Destination directory
             format_info: Archive format information
-            overwrite: Whether to overwrite existing files
+            overwrite: Whether to overwrite all existing files
             skip_files: List of filenames to skip during extraction
+            overwrite_files: List of filenames to overwrite even if overwrite=False
             
         Returns:
             Tuple of (success_count, error_count, skipped_count)
@@ -1287,6 +1338,7 @@ class ArchiveOperationExecutor:
         error_count = 0
         skipped_count = 0
         skip_files = skip_files or []
+        overwrite_files = overwrite_files or []
         
         try:
             # Check archive structure BEFORE creating directories
@@ -1354,7 +1406,9 @@ class ArchiveOperationExecutor:
                         dest_path = extract_dir / member_name
                         
                         # Check for overwrite
-                        if dest_path.exists() and not overwrite:
+                        # Overwrite if: overwrite=True OR file is in overwrite_files list
+                        should_overwrite = overwrite or member_name in overwrite_files
+                        if dest_path.exists() and not should_overwrite:
                             self.logger.warning(f"File exists, skipping: {member_name}")
                             skipped_count += 1
                             continue
@@ -1435,7 +1489,9 @@ class ArchiveOperationExecutor:
                         dest_path = extract_dir / member_name
                         
                         # Check for overwrite
-                        if dest_path.exists() and not overwrite:
+                        # Overwrite if: overwrite=True OR file is in overwrite_files list
+                        should_overwrite = overwrite or member_name in overwrite_files
+                        if dest_path.exists() and not should_overwrite:
                             self.logger.warning(f"File exists, skipping: {member_name}")
                             skipped_count += 1
                             continue
@@ -1518,7 +1574,8 @@ class ArchiveOperationExecutor:
         return (success_count, error_count, skipped_count)
 
     def _extract_archive_cross_storage(self, archive_path: Path, destination_dir: Path,
-                                      format_info: Dict, overwrite: bool, skip_files: List[str] = None) -> tuple:
+                                      format_info: Dict, overwrite: bool, skip_files: List[str] = None,
+                                      overwrite_files: List[str] = None) -> tuple:
         """
         Extract archive with cross-storage support using temporary files.
         
@@ -1528,8 +1585,9 @@ class ArchiveOperationExecutor:
             archive_path: Path to archive file
             destination_dir: Destination directory
             format_info: Archive format information
-            overwrite: Whether to overwrite existing files
+            overwrite: Whether to overwrite all existing files
             skip_files: List of filenames to skip during extraction
+            overwrite_files: List of filenames to overwrite even if overwrite=False
             
         Returns:
             Tuple of (success_count, error_count, skipped_count)
@@ -1539,6 +1597,7 @@ class ArchiveOperationExecutor:
         error_count = 0
         skipped_count = 0
         skip_files = skip_files or []
+        overwrite_files = overwrite_files or []
         
         try:
             # Create temporary directory
@@ -1584,7 +1643,7 @@ class ArchiveOperationExecutor:
             temp_extract_dir.mkdir()
             
             extract_success, extract_errors, extract_skipped = self._extract_archive_local(
-                archive_to_extract, Path(temp_extract_dir), format_info, overwrite=True, skip_files=skip_files, completion_callback=None
+                archive_to_extract, Path(temp_extract_dir), format_info, overwrite=True, skip_files=skip_files, overwrite_files=overwrite_files, completion_callback=None
             )
             success_count += extract_success
             error_count += extract_errors
