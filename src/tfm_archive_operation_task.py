@@ -57,7 +57,7 @@ class ArchiveOperationContext:
         source_paths: List of source files to archive or archive file to extract
         destination: Archive file path (for create) or extraction directory (for extract)
         format_type: Archive format ('tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'zip')
-        conflicts: List of conflicting paths
+        conflicts: List of ConflictInfo objects
         current_conflict_index: Index of conflict currently being resolved
         results: Dictionary tracking operation results by category
         options: Dictionary of user choices for batch operations
@@ -66,7 +66,7 @@ class ArchiveOperationContext:
     source_paths: List[Path]
     destination: Path
     format_type: str = 'tar.gz'
-    conflicts: List[Path] = field(default_factory=list)
+    conflicts: List = field(default_factory=list)  # List of ConflictInfo objects
     current_conflict_index: int = 0
     results: Dict[str, List] = field(default_factory=lambda: {
         'success': [],
@@ -292,13 +292,15 @@ class ArchiveOperationTask(BaseTask):
             self.logger.error("on_conflict_resolved called with no remaining conflicts")
             return
         
-        conflict_path = self.context.conflicts[self.context.current_conflict_index]
+        conflict_info = self.context.conflicts[self.context.current_conflict_index]
+        conflict_path = conflict_info.path
         
         # Handle the choice
         if choice == 'overwrite':
             # Mark file for overwrite
             self.context.results['success'].append(conflict_path)
-            self.logger.info(f"Overwrite selected for: {conflict_path.name}")
+            display_name = conflict_info.archive_entry_name if conflict_info.archive_entry_name else conflict_path.name
+            self.logger.info(f"Overwrite selected for: {display_name}")
             
             # Set apply-to-all option if requested
             if apply_to_all:
@@ -312,7 +314,8 @@ class ArchiveOperationTask(BaseTask):
         elif choice == 'skip':
             # Mark file as skipped
             self.context.results['skipped'].append(conflict_path)
-            self.logger.info(f"Skip selected for: {conflict_path.name}")
+            display_name = conflict_info.archive_entry_name if conflict_info.archive_entry_name else conflict_path.name
+            self.logger.info(f"Skip selected for: {display_name}")
             
             # Set apply-to-all option if requested
             if apply_to_all:
@@ -368,15 +371,12 @@ class ArchiveOperationTask(BaseTask):
             self.context.destination
         )
         
-        # Extract paths from ConflictInfo objects
-        conflicts = [conflict_info.path for conflict_info in conflict_infos]
+        # Store ConflictInfo objects in context
+        self.context.conflicts = conflict_infos
         
-        # Store conflicts in context
-        self.context.conflicts = conflicts
-        
-        if conflicts:
+        if conflict_infos:
             # Conflicts found, transition to resolution state
-            self.logger.info(f"Found {len(conflicts)} conflict(s), transitioning to resolution")
+            self.logger.info(f"Found {len(conflict_infos)} conflict(s), transitioning to resolution")
             self._transition_to_state(State.RESOLVING_CONFLICT)
             self._resolve_next_conflict()
         else:
@@ -411,8 +411,8 @@ class ArchiveOperationTask(BaseTask):
             remaining_conflicts = self.context.conflicts[self.context.current_conflict_index:]
             self.logger.info(f"Auto-overwrite (apply-to-all): processing {len(remaining_conflicts)} remaining conflicts")
             
-            for conflict_path in remaining_conflicts:
-                self.context.results['success'].append(conflict_path)
+            for conflict_info in remaining_conflicts:
+                self.context.results['success'].append(conflict_info.path)
             
             # Update index to mark all conflicts as processed
             self.context.current_conflict_index = len(self.context.conflicts)
@@ -428,8 +428,8 @@ class ArchiveOperationTask(BaseTask):
             remaining_conflicts = self.context.conflicts[self.context.current_conflict_index:]
             self.logger.info(f"Auto-skip (apply-to-all): processing {len(remaining_conflicts)} remaining conflicts")
             
-            for conflict_path in remaining_conflicts:
-                self.context.results['skipped'].append(conflict_path)
+            for conflict_info in remaining_conflicts:
+                self.context.results['skipped'].append(conflict_info.path)
             
             # Update index to mark all conflicts as processed
             self.context.current_conflict_index = len(self.context.conflicts)
@@ -441,7 +441,8 @@ class ArchiveOperationTask(BaseTask):
             return
         
         # Get current conflict
-        conflict_path = self.context.conflicts[self.context.current_conflict_index]
+        conflict_info = self.context.conflicts[self.context.current_conflict_index]
+        conflict_path = conflict_info.path
         
         # Calculate conflict numbers
         conflict_num = self.context.current_conflict_index + 1
@@ -454,8 +455,12 @@ class ArchiveOperationTask(BaseTask):
             conflict_type = 'file_exists'
         
         # Build conflict info dictionary
-        conflict_info = {
+        # For archive extraction, use archive_entry_name if available, otherwise use path
+        display_name = conflict_info.archive_entry_name if conflict_info.archive_entry_name else conflict_path.name
+        
+        conflict_info_dict = {
             'path': conflict_path,
+            'display_name': display_name,
             'size': conflict_path.stat().st_size if conflict_path.exists() else None,
             'is_directory': conflict_path.is_dir() if conflict_path.exists() else False
         }
@@ -463,7 +468,7 @@ class ArchiveOperationTask(BaseTask):
         # Show conflict dialog via UI
         self.ui.show_conflict_dialog(
             conflict_type,
-            conflict_info,
+            conflict_info_dict,
             conflict_num,
             total_conflicts,
             lambda choice, apply_to_all=False: self.on_conflict_resolved(choice, apply_to_all)

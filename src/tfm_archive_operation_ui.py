@@ -118,13 +118,14 @@ class ArchiveOperationUI:
         """
         # Extract conflict information
         conflict_path = conflict_info.get('path')
+        display_name = conflict_info.get('display_name', conflict_path.name if conflict_path else 'unknown')
         conflict_size = conflict_info.get('size')
         is_directory = conflict_info.get('is_directory', False)
         
         # Build conflict message based on conflict type
         if conflict_type == 'archive_exists':
             # Archive file already exists (for create operations)
-            message = f"Archive exists: {conflict_path.name}"
+            message = f"Archive exists: {display_name}"
             if conflict_size is not None:
                 # Format size in human-readable format
                 size_str = self._format_size(conflict_size)
@@ -142,9 +143,9 @@ class ArchiveOperationUI:
         elif conflict_type == 'file_exists':
             # File exists in extraction destination (for extract operations)
             if is_directory:
-                message = f"Directory exists: {conflict_path.name}"
+                message = f"Directory exists: {display_name}"
             else:
-                message = f"File exists: {conflict_path.name}"
+                message = f"File exists: {display_name}"
             
             if conflict_size is not None and not is_directory:
                 size_str = self._format_size(conflict_size)
@@ -161,7 +162,7 @@ class ArchiveOperationUI:
         
         else:
             # Fallback for unknown conflict types
-            message = f"Conflict: {conflict_path.name if conflict_path else 'unknown'}"
+            message = f"Conflict: {display_name}"
             if total_conflicts > 1:
                 message += f" ({conflict_num}/{total_conflicts})"
             

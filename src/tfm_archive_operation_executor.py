@@ -37,11 +37,13 @@ class ConflictInfo:
         path: Conflicting path
         size: File size if applicable (None for directories or non-existent files)
         is_directory: Whether conflict is a directory
+        archive_entry_name: For archive extraction conflicts, the relative path within the archive
     """
     conflict_type: str
     path: Path
     size: Optional[int] = None
     is_directory: bool = False
+    archive_entry_name: Optional[str] = None
 
 
 class ArchiveOperationExecutor:
@@ -79,7 +81,7 @@ class ArchiveOperationExecutor:
         self.file_manager = file_manager
         self.progress_manager = progress_manager
         self.cache_manager = cache_manager
-        self.logger = getLogger("ArchiveExec")
+        self.logger = getLogger("ArchiveOp")
         
         # Thread tracking
         self._current_thread: Optional[threading.Thread] = None
@@ -486,7 +488,7 @@ class ArchiveOperationExecutor:
                     archive_path, destination, format_info
                 )
                 
-                for file_path in conflicting_files:
+                for file_path, archive_entry_name in conflicting_files:
                     # Check for cancellation during conflict detection
                     if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
                         self.logger.info("Conflict detection cancelled")
@@ -496,7 +498,8 @@ class ArchiveOperationExecutor:
                         conflict_type='file_exists',
                         path=file_path,
                         size=file_path.stat().st_size if file_path.exists() and file_path.is_file() else None,
-                        is_directory=file_path.is_dir() if file_path.exists() else False
+                        is_directory=file_path.is_dir() if file_path.exists() else False,
+                        archive_entry_name=archive_entry_name
                     )
                     conflicts.append(conflict)
                 
@@ -509,7 +512,7 @@ class ArchiveOperationExecutor:
         return conflicts
     
     def _get_conflicting_files_in_archive(self, archive_path: Path, destination_dir: Path,
-                                         format_info: Dict) -> List[Path]:
+                                         format_info: Dict) -> List[tuple]:
         """
         Get list of files in archive that would conflict with existing files.
         
@@ -522,7 +525,7 @@ class ArchiveOperationExecutor:
             format_info: Archive format information
             
         Returns:
-            List of Path objects that would conflict
+            List of tuples (dest_path, archive_entry_name) that would conflict
         """
         conflicting_files = []
         
@@ -593,7 +596,7 @@ class ArchiveOperationExecutor:
                             # Check if file would conflict using adjusted path
                             dest_path = extract_dir / member_name
                             if dest_path.exists():
-                                conflicting_files.append(dest_path)
+                                conflicting_files.append((dest_path, member_name))
                 
                 elif format_info['type'] == 'zip':
                     with zipfile.ZipFile(archive_to_check, 'r') as zip_file:
@@ -617,7 +620,7 @@ class ArchiveOperationExecutor:
                             # Check if file would conflict using adjusted path
                             dest_path = extract_dir / member_name
                             if dest_path.exists():
-                                conflicting_files.append(dest_path)
+                                conflicting_files.append((dest_path, member_name))
             
             finally:
                 if temp_dir:
