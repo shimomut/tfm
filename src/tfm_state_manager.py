@@ -37,7 +37,7 @@ class StateManager:
         Args:
             db_path: Optional custom database path. Defaults to ~/.tfm/state.db
         """
-        self.logger = getLogger("StateMgr")
+        self.logger = getLogger("State")
         
         if db_path is None:
             self.db_path = Path.home() / '.tfm' / 'state.db'

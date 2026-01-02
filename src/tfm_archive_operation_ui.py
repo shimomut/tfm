@@ -56,7 +56,7 @@ class ArchiveOperationUI:
         """
         self.file_manager = file_manager
         self.config = file_manager.config
-        self.logger = getLogger("ArchiveUI")
+        self.logger = getLogger("ArcvOp")
     
     def show_confirmation_dialog(self, operation_type: str, source_paths: List[Path],
                                 destination: Path, callback: Callable[[bool], None]):

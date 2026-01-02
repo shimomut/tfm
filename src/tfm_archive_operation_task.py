@@ -112,7 +112,7 @@ class ArchiveOperationTask(BaseTask):
             ui: Reference to ArchiveOperationUI for UI interactions
             executor: Reference to ArchiveOperationExecutor for I/O operations
         """
-        super().__init__(file_manager, logger_name="ArchiveOp")
+        super().__init__(file_manager, logger_name="ArcvOp")
         self.ui = ui
         self.executor = executor
         self.state = State.IDLE

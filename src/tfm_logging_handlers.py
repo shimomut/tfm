@@ -124,7 +124,9 @@ class LogPaneHandler(logging.Handler):
             Formatted string: "HH:MM:SS [LoggerName] LEVEL: message"
         """
         timestamp = datetime.fromtimestamp(record.created).strftime(LOG_TIME_FORMAT)
-        return f"{timestamp} [{record.name}] {record.levelname}: {record.getMessage()}"
+        # Pad logger name to 6 chars if shorter, keep as-is if longer
+        logger_name = record.name.ljust(6) if len(record.name) < 6 else record.name
+        return f"{timestamp} [{logger_name}] {record.levelname}: {record.getMessage()}"
     
     def get_messages(self) -> List[Tuple[str, logging.LogRecord]]:
         """
