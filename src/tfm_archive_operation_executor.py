@@ -195,7 +195,7 @@ class ArchiveOperationExecutor:
             )
             
             # Check for cancellation after counting
-            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+            if not self._should_continue_operation():
                 self.logger.info("Archive creation cancelled before starting")
                 if completion_callback:
                     completion_callback(success_count, error_count)
@@ -226,7 +226,7 @@ class ArchiveOperationExecutor:
             
             # Invalidate cache if successful and not cancelled
             if success_count > 0 and self.cache_manager:
-                if not (hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled):
+                if self._should_continue_operation():
                     self.cache_manager.invalidate_cache_for_archive_operation(archive_path, source_paths)
             
         except Exception as e:
@@ -295,7 +295,7 @@ class ArchiveOperationExecutor:
             )
             
             # Check for cancellation after counting
-            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+            if not self._should_continue_operation():
                 self.logger.info("Archive extraction cancelled before starting")
                 if completion_callback:
                     completion_callback(success_count, error_count)
@@ -326,7 +326,7 @@ class ArchiveOperationExecutor:
             
             # Invalidate cache if successful and not cancelled
             if success_count > 0 and self.cache_manager:
-                if not (hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled):
+                if self._should_continue_operation():
                     self.cache_manager.invalidate_cache_for_directory(destination_dir, "archive extraction")
             
         except Exception as e:
@@ -353,7 +353,7 @@ class ArchiveOperationExecutor:
         total = 0
         for path in paths:
             # Check for cancellation
-            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+            if not self._should_continue_operation():
                 break
             
             try:
@@ -362,7 +362,7 @@ class ArchiveOperationExecutor:
                 elif path.is_dir():
                     # Count files in directory recursively
                     for item in path.rglob('*'):
-                        if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                        if not self._should_continue_operation():
                             break
                         if item.is_file():
                             total += 1
@@ -438,6 +438,34 @@ class ArchiveOperationExecutor:
             # This is independent of progress updates
             time.sleep(0.1)
     
+    def _should_continue_operation(self) -> bool:
+        """Check if operation should continue or has been cancelled.
+        
+        Returns:
+            True if operation should continue, False if cancelled
+        """
+        return not (hasattr(self.file_manager, 'operation_cancelled') and 
+                   self.file_manager.operation_cancelled)
+    
+    def _get_adjusted_member_path(self, member_name: str, strip_prefix: Optional[str]) -> Optional[str]:
+        """Get adjusted member path after stripping prefix if needed.
+        
+        This consolidates the path adjustment logic used in conflict detection
+        and extraction to ensure consistency.
+        
+        Args:
+            member_name: Original member name from archive
+            strip_prefix: Prefix to strip (e.g., "top_dir/"), or None
+        
+        Returns:
+            Adjusted member name, or None if result would be empty
+        """
+        if strip_prefix and member_name.startswith(strip_prefix):
+            adjusted = member_name[len(strip_prefix):]
+            # Return None if stripping results in empty name
+            return adjusted if adjusted else None
+        return member_name
+    
     def _check_conflicts(self, operation_type: str, source_paths: List[Path], 
                         destination: Path) -> List[ConflictInfo]:
         """
@@ -490,7 +518,7 @@ class ArchiveOperationExecutor:
                 
                 for file_path, archive_entry_name in conflicting_files:
                     # Check for cancellation during conflict detection
-                    if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                    if not self._should_continue_operation():
                         self.logger.info("Conflict detection cancelled")
                         break
                     
@@ -578,7 +606,7 @@ class ArchiveOperationExecutor:
                     with tarfile.open(archive_to_check, mode) as tar:
                         for member in tar.getmembers():
                             # Check for cancellation
-                            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                            if not self._should_continue_operation():
                                 break
                             
                             # Skip directories
@@ -586,12 +614,9 @@ class ArchiveOperationExecutor:
                                 continue
                             
                             # Adjust member name if stripping prefix (same as extraction)
-                            member_name = member.name
-                            if strip_prefix and member_name.startswith(strip_prefix):
-                                member_name = member_name[len(strip_prefix):]
-                                # Skip if this results in empty name
-                                if not member_name:
-                                    continue
+                            member_name = self._get_adjusted_member_path(member.name, strip_prefix)
+                            if member_name is None:
+                                continue
                             
                             # Check if file would conflict using adjusted path
                             dest_path = extract_dir / member_name
@@ -602,7 +627,7 @@ class ArchiveOperationExecutor:
                     with zipfile.ZipFile(archive_to_check, 'r') as zip_file:
                         for member in zip_file.namelist():
                             # Check for cancellation
-                            if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                            if not self._should_continue_operation():
                                 break
                             
                             # Skip directories
@@ -610,12 +635,9 @@ class ArchiveOperationExecutor:
                                 continue
                             
                             # Adjust member name if stripping prefix (same as extraction)
-                            member_name = member
-                            if strip_prefix and member_name.startswith(strip_prefix):
-                                member_name = member_name[len(strip_prefix):]
-                                # Skip if this results in empty name
-                                if not member_name:
-                                    continue
+                            member_name = self._get_adjusted_member_path(member, strip_prefix)
+                            if member_name is None:
+                                continue
                             
                             # Check if file would conflict using adjusted path
                             dest_path = extract_dir / member_name
@@ -842,7 +864,7 @@ class ArchiveOperationExecutor:
                     archive_created = True
                     for source_path in source_paths:
                         # Check for cancellation
-                        if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                        if not self._should_continue_operation():
                             self.logger.info("Archive creation cancelled")
                             break
                         
@@ -863,7 +885,7 @@ class ArchiveOperationExecutor:
                                 # Add directory recursively with progress updates per file
                                 for file_path in source_path.rglob('*'):
                                     # Check for cancellation
-                                    if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                                    if not self._should_continue_operation():
                                         break
                                     
                                     if file_path.is_file():
@@ -940,7 +962,7 @@ class ArchiveOperationExecutor:
                     archive_created = True
                     for source_path in source_paths:
                         # Check for cancellation
-                        if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                        if not self._should_continue_operation():
                             self.logger.info("Archive creation cancelled")
                             break
                         
@@ -959,7 +981,7 @@ class ArchiveOperationExecutor:
                                 # Add directory recursively
                                 for file_path in source_path.rglob('*'):
                                     # Check for cancellation
-                                    if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                                    if not self._should_continue_operation():
                                         break
                                     
                                     if file_path.is_file():
@@ -1037,7 +1059,7 @@ class ArchiveOperationExecutor:
                 return (success_count, error_count)
             
             # Check if operation was cancelled
-            was_cancelled = hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled
+            was_cancelled = not self._should_continue_operation()
             
             if was_cancelled and archive_created:
                 # Clean up partial archive file
@@ -1136,7 +1158,7 @@ class ArchiveOperationExecutor:
             staged_paths = []
             for source_path in source_paths:
                 # Check for cancellation
-                if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                if not self._should_continue_operation():
                     self.logger.info("Archive creation cancelled")
                     break
                 
@@ -1273,7 +1295,7 @@ class ArchiveOperationExecutor:
         try:
             for item in remote_dir.iterdir():
                 # Check for cancellation
-                if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                if not self._should_continue_operation():
                     break
                 
                 local_item = local_dir / item.name
@@ -1381,7 +1403,7 @@ class ArchiveOperationExecutor:
                     
                     for member in members:
                         # Check for cancellation
-                        if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                        if not self._should_continue_operation():
                             self.logger.info("Archive extraction cancelled")
                             break
                         
@@ -1390,12 +1412,9 @@ class ArchiveOperationExecutor:
                             continue
                         
                         # Adjust member name if stripping prefix
-                        member_name = member.name
-                        if strip_prefix and member_name.startswith(strip_prefix):
-                            member_name = member_name[len(strip_prefix):]
-                            # Skip if this results in empty name
-                            if not member_name:
-                                continue
+                        member_name = self._get_adjusted_member_path(member.name, strip_prefix)
+                        if member_name is None:
+                            continue
                         
                         # Check if file should be skipped
                         if member_name in skip_files:
@@ -1462,7 +1481,7 @@ class ArchiveOperationExecutor:
                     
                     for member in members:
                         # Check for cancellation
-                        if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                        if not self._should_continue_operation():
                             self.logger.info("Archive extraction cancelled")
                             break
                         
@@ -1471,12 +1490,9 @@ class ArchiveOperationExecutor:
                             continue
                         
                         # Adjust member name if stripping prefix
-                        member_name = member
-                        if strip_prefix and member_name.startswith(strip_prefix):
-                            member_name = member_name[len(strip_prefix):]
-                            # Skip if this results in empty name
-                            if not member_name:
-                                continue
+                        member_name = self._get_adjusted_member_path(member, strip_prefix)
+                        if member_name is None:
+                            continue
                         
                         # Check if file should be skipped
                         if member_name in skip_files:
@@ -1659,7 +1675,7 @@ class ArchiveOperationExecutor:
                     destination_dir.mkdir(parents=True, exist_ok=True)
                     for item in temp_extract_dir.iterdir():
                         # Check for cancellation
-                        if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                        if not self._should_continue_operation():
                             break
                         
                         dest_item = destination_dir / item.name
@@ -1777,7 +1793,7 @@ class ArchiveOperationExecutor:
             
             for item in local_dir.iterdir():
                 # Check for cancellation
-                if hasattr(self.file_manager, 'operation_cancelled') and self.file_manager.operation_cancelled:
+                if not self._should_continue_operation():
                     break
                 
                 remote_item = remote_dir / item.name
