@@ -1044,9 +1044,6 @@ class ArchiveOperationExecutor:
                         self.logger.info(f"Removed partial archive file: {archive_path.name}")
                 except Exception as e:
                     self.logger.warning(f"Could not remove partial archive: {e}")
-            elif success_count > 0 and not completion_callback:
-                # Only log summary if no callback provided (callback suppresses default logging)
-                self.logger.info(f"Archive created successfully: {archive_path}")
             
         except PermissionError as e:
             self.logger.error(f"Permission denied creating archive {archive_path.name}: {e}")
@@ -1455,8 +1452,6 @@ class ArchiveOperationExecutor:
                             error_count += 1
                             self.progress_manager.increment_errors()
                             # Continue with next file
-                    
-                    self.logger.info(f"Extracted {success_count} items, skipped {skipped_count}")
             
             elif format_info['type'] == 'zip':
                 with zipfile.ZipFile(str(archive_path), 'r') as zip_file:
@@ -1537,8 +1532,6 @@ class ArchiveOperationExecutor:
                             error_count += 1
                             self.progress_manager.increment_errors()
                             # Continue with next file
-                    
-                    self.logger.info(f"Extracted {success_count} items, skipped {skipped_count}")
             
             else:
                 self.logger.error(f"Unsupported archive type for local extraction: {format_info['type']}")

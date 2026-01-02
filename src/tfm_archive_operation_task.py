@@ -590,7 +590,6 @@ class ArchiveOperationTask(BaseTask):
             # For 'create': archive file appears in destination, source files may have changed
             # For 'extract': extracted files appear in destination, archive may be in source
             if hasattr(self.file_manager, 'refresh_files'):
-                self.logger.info("Refreshing both panes after successful operation")
                 self.file_manager.refresh_files()  # Refresh both panes
         
         # Mark UI as dirty to trigger redraw
