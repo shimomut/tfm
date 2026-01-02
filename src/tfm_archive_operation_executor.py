@@ -664,6 +664,104 @@ class ArchiveOperationExecutor:
             return '.zip'
         else:
             return '.archive'
+    
+    def _get_archive_top_level_structure(self, archive_path: Path, format_info: Dict) -> tuple:
+        """
+        Analyze archive to determine its top-level structure.
+        
+        Args:
+            archive_path: Path to archive file
+            format_info: Archive format information
+            
+        Returns:
+            Tuple of (should_strip, strip_name, is_single_file)
+            - should_strip: True if we should strip a top-level directory
+            - strip_name: Name to strip, or None
+            - is_single_file: True if archive contains only a single file at top level
+        """
+        try:
+            # Download archive to temp if remote
+            if archive_path.is_remote():
+                temp_dir = tempfile.mkdtemp(prefix='tfm_analyze_')
+                try:
+                    temp_archive = PathlibPath(temp_dir) / archive_path.name
+                    temp_archive.write_bytes(archive_path.read_bytes())
+                    archive_to_analyze = str(temp_archive)
+                except Exception:
+                    import shutil
+                    shutil.rmtree(temp_dir)
+                    return (False, None, False)
+            else:
+                archive_to_analyze = str(archive_path)
+                temp_dir = None
+            
+            top_level_items = set()
+            
+            try:
+                if format_info['type'] == 'tar':
+                    mode = self._get_tar_mode(format_info, 'r')
+                    with tarfile.open(archive_to_analyze, mode) as tar:
+                        for member in tar.getmembers():
+                            # Get top-level item name
+                            parts = member.name.split('/')
+                            if parts[0]:  # Skip empty strings
+                                top_level_items.add(parts[0])
+                            
+                            # If we have more than one top-level item, no need to continue
+                            if len(top_level_items) > 1:
+                                break
+                
+                elif format_info['type'] == 'zip':
+                    with zipfile.ZipFile(archive_to_analyze, 'r') as zip_file:
+                        for member in zip_file.namelist():
+                            # Get top-level item name
+                            parts = member.split('/')
+                            if parts[0]:  # Skip empty strings
+                                top_level_items.add(parts[0])
+                            
+                            # If we have more than one top-level item, no need to continue
+                            if len(top_level_items) > 1:
+                                break
+            
+            finally:
+                if temp_dir:
+                    import shutil
+                    shutil.rmtree(temp_dir)
+            
+            # Check if we have exactly one top-level item
+            if len(top_level_items) == 1:
+                top_item = list(top_level_items)[0]
+                
+                # Verify if it's a directory by checking if any member has this as a path component
+                is_directory = False
+                if format_info['type'] == 'tar':
+                    mode = self._get_tar_mode(format_info, 'r')
+                    with tarfile.open(archive_to_analyze, mode) as tar:
+                        for member in tar.getmembers():
+                            if member.name.startswith(top_item + '/') or member.name == top_item:
+                                if member.isdir() or '/' in member.name:
+                                    is_directory = True
+                                    break
+                elif format_info['type'] == 'zip':
+                    with zipfile.ZipFile(archive_to_analyze, 'r') as zip_file:
+                        for member in zip_file.namelist():
+                            if member.startswith(top_item + '/') or member == top_item + '/':
+                                is_directory = True
+                                break
+                
+                if is_directory:
+                    # Single top-level directory - should strip it
+                    return (True, top_item, False)
+                else:
+                    # Single top-level file
+                    return (False, None, True)
+            
+            # Multiple top-level items
+            return (False, None, False)
+        
+        except Exception as e:
+            self.logger.error(f"Error analyzing archive structure: {e}")
+            return (False, None, False)
 
     def _create_archive_local(self, source_paths: List[Path], archive_path: Path,
                              format_info: Dict, completion_callback: Optional[Callable] = None) -> tuple:
@@ -1191,8 +1289,37 @@ class ArchiveOperationExecutor:
         skip_files = skip_files or []
         
         try:
-            # Ensure destination directory exists
-            destination_dir.mkdir(parents=True, exist_ok=True)
+            # Check archive structure BEFORE creating directories
+            should_strip, strip_name, is_single_file = self._get_archive_top_level_structure(archive_path, format_info)
+            
+            # Determine actual extraction directory
+            if should_strip:
+                # Archive has single top-level directory - strip it
+                extract_dir = destination_dir
+                strip_prefix = strip_name + '/'
+                self.logger.info(f"Archive has single top-level directory '{strip_name}', extracting contents directly")
+            elif is_single_file:
+                # Archive has single top-level file - extract to parent to avoid wrapper directory
+                archive_stem = archive_path.stem
+                if archive_stem.endswith('.tar'):  # Handle .tar.gz, .tar.bz2, etc.
+                    archive_stem = archive_stem[:-4]
+                
+                if destination_dir.name == archive_stem:
+                    # Destination is auto-created wrapper directory - extract to parent instead
+                    extract_dir = destination_dir.parent
+                    strip_prefix = None
+                    self.logger.info(f"Archive has single file, extracting to parent directory")
+                else:
+                    # Destination is user-specified - use it as-is
+                    extract_dir = destination_dir
+                    strip_prefix = None
+            else:
+                # Archive has multiple top-level items - use destination as-is
+                extract_dir = destination_dir
+                strip_prefix = None
+            
+            # Now ensure the actual extraction directory exists
+            extract_dir.mkdir(parents=True, exist_ok=True)
             
             if format_info['type'] == 'tar':
                 mode = self._get_tar_mode(format_info, 'r')
@@ -1210,26 +1337,42 @@ class ArchiveOperationExecutor:
                         if member.isdir():
                             continue
                         
+                        # Adjust member name if stripping prefix
+                        member_name = member.name
+                        if strip_prefix and member_name.startswith(strip_prefix):
+                            member_name = member_name[len(strip_prefix):]
+                            # Skip if this results in empty name
+                            if not member_name:
+                                continue
+                        
                         # Check if file should be skipped
-                        if member.name in skip_files:
-                            self.logger.info(f"Skipping file (user choice): {member.name}")
+                        if member_name in skip_files:
+                            self.logger.info(f"Skipping file (user choice): {member_name}")
                             skipped_count += 1
                             continue
                         
-                        dest_path = destination_dir / member.name
+                        dest_path = extract_dir / member_name
                         
                         # Check for overwrite
                         if dest_path.exists() and not overwrite:
-                            self.logger.warning(f"File exists, skipping: {member.name}")
+                            self.logger.warning(f"File exists, skipping: {member_name}")
                             skipped_count += 1
                             continue
                         
                         try:
-                            # Extract the member
-                            tar.extract(member, str(destination_dir))
+                            # Create a modified member with adjusted name
+                            if strip_prefix and member.name.startswith(strip_prefix):
+                                # Create new member with stripped name
+                                import copy
+                                modified_member = copy.copy(member)
+                                modified_member.name = member_name
+                                tar.extract(modified_member, str(extract_dir))
+                            else:
+                                tar.extract(member, str(extract_dir))
+                            
                             success_count += 1
-                            self.progress_manager.update_progress(member.name, success_count)
-                            self.logger.info(f"Extracted: {member.name}")
+                            self.progress_manager.update_progress(member_name, success_count)
+                            self.logger.info(f"Extracted: {member_name}")
                         except PermissionError as e:
                             self.logger.error(f"Permission denied extracting {member.name}: {e}")
                             error_count += 1
@@ -1275,26 +1418,41 @@ class ArchiveOperationExecutor:
                         if member.endswith('/'):
                             continue
                         
+                        # Adjust member name if stripping prefix
+                        member_name = member
+                        if strip_prefix and member_name.startswith(strip_prefix):
+                            member_name = member_name[len(strip_prefix):]
+                            # Skip if this results in empty name
+                            if not member_name:
+                                continue
+                        
                         # Check if file should be skipped
-                        if member in skip_files:
-                            self.logger.info(f"Skipping file (user choice): {member}")
+                        if member_name in skip_files:
+                            self.logger.info(f"Skipping file (user choice): {member_name}")
                             skipped_count += 1
                             continue
                         
-                        dest_path = destination_dir / member
+                        dest_path = extract_dir / member_name
                         
                         # Check for overwrite
                         if dest_path.exists() and not overwrite:
-                            self.logger.warning(f"File exists, skipping: {member}")
+                            self.logger.warning(f"File exists, skipping: {member_name}")
                             skipped_count += 1
                             continue
                         
                         try:
-                            # Extract the member
-                            zip_file.extract(member, str(destination_dir))
+                            # For zip, we need to manually extract with adjusted path
+                            if strip_prefix and member.startswith(strip_prefix):
+                                # Read file data and write to adjusted location
+                                file_data = zip_file.read(member)
+                                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                                dest_path.write_bytes(file_data)
+                            else:
+                                zip_file.extract(member, str(extract_dir))
+                            
                             success_count += 1
-                            self.progress_manager.update_progress(member, success_count)
-                            self.logger.info(f"Extracted: {member}")
+                            self.progress_manager.update_progress(member_name, success_count)
+                            self.logger.info(f"Extracted: {member_name}")
                         except PermissionError as e:
                             self.logger.error(f"Permission denied extracting {member}: {e}")
                             error_count += 1
