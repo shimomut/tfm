@@ -101,6 +101,31 @@ def get_selected_or_cursor_files(pane_data):
         selected = [focused_file.name]
     return selected
 
+
+def ensure_common_paths_in_env(env):
+    """
+    Ensure common binary paths are in PATH environment variable.
+    
+    When TFM.app is launched from Finder/Dock on macOS, it doesn't inherit
+    the user's shell PATH. This function adds common binary paths like
+    /usr/local/bin where tools like 'code' (VS Code) are typically installed.
+    
+    Args:
+        env: Environment dictionary to modify
+    """
+    if sys.platform == 'darwin':
+        current_path = env.get('PATH', '')
+        common_paths = ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin']
+        path_components = current_path.split(':') if current_path else []
+        
+        # Add missing common paths to the beginning of PATH
+        for path in reversed(common_paths):
+            if path not in path_components:
+                path_components.insert(0, path)
+        
+        env['PATH'] = ':'.join(path_components)
+
+
 class ExternalProgramManager:
     """Manages external program execution and subshell functionality"""
     
@@ -140,6 +165,7 @@ class ExternalProgramManager:
             
             # Set environment variables with TFM_ prefix
             env = os.environ.copy()
+            ensure_common_paths_in_env(env)
             env['TFM_LEFT_DIR'] = str(left_pane['path'])
             env['TFM_RIGHT_DIR'] = str(right_pane['path'])
             env['TFM_THIS_DIR'] = str(current_pane['path'])
@@ -299,6 +325,7 @@ class ExternalProgramManager:
             
             # Set environment variables with TFM_ prefix
             env = os.environ.copy()
+            ensure_common_paths_in_env(env)
             env['TFM_LEFT_DIR'] = str(left_pane['path'])
             env['TFM_RIGHT_DIR'] = str(right_pane['path'])
             env['TFM_THIS_DIR'] = str(current_pane['path'])
