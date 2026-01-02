@@ -8,7 +8,7 @@ The implementation will create three new components and modify the existing Arch
 
 ## Tasks
 
-- [ ] 1. Create ArchiveOperationTask with state machine
+- [x] 1. Create ArchiveOperationTask with state machine
   - Create `src/tfm_archive_operation_task.py` with ArchiveOperationTask class
   - Implement state machine: IDLE → CONFIRMING → CHECKING_CONFLICTS → RESOLVING_CONFLICT → EXECUTING → COMPLETED
   - Implement ArchiveOperationContext dataclass with operation_type, source_paths, destination, format_type, conflicts, results, options
@@ -20,7 +20,7 @@ The implementation will create three new components and modify the existing Arch
   - **Property 1: State Machine Transitions**
   - **Validates: Requirements 1.2, 6.3, 6.4, 13.3, 13.4, 13.6, 13.10**
 
-- [ ] 2. Create ArchiveOperationExecutor with threading
+- [x] 2. Create ArchiveOperationExecutor with threading
   - Create `src/tfm_archive_operation_executor.py` with ArchiveOperationExecutor class
   - Migrate `create_archive()` logic from ArchiveOperations to `perform_create_operation()` with background thread
   - Migrate `extract_archive()` logic from ArchiveOperations to `perform_extract_operation()` with background thread
@@ -42,7 +42,7 @@ The implementation will create three new components and modify the existing Arch
   - **Property 6: Thread Cleanup**
   - **Validates: Requirements 3.4**
 
-- [ ] 3. Implement progress tracking in executor
+- [x] 3. Implement progress tracking in executor
   - Add `_count_files_recursively()` method to count total files for progress tracking
   - Integrate with ProgressManager for file-by-file progress updates during creation
   - Integrate with ProgressManager for file-by-file progress updates during extraction
@@ -62,13 +62,14 @@ The implementation will create three new components and modify the existing Arch
   - **Property 10: Error Count Tracking**
   - **Validates: Requirements 4.5, 7.2**
 
-- [ ] 4. Implement cancellation support
+- [x] 4. Implement cancellation support
   - Add cancellation check in executor's main loop (check `operation_cancelled` flag)
   - Handle ESC key in task to set cancellation flag
   - Clean up partial work on cancellation
   - Transition task to IDLE state on cancellation
   - Invoke completion callback even when cancelled
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - **Status: COMPLETED** ✅
 
 - [ ]* 4.1 Write property test for cancellation support
   - **Property 4: Cancellation Support**
@@ -78,7 +79,7 @@ The implementation will create three new components and modify the existing Arch
   - **Property 20: Callback on Cancellation**
   - **Validates: Requirements 10.5**
 
-- [ ] 5. Create ArchiveOperationUI for user interactions
+- [-] 5. Create ArchiveOperationUI for user interactions
   - Create `src/tfm_archive_operation_ui.py` with ArchiveOperationUI class
   - Implement `show_confirmation_dialog()` for archive creation/extraction confirmation
   - Implement `show_conflict_dialog()` for conflict resolution (Overwrite/Skip options)
@@ -91,7 +92,7 @@ The implementation will create three new components and modify the existing Arch
   - **Property 11: Configuration-Based Confirmation**
   - **Validates: Requirements 6.5**
 
-- [ ] 6. Implement conflict detection
+- [x] 6. Implement conflict detection
   - Add `_check_conflicts()` method to executor
   - Detect archive file exists for creation operations
   - Detect file overwrites for extraction operations
@@ -112,7 +113,7 @@ The implementation will create three new components and modify the existing Arch
   - **Property 32: No Conflicts Fast Path**
   - **Validates: Requirements 13.10**
 
-- [ ] 7. Implement conflict resolution
+- [x] 7. Implement conflict resolution
   - Handle "Overwrite" choice in task: set overwrite flag and proceed to EXECUTING
   - Handle "Skip" choice in task: mark files to skip and proceed to EXECUTING
   - Handle Shift modifier: apply choice to all remaining conflicts (overwrite_all/skip_all)
@@ -132,7 +133,7 @@ The implementation will create three new components and modify the existing Arch
   - **Property 31: Batch Conflict Resolution**
   - **Validates: Requirements 13.9**
 
-- [ ] 8. Implement error handling
+- [x] 8. Implement error handling
   - Add try-except blocks for PermissionError, OSError, ArchiveError in executor
   - Log errors with contextual information (operation type, file name, error message)
   - Increment error count for each error
@@ -152,10 +153,10 @@ The implementation will create three new components and modify the existing Arch
   - **Property 14: Exception Handling**
   - **Validates: Requirements 7.5**
 
-- [ ] 9. Checkpoint - Ensure all tests pass
+- [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Implement completion callbacks
+- [x] 10. Implement completion callbacks
   - Add completion_callback parameter to executor methods
   - Invoke callback with (success_count, error_count) when operation completes
   - Suppress default summary logging when callback provided
@@ -175,13 +176,14 @@ The implementation will create three new components and modify the existing Arch
   - **Property 19: Callback Thread Context**
   - **Validates: Requirements 10.4**
 
-- [ ] 11. Implement file manager integration
+- [x] 11. Implement file manager integration
   - Call file_manager.refresh() after successful archive creation
   - Call file_manager.refresh() after successful archive extraction
   - Call file_manager.mark_dirty() to trigger UI redraw
   - Clear operation_in_progress flag on completion
   - Transition from EXECUTING to COMPLETED to IDLE
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
+  - **Status: COMPLETED** ✅
 
 - [ ]* 11.1 Write property test for file list refresh after creation
   - **Property 21: File List Refresh After Creation**
@@ -203,7 +205,7 @@ The implementation will create three new components and modify the existing Arch
   - **Property 25: Completion State Transition**
   - **Validates: Requirements 11.5**
 
-- [ ] 12. Modify ArchiveOperations for backward compatibility
+- [x] 12. Modify ArchiveOperations for backward compatibility
   - Add `use_task` parameter to `create_archive()` method (default True)
   - Add `use_task` parameter to `extract_archive()` method (default True)
   - Delegate to ArchiveOperationTask when use_task=True
@@ -215,41 +217,44 @@ The implementation will create three new components and modify the existing Arch
   - **Property 26: Backward Compatibility**
   - **Validates: Requirements 12.1, 12.2, 12.3, 12.4, 12.5**
 
-- [ ] 13. Implement cross-storage support
+- [x] 13. Implement cross-storage support
   - Ensure executor handles local file paths
   - Ensure executor handles S3 paths
   - Ensure executor handles mixed storage schemes (local to S3, S3 to local)
   - Test archive creation with cross-storage sources
   - Test archive extraction to cross-storage destinations
   - _Requirements: 2.5, 9.1, 9.2, 9.4_
+  - **Status: COMPLETED** ✅
 
 - [ ]* 13.1 Write property test for cross-storage operations
   - **Property 5: Cross-Storage Operations**
   - **Validates: Requirements 2.5, 9.4**
 
-- [ ] 14. Implement archive format support
+- [x] 14. Implement archive format support
   - Support tar format in executor
   - Support tar.gz format in executor
   - Support tar.bz2 format in executor
   - Support tar.xz format in executor
   - Support zip format in executor
   - _Requirements: 9.3_
+  - **Status: COMPLETED** ✅
 
 - [ ]* 14.1 Write property test for archive format support
   - **Property 15: Archive Format Support**
   - **Validates: Requirements 9.3**
 
-- [ ] 15. Implement cache invalidation
+- [x] 15. Implement cache invalidation
   - Call cache_manager.invalidate() for affected paths after successful creation
   - Call cache_manager.invalidate() for affected paths after successful extraction
   - Invalidate both source and destination paths
   - _Requirements: 9.5_
+  - **Status: COMPLETED** ✅
 
 - [ ]* 15.1 Write property test for cache invalidation
   - **Property 16: Cache Invalidation**
   - **Validates: Requirements 9.5**
 
-- [ ] 16. Wire components together in FileManager
+- [x] 16. Wire components together in FileManager
   - Create ArchiveOperationTask instance in FileManager
   - Create ArchiveOperationExecutor instance in FileManager
   - Create ArchiveOperationUI instance in FileManager
@@ -257,6 +262,7 @@ The implementation will create three new components and modify the existing Arch
   - Update archive extraction key binding to use task
   - Pass file_manager, ui, and executor to task constructor
   - _Requirements: 1.1, 2.1, 6.1_
+  - **Status: COMPLETED** ✅
 
 - [ ]* 16.1 Write integration test for archive creation workflow
   - Test complete workflow: confirmation → conflict detection → execution → completion
@@ -266,7 +272,7 @@ The implementation will create three new components and modify the existing Arch
   - Test complete workflow: confirmation → conflict detection → execution → completion
   - _Requirements: 1.1, 1.2, 1.3, 6.1, 6.2, 6.3, 6.4, 13.2, 13.3_
 
-- [ ] 17. Final checkpoint - Ensure all tests pass
+- [x] 17. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

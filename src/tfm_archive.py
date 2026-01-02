@@ -1960,7 +1960,249 @@ class ArchiveOperations:
         self.logger = getLogger("Archive")
         self.cache_manager = cache_manager
         self.progress_manager = progress_manager
+        
+        # Task-based components (initialized lazily when needed)
+        self._task = None
+        self._executor = None
+        self._ui = None
+        self._file_manager = None
     
+    def set_file_manager(self, file_manager):
+        """Set the file manager reference for task-based operations.
+        
+        This method should be called by FileManager after creating the
+        ArchiveOperations instance to enable task-based execution.
+        
+        Args:
+            file_manager: FileManager instance
+        """
+        self._file_manager = file_manager
+    
+    def _initialize_task_components(self, file_manager):
+        """Initialize task-based components if not already initialized.
+        
+        Args:
+            file_manager: FileManager instance needed for task execution
+        """
+        if self._task is None:
+            # Import here to avoid circular dependencies
+            from tfm_archive_operation_task import ArchiveOperationTask
+            from tfm_archive_operation_executor import ArchiveOperationExecutor
+            from tfm_archive_operation_ui import ArchiveOperationUI
+            
+            # Store file_manager reference
+            self._file_manager = file_manager
+            
+            # Create executor (requires file_manager)
+            self._executor = ArchiveOperationExecutor(
+                file_manager=file_manager,
+                progress_manager=self.progress_manager,
+                cache_manager=self.cache_manager
+            )
+            
+            # Create UI
+            self._ui = ArchiveOperationUI(file_manager)
+            
+            # Create task
+            self._task = ArchiveOperationTask(
+                file_manager=file_manager,
+                ui=self._ui,
+                executor=self._executor
+            )
+    
+    def _create_archive_with_task(self, source_paths: List[Path], archive_path: Path, 
+                                  format_type: str) -> bool:
+        """Create archive using task-based execution.
+        
+        This method delegates to ArchiveOperationTask for non-blocking execution
+        with progress tracking, conflict detection, and cancellation support.
+        
+        Args:
+            source_paths: List of paths to include in archive
+            archive_path: Destination path for the archive
+            format_type: Archive format ('tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'zip')
+            
+        Returns:
+            True to indicate task was started (actual success determined by task completion)
+        """
+        # Get file_manager from progress_manager if available
+        file_manager = None
+        if self.progress_manager and hasattr(self.progress_manager, 'file_manager'):
+            file_manager = self.progress_manager.file_manager
+        
+        if file_manager is None:
+            # Fallback to synchronous execution if no file_manager available
+            self.logger.warning("No file_manager available, falling back to synchronous execution")
+            return self.create_archive(source_paths, archive_path, format_type, use_task=False)
+        
+        # Initialize task components if needed
+        self._initialize_task_components(file_manager)
+        
+        # Start the task-based operation
+        self._task.start_operation('create', source_paths, archive_path, format_type)
+        
+        # Return True to indicate task was started successfully
+        # Actual operation success will be determined by task completion
+        return True
+    
+    def _extract_archive_with_task(self, archive_path: Path, destination_dir: Path, 
+                                   overwrite: bool) -> bool:
+        """Extract archive using task-based execution.
+        
+        This method delegates to ArchiveOperationTask for non-blocking execution
+        with progress tracking, conflict detection, and cancellation support.
+        
+        Args:
+            archive_path: Path to the archive file
+            destination_dir: Directory to extract to
+            overwrite: Whether to overwrite existing files (handled via conflict resolution)
+            
+        Returns:
+            True to indicate task was started (actual success determined by task completion)
+        """
+        # Get file_manager from progress_manager if available
+        file_manager = None
+        if self.progress_manager and hasattr(self.progress_manager, 'file_manager'):
+            file_manager = self.progress_manager.file_manager
+        
+        if file_manager is None:
+            # Fallback to synchronous execution if no file_manager available
+            self.logger.warning("No file_manager available, falling back to synchronous execution")
+            return self.extract_archive(archive_path, destination_dir, overwrite, use_task=False)
+        
+        # Initialize task components if needed
+        self._initialize_task_components(file_manager)
+        
+        # Start the task-based operation
+        # Note: The overwrite parameter is handled through conflict resolution dialogs
+        # in the task-based system. If overwrite=True, conflicts will still be detected
+        # but the user can choose to overwrite via the dialog.
+        self._task.start_operation('extract', [archive_path], destination_dir)
+        
+        # If overwrite was True, set the overwrite_all flag in context after task starts
+        # This allows the task to skip conflict dialogs and proceed with overwriting
+        if overwrite and self._task.context:
+            self._task.context.options['overwrite_all'] = True
+        
+        # Return True to indicate task was started successfully
+        # Actual operation success will be determined by task completion
+        return True
+    
+    def _create_archive_with_task(self, source_paths: List[Path], archive_path: Path, 
+                                  format_type: str) -> bool:
+        """Create archive using task-based implementation.
+        
+        This method delegates to ArchiveOperationTask for non-blocking execution.
+        Note: This is an asynchronous operation - the method returns immediately
+        and the operation continues in the background.
+        
+        Args:
+            source_paths: List of paths to include in archive
+            archive_path: Destination path for the archive
+            format_type: Archive format
+            
+        Returns:
+            True if task was started successfully, False otherwise
+        """
+        # For task-based execution, we need a file_manager reference
+        # If we don't have one, fall back to synchronous execution
+        if not hasattr(self, '_file_manager') or self._file_manager is None:
+            self.logger.warning("No file_manager available, falling back to synchronous execution")
+            return self._create_archive_sync(source_paths, archive_path, format_type)
+        
+        try:
+            # Initialize task components if needed
+            self._initialize_task_components(self._file_manager)
+            
+            # Start the task
+            self._task.start_operation('create', source_paths, archive_path, format_type)
+            self._file_manager.start_task(self._task)
+            
+            # Task started successfully
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error starting archive creation task: {e}")
+            return False
+    
+    def _extract_archive_with_task(self, archive_path: Path, destination_dir: Path, 
+                                   overwrite: bool) -> bool:
+        """Extract archive using task-based implementation.
+        
+        This method delegates to ArchiveOperationTask for non-blocking execution.
+        Note: This is an asynchronous operation - the method returns immediately
+        and the operation continues in the background.
+        
+        Args:
+            archive_path: Path to the archive file
+            destination_dir: Directory to extract to
+            overwrite: Whether to overwrite existing files
+            
+        Returns:
+            True if task was started successfully, False otherwise
+        """
+        # For task-based execution, we need a file_manager reference
+        # If we don't have one, fall back to synchronous execution
+        if not hasattr(self, '_file_manager') or self._file_manager is None:
+            self.logger.warning("No file_manager available, falling back to synchronous execution")
+            return self._extract_archive_sync(archive_path, destination_dir, overwrite)
+        
+        try:
+            # Initialize task components if needed
+            self._initialize_task_components(self._file_manager)
+            
+            # Start the task
+            # For extraction, source_paths is a list containing just the archive
+            self._task.start_operation('extract', [archive_path], destination_dir, '')
+            self._file_manager.start_task(self._task)
+            
+            # Task started successfully
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error starting archive extraction task: {e}")
+            return False
+    
+    def _create_archive_sync(self, source_paths: List[Path], archive_path: Path, 
+                            format_type: str) -> bool:
+        """Synchronous archive creation (legacy implementation).
+        
+        This is the original synchronous implementation kept for backward compatibility.
+        """
+        try:
+            self.logger.info(f"Creating {format_type} archive: {archive_path}")
+            
+            # Determine format info
+            format_info = None
+            for ext, info in self.SUPPORTED_FORMATS.items():
+                if ext.lstrip('.') == format_type or ext == f'.{format_type}':
+                    format_info = info
+                    break
+            
+            if not format_info:
+                self.logger.error(f"Unsupported archive format: {format_type}")
+                return False
+            
+            # Handle cross-storage scenarios
+            source_schemes = {path.get_scheme() for path in source_paths}
+            dest_scheme = archive_path.get_scheme()
+            
+            # If all sources and destination are local, create directly
+            if all(scheme == 'file' for scheme in source_schemes) and dest_scheme == 'file':
+                success = self._create_archive_local(source_paths, archive_path, format_info)
+            else:
+                # For cross-storage, use temporary file approach
+                success = self._create_archive_cross_storage(source_paths, archive_path, format_info)
+            
+            # Invalidate cache for the archive creation if successful
+            if success and self.cache_manager:
+                self.cache_manager.invalidate_cache_for_archive_operation(archive_path, source_paths)
+            
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Error creating archive: {e}")
+            return False
 
     
     def get_archive_format(self, filename: str) -> Optional[dict]:
@@ -1998,7 +2240,7 @@ class ArchiveOperations:
         return self.get_archive_format(path.name) is not None
     
     def create_archive(self, source_paths: List[Path], archive_path: Path, 
-                      format_type: str = 'tar.gz') -> bool:
+                      format_type: str = 'tar.gz', use_task: bool = True) -> bool:
         """
         Create an archive from source files/directories
         
@@ -2006,44 +2248,17 @@ class ArchiveOperations:
             source_paths: List of paths to include in archive
             archive_path: Destination path for the archive
             format_type: Archive format ('tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'zip')
+            use_task: Whether to use task-based execution (default True)
             
         Returns:
             True if successful, False otherwise
         """
-        try:
-            self.logger.info(f"Creating {format_type} archive: {archive_path}")
-            
-            # Determine format info
-            format_info = None
-            for ext, info in self.SUPPORTED_FORMATS.items():
-                if ext.lstrip('.') == format_type or ext == f'.{format_type}':
-                    format_info = info
-                    break
-            
-            if not format_info:
-                self.logger.error(f"Unsupported archive format: {format_type}")
-                return False
-            
-            # Handle cross-storage scenarios
-            source_schemes = {path.get_scheme() for path in source_paths}
-            dest_scheme = archive_path.get_scheme()
-            
-            # If all sources and destination are local, create directly
-            if all(scheme == 'file' for scheme in source_schemes) and dest_scheme == 'file':
-                success = self._create_archive_local(source_paths, archive_path, format_info)
-            else:
-                # For cross-storage, use temporary file approach
-                success = self._create_archive_cross_storage(source_paths, archive_path, format_info)
-            
-            # Invalidate cache for the archive creation if successful
-            if success and self.cache_manager:
-                self.cache_manager.invalidate_cache_for_archive_operation(archive_path, source_paths)
-            
-            return success
-            
-        except Exception as e:
-            self.logger.error(f"Error creating archive: {e}")
-            return False
+        # Delegate to task-based implementation if requested
+        if use_task:
+            return self._create_archive_with_task(source_paths, archive_path, format_type)
+        
+        # Legacy synchronous implementation
+        return self._create_archive_sync(source_paths, archive_path, format_type)
     
     def _create_archive_local(self, source_paths: List[Path], archive_path: Path, 
                              format_info: dict) -> bool:
@@ -2187,7 +2402,7 @@ class ArchiveOperations:
             return '.archive'
     
     def extract_archive(self, archive_path: Path, destination_dir: Path, 
-                       overwrite: bool = False) -> bool:
+                       overwrite: bool = False, use_task: bool = True) -> bool:
         """
         Extract an archive to a destination directory
         
@@ -2195,9 +2410,23 @@ class ArchiveOperations:
             archive_path: Path to the archive file
             destination_dir: Directory to extract to
             overwrite: Whether to overwrite existing files
+            use_task: Whether to use task-based execution (default True)
             
         Returns:
             True if successful, False otherwise
+        """
+        # Delegate to task-based implementation if requested
+        if use_task:
+            return self._extract_archive_with_task(archive_path, destination_dir, overwrite)
+        
+        # Legacy synchronous implementation
+        return self._extract_archive_sync(archive_path, destination_dir, overwrite)
+    
+    def _extract_archive_sync(self, archive_path: Path, destination_dir: Path, 
+                             overwrite: bool) -> bool:
+        """Synchronous archive extraction (legacy implementation).
+        
+        This is the original synchronous implementation kept for backward compatibility.
         """
         try:
             if not archive_path.is_file():
@@ -2593,62 +2822,22 @@ class ArchiveUI:
         archive_filename = archive_name.strip()
         archive_path = other_pane['path'] / archive_filename
         
-        # Check if archive already exists
-        if archive_path.exists():
-            self.logger.warning(f"Archive '{archive_filename}' already exists")
+        # Determine archive format from filename
+        format_type = self._get_archive_format_from_filename(archive_filename)
+        
+        if not format_type:
+            self.logger.error(f"Unsupported archive format. Supported: .zip, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .txz")
             self.file_manager.quick_edit_bar.hide()
             self.file_manager.mark_dirty()
             return
         
-        try:
-            # Determine archive format from filename
-            format_type = self._get_archive_format_from_filename(archive_filename)
-            
-            if not format_type:
-                self.logger.error(f"Unsupported archive format. Supported: .zip, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .txz")
-                self.file_manager.quick_edit_bar.hide()
-                self.file_manager.mark_dirty()
-                return
-            
-            # Start progress tracking
-            total_files = self._count_files_recursively(files_to_archive)
-            self.progress_manager.start_operation(
-                OperationType.ARCHIVE_CREATE, 
-                total_files, 
-                f"Creating {format_type}: {archive_filename}",
-                self._progress_callback
-            )
-            
-            try:
-                # Use the cross-storage archive operations
-                success = self.archive_operations.create_archive(files_to_archive, archive_path, format_type)
-                
-                if success:
-                    self.logger.info(f"Created archive: {archive_filename}")
-                    
-                    # Refresh the other pane to show the new archive
-                    self.file_manager.refresh_files(other_pane)
-                    
-                    # Try to select the new archive in the other pane
-                    for i, file_path in enumerate(other_pane['files']):
-                        if file_path.name == archive_filename:
-                            other_pane['focused_index'] = i
-                            self.file_manager.adjust_scroll_for_focus(other_pane)
-                            break
-                else:
-                    self.logger.error(f"Failed to create archive: {archive_filename}")
-                    
-            finally:
-                self.progress_manager.finish_operation()
-            
-            self.file_manager.quick_edit_bar.hide()
-            self.file_manager.mark_dirty()
-            
-        except Exception as e:
-            self.logger.error(f"Error creating archive: {e}")
-            self.progress_manager.finish_operation()
-            self.file_manager.quick_edit_bar.hide()
-            self.file_manager.mark_dirty()
+        # Hide the input bar before starting the task
+        self.file_manager.quick_edit_bar.hide()
+        self.file_manager.mark_dirty()
+        
+        # Use the pre-created ArchiveOperationTask instance
+        self.file_manager.archive_operation_task.start_operation('create', files_to_archive, archive_path, format_type)
+        self.file_manager.start_task(self.file_manager.archive_operation_task)
     
     def on_create_archive_cancel(self):
         """Handle create archive cancellation"""
@@ -2683,21 +2872,9 @@ class ArchiveUI:
         archive_basename = self.get_archive_basename(focused_file.name)
         extract_dir = other_pane['path'] / archive_basename
         
-        # Check if extract confirmation is enabled
-        if getattr(self.config, 'CONFIRM_EXTRACT_ARCHIVE', True):
-            # Show confirmation dialog
-            message = f"Extract '{focused_file.name}' to {other_pane['path']}?"
-            
-            def extract_callback(confirmed):
-                if confirmed:
-                    self._proceed_with_extraction(focused_file, extract_dir, other_pane, archive_basename)
-                else:
-                    self.logger.info("Extraction cancelled")
-            
-            self.file_manager.show_confirmation(message, extract_callback)
-        else:
-            # Proceed with extraction without confirmation
-            self._proceed_with_extraction(focused_file, extract_dir, other_pane, archive_basename)
+        # Use the pre-created ArchiveOperationTask instance
+        self.file_manager.archive_operation_task.start_operation('extract', [focused_file], extract_dir)
+        self.file_manager.start_task(self.file_manager.archive_operation_task)
     
     def _proceed_with_extraction(self, selected_file, extract_dir, other_pane, archive_basename):
         """Proceed with extraction using archive operations"""
