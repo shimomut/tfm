@@ -549,9 +549,12 @@ class ArchiveOperationTask(BaseTask):
         
         # Refresh file manager if operation was successful and not cancelled
         if success_count > 0 and not self.file_manager.operation_cancelled:
-            if hasattr(self.file_manager, 'refresh'):
-                self.logger.info("Refreshing file manager after successful operation")
-                self.file_manager.refresh()
+            # Refresh both panes since source and destination could be in the same directory
+            # For 'create': archive file appears in destination, source files may have changed
+            # For 'extract': extracted files appear in destination, archive may be in source
+            if hasattr(self.file_manager, 'refresh_files'):
+                self.logger.info("Refreshing both panes after successful operation")
+                self.file_manager.refresh_files()  # Refresh both panes
         
         # Mark UI as dirty to trigger redraw
         if hasattr(self.file_manager, 'mark_dirty'):
