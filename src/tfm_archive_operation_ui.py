@@ -171,21 +171,13 @@ class ArchiveOperationUI:
             ]
         
         # Wrapper callback to handle shift modifier detection
-        def dialog_callback(choice):
-            """Wrapper callback that detects shift modifier and calls original callback.
+        def dialog_callback(choice, apply_to_all=False):
+            """Wrapper callback that receives shift modifier flag and calls original callback.
             
             Args:
                 choice: The user's choice value from the dialog
+                apply_to_all: True if Shift modifier was pressed, False otherwise
             """
-            # Check if shift modifier was pressed
-            # The file_manager.show_dialog() with enable_shift_modifier=True
-            # will set a flag that we can check
-            apply_to_all = getattr(self.file_manager, '_last_dialog_shift_pressed', False)
-            
-            # Clear the flag for next dialog
-            if hasattr(self.file_manager, '_last_dialog_shift_pressed'):
-                self.file_manager._last_dialog_shift_pressed = False
-            
             # Call the original callback with choice and apply_to_all flag
             callback(choice, apply_to_all)
         
