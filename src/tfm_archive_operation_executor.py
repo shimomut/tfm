@@ -84,6 +84,21 @@ class ArchiveOperationExecutor:
         # Thread tracking
         self._current_thread: Optional[threading.Thread] = None
     
+    def is_archive(self, path: Path) -> bool:
+        """
+        Check if a file is a supported archive format.
+        
+        Args:
+            path: Path to check
+            
+        Returns:
+            True if file is a supported archive format
+        """
+        if not path.is_file():
+            return False
+        
+        return self._get_archive_format(path.name) is not None
+    
     def perform_create_operation(self, source_paths: List[Path], archive_path: Path,
                                 format_type: str, completion_callback: Optional[Callable] = None):
         """
