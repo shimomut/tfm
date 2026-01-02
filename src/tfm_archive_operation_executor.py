@@ -81,7 +81,7 @@ class ArchiveOperationExecutor:
         self.file_manager = file_manager
         self.progress_manager = progress_manager
         self.cache_manager = cache_manager
-        self.logger = getLogger("ArchiveOp")
+        self.logger = getLogger("ArcvOp")
         
         # Thread tracking
         self._current_thread: Optional[threading.Thread] = None
