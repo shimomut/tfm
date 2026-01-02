@@ -405,27 +405,39 @@ class ArchiveOperationTask(BaseTask):
             self._execute_operation()
             return
         
-        # Check if apply-to-all options are set
+        # Check if apply-to-all options are set - use loop instead of recursion
         if self.context.options['overwrite_all']:
-            # Apply overwrite to current conflict
-            conflict_path = self.context.conflicts[self.context.current_conflict_index]
-            self.context.results['success'].append(conflict_path)
-            self.logger.info(f"Auto-overwrite (apply-to-all): {conflict_path.name}")
+            # Process all remaining conflicts in a loop to avoid recursion
+            remaining_conflicts = self.context.conflicts[self.context.current_conflict_index:]
+            self.logger.info(f"Auto-overwrite (apply-to-all): processing {len(remaining_conflicts)} remaining conflicts")
             
-            # Move to next conflict
-            self.context.current_conflict_index += 1
-            self._resolve_next_conflict()
+            for conflict_path in remaining_conflicts:
+                self.context.results['success'].append(conflict_path)
+            
+            # Update index to mark all conflicts as processed
+            self.context.current_conflict_index = len(self.context.conflicts)
+            
+            # Proceed to execution
+            self.logger.info("All conflicts resolved with overwrite-all, proceeding to execution")
+            self._transition_to_state(State.EXECUTING)
+            self._execute_operation()
             return
         
         if self.context.options['skip_all']:
-            # Apply skip to current conflict
-            conflict_path = self.context.conflicts[self.context.current_conflict_index]
-            self.context.results['skipped'].append(conflict_path)
-            self.logger.info(f"Auto-skip (apply-to-all): {conflict_path.name}")
+            # Process all remaining conflicts in a loop to avoid recursion
+            remaining_conflicts = self.context.conflicts[self.context.current_conflict_index:]
+            self.logger.info(f"Auto-skip (apply-to-all): processing {len(remaining_conflicts)} remaining conflicts")
             
-            # Move to next conflict
-            self.context.current_conflict_index += 1
-            self._resolve_next_conflict()
+            for conflict_path in remaining_conflicts:
+                self.context.results['skipped'].append(conflict_path)
+            
+            # Update index to mark all conflicts as processed
+            self.context.current_conflict_index = len(self.context.conflicts)
+            
+            # Proceed to execution
+            self.logger.info("All conflicts resolved with skip-all, proceeding to execution")
+            self._transition_to_state(State.EXECUTING)
+            self._execute_operation()
             return
         
         # Get current conflict
