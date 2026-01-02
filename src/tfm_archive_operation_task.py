@@ -524,10 +524,28 @@ class ArchiveOperationTask(BaseTask):
         overwrite_all = self.context.options.get('overwrite_all', False)
         
         # Build list of files to skip (those marked as skipped during conflict resolution)
-        skip_files = [path.name for path in self.context.results.get('skipped', [])]
+        # Convert full paths to relative paths from destination directory
+        skip_files = []
+        for path in self.context.results.get('skipped', []):
+            try:
+                # Get relative path from destination directory
+                rel_path = path.relative_to(self.context.destination)
+                skip_files.append(str(rel_path))
+            except ValueError:
+                # If relative_to fails, fall back to just the name
+                skip_files.append(path.name)
         
         # Build list of files to overwrite (those marked for overwrite during conflict resolution)
-        overwrite_files = [path.name for path in self.context.results.get('success', [])]
+        # Convert full paths to relative paths from destination directory
+        overwrite_files = []
+        for path in self.context.results.get('success', []):
+            try:
+                # Get relative path from destination directory
+                rel_path = path.relative_to(self.context.destination)
+                overwrite_files.append(str(rel_path))
+            except ValueError:
+                # If relative_to fails, fall back to just the name
+                overwrite_files.append(path.name)
         
         # Call executor to perform extraction operation
         self.executor.perform_extract_operation(
