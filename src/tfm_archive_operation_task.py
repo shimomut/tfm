@@ -542,6 +542,8 @@ class ArchiveOperationTask(BaseTask):
         """
         # Store results in context
         if self.context:
+            # Store success count - add placeholder entries to match the count
+            self.context.results['success'].extend([None] * success_count)
             # Update error count in results
             self.context.results['errors'].extend([None] * error_count)
         
