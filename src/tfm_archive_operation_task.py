@@ -576,12 +576,13 @@ class ArchiveOperationTask(BaseTask):
             success_count: Number of files successfully processed
             error_count: Number of files that failed to process
         """
-        # Store results in context
+        # Store executor's counts for final summary
+        # Note: We don't add to results lists here because conflict resolution
+        # already populated them with the actual file paths
         if self.context:
-            # Store success count - add placeholder entries to match the count
-            self.context.results['success'].extend([None] * success_count)
-            # Update error count in results
-            self.context.results['errors'].extend([None] * error_count)
+            # Store the executor's counts separately for accurate reporting
+            self.context.executor_success_count = success_count
+            self.context.executor_error_count = error_count
         
         # Refresh file manager if operation was successful and not cancelled
         if success_count > 0 and not self.file_manager.operation_cancelled:
@@ -618,10 +619,11 @@ class ArchiveOperationTask(BaseTask):
             return
         
         # Build summary message with counts
+        # Use executor's counts if available (from actual operation), otherwise use results lists
         operation_type = self.context.operation_type
-        success_count = len(self.context.results['success'])
+        success_count = getattr(self.context, 'executor_success_count', len(self.context.results['success']))
         skipped_count = len(self.context.results['skipped'])
-        error_count = len(self.context.results['errors'])
+        error_count = getattr(self.context, 'executor_error_count', len(self.context.results['errors']))
         
         # Check if operation was cancelled
         was_cancelled = self.file_manager.operation_cancelled
