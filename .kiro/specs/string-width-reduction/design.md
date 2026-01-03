@@ -243,6 +243,46 @@ Width calculation is handled by TTK's `wide_char_utils.get_display_width()`, whi
    - Return result (even if still too wide)
 ```
 
+### Priority Recalculation Optimization
+
+When processing multiple regions with different priorities, lower priority regions (especially in filepath mode) may free up significant display width by removing multiple directory levels. This freed space should be used to restore content in higher priority regions that were previously shortened.
+
+**Algorithm Enhancement**:
+
+```
+1. Process regions by priority (highest priority number first = less important)
+2. For each priority level:
+   a. Shorten regions at this priority to meet target
+   b. Store both original and shortened versions
+3. After all priorities processed:
+   a. Calculate actual width of result
+   b. If width < target (space freed up):
+      - Iterate through priorities in REVERSE order (lowest priority number to highest)
+      - For each priority level:
+        * Try to restore original content for regions at this priority
+        * If restored version still fits within target, keep it
+        * Otherwise, keep shortened version
+      - Stop when no more space available or all regions checked
+4. Return final result with maximum content preserved
+```
+
+**Rationale for Reverse Order**:
+- Lower priority numbers represent MORE important content (shortened last)
+- Higher priority numbers represent LESS important content (shortened first)
+- When recalculating, restore more important content (lower priority numbers) first
+- If restoring important content uses freed space, that's the correct behavior
+- Example: Priority 0 (path, important) restored before Priority 1 (match content, less important)
+
+**Example Scenario**:
+- Original: `projects/my-app/src/components/authentication/forms/LoginForm.tsx - Line 142: const handleSubmit = async`
+- Target width: 60
+- Priority 1 (match content, less important): Shortened first to `…`
+- Priority 0 (path, more important): Shortened last to `projects/my-app/src/…/forms/LoginForm.tsx`
+- After recalculation: Path shortening freed 20 columns
+- Restore Priority 0 first (path is more important): Already optimal
+- Restore Priority 1 next (match content): `const handleSubmit = async` (26 cols) fits!
+- Final: `projects/my-app/src/…/forms/LoginForm.tsx - Line 142: const handleSubmit = async`
+
 ## Correctness Properties
 
 *A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
@@ -326,6 +366,10 @@ Property 16: Unicode NFC normalization
 Property 17: Complex character width calculation
 *For any* string containing combining characters or emoji with modifiers, the display width should correctly account for zero-width combining marks and multi-codepoint emoji sequences
 **Validates: Requirements 7.3, 7.4**
+
+Property 18: Priority recalculation optimization
+*For any* string with multiple regions where lower priority shortening frees up display width, higher priority regions should be recalculated to restore previously shortened content when possible
+**Validates: Requirements 9.1, 9.2, 9.3**
 
 ## Error Handling
 

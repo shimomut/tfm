@@ -711,10 +711,13 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
         available_for_regions = 1
     
     # Process regions by priority (highest first)
-    # Keep track of shortened versions of each region
+    # Keep track of both original and shortened versions of each region
     region_texts = {}
+    original_region_texts = {}
     for region in regions_by_position:
-        region_texts[region.start] = text[region.start:region.end]
+        original_text = text[region.start:region.end]
+        region_texts[region.start] = original_text
+        original_region_texts[region.start] = original_text  # Store original for recalculation
     
     # Process each priority level
     for priority_level in sorted(set(r.priority for r in valid_regions), reverse=True):
@@ -735,9 +738,8 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
         current_result = ''.join(current_parts)
         current_result_width = calculate_display_width(current_result)
         
-        # If we've met the target, stop
-        if current_result_width <= target_width:
-            return current_result
+        # Don't return early - continue processing all priorities
+        # so we can recalculate later
         
         # Calculate how much we need to reduce
         width_to_reduce = current_result_width - target_width
@@ -787,6 +789,101 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
             # Update how much we've reduced
             width_reduced = region_width - shortened_width
             width_to_reduce -= width_reduced
+    
+    # Recalculation phase: Try to restore content in reverse priority order
+    # (lowest priority number = most important, restored first)
+    
+    # Calculate current result width
+    current_parts = []
+    last_end = 0
+    for region in regions_by_position:
+        if region.start > last_end:
+            current_parts.append(text[last_end:region.start])
+        current_parts.append(region_texts[region.start])
+        last_end = region.end
+    if last_end < len(text):
+        current_parts.append(text[last_end:])
+    
+    current_result = ''.join(current_parts)
+    current_result_width = calculate_display_width(current_result)
+    
+    logger.debug(f"Before recalculation: width={current_result_width}, target={target_width}")
+    
+    # If we have freed space (width < target), try to restore regions
+    if current_result_width < target_width:
+        available_space = target_width - current_result_width
+        logger.debug(f"Recalculation: {available_space} cols available (result={current_result_width}, target={target_width})")
+        
+        # Iterate through priorities in reverse order (lowest to highest)
+        # Lower priority numbers = more important = restore first
+        for priority_level in sorted(set(r.priority for r in valid_regions)):
+            if available_space <= 0:
+                break
+            
+            logger.debug(f"Trying to restore priority {priority_level} regions")
+            
+            # Get regions at this priority level
+            priority_regions = [r for r in valid_regions if r.priority == priority_level]
+            
+            # Try to restore each region at this priority
+            for region in priority_regions:
+                if available_space <= 0:
+                    break
+                
+                current_text = region_texts[region.start]
+                original_text = original_region_texts[region.start]
+                
+                # Skip if already at original
+                if current_text == original_text:
+                    continue
+                
+                # Calculate widths
+                current_width = calculate_display_width(current_text)
+                original_width = calculate_display_width(original_text)
+                
+                # Calculate new target width for this region with available space
+                new_target_width = current_width + available_space
+                
+                # If we can fit the original, use it
+                if original_width <= new_target_width:
+                    region_texts[region.start] = original_text
+                    space_used = original_width - current_width
+                    available_space -= space_used
+                    logger.debug(f"Restored region at priority {priority_level} to original, used {space_used} cols")
+                else:
+                    # Re-shorten with the new target width
+                    # Select the appropriate strategy
+                    strategy_name = region.strategy.lower()
+                    if strategy_name not in ['remove', 'abbreviate']:
+                        strategy_name = 'abbreviate'
+                    
+                    if region.filepath_mode:
+                        strategy = FilepathStrategy()
+                    elif strategy_name == 'remove':
+                        strategy = RemovalStrategy()
+                    else:
+                        strategy = AbbreviationStrategy()
+                    
+                    # Create a temporary region for just this text
+                    temp_region = ShorteningRegion(
+                        start=0,
+                        end=len(original_text),
+                        priority=region.priority,
+                        strategy=region.strategy,
+                        abbrev_position=region.abbrev_position,
+                        filepath_mode=region.filepath_mode
+                    )
+                    
+                    # Re-shorten the original text with new target
+                    re_shortened = strategy.shorten(original_text, new_target_width, temp_region)
+                    re_shortened_width = calculate_display_width(re_shortened)
+                    
+                    # Only use if it's better than current
+                    if re_shortened_width > current_width:
+                        region_texts[region.start] = re_shortened
+                        space_used = re_shortened_width - current_width
+                        available_space -= space_used
+                        logger.debug(f"Re-shortened region at priority {priority_level}, used {space_used} cols")
     
     # Reconstruct the final text
     result_parts = []

@@ -107,3 +107,15 @@ This document specifies requirements for a string width reduction utility module
 2. THE String_Width_Reducer SHALL provide convenience functions for common patterns (e.g., abbreviate_middle, abbreviate_path)
 3. WHEN using convenience functions, THE String_Width_Reducer SHALL apply appropriate defaults for the use case
 4. THE String_Width_Reducer SHALL provide clear documentation with usage examples for all public functions
+
+### Requirement 9
+
+**User Story:** As a developer, I want higher priority regions to be recalculated after lower priority regions are shortened, so that content is preserved optimally when filepath mode frees up significant space.
+
+#### Acceptance Criteria
+
+1. WHEN a lower priority region is shortened and frees up display width, THE String_Width_Reducer SHALL recalculate higher priority regions to potentially restore content
+2. WHEN recalculating higher priority regions, THE String_Width_Reducer SHALL attempt to restore content that was previously shortened
+3. WHEN filepath mode removes multiple directory levels, THE String_Width_Reducer SHALL use the freed space to preserve more content in higher priority regions
+4. WHEN recalculation occurs, THE String_Width_Reducer SHALL maintain the priority order and not exceed the target width
+5. WHEN all regions fit after recalculation, THE String_Width_Reducer SHALL return the result with maximum content preserved

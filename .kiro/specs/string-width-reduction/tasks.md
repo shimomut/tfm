@@ -194,6 +194,38 @@ Implement a string width reduction utility module (`src/tfm_string_width.py`) th
 - [x] 12. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
+- [x] 13. Implement priority recalculation optimization
+  - [x] 13.1 Enhance `_process_regions()` to track original region content
+    - Store original text for each region before shortening
+    - Track which regions were shortened
+    - _Requirements: 9.1, 9.2_
+  
+  - [x] 13.2 Implement recalculation phase after all priorities processed
+    - Calculate actual width of result after all shortening
+    - If width < target, iterate through priorities in REVERSE order (lowest priority number to highest)
+    - For each priority level, try to restore original content or re-shorten with available space
+    - Keep restored/re-shortened version if it still fits within target
+    - Stop when no more space available
+    - _Requirements: 9.3, 9.4_
+  
+  - [x] 13.3 Add optimization for filepath mode
+    - Filepath mode naturally frees significant space by removing directory levels
+    - Recalculation automatically benefits from this freed space
+    - _Requirements: 9.3_
+  
+  - [ ]* 13.4 Write property test for recalculation optimization
+    - **Property 18: Priority recalculation optimization**
+    - **Validates: Requirements 9.1, 9.2, 9.3**
+  
+  - [ ]* 13.5 Write unit tests for recalculation scenarios
+    - Test filepath mode freeing significant space
+    - Test restoration of higher priority content
+    - Test that recalculation doesn't exceed target width
+    - _Requirements: 9.4, 9.5_
+
+- [ ] 14. Final checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP
