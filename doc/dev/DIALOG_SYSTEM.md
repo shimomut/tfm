@@ -50,7 +50,7 @@ class DialogType:
 
 class GeneralPurposeDialog:
     def __init__(self, config)
-    def show_status_line_input(self, prompt_text, initial_text="", help_text="")
+    def show_status_line_input(self, prompt_text, initial_text="")
     def handle_input(self, key)
     def draw(self, stdscr, safe_addstr_func)
     def needs_redraw(self)

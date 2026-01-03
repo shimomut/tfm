@@ -116,7 +116,6 @@ class TestQuickEditBarTTKIntegration(unittest.TestCase):
         
         dialog.show_status_line_input(
             prompt="Test: ",
-            help_text="ESC:cancel Enter:confirm",
             initial_text="initial",
             callback=test_callback
         )

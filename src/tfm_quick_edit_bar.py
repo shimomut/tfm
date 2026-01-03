@@ -33,25 +33,21 @@ class QuickEditBar:
         # Status line input dialog state
         self.text_editor = SingleLineTextEdit(renderer=renderer)
         self.prompt_text = ""
-        self.help_text = ""
         self.callback = None
         self.cancel_callback = None
         
-    def show_status_line_input(self, prompt, help_text="ESC:cancel Enter:confirm", 
-                              initial_text="", callback=None, cancel_callback=None):
+    def show_status_line_input(self, prompt, initial_text="", callback=None, cancel_callback=None):
         """
         Show a status line input dialog
         
         Args:
             prompt (str): The prompt text to display
-            help_text (str): Help text to show on the right side
             initial_text (str): Initial text in the input field
             callback (callable): Function to call when Enter is pressed
             cancel_callback (callable): Function to call when ESC is pressed
         """
         self.is_active = True
         self.prompt_text = prompt
-        self.help_text = help_text
         self.callback = callback
         self.cancel_callback = cancel_callback
         self.content_changed = True  # Mark content as changed when showing
@@ -65,7 +61,6 @@ class QuickEditBar:
         self.content_changed = True  # Mark content as changed when hiding
         self.text_editor.clear()
         self.prompt_text = ""
-        self.help_text = ""
         self.callback = None
         self.cancel_callback = None
     
@@ -192,7 +187,6 @@ class QuickEditBarHelpers:
         """Create a filter dialog configuration"""
         dialog.show_status_line_input(
             prompt="Filter: ",
-            help_text="ESC:cancel Enter:apply (files only: *.py, test_*, *.[ch])",
             initial_text=current_filter
         )
     
@@ -203,7 +197,6 @@ class QuickEditBarHelpers:
             current_name = original_name
         dialog.show_status_line_input(
             prompt=f"Rename '{original_name}' to: ",
-            help_text="ESC:cancel Enter:confirm",
             initial_text=current_name
         )
     
@@ -211,22 +204,19 @@ class QuickEditBarHelpers:
     def create_create_directory_dialog(dialog):
         """Create a create directory dialog configuration"""
         dialog.show_status_line_input(
-            prompt="Create directory: ",
-            help_text="ESC:cancel Enter:create"
+            prompt="Create directory: "
         )
     
     @staticmethod
     def create_create_file_dialog(dialog):
         """Create a create file dialog configuration"""
         dialog.show_status_line_input(
-            prompt="Create file: ",
-            help_text="ESC:cancel Enter:create"
+            prompt="Create file: "
         )
     
     @staticmethod
     def create_create_archive_dialog(dialog):
         """Create an archive creation dialog configuration"""
         dialog.show_status_line_input(
-            prompt="Archive filename: ",
-            help_text="ESC:cancel Enter:create (.zip/.tar.gz/.tgz)"
+            prompt="Archive filename: "
         )
