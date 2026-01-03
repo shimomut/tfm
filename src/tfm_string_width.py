@@ -415,9 +415,9 @@ class FilepathStrategy:
         """
         Shorten a filesystem path by replacing directory levels with ellipsis.
         
-        The path is parsed into components, and entire directory levels are
-        replaced with ellipsis before the filename is touched. This preserves
-        the most important part (filename) as long as possible.
+        The path is parsed into components, and the minimum number of directory
+        levels are replaced with ellipsis to meet the target width. This preserves
+        as much context as possible while keeping the filename intact.
         
         Args:
             text: Full string to process
@@ -425,7 +425,7 @@ class FilepathStrategy:
             region: Region to shorten (should cover the entire path)
             
         Returns:
-            Shortened path with directory levels replaced by ellipsis
+            Shortened path with minimum directory levels replaced by ellipsis
         """
         # Normalize the input text
         text = normalize_unicode(text)
@@ -503,30 +503,37 @@ class FilepathStrategy:
         separator_width = calculate_display_width(separator)
         filename_width = calculate_display_width(filename)
         
-        # Try different combinations of directory levels
-        # Start with all directories, then progressively replace middle ones with ellipsis
-        
-        # Strategy: Keep first and last directories as long as possible
-        # Replace middle directories with ellipsis
-        
-        # Calculate minimum width: first_dir/…/last_dir/filename
-        # Or just: …/filename if even that doesn't fit
+        # Strategy: Try to keep as many directory levels as possible
+        # Start with all directories, then progressively remove from the middle
         
         # Try: all directories + filename
         full_path = separator.join(directories) + separator + filename
         if calculate_display_width(full_path) <= available_width:
             return before_region + full_path + after_region
         
-        # Try: first_dir/…/last_dir/filename
-        if len(directories) >= 2:
-            first_dir = directories[0]
-            last_dir = directories[-1]
-            path_with_ellipsis = f"{first_dir}{separator}{self.ELLIPSIS}{separator}{last_dir}{separator}{filename}"
-            if calculate_display_width(path_with_ellipsis) <= available_width:
-                return before_region + path_with_ellipsis + after_region
+        # We need to shorten. Try different combinations, keeping as many dirs as possible
+        # Strategy: Keep directories from both ends, replace middle with ellipsis
         
-        # Try: first_dir/…/filename
-        if len(directories) >= 1:
+        num_dirs = len(directories)
+        
+        # Try keeping progressively fewer directories from each end
+        # Start with keeping all but one from each end, then reduce
+        for keep_from_start in range(num_dirs - 1, 0, -1):
+            for keep_from_end in range(num_dirs - keep_from_start, 0, -1):
+                if keep_from_start + keep_from_end >= num_dirs:
+                    # This would keep all directories, already tried
+                    continue
+                
+                # Build path with these directories
+                kept_dirs = directories[:keep_from_start] + directories[-keep_from_end:]
+                path_parts = directories[:keep_from_start] + [self.ELLIPSIS] + directories[-keep_from_end:] + [filename]
+                test_path = separator.join(path_parts)
+                
+                if calculate_display_width(test_path) <= available_width:
+                    return before_region + test_path + after_region
+        
+        # Try keeping just first directory: first_dir/…/filename
+        if num_dirs >= 1:
             first_dir = directories[0]
             path_with_ellipsis = f"{first_dir}{separator}{self.ELLIPSIS}{separator}{filename}"
             if calculate_display_width(path_with_ellipsis) <= available_width:
