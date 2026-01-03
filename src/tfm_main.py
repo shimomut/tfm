@@ -2993,9 +2993,9 @@ class FileManager(UILayer):
         self.quick_choice_bar.show(message, choices, callback, enable_shift_modifier)
         self.mark_dirty()
     
-    def show_confirmation(self, message, callback):
+    def show_confirmation(self, message, callback, shortening_regions=None):
         """Show confirmation dialog with Yes/No options (ESC to cancel)"""
-        QuickChoiceBarHelpers.show_yes_no_confirmation(self.quick_choice_bar, message, callback)
+        QuickChoiceBarHelpers.show_yes_no_confirmation(self.quick_choice_bar, message, callback, shortening_regions=shortening_regions)
         self.mark_dirty()
         
     def exit_quick_choice_mode(self):

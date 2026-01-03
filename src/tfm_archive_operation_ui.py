@@ -72,6 +72,8 @@ class ArchiveOperationUI:
             destination: Destination Path (archive file for create, directory for extract)
             callback: Function to call with confirmation result (True/False)
         """
+        from tfm_string_width import ShorteningRegion
+        
         # Build confirmation message
         if operation_type == 'create':
             if len(source_paths) == 1:
@@ -82,18 +84,50 @@ class ArchiveOperationUI:
                 # Multiple file archive creation
                 file_count = len(source_paths)
                 message = f"Create archive '{destination.name}' from {file_count} files?"
+            
+            # No shortening regions for create operations
+            shortening_regions = None
         
         elif operation_type == 'extract':
             # Archive extraction
             archive_name = source_paths[0].name if source_paths else 'archive'
-            message = f"Extract '{archive_name}' to {destination}?"
+            destination_str = str(destination)
+            message = f"Extract '{archive_name}' to {destination_str}?"
+            
+            # Define shortening regions:
+            # 1. "'{archive_name}' " - AllOrNothing strategy (priority 1, higher = shortened first)
+            # 2. destination path - Abbreviation with filepath mode (priority 0, lower = more important)
+            archive_part_start = len("Extract ")
+            archive_part_end = archive_part_start + len(f"'{archive_name}' ")
+            destination_start = archive_part_end + len("to ")
+            destination_end = destination_start + len(destination_str)
+            
+            shortening_regions = [
+                # Archive name region - remove entirely if space is tight
+                ShorteningRegion(
+                    start=archive_part_start,
+                    end=archive_part_end,
+                    priority=1,  # Higher priority = shortened first
+                    strategy='all_or_nothing'
+                ),
+                # Destination path region - abbreviate intelligently
+                ShorteningRegion(
+                    start=destination_start,
+                    end=destination_end,
+                    priority=0,  # Lower priority = more important, shortened last
+                    strategy='abbreviate',
+                    abbrev_position='middle',
+                    filepath_mode=True
+                )
+            ]
         
         else:
             # Fallback for unknown operation types
             message = f"Confirm {operation_type} operation?"
+            shortening_regions = None
         
         # Show confirmation dialog
-        self.file_manager.show_confirmation(message, callback)
+        self.file_manager.show_confirmation(message, callback, shortening_regions=shortening_regions)
     
     def show_conflict_dialog(self, conflict_type: str, conflict_info: Dict,
                            conflict_num: int, total_conflicts: int,
