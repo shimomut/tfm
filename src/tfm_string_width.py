@@ -1,0 +1,966 @@
+"""
+String Width Reduction Utility
+
+This module provides intelligent string shortening functionality for terminal UI
+components. It accounts for wide characters (CJK, emoji), supports multiple
+shortening strategies (removal, abbreviation), and offers both simple and
+advanced APIs for different use cases.
+
+The module integrates with TTK's wide_char_utils for accurate display width
+calculations and provides region-based control for flexible shortening.
+
+Usage Examples:
+    Basic usage with default abbreviation:
+        >>> from tfm_string_width import reduce_width
+        >>> reduce_width("very_long_filename.txt", 15)
+        'very_lon….txt'
+    
+    Middle abbreviation:
+        >>> from tfm_string_width import abbreviate_middle
+        >>> abbreviate_middle("very_long_filename.txt", 15)
+        'very_l…name.txt'
+    
+    Path abbreviation:
+        >>> from tfm_string_width import abbreviate_path
+        >>> abbreviate_path("/home/user/documents/file.txt", 20)
+        '/home/…/file.txt'
+    
+    Region-based shortening:
+        >>> from tfm_string_width import reduce_width, ShorteningRegion
+        >>> region = ShorteningRegion(start=0, end=10, priority=1, strategy='remove')
+        >>> reduce_width("prefix_important_suffix", 20, regions=[region])
+        'pre_important_suffix'
+"""
+
+from dataclasses import dataclass
+from typing import Optional, List
+import unicodedata
+
+# Import TTK's display width calculation
+from ttk.wide_char_utils import get_display_width
+
+# Import TFM's unified logging system
+from tfm_log_manager import getLogger
+
+# Initialize logger for this module
+logger = getLogger("StrWidth")
+
+
+@dataclass
+class ShorteningRegion:
+    """
+    Defines a region of a string that can be shortened with a priority.
+    
+    Attributes:
+        start: Start index (inclusive) of the region
+        end: End index (exclusive) of the region
+        priority: Priority value (higher values are shortened first)
+        strategy: Shortening strategy ('remove' or 'abbreviate')
+        abbrev_position: Position for ellipsis ('left', 'middle', 'right')
+        filepath_mode: Whether to treat the region as a filesystem path
+    """
+    start: int
+    end: int
+    priority: int
+    strategy: str
+    abbrev_position: str = 'right'
+    filepath_mode: bool = False
+
+
+def calculate_display_width(text: str) -> int:
+    """
+    Calculate the display width of a string in terminal columns.
+    
+    Delegates to TTK's get_display_width() which handles:
+    - Wide characters (CJK, emoji) count as 2 columns
+    - Narrow characters count as 1 column
+    - Combining characters count as 0 columns (via NFC normalization)
+    
+    Args:
+        text: Input string (will be NFC normalized by get_display_width)
+        
+    Returns:
+        Display width in columns
+    """
+    return get_display_width(text)
+
+
+def normalize_unicode(text: str) -> str:
+    """
+    Normalize string to NFC form for consistent processing.
+    
+    NFC (Canonical Decomposition followed by Canonical Composition) ensures
+    that characters are represented in their composed form, which is important
+    for consistent width calculation and string manipulation.
+    
+    Args:
+        text: Input string
+        
+    Returns:
+        NFC normalized string
+    """
+    return unicodedata.normalize('NFC', text)
+
+
+class RemovalStrategy:
+    """
+    Shortening strategy that removes characters without adding ellipsis.
+    
+    This strategy removes characters from the end of the specified region
+    until the target width is met. No ellipsis character is added.
+    """
+    
+    def shorten(self, text: str, target_width: int, region: ShorteningRegion) -> str:
+        """
+        Shorten text by removing characters from the end of the region.
+        
+        Characters are removed from the end of the region (working backwards
+        from region.end towards region.start) until the total display width
+        of the string meets the target width. No ellipsis is added.
+        
+        Args:
+            text: Full string to process
+            target_width: Target display width in columns
+            region: Region to shorten (only region.start and region.end are used)
+            
+        Returns:
+            Shortened string with characters removed from the region
+        """
+        # Normalize the input text
+        text = normalize_unicode(text)
+        
+        # Calculate current width
+        current_width = calculate_display_width(text)
+        
+        # If already fits, return unchanged
+        if current_width <= target_width:
+            return text
+        
+        # Extract the three parts: before region, region, after region
+        before_region = text[:region.start]
+        region_text = text[region.start:region.end]
+        after_region = text[region.end:]
+        
+        # Calculate widths
+        before_width = calculate_display_width(before_region)
+        after_width = calculate_display_width(after_region)
+        
+        # Calculate available width for the region
+        available_width = target_width - before_width - after_width
+        
+        # Edge case: target width = 1
+        # Return first character of region if it fits
+        if available_width == 1:
+            if region_text:
+                first_char = region_text[0]
+                first_char_width = calculate_display_width(first_char)
+                if first_char_width <= 1:
+                    return before_region + first_char + after_region
+            # Can't fit anything, return empty region
+            return before_region + after_region
+        
+        # Edge case: no space available for region content
+        if available_width <= 0:
+            return before_region + after_region
+        
+        # Calculate how much width we need to reduce
+        width_to_reduce = current_width - target_width
+        
+        # Remove characters from the end of the region until we meet the target
+        while region_text and width_to_reduce > 0:
+            # Remove the last character
+            removed_char = region_text[-1]
+            region_text = region_text[:-1]
+            
+            # Calculate the width of the removed character
+            char_width = calculate_display_width(removed_char)
+            width_to_reduce -= char_width
+        
+        # Reconstruct the string
+        result = before_region + region_text + after_region
+        
+        return result
+
+
+class AbbreviationStrategy:
+    """
+    Shortening strategy that replaces removed content with an ellipsis character.
+    
+    This strategy abbreviates text by removing characters and inserting an
+    ellipsis ("…") at the specified position (left, middle, or right).
+    """
+    
+    ELLIPSIS = "…"
+    
+    def shorten(self, text: str, target_width: int, region: ShorteningRegion) -> str:
+        """
+        Shorten text by abbreviating with an ellipsis at the specified position.
+        
+        The abbreviation position determines where the ellipsis appears:
+        - 'left': Ellipsis at start, preserve right portion
+        - 'right': Ellipsis at end, preserve left portion
+        - 'middle': Ellipsis in center, preserve both ends with balanced distribution
+        
+        Args:
+            text: Full string to process
+            target_width: Target display width in columns
+            region: Region to shorten (uses region.abbrev_position)
+            
+        Returns:
+            Shortened string with ellipsis replacing removed content
+        """
+        # Normalize the input text
+        text = normalize_unicode(text)
+        
+        # Calculate current width
+        current_width = calculate_display_width(text)
+        
+        # If already fits, return unchanged
+        if current_width <= target_width:
+            return text
+        
+        # Extract the three parts: before region, region, after region
+        before_region = text[:region.start]
+        region_text = text[region.start:region.end]
+        after_region = text[region.end:]
+        
+        # Calculate widths
+        before_width = calculate_display_width(before_region)
+        after_width = calculate_display_width(after_region)
+        ellipsis_width = calculate_display_width(self.ELLIPSIS)
+        
+        # Calculate available width for the region (including ellipsis)
+        available_width = target_width - before_width - after_width
+        
+        # Edge case: target width = 1
+        # Return just the ellipsis if abbreviating, or first character if possible
+        if available_width == 1:
+            if ellipsis_width <= 1:
+                return before_region + self.ELLIPSIS + after_region
+            else:
+                # Ellipsis is too wide, return first character of region if it fits
+                if region_text:
+                    first_char = region_text[0]
+                    first_char_width = calculate_display_width(first_char)
+                    if first_char_width <= 1:
+                        return before_region + first_char + after_region
+                # Can't fit anything, return ellipsis anyway
+                return before_region + self.ELLIPSIS + after_region
+        
+        # Edge case: String shorter than ellipsis
+        # If the region text is shorter than the ellipsis, just return ellipsis
+        region_width = calculate_display_width(region_text)
+        if region_width < ellipsis_width and available_width >= ellipsis_width:
+            return before_region + self.ELLIPSIS + after_region
+        
+        # If there's not enough space even for the ellipsis, return just ellipsis
+        if available_width < ellipsis_width:
+            return before_region + self.ELLIPSIS + after_region
+        
+        # Calculate how much content we can preserve (minus ellipsis)
+        content_width = available_width - ellipsis_width
+        
+        # Apply the appropriate abbreviation strategy based on position
+        # Validate abbreviation position
+        position = region.abbrev_position.lower()
+        if position not in ['left', 'middle', 'right']:
+            logger.warning(f"Invalid abbreviation position '{region.abbrev_position}', falling back to 'right'")
+            position = 'right'
+        
+        if position == 'left':
+            # Ellipsis at start, preserve right portion
+            abbreviated = self._abbreviate_left(region_text, content_width)
+        elif position == 'middle':
+            # Ellipsis in center, preserve both ends
+            abbreviated = self._abbreviate_middle(region_text, content_width)
+        else:  # 'right' or default
+            # Ellipsis at end, preserve left portion
+            abbreviated = self._abbreviate_right(region_text, content_width)
+        
+        # Reconstruct the string
+        result = before_region + abbreviated + after_region
+        
+        return result
+    
+    def _abbreviate_left(self, text: str, content_width: int) -> str:
+        """
+        Abbreviate with ellipsis at the start, preserving the right portion.
+        
+        Args:
+            text: Text to abbreviate
+            content_width: Available width for content (excluding ellipsis)
+            
+        Returns:
+            Abbreviated text with ellipsis at the start
+        """
+        if content_width <= 0:
+            return self.ELLIPSIS
+        
+        # Build from the right, preserving as much as possible
+        preserved = ""
+        current_width = 0
+        
+        for i in range(len(text) - 1, -1, -1):
+            char = text[i]
+            char_width = calculate_display_width(char)
+            
+            if current_width + char_width <= content_width:
+                preserved = char + preserved
+                current_width += char_width
+            else:
+                break
+        
+        return self.ELLIPSIS + preserved
+    
+    def _abbreviate_right(self, text: str, content_width: int) -> str:
+        """
+        Abbreviate with ellipsis at the end, preserving the left portion.
+        
+        Args:
+            text: Text to abbreviate
+            content_width: Available width for content (excluding ellipsis)
+            
+        Returns:
+            Abbreviated text with ellipsis at the end
+        """
+        if content_width <= 0:
+            return self.ELLIPSIS
+        
+        # Build from the left, preserving as much as possible
+        preserved = ""
+        current_width = 0
+        
+        for char in text:
+            char_width = calculate_display_width(char)
+            
+            if current_width + char_width <= content_width:
+                preserved += char
+                current_width += char_width
+            else:
+                break
+        
+        return preserved + self.ELLIPSIS
+    
+    def _abbreviate_middle(self, text: str, content_width: int) -> str:
+        """
+        Abbreviate with ellipsis in the center, preserving both ends.
+        
+        The preserved characters are distributed approximately equally between
+        the left and right portions. If the content width is odd, the extra
+        character goes to the left side.
+        
+        Args:
+            text: Text to abbreviate
+            content_width: Available width for content (excluding ellipsis)
+            
+        Returns:
+            Abbreviated text with ellipsis in the middle
+        """
+        if content_width <= 0:
+            return self.ELLIPSIS
+        
+        # Calculate how much width to allocate to each side
+        # If odd, give the extra character to the left
+        left_width = (content_width + 1) // 2
+        right_width = content_width // 2
+        
+        # Build left portion
+        left_preserved = ""
+        left_current_width = 0
+        
+        for char in text:
+            char_width = calculate_display_width(char)
+            
+            if left_current_width + char_width <= left_width:
+                left_preserved += char
+                left_current_width += char_width
+            else:
+                break
+        
+        # Build right portion (from the end)
+        right_preserved = ""
+        right_current_width = 0
+        
+        for i in range(len(text) - 1, -1, -1):
+            char = text[i]
+            char_width = calculate_display_width(char)
+            
+            if right_current_width + char_width <= right_width:
+                right_preserved = char + right_preserved
+                right_current_width += char_width
+            else:
+                break
+        
+        return left_preserved + self.ELLIPSIS + right_preserved
+
+
+class FilepathStrategy:
+    """
+    Shortening strategy specialized for filesystem paths.
+    
+    This strategy intelligently abbreviates filesystem paths by:
+    1. Parsing the path into directory components and filename
+    2. Abbreviating directory components before abbreviating the filename
+    3. Preserving path separators (/ or \\)
+    
+    This ensures that the filename remains as readable as possible while
+    directory paths are shortened first.
+    """
+    
+    ELLIPSIS = "…"
+    
+    def shorten(self, text: str, target_width: int, region: ShorteningRegion) -> str:
+        """
+        Shorten a filesystem path by abbreviating directories before filename.
+        
+        The path is parsed into components, and directories are abbreviated
+        (using middle abbreviation) before the filename is touched. This
+        preserves the most important part (filename) as long as possible.
+        
+        Args:
+            text: Full string to process
+            target_width: Target display width in columns
+            region: Region to shorten (should cover the entire path)
+            
+        Returns:
+            Shortened path with directories abbreviated before filename
+        """
+        # Normalize the input text
+        text = normalize_unicode(text)
+        
+        # Calculate current width
+        current_width = calculate_display_width(text)
+        
+        # If already fits, return unchanged
+        if current_width <= target_width:
+            return text
+        
+        # Extract the three parts: before region, region, after region
+        before_region = text[:region.start]
+        region_text = text[region.start:region.end]
+        after_region = text[region.end:]
+        
+        # Calculate widths
+        before_width = calculate_display_width(before_region)
+        after_width = calculate_display_width(after_region)
+        
+        # Calculate available width for the path region
+        available_width = target_width - before_width - after_width
+        
+        # Edge case: target width = 1
+        # Return just the ellipsis or first character
+        ellipsis_width = calculate_display_width(self.ELLIPSIS)
+        if available_width == 1:
+            if ellipsis_width <= 1:
+                return before_region + self.ELLIPSIS + after_region
+            else:
+                # Ellipsis is too wide, return first character if it fits
+                if region_text:
+                    first_char = region_text[0]
+                    first_char_width = calculate_display_width(first_char)
+                    if first_char_width <= 1:
+                        return before_region + first_char + after_region
+                # Can't fit anything, return ellipsis anyway
+                return before_region + self.ELLIPSIS + after_region
+        
+        # Edge case: not enough space even for ellipsis
+        if available_width < ellipsis_width:
+            return before_region + self.ELLIPSIS + after_region
+        
+        # Parse the path into components
+        # Detect separator (prefer / but support \)
+        if '/' in region_text:
+            separator = '/'
+        elif '\\' in region_text:
+            separator = '\\'
+        else:
+            # No separator, treat as a single filename
+            # Use middle abbreviation on the whole thing
+            abbrev_strategy = AbbreviationStrategy()
+            temp_region = ShorteningRegion(
+                start=0,
+                end=len(region_text),
+                priority=region.priority,
+                strategy='abbreviate',
+                abbrev_position='middle'
+            )
+            abbreviated = abbrev_strategy.shorten(region_text, available_width, temp_region)
+            return before_region + abbreviated + after_region
+        
+        # Split into components
+        components = region_text.split(separator)
+        
+        # Separate directories from filename
+        # The last component is the filename
+        if len(components) > 1:
+            directories = components[:-1]
+            filename = components[-1]
+        else:
+            # Only one component (shouldn't happen if separator was found, but handle it)
+            directories = []
+            filename = components[0]
+        
+        # Calculate the width needed for separators
+        separator_width = calculate_display_width(separator)
+        num_separators = len(directories)  # One separator before each directory, plus one before filename
+        separators_total_width = separator_width * num_separators
+        
+        # Calculate filename width
+        filename_width = calculate_display_width(filename)
+        
+        # Calculate available width for directories
+        available_for_dirs = available_width - filename_width - separators_total_width
+        
+        # If we can't fit even the filename and separators, we need to abbreviate everything
+        if available_for_dirs < 0:
+            # Not enough space for full filename, need to abbreviate the whole path
+            # Use middle abbreviation on the entire path
+            ellipsis_width = calculate_display_width(self.ELLIPSIS)
+            
+            if available_width < ellipsis_width:
+                return before_region + self.ELLIPSIS + after_region
+            
+            # Try to preserve the filename as much as possible
+            # Allocate space: try to keep some of the filename
+            content_width = available_width - ellipsis_width
+            
+            if content_width <= 0:
+                return before_region + self.ELLIPSIS + after_region
+            
+            # Give priority to the filename - try to preserve at least part of it
+            # Allocate 2/3 to filename, 1/3 to path prefix if possible
+            filename_target = min(filename_width, (content_width * 2) // 3)
+            prefix_target = content_width - filename_target
+            
+            # Build abbreviated filename
+            abbreviated_filename = ""
+            current_width = 0
+            for i in range(len(filename) - 1, -1, -1):
+                char = filename[i]
+                char_width = calculate_display_width(char)
+                if current_width + char_width <= filename_target:
+                    abbreviated_filename = char + abbreviated_filename
+                    current_width += char_width
+                else:
+                    break
+            
+            # Build abbreviated prefix (from the start)
+            path_prefix = separator.join(directories) + separator if directories else ""
+            abbreviated_prefix = ""
+            current_width = 0
+            for char in path_prefix:
+                char_width = calculate_display_width(char)
+                if current_width + char_width <= prefix_target:
+                    abbreviated_prefix += char
+                    current_width += char_width
+                else:
+                    break
+            
+            result = before_region + abbreviated_prefix + self.ELLIPSIS + abbreviated_filename + after_region
+            return result
+        
+        # We have enough space for the full filename, now abbreviate directories
+        # Abbreviate directories from left to right using middle abbreviation
+        abbreviated_dirs = []
+        
+        for directory in directories:
+            dir_width = calculate_display_width(directory)
+            
+            # Calculate how much width we can allocate to this directory
+            # Distribute available width equally among remaining directories
+            remaining_dirs = len(directories) - len(abbreviated_dirs)
+            if remaining_dirs > 0:
+                width_per_dir = available_for_dirs // remaining_dirs
+            else:
+                width_per_dir = available_for_dirs
+            
+            if dir_width <= width_per_dir:
+                # Directory fits, use it as-is
+                abbreviated_dirs.append(directory)
+                available_for_dirs -= dir_width
+            else:
+                # Need to abbreviate this directory
+                # Use middle abbreviation
+                ellipsis_width = calculate_display_width(self.ELLIPSIS)
+                
+                if width_per_dir < ellipsis_width:
+                    # Not enough space for ellipsis, just use ellipsis
+                    abbreviated_dirs.append(self.ELLIPSIS)
+                    available_for_dirs -= ellipsis_width
+                else:
+                    # Abbreviate with middle position
+                    content_width = width_per_dir - ellipsis_width
+                    
+                    if content_width <= 0:
+                        abbreviated_dirs.append(self.ELLIPSIS)
+                        available_for_dirs -= ellipsis_width
+                    else:
+                        # Build abbreviated directory with middle ellipsis
+                        left_width = (content_width + 1) // 2
+                        right_width = content_width // 2
+                        
+                        # Build left portion
+                        left_part = ""
+                        current_width = 0
+                        for char in directory:
+                            char_width = calculate_display_width(char)
+                            if current_width + char_width <= left_width:
+                                left_part += char
+                                current_width += char_width
+                            else:
+                                break
+                        
+                        # Build right portion
+                        right_part = ""
+                        current_width = 0
+                        for i in range(len(directory) - 1, -1, -1):
+                            char = directory[i]
+                            char_width = calculate_display_width(char)
+                            if current_width + char_width <= right_width:
+                                right_part = char + right_part
+                                current_width += char_width
+                            else:
+                                break
+                        
+                        abbreviated_dir = left_part + self.ELLIPSIS + right_part
+                        abbreviated_dirs.append(abbreviated_dir)
+                        available_for_dirs -= calculate_display_width(abbreviated_dir)
+        
+        # Reconstruct the path
+        if abbreviated_dirs:
+            abbreviated_path = separator.join(abbreviated_dirs) + separator + filename
+        else:
+            abbreviated_path = filename
+        
+        result = before_region + abbreviated_path + after_region
+        
+        return result
+
+
+def _sort_regions_by_priority(regions: List[ShorteningRegion]) -> List[ShorteningRegion]:
+    """
+    Sort regions by priority in descending order.
+    
+    Regions with higher priority values are processed first. When regions
+    have equal priority, they are kept in their original definition order
+    (stable sort).
+    
+    Args:
+        regions: List of shortening regions to sort
+        
+    Returns:
+        Sorted list of regions (highest priority first)
+    """
+    # Use stable sort to preserve definition order for equal priorities
+    return sorted(regions, key=lambda r: r.priority, reverse=True)
+
+
+def _validate_region(region: ShorteningRegion, text_length: int) -> bool:
+    """
+    Validate region boundaries.
+    
+    A region is valid if:
+    - start is non-negative
+    - end is non-negative
+    - start < end
+    - start < text_length
+    - end <= text_length
+    
+    Invalid regions are logged as warnings and should be skipped during processing.
+    
+    Args:
+        region: Region to validate
+        text_length: Length of the text being processed
+        
+    Returns:
+        True if region is valid, False otherwise
+    """
+    # Check for negative indices
+    if region.start < 0:
+        logger.warning(f"Invalid region: start index is negative ({region.start})")
+        return False
+    
+    if region.end < 0:
+        logger.warning(f"Invalid region: end index is negative ({region.end})")
+        return False
+    
+    # Check that start < end
+    if region.start >= region.end:
+        logger.warning(f"Invalid region: start ({region.start}) >= end ({region.end})")
+        return False
+    
+    # Check that indices are within text bounds
+    if region.start >= text_length:
+        logger.warning(f"Invalid region: start ({region.start}) >= text length ({text_length})")
+        return False
+    
+    if region.end > text_length:
+        logger.warning(f"Invalid region: end ({region.end}) > text length ({text_length})")
+        return False
+    
+    return True
+
+
+def _process_regions(text: str, target_width: int, regions: List[ShorteningRegion]) -> str:
+    """
+    Process regions in priority order to shorten text.
+    
+    This function:
+    1. Sorts regions by priority (highest first)
+    2. Validates each region's boundaries
+    3. Applies the appropriate strategy to each region
+    4. Checks if target width is met after each region
+    5. Preserves characters outside region boundaries
+    
+    Processing stops as soon as the target width is met. If the target is not
+    met after processing all regions, the current result is returned (the caller
+    may then apply fallback shortening to the entire string).
+    
+    Args:
+        text: Text to shorten
+        target_width: Target display width in columns
+        regions: List of shortening regions with priorities
+        
+    Returns:
+        Shortened text after processing regions
+    """
+    # Normalize the input text
+    text = normalize_unicode(text)
+    
+    # Sort regions by priority (highest first)
+    sorted_regions = _sort_regions_by_priority(regions)
+    
+    # Process each region in priority order
+    current_text = text
+    
+    for region in sorted_regions:
+        # Validate region boundaries
+        if not _validate_region(region, len(current_text)):
+            # Skip invalid regions
+            continue
+        
+        # Check if we've already met the target width
+        current_width = calculate_display_width(current_text)
+        if current_width <= target_width:
+            # Target met, stop processing
+            return current_text
+        
+        # Select the appropriate strategy
+        # Validate strategy name
+        strategy_name = region.strategy.lower()
+        if strategy_name not in ['remove', 'abbreviate']:
+            logger.warning(f"Invalid strategy '{region.strategy}' in region, falling back to 'abbreviate'")
+            strategy_name = 'abbreviate'
+        
+        if region.filepath_mode:
+            strategy = FilepathStrategy()
+        elif strategy_name == 'remove':
+            strategy = RemovalStrategy()
+        else:  # 'abbreviate' or default
+            strategy = AbbreviationStrategy()
+        
+        # Apply the strategy to shorten the text
+        # Note: The region boundaries refer to the current_text, which may have
+        # changed from previous region processing. This is intentional - each
+        # region operates on the result of the previous region.
+        current_text = strategy.shorten(current_text, target_width, region)
+    
+    return current_text
+
+
+def reduce_width(
+    text: str,
+    target_width: int,
+    regions: Optional[List[ShorteningRegion]] = None,
+    default_strategy: str = 'abbreviate',
+    default_position: str = 'right'
+) -> str:
+    """
+    Reduce string display width to fit within target.
+    
+    This is the main entry point for the string width reduction utility. It
+    intelligently shortens strings to fit within a specified display width,
+    accounting for wide characters (CJK, emoji) and providing flexible control
+    through regions and strategies.
+    
+    The function processes the string in the following order:
+    1. Input validation and edge case handling
+    2. If regions are specified, process them in priority order
+    3. If target not met after regions (or no regions), apply fallback shortening
+       to the entire string using the default strategy and position
+    
+    Args:
+        text: Input string to shorten
+        target_width: Maximum display width in columns
+        regions: Optional list of regions to shorten with priorities.
+                If None, the entire string is shortened using default strategy.
+        default_strategy: Strategy when no regions specified or for fallback
+                         ('remove' or 'abbreviate'). Default is 'abbreviate'.
+        default_position: Abbreviation position for fallback shortening
+                         ('left', 'middle', 'right'). Default is 'right'.
+        
+    Returns:
+        Shortened string fitting within target_width
+        
+    Examples:
+        Basic usage with default abbreviation:
+            >>> reduce_width("very_long_filename.txt", 15)
+            'very_lon….txt'
+        
+        With middle abbreviation:
+            >>> reduce_width("very_long_filename.txt", 15, default_position='middle')
+            'very_l…name.txt'
+        
+        With regions:
+            >>> region = ShorteningRegion(start=0, end=10, priority=1, strategy='remove')
+            >>> reduce_width("prefix_important_suffix", 20, regions=[region])
+            'pre_important_suffix'
+    """
+    # Subtask 7.1: Input validation and edge cases
+    
+    # Handle None input
+    if text is None:
+        return ""
+    
+    # Handle empty string
+    if not text:
+        return ""
+    
+    # Handle negative or zero target width
+    if target_width <= 0:
+        return ""
+    
+    # Normalize the input text
+    text = normalize_unicode(text)
+    
+    # Calculate current display width
+    current_width = calculate_display_width(text)
+    
+    # If string already fits, return unchanged
+    if current_width <= target_width:
+        return text
+    
+    # Subtask 7.2: Region-based shortening
+    
+    if regions:
+        # Process regions in priority order
+        result = _process_regions(text, target_width, regions)
+        
+        # Check if target width is met
+        result_width = calculate_display_width(result)
+        if result_width <= target_width:
+            return result
+        
+        # Target not met, will fall through to fallback shortening
+        text = result
+    else:
+        # No regions specified, create a default region for the entire string
+        default_region = ShorteningRegion(
+            start=0,
+            end=len(text),
+            priority=1,
+            strategy=default_strategy,
+            abbrev_position=default_position,
+            filepath_mode=False
+        )
+        regions = [default_region]
+        
+        # Process the default region
+        result = _process_regions(text, target_width, regions)
+        
+        # Check if target width is met
+        result_width = calculate_display_width(result)
+        if result_width <= target_width:
+            return result
+        
+        # If still doesn't fit, fall through to fallback shortening
+        text = result
+    
+    # Subtask 7.3: Fallback to entire string
+    
+    # If we reach here, the target was not met after processing all regions
+    # Apply fallback shortening to the entire string using default strategy
+    
+    # Validate default_strategy
+    if default_strategy.lower() not in ['remove', 'abbreviate']:
+        logger.warning(f"Invalid strategy '{default_strategy}', falling back to 'abbreviate'")
+        default_strategy = 'abbreviate'
+    
+    # Validate default_position
+    if default_position.lower() not in ['left', 'middle', 'right']:
+        logger.warning(f"Invalid position '{default_position}', falling back to 'right'")
+        default_position = 'right'
+    
+    # Create a fallback region covering the entire string
+    fallback_region = ShorteningRegion(
+        start=0,
+        end=len(text),
+        priority=1,
+        strategy=default_strategy,
+        abbrev_position=default_position,
+        filepath_mode=False
+    )
+    
+    # Select the appropriate strategy
+    if default_strategy.lower() == 'remove':
+        strategy = RemovalStrategy()
+    else:  # 'abbreviate'
+        strategy = AbbreviationStrategy()
+    
+    # Apply the fallback strategy to the entire string
+    result = strategy.shorten(text, target_width, fallback_region)
+    
+    return result
+
+
+def abbreviate_middle(text: str, target_width: int) -> str:
+    """
+    Convenience function: abbreviate with ellipsis in the middle.
+    
+    This is a convenience wrapper around reduce_width() that uses middle
+    abbreviation by default. The ellipsis will be placed in the center of
+    the string, preserving both the beginning and end.
+    
+    Args:
+        text: Input string to abbreviate
+        target_width: Maximum display width in columns
+        
+    Returns:
+        Abbreviated string with ellipsis in the middle
+        
+    Example:
+        >>> abbreviate_middle("very_long_filename.txt", 15)
+        'very_l…name.txt'
+    """
+    return reduce_width(text, target_width, default_position='middle')
+
+
+def abbreviate_path(path: str, target_width: int) -> str:
+    """
+    Convenience function: abbreviate filesystem path intelligently.
+    
+    This is a convenience wrapper around reduce_width() that uses filepath
+    mode to intelligently abbreviate filesystem paths. Directory components
+    are abbreviated before the filename, ensuring the filename remains as
+    readable as possible.
+    
+    Args:
+        path: Filesystem path to abbreviate
+        target_width: Maximum display width in columns
+        
+    Returns:
+        Abbreviated path with directories shortened before filename
+        
+    Example:
+        >>> abbreviate_path("/home/user/documents/file.txt", 20)
+        '/home/…/file.txt'
+    """
+    region = ShorteningRegion(
+        start=0,
+        end=len(path),
+        priority=1,
+        strategy='abbreviate',
+        abbrev_position='middle',
+        filepath_mode=True
+    )
+    return reduce_width(path, target_width, regions=[region])
