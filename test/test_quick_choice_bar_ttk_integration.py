@@ -50,7 +50,7 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         event = KeyEvent(key_code=KeyCode.ESCAPE, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         
-        self.assertEqual(result, ('cancel', None))
+        self.assertEqual(result, ('cancel', None, False))
     
     def test_handle_input_uses_input_event_left_right(self):
         """Test that handle_input uses KeyEvent for LEFT/RIGHT keys"""
@@ -65,13 +65,13 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         # Test LEFT key
         event = KeyEvent(key_code=KeyCode.LEFT, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
-        self.assertEqual(result, ('selection_changed', None))
+        self.assertEqual(result, ('selection_changed', None, False))
         self.assertEqual(self.quick_choice_bar.selected, 0)
         
         # Test RIGHT key
         event = KeyEvent(key_code=KeyCode.RIGHT, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
-        self.assertEqual(result, ('selection_changed', None))
+        self.assertEqual(result, ('selection_changed', None, False))
         self.assertEqual(self.quick_choice_bar.selected, 1)
     
     def test_handle_input_uses_input_event_enter(self):
@@ -86,7 +86,7 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         event = KeyEvent(key_code=KeyCode.ENTER, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
         
-        self.assertEqual(result, ('execute', True))
+        self.assertEqual(result, ('execute', True, False))
     
     def test_handle_input_uses_input_event_char(self):
         """Test that handle_input uses KeyEvent.char for quick keys"""
@@ -100,17 +100,17 @@ class TestQuickChoiceBarTTKIntegration(unittest.TestCase):
         # Test 'y' key
         event = KeyEvent(char='y', key_code=None, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
-        self.assertEqual(result, ('execute', True))
+        self.assertEqual(result, ('execute', True, False))
         
         # Test 'n' key
         event = KeyEvent(char='n', key_code=None, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
-        self.assertEqual(result, ('execute', False))
+        self.assertEqual(result, ('execute', False, False))
         
         # Test 'c' key
         event = KeyEvent(char='c', key_code=None, modifiers=0)
         result = self.quick_choice_bar.handle_input(event)
-        self.assertEqual(result, ('execute', None))
+        self.assertEqual(result, ('execute', None, False))
     
     def test_draw_uses_renderer(self):
         """Test that draw() uses TTK Renderer API"""
