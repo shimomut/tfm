@@ -452,20 +452,18 @@ class SearchDialog(UILayer, BaseListDialog):
                 line_num = result.get('line_num', 0)
                 match_content = result['match_info']
                 
-                # Construct line prefix and separator
-                line_prefix = f"Line {line_num}: "
-                separator = " - "
+                # Format: path:linenum: match_content
+                line_prefix = f":{line_num}: "
                 
-                # Build combined text: path - line_prefix + match_content
-                combined_text = f"{result['relative_path']}{separator}{line_prefix}{match_content}"
+                # Build combined text: path:linenum: match_content
+                combined_text = f"{result['relative_path']}{line_prefix}{match_content}"
                 
                 # Define regions:
                 # Region 1 (priority 0): relative_path - most important, shortened last
-                # Separator and line prefix are preserved (not in any region)
+                # Line prefix (:linenum : ) is preserved (not in any region)
                 # Region 2 (priority 1): match_content - shortened first
                 path_end = len(result['relative_path'])
-                separator_end = path_end + len(separator)
-                line_prefix_end = separator_end + len(line_prefix)
+                line_prefix_end = path_end + len(line_prefix)
                 
                 regions = [
                     ShorteningRegion(
