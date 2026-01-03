@@ -50,7 +50,7 @@ class DialogType:
 
 class GeneralPurposeDialog:
     def __init__(self, config)
-    def show_status_line_input(self, prompt_text, initial_text="")
+    def show_status_line_input(self, prompt_text, initial_text="", shortening_regions=None)
     def handle_input(self, key)
     def draw(self, stdscr, safe_addstr_func)
     def needs_redraw(self)
@@ -77,6 +77,46 @@ dialog.show_status_line_input(
     help_text="Enter new name or press ESC to cancel"
 )
 ```
+
+**Note**: The rename dialog now uses intelligent prompt shortening via `QuickEditBarHelpers.create_rename_dialog()` which automatically hides the " '{original_name}' to" part when space is limited to ensure at least 40 chars for the input field.
+
+### Prompt Shortening
+
+QuickEditBar supports intelligent prompt shortening using `ShorteningRegion` to ensure adequate space for text input:
+
+```python
+from tfm_string_width import ShorteningRegion
+
+# Define regions that can be shortened/removed when space is limited
+regions = [
+    ShorteningRegion(
+        start=6,  # After "Rename"
+        end=len(prompt) - 2,  # Before ": "
+        priority=1,
+        strategy='all_or_nothing'  # Either show full or remove entirely
+    )
+]
+
+dialog.show_status_line_input(
+    prompt="Rename 'very_long_filename.txt' to: ",
+    initial_text="very_long_filename.txt",
+    shortening_regions=regions
+)
+```
+
+**Available Strategies**:
+- `all_or_nothing`: Either shows the full region or removes it entirely (no partial truncation)
+- `remove`: Gradually removes characters from the right side of the region
+- `abbreviate`: Replaces removed content with ellipsis ("…")
+
+**Behavior**:
+- Reserves minimum 40 chars for the input field
+- Shortens prompt using provided `ShorteningRegion` definitions
+- For `strategy='all_or_nothing'`: Uses "all or nothing" approach - either shows the full region or removes it entirely
+- Falls back to default right abbreviation if no regions specified
+- Automatically applied in `QuickEditBarHelpers.create_rename_dialog()`
+
+**Example**: In narrow terminals, "Rename 'document.txt' to: " becomes "Rename: " (complete removal using `all_or_nothing` strategy).
 
 ### Helper Functions
 

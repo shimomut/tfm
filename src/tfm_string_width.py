@@ -3,8 +3,8 @@ String Width Reduction Utility
 
 This module provides intelligent string shortening functionality for terminal UI
 components. It accounts for wide characters (CJK, emoji), supports multiple
-shortening strategies (removal, abbreviation), and offers both simple and
-advanced APIs for different use cases.
+shortening strategies (all-or-nothing, truncation, abbreviation), and offers both
+simple and advanced APIs for different use cases.
 
 The module integrates with TTK's wide_char_utils for accurate display width
 calculations and provides region-based control for flexible shortening.
@@ -55,7 +55,7 @@ class ShorteningRegion:
         start: Start index (inclusive) of the region
         end: End index (exclusive) of the region
         priority: Priority value (higher values are shortened first)
-        strategy: Shortening strategy ('remove' or 'abbreviate')
+        strategy: Shortening strategy ('all_or_nothing', 'truncate', or 'abbreviate')
         abbrev_position: Position for ellipsis ('left', 'middle', 'right')
         filepath_mode: Whether to treat the region as a filesystem path
     """
@@ -102,9 +102,56 @@ def normalize_unicode(text: str) -> str:
     return unicodedata.normalize('NFC', text)
 
 
-class RemovalStrategy:
+class AllOrNothingStrategy:
     """
-    Shortening strategy that removes characters without adding ellipsis.
+    Shortening strategy that either keeps the region entirely or removes it completely.
+    
+    This strategy implements "all or nothing" behavior: if the region fits within
+    the target width, it's kept in full; otherwise, it's removed entirely.
+    No partial truncation or ellipsis is used.
+    
+    This is useful for optional context in prompts where partial information
+    would be confusing or misleading.
+    """
+    
+    def shorten(self, text: str, target_width: int, region: ShorteningRegion) -> str:
+        """
+        Shorten text by either keeping or removing the region entirely.
+        
+        If the full text fits within target_width, return it unchanged.
+        Otherwise, remove the region completely (no partial truncation).
+        
+        Args:
+            text: Full string to process
+            target_width: Target display width in columns
+            region: Region to potentially remove (only region.start and region.end are used)
+            
+        Returns:
+            Either the original text (if it fits) or text with region completely removed
+        """
+        # Normalize the input text
+        text = normalize_unicode(text)
+        
+        # Calculate current width
+        current_width = calculate_display_width(text)
+        
+        # If already fits, return unchanged
+        if current_width <= target_width:
+            return text
+        
+        # Extract the three parts: before region, region, after region
+        before_region = text[:region.start]
+        after_region = text[region.end:]
+        
+        # Remove the region entirely
+        result = before_region + after_region
+        
+        return result
+
+
+class TruncationStrategy:
+    """
+    Shortening strategy that truncates characters from the right without adding ellipsis.
     
     This strategy removes characters from the end of the specified region
     until the target width is met. No ellipsis character is added.
@@ -112,7 +159,7 @@ class RemovalStrategy:
     
     def shorten(self, text: str, target_width: int, region: ShorteningRegion) -> str:
         """
-        Shorten text by removing characters from the end of the region.
+        Shorten text by truncating characters from the right side of the region.
         
         Characters are removed from the end of the region (working backwards
         from region.end towards region.start) until the total display width
@@ -124,7 +171,7 @@ class RemovalStrategy:
             region: Region to shorten (only region.start and region.end are used)
             
         Returns:
-            Shortened string with characters removed from the region
+            Shortened string with characters truncated from the right side of the region
         """
         # Normalize the input text
         text = normalize_unicode(text)
@@ -758,14 +805,16 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
             
             # Select the appropriate strategy
             strategy_name = region.strategy.lower()
-            if strategy_name not in ['remove', 'abbreviate']:
+            if strategy_name not in ['all_or_nothing', 'truncate', 'abbreviate']:
                 logger.warning(f"Invalid strategy '{region.strategy}' in region, falling back to 'abbreviate'")
                 strategy_name = 'abbreviate'
             
             if region.filepath_mode:
                 strategy = FilepathStrategy()
-            elif strategy_name == 'remove':
-                strategy = RemovalStrategy()
+            elif strategy_name == 'all_or_nothing':
+                strategy = AllOrNothingStrategy()
+            elif strategy_name == 'truncate':
+                strategy = TruncationStrategy()
             else:
                 strategy = AbbreviationStrategy()
             
@@ -854,13 +903,15 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
                     # Re-shorten with the new target width
                     # Select the appropriate strategy
                     strategy_name = region.strategy.lower()
-                    if strategy_name not in ['remove', 'abbreviate']:
+                    if strategy_name not in ['all_or_nothing', 'truncate', 'abbreviate']:
                         strategy_name = 'abbreviate'
                     
                     if region.filepath_mode:
                         strategy = FilepathStrategy()
-                    elif strategy_name == 'remove':
-                        strategy = RemovalStrategy()
+                    elif strategy_name == 'all_or_nothing':
+                        strategy = AllOrNothingStrategy()
+                    elif strategy_name == 'truncate':
+                        strategy = TruncationStrategy()
                     else:
                         strategy = AbbreviationStrategy()
                     
@@ -925,14 +976,16 @@ def _process_regions_sequential(text: str, target_width: int, regions: List[Shor
         
         # Select the appropriate strategy
         strategy_name = region.strategy.lower()
-        if strategy_name not in ['remove', 'abbreviate']:
+        if strategy_name not in ['all_or_nothing', 'truncate', 'abbreviate']:
             logger.warning(f"Invalid strategy '{region.strategy}' in region, falling back to 'abbreviate'")
             strategy_name = 'abbreviate'
         
         if region.filepath_mode:
             strategy = FilepathStrategy()
-        elif strategy_name == 'remove':
-            strategy = RemovalStrategy()
+        elif strategy_name == 'all_or_nothing':
+            strategy = AllOrNothingStrategy()
+        elif strategy_name == 'truncate':
+            strategy = TruncationStrategy()
         else:
             strategy = AbbreviationStrategy()
         
@@ -1056,7 +1109,7 @@ def reduce_width(
     # Apply fallback shortening to the entire string using default strategy
     
     # Validate default_strategy
-    if default_strategy.lower() not in ['remove', 'abbreviate']:
+    if default_strategy.lower() not in ['all_or_nothing', 'truncate', 'abbreviate']:
         logger.warning(f"Invalid strategy '{default_strategy}', falling back to 'abbreviate'")
         default_strategy = 'abbreviate'
     
@@ -1076,8 +1129,10 @@ def reduce_width(
     )
     
     # Select the appropriate strategy
-    if default_strategy.lower() == 'remove':
-        strategy = RemovalStrategy()
+    if default_strategy.lower() == 'all_or_nothing':
+        strategy = AllOrNothingStrategy()
+    elif default_strategy.lower() == 'truncate':
+        strategy = TruncationStrategy()
     else:  # 'abbreviate'
         strategy = AbbreviationStrategy()
     
