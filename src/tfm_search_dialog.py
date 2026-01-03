@@ -241,7 +241,7 @@ class SearchDialog(UILayer, BaseListDialog):
                                                 'path': file_path,
                                                 'relative_path': str(relative_path),
                                                 'line_num': line_num,
-                                                'match_info': f"Line {line_num}: {line.strip()[:50]}"
+                                                'match_info': f"Line {line_num}: {line.strip()[:200]}"
                                             }
                                             temp_results.append(result)
                                             
