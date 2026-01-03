@@ -705,16 +705,10 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
     """
     Process regions in priority order to shorten text.
     
-    This function:
-    1. Sorts regions by priority (highest first)
-    2. Validates each region's boundaries
-    3. Applies the appropriate strategy to each region
-    4. Checks if target width is met after each region
-    5. Preserves characters outside region boundaries
+    For non-overlapping regions, processes regions by priority (highest first).
+    Each region is shortened as much as needed before moving to the next priority.
     
-    Processing stops as soon as the target width is met. If the target is not
-    met after processing all regions, the current result is returned (the caller
-    may then apply fallback shortening to the entire string).
+    For overlapping regions, falls back to sequential processing.
     
     Args:
         text: Text to shorten
@@ -727,26 +721,181 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
     # Normalize the input text
     text = normalize_unicode(text)
     
+    # If no regions, return original text
+    if not regions:
+        return text
+    
     # Sort regions by priority (highest first)
     sorted_regions = _sort_regions_by_priority(regions)
     
-    # Process each region in priority order
+    # Validate all regions and filter out invalid ones
+    valid_regions = []
+    for region in sorted_regions:
+        if _validate_region(region, len(text)):
+            valid_regions.append(region)
+    
+    if not valid_regions:
+        return text
+    
+    # Check if regions overlap
+    regions_overlap = False
+    for i, region1 in enumerate(valid_regions):
+        for region2 in valid_regions[i+1:]:
+            # Check for overlap (regions share any indices)
+            if not (region1.end <= region2.start or region2.end <= region1.start):
+                regions_overlap = True
+                break
+        if regions_overlap:
+            break
+    
+    # If regions overlap, use sequential processing
+    if regions_overlap:
+        logger.warning("Overlapping regions detected, using sequential processing")
+        return _process_regions_sequential(text, target_width, valid_regions)
+    
+    # Process non-overlapping regions by priority
+    # Sort regions by start position for reconstruction
+    regions_by_position = sorted(valid_regions, key=lambda r: r.start)
+    
+    # Calculate current width
+    current_width = calculate_display_width(text)
+    if current_width <= target_width:
+        return text
+    
+    # Calculate width of text outside all regions (this must be preserved)
+    preserved_parts = []
+    last_end = 0
+    for region in regions_by_position:
+        if region.start > last_end:
+            preserved_parts.append(text[last_end:region.start])
+        last_end = region.end
+    if last_end < len(text):
+        preserved_parts.append(text[last_end:])
+    
+    preserved_width = sum(calculate_display_width(part) for part in preserved_parts)
+    available_for_regions = target_width - preserved_width
+    
+    if available_for_regions <= 0:
+        logger.warning("Target width too small for preserved text outside regions")
+        available_for_regions = 1
+    
+    # Process regions by priority (highest first)
+    # Keep track of shortened versions of each region
+    region_texts = {}
+    for region in regions_by_position:
+        region_texts[region.start] = text[region.start:region.end]
+    
+    # Process each priority level
+    for priority_level in sorted(set(r.priority for r in valid_regions), reverse=True):
+        # Get regions at this priority level
+        priority_regions = [r for r in valid_regions if r.priority == priority_level]
+        
+        # Calculate current total width with current region texts
+        current_parts = []
+        last_end = 0
+        for region in regions_by_position:
+            if region.start > last_end:
+                current_parts.append(text[last_end:region.start])
+            current_parts.append(region_texts[region.start])
+            last_end = region.end
+        if last_end < len(text):
+            current_parts.append(text[last_end:])
+        
+        current_result = ''.join(current_parts)
+        current_result_width = calculate_display_width(current_result)
+        
+        # If we've met the target, stop
+        if current_result_width <= target_width:
+            return current_result
+        
+        # Calculate how much we need to reduce
+        width_to_reduce = current_result_width - target_width
+        
+        # Shorten regions at this priority level
+        for region in priority_regions:
+            if width_to_reduce <= 0:
+                break
+            
+            region_text = region_texts[region.start]
+            region_width = calculate_display_width(region_text)
+            
+            # Calculate target width for this region
+            # Try to reduce by the full amount needed, but at least leave 1 char
+            region_target = max(1, region_width - width_to_reduce)
+            
+            # Select the appropriate strategy
+            strategy_name = region.strategy.lower()
+            if strategy_name not in ['remove', 'abbreviate']:
+                logger.warning(f"Invalid strategy '{region.strategy}' in region, falling back to 'abbreviate'")
+                strategy_name = 'abbreviate'
+            
+            if region.filepath_mode:
+                strategy = FilepathStrategy()
+            elif strategy_name == 'remove':
+                strategy = RemovalStrategy()
+            else:
+                strategy = AbbreviationStrategy()
+            
+            # Create a temporary region for just this text
+            temp_region = ShorteningRegion(
+                start=0,
+                end=len(region_text),
+                priority=region.priority,
+                strategy=region.strategy,
+                abbrev_position=region.abbrev_position,
+                filepath_mode=region.filepath_mode
+            )
+            
+            # Shorten the region text
+            shortened = strategy.shorten(region_text, region_target, temp_region)
+            shortened_width = calculate_display_width(shortened)
+            
+            # Update the region text
+            region_texts[region.start] = shortened
+            
+            # Update how much we've reduced
+            width_reduced = region_width - shortened_width
+            width_to_reduce -= width_reduced
+    
+    # Reconstruct the final text
+    result_parts = []
+    last_end = 0
+    
+    for region in regions_by_position:
+        # Add preserved text before this region
+        if region.start > last_end:
+            result_parts.append(text[last_end:region.start])
+        # Add shortened region
+        result_parts.append(region_texts[region.start])
+        last_end = region.end
+    
+    # Add any remaining preserved text
+    if last_end < len(text):
+        result_parts.append(text[last_end:])
+    
+    return ''.join(result_parts)
+
+
+def _process_regions_sequential(text: str, target_width: int, regions: List[ShorteningRegion]) -> str:
+    """
+    Process overlapping regions sequentially (fallback for overlapping regions).
+    
+    Note: Region boundaries refer to the current text, which changes after
+    each region is processed. This may cause issues with overlapping regions.
+    """
     current_text = text
     
-    for region in sorted_regions:
-        # Validate region boundaries
+    for region in regions:
+        # Validate region boundaries against current text
         if not _validate_region(region, len(current_text)):
-            # Skip invalid regions
             continue
         
         # Check if we've already met the target width
         current_width = calculate_display_width(current_text)
         if current_width <= target_width:
-            # Target met, stop processing
             return current_text
         
         # Select the appropriate strategy
-        # Validate strategy name
         strategy_name = region.strategy.lower()
         if strategy_name not in ['remove', 'abbreviate']:
             logger.warning(f"Invalid strategy '{region.strategy}' in region, falling back to 'abbreviate'")
@@ -756,13 +905,10 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
             strategy = FilepathStrategy()
         elif strategy_name == 'remove':
             strategy = RemovalStrategy()
-        else:  # 'abbreviate' or default
+        else:
             strategy = AbbreviationStrategy()
         
-        # Apply the strategy to shorten the text
-        # Note: The region boundaries refer to the current_text, which may have
-        # changed from previous region processing. This is intentional - each
-        # region operates on the result of the previous region.
+        # Apply the strategy
         current_text = strategy.shorten(current_text, target_width, region)
     
     return current_text

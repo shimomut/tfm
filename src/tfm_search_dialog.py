@@ -17,6 +17,7 @@ from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_log_manager import getLogger
+from tfm_string_width import reduce_width, ShorteningRegion
 
 # Module-level logger
 logger = getLogger("SearchDlg")
@@ -438,12 +439,50 @@ class SearchDialog(UILayer, BaseListDialog):
         
         # Format search results for display
         def format_result(result):
+            # Calculate available width for the result text
+            # Account for emoji (2 columns) and spacing
+            available_width = content_width - 3  # 2 for emoji + 1 for space
+            
             if result['type'] == 'dir':
-                return f"📁 {result['relative_path']}"
+                path_text = reduce_width(result['relative_path'], available_width, default_position='middle')
+                return f"📁 {path_text}"
             elif result['type'] == 'content':
-                return f"📄 {result['relative_path']} - {result['match_info']}"
+                # For content matches, combine path and match info with separator
+                # Use multiple regions to shorten both parts with a single reduce_width call
+                separator = " - "
+                combined_text = f"{result['relative_path']}{separator}{result['match_info']}"
+                
+                # Define regions:
+                # Region 1 (priority 0): relative_path with filepath mode and middle abbreviation
+                # Region 2 (priority 1): match_info with right abbreviation (shortened first)
+                # The separator is preserved (not in any region)
+                path_end = len(result['relative_path'])
+                separator_end = path_end + len(separator)
+                
+                regions = [
+                    ShorteningRegion(
+                        start=0,
+                        end=path_end,
+                        priority=0,  # Lower priority - path is more important, shortened last
+                        strategy='abbreviate',
+                        abbrev_position='middle',
+                        filepath_mode=True
+                    ),
+                    ShorteningRegion(
+                        start=separator_end,
+                        end=len(combined_text),
+                        priority=1,  # Higher priority - match_info shortened first
+                        strategy='abbreviate',
+                        abbrev_position='right',
+                        filepath_mode=False
+                    )
+                ]
+                
+                shortened_text = reduce_width(combined_text, available_width, regions=regions)
+                return f"📄 {shortened_text}"
             else:
-                return f"📄 {result['relative_path']}"
+                path_text = reduce_width(result['relative_path'], available_width, default_position='middle')
+                return f"📄 {path_text}"
         
         # Draw results (thread-safe)
         with self.search_lock:
