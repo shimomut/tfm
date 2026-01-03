@@ -444,7 +444,16 @@ class SearchDialog(UILayer, BaseListDialog):
             available_width = content_width - 5  # 2 for emoji + 1 for space + 2 for selection indicator
             
             if result['type'] == 'dir':
-                path_text = reduce_width(result['relative_path'], available_width, default_position='middle')
+                # Use filepath mode for directory paths
+                region = ShorteningRegion(
+                    start=0,
+                    end=len(result['relative_path']),
+                    priority=1,
+                    strategy='abbreviate',
+                    abbrev_position='middle',
+                    filepath_mode=True
+                )
+                path_text = reduce_width(result['relative_path'], available_width, regions=[region])
                 return f"📁 {path_text}"
             elif result['type'] == 'content':
                 # For content matches, construct line prefix from line_num
@@ -452,10 +461,10 @@ class SearchDialog(UILayer, BaseListDialog):
                 line_num = result.get('line_num', 0)
                 match_content = result['match_info']
                 
-                # Format: path:linenum: match_content
-                line_prefix = f":{line_num}: "
+                # Format: path:linenum : match_content
+                line_prefix = f":{line_num} : "
                 
-                # Build combined text: path:linenum: match_content
+                # Build combined text: path:linenum : match_content
                 combined_text = f"{result['relative_path']}{line_prefix}{match_content}"
                 
                 # Define regions:
@@ -487,7 +496,16 @@ class SearchDialog(UILayer, BaseListDialog):
                 shortened_text = reduce_width(combined_text, available_width, regions=regions)
                 return f"📄 {shortened_text}"
             else:
-                path_text = reduce_width(result['relative_path'], available_width, default_position='middle')
+                # Use filepath mode for file paths
+                region = ShorteningRegion(
+                    start=0,
+                    end=len(result['relative_path']),
+                    priority=1,
+                    strategy='abbreviate',
+                    abbrev_position='middle',
+                    filepath_mode=True
+                )
+                path_text = reduce_width(result['relative_path'], available_width, regions=[region])
                 return f"📄 {path_text}"
         
         # Draw results (thread-safe)
