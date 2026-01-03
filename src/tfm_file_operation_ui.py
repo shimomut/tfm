@@ -407,7 +407,6 @@ class FileOperationUI:
         # Show QuickEditBar with current filename as initial text
         self.file_manager.quick_edit_bar.show_status_line_input(
             prompt=prompt,
-            help_text="ESC:cancel Enter:confirm",
             initial_text=source_file.name,
             callback=on_confirm,
             cancel_callback=cancel_callback

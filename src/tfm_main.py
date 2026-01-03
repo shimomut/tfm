@@ -3892,7 +3892,6 @@ class FileManager(UILayer):
         # Enter archive creation mode using general dialog with default filename
         self.quick_edit_bar.show_status_line_input(
             prompt="Archive filename: ",
-            help_text="ESC:cancel Enter:create (.zip/.tar.gz/.tgz)",
             initial_text=default_filename,
             callback=self.on_create_archive_confirm,
             cancel_callback=self.on_create_archive_cancel
@@ -4212,7 +4211,6 @@ class FileManager(UILayer):
         # Show QuickEditBar for path input
         self.quick_edit_bar.show_status_line_input(
             prompt="Jump to path: ",
-            help_text="ESC:cancel Enter:jump",
             initial_text=current_path,
             callback=on_confirm,
             cancel_callback=on_cancel
