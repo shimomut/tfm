@@ -400,22 +400,24 @@ class FilepathStrategy:
     
     This strategy intelligently abbreviates filesystem paths by:
     1. Parsing the path into directory components and filename
-    2. Abbreviating directory components before abbreviating the filename
+    2. Replacing entire directory levels with ellipsis (…) before touching the filename
     3. Preserving path separators (/ or \\)
     
+    Example: "aaaa/bbbb/cccc/dddd.txt" -> "aaaa/…/dddd.txt"
+    
     This ensures that the filename remains as readable as possible while
-    directory paths are shortened first.
+    directory paths are shortened by removing entire levels.
     """
     
     ELLIPSIS = "…"
     
     def shorten(self, text: str, target_width: int, region: ShorteningRegion) -> str:
         """
-        Shorten a filesystem path by abbreviating directories before filename.
+        Shorten a filesystem path by replacing directory levels with ellipsis.
         
-        The path is parsed into components, and directories are abbreviated
-        (using middle abbreviation) before the filename is touched. This
-        preserves the most important part (filename) as long as possible.
+        The path is parsed into components, and entire directory levels are
+        replaced with ellipsis before the filename is touched. This preserves
+        the most important part (filename) as long as possible.
         
         Args:
             text: Full string to process
@@ -423,7 +425,7 @@ class FilepathStrategy:
             region: Region to shorten (should cover the entire path)
             
         Returns:
-            Shortened path with directories abbreviated before filename
+            Shortened path with directory levels replaced by ellipsis
         """
         # Normalize the input text
         text = normalize_unicode(text)
@@ -448,23 +450,8 @@ class FilepathStrategy:
         available_width = target_width - before_width - after_width
         
         # Edge case: target width = 1
-        # Return just the ellipsis or first character
         ellipsis_width = calculate_display_width(self.ELLIPSIS)
-        if available_width == 1:
-            if ellipsis_width <= 1:
-                return before_region + self.ELLIPSIS + after_region
-            else:
-                # Ellipsis is too wide, return first character if it fits
-                if region_text:
-                    first_char = region_text[0]
-                    first_char_width = calculate_display_width(first_char)
-                    if first_char_width <= 1:
-                        return before_region + first_char + after_region
-                # Can't fit anything, return ellipsis anyway
-                return before_region + self.ELLIPSIS + after_region
-        
-        # Edge case: not enough space even for ellipsis
-        if available_width < ellipsis_width:
+        if available_width <= ellipsis_width:
             return before_region + self.ELLIPSIS + after_region
         
         # Parse the path into components
@@ -491,149 +478,86 @@ class FilepathStrategy:
         components = region_text.split(separator)
         
         # Separate directories from filename
-        # The last component is the filename
         if len(components) > 1:
             directories = components[:-1]
             filename = components[-1]
         else:
-            # Only one component (shouldn't happen if separator was found, but handle it)
+            # Only one component
             directories = []
             filename = components[0]
         
-        # Calculate the width needed for separators
-        separator_width = calculate_display_width(separator)
-        num_separators = len(directories)  # One separator before each directory, plus one before filename
-        separators_total_width = separator_width * num_separators
+        if not directories:
+            # No directories, just abbreviate the filename
+            abbrev_strategy = AbbreviationStrategy()
+            temp_region = ShorteningRegion(
+                start=0,
+                end=len(filename),
+                priority=region.priority,
+                strategy='abbreviate',
+                abbrev_position='middle'
+            )
+            abbreviated = abbrev_strategy.shorten(filename, available_width, temp_region)
+            return before_region + abbreviated + after_region
         
-        # Calculate filename width
+        # Calculate widths
+        separator_width = calculate_display_width(separator)
         filename_width = calculate_display_width(filename)
         
-        # Calculate available width for directories
-        available_for_dirs = available_width - filename_width - separators_total_width
+        # Try different combinations of directory levels
+        # Start with all directories, then progressively replace middle ones with ellipsis
         
-        # If we can't fit even the filename and separators, we need to abbreviate everything
-        if available_for_dirs < 0:
-            # Not enough space for full filename, need to abbreviate the whole path
-            # Use middle abbreviation on the entire path
-            ellipsis_width = calculate_display_width(self.ELLIPSIS)
-            
-            if available_width < ellipsis_width:
-                return before_region + self.ELLIPSIS + after_region
-            
-            # Try to preserve the filename as much as possible
-            # Allocate space: try to keep some of the filename
-            content_width = available_width - ellipsis_width
-            
-            if content_width <= 0:
-                return before_region + self.ELLIPSIS + after_region
-            
-            # Give priority to the filename - try to preserve at least part of it
-            # Allocate 2/3 to filename, 1/3 to path prefix if possible
-            filename_target = min(filename_width, (content_width * 2) // 3)
-            prefix_target = content_width - filename_target
-            
-            # Build abbreviated filename
-            abbreviated_filename = ""
-            current_width = 0
-            for i in range(len(filename) - 1, -1, -1):
-                char = filename[i]
-                char_width = calculate_display_width(char)
-                if current_width + char_width <= filename_target:
-                    abbreviated_filename = char + abbreviated_filename
-                    current_width += char_width
-                else:
-                    break
-            
-            # Build abbreviated prefix (from the start)
-            path_prefix = separator.join(directories) + separator if directories else ""
-            abbreviated_prefix = ""
-            current_width = 0
-            for char in path_prefix:
-                char_width = calculate_display_width(char)
-                if current_width + char_width <= prefix_target:
-                    abbreviated_prefix += char
-                    current_width += char_width
-                else:
-                    break
-            
-            result = before_region + abbreviated_prefix + self.ELLIPSIS + abbreviated_filename + after_region
-            return result
+        # Strategy: Keep first and last directories as long as possible
+        # Replace middle directories with ellipsis
         
-        # We have enough space for the full filename, now abbreviate directories
-        # Abbreviate directories from left to right using middle abbreviation
-        abbreviated_dirs = []
+        # Calculate minimum width: first_dir/…/last_dir/filename
+        # Or just: …/filename if even that doesn't fit
         
-        for directory in directories:
-            dir_width = calculate_display_width(directory)
-            
-            # Calculate how much width we can allocate to this directory
-            # Distribute available width equally among remaining directories
-            remaining_dirs = len(directories) - len(abbreviated_dirs)
-            if remaining_dirs > 0:
-                width_per_dir = available_for_dirs // remaining_dirs
-            else:
-                width_per_dir = available_for_dirs
-            
-            if dir_width <= width_per_dir:
-                # Directory fits, use it as-is
-                abbreviated_dirs.append(directory)
-                available_for_dirs -= dir_width
-            else:
-                # Need to abbreviate this directory
-                # Use middle abbreviation
-                ellipsis_width = calculate_display_width(self.ELLIPSIS)
-                
-                if width_per_dir < ellipsis_width:
-                    # Not enough space for ellipsis, just use ellipsis
-                    abbreviated_dirs.append(self.ELLIPSIS)
-                    available_for_dirs -= ellipsis_width
-                else:
-                    # Abbreviate with middle position
-                    content_width = width_per_dir - ellipsis_width
-                    
-                    if content_width <= 0:
-                        abbreviated_dirs.append(self.ELLIPSIS)
-                        available_for_dirs -= ellipsis_width
-                    else:
-                        # Build abbreviated directory with middle ellipsis
-                        left_width = (content_width + 1) // 2
-                        right_width = content_width // 2
-                        
-                        # Build left portion
-                        left_part = ""
-                        current_width = 0
-                        for char in directory:
-                            char_width = calculate_display_width(char)
-                            if current_width + char_width <= left_width:
-                                left_part += char
-                                current_width += char_width
-                            else:
-                                break
-                        
-                        # Build right portion
-                        right_part = ""
-                        current_width = 0
-                        for i in range(len(directory) - 1, -1, -1):
-                            char = directory[i]
-                            char_width = calculate_display_width(char)
-                            if current_width + char_width <= right_width:
-                                right_part = char + right_part
-                                current_width += char_width
-                            else:
-                                break
-                        
-                        abbreviated_dir = left_part + self.ELLIPSIS + right_part
-                        abbreviated_dirs.append(abbreviated_dir)
-                        available_for_dirs -= calculate_display_width(abbreviated_dir)
+        # Try: all directories + filename
+        full_path = separator.join(directories) + separator + filename
+        if calculate_display_width(full_path) <= available_width:
+            return before_region + full_path + after_region
         
-        # Reconstruct the path
-        if abbreviated_dirs:
-            abbreviated_path = separator.join(abbreviated_dirs) + separator + filename
-        else:
-            abbreviated_path = filename
+        # Try: first_dir/…/last_dir/filename
+        if len(directories) >= 2:
+            first_dir = directories[0]
+            last_dir = directories[-1]
+            path_with_ellipsis = f"{first_dir}{separator}{self.ELLIPSIS}{separator}{last_dir}{separator}{filename}"
+            if calculate_display_width(path_with_ellipsis) <= available_width:
+                return before_region + path_with_ellipsis + after_region
         
-        result = before_region + abbreviated_path + after_region
+        # Try: first_dir/…/filename
+        if len(directories) >= 1:
+            first_dir = directories[0]
+            path_with_ellipsis = f"{first_dir}{separator}{self.ELLIPSIS}{separator}{filename}"
+            if calculate_display_width(path_with_ellipsis) <= available_width:
+                return before_region + path_with_ellipsis + after_region
         
+        # Try: …/filename
+        path_with_ellipsis = f"{self.ELLIPSIS}{separator}{filename}"
+        if calculate_display_width(path_with_ellipsis) <= available_width:
+            return before_region + path_with_ellipsis + after_region
+        
+        # Even …/filename doesn't fit, need to abbreviate filename too
+        # Calculate available width for filename
+        ellipsis_and_sep_width = calculate_display_width(self.ELLIPSIS) + separator_width
+        available_for_filename = available_width - ellipsis_and_sep_width
+        
+        if available_for_filename <= 0:
+            # Can't fit anything, just return ellipsis
+            return before_region + self.ELLIPSIS + after_region
+        
+        # Abbreviate the filename
+        abbrev_strategy = AbbreviationStrategy()
+        temp_region = ShorteningRegion(
+            start=0,
+            end=len(filename),
+            priority=region.priority,
+            strategy='abbreviate',
+            abbrev_position='middle'
+        )
+        abbreviated_filename = abbrev_strategy.shorten(filename, available_for_filename, temp_region)
+        
+        result = before_region + self.ELLIPSIS + separator + abbreviated_filename + after_region
         return result
 
 
