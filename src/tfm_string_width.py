@@ -707,7 +707,7 @@ def _process_regions(text: str, target_width: int, regions: List[ShorteningRegio
     available_for_regions = target_width - preserved_width
     
     if available_for_regions <= 0:
-        logger.warning("Target width too small for preserved text outside regions")
+        logger.debug("Target width too small for preserved text outside regions")
         available_for_regions = 1
     
     # Process regions by priority (highest first)

@@ -447,31 +447,47 @@ class SearchDialog(UILayer, BaseListDialog):
                 path_text = reduce_width(result['relative_path'], available_width, default_position='middle')
                 return f"📁 {path_text}"
             elif result['type'] == 'content':
-                # For content matches, combine path and match info with separator
-                # Use multiple regions to shorten both parts with a single reduce_width call
+                # For content matches, parse match_info to separate line number from content
+                # Format is typically "Line 42: actual content here"
+                match_info = result['match_info']
+                
+                # Try to extract line number prefix (e.g., "Line 42: ")
+                import re
+                line_prefix_match = re.match(r'^(Line \d+:\s*)', match_info)
+                
+                if line_prefix_match:
+                    line_prefix = line_prefix_match.group(1)
+                    match_content = match_info[len(line_prefix):]
+                else:
+                    # No line prefix found, treat entire match_info as content
+                    line_prefix = ""
+                    match_content = match_info
+                
+                # Build combined text: path - line_prefix + match_content
                 separator = " - "
-                combined_text = f"{result['relative_path']}{separator}{result['match_info']}"
+                combined_text = f"{result['relative_path']}{separator}{line_prefix}{match_content}"
                 
                 # Define regions:
-                # Region 1 (priority 0): relative_path with filepath mode and middle abbreviation
-                # Region 2 (priority 1): match_info with right abbreviation (shortened first)
-                # The separator is preserved (not in any region)
+                # Region 1 (priority 0): relative_path - most important, shortened last
+                # Line prefix is preserved (not in any region)
+                # Region 2 (priority 1): match_content - shortened first
                 path_end = len(result['relative_path'])
                 separator_end = path_end + len(separator)
+                line_prefix_end = separator_end + len(line_prefix)
                 
                 regions = [
                     ShorteningRegion(
                         start=0,
                         end=path_end,
-                        priority=0,  # Lower priority - path is more important, shortened last
+                        priority=0,  # Path is more important, shortened last
                         strategy='abbreviate',
                         abbrev_position='middle',
                         filepath_mode=True
                     ),
                     ShorteningRegion(
-                        start=separator_end,
+                        start=line_prefix_end,
                         end=len(combined_text),
-                        priority=1,  # Higher priority - match_info shortened first
+                        priority=1,  # Match content shortened first
                         strategy='abbreviate',
                         abbrev_position='right',
                         filepath_mode=False
