@@ -440,8 +440,8 @@ class SearchDialog(UILayer, BaseListDialog):
         # Format search results for display
         def format_result(result):
             # Calculate available width for the result text
-            # Account for emoji (2 columns) and spacing
-            available_width = content_width - 3  # 2 for emoji + 1 for space
+            # Account for emoji (2 columns), spacing (1), and selection indicator (2)
+            available_width = content_width - 5  # 2 for emoji + 1 for space + 2 for selection indicator
             
             if result['type'] == 'dir':
                 path_text = reduce_width(result['relative_path'], available_width, default_position='middle')
@@ -452,16 +452,16 @@ class SearchDialog(UILayer, BaseListDialog):
                 line_num = result.get('line_num', 0)
                 match_content = result['match_info']
                 
-                # Construct line prefix
+                # Construct line prefix and separator
                 line_prefix = f"Line {line_num}: "
+                separator = " - "
                 
                 # Build combined text: path - line_prefix + match_content
-                separator = " - "
                 combined_text = f"{result['relative_path']}{separator}{line_prefix}{match_content}"
                 
                 # Define regions:
                 # Region 1 (priority 0): relative_path - most important, shortened last
-                # Line prefix is preserved (not in any region)
+                # Separator and line prefix are preserved (not in any region)
                 # Region 2 (priority 1): match_content - shortened first
                 path_end = len(result['relative_path'])
                 separator_end = path_end + len(separator)
