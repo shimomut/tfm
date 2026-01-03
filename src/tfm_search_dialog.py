@@ -17,6 +17,7 @@ from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_log_manager import getLogger
+from tfm_string_width import reduce_width, ShorteningRegion
 
 # Module-level logger
 logger = getLogger("SearchDlg")
@@ -240,7 +241,7 @@ class SearchDialog(UILayer, BaseListDialog):
                                                 'path': file_path,
                                                 'relative_path': str(relative_path),
                                                 'line_num': line_num,
-                                                'match_info': f"Line {line_num}: {line.strip()[:50]}"
+                                                'match_info': line.strip()[:200]
                                             }
                                             temp_results.append(result)
                                             
@@ -273,7 +274,7 @@ class SearchDialog(UILayer, BaseListDialog):
                                             'path': file_path,
                                             'relative_path': str(relative_path),
                                             'line_num': line_num,
-                                            'match_info': f"Line {line_num}: {line.strip()[:50]}"
+                                            'match_info': line.strip()[:200]
                                         }
                                         temp_results.append(result)
                                         
@@ -438,12 +439,74 @@ class SearchDialog(UILayer, BaseListDialog):
         
         # Format search results for display
         def format_result(result):
+            # Calculate available width for the result text
+            # Account for emoji (2 columns), spacing (1), and selection indicator (2)
+            available_width = content_width - 5  # 2 for emoji + 1 for space + 2 for selection indicator
+            
             if result['type'] == 'dir':
-                return f"📁 {result['relative_path']}"
+                # Use filepath mode for directory paths
+                region = ShorteningRegion(
+                    start=0,
+                    end=len(result['relative_path']),
+                    priority=1,
+                    strategy='abbreviate',
+                    abbrev_position='middle',
+                    filepath_mode=True
+                )
+                path_text = reduce_width(result['relative_path'], available_width, regions=[region])
+                return f"📁 {path_text}"
             elif result['type'] == 'content':
-                return f"📄 {result['relative_path']} - {result['match_info']}"
+                # For content matches, construct line prefix from line_num
+                # match_info now contains only the actual match content
+                line_num = result.get('line_num', 0)
+                match_content = result['match_info']
+                
+                # Format: path:linenum : match_content
+                line_prefix = f":{line_num} : "
+                
+                # Build combined text: path:linenum : match_content
+                combined_text = f"{result['relative_path']}{line_prefix}{match_content}"
+                
+                # Define regions:
+                # Region 1 (priority 0): relative_path - most important, shortened last
+                # Line prefix (:linenum : ) is preserved (not in any region)
+                # Region 2 (priority 1): match_content - shortened first
+                path_end = len(result['relative_path'])
+                line_prefix_end = path_end + len(line_prefix)
+                
+                regions = [
+                    ShorteningRegion(
+                        start=0,
+                        end=path_end,
+                        priority=0,  # Path is more important, shortened last
+                        strategy='abbreviate',
+                        abbrev_position='middle',
+                        filepath_mode=True
+                    ),
+                    ShorteningRegion(
+                        start=line_prefix_end,
+                        end=len(combined_text),
+                        priority=1,  # Match content shortened first
+                        strategy='abbreviate',
+                        abbrev_position='right',
+                        filepath_mode=False
+                    )
+                ]
+                
+                shortened_text = reduce_width(combined_text, available_width, regions=regions)
+                return f"📄 {shortened_text}"
             else:
-                return f"📄 {result['relative_path']}"
+                # Use filepath mode for file paths
+                region = ShorteningRegion(
+                    start=0,
+                    end=len(result['relative_path']),
+                    priority=1,
+                    strategy='abbreviate',
+                    abbrev_position='middle',
+                    filepath_mode=True
+                )
+                path_text = reduce_width(result['relative_path'], available_width, regions=[region])
+                return f"📄 {path_text}"
         
         # Draw results (thread-safe)
         with self.search_lock:
