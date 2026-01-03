@@ -2978,7 +2978,7 @@ class FileManager(UILayer):
         self.batch_rename_dialog.exit()
         self.mark_dirty()
     
-    def show_dialog(self, message, choices, callback, enable_shift_modifier=False):
+    def show_dialog(self, message, choices, callback, enable_shift_modifier=False, shortening_regions=None):
         """Show quick choice dialog - wrapper for quick choice bar component
         
         Args:
@@ -2989,8 +2989,9 @@ class FileManager(UILayer):
                       {"text": "Cancel", "key": "c", "value": None}]
             callback: Function to call with the selected choice's value
             enable_shift_modifier: If True, Shift key applies choice to all remaining items
+            shortening_regions: Optional list of ShorteningRegion for intelligent message shortening
         """
-        self.quick_choice_bar.show(message, choices, callback, enable_shift_modifier)
+        self.quick_choice_bar.show(message, choices, callback, enable_shift_modifier, shortening_regions=shortening_regions)
         self.mark_dirty()
     
     def show_confirmation(self, message, callback, shortening_regions=None):

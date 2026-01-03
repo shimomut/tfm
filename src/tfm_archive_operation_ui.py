@@ -150,6 +150,8 @@ class ArchiveOperationUI:
                      Signature: callback(choice: Optional[str], apply_to_all: bool)
                      choice can be 'overwrite', 'skip', or None (for cancel/ESC)
         """
+        from tfm_string_width import ShorteningRegion
+        
         # Extract conflict information
         conflict_path = conflict_info.get('path')
         display_name = conflict_info.get('display_name', conflict_path.name if conflict_path else 'unknown')
@@ -159,7 +161,8 @@ class ArchiveOperationUI:
         # Build conflict message based on conflict type
         if conflict_type == 'archive_exists':
             # Archive file already exists (for create operations)
-            message = f"Archive exists: {display_name}"
+            prefix = "Archive exists: "
+            message = f"{prefix}{display_name}"
             if conflict_size is not None:
                 # Format size in human-readable format
                 size_str = self._format_size(conflict_size)
@@ -173,13 +176,30 @@ class ArchiveOperationUI:
             choices = [
                 {"text": "Overwrite", "key": "o", "value": "overwrite"}
             ]
+            
+            # Define shortening region for the filename
+            filename_start = len(prefix)
+            filename_end = filename_start + len(display_name)
+            
+            shortening_regions = [
+                ShorteningRegion(
+                    start=filename_start,
+                    end=filename_end,
+                    priority=1,
+                    strategy='abbreviate',
+                    abbrev_position='middle',
+                    filepath_mode=True
+                )
+            ]
         
         elif conflict_type == 'file_exists':
             # File exists in extraction destination (for extract operations)
             if is_directory:
-                message = f"Directory exists: {display_name}"
+                prefix = "Directory exists: "
             else:
-                message = f"File exists: {display_name}"
+                prefix = "File exists: "
+            
+            message = f"{prefix}{display_name}"
             
             if conflict_size is not None and not is_directory:
                 size_str = self._format_size(conflict_size)
@@ -193,16 +213,47 @@ class ArchiveOperationUI:
                 {"text": "Overwrite", "key": "o", "value": "overwrite"},
                 {"text": "Skip", "key": "s", "value": "skip"}
             ]
+            
+            # Define shortening region for the filename
+            filename_start = len(prefix)
+            filename_end = filename_start + len(display_name)
+            
+            shortening_regions = [
+                ShorteningRegion(
+                    start=filename_start,
+                    end=filename_end,
+                    priority=1,
+                    strategy='abbreviate',
+                    abbrev_position='middle',
+                    filepath_mode=True
+                )
+            ]
         
         else:
             # Fallback for unknown conflict types
-            message = f"Conflict: {display_name}"
+            prefix = "Conflict: "
+            message = f"{prefix}{display_name}"
             if total_conflicts > 1:
                 message += f" ({conflict_num}/{total_conflicts})"
             
             choices = [
                 {"text": "Overwrite", "key": "o", "value": "overwrite"},
                 {"text": "Skip", "key": "s", "value": "skip"}
+            ]
+            
+            # Define shortening region for the filename
+            filename_start = len(prefix)
+            filename_end = filename_start + len(display_name)
+            
+            shortening_regions = [
+                ShorteningRegion(
+                    start=filename_start,
+                    end=filename_end,
+                    priority=1,
+                    strategy='abbreviate',
+                    abbrev_position='middle',
+                    filepath_mode=True
+                )
             ]
         
         # Wrapper callback to handle shift modifier detection
@@ -221,7 +272,8 @@ class ArchiveOperationUI:
             message,
             choices,
             dialog_callback,
-            enable_shift_modifier=True
+            enable_shift_modifier=True,
+            shortening_regions=shortening_regions
         )
     
     def _format_size(self, size_bytes: int) -> str:
