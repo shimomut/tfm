@@ -241,7 +241,7 @@ class SearchDialog(UILayer, BaseListDialog):
                                                 'path': file_path,
                                                 'relative_path': str(relative_path),
                                                 'line_num': line_num,
-                                                'match_info': f"Line {line_num}: {line.strip()[:200]}"
+                                                'match_info': line.strip()[:200]
                                             }
                                             temp_results.append(result)
                                             
@@ -274,7 +274,7 @@ class SearchDialog(UILayer, BaseListDialog):
                                             'path': file_path,
                                             'relative_path': str(relative_path),
                                             'line_num': line_num,
-                                            'match_info': f"Line {line_num}: {line.strip()[:50]}"
+                                            'match_info': line.strip()[:200]
                                         }
                                         temp_results.append(result)
                                         
@@ -447,21 +447,13 @@ class SearchDialog(UILayer, BaseListDialog):
                 path_text = reduce_width(result['relative_path'], available_width, default_position='middle')
                 return f"📁 {path_text}"
             elif result['type'] == 'content':
-                # For content matches, parse match_info to separate line number from content
-                # Format is typically "Line 42: actual content here"
-                match_info = result['match_info']
+                # For content matches, construct line prefix from line_num
+                # match_info now contains only the actual match content
+                line_num = result.get('line_num', 0)
+                match_content = result['match_info']
                 
-                # Try to extract line number prefix (e.g., "Line 42: ")
-                import re
-                line_prefix_match = re.match(r'^(Line \d+:\s*)', match_info)
-                
-                if line_prefix_match:
-                    line_prefix = line_prefix_match.group(1)
-                    match_content = match_info[len(line_prefix):]
-                else:
-                    # No line prefix found, treat entire match_info as content
-                    line_prefix = ""
-                    match_content = match_info
+                # Construct line prefix
+                line_prefix = f"Line {line_num}: "
                 
                 # Build combined text: path - line_prefix + match_content
                 separator = " - "
