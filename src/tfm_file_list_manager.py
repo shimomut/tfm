@@ -133,6 +133,28 @@ class FileListManager:
             pane_data['files'] = []
             pane_data['focused_index'] = 0
     
+    def _natural_sort_key(self, text):
+        """
+        Generate a natural sort key that handles numeric parts as numbers.
+        
+        Converts "Test10.txt" into ['test', 10, '.txt'] so it sorts numerically.
+        
+        Args:
+            text: String to convert to natural sort key
+            
+        Returns:
+            List of alternating strings and integers for natural sorting
+        """
+        import re
+        
+        def convert(part):
+            """Convert numeric strings to integers, leave others as lowercase strings"""
+            return int(part) if part.isdigit() else part.lower()
+        
+        # Split on digit sequences, keeping the digits
+        parts = re.split(r'(\d+)', text)
+        return [convert(part) for part in parts]
+    
     def sort_entries(self, entries, sort_mode, reverse=False):
         """Sort file entries based on the specified mode
         
@@ -175,10 +197,10 @@ class FileListManager:
                             return ""  # Extension too long, treat as no extension
                         return extension.lower()
                 else:  # name (default)
-                    return entry.name.lower()
+                    return self._natural_sort_key(entry.name)
             except (OSError, PermissionError):
                 # If we can't get file info, use name as fallback
-                return entry.name.lower()
+                return self._natural_sort_key(entry.name)
         
         # Separate directories and files
         directories = [entry for entry in entries if entry.is_dir()]
