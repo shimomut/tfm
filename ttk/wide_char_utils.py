@@ -324,6 +324,11 @@ def truncate_to_width(text: str, max_width: int, ellipsis: str = "…") -> str:
     if not text:
         return text
     
+    # Normalize to NFC to handle NFD decomposed characters correctly
+    # This ensures that combining characters are composed with their base characters
+    # before we iterate character by character
+    text = unicodedata.normalize('NFC', text)
+    
     # Fast path for ASCII-only strings (most common case)
     if all(ord(c) < 128 for c in text):
         if len(text) <= max_width:
