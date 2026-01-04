@@ -11,6 +11,8 @@ This module provides a reusable SingleLineTextEdit class that handles:
 - Wide character support for proper display and editing
 """
 
+import unicodedata
+
 # TTK imports
 from ttk import TextAttribute, KeyCode, ModifierKey
 from ttk.input_event import CharEvent, KeyEvent
@@ -28,22 +30,61 @@ class SingleLineTextEdit:
         Initialize the text editor
         
         Args:
-            initial_text (str): Initial text content
+            initial_text (str): Initial text content (will be normalized to NFC)
             max_length (int, optional): Maximum allowed text length
             renderer: TTK Renderer instance for clipboard access (optional)
         """
-        self.text = initial_text
-        self.cursor_pos = len(initial_text)
+        # Store the original normalization form to convert back on retrieval
+        self._original_was_nfd = self._is_nfd(initial_text)
+        
+        # Normalize to NFC for internal editing (consistent character representation)
+        self.text = unicodedata.normalize('NFC', initial_text)
+        self.cursor_pos = len(self.text)
         self.max_length = max_length
         self.renderer = renderer
         
+    def _is_nfd(self, text):
+        """
+        Check if text is in NFD (decomposed) form.
+        
+        Args:
+            text (str): Text to check
+            
+        Returns:
+            bool: True if text is in NFD form
+        """
+        if not text:
+            return False
+        # Text is NFD if normalizing to NFD doesn't change it, but normalizing to NFC does
+        return text == unicodedata.normalize('NFD', text) and text != unicodedata.normalize('NFC', text)
+    
     def get_text(self):
-        """Get the current text content"""
+        """
+        Get the current text content.
+        
+        If the initial text was in NFD form, converts back to NFD.
+        This ensures that when editing filenames on macOS (which uses NFD),
+        the returned text matches the original normalization form.
+        
+        Returns:
+            str: Text in the same normalization form as the initial text
+        """
+        if self._original_was_nfd:
+            return unicodedata.normalize('NFD', self.text)
         return self.text
         
     def set_text(self, text):
-        """Set the text content and adjust cursor if needed"""
-        self.text = text
+        """
+        Set the text content and adjust cursor if needed.
+        
+        Args:
+            text (str): New text content (will be normalized to NFC)
+        """
+        # Update original normalization form tracking
+        self._original_was_nfd = self._is_nfd(text)
+        
+        # Normalize to NFC for internal editing
+        self.text = unicodedata.normalize('NFC', text)
         self.cursor_pos = min(self.cursor_pos, len(self.text))
         
     def get_cursor_pos(self):
@@ -219,14 +260,17 @@ class SingleLineTextEdit:
         
     def insert_char(self, char):
         """
-        Insert a character at the cursor position, handling wide characters
+        Insert a character at the cursor position, handling wide characters.
         
         Args:
-            char (str): Character to insert
+            char (str): Character to insert (will be normalized to NFC)
             
         Returns:
             bool: True if character was inserted, False if max_length exceeded
         """
+        # Normalize character to NFC for consistent internal representation
+        char = unicodedata.normalize('NFC', char)
+        
         # Check max_length constraint (by character count, not display width)
         if self.max_length and len(self.text) >= self.max_length:
             return False
@@ -291,6 +335,9 @@ class SingleLineTextEdit:
         # Only paste the first line (single-line editor)
         # Replace newlines with spaces
         paste_text = clipboard_text.replace('\n', ' ').replace('\r', ' ')
+        
+        # Normalize to NFC for consistent internal representation
+        paste_text = unicodedata.normalize('NFC', paste_text)
         
         # Check max_length constraint
         if self.max_length:
