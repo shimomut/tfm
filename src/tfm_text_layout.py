@@ -12,8 +12,7 @@ the complete text layout and rendering pipeline, including:
 - Color and attribute management per segment
 - Integration with TTK rendering backend
 
-The system is designed to be independent of the legacy tfm_string_width.py module
-and will eventually replace it.
+This system has replaced the legacy tfm_string_width.py module.
 
 Basic Usage:
     from tfm_text_layout import draw_text_segments, AbbreviationSegment, SpacerSegment
