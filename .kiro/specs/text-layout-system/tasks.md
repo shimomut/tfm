@@ -6,7 +6,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
 
 ## Tasks
 
-- [ ] 1. Create module structure and base classes
+- [x] 1. Create module structure and base classes
   - Create `src/tfm_text_layout.py` with module docstring
   - Import required dependencies (TTK wide_char_utils, unicodedata, dataclasses, typing, abc)
   - Initialize logger using TFM's unified logging system
@@ -18,8 +18,8 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 1: Default values are applied correctly**
   - **Validates: Requirements 1.8**
 
-- [ ] 2. Implement TextSegment subclasses
-  - [ ] 2.1 Implement AbbreviationSegment class
+- [x] 2. Implement TextSegment subclasses
+  - [x] 2.1 Implement AbbreviationSegment class
     - Define class with abbrev_position attribute
     - Implement shorten() method with left/middle/right ellipsis placement
     - Handle edge cases (target_width = 0, 1, text shorter than ellipsis)
@@ -29,7 +29,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 8: Abbreviation Strategy Ellipsis Presence**
   - **Validates: Requirements 2.1, 3.1, 3.2, 3.3**
 
-- [ ] 2.3 Implement FilepathSegment class
+- [x] 2.3 Implement FilepathSegment class
     - Define class with abbrev_position attribute
     - Implement shorten() method with directory-level removal
     - Parse path into components, remove directories before filename
@@ -40,7 +40,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 12: Filepath Abbreviation Directory Preservation**
   - **Validates: Requirements 2.2**
 
-- [ ] 2.5 Implement TruncateSegment class
+- [x] 2.5 Implement TruncateSegment class
     - Define class without abbrev_position
     - Implement shorten() method that removes characters from end
     - Ensure no ellipsis is added
@@ -50,7 +50,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 9: Truncate Strategy No Ellipsis**
   - **Validates: Requirements 2.3**
 
-- [ ] 2.7 Implement AllOrNothingSegment class
+- [x] 2.7 Implement AllOrNothingSegment class
     - Define class
     - Implement shorten() method that returns full text or empty string
     - _Requirements: 2.4_
@@ -59,7 +59,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 10: All-or-Nothing Behavior**
   - **Validates: Requirements 2.4**
 
-- [ ] 2.9 Implement AsIsSegment class
+- [x] 2.9 Implement AsIsSegment class
     - Define class
     - Implement shorten() method that always returns original text
     - _Requirements: 2.5_
@@ -68,7 +68,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 11: As-Is Strategy Preservation**
   - **Validates: Requirements 2.5**
 
-- [ ] 3. Implement wide character support utilities
+- [x] 3. Implement wide character support utilities
   - Create helper function for NFC normalization
   - Create helper function for display width calculation (delegates to TTK)
   - Create helper function for wide character boundary checking
@@ -80,13 +80,13 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 14: Wide Character Width Accounting**
   - **Validates: Requirements 8.2, 8.3**
 
-- [ ] 4. Implement layout calculation engine
-  - [ ] 4.1 Create LayoutState dataclass
+- [x] 4. Implement layout calculation engine
+  - [x] 4.1 Create LayoutState dataclass
     - Define internal state structure
     - Track current widths, original widths, spacer indices
     - _Requirements: Internal implementation_
 
-- [ ] 4.2 Implement spacer collapse logic
+- [x] 4.2 Implement spacer collapse logic
     - Identify all spacer segments
     - Set spacer widths to zero when shortening is needed
     - _Requirements: 6.5_
@@ -95,7 +95,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 5: Spacer Collapse Before Shortening**
   - **Validates: Requirements 6.5**
 
-- [ ] 4.4 Implement priority-based shortening
+- [x] 4.4 Implement priority-based shortening
     - Sort segments by priority (descending)
     - Shorten segments at each priority level
     - Respect minimum length constraints
@@ -110,7 +110,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 4: Minimum Length Preservation**
   - **Validates: Requirements 5.1, 5.2**
 
-- [ ] 4.7 Implement priority-based restoration
+- [x] 4.7 Implement priority-based restoration
     - Calculate available space after shortening
     - Restore segments in reverse priority order (low to high)
     - Try to restore each segment with available space
@@ -120,7 +120,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 3: Priority-Based Restoration Order**
   - **Validates: Requirements 4.4**
 
-- [ ] 4.9 Implement spacer expansion logic
+- [x] 4.9 Implement spacer expansion logic
     - Calculate extra space when total width < rendering width
     - Distribute space equally among spacers
     - Handle remainder distribution (first N spacers get +1)
@@ -131,12 +131,12 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 7: No Padding Without Spacers**
   - **Validates: Requirements 6.2, 6.3, 6.4**
 
-- [ ] 5. Implement rendering logic
-  - [ ] 5.1 Create RenderContext dataclass
+- [x] 5. Implement rendering logic
+  - [x] 5.1 Create RenderContext dataclass
     - Track renderer, row, current column, defaults
     - _Requirements: Internal implementation_
 
-- [ ] 5.2 Implement segment rendering loop
+- [x] 5.2 Implement segment rendering loop
     - Iterate through segments with calculated widths
     - Apply color pair (segment's or default)
     - Apply attributes (segment's or default)
@@ -153,7 +153,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 17: Rendering Position Continuity**
   - **Validates: Requirements 7.5**
 
-- [ ] 6. Implement main draw_text_segments function
+- [x] 6. Implement main draw_text_segments function
   - Define function signature with all parameters
   - Validate input parameters (renderer, segments, rendering_width)
   - Create LayoutState from segments
@@ -166,7 +166,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - **Property 1: Width Constraint Satisfaction**
   - **Validates: Requirements 6.6, 7.6**
 
-- [ ] 7. Add error handling and validation
+- [x] 7. Add error handling and validation
   - Validate segment configuration (invalid abbrev_position, etc.)
   - Validate layout parameters (negative width, None renderer)
   - Handle Unicode errors in normalization and width calculation
@@ -180,14 +180,14 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - Test renderer exception handling
   - _Requirements: 2.6, 3.4, 10.5_
 
-- [ ] 8. Add helper functions and convenience APIs
+- [x] 8. Add helper functions and convenience APIs
   - Create helper for common status bar layouts
   - Create helper for file list rendering
   - Create helper for dialog prompts
   - Add comprehensive docstrings with examples
   - _Requirements: 10.4_
 
-- [ ] 9. Create demo script
+- [x] 9. Create demo script
   - Create `demo/demo_text_layout_system.py`
   - Demonstrate all segment types
   - Demonstrate spacer behavior
@@ -195,7 +195,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - Demonstrate wide character handling
   - _Requirements: Validation_
 
-- [ ] 10. Create unit tests for edge cases
+- [x] 10. Create unit tests for edge cases
   - Test empty segment list
   - Test zero rendering width
   - Test single character segments
@@ -204,7 +204,7 @@ This plan implements a comprehensive text layout system for TFM that handles tex
   - Test spacer-only layouts
   - _Requirements: Comprehensive testing_
 
-- [ ] 11. Checkpoint - Ensure all tests pass
+- [x] 11. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
