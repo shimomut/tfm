@@ -322,6 +322,130 @@ class CompletionState:
     is_active: bool                 # Whether completion is currently active
 ```
 
+### Keyboard Navigation State
+
+The CandidateListOverlay maintains additional state for keyboard navigation:
+
+```python
+@dataclass
+class NavigationState:
+    """State for keyboard navigation in candidate list"""
+    focused_index: Optional[int]    # Index of focused candidate (None if no focus)
+    scroll_offset: int              # First visible candidate index
+    visible_count: int              # Number of candidates that fit in visible area
+```
+
+## Keyboard Navigation Design
+
+### Focus Management
+
+The candidate list supports keyboard navigation with visual focus indication:
+
+1. **Initial State**: When the candidate list first appears, no candidate is focused
+2. **Focus Activation**: Pressing Up/Down arrow keys activates focus on a candidate
+3. **Focus Movement**: Subsequent Up/Down presses move focus through the list
+4. **Focus Wrapping**: Focus wraps from last to first (Down) and first to last (Up)
+5. **Focus Clearing**: Pressing ESC or selecting a candidate clears focus
+
+### Visual Feedback
+
+The focused candidate is visually distinguished from other candidates:
+- Background color change (highlighted)
+- Different text attributes (bold or inverse video)
+- Clear visual indication of which candidate will be selected on Enter
+
+### Scrolling Behavior
+
+When the candidate list has more items than fit in the visible area:
+
+1. **Auto-scroll**: The list automatically scrolls to keep the focused candidate visible
+2. **Scroll-up**: When focus moves above the visible area, scroll up to show it
+3. **Scroll-down**: When focus moves below the visible area, scroll down to show it
+4. **Scrollbar**: A visual scrollbar indicates scroll position and list size
+
+### Scrollbar Design
+
+The scrollbar uses the existing `draw_scrollbar()` utility from `tfm_scrollbar.py`:
+
+```
+┌─────────────────┐
+│ candidate1      │
+│ candidate2      │┃  ← Thumb (visible portion)
+│ candidate3      │┃
+│ candidate4      │   ← Track (non-visible portion)
+│ candidate5      │
+└─────────────────┘
+```
+
+- **Thumb (┃)**: Heavy vertical line indicates visible portion of list
+- **Track (space)**: Background shows through for non-visible portion
+- **Position**: Right edge of overlay, inside the border
+- **Height**: Proportional to visible/total ratio
+- **Implementation**: Use `draw_scrollbar(renderer, start_y, x_pos, display_height, total_items, scroll_offset, inverted=False)`
+
+### Key Event Handling
+
+The SingleLineTextEdit component handles these additional key events when the candidate list is visible:
+
+```python
+def handle_key(self, event):
+    """Extended key handling for candidate list navigation"""
+    
+    if candidate_list_visible:
+        if event.key == UP_ARROW:
+            # Move focus to previous candidate (wrap to last if at first)
+            candidate_list.move_focus_up()
+            return True
+        
+        elif event.key == DOWN_ARROW:
+            # Move focus to next candidate (wrap to first if at last)
+            candidate_list.move_focus_down()
+            return True
+        
+        elif event.key == ENTER and candidate_list.has_focus():
+            # Apply focused candidate to text edit
+            focused_candidate = candidate_list.get_focused_candidate()
+            self.apply_candidate(focused_candidate)
+            candidate_list.hide()
+            return True
+        
+        elif event.key == ESC:
+            # Hide candidate list without applying selection
+            candidate_list.hide()
+            return True
+    
+    # Fall through to existing key handling
+    return existing_key_handling(event)
+```
+
+### Candidate Application
+
+When a candidate is selected via Enter key:
+
+1. **Extract completion portion**: Get the part of the candidate after the completion start position
+2. **Replace text**: Replace from completion_start_pos to cursor_pos with the selected candidate
+3. **Update cursor**: Move cursor to end of inserted text
+4. **Hide list**: Close the candidate list
+5. **Clear focus**: Reset focus state for next completion
+
+Algorithm:
+```python
+def apply_candidate(self, candidate: str):
+    """Apply selected candidate to text edit"""
+    # Calculate what to insert
+    already_typed = self.text[self.completion_start_pos:self.cursor_pos]
+    
+    # Replace the completion portion
+    self.text = (
+        self.text[:self.completion_start_pos] +
+        candidate +
+        self.text[self.cursor_pos:]
+    )
+    
+    # Update cursor position
+    self.cursor_pos = self.completion_start_pos + len(candidate)
+```
+
 ## Correctness Properties
 
 *A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
@@ -421,6 +545,54 @@ class CompletionState:
 *For any* active TAB completion session, all existing text editing operations (character insertion, deletion, cursor movement, etc.) should continue to function normally.
 
 **Validates: Requirements 8.2**
+
+### Property 17: Focus Movement with Down Arrow
+
+*For any* visible candidate list, pressing the Down arrow key should move focus to the next candidate, wrapping to the first candidate when focus is on the last candidate.
+
+**Validates: Requirements 9.1, 9.3, 9.5**
+
+### Property 18: Focus Movement with Up Arrow
+
+*For any* visible candidate list, pressing the Up arrow key should move focus to the previous candidate, wrapping to the last candidate when focus is on the first candidate.
+
+**Validates: Requirements 9.2, 9.4, 9.6**
+
+### Property 19: Focused Candidate Visual Distinction
+
+*For any* candidate list with a focused candidate, the focused candidate should be visually highlighted to distinguish it from other candidates.
+
+**Validates: Requirements 9.7**
+
+### Property 20: Enter Key Selection
+
+*For any* focused candidate, pressing Enter should replace the completion portion of the text with the focused candidate and hide the candidate list.
+
+**Validates: Requirements 10.1, 10.2, 10.3**
+
+### Property 21: ESC Key Dismissal
+
+*For any* visible candidate list, pressing ESC should hide the candidate list without modifying the text.
+
+**Validates: Requirements 11.1, 11.2, 11.3**
+
+### Property 22: Scrollbar Visibility
+
+*For any* candidate list where the number of candidates exceeds the visible area, a scrollbar should be displayed on the right edge of the overlay.
+
+**Validates: Requirements 12.1**
+
+### Property 23: Scrollbar Position Indication
+
+*For any* candidate list with a scrollbar, the scrollbar should accurately indicate the current scroll position and the proportion of candidates currently visible.
+
+**Validates: Requirements 12.2, 12.3**
+
+### Property 24: Auto-scroll on Navigation
+
+*For any* focused candidate that is outside the visible area, the candidate list should automatically scroll to make the focused candidate visible.
+
+**Validates: Requirements 12.4, 12.5, 12.6**
 
 ## Error Handling
 

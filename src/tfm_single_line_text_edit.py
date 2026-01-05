@@ -663,6 +663,10 @@ class SingleLineTextEdit:
         This method implements dynamic candidate filtering as the user types,
         ensuring the candidate list stays synchronized with the current input.
         
+        When the user types characters, focus is cleared to prevent the focused
+        candidate from unexpectedly changing as the list filters. This provides
+        more predictable UX - typing refines the search, arrow keys navigate.
+        
         Requirements:
         - 2.4: Update candidate list when user types additional characters
         - 2.5: Hide candidate list when reduced to zero matches
@@ -673,6 +677,11 @@ class SingleLineTextEdit:
         # Check if completer and candidate list are available
         if not self.completer or not self.candidate_list:
             return
+        
+        # Clear focus when candidate list is updated due to typing
+        # This ensures the focused candidate doesn't unexpectedly change
+        # User must press Up/Down again to re-activate focus after typing
+        self.candidate_list.clear_focus()
         
         # Get current candidates from completer
         candidates = self.completer.get_candidates(self.text, self.cursor_pos)
@@ -691,6 +700,37 @@ class SingleLineTextEdit:
         # Mark completion as active - candidates will be displayed in draw()
         # The candidate list will remain visible even for single candidate (Req 2.6)
         self.completion_active = len(candidates) > 0
+    
+    def apply_candidate(self, candidate: str):
+        """
+        Apply a selected candidate to the text edit field.
+        
+        This method replaces the completion portion of the text (from the
+        completion start position to the cursor) with the selected candidate.
+        The cursor is then moved to the end of the inserted text.
+        
+        This is called when the user presses Enter with a focused candidate,
+        allowing them to quickly apply a specific completion without typing
+        the full text.
+        
+        Args:
+            candidate: The candidate text to apply
+        
+        Requirements:
+        - 10.1: Replace completion portion with focused candidate text
+        - 10.2: Hide candidate list after applying selection
+        - 10.3: Move cursor to end of inserted text
+        """
+        # Replace the completion portion with the selected candidate
+        # The completion portion is from completion_start_pos to cursor_pos
+        self.text = (
+            self.text[:self.completion_start_pos] +
+            candidate +
+            self.text[self.cursor_pos:]
+        )
+        
+        # Update cursor position to end of inserted text
+        self.cursor_pos = self.completion_start_pos + len(candidate)
         
     def handle_key(self, event, handle_vertical_nav=False):
         """
@@ -720,12 +760,47 @@ class SingleLineTextEdit:
             if event.key_code == KeyCode.TAB:
                 return self.handle_tab_completion()
             
-            # Check for ESC key press - hide candidate list
+            # Check for ESC key press - hide candidate list and clear focus
             if event.key_code == KeyCode.ESCAPE:
                 if self.candidate_list and self.completion_active:
                     self.candidate_list.hide()
+                    self.candidate_list.clear_focus()
                     self.completion_active = False
                     return True
+                return False
+            
+            # Check for Up/Down arrow keys when candidate list is visible
+            # These keys navigate through the candidate list
+            if self.candidate_list and self.completion_active and self.candidate_list.is_visible:
+                if event.key_code == KeyCode.DOWN:
+                    # Move focus to next candidate
+                    self.candidate_list.move_focus_down()
+                    # Mark dirty to trigger redraw with updated focus
+                    # (The parent component will handle the actual redraw)
+                    return True
+                elif event.key_code == KeyCode.UP:
+                    # Move focus to previous candidate
+                    self.candidate_list.move_focus_up()
+                    # Mark dirty to trigger redraw with updated focus
+                    # (The parent component will handle the actual redraw)
+                    return True
+            
+            # Check for Enter key when candidate list has focus
+            # This applies the focused candidate to the text edit
+            if event.key_code == KeyCode.ENTER:
+                if self.candidate_list and self.candidate_list.has_focus():
+                    # Get the focused candidate
+                    focused_candidate = self.candidate_list.get_focused_candidate()
+                    if focused_candidate:
+                        # Apply the candidate to the text
+                        self.apply_candidate(focused_candidate)
+                        # Hide the candidate list
+                        self.candidate_list.hide()
+                        self.completion_active = False
+                        # Clear focus state
+                        self.candidate_list.clear_focus()
+                        return True
+                # If no focus or no candidate list, fall through to normal Enter handling
                 return False
             
             # Check for Cmd+V / Ctrl+V paste (exact modifier match)
@@ -1039,6 +1114,7 @@ class SingleLineTextEdit:
         # Hide candidate list when focus is lost
         if self.candidate_list and self.completion_active:
             self.candidate_list.hide()
+            self.candidate_list.clear_focus()
             self.completion_active = False
     
     def _safe_draw_text(self, renderer, y, x, text, color_pair, attributes):

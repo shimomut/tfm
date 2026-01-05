@@ -110,3 +110,51 @@ This document specifies the requirements for adding TAB completion functionality
 2. WHEN TAB completion is active, THE existing text editing operations SHALL continue to function normally
 3. WHEN the text field loses focus, THE Candidate_List SHALL hide itself
 4. WHEN the text field gains focus, THE Candidate_List SHALL not automatically appear until TAB is pressed
+
+### Requirement 9: Keyboard Navigation in Candidate List
+
+**User Story:** As a user, I want to navigate through completion candidates using arrow keys, so that I can select a specific candidate without typing more characters.
+
+#### Acceptance Criteria
+
+1. WHEN the candidate list is visible and the user presses the Down arrow key, THE Candidate_List SHALL move focus to the next candidate in the list
+2. WHEN the candidate list is visible and the user presses the Up arrow key, THE Candidate_List SHALL move focus to the previous candidate in the list
+3. WHEN focus is on the last candidate and the user presses Down, THE Candidate_List SHALL wrap focus to the first candidate
+4. WHEN focus is on the first candidate and the user presses Up, THE Candidate_List SHALL wrap focus to the last candidate
+5. WHEN no candidate is focused and the user presses Down, THE Candidate_List SHALL focus the first candidate
+6. WHEN no candidate is focused and the user presses Up, THE Candidate_List SHALL focus the last candidate
+7. THE Candidate_List SHALL visually highlight the focused candidate to distinguish it from other candidates
+
+### Requirement 10: Candidate Selection with Enter Key
+
+**User Story:** As a user, I want to press Enter to select the focused candidate, so that I can quickly apply a specific completion without typing the full text.
+
+#### Acceptance Criteria
+
+1. WHEN a candidate is focused and the user presses Enter, THE SingleLineTextEdit SHALL replace the completion portion with the focused candidate text
+2. WHEN a candidate is focused and the user presses Enter, THE Candidate_List SHALL hide itself after applying the selection
+3. WHEN a candidate is focused and the user presses Enter, THE cursor position SHALL move to the end of the inserted text
+4. WHEN no candidate is focused and the user presses Enter, THE SingleLineTextEdit SHALL process Enter as a normal text submission (not as candidate selection)
+
+### Requirement 11: ESC Key Behavior with Focus
+
+**User Story:** As a user, I want to press ESC to close the candidate list, so that I can dismiss completions and continue typing normally.
+
+#### Acceptance Criteria
+
+1. WHEN the candidate list is visible and the user presses ESC, THE Candidate_List SHALL hide itself
+2. WHEN the candidate list is visible and the user presses ESC, THE SingleLineTextEdit SHALL retain its current text without modification
+3. WHEN a candidate is focused and the user presses ESC, THE Candidate_List SHALL hide itself and clear the focus state
+
+### Requirement 12: Scrollbar for Long Candidate Lists
+
+**User Story:** As a user, I want to see a scrollbar when there are many candidates, so that I know there are more options available and can understand my position in the list.
+
+#### Acceptance Criteria
+
+1. WHEN the number of candidates exceeds the visible area, THE Candidate_List SHALL display a scrollbar on the right edge
+2. THE scrollbar SHALL indicate the current scroll position within the full list of candidates
+3. THE scrollbar SHALL indicate the proportion of candidates currently visible
+4. WHEN the user navigates with arrow keys, THE Candidate_List SHALL automatically scroll to keep the focused candidate visible
+5. WHEN the focused candidate is above the visible area, THE Candidate_List SHALL scroll up to show it
+6. WHEN the focused candidate is below the visible area, THE Candidate_List SHALL scroll down to show it
