@@ -12,7 +12,6 @@ from ttk.wide_char_utils import get_display_width, get_safe_functions
 
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
-from tfm_string_width import reduce_width, ShorteningRegion, calculate_display_width
 
 
 class QuickEditBar:
@@ -34,11 +33,10 @@ class QuickEditBar:
         # Status line input dialog state
         self.text_editor = SingleLineTextEdit(renderer=renderer)
         self.prompt_text = ""
-        self.shortening_regions = None  # Optional list of ShorteningRegion for prompt shortening
         self.callback = None
         self.cancel_callback = None
         
-    def show_status_line_input(self, prompt, initial_text="", callback=None, cancel_callback=None, shortening_regions=None):
+    def show_status_line_input(self, prompt, initial_text="", callback=None, cancel_callback=None):
         """
         Show a status line input dialog
         
@@ -47,12 +45,9 @@ class QuickEditBar:
             initial_text (str): Initial text in the input field
             callback (callable): Function to call when Enter is pressed
             cancel_callback (callable): Function to call when ESC is pressed
-            shortening_regions (list): Optional list of ShorteningRegion for intelligent prompt shortening.
-                                      If None, default right abbreviation is used when prompt is too long.
         """
         self.is_active = True
         self.prompt_text = prompt
-        self.shortening_regions = shortening_regions
         self.callback = callback
         self.cancel_callback = cancel_callback
         self.content_changed = True  # Mark content as changed when showing
@@ -66,7 +61,6 @@ class QuickEditBar:
         self.content_changed = True  # Mark content as changed when hiding
         self.text_editor.clear()
         self.prompt_text = ""
-        self.shortening_regions = None
         self.callback = None
         self.cancel_callback = None
     
@@ -163,37 +157,16 @@ class QuickEditBar:
         # Don't show help text during editing to avoid position shifts
         # caused by IME composition text width variations
         
-        # Reserve minimum 40 chars for the input field
-        min_input_width = 40
+        # Calculate available space for the input field (prompt + text)
         # Leave some margin (4 chars total: 2 on left, 2 on right)
         margin = 4
-        max_prompt_width = width - margin - min_input_width
-        
-        # Shorten prompt if needed using reduce_width with optional regions
-        prompt = self.prompt_text
-        prompt_width = calculate_display_width(prompt)
-        if prompt_width > max_prompt_width and max_prompt_width > 0:
-            if self.shortening_regions:
-                # Use provided shortening regions
-                prompt = reduce_width(prompt, max_prompt_width, regions=self.shortening_regions)
-            else:
-                # Use default right abbreviation
-                prompt = reduce_width(prompt, max_prompt_width, default_position='right')
-        
-        # Calculate available space for the input field (prompt + text)
         max_field_width = width - margin
-        
-        # Ensure minimum width for the input field using display width
-        prompt_width = calculate_display_width(prompt)
-        min_field_width = prompt_width + 5  # At least 5 chars for input
-        if max_field_width < min_field_width:
-            max_field_width = min_field_width
         
         # Draw input field using SingleLineTextEdit
         # SingleLineTextEdit.draw() will set the caret position for IME
         self.text_editor.draw(
             self.renderer, status_y, 2, max_field_width,
-            prompt,
+            self.prompt_text,
             is_active=True
         )
         
@@ -215,36 +188,16 @@ class QuickEditBarHelpers:
     
     @staticmethod
     def create_rename_dialog(dialog, original_name, current_name=""):
-        """Create a rename dialog configuration with intelligent prompt shortening
+        """Create a rename dialog configuration with simple static prompt
         
-        The prompt format is: "Rename '{original_name}' to: "
-        When space is limited (less than 40 chars for input + full prompt),
-        it falls back to just "Rename: " to ensure adequate input space.
-        
-        Uses 'all_or_nothing' strategy: either shows the full middle part or removes it entirely.
+        Uses a simple "Rename to: " prompt for all rename operations.
         """
         if not current_name:
             current_name = original_name
         
-        # Full prompt with original name
-        full_prompt = f"Rename '{original_name}' to: "
-        
-        # Define shortening region: " '{original_name}' to" (middle part)
-        # This leaves "Rename" at start and ": " at end
-        # Uses 'all_or_nothing' strategy for clean removal
-        regions = [
-            ShorteningRegion(
-                start=6,  # After "Rename"
-                end=len(full_prompt) - 2,  # Before ": "
-                priority=1,
-                strategy='all_or_nothing'  # Either show full or remove entirely
-            )
-        ]
-        
         dialog.show_status_line_input(
-            prompt=full_prompt,
-            initial_text=current_name,
-            shortening_regions=regions
+            prompt="Rename to: ",
+            initial_text=current_name
         )
     
     @staticmethod

@@ -2978,25 +2978,33 @@ class FileManager(UILayer):
         self.batch_rename_dialog.exit()
         self.mark_dirty()
     
-    def show_dialog(self, message, choices, callback, enable_shift_modifier=False, shortening_regions=None):
+    def show_dialog(self, message, choices, callback, enable_shift_modifier=False):
         """Show quick choice dialog - wrapper for quick choice bar component
         
         Args:
-            message: The message to display
+            message: Message to display. Can be either:
+                    - str: Plain text message
+                    - List[TextSegment]: List of text segments for advanced formatting
             choices: List of choice dictionaries with format:
                      [{"text": "Yes", "key": "y", "value": True}, 
                       {"text": "No", "key": "n", "value": False},
                       {"text": "Cancel", "key": "c", "value": None}]
             callback: Function to call with the selected choice's value
             enable_shift_modifier: If True, Shift key applies choice to all remaining items
-            shortening_regions: Optional list of ShorteningRegion for intelligent message shortening
         """
-        self.quick_choice_bar.show(message, choices, callback, enable_shift_modifier, shortening_regions=shortening_regions)
+        self.quick_choice_bar.show(message, choices, callback, enable_shift_modifier)
         self.mark_dirty()
     
-    def show_confirmation(self, message, callback, shortening_regions=None):
-        """Show confirmation dialog with Yes/No options (ESC to cancel)"""
-        QuickChoiceBarHelpers.show_yes_no_confirmation(self.quick_choice_bar, message, callback, shortening_regions=shortening_regions)
+    def show_confirmation(self, message, callback):
+        """Show confirmation dialog with Yes/No options (ESC to cancel)
+        
+        Args:
+            message: Message to display. Can be either:
+                    - str: Plain text message
+                    - List[TextSegment]: List of text segments for advanced formatting
+            callback: Function to call with result (True/False/None)
+        """
+        QuickChoiceBarHelpers.show_yes_no_confirmation(self.quick_choice_bar, message, callback)
         self.mark_dirty()
         
     def exit_quick_choice_mode(self):

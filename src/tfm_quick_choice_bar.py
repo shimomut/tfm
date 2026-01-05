@@ -6,7 +6,11 @@ Provides quick choice dialog functionality displayed in the status bar
 
 from ttk import KeyCode, TextAttribute, KeyEvent, CharEvent
 from tfm_colors import get_status_color
-from tfm_string_width import reduce_width, ShorteningRegion, calculate_display_width
+from tfm_text_layout import (
+    draw_text_segments, AbbreviationSegment, AsIsSegment, SpacerSegment, 
+    AllOrNothingSegment, TextSegment
+)
+from typing import Union, List
 
 
 class QuickChoiceBar:
@@ -23,21 +27,23 @@ class QuickChoiceBar:
         self.callback = None
         self.selected = 0  # Index of currently selected choice
         self.enable_shift_modifier = False  # Whether Shift modifier is enabled for "apply to all"
-        self.shortening_regions = None  # Optional list of ShorteningRegion for message shortening
+        self.shortening_regions = None  # Deprecated: kept for backward compatibility
         
     def show(self, message, choices, callback, enable_shift_modifier=False, shortening_regions=None):
         """Show a quick choice dialog
         
         Args:
-            message: The message to display
+            message: The message to display. Can be either:
+                    - str: Plain text message (will be converted to AbbreviationSegment)
+                    - List[TextSegment]: List of text segments for advanced formatting
             choices: List of choice dictionaries with format:
                      [{"text": "Yes", "key": "y", "value": True}, 
                       {"text": "No", "key": "n", "value": False},
                       {"text": "Cancel", "key": "c", "value": None}]
             callback: Function to call with the selected choice's value
             enable_shift_modifier: If True, Shift key applies choice to all remaining items
-            shortening_regions: Optional list of ShorteningRegion for intelligent message shortening.
-                              If None, default right abbreviation is used when message is too long.
+            shortening_regions: Deprecated parameter, kept for backward compatibility.
+                              Message shortening is now handled automatically by the text layout system.
         """
         self.is_active = True
         self.message = message
@@ -133,8 +139,77 @@ class QuickChoiceBar:
         status_line = " " * width
         self.renderer.draw_text(status_y, 0, status_line, status_color_pair, status_attributes)
         
-        # Calculate space needed for buttons
-        # Generate help text based on available quick keys (for later use)
+        # Build segments list for the entire status bar
+        segments = []
+        
+        # Add leading spaces
+        segments.append(AsIsSegment("  "))
+        
+        # Add message segment(s)
+        # Message can be either a string or a list of TextSegment objects
+        if isinstance(self.message, str):
+            # String message: convert to AbbreviationSegment with priority-based shortening
+            # If shortening_regions provided, use middle abbreviation
+            # Otherwise, use right abbreviation
+            if self.shortening_regions:
+                # Note: shortening_regions is legacy API, we'll use middle abbreviation
+                # as a reasonable default for messages with regions
+                segments.append(AbbreviationSegment(
+                    self.message,
+                    priority=0,  # Lower priority than help text (preserved more)
+                    min_length=10,
+                    abbrev_position='middle'
+                ))
+            else:
+                segments.append(AbbreviationSegment(
+                    self.message,
+                    priority=0,  # Lower priority than help text (preserved more)
+                    min_length=10,
+                    abbrev_position='right'
+                ))
+        elif isinstance(self.message, list):
+            # List of TextSegment objects: use them directly
+            segments.extend(self.message)
+        else:
+            # Fallback: convert to string and use as AbbreviationSegment
+            segments.append(AbbreviationSegment(
+                str(self.message),
+                priority=0,
+                min_length=10,
+                abbrev_position='right'
+            ))
+        
+        # Add space after message
+        segments.append(AsIsSegment(" "))
+        
+        # Add spacer before buttons
+        segments.append(SpacerSegment())
+        
+        # Add button segments
+        for i, choice in enumerate(self.choices):
+            choice_text = choice["text"]
+            
+            if i == self.selected:
+                # Selected button with brackets and highlighting
+                button_text = f"[{choice_text}]"
+                segments.append(AsIsSegment(
+                    button_text,
+                    color_pair=status_color_pair,
+                    attributes=TextAttribute.BOLD | TextAttribute.REVERSE
+                ))
+            else:
+                # Unselected button with spaces
+                button_text = f" {choice_text} "
+                segments.append(AsIsSegment(button_text))
+            
+            # Add space between buttons (except after last button)
+            if i < len(self.choices) - 1:
+                segments.append(AsIsSegment(" "))
+        
+        # Add space before help text
+        segments.append(AsIsSegment(" "))
+        
+        # Generate help text based on available quick keys
         quick_keys = []
         for choice in self.choices:
             if "key" in choice and choice["key"]:
@@ -147,67 +222,26 @@ class QuickChoiceBar:
             help_parts.append(f"{'/'.join(quick_keys)}:quick")
         help_parts.append("ESC:cancel")
         help_text = " ".join(help_parts)
-        help_text_width = calculate_display_width(help_text)
         
-        # Calculate button widths
-        button_widths = []
-        for i, choice in enumerate(self.choices):
-            choice_text = choice["text"]
-            if i == self.selected:
-                button_text = f"[{choice_text}]"
-            else:
-                button_text = f" {choice_text} "
-            button_widths.append(calculate_display_width(button_text))
+        # Add help text segment with all-or-nothing strategy (shown in full or not at all)
+        segments.append(AllOrNothingSegment(
+            help_text,
+            priority=1  # Higher priority, removed before message
+        ))
         
-        total_button_width = sum(button_widths) + len(button_widths) - 1  # Add spacing between buttons
+        # Add trailing spaces
+        segments.append(AsIsSegment("   "))
         
-        # Priority: Message > Buttons > Help text
-        # Calculate available width for message WITHOUT reserving space for help text
-        # Format: "  <message> <buttons>"
-        reserved_width_without_help = 2 + 1 + total_button_width + 4
-        available_message_width = max(1, width - reserved_width_without_help)
-        
-        # Shorten message if needed using reduce_width with optional regions
-        message = self.message
-        message_width = calculate_display_width(message)
-        
-        if message_width > available_message_width:
-            if self.shortening_regions:
-                # Use provided shortening regions
-                message = reduce_width(message, available_message_width, regions=self.shortening_regions)
-            else:
-                # Use default right abbreviation
-                message = reduce_width(message, available_message_width, default_position='right')
-        
-        # Draw message
-        message_with_space = f"{message} "
-        self.renderer.draw_text(status_y, 2, message_with_space, status_color_pair, status_attributes)
-        
-        # Calculate button start position based on actual message width
-        button_start_x = 2 + calculate_display_width(message_with_space) + 2
-        
-        # Draw buttons
-        for i, choice in enumerate(self.choices):
-            choice_text = choice["text"]
-            if i == self.selected:
-                # Highlight selected option with bold and standout
-                button_text = f"[{choice_text}]"
-                self.renderer.draw_text(status_y, button_start_x, button_text, 
-                                      status_color_pair, 
-                                      TextAttribute.BOLD | TextAttribute.REVERSE)
-            else:
-                button_text = f" {choice_text} "
-                self.renderer.draw_text(status_y, button_start_x, button_text, status_color_pair, status_attributes)
-            
-            button_start_x += button_widths[i] + 1  # Move to next button position
-        
-        # Now check if help text fits in the remaining space
-        # Help text needs: help_text_width + 3 (spacing) + 2 (minimum gap after buttons)
-        help_x = width - help_text_width - 3
-        if help_x > button_start_x + 2:
-            # Help text fits, draw it
-            self.renderer.draw_text(status_y, help_x, help_text, 
-                                  status_color_pair, status_attributes)
+        # Use text layout system to render all segments
+        draw_text_segments(
+            self.renderer,
+            row=status_y,
+            col=0,
+            segments=segments,
+            rendering_width=width,
+            default_color=status_color_pair,
+            default_attributes=status_attributes
+        )
 
 
 class QuickChoiceBarHelpers:
@@ -301,44 +335,43 @@ class QuickChoiceBarHelpers:
         return choices
     
     @staticmethod
-    def show_yes_no_confirmation(quick_choice_bar, message, callback, shortening_regions=None):
+    def show_yes_no_confirmation(quick_choice_bar, message, callback):
         """Show a Yes/No confirmation dialog (ESC to cancel)
         
         Args:
             quick_choice_bar: QuickChoiceBar instance
-            message: Message to display
+            message: Message to display. Can be either:
+                    - str: Plain text message
+                    - List[TextSegment]: List of text segments for advanced formatting
             callback: Function to call with result (True/False/None)
                      - True: User selected Yes
                      - False: User selected No
                      - None: User pressed ESC to cancel
-            shortening_regions: Optional list of ShorteningRegion for intelligent message shortening
         """
         choices = QuickChoiceBarHelpers.create_yes_no_choices()
-        quick_choice_bar.show(message, choices, callback, shortening_regions=shortening_regions)
+        quick_choice_bar.show(message, choices, callback)
     
     @staticmethod
-    def show_overwrite_dialog(quick_choice_bar, filename, callback, shortening_regions=None):
+    def show_overwrite_dialog(quick_choice_bar, filename, callback):
         """Show a file overwrite dialog
         
         Args:
             quick_choice_bar: QuickChoiceBar instance
             filename: Name of the file that would be overwritten
             callback: Function to call with result ("overwrite"/"skip"/"rename"/None)
-            shortening_regions: Optional list of ShorteningRegion for intelligent message shortening
         """
         message = f"File '{filename}' already exists. What do you want to do?"
         choices = QuickChoiceBarHelpers.create_overwrite_choices()
-        quick_choice_bar.show(message, choices, callback, shortening_regions=shortening_regions)
+        quick_choice_bar.show(message, choices, callback)
     
     @staticmethod
-    def show_delete_confirmation(quick_choice_bar, items, callback, shortening_regions=None):
+    def show_delete_confirmation(quick_choice_bar, items, callback):
         """Show a delete confirmation dialog
         
         Args:
             quick_choice_bar: QuickChoiceBar instance
             items: List of items to delete or count of items
             callback: Function to call with result (True/False)
-            shortening_regions: Optional list of ShorteningRegion for intelligent message shortening
         """
         if isinstance(items, (list, tuple)):
             count = len(items)
@@ -351,17 +384,16 @@ class QuickChoiceBarHelpers:
             message = f"Delete {items} selected items?"
         
         choices = QuickChoiceBarHelpers.create_delete_choices()
-        quick_choice_bar.show(message, choices, callback, shortening_regions=shortening_regions)
+        quick_choice_bar.show(message, choices, callback)
     
     @staticmethod
-    def show_error_dialog(quick_choice_bar, error_message, callback=None, shortening_regions=None):
+    def show_error_dialog(quick_choice_bar, error_message, callback=None):
         """Show an error dialog with OK button
         
         Args:
             quick_choice_bar: QuickChoiceBar instance
             error_message: Error message to display
             callback: Optional callback function
-            shortening_regions: Optional list of ShorteningRegion for intelligent message shortening
         """
         message = f"Error: {error_message}"
         choices = [{"text": "OK", "key": "o", "value": True}]
@@ -370,17 +402,16 @@ class QuickChoiceBarHelpers:
             if callback:
                 callback(result)
         
-        quick_choice_bar.show(message, choices, error_callback, shortening_regions=shortening_regions)
+        quick_choice_bar.show(message, choices, error_callback)
     
     @staticmethod
-    def show_info_dialog(quick_choice_bar, info_message, callback=None, shortening_regions=None):
+    def show_info_dialog(quick_choice_bar, info_message, callback=None):
         """Show an info dialog with OK button
         
         Args:
             quick_choice_bar: QuickChoiceBar instance
             info_message: Info message to display
             callback: Optional callback function
-            shortening_regions: Optional list of ShorteningRegion for intelligent message shortening
         """
         choices = [{"text": "OK", "key": "o", "value": True}]
         
@@ -388,4 +419,4 @@ class QuickChoiceBarHelpers:
             if callback:
                 callback(result)
         
-        quick_choice_bar.show(info_message, choices, info_callback, shortening_regions=shortening_regions)
+        quick_choice_bar.show(info_message, choices, info_callback)
