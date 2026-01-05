@@ -4232,10 +4232,13 @@ class FileManager(UILayer):
         # Use current pane's path as base directory for relative path completion
         completer = FilepathCompleter(base_directory=current_path, directories_only=True)
         
+        # Append "/" to current path so users can immediately start typing child directory name
+        initial_text = current_path if current_path.endswith(os.sep) else current_path + os.sep
+        
         # Show QuickEditBar for path input with filepath completion
         self.quick_edit_bar.show_status_line_input(
             prompt="Jump to path: ",
-            initial_text=current_path,
+            initial_text=initial_text,
             callback=on_confirm,
             cancel_callback=on_cancel,
             completer=completer
