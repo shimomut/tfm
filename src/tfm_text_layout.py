@@ -132,24 +132,6 @@ class TextSegment(ABC):
             Shortened text that fits within target_width
         """
         pass
-    
-    def get_display_width(self) -> int:
-        """
-        Calculate the display width of the text in terminal columns.
-        
-        Returns:
-            Display width accounting for wide characters
-            
-        Note:
-            TTK's get_display_width() already normalizes to NFC internally,
-            so no additional normalization is needed here.
-        """
-        try:
-            return get_display_width(self.text)
-        except Exception as e:
-            logger.error(f"get_display_width failed for text '{self.text}': {e}")
-            # Fall back to character count
-            return len(self.text)
 
 
 @dataclass
@@ -176,15 +158,6 @@ class SpacerSegment:
                 f"(must be 0-255), will use default color"
             )
             self.color_pair = None
-    
-    def get_display_width(self) -> int:
-        """
-        Spacers have zero width initially.
-        
-        Returns:
-            0 (spacers are sized during layout calculation)
-        """
-        return 0
 
 
 @dataclass
@@ -1294,7 +1267,11 @@ def draw_text_segments(
                 spacer_indices.append(idx)
             elif isinstance(segment, TextSegment):
                 # Text segments start with their full width
-                width = segment.get_display_width()
+                try:
+                    width = get_display_width(segment.text)
+                except Exception as e:
+                    logger.error(f"get_display_width failed for segment {idx}: {e}")
+                    width = len(segment.text)  # Fall back to character count
                 current_widths.append(width)
                 original_widths.append(width)
             else:
