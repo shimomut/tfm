@@ -104,8 +104,20 @@ class QuickEditBar:
                     cancel_callback()
                 return True
             
-            # Handle Enter - confirm
+            # Handle Enter - but first check if SingleLineTextEdit wants to handle it
+            # (e.g., for candidate selection in TAB completion)
             elif event.key_code == KeyCode.ENTER:
+                # Let SingleLineTextEdit handle Enter first if it has a focused candidate
+                # This allows TAB completion to intercept Enter for candidate selection
+                if hasattr(self.text_editor, 'candidate_list') and self.text_editor.candidate_list:
+                    if self.text_editor.candidate_list.has_focus():
+                        # SingleLineTextEdit will handle this Enter key for candidate selection
+                        handled = self.text_editor.handle_key(event)
+                        if handled:
+                            self.content_changed = True
+                        return handled
+                
+                # No focused candidate - handle Enter normally (confirm and close)
                 # Store callback and text before hiding
                 callback = self.callback
                 text = self.text_editor.get_text()
