@@ -1,0 +1,309 @@
+<svg viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="#1e1e1e"/>
+  
+  <!-- Title -->
+  <text x="960" y="70" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#ffffff" text-anchor="middle">
+    Task System Architecture
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="960" y="120" font-family="Arial, sans-serif" font-size="22" fill="#cccccc" text-anchor="middle">
+    State Machine Framework for Long-Running Operations with UI Interaction
+  </text>
+  
+  <!-- Base Task -->
+  <text x="100" y="180" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    Abstract Base Class
+  </text>
+  
+  <rect x="100" y="200" width="600" height="180" fill="#2d2d30" stroke="#569cd6" stroke-width="4" rx="10"/>
+  <text x="400" y="235" font-family="Arial, sans-serif" font-size="26" font-weight="bold" fill="#569cd6" text-anchor="middle">
+    BaseTask (ABC)
+  </text>
+  <text x="120" y="270" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Abstract methods: start(), cancel(), is_active(), get_state()
+  </text>
+  <text x="120" y="300" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Lifecycle hooks: on_state_enter(), on_state_exit()
+  </text>
+  <text x="120" y="330" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Holds reference to FileManager for UI interactions
+  </text>
+  <text x="120" y="360" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Provides framework for complex workflows
+  </text>
+  
+  <!-- Concrete Implementations -->
+  <text x="100" y="430" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    Concrete Task Implementations
+  </text>
+  
+  <!-- FileOperationTask -->
+  <rect x="100" y="460" width="550" height="200" fill="#2d2d30" stroke="#ce9178" stroke-width="3" rx="10"/>
+  <text x="375" y="495" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    FileOperationTask
+  </text>
+  <text x="120" y="530" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Operations: copy, move, delete
+  </text>
+  <text x="120" y="560" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Delegates UI → FileOperationUI
+  </text>
+  <text x="120" y="590" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Delegates I/O → FileOperationExecutor
+  </text>
+  <text x="120" y="620" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Manages OperationContext state
+  </text>
+  <text x="120" y="650" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Conflict resolution with rename support
+  </text>
+  
+  <!-- ArchiveOperationTask -->
+  <rect x="700" y="460" width="550" height="200" fill="#2d2d30" stroke="#ce9178" stroke-width="3" rx="10"/>
+  <text x="975" y="495" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    ArchiveOperationTask
+  </text>
+  <text x="720" y="530" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Operations: create, extract
+  </text>
+  <text x="720" y="560" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Delegates UI → ArchiveOperationUI
+  </text>
+  <text x="720" y="590" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Delegates I/O → ArchiveOperationExecutor
+  </text>
+  <text x="720" y="620" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Manages ArchiveOperationContext
+  </text>
+  <text x="720" y="650" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Format support: tar, tar.gz, zip, etc.
+  </text>
+  
+  <!-- State Machine -->
+  <text x="100" y="710" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    State Machine (6 States)
+  </text>
+  
+  <!-- States -->
+  <rect x="100" y="740" width="180" height="100" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="8"/>
+  <text x="190" y="770" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    IDLE
+  </text>
+  <text x="190" y="800" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    No operation
+  </text>
+  <text x="190" y="825" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    in progress
+  </text>
+  
+  <rect x="320" y="740" width="180" height="100" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="8"/>
+  <text x="410" y="770" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    CONFIRMING
+  </text>
+  <text x="410" y="800" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    Waiting for user
+  </text>
+  <text x="410" y="825" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    confirmation
+  </text>
+  
+  <rect x="540" y="740" width="200" height="100" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="8"/>
+  <text x="640" y="770" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    CHECKING_CONFLICTS
+  </text>
+  <text x="640" y="800" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    Detecting file
+  </text>
+  <text x="640" y="825" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    conflicts
+  </text>
+  
+  <rect x="780" y="740" width="200" height="100" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="8"/>
+  <text x="880" y="770" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    RESOLVING_CONFLICT
+  </text>
+  <text x="880" y="800" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    User resolving
+  </text>
+  <text x="880" y="825" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    conflicts
+  </text>
+  
+  <rect x="1020" y="740" width="180" height="100" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="8"/>
+  <text x="1110" y="770" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    EXECUTING
+  </text>
+  <text x="1110" y="800" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    Background
+  </text>
+  <text x="1110" y="825" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    thread running
+  </text>
+  
+  <rect x="1240" y="740" width="180" height="100" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="8"/>
+  <text x="1330" y="770" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    COMPLETED
+  </text>
+  <text x="1330" y="800" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    Operation
+  </text>
+  <text x="1330" y="825" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4" text-anchor="middle">
+    finished
+  </text>
+  
+  <!-- State transitions arrows -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#dcdcaa"/>
+    </marker>
+  </defs>
+  
+  <line x1="280" y1="790" x2="320" y2="790" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="500" y1="790" x2="540" y2="790" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="740" y1="790" x2="780" y2="790" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="980" y1="790" x2="1020" y2="790" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1200" y1="790" x2="1240" y2="790" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  
+  <!-- Back to IDLE -->
+  <path d="M 1330 840 Q 1330 900, 190 900 Q 190 860, 190 840" stroke="#dcdcaa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  
+  <!-- Context Data Structures -->
+  <text x="100" y="950" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    Operation Context (State Container)
+  </text>
+  
+  <!-- OperationContext -->
+  <rect x="100" y="980" width="550" height="180" fill="#2d2d30" stroke="#c586c0" stroke-width="2" rx="8"/>
+  <text x="375" y="1010" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#c586c0" text-anchor="middle">
+    OperationContext
+  </text>
+  <text x="120" y="1040" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • operation_type, files, destination
+  </text>
+  <text x="120" y="1065" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • conflicts: List[Tuple[source, dest]]
+  </text>
+  <text x="120" y="1090" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • results: {success, skipped, errors}
+  </text>
+  <text x="120" y="1115" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • options: {overwrite_all, skip_all, rename_all}
+  </text>
+  <text x="120" y="1140" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • current_conflict_index: int
+  </text>
+  
+  <!-- ArchiveOperationContext -->
+  <rect x="700" y="980" width="550" height="180" fill="#2d2d30" stroke="#c586c0" stroke-width="2" rx="8"/>
+  <text x="975" y="1010" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#c586c0" text-anchor="middle">
+    ArchiveOperationContext
+  </text>
+  <text x="720" y="1040" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • operation_type, source_paths, destination
+  </text>
+  <text x="720" y="1065" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • format_type: str (tar.gz, zip, etc.)
+  </text>
+  <text x="720" y="1090" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • conflicts: List[ConflictInfo]
+  </text>
+  <text x="720" y="1115" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • results: {success, skipped, errors}
+  </text>
+  <text x="720" y="1140" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • options: {overwrite_all, skip_all}
+  </text>
+  
+  <!-- Delegation Architecture -->
+  <text x="1300" y="180" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    Delegation Pattern
+  </text>
+  
+  <rect x="1300" y="200" width="520" height="280" fill="#2d2d30" stroke="#4fc1ff" stroke-width="3" rx="10"/>
+  <text x="1560" y="235" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4fc1ff" text-anchor="middle">
+    Task Responsibilities
+  </text>
+  
+  <text x="1320" y="270" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#569cd6">
+    Task (State Machine Logic)
+  </text>
+  <text x="1340" y="295" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • State transitions
+  </text>
+  <text x="1340" y="320" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Workflow coordination
+  </text>
+  
+  <text x="1320" y="355" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ce9178">
+    UI Component
+  </text>
+  <text x="1340" y="380" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Confirmation dialogs
+  </text>
+  <text x="1340" y="405" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Conflict resolution dialogs
+  </text>
+  <text x="1340" y="430" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Rename dialogs
+  </text>
+  
+  <text x="1320" y="465" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#dcdcaa">
+    Executor Component
+  </text>
+  <text x="1340" y="490" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Background thread execution
+  </text>
+  <text x="1340" y="515" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • File I/O operations
+  </text>
+  <text x="1340" y="540" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Progress tracking
+  </text>
+  <text x="1340" y="565" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Error handling
+  </text>
+  
+  <!-- Key Features -->
+  <rect x="1300" y="520" width="520" height="200" fill="#2d2d30" stroke="#4fc1ff" stroke-width="3" rx="10"/>
+  <text x="1560" y="555" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4fc1ff" text-anchor="middle">
+    Key Features
+  </text>
+  <text x="1320" y="590" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Conflict Detection: Checks for existing files
+  </text>
+  <text x="1320" y="620" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Conflict Resolution: Overwrite/Skip/Rename
+  </text>
+  <text x="1320" y="650" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Apply-to-All: Batch conflict handling
+  </text>
+  <text x="1320" y="680" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Cancellation: ESC key support
+  </text>
+  <text x="1320" y="710" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Progress Tracking: Real-time updates
+  </text>
+  
+  <!-- FileManager Integration -->
+  <rect x="1300" y="760" width="520" height="140" fill="#2d2d30" stroke="#4fc1ff" stroke-width="3" rx="10"/>
+  <text x="1560" y="795" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4fc1ff" text-anchor="middle">
+    FileManager Integration
+  </text>
+  <text x="1320" y="830" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • start_task(task) - Begin task execution
+  </text>
+  <text x="1320" y="860" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • _clear_task() - Clean up after completion
+  </text>
+  <text x="1320" y="890" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • operation_in_progress flag management
+  </text>
+  
+  <!-- Inheritance arrow -->
+  <line x1="375" y1="380" x2="375" y2="460" stroke="#569cd6" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="975" y1="380" x2="975" y2="460" stroke="#569cd6" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="300" y="425" font-family="Arial, sans-serif" font-size="16" fill="#569cd6">inherits</text>
+  <text x="900" y="425" font-family="Arial, sans-serif" font-size="16" fill="#569cd6">inherits</text>
+</svg>
