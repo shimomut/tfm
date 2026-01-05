@@ -6,7 +6,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
 
 ## Tasks
 
-- [ ] 1. Create completer interface and filepath implementation
+- [x] 1. Create completer interface and filepath implementation
   - Create `Completer` protocol in `src/tfm_single_line_text_edit.py`
   - Implement `FilepathCompleter` class with `get_candidates()` and `get_completion_start_pos()` methods
   - Handle directory parsing, file listing, and candidate formatting
@@ -30,7 +30,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Test permission errors and empty directories
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 2. Implement common prefix calculation utility
+- [x] 2. Implement common prefix calculation utility
   - Create `calculate_common_prefix()` function in `src/tfm_single_line_text_edit.py`
   - Handle empty lists, single-element lists, and multiple candidates
   - Use case-sensitive string comparison
@@ -45,7 +45,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Test case-sensitive behavior
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 3. Create CandidateListOverlay class
+- [x] 3. Create CandidateListOverlay class
   - Create `CandidateListOverlay` class in new file `src/tfm_candidate_list_overlay.py`
   - Implement `__init__()`, `set_candidates()`, `show()`, `hide()`, `draw()` methods
   - Calculate positioning (above/below text edit field)
@@ -81,10 +81,10 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Test colors, borders, and visual attributes
   - _Requirements: 6.2, 6.5_
 
-- [ ] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Extend SingleLineTextEdit with TAB completion
+- [x] 5. Extend SingleLineTextEdit with TAB completion
   - Add `completer` parameter to `__init__()`
   - Create `CandidateListOverlay` instance if completer provided
   - Add `completion_active` state tracking
@@ -95,7 +95,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Test with and without completer
   - _Requirements: 4.1, 4.2_
 
-- [ ] 6. Implement handle_tab_completion() method
+- [x] 6. Implement handle_tab_completion() method
   - Get candidates from completer
   - Calculate common prefix
   - Determine completion start position
@@ -114,7 +114,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Test common prefix equals current input
   - _Requirements: 1.3, 1.4_
 
-- [ ] 7. Implement update_candidate_list() method
+- [x] 7. Implement update_candidate_list() method
   - Get current candidates from completer
   - Update candidate list overlay with new candidates
   - Hide candidate list if no candidates
@@ -133,7 +133,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Test zero candidates hide the list
   - _Requirements: 2.5_
 
-- [ ] 8. Update handle_key() method for TAB and ESC
+- [x] 8. Update handle_key() method for TAB and ESC
   - Check for TAB key press and call `handle_tab_completion()`
   - Check for ESC key press and hide candidate list
   - Update candidate list after text modifications
@@ -156,13 +156,13 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Test ESC hides candidate list
   - _Requirements: 5.4_
 
-- [ ] 9. Update draw() method to render candidate list
+- [x] 9. Update draw() method to render candidate list
   - Call existing draw logic for text field
   - Call `candidate_list.draw()` if visible
   - Pass correct positioning information
   - _Requirements: 2.1, 6.1, 6.2, 6.3, 6.4, 6.5, 6.7_
 
-- [ ] 10. Add focus handling for candidate list
+- [x] 10. Add focus handling for candidate list
   - Hide candidate list when text field loses focus
   - Ensure candidate list doesn't auto-appear on focus gain
   - _Requirements: 8.3, 8.4_
@@ -172,7 +172,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Test focus gain doesn't show list
   - _Requirements: 8.3, 8.4_
 
-- [ ] 11. Add error handling for filesystem operations
+- [x] 11. Add error handling for filesystem operations
   - Catch and handle PermissionError, FileNotFoundError
   - Return empty candidate list on errors
   - Add logging for debugging
@@ -183,7 +183,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Verify empty candidate list returned
   - _Requirements: 3.1_
 
-- [ ] 12. Final checkpoint - Ensure all tests pass
+- [x] 12. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
