@@ -291,13 +291,13 @@ class TextSegment(ABC):
         priority: Shortening priority (higher values shortened first, default 0)
         min_length: Minimum characters to preserve when shortening (default 0)
         color_pair: Terminal color pair number, None uses default (default None)
-        attributes: Terminal text attributes (bold, underline, etc.), None uses default (default 0)
+        attributes: Terminal text attributes (bold, underline, etc.), None uses default (default None)
     """
     text: str
     priority: int = 0
     min_length: int = 0
     color_pair: Optional[int] = None
-    attributes: int = 0
+    attributes: Optional[int] = None
     
     @abstractmethod
     def shorten(self, target_width: int) -> str:
@@ -341,10 +341,10 @@ class SpacerSegment:
     
     Attributes:
         color_pair: Terminal color pair number, None uses default (default None)
-        attributes: Terminal text attributes, None uses default (default 0)
+        attributes: Terminal text attributes, None uses default (default None)
     """
     color_pair: Optional[int] = None
-    attributes: int = 0
+    attributes: Optional[int] = None
     
     def __post_init__(self):
         """Validate segment configuration after initialization."""
@@ -1368,9 +1368,9 @@ def render_segments(
         
         # Determine attributes to use
         if isinstance(segment, SpacerSegment):
-            attributes = segment.attributes if segment.attributes != 0 else context.default_attributes
+            attributes = segment.attributes if segment.attributes is not None else context.default_attributes
         else:
-            attributes = segment.attributes if segment.attributes != 0 else context.default_attributes
+            attributes = segment.attributes if segment.attributes is not None else context.default_attributes
         
         # Validate color pair
         if color_pair < 0 or color_pair > 255:

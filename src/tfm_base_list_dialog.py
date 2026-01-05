@@ -407,25 +407,23 @@ class BaseListDialog:
                 # Get segments from format function
                 segments = format_item_func(item)
                 
-                # Add selection indicator as first segment
+                # Determine default attributes based on selection
                 if is_selected:
-                    indicator_segment = AsIsSegment("► ", attributes=TextAttribute.BOLD | TextAttribute.REVERSE)
-                    item_attributes = TextAttribute.BOLD | TextAttribute.REVERSE
+                    indicator_text = "► "
+                    default_attributes = TextAttribute.BOLD | TextAttribute.REVERSE
                 else:
-                    indicator_segment = AsIsSegment("  ", attributes=TextAttribute.NORMAL)
-                    item_attributes = TextAttribute.NORMAL
+                    indicator_text = "  "
+                    default_attributes = TextAttribute.NORMAL
                 
-                # Apply selection attributes to all segments
-                for segment in segments:
-                    if segment.attributes == 0:  # Only override if not explicitly set
-                        segment.attributes = item_attributes
-                    if segment.color_pair is None:  # Only override if not explicitly set
-                        segment.color_pair = status_color_pair
+                # Add selection indicator as first segment
+                # Use AsIsSegment without explicit attributes to let defaults apply
+                indicator_segment = AsIsSegment(indicator_text)
                 
                 # Combine indicator with item segments
                 all_segments = [indicator_segment] + segments
                 
-                # Use text layout system to render
+                # Use text layout system to render with default attributes
+                # Segments without explicit color/attributes will use these defaults
                 draw_text_segments(
                     self.renderer,
                     row=y,
@@ -433,7 +431,7 @@ class BaseListDialog:
                     segments=all_segments,
                     rendering_width=content_width,
                     default_color=status_color_pair,
-                    default_attributes=item_attributes
+                    default_attributes=default_attributes
                 )
                 
     def draw_scrollbar(self, items_list, start_y, content_height, scrollbar_x):
