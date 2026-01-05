@@ -74,47 +74,8 @@ logger = getLogger("TextLayout")
 # ============================================================================
 # Wide Character Support Utilities
 # ============================================================================
-
-def truncate_at_width(text: str, target_width: int) -> str:
-    """
-    Truncate text to fit within target_width columns, respecting wide character boundaries.
-    
-    This is a convenience wrapper around TTK's truncate_to_width that adds error
-    handling and logging. It ensures wide characters are never split in half.
-    
-    Note: This function does NOT add an ellipsis. Use the segment classes for
-    ellipsis handling.
-    
-    Args:
-        text: Text to truncate (should be NFC-normalized)
-        target_width: Target display width in terminal columns
-        
-    Returns:
-        Truncated text that fits within target_width, or original text if truncation fails
-        
-    Example:
-        >>> truncate_at_width("hello world", 5)
-        'hello'
-        >>> truncate_at_width("你好世界", 4)
-        '你好'  # Two wide characters = 4 columns
-        >>> truncate_at_width("hello世界", 6)
-        'hello'  # Can't fit the wide character, so exclude it
-    """
-    try:
-        if target_width <= 0:
-            return ""
-        
-        current_width = get_display_width(text)
-        if current_width <= target_width:
-            return text
-        
-        # Use TTK's truncate_to_width with empty ellipsis to get pure truncation
-        return truncate_to_width(text, target_width, ellipsis="")
-        
-    except Exception as e:
-        logger.error(f"Text truncation failed: {e}")
-        # Fall back to simple character truncation
-        return text[:target_width] if target_width > 0 else ""
+# Note: We use TTK's truncate_to_width() directly with ellipsis="" for pure truncation.
+# No wrapper needed - TTK handles all edge cases correctly.
 
 
 @dataclass
@@ -307,9 +268,8 @@ class AbbreviationSegment(TextSegment):
                 return normalized_text[0] if len(normalized_text) > 0 else ""
             
             # If text is shorter than ellipsis, just truncate
-            # truncate_at_width normalizes internally
             if target_width < ellipsis_width:
-                return truncate_at_width(self.text, target_width)
+                return truncate_to_width(self.text, target_width, ellipsis="")
             
             # Validate abbrev_position (should have been validated in __post_init__, but double-check)
             position = self.abbrev_position
@@ -325,8 +285,7 @@ class AbbreviationSegment(TextSegment):
             
             if position == 'right':
                 # Keep left portion, ellipsis at end
-                # truncate_at_width normalizes internally, but we already normalized
-                left_part = truncate_at_width(normalized_text, available_width)
+                left_part = truncate_to_width(normalized_text, available_width, ellipsis="")
                 return left_part + ellipsis
             
             elif position == 'left':
@@ -340,15 +299,15 @@ class AbbreviationSegment(TextSegment):
                 left_width = available_width // 2
                 right_width = available_width - left_width
                 
-                left_part = truncate_at_width(normalized_text, left_width)
+                left_part = truncate_to_width(normalized_text, left_width, ellipsis="")
                 right_part = self._truncate_from_right(normalized_text, right_width)
                 return left_part + ellipsis + right_part
                 
         except Exception as e:
             logger.error(f"AbbreviationSegment.shorten failed for text '{self.text}': {e}")
-            # Fall back to simple truncation (truncate_at_width normalizes internally)
+            # Fall back to simple truncation
             try:
-                return truncate_at_width(self.text, target_width)
+                return truncate_to_width(self.text, target_width, ellipsis="")
             except Exception as e2:
                 logger.error(f"Fallback truncation also failed: {e2}")
                 # Last resort: return original text or empty string
@@ -552,7 +511,7 @@ class FilepathSegment(TextSegment):
             # Fall back to simple truncation
             try:
                 normalized_text = self.text
-                return truncate_at_width(normalized_text, target_width)
+                return truncate_to_width(normalized_text, target_width, ellipsis="")
             except Exception as e2:
                 logger.error(f"Fallback truncation also failed: {e2}")
                 # Last resort: return original text or empty string
@@ -582,7 +541,7 @@ class FilepathSegment(TextSegment):
             ellipsis_width = get_display_width(ellipsis)
             
             if target_width < ellipsis_width:
-                return truncate_at_width(filename, target_width)
+                return truncate_to_width(filename, target_width, ellipsis="")
             
             # Validate abbrev_position (should have been validated in __post_init__, but double-check)
             position = self.abbrev_position
@@ -593,7 +552,7 @@ class FilepathSegment(TextSegment):
             available_width = target_width - ellipsis_width
             
             if position == 'right':
-                left_part = truncate_at_width(filename, available_width)
+                left_part = truncate_to_width(filename, available_width, ellipsis="")
                 return left_part + ellipsis
             
             elif position == 'left':
@@ -604,7 +563,7 @@ class FilepathSegment(TextSegment):
                 left_width = available_width // 2
                 right_width = available_width - left_width
                 
-                left_part = truncate_at_width(filename, left_width)
+                left_part = truncate_to_width(filename, left_width, ellipsis="")
                 right_part = self._truncate_from_right(filename, right_width)
                 return left_part + ellipsis + right_part
                 
@@ -612,7 +571,7 @@ class FilepathSegment(TextSegment):
             logger.error(f"_abbreviate_filename failed for '{filename}': {e}")
             # Fall back to simple truncation
             try:
-                return truncate_at_width(filename, target_width)
+                return truncate_to_width(filename, target_width, ellipsis="")
             except Exception as e2:
                 logger.error(f"Fallback truncation also failed: {e2}")
                 return filename if target_width > 0 else ""
