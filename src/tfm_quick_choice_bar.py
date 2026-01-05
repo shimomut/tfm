@@ -206,9 +206,6 @@ class QuickChoiceBar:
             if i < len(self.choices) - 1:
                 segments.append(AsIsSegment(" "))
         
-        # Add space before help text
-        segments.append(AsIsSegment(" "))
-        
         # Generate help text based on available quick keys
         quick_keys = []
         for choice in self.choices:
@@ -223,9 +220,10 @@ class QuickChoiceBar:
         help_parts.append("ESC:cancel")
         help_text = " ".join(help_parts)
         
-        # Add help text segment with all-or-nothing strategy (shown in full or not at all)
+        # Add help text segment with whitespace included (all-or-nothing strategy)
+        # Include leading and trailing spaces so they disappear with the help text
         segments.append(AllOrNothingSegment(
-            help_text,
+            "  " + help_text,
             priority=1  # Higher priority, removed before message
         ))
         
