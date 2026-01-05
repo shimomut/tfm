@@ -1,0 +1,268 @@
+<svg viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="#1e1e1e"/>
+  
+  <!-- Title -->
+  <text x="960" y="70" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#ffffff" text-anchor="middle">
+    Text Layout System Architecture
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="960" y="120" font-family="Arial, sans-serif" font-size="22" fill="#cccccc" text-anchor="middle">
+    Priority-Based Intelligent Width Management with Wide Character Support
+  </text>
+  
+  <!-- Main API -->
+  <text x="100" y="180" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    Main API
+  </text>
+  
+  <rect x="100" y="200" width="700" height="120" fill="#2d2d30" stroke="#569cd6" stroke-width="4" rx="10"/>
+  <text x="450" y="235" font-family="Arial, sans-serif" font-size="26" font-weight="bold" fill="#569cd6" text-anchor="middle">
+    draw_text_segments()
+  </text>
+  <text x="120" y="270" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Entry point for layout &amp; rendering pipeline
+  </text>
+  <text x="120" y="295" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Validates inputs, creates layout state, executes phases
+  </text>
+  
+  <!-- Segment Types -->
+  <text x="100" y="370" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    Segment Types
+  </text>
+  
+  <!-- AbbreviationSegment -->
+  <rect x="100" y="400" width="280" height="160" fill="#2d2d30" stroke="#c586c0" stroke-width="2" rx="8"/>
+  <text x="240" y="430" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#c586c0" text-anchor="middle">
+    AbbreviationSegment
+  </text>
+  <text x="120" y="460" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Shortens with ellipsis
+  </text>
+  <text x="120" y="485" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Position: left/middle/right
+  </text>
+  <text x="120" y="510" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Priority-based
+  </text>
+  <text x="120" y="535" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Respects min_length
+  </text>
+  
+  <!-- FilepathSegment -->
+  <rect x="420" y="400" width="280" height="160" fill="#2d2d30" stroke="#c586c0" stroke-width="2" rx="8"/>
+  <text x="560" y="430" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#c586c0" text-anchor="middle">
+    FilepathSegment
+  </text>
+  <text x="440" y="460" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Intelligent path shortening
+  </text>
+  <text x="440" y="485" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Removes directory levels
+  </text>
+  <text x="440" y="510" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Preserves filename
+  </text>
+  <text x="440" y="535" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Example: /a/b/c → …/c
+  </text>
+  
+  <!-- AllOrNothingSegment -->
+  <rect x="740" y="400" width="280" height="160" fill="#2d2d30" stroke="#c586c0" stroke-width="2" rx="8"/>
+  <text x="880" y="430" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#c586c0" text-anchor="middle">
+    AllOrNothingSegment
+  </text>
+  <text x="760" y="460" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Full text or nothing
+  </text>
+  <text x="760" y="485" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • No partial shortening
+  </text>
+  <text x="760" y="510" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Returns "" if too wide
+  </text>
+  
+  <!-- AsIsSegment -->
+  <rect x="1060" y="400" width="280" height="160" fill="#2d2d30" stroke="#c586c0" stroke-width="2" rx="8"/>
+  <text x="1200" y="430" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#c586c0" text-anchor="middle">
+    AsIsSegment
+  </text>
+  <text x="1080" y="460" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Never shortens
+  </text>
+  <text x="1080" y="485" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Always original text
+  </text>
+  <text x="1080" y="510" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Ignores width constraints
+  </text>
+  
+  <!-- SpacerSegment -->
+  <rect x="1380" y="400" width="280" height="160" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="8"/>
+  <text x="1520" y="430" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    SpacerSegment
+  </text>
+  <text x="1400" y="460" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Expandable whitespace
+  </text>
+  <text x="1400" y="485" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Collapses when needed
+  </text>
+  <text x="1400" y="510" font-family="Arial, sans-serif" font-size="16" fill="#d4d4d4">
+    • Expands to fill space
+  </text>
+  
+  <!-- Layout Calculation Pipeline -->
+  <text x="100" y="610" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    Layout Calculation Pipeline (4 Phases)
+  </text>
+  
+  <!-- Phase 1 -->
+  <rect x="100" y="640" width="400" height="140" fill="#2d2d30" stroke="#ce9178" stroke-width="3" rx="10"/>
+  <text x="300" y="670" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    Phase 1: Collapse Spacers
+  </text>
+  <text x="120" y="705" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • If total_width &gt; target_width
+  </text>
+  <text x="120" y="730" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Set all spacer widths to 0
+  </text>
+  <text x="120" y="755" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Maximize space for text
+  </text>
+  
+  <!-- Phase 2 -->
+  <rect x="540" y="640" width="400" height="140" fill="#2d2d30" stroke="#ce9178" stroke-width="3" rx="10"/>
+  <text x="740" y="670" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    Phase 2: Shorten by Priority
+  </text>
+  <text x="560" y="705" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Sort segments by priority (desc)
+  </text>
+  <text x="560" y="730" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Shorten high priority first
+  </text>
+  <text x="560" y="755" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Respect min_length constraints
+  </text>
+  
+  <!-- Phase 3 -->
+  <rect x="980" y="640" width="400" height="140" fill="#2d2d30" stroke="#ce9178" stroke-width="3" rx="10"/>
+  <text x="1180" y="670" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    Phase 3: Restore Segments
+  </text>
+  <text x="1000" y="705" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • If total_width &lt; target_width
+  </text>
+  <text x="1000" y="730" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Restore low priority first
+  </text>
+  <text x="1000" y="755" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Reverse priority order
+  </text>
+  
+  <!-- Phase 4 -->
+  <rect x="1420" y="640" width="400" height="140" fill="#2d2d30" stroke="#ce9178" stroke-width="3" rx="10"/>
+  <text x="1620" y="670" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    Phase 4: Expand Spacers
+  </text>
+  <text x="1440" y="705" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • If extra space available
+  </text>
+  <text x="1440" y="730" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Distribute among spacers
+  </text>
+  <text x="1440" y="755" font-family="Arial, sans-serif" font-size="17" fill="#d4d4d4">
+    • Fill to target_width
+  </text>
+  
+  <!-- State Management -->
+  <text x="100" y="830" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#4ec9b0">
+    State Management
+  </text>
+  
+  <!-- LayoutState -->
+  <rect x="100" y="860" width="500" height="180" fill="#2d2d30" stroke="#4fc1ff" stroke-width="3" rx="10"/>
+  <text x="350" y="895" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4fc1ff" text-anchor="middle">
+    LayoutState
+  </text>
+  <text x="120" y="930" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • segments: List[TextSegment | SpacerSegment]
+  </text>
+  <text x="120" y="960" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • current_widths, original_widths: List[int]
+  </text>
+  <text x="120" y="990" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • total_width, target_width: int
+  </text>
+  <text x="120" y="1020" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • spacer_indices: List[int]
+  </text>
+  
+  <!-- RenderContext -->
+  <rect x="660" y="860" width="500" height="180" fill="#2d2d30" stroke="#4fc1ff" stroke-width="3" rx="10"/>
+  <text x="910" y="895" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4fc1ff" text-anchor="middle">
+    RenderContext
+  </text>
+  <text x="680" y="930" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • renderer: TTK Renderer instance
+  </text>
+  <text x="680" y="960" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • row, current_col: int (position)
+  </text>
+  <text x="680" y="990" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • default_color, default_attributes: int
+  </text>
+  <text x="680" y="1020" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Updated as segments render
+  </text>
+  
+  <!-- Wide Character Support -->
+  <rect x="1220" y="860" width="600" height="180" fill="#2d2d30" stroke="#dcdcaa" stroke-width="3" rx="10"/>
+  <text x="1520" y="895" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Wide Character Support (TTK)
+  </text>
+  <text x="1240" y="930" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • get_display_width() - Accurate column width
+  </text>
+  <text x="1240" y="960" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • truncate_to_width() - Safe truncation
+  </text>
+  <text x="1240" y="990" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • Handles CJK, emoji (2 columns each)
+  </text>
+  <text x="1240" y="1020" font-family="Arial, sans-serif" font-size="18" fill="#d4d4d4">
+    • NFC normalization for macOS compatibility
+  </text>
+  
+  <!-- Flow arrows -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#569cd6"/>
+    </marker>
+  </defs>
+  
+  <!-- API to Phase 1 -->
+  <line x1="450" y1="320" x2="300" y2="640" stroke="#569cd6" stroke-width="3" marker-end="url(#arrow)"/>
+  
+  <!-- Phase 1 to Phase 2 -->
+  <line x1="500" y1="710" x2="540" y2="710" stroke="#ce9178" stroke-width="3" marker-end="url(#arrow)"/>
+  
+  <!-- Phase 2 to Phase 3 -->
+  <line x1="940" y1="710" x2="980" y2="710" stroke="#ce9178" stroke-width="3" marker-end="url(#arrow)"/>
+  
+  <!-- Phase 3 to Phase 4 -->
+  <line x1="1380" y1="710" x2="1420" y2="710" stroke="#ce9178" stroke-width="3" marker-end="url(#arrow)"/>
+  
+  <!-- Phase 4 to Rendering -->
+  <line x1="1620" y1="780" x2="910" y2="860" stroke="#569cd6" stroke-width="3" marker-end="url(#arrow)"/>
+  
+  <!-- LayoutState to Phases -->
+  <line x1="350" y1="860" x2="300" y2="780" stroke="#4fc1ff" stroke-width="2" stroke-dasharray="5,5"/>
+  
+  <!-- Wide char to segments -->
+  <line x1="1520" y1="860" x2="1200" y2="560" stroke="#dcdcaa" stroke-width="2" stroke-dasharray="5,5"/>
+</svg>
