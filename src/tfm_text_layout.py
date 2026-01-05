@@ -615,22 +615,41 @@ class FilepathSegment(TextSegment):
             filename = components[-1]
             directories = components[:-1]
             
-            # Try progressively removing directories
-            while len(directories) > 0:
-                # Build path with ellipsis for removed directories
-                if len(directories) == len(components) - 1:
-                    # First removal, just use ellipsis
-                    abbreviated_path = ellipsis + separator + filename
-                else:
-                    # Keep some directories, add ellipsis
-                    abbreviated_path = ellipsis + separator + filename
-                
-                path_width = calculate_display_width(abbreviated_path)
+            # Strategy: Keep directories from both ends, remove from middle
+            # This matches the legacy FilepathStrategy behavior
+            num_dirs = len(directories)
+            
+            # First try: keep all directories (no ellipsis)
+            if num_dirs > 0:
+                test_path = separator.join(directories) + separator + filename
+                path_width = calculate_display_width(test_path)
                 if path_width <= target_width:
-                    return abbreviated_path
+                    return test_path
+            
+            # Try removing directories from the middle, one at a time
+            # Start by removing the directory closest to the middle
+            for num_to_remove in range(1, num_dirs):
+                # Calculate which directories to remove (from middle)
+                num_to_keep = num_dirs - num_to_remove
                 
-                # Remove one directory and try again
-                directories.pop(0)
+                # Split kept directories between start and end
+                # Prefer balanced distribution
+                keep_from_start = (num_to_keep + 1) // 2  # Round up for start
+                keep_from_end = num_to_keep - keep_from_start
+                
+                # Build path with ellipsis in middle
+                start_dirs = directories[:keep_from_start] if keep_from_start > 0 else []
+                end_dirs = directories[-keep_from_end:] if keep_from_end > 0 else []
+                
+                if start_dirs or end_dirs:
+                    path_parts = start_dirs + [ellipsis] + end_dirs + [filename]
+                else:
+                    path_parts = [ellipsis, filename]
+                
+                test_path = separator.join(path_parts)
+                path_width = calculate_display_width(test_path)
+                if path_width <= target_width:
+                    return test_path
             
             # All directories removed, just ellipsis + separator + filename
             abbreviated_path = ellipsis + separator + filename
