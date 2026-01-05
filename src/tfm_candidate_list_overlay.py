@@ -127,13 +127,15 @@ class CandidateListOverlay:
                 overlay_y = height - overlay_height
         
         # Calculate overlay X position (aligned with completion start)
-        overlay_x = self.completion_start_x
-        # Ensure it doesn't go off right edge of screen
-        if overlay_x + overlay_width > width:
-            overlay_x = width - overlay_width
+        # Shift left by 2 to account for left border (1) and left padding (1)
+        # This aligns the candidate text with the text being edited
+        overlay_x = self.completion_start_x - 2
         # Ensure it doesn't go off left edge
         if overlay_x < 0:
             overlay_x = 0
+        # Ensure it doesn't go off right edge of screen
+        if overlay_x + overlay_width > width:
+            overlay_x = width - overlay_width
         
         # Get color and attributes for overlay
         color_pair, attributes = get_status_color()
