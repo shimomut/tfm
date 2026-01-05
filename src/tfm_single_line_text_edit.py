@@ -126,15 +126,18 @@ class Completer(Protocol):
 class FilepathCompleter:
     """Completer for filesystem paths"""
     
-    def __init__(self, base_directory: Optional[str] = None):
+    def __init__(self, base_directory: Optional[str] = None, directories_only: bool = False):
         """
         Initialize filepath completer.
         
         Args:
             base_directory: Base directory for relative path completion.
                           If None, uses current working directory.
+            directories_only: If True, only show directories in completion candidates.
+                            If False, show both files and directories.
         """
         self.base_directory = base_directory or os.getcwd()
+        self.directories_only = directories_only
         self.logger = getLogger("FilepathComp")
     
     def get_candidates(self, text: str, cursor_pos: int) -> List[str]:
@@ -198,8 +201,15 @@ class FilepathCompleter:
                     # Get full path to check if it's a directory
                     full_path = os.path.join(directory, entry)
                     
+                    # Check if it's a directory
+                    is_directory = os.path.isdir(full_path)
+                    
+                    # Skip files if directories_only mode is enabled
+                    if self.directories_only and not is_directory:
+                        continue
+                    
                     # Add trailing separator for directories
-                    if os.path.isdir(full_path):
+                    if is_directory:
                         candidates.append(entry + os.sep)
                     else:
                         candidates.append(entry)

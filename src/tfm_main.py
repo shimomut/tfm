@@ -4219,8 +4219,8 @@ class FileManager(UILayer):
             """Handle cancellation"""
             pass
         
-        # Create filepath completer for TAB completion
-        completer = FilepathCompleter()
+        # Create filepath completer for TAB completion (directories only)
+        completer = FilepathCompleter(directories_only=True)
         
         # Show QuickEditBar for path input with filepath completion
         self.quick_edit_bar.show_status_line_input(
