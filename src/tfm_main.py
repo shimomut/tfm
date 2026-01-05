@@ -4167,6 +4167,8 @@ class FileManager(UILayer):
 
     def enter_jump_to_path_mode(self):
         """Enter jump to path mode using QuickEditBar"""
+        from tfm_single_line_text_edit import FilepathCompleter
+        
         current_pane = self.get_current_pane()
         current_path = str(current_pane['path'])
         
@@ -4217,12 +4219,16 @@ class FileManager(UILayer):
             """Handle cancellation"""
             pass
         
-        # Show QuickEditBar for path input
+        # Create filepath completer for TAB completion
+        completer = FilepathCompleter()
+        
+        # Show QuickEditBar for path input with filepath completion
         self.quick_edit_bar.show_status_line_input(
             prompt="Jump to path: ",
             initial_text=current_path,
             callback=on_confirm,
-            cancel_callback=on_cancel
+            cancel_callback=on_cancel,
+            completer=completer
         )
         self.mark_dirty()
     

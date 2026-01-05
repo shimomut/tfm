@@ -36,7 +36,7 @@ class QuickEditBar:
         self.callback = None
         self.cancel_callback = None
         
-    def show_status_line_input(self, prompt, initial_text="", callback=None, cancel_callback=None):
+    def show_status_line_input(self, prompt, initial_text="", callback=None, cancel_callback=None, completer=None):
         """
         Show a status line input dialog
         
@@ -45,6 +45,7 @@ class QuickEditBar:
             initial_text (str): Initial text in the input field
             callback (callable): Function to call when Enter is pressed
             cancel_callback (callable): Function to call when ESC is pressed
+            completer (Completer): Optional completer for TAB completion
         """
         self.is_active = True
         self.prompt_text = prompt
@@ -52,6 +53,8 @@ class QuickEditBar:
         self.cancel_callback = cancel_callback
         self.content_changed = True  # Mark content as changed when showing
         
+        # Create new text editor with optional completer
+        self.text_editor = SingleLineTextEdit(renderer=self.renderer, completer=completer)
         self.text_editor.set_text(initial_text)
         self.text_editor.set_cursor_pos(len(initial_text))
     
