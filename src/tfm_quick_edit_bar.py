@@ -12,11 +12,6 @@ from ttk.wide_char_utils import get_display_width, get_safe_functions
 
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
-from tfm_text_layout import (
-    draw_text_segments, AbbreviationSegment, AsIsSegment, AllOrNothingSegment, 
-    TextSegment, calculate_display_width
-)
-from typing import Union, List
 
 
 class QuickEditBar:
@@ -46,9 +41,7 @@ class QuickEditBar:
         Show a status line input dialog
         
         Args:
-            prompt: The prompt text to display. Can be either:
-                   - str: Plain text prompt (will be converted to AbbreviationSegment)
-                   - List[TextSegment]: List of text segments for advanced formatting
+            prompt (str): The prompt text to display
             initial_text (str): Initial text in the input field
             callback (callable): Function to call when Enter is pressed
             cancel_callback (callable): Function to call when ESC is pressed
@@ -148,6 +141,10 @@ class QuickEditBar:
         height, width = self.renderer.get_dimensions()
         status_y = height - 1
         
+        # Get safe wide character functions
+        safe_funcs = get_safe_functions()
+        get_width = safe_funcs['get_display_width']
+        
         # Get status color and attributes
         status_color, status_attrs = get_status_color()
         
@@ -160,90 +157,16 @@ class QuickEditBar:
         # Don't show help text during editing to avoid position shifts
         # caused by IME composition text width variations
         
-        # Build segments list for the prompt
-        segments = []
-        
-        # Add leading spaces
-        segments.append(AsIsSegment("  "))
-        
-        # Add prompt segment(s)
-        # Prompt can be either a string or a list of TextSegment objects
-        if isinstance(self.prompt_text, str):
-            # String prompt: convert to AbbreviationSegment with priority-based shortening
-            segments.append(AbbreviationSegment(
-                self.prompt_text,
-                priority=0,
-                min_length=10,
-                abbrev_position='right'
-            ))
-        elif isinstance(self.prompt_text, list):
-            # List of TextSegment objects: use them directly
-            segments.extend(self.prompt_text)
-        else:
-            # Fallback: convert to string and use as AbbreviationSegment
-            segments.append(AbbreviationSegment(
-                str(self.prompt_text),
-                priority=0,
-                min_length=10,
-                abbrev_position='right'
-            ))
-        
-        # Calculate the prompt width after layout
-        # We need to know how much space the prompt takes to position the input field
-        # Reserve minimum 40 chars for the input field
-        min_input_width = 40
-        margin = 4  # Total margin (2 on left, 2 on right)
-        max_prompt_width = width - margin - min_input_width
-        
         # Calculate available space for the input field (prompt + text)
+        # Leave some margin (4 chars total: 2 on left, 2 on right)
+        margin = 4
         max_field_width = width - margin
         
         # Draw input field using SingleLineTextEdit
-        # SingleLineTextEdit.draw() will render both prompt and input field
-        # and set the caret position for IME
-        # We need to extract just the prompt text for SingleLineTextEdit
-        if isinstance(self.prompt_text, str):
-            prompt_for_editor = self.prompt_text
-        elif isinstance(self.prompt_text, list):
-            # Concatenate text from all segments
-            prompt_for_editor = "".join(seg.text for seg in self.prompt_text if hasattr(seg, 'text'))
-        else:
-            prompt_for_editor = str(self.prompt_text)
-        
-        # For list of segments with AllOrNothingSegment, we need to handle shortening properly
-        # If the full prompt doesn't fit, check if any AllOrNothingSegment should be removed
-        if isinstance(self.prompt_text, list) and max_prompt_width > 0:
-            full_width = calculate_display_width(prompt_for_editor)
-            if full_width > max_prompt_width:
-                # Need to shorten - remove AllOrNothingSegment segments
-                shortened_segments = []
-                for seg in self.prompt_text:
-                    if isinstance(seg, AllOrNothingSegment):
-                        # Skip this segment (all-or-nothing: remove entirely)
-                        continue
-                    else:
-                        shortened_segments.append(seg)
-                
-                # Recalculate prompt text without AllOrNothingSegment segments
-                prompt_for_editor = "".join(seg.text for seg in shortened_segments if hasattr(seg, 'text'))
-                
-                # If still too long, use simple right abbreviation
-                if calculate_display_width(prompt_for_editor) > max_prompt_width:
-                    # Truncate from right with ellipsis
-                    prompt_for_editor = prompt_for_editor[:max_prompt_width-1] + "…"
-        elif calculate_display_width(prompt_for_editor) > max_prompt_width and max_prompt_width > 0:
-            # Simple string prompt - use right abbreviation
-            prompt_for_editor = prompt_for_editor[:max_prompt_width-1] + "…"
-        
-        # Ensure minimum width for the input field
-        prompt_width = calculate_display_width(prompt_for_editor)
-        min_field_width = prompt_width + 5  # At least 5 chars for input
-        if max_field_width < min_field_width:
-            max_field_width = min_field_width
-        
+        # SingleLineTextEdit.draw() will set the caret position for IME
         self.text_editor.draw(
             self.renderer, status_y, 2, max_field_width,
-            prompt_for_editor,
+            self.prompt_text,
             is_active=True
         )
         
@@ -265,31 +188,15 @@ class QuickEditBarHelpers:
     
     @staticmethod
     def create_rename_dialog(dialog, original_name, current_name=""):
-        """Create a rename dialog configuration with intelligent prompt shortening
+        """Create a rename dialog configuration with simple static prompt
         
-        The prompt format is: "Rename '{original_name}' to: "
-        When space is limited (less than 40 chars for input + full prompt),
-        it falls back to just "Rename: " to ensure adequate input space.
-        
-        Uses all-or-nothing strategy: either shows the full middle part or removes it entirely.
+        Uses a simple "Rename to: " prompt for all rename operations.
         """
         if not current_name:
             current_name = original_name
         
-        # Build prompt as a list of TextSegment objects
-        # The middle part (original filename) uses AllOrNothingSegment
-        # so it's either shown in full or removed entirely
-        prompt_segments = [
-            AsIsSegment("Rename"),
-            AllOrNothingSegment(
-                f" '{original_name}' to",
-                priority=1  # Higher priority, removed first when space is limited
-            ),
-            AsIsSegment(": ")
-        ]
-        
         dialog.show_status_line_input(
-            prompt=prompt_segments,
+            prompt="Rename to: ",
             initial_text=current_name
         )
     
