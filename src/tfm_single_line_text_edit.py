@@ -214,8 +214,9 @@ class FilepathCompleter:
                     else:
                         candidates.append(entry)
         except (PermissionError, FileNotFoundError, OSError) as e:
-            # Log error but return empty list
-            self.logger.error(f"Error listing directory {directory}: {e}")
+            # Silently return empty list for non-existent directories
+            # This is expected when completing paths that don't exist yet
+            # or during testing with mock paths
             return []
         
         return sorted(candidates)
@@ -638,6 +639,14 @@ class SingleLineTextEdit:
             
             # Update cursor position to end of inserted text
             self.cursor_pos += len(text_to_insert)
+            
+            # IMPORTANT: Update completion_start_pos to cursor position
+            # This ensures that if the user navigates the candidate list and presses Enter,
+            # we replace the correct range (from current cursor position, not the old one)
+            # Example: "src/t" + TAB -> "src/tfm_" with cursor at 8
+            # completion_start_pos should be 8, not 4, so selecting a different file
+            # replaces "tfm_" not "src/tfm_"
+            self.completion_start_pos = self.cursor_pos
             
             # Mark completion as active
             self.completion_active = True
