@@ -2,13 +2,13 @@
 
 ## Overview
 
-This implementation plan breaks down the TAB completion feature into discrete coding tasks. The implementation will extend SingleLineTextEdit with completion functionality, create a completion behavior strategy interface with filepath completion implementation, and add a candidate list overlay UI component.
+This implementation plan breaks down the TAB completion feature into discrete coding tasks. The implementation will extend SingleLineTextEdit with completion functionality, create a completer strategy interface with filepath completion implementation, and add a candidate list overlay UI component.
 
 ## Tasks
 
-- [ ] 1. Create completion behavior interface and filepath implementation
-  - Create `CompletionBehavior` protocol in `src/tfm_single_line_text_edit.py`
-  - Implement `FilepathCompletionBehavior` class with `get_candidates()` and `get_completion_start_pos()` methods
+- [ ] 1. Create completer interface and filepath implementation
+  - Create `Completer` protocol in `src/tfm_single_line_text_edit.py`
+  - Implement `FilepathCompleter` class with `get_candidates()` and `get_completion_start_pos()` methods
   - Handle directory parsing, file listing, and candidate formatting
   - Add trailing separators for directories
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.4_
@@ -85,18 +85,18 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 5. Extend SingleLineTextEdit with TAB completion
-  - Add `completion_behavior` parameter to `__init__()`
-  - Create `CandidateListOverlay` instance if completion behavior provided
+  - Add `completer` parameter to `__init__()`
+  - Create `CandidateListOverlay` instance if completer provided
   - Add `completion_active` state tracking
   - Store completion start position
   - _Requirements: 4.1, 4.2_
 
-- [ ]* 5.1 Write unit tests for completion behavior configuration
-  - Test with and without completion behavior
+- [ ]* 5.1 Write unit tests for completer configuration
+  - Test with and without completer
   - _Requirements: 4.1, 4.2_
 
 - [ ] 6. Implement handle_tab_completion() method
-  - Get candidates from completion behavior
+  - Get candidates from completer
   - Calculate common prefix
   - Determine completion start position
   - Calculate text to insert
@@ -115,7 +115,7 @@ This implementation plan breaks down the TAB completion feature into discrete co
   - _Requirements: 1.3, 1.4_
 
 - [ ] 7. Implement update_candidate_list() method
-  - Get current candidates from completion behavior
+  - Get current candidates from completer
   - Update candidate list overlay with new candidates
   - Hide candidate list if no candidates
   - Maintain visibility for single candidate

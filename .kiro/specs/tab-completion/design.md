@@ -5,7 +5,7 @@
 This design document describes the implementation of TAB completion functionality for the SingleLineTextEdit component in TFM. The feature enables users to efficiently complete text input by pressing the TAB key, with an overlay candidate list that displays available completions. The design follows a strategy pattern to support multiple completion behaviors, with filepath completion as the initial implementation.
 
 The system consists of three main components:
-1. **Completion Behavior Strategy**: An interface and implementations for generating completion candidates
+1. **Completer Strategy**: An interface and implementations for generating completion candidates
 2. **Candidate List UI**: An overlay component that displays and manages completion candidates
 3. **Enhanced SingleLineTextEdit**: Extended functionality to integrate TAB completion with existing text editing
 
@@ -30,7 +30,7 @@ The system consists of three main components:
 │                          │ uses                              │
 │                          ▼                                   │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │         CompletionBehavior (Strategy)                  │ │
+│  │         Completer (Strategy)                           │ │
 │  │  - get_candidates(text, cursor_pos) -> List[str]      │ │
 │  │  - get_completion_start_pos(text, cursor_pos) -> int  │ │
 │  └────────────────────────────────────────────────────────┘ │
@@ -38,7 +38,7 @@ The system consists of three main components:
 │                          │ implements                        │
 │                          │                                   │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │      FilepathCompletionBehavior                        │ │
+│  │      FilepathCompleter                                 │ │
 │  │  - Parse directory and filename from input             │ │
 │  │  - List matching files/directories                     │ │
 │  │  - Format candidates with trailing separators          │ │
@@ -84,10 +84,10 @@ The system consists of three main components:
 
 ## Components and Interfaces
 
-### CompletionBehavior (Protocol/Interface)
+### Completer (Protocol/Interface)
 
 ```python
-class CompletionBehavior(Protocol):
+class Completer(Protocol):
     """Strategy interface for generating completion candidates"""
     
     def get_candidates(self, text: str, cursor_pos: int) -> List[str]:
@@ -122,15 +122,15 @@ class CompletionBehavior(Protocol):
         ...
 ```
 
-### FilepathCompletionBehavior
+### FilepathCompleter
 
 ```python
-class FilepathCompletionBehavior:
-    """Completion behavior for filesystem paths"""
+class FilepathCompleter:
+    """Completer for filesystem paths"""
     
     def __init__(self, base_directory: Optional[str] = None):
         """
-        Initialize filepath completion behavior.
+        Initialize filepath completer.
         
         Args:
             base_directory: Base directory for relative path completion.
@@ -232,19 +232,19 @@ class SingleLineTextEdit:
     """Extended with TAB completion functionality"""
     
     def __init__(self, initial_text="", max_length=None, renderer=None,
-                 completion_behavior: Optional[CompletionBehavior] = None):
+                 completer: Optional[Completer] = None):
         """
-        Initialize text editor with optional completion behavior.
+        Initialize text editor with optional completer.
         
         Args:
             initial_text: Initial text content
             max_length: Maximum allowed text length
             renderer: TTK Renderer instance
-            completion_behavior: Strategy for generating completions (optional)
+            completer: Strategy for generating completions (optional)
         """
         # Existing initialization...
-        self.completion_behavior = completion_behavior
-        self.candidate_list = CandidateListOverlay(renderer) if completion_behavior else None
+        self.completer = completer
+        self.candidate_list = CandidateListOverlay(renderer) if completer else None
         self.completion_active = False
     
     def handle_tab_completion(self) -> bool:
@@ -252,7 +252,7 @@ class SingleLineTextEdit:
         Handle TAB key press for completion.
         
         Algorithm:
-        1. Get candidates from completion behavior
+        1. Get candidates from completer
         2. If no candidates, return False
         3. Calculate common prefix of all candidates
         4. Determine completion start position
@@ -376,7 +376,7 @@ class CompletionState:
 
 ### Property 9: Completion Behavior Integration
 
-*For any* completion behavior strategy provided to SingleLineTextEdit, pressing TAB should invoke that behavior's get_candidates method to generate the candidate list.
+*For any* completer strategy provided to SingleLineTextEdit, pressing TAB should invoke that completer's get_candidates method to generate the candidate list.
 
 **Validates: Requirements 4.3**
 
@@ -474,7 +474,7 @@ Unit tests will verify specific examples and edge cases:
    - Multiple candidates with no common prefix
    - Case-sensitive prefix calculation
 
-2. **Filepath completion behavior**:
+2. **Filepath completer**:
    - Absolute paths
    - Relative paths
    - Paths with no directory separator
@@ -489,7 +489,7 @@ Unit tests will verify specific examples and edge cases:
 
 4. **ESC key handling**: Pressing ESC hides candidate list
 5. **Focus handling**: Losing focus hides candidate list
-6. **No completion behavior**: TAB does nothing when no behavior set
+6. **No completer**: TAB does nothing when no completer set
 7. **Visual styling**: Candidate list uses correct colors and borders
 
 ### Property-Based Tests
@@ -538,7 +538,7 @@ Property-based tests will verify universal properties across randomized inputs. 
    - **Feature: tab-completion, Property 8: Candidate format**
 
 9. **Property 9: Completion Behavior Integration**
-   - Generate random completion behaviors
+   - Generate random completers
    - Verify TAB invokes get_candidates
    - **Feature: tab-completion, Property 9: Completion behavior integration**
 
