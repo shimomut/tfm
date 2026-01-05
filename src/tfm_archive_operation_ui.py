@@ -72,7 +72,7 @@ class ArchiveOperationUI:
             destination: Destination Path (archive file for create, directory for extract)
             callback: Function to call with confirmation result (True/False)
         """
-        from tfm_string_width import ShorteningRegion
+        from tfm_text_layout import AbbreviationSegment, AsIsSegment, AllOrNothingSegment, FilepathSegment
         
         # Build confirmation message
         if operation_type == 'create':
@@ -85,49 +85,38 @@ class ArchiveOperationUI:
                 file_count = len(source_paths)
                 message = f"Create archive '{destination.name}' from {file_count} files?"
             
-            # No shortening regions for create operations
-            shortening_regions = None
+            # Simple string message for create operations
+            message_segments = message
         
         elif operation_type == 'extract':
-            # Archive extraction
+            # Archive extraction with intelligent shortening
             archive_name = source_paths[0].name if source_paths else 'archive'
             destination_str = str(destination)
-            message = f"Extract '{archive_name}' to {destination_str}?"
             
-            # Define shortening regions:
-            # 1. "'{archive_name}' " - AllOrNothing strategy (priority 1, higher = shortened first)
-            # 2. destination path - Abbreviation with filepath mode (priority 0, lower = more important)
-            archive_part_start = len("Extract ")
-            archive_part_end = archive_part_start + len(f"'{archive_name}' ")
-            destination_start = archive_part_end + len("to ")
-            destination_end = destination_start + len(destination_str)
-            
-            shortening_regions = [
-                # Archive name region - remove entirely if space is tight
-                ShorteningRegion(
-                    start=archive_part_start,
-                    end=archive_part_end,
-                    priority=1,  # Higher priority = shortened first
-                    strategy='all_or_nothing'
+            # Build message as segments:
+            # "Extract " + archive_name (all-or-nothing) + " to " + destination (filepath)
+            message_segments = [
+                AsIsSegment("Extract "),
+                AllOrNothingSegment(
+                    f"'{archive_name}' ",
+                    priority=1  # Higher priority = removed first
                 ),
-                # Destination path region - abbreviate intelligently
-                ShorteningRegion(
-                    start=destination_start,
-                    end=destination_end,
-                    priority=0,  # Lower priority = more important, shortened last
-                    strategy='abbreviate',
-                    abbrev_position='middle',
-                    filepath_mode=True
-                )
+                AsIsSegment("to "),
+                FilepathSegment(
+                    destination_str,
+                    priority=0,  # Lower priority = preserved more
+                    min_length=15,
+                    abbrev_position='middle'
+                ),
+                AsIsSegment("?")
             ]
         
         else:
             # Fallback for unknown operation types
-            message = f"Confirm {operation_type} operation?"
-            shortening_regions = None
+            message_segments = f"Confirm {operation_type} operation?"
         
         # Show confirmation dialog
-        self.file_manager.show_confirmation(message, callback, shortening_regions=shortening_regions)
+        self.file_manager.show_confirmation(message_segments, callback)
     
     def show_conflict_dialog(self, conflict_type: str, conflict_info: Dict,
                            conflict_num: int, total_conflicts: int,
@@ -150,7 +139,7 @@ class ArchiveOperationUI:
                      Signature: callback(choice: Optional[str], apply_to_all: bool)
                      choice can be 'overwrite', 'skip', or None (for cancel/ESC)
         """
-        from tfm_string_width import ShorteningRegion
+        from tfm_text_layout import FilepathSegment, AsIsSegment
         
         # Extract conflict information
         conflict_path = conflict_info.get('path')
@@ -162,34 +151,30 @@ class ArchiveOperationUI:
         if conflict_type == 'archive_exists':
             # Archive file already exists (for create operations)
             prefix = "Archive exists: "
-            message = f"{prefix}{display_name}"
+            
+            # Build message as segments
+            message_segments = [
+                AsIsSegment(prefix),
+                FilepathSegment(
+                    display_name,
+                    priority=1,
+                    min_length=10,
+                    abbrev_position='middle'
+                )
+            ]
+            
             if conflict_size is not None:
                 # Format size in human-readable format
                 size_str = self._format_size(conflict_size)
-                message += f" ({size_str})"
+                message_segments.append(AsIsSegment(f" ({size_str})"))
             
             if total_conflicts > 1:
-                message += f" ({conflict_num}/{total_conflicts})"
+                message_segments.append(AsIsSegment(f" ({conflict_num}/{total_conflicts})"))
             
             # For archive creation conflicts, only show Overwrite option
             # (Skip doesn't make sense for single archive file)
             choices = [
                 {"text": "Overwrite", "key": "o", "value": "overwrite"}
-            ]
-            
-            # Define shortening region for the filename
-            filename_start = len(prefix)
-            filename_end = filename_start + len(display_name)
-            
-            shortening_regions = [
-                ShorteningRegion(
-                    start=filename_start,
-                    end=filename_end,
-                    priority=1,
-                    strategy='abbreviate',
-                    abbrev_position='middle',
-                    filepath_mode=True
-                )
             ]
         
         elif conflict_type == 'file_exists':
@@ -199,61 +184,51 @@ class ArchiveOperationUI:
             else:
                 prefix = "File exists: "
             
-            message = f"{prefix}{display_name}"
+            # Build message as segments
+            message_segments = [
+                AsIsSegment(prefix),
+                FilepathSegment(
+                    display_name,
+                    priority=1,
+                    min_length=10,
+                    abbrev_position='middle'
+                )
+            ]
             
             if conflict_size is not None and not is_directory:
                 size_str = self._format_size(conflict_size)
-                message += f" ({size_str})"
+                message_segments.append(AsIsSegment(f" ({size_str})"))
             
             if total_conflicts > 1:
-                message += f" ({conflict_num}/{total_conflicts})"
+                message_segments.append(AsIsSegment(f" ({conflict_num}/{total_conflicts})"))
             
             # For extraction conflicts, show both Overwrite and Skip options
             choices = [
                 {"text": "Overwrite", "key": "o", "value": "overwrite"},
                 {"text": "Skip", "key": "s", "value": "skip"}
             ]
-            
-            # Define shortening region for the filename
-            filename_start = len(prefix)
-            filename_end = filename_start + len(display_name)
-            
-            shortening_regions = [
-                ShorteningRegion(
-                    start=filename_start,
-                    end=filename_end,
-                    priority=1,
-                    strategy='abbreviate',
-                    abbrev_position='middle',
-                    filepath_mode=True
-                )
-            ]
         
         else:
             # Fallback for unknown conflict types
             prefix = "Conflict: "
-            message = f"{prefix}{display_name}"
+            
+            # Build message as segments
+            message_segments = [
+                AsIsSegment(prefix),
+                FilepathSegment(
+                    display_name,
+                    priority=1,
+                    min_length=10,
+                    abbrev_position='middle'
+                )
+            ]
+            
             if total_conflicts > 1:
-                message += f" ({conflict_num}/{total_conflicts})"
+                message_segments.append(AsIsSegment(f" ({conflict_num}/{total_conflicts})"))
             
             choices = [
                 {"text": "Overwrite", "key": "o", "value": "overwrite"},
                 {"text": "Skip", "key": "s", "value": "skip"}
-            ]
-            
-            # Define shortening region for the filename
-            filename_start = len(prefix)
-            filename_end = filename_start + len(display_name)
-            
-            shortening_regions = [
-                ShorteningRegion(
-                    start=filename_start,
-                    end=filename_end,
-                    priority=1,
-                    strategy='abbreviate',
-                    abbrev_position='middle',
-                    filepath_mode=True
-                )
             ]
         
         # Wrapper callback to handle shift modifier detection
@@ -269,11 +244,10 @@ class ArchiveOperationUI:
         
         # Show conflict dialog with shift modifier enabled for apply-to-all
         self.file_manager.show_dialog(
-            message,
+            message_segments,
             choices,
             dialog_callback,
-            enable_shift_modifier=True,
-            shortening_regions=shortening_regions
+            enable_shift_modifier=True
         )
     
     def _format_size(self, size_bytes: int) -> str:

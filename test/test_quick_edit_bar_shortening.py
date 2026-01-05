@@ -1,7 +1,7 @@
 """
 Test QuickEditBar prompt shortening functionality
 
-This test verifies that QuickEditBar correctly shortens prompts using ShorteningRegion
+This test verifies that QuickEditBar correctly shortens prompts using TextSegment
 to ensure adequate space for text input.
 
 Run with: PYTHONPATH=.:src:ttk pytest test/test_quick_edit_bar_shortening.py -v
@@ -10,7 +10,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_quick_edit_bar_shortening.py -v
 import unittest
 from unittest.mock import Mock
 from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
-from tfm_string_width import ShorteningRegion, calculate_display_width
+from tfm_text_layout import AsIsSegment, AllOrNothingSegment, calculate_display_width
 
 
 class TestQuickEditBarShortening(unittest.TestCase):
@@ -34,9 +34,17 @@ class TestQuickEditBarShortening(unittest.TestCase):
         # Verify dialog is active
         self.assertTrue(self.dialog.is_active)
         
-        # Verify shortening regions are set
-        self.assertIsNotNone(self.dialog.shortening_regions)
-        self.assertEqual(len(self.dialog.shortening_regions), 1)
+        # Verify prompt is a list of TextSegment objects
+        self.assertIsInstance(self.dialog.prompt_text, list)
+        self.assertEqual(len(self.dialog.prompt_text), 3)
+        
+        # Verify segment structure
+        self.assertIsInstance(self.dialog.prompt_text[0], AsIsSegment)
+        self.assertEqual(self.dialog.prompt_text[0].text, "Rename")
+        self.assertIsInstance(self.dialog.prompt_text[1], AllOrNothingSegment)
+        self.assertIn(original_name, self.dialog.prompt_text[1].text)
+        self.assertIsInstance(self.dialog.prompt_text[2], AsIsSegment)
+        self.assertEqual(self.dialog.prompt_text[2].text, ": ")
         
         # Verify initial text is set
         self.assertEqual(self.dialog.get_text(), original_name)
@@ -52,14 +60,13 @@ class TestQuickEditBarShortening(unittest.TestCase):
         # Verify dialog is active
         self.assertTrue(self.dialog.is_active)
         
-        # Verify shortening regions are configured
-        self.assertIsNotNone(self.dialog.shortening_regions)
-        region = self.dialog.shortening_regions[0]
+        # Verify prompt is a list of TextSegment objects
+        self.assertIsInstance(self.dialog.prompt_text, list)
         
-        # Verify region configuration
-        self.assertEqual(region.start, 6)  # After "Rename"
-        self.assertEqual(region.priority, 1)
-        self.assertEqual(region.strategy, 'all_or_nothing')  # All or nothing strategy
+        # Verify the middle segment uses AllOrNothingSegment with priority=1
+        middle_segment = self.dialog.prompt_text[1]
+        self.assertIsInstance(middle_segment, AllOrNothingSegment)
+        self.assertEqual(middle_segment.priority, 1)  # Higher priority, removed first
         
         # Verify initial text is set correctly
         self.assertEqual(self.dialog.get_text(), original_name)
@@ -69,14 +76,23 @@ class TestQuickEditBarShortening(unittest.TestCase):
         original_name = "test.txt"
         QuickEditBarHelpers.create_rename_dialog(self.dialog, original_name)
         
-        # Expected prompt format: "Rename '{original_name}' to: "
-        expected_prompt = f"Rename '{original_name}' to: "
-        self.assertEqual(self.dialog.prompt_text, expected_prompt)
+        # Verify prompt is a list of TextSegment objects
+        self.assertIsInstance(self.dialog.prompt_text, list)
+        self.assertEqual(len(self.dialog.prompt_text), 3)
         
-        # Verify shortening region covers the middle part
-        region = self.dialog.shortening_regions[0]
-        self.assertEqual(region.start, 6)  # After "Rename"
-        self.assertEqual(region.end, len(expected_prompt) - 2)  # Before ": "
+        # Verify segment structure
+        # First segment: "Rename"
+        self.assertIsInstance(self.dialog.prompt_text[0], AsIsSegment)
+        self.assertEqual(self.dialog.prompt_text[0].text, "Rename")
+        
+        # Second segment: " '{original_name}' to" with AllOrNothingSegment
+        self.assertIsInstance(self.dialog.prompt_text[1], AllOrNothingSegment)
+        self.assertEqual(self.dialog.prompt_text[1].text, f" '{original_name}' to")
+        self.assertEqual(self.dialog.prompt_text[1].priority, 1)
+        
+        # Third segment: ": "
+        self.assertIsInstance(self.dialog.prompt_text[2], AsIsSegment)
+        self.assertEqual(self.dialog.prompt_text[2].text, ": ")
     
     def test_rename_dialog_with_custom_current_name(self):
         """Test rename dialog with different current name"""
@@ -88,9 +104,10 @@ class TestQuickEditBarShortening(unittest.TestCase):
         # Verify current name is used as initial text
         self.assertEqual(self.dialog.get_text(), current_name)
         
-        # Verify prompt still references original name
-        expected_prompt = f"Rename '{original_name}' to: "
-        self.assertEqual(self.dialog.prompt_text, expected_prompt)
+        # Verify prompt still references original name in the middle segment
+        self.assertIsInstance(self.dialog.prompt_text, list)
+        middle_segment = self.dialog.prompt_text[1]
+        self.assertIn(original_name, middle_segment.text)
     
     def test_minimum_input_width_guaranteed(self):
         """Test that at least 40 chars are reserved for input field"""
@@ -117,42 +134,45 @@ class TestQuickEditBarShortening(unittest.TestCase):
         # The implementation should ensure adequate space for input
         # by shortening the prompt when necessary
     
-    def test_shortening_regions_parameter(self):
-        """Test that shortening_regions parameter is properly stored"""
-        regions = [
-            ShorteningRegion(start=5, end=10, priority=1, strategy='all_or_nothing')
-        ]
-        
-        self.dialog.show_status_line_input(
-            prompt="Test prompt: ",
-            initial_text="test",
-            shortening_regions=regions
-        )
-        
-        # Verify regions are stored
-        self.assertEqual(self.dialog.shortening_regions, regions)
-        
-        # Verify regions are cleared on hide
-        self.dialog.hide()
-        self.assertIsNone(self.dialog.shortening_regions)
-    
-    def test_no_shortening_regions_uses_default(self):
-        """Test that without shortening_regions, default behavior is used"""
+    def test_string_prompt_support(self):
+        """Test that string prompts are still supported"""
         self.dialog.show_status_line_input(
             prompt="Simple prompt: ",
             initial_text="test"
         )
         
-        # Verify no regions are set
-        self.assertIsNone(self.dialog.shortening_regions)
+        # Verify prompt is stored as string
+        self.assertIsInstance(self.dialog.prompt_text, str)
+        self.assertEqual(self.dialog.prompt_text, "Simple prompt: ")
         
-        # Dialog should still work with default right abbreviation
+        # Dialog should work with string prompts
         self.assertTrue(self.dialog.is_active)
         self.assertEqual(self.dialog.get_text(), "test")
     
-    def test_remove_strategy_all_or_nothing(self):
-        """Test that 'remove' strategy removes region entirely, not partially"""
-        # Set up a scenario where partial removal would occur without the fix
+    def test_segment_list_prompt_support(self):
+        """Test that list of TextSegment prompts are supported"""
+        prompt_segments = [
+            AsIsSegment("Rename"),
+            AllOrNothingSegment(" 'file.txt' to", priority=1),
+            AsIsSegment(": ")
+        ]
+        
+        self.dialog.show_status_line_input(
+            prompt=prompt_segments,
+            initial_text="test"
+        )
+        
+        # Verify prompt is stored as list
+        self.assertIsInstance(self.dialog.prompt_text, list)
+        self.assertEqual(len(self.dialog.prompt_text), 3)
+        
+        # Dialog should work with segment list prompts
+        self.assertTrue(self.dialog.is_active)
+        self.assertEqual(self.dialog.get_text(), "test")
+    
+    def test_all_or_nothing_strategy(self):
+        """Test that AllOrNothingSegment removes content entirely, not partially"""
+        # Set up a scenario where the middle segment should be removed entirely
         self.mock_renderer.get_dimensions.return_value = (24, 70)
         
         original_name = "medium_length_filename.txt"
@@ -173,7 +193,7 @@ class TestQuickEditBarShortening(unittest.TestCase):
         prompt_used = draw_calls[0]
         
         # The prompt should be either the full version or the minimal version
-        # It should NOT be a partial truncation like "Rename 'medium_length_fi"
+        # It should NOT be a partial truncation like "Rename 'medium_length_fi…"
         full_prompt = f"Rename '{original_name}' to: "
         minimal_prompt = "Rename: "
         
@@ -184,7 +204,7 @@ class TestQuickEditBarShortening(unittest.TestCase):
         # If it's not the full prompt, it must be the minimal one (complete removal)
         if prompt_used != full_prompt:
             self.assertEqual(prompt_used, minimal_prompt,
-                           "Partial removal detected - region should be removed entirely")
+                           "Partial removal detected - segment should be removed entirely")
 
 
 if __name__ == '__main__':
