@@ -75,61 +75,6 @@ logger = getLogger("TextLayout")
 # Wide Character Support Utilities
 # ============================================================================
 
-def normalize_text(text: str) -> str:
-    """
-    Normalize text to NFC (Canonical Composition) form.
-    
-    NFC normalization ensures consistent character representation across different
-    platforms and handles macOS NFD filenames correctly. This is essential for
-    accurate width calculation and text comparison.
-    
-    Args:
-        text: Text to normalize
-        
-    Returns:
-        NFC-normalized text, or original text if normalization fails
-        
-    Example:
-        >>> normalize_text("café")  # é as single character
-        'café'
-        >>> normalize_text("café")  # é as e + combining accent
-        'café'  # Both normalize to same form
-    """
-    try:
-        return unicodedata.normalize('NFC', text)
-    except Exception as e:
-        logger.error(f"Unicode normalization failed for text: {e}")
-        return text
-
-
-def calculate_display_width(text: str) -> int:
-    """
-    Calculate the display width of text in terminal columns.
-    
-    This function accounts for wide characters (CJK, emoji) which occupy 2 columns
-    instead of 1. It delegates to TTK's wide_char_utils for accurate calculation.
-    
-    Args:
-        text: Text to measure (should be NFC-normalized for best results)
-        
-    Returns:
-        Display width in terminal columns, or character count if calculation fails
-        
-    Example:
-        >>> calculate_display_width("hello")
-        5
-        >>> calculate_display_width("你好")  # Two wide characters
-        4
-        >>> calculate_display_width("hello世界")  # Mixed narrow and wide
-        9
-    """
-    try:
-        return get_display_width(text)
-    except Exception as e:
-        logger.error(f"Display width calculation failed, falling back to character count: {e}")
-        return len(text)
-
-
 def truncate_at_width(text: str, target_width: int) -> str:
     """
     Truncate text to fit within target_width columns, respecting wide character boundaries.
@@ -216,9 +161,9 @@ class TextSegment(ABC):
             Display width accounting for wide characters
         """
         try:
-            # Use helper function for normalization and width calculation
-            normalized_text = normalize_text(self.text)
-            return calculate_display_width(normalized_text)
+            # Normalize and calculate width
+            normalized_text = unicodedata.normalize('NFC', self.text)
+            return get_display_width(normalized_text)
         except Exception as e:
             logger.error(f"get_display_width failed for text '{self.text}': {e}")
             # Fall back to character count
@@ -313,8 +258,8 @@ class AbbreviationSegment(TextSegment):
         """
         try:
             # Use helper function for normalization
-            normalized_text = normalize_text(self.text)
-            current_width = calculate_display_width(normalized_text)
+            normalized_text = unicodedata.normalize('NFC', self.text)
+            current_width = get_display_width(normalized_text)
             
             # If already fits, return as-is
             if current_width <= target_width:
@@ -325,7 +270,7 @@ class AbbreviationSegment(TextSegment):
                 return ""
             
             ellipsis = "…"
-            ellipsis_width = calculate_display_width(ellipsis)
+            ellipsis_width = get_display_width(ellipsis)
             
             if target_width == 1:
                 # Only room for ellipsis or single character
@@ -370,7 +315,7 @@ class AbbreviationSegment(TextSegment):
             logger.error(f"AbbreviationSegment.shorten failed for text '{self.text}': {e}")
             # Fall back to simple truncation
             try:
-                normalized_text = normalize_text(self.text)
+                normalized_text = unicodedata.normalize('NFC', self.text)
                 return truncate_at_width(normalized_text, target_width)
             except Exception as e2:
                 logger.error(f"Fallback truncation also failed: {e2}")
@@ -400,7 +345,7 @@ class AbbreviationSegment(TextSegment):
             current_width = 0
             
             for char in reversed(text):
-                char_width = calculate_display_width(char)
+                char_width = get_display_width(char)
                 if current_width + char_width > target_width:
                     break
                 result = char + result
@@ -475,8 +420,8 @@ class FilepathSegment(TextSegment):
         """
         try:
             # Use helper function for normalization
-            normalized_text = normalize_text(self.text)
-            current_width = calculate_display_width(normalized_text)
+            normalized_text = unicodedata.normalize('NFC', self.text)
+            current_width = get_display_width(normalized_text)
             
             # If already fits, return as-is
             if current_width <= target_width:
@@ -487,7 +432,7 @@ class FilepathSegment(TextSegment):
                 return ""
             
             ellipsis = "…"
-            ellipsis_width = calculate_display_width(ellipsis)
+            ellipsis_width = get_display_width(ellipsis)
             
             # Detect path separator (handle both Unix and Windows paths)
             separator = '/'
@@ -516,7 +461,7 @@ class FilepathSegment(TextSegment):
             # First try: keep all directories (no ellipsis)
             if num_dirs > 0:
                 test_path = separator.join(directories) + separator + filename
-                path_width = calculate_display_width(test_path)
+                path_width = get_display_width(test_path)
                 if path_width <= target_width:
                     return test_path
             
@@ -541,13 +486,13 @@ class FilepathSegment(TextSegment):
                     path_parts = [ellipsis, filename]
                 
                 test_path = separator.join(path_parts)
-                path_width = calculate_display_width(test_path)
+                path_width = get_display_width(test_path)
                 if path_width <= target_width:
                     return test_path
             
             # All directories removed, just ellipsis + separator + filename
             abbreviated_path = ellipsis + separator + filename
-            path_width = calculate_display_width(abbreviated_path)
+            path_width = get_display_width(abbreviated_path)
             
             if path_width <= target_width:
                 return abbreviated_path
@@ -555,7 +500,7 @@ class FilepathSegment(TextSegment):
             # Still too long, need to abbreviate the filename itself
             # Calculate space available for filename
             prefix = ellipsis + separator
-            prefix_width = calculate_display_width(prefix)
+            prefix_width = get_display_width(prefix)
             
             if prefix_width >= target_width:
                 # Not even room for prefix, just abbreviate filename alone
@@ -570,7 +515,7 @@ class FilepathSegment(TextSegment):
             logger.error(f"FilepathSegment.shorten failed for path '{self.text}': {e}")
             # Fall back to simple truncation
             try:
-                normalized_text = normalize_text(self.text)
+                normalized_text = unicodedata.normalize('NFC', self.text)
                 return truncate_at_width(normalized_text, target_width)
             except Exception as e2:
                 logger.error(f"Fallback truncation also failed: {e2}")
@@ -589,7 +534,7 @@ class FilepathSegment(TextSegment):
             Abbreviated filename
         """
         try:
-            current_width = calculate_display_width(filename)
+            current_width = get_display_width(filename)
             
             if current_width <= target_width:
                 return filename
@@ -598,7 +543,7 @@ class FilepathSegment(TextSegment):
                 return ""
             
             ellipsis = "…"
-            ellipsis_width = calculate_display_width(ellipsis)
+            ellipsis_width = get_display_width(ellipsis)
             
             if target_width < ellipsis_width:
                 return truncate_at_width(filename, target_width)
@@ -655,7 +600,7 @@ class FilepathSegment(TextSegment):
             current_width = 0
             
             for char in reversed(text):
-                char_width = calculate_display_width(char)
+                char_width = get_display_width(char)
                 if current_width + char_width > target_width:
                     break
                 result = char + result
@@ -712,8 +657,8 @@ class AllOrNothingSegment(TextSegment):
         """
         try:
             # Use helper function for normalization
-            normalized_text = normalize_text(self.text)
-            current_width = calculate_display_width(normalized_text)
+            normalized_text = unicodedata.normalize('NFC', self.text)
+            current_width = get_display_width(normalized_text)
             
             # All or nothing: either keep full text or remove entirely
             if current_width <= target_width:
@@ -768,7 +713,7 @@ class AsIsSegment(TextSegment):
         """
         try:
             # Use helper function for normalization
-            normalized_text = normalize_text(self.text)
+            normalized_text = unicodedata.normalize('NFC', self.text)
             
             # Always return original text, never shorten
             return normalized_text
@@ -945,12 +890,12 @@ def shorten_segments_by_priority(state: LayoutState, shortened_texts: List[str])
             # Shorten the segment
             try:
                 shortened_text = segment.shorten(new_width)
-                actual_width = calculate_display_width(shortened_text)
+                actual_width = get_display_width(shortened_text)
             except Exception as e:
                 logger.error(f"Segment {idx} shorten() failed: {e}, using original text")
                 # Use original text if shortening fails
-                shortened_text = normalize_text(segment.text)
-                actual_width = calculate_display_width(shortened_text)
+                shortened_text = unicodedata.normalize('NFC', segment.text)
+                actual_width = get_display_width(shortened_text)
             
             # Update state
             width_reduction = current_width - actual_width
@@ -1034,7 +979,7 @@ def restore_segments_by_priority(state: LayoutState, shortened_texts: List[str])
         target_width = current_width + actual_restoration
         
         # Get the original text (not shortened)
-        original_text = normalize_text(segment.text)
+        original_text = unicodedata.normalize('NFC', segment.text)
         
         # If we can restore to full width, use original text
         if target_width >= original_width:
@@ -1044,7 +989,7 @@ def restore_segments_by_priority(state: LayoutState, shortened_texts: List[str])
             # Partially restore by shortening to the new target width
             try:
                 restored_text = segment.shorten(target_width)
-                actual_width = calculate_display_width(restored_text)
+                actual_width = get_display_width(restored_text)
             except Exception as e:
                 logger.error(f"Segment {idx} shorten() failed during restoration: {e}, using original text")
                 # Use original text if shortening fails
@@ -1387,7 +1332,7 @@ def draw_text_segments(
         if isinstance(segment, SpacerSegment):
             shortened_texts.append("")  # Spacers start empty
         elif isinstance(segment, TextSegment):
-            shortened_texts.append(normalize_text(segment.text))
+            shortened_texts.append(unicodedata.normalize('NFC', segment.text))
         else:
             shortened_texts.append("")
     
