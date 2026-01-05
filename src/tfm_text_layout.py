@@ -126,17 +126,36 @@ class TextSegment(ABC):
     should be shortened, rendered, and styled.
     
     Attributes:
-        text: The text content of this segment
+        text: The text content of this segment (automatically normalized to NFC)
         priority: Shortening priority (higher values shortened first, default 0)
         min_length: Minimum characters to preserve when shortening (default 0)
         color_pair: Terminal color pair number, None uses default (default None)
         attributes: Terminal text attributes (bold, underline, etc.), None uses default (default None)
+    
+    Note:
+        Text is automatically normalized to NFC form during initialization to ensure
+        consistent character representation across platforms (especially macOS NFD filenames).
     """
     text: str
     priority: int = 0
     min_length: int = 0
     color_pair: Optional[int] = None
     attributes: Optional[int] = None
+    
+    def __post_init__(self):
+        """
+        Normalize text to NFC form after initialization.
+        
+        This ensures all text is in NFC (Canonical Composition) form, which:
+        - Handles macOS NFD decomposed filenames correctly
+        - Ensures consistent character representation
+        - Allows all methods to assume text is already normalized
+        
+        Note: Subclasses should call super().__post_init__() if they override this.
+        """
+        # Normalize text to NFC form for consistent character representation
+        # This is done once at initialization rather than repeatedly in methods
+        object.__setattr__(self, 'text', unicodedata.normalize('NFC', self.text))
     
     @abstractmethod
     def shorten(self, target_width: int) -> str:
@@ -159,11 +178,13 @@ class TextSegment(ABC):
         
         Returns:
             Display width accounting for wide characters
+            
+        Note:
+            TTK's get_display_width() already normalizes to NFC internally,
+            so no additional normalization is needed here.
         """
         try:
-            # Normalize and calculate width
-            normalized_text = unicodedata.normalize('NFC', self.text)
-            return get_display_width(normalized_text)
+            return get_display_width(self.text)
         except Exception as e:
             logger.error(f"get_display_width failed for text '{self.text}': {e}")
             # Fall back to character count
@@ -220,6 +241,9 @@ class AbbreviationSegment(TextSegment):
     
     def __post_init__(self):
         """Validate segment configuration after initialization."""
+        # Call parent to normalize text
+        super().__post_init__()
+        
         # Validate abbrev_position
         if self.abbrev_position not in ('left', 'middle', 'right'):
             logger.warning(
@@ -255,15 +279,18 @@ class AbbreviationSegment(TextSegment):
             
         Returns:
             Shortened text with ellipsis at the specified position
+            
+        Note:
+            TTK's get_display_width() and truncate_to_width() already normalize
+            to NFC internally, so no explicit normalization is needed here.
         """
         try:
-            # Use helper function for normalization
-            normalized_text = unicodedata.normalize('NFC', self.text)
-            current_width = get_display_width(normalized_text)
+            current_width = get_display_width(self.text)
             
-            # If already fits, return as-is
+            # If already fits, return as-is (normalized by get_display_width)
             if current_width <= target_width:
-                return normalized_text
+                # Need to normalize since we're returning early
+                return self.text
             
             # Handle edge cases
             if target_width == 0:
@@ -276,11 +303,13 @@ class AbbreviationSegment(TextSegment):
                 # Only room for ellipsis or single character
                 if ellipsis_width <= 1:
                     return ellipsis
+                normalized_text = self.text
                 return normalized_text[0] if len(normalized_text) > 0 else ""
             
             # If text is shorter than ellipsis, just truncate
+            # truncate_at_width normalizes internally
             if target_width < ellipsis_width:
-                return truncate_at_width(normalized_text, target_width)
+                return truncate_at_width(self.text, target_width)
             
             # Validate abbrev_position (should have been validated in __post_init__, but double-check)
             position = self.abbrev_position
@@ -291,8 +320,12 @@ class AbbreviationSegment(TextSegment):
             # Calculate available width for actual text (minus ellipsis)
             available_width = target_width - ellipsis_width
             
+            # Normalize text once for use in truncation operations
+            normalized_text = self.text
+            
             if position == 'right':
                 # Keep left portion, ellipsis at end
+                # truncate_at_width normalizes internally, but we already normalized
                 left_part = truncate_at_width(normalized_text, available_width)
                 return left_part + ellipsis
             
@@ -313,10 +346,9 @@ class AbbreviationSegment(TextSegment):
                 
         except Exception as e:
             logger.error(f"AbbreviationSegment.shorten failed for text '{self.text}': {e}")
-            # Fall back to simple truncation
+            # Fall back to simple truncation (truncate_at_width normalizes internally)
             try:
-                normalized_text = unicodedata.normalize('NFC', self.text)
-                return truncate_at_width(normalized_text, target_width)
+                return truncate_at_width(self.text, target_width)
             except Exception as e2:
                 logger.error(f"Fallback truncation also failed: {e2}")
                 # Last resort: return original text or empty string
@@ -377,6 +409,9 @@ class FilepathSegment(TextSegment):
     
     def __post_init__(self):
         """Validate segment configuration after initialization."""
+        # Call parent to normalize text
+        super().__post_init__()
+        
         # Validate abbrev_position
         if self.abbrev_position not in ('left', 'middle', 'right'):
             logger.warning(
@@ -402,6 +437,7 @@ class FilepathSegment(TextSegment):
                 f"(must be 0-255), will use default color"
             )
             self.color_pair = None
+            self.color_pair = None
     
     def shorten(self, target_width: int) -> str:
         """
@@ -420,7 +456,7 @@ class FilepathSegment(TextSegment):
         """
         try:
             # Use helper function for normalization
-            normalized_text = unicodedata.normalize('NFC', self.text)
+            normalized_text = self.text
             current_width = get_display_width(normalized_text)
             
             # If already fits, return as-is
@@ -515,7 +551,7 @@ class FilepathSegment(TextSegment):
             logger.error(f"FilepathSegment.shorten failed for path '{self.text}': {e}")
             # Fall back to simple truncation
             try:
-                normalized_text = unicodedata.normalize('NFC', self.text)
+                normalized_text = self.text
                 return truncate_at_width(normalized_text, target_width)
             except Exception as e2:
                 logger.error(f"Fallback truncation also failed: {e2}")
@@ -627,6 +663,9 @@ class AllOrNothingSegment(TextSegment):
     
     def __post_init__(self):
         """Validate segment configuration after initialization."""
+        # Call parent to normalize text
+        super().__post_init__()
+        
         # Validate priority (should be non-negative)
         if self.priority < 0:
             logger.warning(f"Negative priority {self.priority} in AllOrNothingSegment, treating as 0")
@@ -657,7 +696,7 @@ class AllOrNothingSegment(TextSegment):
         """
         try:
             # Use helper function for normalization
-            normalized_text = unicodedata.normalize('NFC', self.text)
+            normalized_text = self.text
             current_width = get_display_width(normalized_text)
             
             # All or nothing: either keep full text or remove entirely
@@ -683,6 +722,9 @@ class AsIsSegment(TextSegment):
     
     def __post_init__(self):
         """Validate segment configuration after initialization."""
+        # Call parent to normalize text
+        super().__post_init__()
+        
         # Validate priority (should be non-negative)
         if self.priority < 0:
             logger.warning(f"Negative priority {self.priority} in AsIsSegment, treating as 0")
@@ -713,7 +755,7 @@ class AsIsSegment(TextSegment):
         """
         try:
             # Use helper function for normalization
-            normalized_text = unicodedata.normalize('NFC', self.text)
+            normalized_text = self.text
             
             # Always return original text, never shorten
             return normalized_text
@@ -893,8 +935,8 @@ def shorten_segments_by_priority(state: LayoutState, shortened_texts: List[str])
                 actual_width = get_display_width(shortened_text)
             except Exception as e:
                 logger.error(f"Segment {idx} shorten() failed: {e}, using original text")
-                # Use original text if shortening fails
-                shortened_text = unicodedata.normalize('NFC', segment.text)
+                # Use original text if shortening fails (already normalized in __post_init__)
+                shortened_text = segment.text
                 actual_width = get_display_width(shortened_text)
             
             # Update state
@@ -978,8 +1020,8 @@ def restore_segments_by_priority(state: LayoutState, shortened_texts: List[str])
         # Try to restore to current_width + actual_restoration
         target_width = current_width + actual_restoration
         
-        # Get the original text (not shortened)
-        original_text = unicodedata.normalize('NFC', segment.text)
+        # Get the original text (not shortened, already normalized in __post_init__)
+        original_text = segment.text
         
         # If we can restore to full width, use original text
         if target_width >= original_width:
@@ -1332,7 +1374,7 @@ def draw_text_segments(
         if isinstance(segment, SpacerSegment):
             shortened_texts.append("")  # Spacers start empty
         elif isinstance(segment, TextSegment):
-            shortened_texts.append(unicodedata.normalize('NFC', segment.text))
+            shortened_texts.append(segment.text)  # Already normalized in __post_init__
         else:
             shortened_texts.append("")
     
