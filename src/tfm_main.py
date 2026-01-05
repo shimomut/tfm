@@ -4167,6 +4167,8 @@ class FileManager(UILayer):
 
     def enter_jump_to_path_mode(self):
         """Enter jump to path mode using QuickEditBar"""
+        from tfm_single_line_text_edit import FilepathCompleter
+        
         current_pane = self.get_current_pane()
         current_path = str(current_pane['path'])
         
@@ -4177,11 +4179,20 @@ class FileManager(UILayer):
             
             try:
                 from tfm_path import Path
-                target_path = Path(path_str.strip())
+                path_str = path_str.strip()
                 
                 # Expand ~ to home directory
-                if str(target_path).startswith('~'):
-                    target_path = Path.home() / str(target_path)[2:].lstrip('/')
+                if path_str.startswith('~'):
+                    target_path = Path.home() / path_str[2:].lstrip('/')
+                # Handle relative paths - resolve relative to current pane's path
+                elif not os.path.isabs(path_str):
+                    target_path = Path(current_path) / path_str
+                else:
+                    # Absolute path - use as-is
+                    target_path = Path(path_str)
+                
+                # Normalize path to resolve .. and . components
+                target_path = Path(os.path.normpath(str(target_path)))
                 
                 # Check if path exists and is a directory
                 if not target_path.exists():
@@ -4217,12 +4228,20 @@ class FileManager(UILayer):
             """Handle cancellation"""
             pass
         
-        # Show QuickEditBar for path input
+        # Create filepath completer for TAB completion (directories only)
+        # Use current pane's path as base directory for relative path completion
+        completer = FilepathCompleter(base_directory=current_path, directories_only=True)
+        
+        # Append "/" to current path so users can immediately start typing child directory name
+        initial_text = current_path if current_path.endswith(os.sep) else current_path + os.sep
+        
+        # Show QuickEditBar for path input with filepath completion
         self.quick_edit_bar.show_status_line_input(
             prompt="Jump to path: ",
-            initial_text=current_path,
+            initial_text=initial_text,
             callback=on_confirm,
-            cancel_callback=on_cancel
+            cancel_callback=on_cancel,
+            completer=completer
         )
         self.mark_dirty()
     

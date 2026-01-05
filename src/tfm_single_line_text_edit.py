@@ -9,9 +9,12 @@ This module provides a reusable SingleLineTextEdit class that handles:
 - Common editing operations (insert, delete, backspace)
 - Navigation (home, end, left, right)
 - Wide character support for proper display and editing
+- TAB completion with pluggable completion strategies
 """
 
+import os
 import unicodedata
+from typing import Protocol, List, Optional
 
 # TTK imports
 from ttk import TextAttribute, KeyCode, ModifierKey
@@ -20,12 +23,247 @@ from ttk.wide_char_utils import get_display_width, truncate_to_width, get_safe_f
 
 # TFM imports
 from tfm_colors import get_status_color
+from tfm_log_manager import getLogger
+from tfm_candidate_list_overlay import CandidateListOverlay
+
+
+def calculate_common_prefix(candidates: List[str]) -> str:
+    """
+    Calculate the longest common prefix shared by all candidates.
+    
+    This function determines the maximum unambiguous text that can be
+    inserted during TAB completion. It uses case-sensitive comparison
+    to match the behavior of most filesystem operations.
+    
+    Args:
+        candidates: List of candidate strings
+        
+    Returns:
+        str: The longest common prefix shared by all candidates.
+             Returns empty string for empty list.
+             Returns the complete candidate for single-element list.
+    
+    Examples:
+        >>> calculate_common_prefix([])
+        ''
+        >>> calculate_common_prefix(['hello'])
+        'hello'
+        >>> calculate_common_prefix(['hello', 'help', 'hero'])
+        'he'
+        >>> calculate_common_prefix(['abc', 'def'])
+        ''
+    """
+    # Handle empty list
+    if not candidates:
+        return ""
+    
+    # Handle single candidate
+    if len(candidates) == 1:
+        return candidates[0]
+    
+    # Find common prefix for multiple candidates
+    # Start with the first candidate as the initial prefix
+    prefix = candidates[0]
+    
+    # Compare with each subsequent candidate
+    for candidate in candidates[1:]:
+        # Find the common prefix between current prefix and this candidate
+        # by comparing character by character
+        common_len = 0
+        min_len = min(len(prefix), len(candidate))
+        
+        for i in range(min_len):
+            if prefix[i] == candidate[i]:
+                common_len += 1
+            else:
+                break
+        
+        # Update prefix to the common portion
+        prefix = prefix[:common_len]
+        
+        # Early exit if no common prefix remains
+        if not prefix:
+            return ""
+    
+    return prefix
+
+
+class Completer(Protocol):
+    """Strategy interface for generating completion candidates"""
+    
+    def get_candidates(self, text: str, cursor_pos: int) -> List[str]:
+        """
+        Generate completion candidates based on current text and cursor position.
+        
+        Args:
+            text: Current text in the edit field
+            cursor_pos: Current cursor position (character index)
+            
+        Returns:
+            List of candidate strings that match the current input.
+            For filepath completion, returns filenames/directory names with
+            trailing separators for directories.
+        """
+        ...
+    
+    def get_completion_start_pos(self, text: str, cursor_pos: int) -> int:
+        """
+        Determine the character position where completion should start.
+        
+        For filepath completion, this is the position after the last
+        directory separator (or 0 if no separator exists).
+        
+        Args:
+            text: Current text in the edit field
+            cursor_pos: Current cursor position (character index)
+            
+        Returns:
+            Character position where the completion portion begins
+        """
+        ...
+
+
+class FilepathCompleter:
+    """Completer for filesystem paths"""
+    
+    def __init__(self, base_directory: Optional[str] = None, directories_only: bool = False):
+        """
+        Initialize filepath completer.
+        
+        Args:
+            base_directory: Base directory for relative path completion.
+                          If None, uses current working directory.
+            directories_only: If True, only show directories in completion candidates.
+                            If False, show both files and directories.
+        """
+        self.base_directory = base_directory or os.getcwd()
+        self.directories_only = directories_only
+        self.logger = getLogger("FilepathComp")
+    
+    def get_candidates(self, text: str, cursor_pos: int) -> List[str]:
+        """
+        Generate filepath completion candidates.
+        
+        Algorithm:
+        1. Extract the portion of text up to cursor position
+        2. Expand ~ to home directory if present
+        3. Find the last directory separator (/ or os.sep)
+        4. Split into directory path and filename prefix
+        5. List all entries in the directory
+        6. Filter entries that start with the filename prefix
+        7. Add trailing separator for directories
+        8. Return list of matching filenames/directory names
+        
+        Example:
+            text = "/aaaa/bbbb/ab"
+            cursor_pos = 13
+            directory = "/aaaa/bbbb/"
+            prefix = "ab"
+            matches = ["abcd1234/", "abc678/"]
+        
+        Example with tilde:
+            text = "~/proj"
+            cursor_pos = 6
+            directory = "/Users/username/"
+            prefix = "proj"
+            matches = ["projects/"]
+        
+        Args:
+            text: Current text in the edit field
+            cursor_pos: Current cursor position (character index)
+            
+        Returns:
+            List of candidate strings (filenames/directory names with trailing
+            separators for directories)
+        """
+        # Extract text up to cursor
+        text_to_cursor = text[:cursor_pos]
+        
+        # Expand ~ to home directory
+        if text_to_cursor.startswith('~'):
+            from tfm_path import Path
+            home_dir = str(Path.home())
+            # Replace ~ with home directory
+            text_to_cursor = home_dir + text_to_cursor[1:]
+        
+        # Find the last directory separator
+        last_sep_pos = text_to_cursor.rfind(os.sep)
+        
+        # Split into directory path and filename prefix
+        if last_sep_pos == -1:
+            # No separator - search in base directory
+            directory = self.base_directory
+            prefix = text_to_cursor
+        else:
+            # Has separator - split into directory and prefix
+            directory = text_to_cursor[:last_sep_pos + 1]
+            prefix = text_to_cursor[last_sep_pos + 1:]
+            
+            # Handle absolute vs relative paths
+            if not os.path.isabs(directory):
+                directory = os.path.join(self.base_directory, directory)
+        
+        # Normalize directory path
+        directory = os.path.normpath(directory)
+        
+        # List entries in directory and filter by prefix
+        candidates = []
+        try:
+            entries = os.listdir(directory)
+            for entry in entries:
+                # Check if entry starts with prefix (case-sensitive)
+                if entry.startswith(prefix):
+                    # Get full path to check if it's a directory
+                    full_path = os.path.join(directory, entry)
+                    
+                    # Check if it's a directory
+                    is_directory = os.path.isdir(full_path)
+                    
+                    # Skip files if directories_only mode is enabled
+                    if self.directories_only and not is_directory:
+                        continue
+                    
+                    # Add trailing separator for directories
+                    if is_directory:
+                        candidates.append(entry + os.sep)
+                    else:
+                        candidates.append(entry)
+        except (PermissionError, FileNotFoundError, OSError) as e:
+            # Silently return empty list for non-existent directories
+            # This is expected when completing paths that don't exist yet
+            # or during testing with mock paths
+            return []
+        
+        return sorted(candidates)
+    
+    def get_completion_start_pos(self, text: str, cursor_pos: int) -> int:
+        """
+        Find the position after the last directory separator.
+        
+        Returns the character position where the filename/directory name
+        being completed begins.
+        
+        Args:
+            text: Current text in the edit field
+            cursor_pos: Current cursor position (character index)
+            
+        Returns:
+            Character position where the completion portion begins
+        """
+        # Extract text up to cursor
+        text_to_cursor = text[:cursor_pos]
+        
+        # Find the last directory separator
+        last_sep_pos = text_to_cursor.rfind(os.sep)
+        
+        # Return position after separator (or 0 if no separator)
+        return last_sep_pos + 1 if last_sep_pos != -1 else 0
 
 
 class SingleLineTextEdit:
     """A single-line text editor with cursor control and visual feedback"""
     
-    def __init__(self, initial_text="", max_length=None, renderer=None):
+    def __init__(self, initial_text="", max_length=None, renderer=None, completer: Optional[Completer] = None):
         """
         Initialize the text editor
         
@@ -33,6 +271,7 @@ class SingleLineTextEdit:
             initial_text (str): Initial text content (will be normalized to NFC)
             max_length (int, optional): Maximum allowed text length
             renderer: TTK Renderer instance for clipboard access (optional)
+            completer (Completer, optional): Strategy for generating completions
         """
         # Store the original normalization form to convert back on retrieval
         self._original_was_nfd = self._is_nfd(initial_text)
@@ -42,6 +281,12 @@ class SingleLineTextEdit:
         self.cursor_pos = len(self.text)
         self.max_length = max_length
         self.renderer = renderer
+        
+        # TAB completion support
+        self.completer = completer
+        self.candidate_list = CandidateListOverlay(renderer) if completer else None
+        self.completion_active = False
+        self.completion_start_pos = 0
         
     def _is_nfd(self, text):
         """
@@ -353,6 +598,163 @@ class SingleLineTextEdit:
                     self.text[self.cursor_pos:])
         self.cursor_pos += len(paste_text)
         return True
+    
+    def handle_tab_completion(self) -> bool:
+        """
+        Handle TAB key press for completion.
+        
+        Algorithm:
+        1. Get candidates from completer
+        2. If no candidates, return False
+        3. Calculate common prefix of all candidates
+        4. Determine completion start position
+        5. Extract already-typed portion
+        6. Calculate text to insert (common prefix - already typed)
+        7. Insert completion text at cursor
+        8. Update cursor position
+        9. Show/update candidate list if multiple candidates
+        10. Return True if completion occurred
+        
+        Returns:
+            bool: True if completion occurred, False otherwise
+        """
+        # Check if completer is available
+        if not self.completer:
+            return False
+        
+        # Get candidates from completer
+        candidates = self.completer.get_candidates(self.text, self.cursor_pos)
+        
+        # If no candidates, return False
+        if not candidates:
+            return False
+        
+        # Calculate common prefix of all candidates
+        common_prefix = calculate_common_prefix(candidates)
+        
+        # Determine completion start position
+        self.completion_start_pos = self.completer.get_completion_start_pos(
+            self.text, self.cursor_pos
+        )
+        
+        # Extract already-typed portion (from completion start to cursor)
+        already_typed = self.text[self.completion_start_pos:self.cursor_pos]
+        
+        # Calculate text to insert (common prefix minus already typed)
+        # Only insert if common prefix extends beyond what's already typed
+        if common_prefix.startswith(already_typed) and len(common_prefix) > len(already_typed):
+            text_to_insert = common_prefix[len(already_typed):]
+            
+            # Insert completion text at cursor
+            self.text = (
+                self.text[:self.cursor_pos] + 
+                text_to_insert + 
+                self.text[self.cursor_pos:]
+            )
+            
+            # Update cursor position to end of inserted text
+            self.cursor_pos += len(text_to_insert)
+            
+            # IMPORTANT: Update completion_start_pos to cursor position
+            # This ensures that if the user navigates the candidate list and presses Enter,
+            # we replace the correct range (from current cursor position, not the old one)
+            # Example: "src/t" + TAB -> "src/tfm_" with cursor at 8
+            # completion_start_pos should be 8, not 4, so selecting a different file
+            # replaces "tfm_" not "src/tfm_"
+            self.completion_start_pos = self.cursor_pos
+            
+            # Mark completion as active
+            self.completion_active = True
+        
+        # Show/update candidate list if multiple candidates exist
+        if len(candidates) > 1 and self.candidate_list:
+            # Mark completion as active so draw() will render the candidate list
+            self.completion_active = True
+            # Store candidates for later rendering in draw()
+            # The actual positioning will be calculated in draw() method
+            # where we have access to the current y, x coordinates
+        
+        # Return True if we had candidates (even if no text was inserted)
+        return True
+    
+    def update_candidate_list(self):
+        """
+        Update candidate list based on current text.
+        
+        Called after text changes to refresh the candidate list.
+        Hides the list if no candidates match.
+        
+        This method implements dynamic candidate filtering as the user types,
+        ensuring the candidate list stays synchronized with the current input.
+        
+        When the user types characters, focus is cleared to prevent the focused
+        candidate from unexpectedly changing as the list filters. This provides
+        more predictable UX - typing refines the search, arrow keys navigate.
+        
+        Requirements:
+        - 2.4: Update candidate list when user types additional characters
+        - 2.5: Hide candidate list when reduced to zero matches
+        - 2.6: Maintain visibility for single candidate
+        - 5.1: Filter candidates when user types a character
+        - 5.2: Expand candidates when user deletes a character
+        """
+        # Check if completer and candidate list are available
+        if not self.completer or not self.candidate_list:
+            return
+        
+        # Clear focus when candidate list is updated due to typing
+        # This ensures the focused candidate doesn't unexpectedly change
+        # User must press Up/Down again to re-activate focus after typing
+        self.candidate_list.clear_focus()
+        
+        # Get current candidates from completer
+        candidates = self.completer.get_candidates(self.text, self.cursor_pos)
+        
+        # Update completion start position
+        self.completion_start_pos = self.completer.get_completion_start_pos(
+            self.text, self.cursor_pos
+        )
+        
+        # Hide candidate list if no candidates
+        if not candidates:
+            self.candidate_list.hide()
+            self.completion_active = False
+            return
+        
+        # Mark completion as active - candidates will be displayed in draw()
+        # The candidate list will remain visible even for single candidate (Req 2.6)
+        self.completion_active = len(candidates) > 0
+    
+    def apply_candidate(self, candidate: str):
+        """
+        Apply a selected candidate to the text edit field.
+        
+        This method replaces the completion portion of the text (from the
+        completion start position to the cursor) with the selected candidate.
+        The cursor is then moved to the end of the inserted text.
+        
+        This is called when the user presses Enter with a focused candidate,
+        allowing them to quickly apply a specific completion without typing
+        the full text.
+        
+        Args:
+            candidate: The candidate text to apply
+        
+        Requirements:
+        - 10.1: Replace completion portion with focused candidate text
+        - 10.2: Hide candidate list after applying selection
+        - 10.3: Move cursor to end of inserted text
+        """
+        # Replace the completion portion with the selected candidate
+        # The completion portion is from completion_start_pos to cursor_pos
+        self.text = (
+            self.text[:self.completion_start_pos] +
+            candidate +
+            self.text[self.cursor_pos:]
+        )
+        
+        # Update cursor position to end of inserted text
+        self.cursor_pos = self.completion_start_pos + len(candidate)
         
     def handle_key(self, event, handle_vertical_nav=False):
         """
@@ -370,13 +772,71 @@ class SingleLineTextEdit:
         
         # Handle CharEvent - text input
         if isinstance(event, CharEvent):
-            return self.insert_char(event.char)
+            result = self.insert_char(event.char)
+            # Update candidate list after text modification
+            if result and self.completion_active:
+                self.update_candidate_list()
+            return result
         
         # Handle KeyEvent - navigation and editing commands
         if isinstance(event, KeyEvent):
+            # Check for TAB key press - trigger completion
+            if event.key_code == KeyCode.TAB:
+                return self.handle_tab_completion()
+            
+            # Check for ESC key press - hide candidate list and clear focus
+            if event.key_code == KeyCode.ESCAPE:
+                if self.candidate_list and self.completion_active:
+                    self.candidate_list.hide()
+                    self.candidate_list.clear_focus()
+                    self.completion_active = False
+                    return True
+                return False
+            
+            # Check for Up/Down arrow keys when candidate list is visible
+            # These keys navigate through the candidate list
+            if self.candidate_list and self.completion_active and self.candidate_list.is_visible:
+                if event.key_code == KeyCode.DOWN:
+                    # Move focus to next candidate
+                    self.candidate_list.move_focus_down()
+                    # Mark dirty to trigger redraw with updated focus
+                    # (The parent component will handle the actual redraw)
+                    return True
+                elif event.key_code == KeyCode.UP:
+                    # Move focus to previous candidate
+                    self.candidate_list.move_focus_up()
+                    # Mark dirty to trigger redraw with updated focus
+                    # (The parent component will handle the actual redraw)
+                    return True
+            
+            # Check for Enter key when candidate list has focus
+            # This applies the focused candidate to the text edit
+            if event.key_code == KeyCode.ENTER:
+                if self.candidate_list and self.candidate_list.has_focus():
+                    # Get the focused candidate
+                    focused_candidate = self.candidate_list.get_focused_candidate()
+                    if focused_candidate:
+                        # Apply the candidate to the text
+                        self.apply_candidate(focused_candidate)
+                        # Clear focus state before updating candidate list
+                        self.candidate_list.clear_focus()
+                        # Re-trigger completion to show updated candidates
+                        # This allows the user to continue completing without pressing TAB again
+                        self.update_candidate_list()
+                        return True
+                # If no focus or no candidate list, fall through to normal Enter handling
+                return False
+            
             # Check for Cmd+V / Ctrl+V paste (exact modifier match)
             if event.char == 'v' and event.modifiers == ModifierKey.COMMAND:
-                return self.paste_from_clipboard()
+                result = self.paste_from_clipboard()
+                # Update candidate list after text modification
+                if result and self.completion_active:
+                    self.update_candidate_list()
+                return result
+            
+            # Track if this is a text-modifying operation
+            text_modified = False
             
             # Command+Left/Right for home/end (macOS style)
             if event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.COMMAND:
@@ -385,7 +845,8 @@ class SingleLineTextEdit:
                 return self.move_cursor_end()
             # Command+Backspace to delete to beginning
             elif event.key_code == KeyCode.BACKSPACE and event.modifiers == ModifierKey.COMMAND:
-                return self.delete_to_beginning()
+                result = self.delete_to_beginning()
+                text_modified = result
             # Word-level navigation with Alt modifier
             elif event.key_code == KeyCode.LEFT and event.modifiers == ModifierKey.ALT:
                 return self.move_cursor_word_left()
@@ -393,7 +854,8 @@ class SingleLineTextEdit:
                 return self.move_cursor_word_right()
             # Word-level deletion with Alt+Backspace
             elif event.key_code == KeyCode.BACKSPACE and event.modifiers == ModifierKey.ALT:
-                return self.delete_word_backward()
+                result = self.delete_word_backward()
+                text_modified = result
             # Character-level navigation (no modifiers)
             elif event.key_code == KeyCode.LEFT:
                 return self.move_cursor_left()
@@ -410,9 +872,19 @@ class SingleLineTextEdit:
                 # Down arrow - move to end of line when vertical nav is enabled
                 return self.move_cursor_end()
             elif event.key_code == KeyCode.BACKSPACE:
-                return self.backspace()
+                result = self.backspace()
+                text_modified = result
             elif event.key_code == KeyCode.DELETE:
-                return self.delete_char_at_cursor()
+                result = self.delete_char_at_cursor()
+                text_modified = result
+            else:
+                return False
+            
+            # Update candidate list after text modifications
+            if text_modified and self.completion_active:
+                self.update_candidate_list()
+            
+            return text_modified if text_modified else False
         
         return False
         
@@ -457,6 +929,11 @@ class SingleLineTextEdit:
                                    base_attributes | TextAttribute.REVERSE)
                 # Set caret position at the beginning of the text field
                 renderer.set_caret_position(text_start_x, y)
+            
+            # Draw candidate list if active and visible
+            if self.completion_active and self.candidate_list and self.completer:
+                self._render_candidate_list(y, text_start_x)
+            
             return
         
         # Ensure cursor is within bounds
@@ -563,6 +1040,106 @@ class SingleLineTextEdit:
         # TTK refresh() will automatically restore this position
         if is_active:
             renderer.set_caret_position(caret_x, y)
+        
+        # Draw candidate list if active and visible
+        if self.completion_active and self.candidate_list and self.completer:
+            self._render_candidate_list(y, text_start_x)
+    
+    def _render_candidate_list(self, text_edit_y: int, text_edit_x: int):
+        """
+        Render the candidate list overlay with proper positioning.
+        
+        This method calculates the correct position for the candidate list
+        based on available screen space and the completion start position,
+        then updates the candidate list and makes it visible.
+        
+        Args:
+            text_edit_y: Y coordinate of the text edit field
+            text_edit_x: X coordinate where the text starts (after label)
+        """
+        # Get current candidates from completer
+        candidates = self.completer.get_candidates(self.text, self.cursor_pos)
+        
+        if not candidates:
+            self.candidate_list.hide()
+            return
+        
+        # Get screen dimensions
+        height, width = self.renderer.get_dimensions()
+        
+        # Calculate completion start X position
+        # This is where the filename/directory name being completed begins
+        safe_funcs = get_safe_functions()
+        get_width = safe_funcs['get_display_width']
+        
+        # Get completion start position from completer
+        completion_start_pos = self.completer.get_completion_start_pos(self.text, self.cursor_pos)
+        
+        # Get the text up to completion start position
+        text_before_completion = self.text[:completion_start_pos]
+        completion_start_display_x = text_edit_x + get_width(text_before_completion)
+        
+        # Determine if we should show above or below the text edit field
+        # Calculate approximate height needed for candidate list
+        num_candidates = min(len(candidates), self.candidate_list.max_visible_candidates)
+        overlay_height = num_candidates + 2  # +2 for borders
+        
+        # Check if there's enough space below
+        space_below = height - text_edit_y - 1
+        space_above = text_edit_y
+        
+        # Prefer showing below unless there's not enough space
+        show_above = space_below < overlay_height and space_above >= overlay_height
+        
+        # Update candidate list with position information
+        self.candidate_list.set_candidates(
+            candidates,
+            text_edit_y,
+            text_edit_x,
+            completion_start_display_x,
+            show_above
+        )
+        
+        # Make candidate list visible
+        self.candidate_list.show()
+        
+        # Draw the candidate list
+        self.candidate_list.draw()
+    
+    def on_focus_gained(self):
+        """
+        Handle focus gained event.
+        
+        When the text field gains focus, the candidate list should NOT
+        automatically appear. The user must press TAB to trigger completion.
+        
+        This method is called by the parent component when focus is gained.
+        
+        Requirements:
+        - 8.4: Candidate list doesn't auto-appear on focus gain
+        """
+        # Do nothing - candidate list should only appear when TAB is pressed
+        # This ensures the candidate list doesn't automatically show up
+        # when the text field receives focus
+        pass
+    
+    def on_focus_lost(self):
+        """
+        Handle focus lost event.
+        
+        When the text field loses focus, hide the candidate list to ensure
+        it doesn't remain visible when the user is no longer editing this field.
+        
+        This method is called by the parent component when focus is lost.
+        
+        Requirements:
+        - 8.3: Hide candidate list when text field loses focus
+        """
+        # Hide candidate list when focus is lost
+        if self.candidate_list and self.completion_active:
+            self.candidate_list.hide()
+            self.candidate_list.clear_focus()
+            self.completion_active = False
     
     def _safe_draw_text(self, renderer, y, x, text, color_pair, attributes):
         """Safely draw text to screen, handling boundary conditions and wide characters"""

@@ -36,7 +36,7 @@ class QuickEditBar:
         self.callback = None
         self.cancel_callback = None
         
-    def show_status_line_input(self, prompt, initial_text="", callback=None, cancel_callback=None):
+    def show_status_line_input(self, prompt, initial_text="", callback=None, cancel_callback=None, completer=None):
         """
         Show a status line input dialog
         
@@ -45,6 +45,7 @@ class QuickEditBar:
             initial_text (str): Initial text in the input field
             callback (callable): Function to call when Enter is pressed
             cancel_callback (callable): Function to call when ESC is pressed
+            completer (Completer): Optional completer for TAB completion
         """
         self.is_active = True
         self.prompt_text = prompt
@@ -52,6 +53,8 @@ class QuickEditBar:
         self.cancel_callback = cancel_callback
         self.content_changed = True  # Mark content as changed when showing
         
+        # Create new text editor with optional completer
+        self.text_editor = SingleLineTextEdit(renderer=self.renderer, completer=completer)
         self.text_editor.set_text(initial_text)
         self.text_editor.set_cursor_pos(len(initial_text))
     
@@ -91,8 +94,20 @@ class QuickEditBar:
         """Handle input for status line input dialog"""
         # Check if it's a KeyEvent first
         if isinstance(event, KeyEvent):
-            # Handle ESC - cancel
+            # Handle ESC - but first check if SingleLineTextEdit wants to handle it
+            # (e.g., for hiding candidate list in TAB completion)
             if event.key_code == KeyCode.ESCAPE:
+                # Let SingleLineTextEdit handle ESC first if candidate list is visible
+                # This allows TAB completion to intercept ESC for hiding the candidate list
+                if hasattr(self.text_editor, 'candidate_list') and self.text_editor.candidate_list:
+                    if self.text_editor.completion_active and self.text_editor.candidate_list.is_visible:
+                        # SingleLineTextEdit will handle this ESC key for hiding candidate list
+                        handled = self.text_editor.handle_key(event)
+                        if handled:
+                            self.content_changed = True
+                        return handled
+                
+                # No visible candidate list - handle ESC normally (cancel and close)
                 # Store callback before hiding
                 cancel_callback = self.cancel_callback
                 self.hide()
@@ -101,8 +116,20 @@ class QuickEditBar:
                     cancel_callback()
                 return True
             
-            # Handle Enter - confirm
+            # Handle Enter - but first check if SingleLineTextEdit wants to handle it
+            # (e.g., for candidate selection in TAB completion)
             elif event.key_code == KeyCode.ENTER:
+                # Let SingleLineTextEdit handle Enter first if it has a focused candidate
+                # This allows TAB completion to intercept Enter for candidate selection
+                if hasattr(self.text_editor, 'candidate_list') and self.text_editor.candidate_list:
+                    if self.text_editor.candidate_list.has_focus():
+                        # SingleLineTextEdit will handle this Enter key for candidate selection
+                        handled = self.text_editor.handle_key(event)
+                        if handled:
+                            self.content_changed = True
+                        return handled
+                
+                # No focused candidate - handle Enter normally (confirm and close)
                 # Store callback and text before hiding
                 callback = self.callback
                 text = self.text_editor.get_text()
