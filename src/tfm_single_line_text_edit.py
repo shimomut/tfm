@@ -146,12 +146,13 @@ class FilepathCompleter:
         
         Algorithm:
         1. Extract the portion of text up to cursor position
-        2. Find the last directory separator (/ or os.sep)
-        3. Split into directory path and filename prefix
-        4. List all entries in the directory
-        5. Filter entries that start with the filename prefix
-        6. Add trailing separator for directories
-        7. Return list of matching filenames/directory names
+        2. Expand ~ to home directory if present
+        3. Find the last directory separator (/ or os.sep)
+        4. Split into directory path and filename prefix
+        5. List all entries in the directory
+        6. Filter entries that start with the filename prefix
+        7. Add trailing separator for directories
+        8. Return list of matching filenames/directory names
         
         Example:
             text = "/aaaa/bbbb/ab"
@@ -159,6 +160,13 @@ class FilepathCompleter:
             directory = "/aaaa/bbbb/"
             prefix = "ab"
             matches = ["abcd1234/", "abc678/"]
+        
+        Example with tilde:
+            text = "~/proj"
+            cursor_pos = 6
+            directory = "/Users/username/"
+            prefix = "proj"
+            matches = ["projects/"]
         
         Args:
             text: Current text in the edit field
@@ -170,6 +178,13 @@ class FilepathCompleter:
         """
         # Extract text up to cursor
         text_to_cursor = text[:cursor_pos]
+        
+        # Expand ~ to home directory
+        if text_to_cursor.startswith('~'):
+            from tfm_path import Path
+            home_dir = str(Path.home())
+            # Replace ~ with home directory
+            text_to_cursor = home_dir + text_to_cursor[1:]
         
         # Find the last directory separator
         last_sep_pos = text_to_cursor.rfind(os.sep)
