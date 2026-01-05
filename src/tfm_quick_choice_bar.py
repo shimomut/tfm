@@ -206,8 +206,8 @@ class QuickChoiceBar:
             if i < len(self.choices) - 1:
                 segments.append(AsIsSegment(" "))
         
-        # Add spacer before help text
-        segments.append(SpacerSegment())
+        # Add space before help text
+        segments.append(AsIsSegment(" "))
         
         # Generate help text based on available quick keys
         quick_keys = []
