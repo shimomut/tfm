@@ -10,6 +10,7 @@ from ttk.wide_char_utils import get_display_width, get_safe_functions
 from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
 from tfm_scrollbar import draw_scrollbar
+from tfm_text_layout import draw_text_segments, AsIsSegment
 
 
 class BaseListDialog:
@@ -364,6 +365,76 @@ class BaseListDialog:
                 if get_width(display_text) > content_width:
                     display_text = truncate_text(display_text, content_width, "")
                 self.renderer.draw_text(y, start_x, display_text, color_pair=status_color_pair, attributes=item_attributes)
+    
+    def draw_list_items_with_segments(self, items_list, start_y, end_y, start_x, content_width, format_item_func):
+        """Draw list items with selection highlighting using text layout segments
+        
+        This method uses the text layout system for intelligent text shortening with
+        priority-based segment handling.
+        
+        Args:
+            items_list: List of items to display
+            start_y: Starting Y position for list
+            end_y: Ending Y position for list
+            start_x: X position for content
+            content_width: Width available for content
+            format_item_func: Function to format items (item) -> List[TextSegment]
+                             Should return a list of text segments for the item
+        """
+        height, _ = self.renderer.get_dimensions()
+        content_height = end_y - start_y + 1
+        
+        # Cache the actual content height for use in navigation
+        self._last_content_height = content_height
+        
+        # DON'T adjust scroll here - that would override wheel scrolling
+        # Only clamp scroll to valid range
+        max_scroll = max(0, len(items_list) - content_height)
+        if self.scroll > max_scroll:
+            self.scroll = max_scroll
+        
+        # Draw visible items
+        visible_items = items_list[self.scroll:self.scroll + content_height]
+        
+        status_color_pair, _ = get_status_color()
+        
+        for i, item in enumerate(visible_items):
+            y = start_y + i
+            if y <= end_y and y < height:
+                item_index = self.scroll + i
+                is_selected = item_index == self.selected
+                
+                # Get segments from format function
+                segments = format_item_func(item)
+                
+                # Add selection indicator as first segment
+                if is_selected:
+                    indicator_segment = AsIsSegment("► ", attributes=TextAttribute.BOLD | TextAttribute.REVERSE)
+                    item_attributes = TextAttribute.BOLD | TextAttribute.REVERSE
+                else:
+                    indicator_segment = AsIsSegment("  ", attributes=TextAttribute.NORMAL)
+                    item_attributes = TextAttribute.NORMAL
+                
+                # Apply selection attributes to all segments
+                for segment in segments:
+                    if segment.attributes == 0:  # Only override if not explicitly set
+                        segment.attributes = item_attributes
+                    if segment.color_pair is None:  # Only override if not explicitly set
+                        segment.color_pair = status_color_pair
+                
+                # Combine indicator with item segments
+                all_segments = [indicator_segment] + segments
+                
+                # Use text layout system to render
+                draw_text_segments(
+                    self.renderer,
+                    row=y,
+                    col=start_x,
+                    segments=all_segments,
+                    rendering_width=content_width,
+                    default_color=status_color_pair,
+                    default_attributes=item_attributes
+                )
                 
     def draw_scrollbar(self, items_list, start_y, content_height, scrollbar_x):
         """Draw scrollbar if needed using unified implementation
