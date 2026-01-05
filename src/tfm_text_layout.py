@@ -1499,8 +1499,6 @@ def draw_text_segments(
         logger.warning(f"Negative col {col}, clipping to 0")
         col = 0
     
-    logger.info(f"draw_text_segments: {len(segments)} segment(s), target width {rendering_width}, row {row}, col {col}")
-    
     # ========================================================================
     # Create Initial Layout State
     # ========================================================================
@@ -1583,8 +1581,6 @@ def draw_text_segments(
             logger.debug("Extra space available with spacers, expanding spacers")
             expand_spacers(state, shortened_texts)
         
-        logger.info(f"Layout calculation complete: final width {state.total_width}/{state.target_width}")
-        
     except Exception as e:
         logger.error(f"Layout calculation failed: {e}")
         # Try to render with whatever state we have
@@ -1606,8 +1602,6 @@ def draw_text_segments(
         
         # Render all segments
         render_segments(context, segments, shortened_texts, state.current_widths)
-        
-        logger.info(f"Rendering complete: rendered to column {context.current_col}")
         
     except Exception as e:
         logger.error(f"Rendering failed: {e}")
