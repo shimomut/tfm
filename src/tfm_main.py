@@ -4179,11 +4179,20 @@ class FileManager(UILayer):
             
             try:
                 from tfm_path import Path
-                target_path = Path(path_str.strip())
+                path_str = path_str.strip()
                 
                 # Expand ~ to home directory
-                if str(target_path).startswith('~'):
-                    target_path = Path.home() / str(target_path)[2:].lstrip('/')
+                if path_str.startswith('~'):
+                    target_path = Path.home() / path_str[2:].lstrip('/')
+                # Handle relative paths - resolve relative to current pane's path
+                elif not os.path.isabs(path_str):
+                    target_path = Path(current_path) / path_str
+                else:
+                    # Absolute path - use as-is
+                    target_path = Path(path_str)
+                
+                # Normalize path to resolve .. and . components
+                target_path = Path(os.path.normpath(str(target_path)))
                 
                 # Check if path exists and is a directory
                 if not target_path.exists():
@@ -4220,7 +4229,8 @@ class FileManager(UILayer):
             pass
         
         # Create filepath completer for TAB completion (directories only)
-        completer = FilepathCompleter(directories_only=True)
+        # Use current pane's path as base directory for relative path completion
+        completer = FilepathCompleter(base_directory=current_path, directories_only=True)
         
         # Show QuickEditBar for path input with filepath completion
         self.quick_edit_bar.show_status_line_input(
