@@ -228,27 +228,10 @@ class CandidateListOverlay:
         # Draw bottom border
         bottom_y = overlay_y + 1 + num_candidates
         if bottom_y >= 0 and bottom_y < height:
-            # Check if there are more candidates than displayed
-            if len(self.candidates) > num_candidates:
-                # Show indicator that more candidates exist
-                indicator = f" +{len(self.candidates) - num_candidates} more "
-                indicator_width = get_width(indicator)
-                
-                # Calculate how much border to show on each side
-                remaining_width = overlay_width - 2 - indicator_width
-                left_border_width = remaining_width // 2
-                right_border_width = remaining_width - left_border_width
-                
-                bottom_border = (self.corner_chars["bottom_left"] + 
-                               self.horizontal_border_char * left_border_width +
-                               indicator +
-                               self.horizontal_border_char * right_border_width +
-                               self.corner_chars["bottom_right"])
-            else:
-                # Normal bottom border
-                bottom_border = (self.corner_chars["bottom_left"] + 
-                               self.horizontal_border_char * (overlay_width - 2) + 
-                               self.corner_chars["bottom_right"])
+            # Draw normal bottom border (scrollbar indicates if more candidates exist)
+            bottom_border = (self.corner_chars["bottom_left"] + 
+                           self.horizontal_border_char * (overlay_width - 2) + 
+                           self.corner_chars["bottom_right"])
             
             self._safe_draw_text(bottom_y, overlay_x, bottom_border, color_pair, attributes)
     
