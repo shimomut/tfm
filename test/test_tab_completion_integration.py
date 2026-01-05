@@ -128,11 +128,11 @@ class TestTabCompletionIntegration(unittest.TestCase):
         print(f"  Final text: {text}")
         assert focused_candidate in text, f"Text should contain selected candidate: {focused_candidate}"
         
-        # Verify candidate list is hidden
-        assert not editor.candidate_list.is_visible, "Candidate list should be hidden after selection"
-        
-        # Verify focus is cleared
+        # Verify focus is cleared (even though list may re-open)
         assert editor.candidate_list.focused_index is None, "Focus should be cleared"
+        
+        # Note: Candidate list may re-open with new candidates based on the selected text
+        # This is the new behavior - the list automatically updates after selection
         
         print("✓ TAB → Down → Down → Enter workflow passed")
     
@@ -444,9 +444,10 @@ class TestTabCompletionIntegration(unittest.TestCase):
         enter_event = KeyEvent(key_code=KeyCode.ENTER, modifiers=0)
         editor.handle_key(enter_event)
         
-        assert not editor.candidate_list.is_visible, "Candidate list should be hidden after Enter"
+        # Note: Candidate list may re-open with new candidates based on the selected text
+        # This is the new behavior - the list automatically updates after selection
         assert editor.candidate_list.focused_index is None, "Focus should be cleared"
-        print("  ✓ Candidate list hidden after selection")
+        print("  ✓ Focus cleared after selection (list may re-open with new candidates)")
         
         print("✓ Visual feedback at each step passed")
     

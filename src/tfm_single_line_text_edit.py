@@ -794,11 +794,11 @@ class SingleLineTextEdit:
                     if focused_candidate:
                         # Apply the candidate to the text
                         self.apply_candidate(focused_candidate)
-                        # Hide the candidate list
-                        self.candidate_list.hide()
-                        self.completion_active = False
-                        # Clear focus state
+                        # Clear focus state before updating candidate list
                         self.candidate_list.clear_focus()
+                        # Re-trigger completion to show updated candidates
+                        # This allows the user to continue completing without pressing TAB again
+                        self.update_candidate_list()
                         return True
                 # If no focus or no candidate list, fall through to normal Enter handling
                 return False
