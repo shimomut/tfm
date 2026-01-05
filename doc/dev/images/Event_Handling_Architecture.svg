@@ -1,0 +1,370 @@
+<svg viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="#1e1e1e"/>
+  
+  <!-- Title -->
+  <text x="960" y="50" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#ffffff" text-anchor="middle">
+    TFM/TTK Event Handling Architecture
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="960" y="85" font-family="Arial, sans-serif" font-size="18" fill="#cccccc" text-anchor="middle">
+    Callback-Based Event Delivery with Layer Stack Routing
+  </text>
+  
+  <!-- Event Sources (Top) -->
+  <text x="960" y="130" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4ec9b0" text-anchor="middle">
+    Event Sources (OS/Backend)
+  </text>
+  
+  <!-- Event Source Boxes -->
+  <rect x="80" y="145" width="200" height="80" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="180" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Keyboard
+  </text>
+  <text x="180" y="198" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Keys, Modifiers
+  </text>
+  <text x="180" y="216" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Shortcuts
+  </text>
+  
+  <rect x="300" y="145" width="200" height="80" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="400" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Character Input
+  </text>
+  <text x="400" y="198" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Text Entry
+  </text>
+  <text x="400" y="216" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    IME Composition
+  </text>
+  
+  <rect x="520" y="145" width="200" height="80" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="620" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Mouse
+  </text>
+  <text x="620" y="198" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Click, Move
+  </text>
+  <text x="620" y="216" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Wheel, Drag
+  </text>
+  
+  <rect x="740" y="145" width="200" height="80" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="840" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    System Events
+  </text>
+  <text x="840" y="198" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Resize, Close
+  </text>
+  <text x="840" y="216" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Broadcast
+  </text>
+  
+  <rect x="960" y="145" width="200" height="80" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="1060" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Menu Events
+  </text>
+  <text x="1060" y="198" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Menu Selection
+  </text>
+  <text x="1060" y="216" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4" text-anchor="middle">
+    Desktop Only
+  </text>
+  
+  <!-- Event Loop -->
+  <text x="960" y="270" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4ec9b0" text-anchor="middle">
+    Event Loop (Renderer Backend)
+  </text>
+  
+  <rect x="300" y="285" width="1320" height="110" fill="#2d2d30" stroke="#569cd6" stroke-width="3" rx="8"/>
+  <text x="960" y="315" font-family="Arial, sans-serif" font-size="19" font-weight="bold" fill="#569cd6" text-anchor="middle">
+    run_event_loop_iteration(timeout_ms)
+  </text>
+  <text x="320" y="342" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Polls OS for events (keyboard, mouse, system, menu)
+  </text>
+  <text x="320" y="363" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Converts OS-specific events to TTK event objects (KeyEvent, CharEvent, MouseEvent, SystemEvent, MenuEvent)
+  </text>
+  <text x="320" y="384" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Delivers events via EventCallback interface (on_key_event, on_char_event, on_mouse_event, on_system_event, on_menu_event)
+  </text>
+  
+  <!-- Arrows from sources to event loop -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#dcdcaa"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#569cd6"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#4ec9b0"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#ce9178"/>
+    </marker>
+  </defs>
+  
+  <line x1="180" y1="225" x2="400" y2="285" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="400" y1="225" x2="550" y2="285" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="620" y1="225" x2="700" y2="285" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="840" y1="225" x2="850" y2="285" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1060" y1="225" x2="1000" y2="285" stroke="#dcdcaa" stroke-width="2" marker-end="url(#arrow)"/>
+  
+  <!-- EventCallback Interface -->
+  <text x="960" y="440" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4ec9b0" text-anchor="middle">
+    EventCallback Interface (TFMEventCallback)
+  </text>
+  
+  <rect x="300" y="455" width="1320" height="135" fill="#2d2d30" stroke="#c586c0" stroke-width="3" rx="8"/>
+  <text x="960" y="485" font-family="Arial, sans-serif" font-size="19" font-weight="bold" fill="#c586c0" text-anchor="middle">
+    Application Event Handler
+  </text>
+  <text x="320" y="512" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • on_key_event(KeyEvent) → bool - Routes to UI layer stack, handles global shortcuts (font size)
+  </text>
+  <text x="320" y="533" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • on_char_event(CharEvent) → bool - Routes to UI layer stack for text input
+  </text>
+  <text x="320" y="554" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • on_mouse_event(MouseEvent) → bool - Routes to UI layer stack (top layer only)
+  </text>
+  <text x="320" y="575" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • on_system_event(SystemEvent) → bool - Broadcasts to ALL layers (resize, close)
+  </text>
+  
+  <!-- Arrow from event loop to callback -->
+  <line x1="960" y1="395" x2="960" y2="455" stroke="#569cd6" stroke-width="3" marker-end="url(#arrow-blue)"/>
+  <text x="980" y="430" font-family="Arial, sans-serif" font-size="14" fill="#569cd6">Callback Delivery</text>
+  
+  <!-- UI Layer Stack -->
+  <text x="960" y="635" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4ec9b0" text-anchor="middle">
+    UI Layer Stack (Event Routing)
+  </text>
+  
+  <rect x="80" y="650" width="1760" height="180" fill="#2d2d30" stroke="#4fc1ff" stroke-width="3" rx="8"/>
+  <text x="960" y="680" font-family="Arial, sans-serif" font-size="19" font-weight="bold" fill="#4fc1ff" text-anchor="middle">
+    UILayerStack - LIFO Stack with Top-Layer-Only Routing
+  </text>
+  
+  <!-- Routing Rules -->
+  <text x="100" y="710" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ce9178">
+    Key/Char/Mouse Events:
+  </text>
+  <text x="120" y="732" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Routed ONLY to top layer
+  </text>
+  <text x="120" y="752" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • No propagation to lower layers
+  </text>
+  <text x="120" y="772" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Top layer handles completely
+  </text>
+  <text x="120" y="792" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Exception handling (logged)
+  </text>
+  <text x="120" y="812" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Marks activity for adaptive FPS
+  </text>
+  
+  <text x="550" y="710" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ce9178">
+    System Events:
+  </text>
+  <text x="570" y="732" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Broadcast to ALL layers
+  </text>
+  <text x="570" y="752" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Bottom to top traversal
+  </text>
+  <text x="570" y="772" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • All layers update state
+  </text>
+  <text x="570" y="792" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Resize → mark all dirty
+  </text>
+  <text x="570" y="812" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Exception handling per layer
+  </text>
+  
+  <text x="1000" y="710" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ce9178">
+    Lifecycle Management:
+  </text>
+  <text x="1020" y="732" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • push(layer) → deactivate old top, activate new
+  </text>
+  <text x="1020" y="752" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • pop() → deactivate top, activate new top
+  </text>
+  <text x="1020" y="772" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • Bottom layer protected (FileManager)
+  </text>
+  <text x="1020" y="792" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • check_and_close_top_layer()
+  </text>
+  <text x="1020" y="812" font-family="Arial, sans-serif" font-size="14" fill="#d4d4d4">
+    • on_activate() / on_deactivate() hooks
+  </text>
+  
+  <!-- Arrow from callback to layer stack -->
+  <line x1="960" y1="590" x2="960" y2="650" stroke="#c586c0" stroke-width="3" marker-end="url(#arrow-blue)"/>
+  <text x="980" y="625" font-family="Arial, sans-serif" font-size="14" fill="#c586c0">Route Events</text>
+  
+  <!-- UI Layers -->
+  <text x="960" y="875" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#4ec9b0" text-anchor="middle">
+    UI Layers (Event Handlers)
+  </text>
+  
+  <!-- Layer boxes -->
+  <rect x="80" y="890" width="280" height="155" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="220" y="918" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    FileManager (Bottom)
+  </text>
+  <text x="100" y="942" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Main file browser
+  </text>
+  <text x="100" y="961" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Permanent base layer
+  </text>
+  <text x="100" y="980" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Navigation, selection
+  </text>
+  <text x="100" y="999" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • File operations
+  </text>
+  <text x="100" y="1018" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Key bindings
+  </text>
+  <text x="100" y="1037" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Full-screen layer
+  </text>
+  
+  <rect x="380" y="890" width="280" height="155" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="520" y="918" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Dialogs
+  </text>
+  <text x="400" y="942" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • ListDialog, InfoDialog
+  </text>
+  <text x="400" y="961" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • SearchDialog, DrivesDialog
+  </text>
+  <text x="400" y="980" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • BatchRenameDialog
+  </text>
+  <text x="400" y="999" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Modal interaction
+  </text>
+  <text x="400" y="1018" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • ESC to close
+  </text>
+  <text x="400" y="1037" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Full-screen or overlay
+  </text>
+  
+  <rect x="680" y="890" width="280" height="155" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="820" y="918" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Text/Diff Viewers
+  </text>
+  <text x="700" y="942" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • TextViewer, DiffViewer
+  </text>
+  <text x="700" y="961" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • DirectoryDiffViewer
+  </text>
+  <text x="700" y="980" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Scrolling, search
+  </text>
+  <text x="700" y="999" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Navigation keys
+  </text>
+  <text x="700" y="1018" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Q to close
+  </text>
+  <text x="700" y="1037" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Full-screen layer
+  </text>
+  
+  <rect x="980" y="890" width="280" height="155" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="1120" y="918" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Quick Bars
+  </text>
+  <text x="1000" y="942" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • QuickChoiceBar
+  </text>
+  <text x="1000" y="961" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • QuickEditBar
+  </text>
+  <text x="1000" y="980" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Path completion
+  </text>
+  <text x="1000" y="999" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Text input
+  </text>
+  <text x="1000" y="1018" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Tab completion
+  </text>
+  <text x="1000" y="1037" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Overlay (not full-screen)
+  </text>
+  
+  <rect x="1280" y="890" width="280" height="155" fill="#2d2d30" stroke="#dcdcaa" stroke-width="2" rx="6"/>
+  <text x="1420" y="918" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#dcdcaa" text-anchor="middle">
+    Candidate List Overlay
+  </text>
+  <text x="1300" y="942" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • CandidateListOverlay
+  </text>
+  <text x="1300" y="961" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Path suggestions
+  </text>
+  <text x="1300" y="980" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Arrow key navigation
+  </text>
+  <text x="1300" y="999" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Enter to select
+  </text>
+  <text x="1300" y="1018" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • ESC to close
+  </text>
+  <text x="1300" y="1037" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Small overlay
+  </text>
+  
+  <!-- Arrows from layer stack to layers -->
+  <line x1="220" y1="830" x2="220" y2="890" stroke="#4fc1ff" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="520" y1="830" x2="520" y2="890" stroke="#4fc1ff" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="820" y1="830" x2="820" y2="890" stroke="#4fc1ff" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="1120" y1="830" x2="1120" y2="890" stroke="#4fc1ff" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <line x1="1420" y1="830" x2="1420" y2="890" stroke="#4fc1ff" stroke-width="2" marker-end="url(#arrow-green)"/>
+  
+  <text x="960" y="865" font-family="Arial, sans-serif" font-size="14" fill="#4fc1ff" text-anchor="middle">
+    Top Layer Receives Events (Others Inactive)
+  </text>
+  
+  <!-- Right side: Event Types -->
+  <rect x="1580" y="890" width="260" height="155" fill="#2d2d30" stroke="#ce9178" stroke-width="2" rx="6"/>
+  <text x="1710" y="918" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    Event Types (TTK)
+  </text>
+  <text x="1600" y="942" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • KeyEvent (key_code, modifiers)
+  </text>
+  <text x="1600" y="961" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • CharEvent (char)
+  </text>
+  <text x="1600" y="980" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • MouseEvent (row, col, button)
+  </text>
+  <text x="1600" y="999" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • SystemEvent (RESIZE, CLOSE)
+  </text>
+  <text x="1600" y="1018" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • MenuEvent (item_id)
+  </text>
+  <text x="1600" y="1037" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • Unified cross-backend API
+  </text>
+</svg>
