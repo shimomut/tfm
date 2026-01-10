@@ -1991,20 +1991,9 @@ class FileManager(UILayer):
             # to handle layers that want to close due to system events
             if self.ui_layer_stack.check_and_close_top_layer():
                 self.mark_dirty()
-            
 
-            if 'rendering' in self.profiling_targets:
-                import cProfile
-                cProfile.runctx(
-                    "self.draw_interface()",
-                    globals(),
-                    locals()
-                )
-            else:
-                self.draw_interface()
-
-            # # Draw interface after event processing
-            # self.draw_interface()
+            # Draw interface after event processing
+            self.draw_interface()
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
@@ -4774,7 +4763,15 @@ class FileManager(UILayer):
     def draw_interface(self):
         """Draw the complete interface using the UI layer stack"""
         # Delegate rendering to the UI layer stack
-        self.ui_layer_stack.render(self.renderer)
+        if 'rendering' in self.profiling_targets:
+            import cProfile
+            cProfile.runctx(
+                "self.ui_layer_stack.render(self.renderer)",
+                globals(),
+                locals()
+            )
+        else:
+            self.ui_layer_stack.render(self.renderer)
 
 
     def load_application_state(self):
