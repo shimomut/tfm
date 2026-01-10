@@ -6,7 +6,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
 
 ## Tasks
 
-- [ ] 1. Create SSH configuration parser
+- [x] 1. Create SSH configuration parser
   - Implement SSHConfigParser class in new file `src/tfm_ssh_config.py`
   - Parse ~/.ssh/config file to extract Host entries
   - Support Include directives for additional config files
@@ -28,7 +28,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test malformed config entry handling
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
-- [ ] 2. Implement SSH connection management
+- [x] 2. Implement SSH connection management
   - Create SSHConnection class in `src/tfm_ssh_connection.py`
   - Implement connection establishment using subprocess and sftp command
   - Implement connection state tracking (connected/disconnected)
@@ -44,7 +44,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test authentication failure handling
   - _Requirements: 3.3, 3.4, 8.1_
 
-- [ ] 3. Implement SSH connection manager
+- [x] 3. Implement SSH connection manager
   - Create SSHConnectionManager singleton class in `src/tfm_ssh_connection.py`
   - Implement connection pooling (hostname -> SSHConnection mapping)
   - Implement connection reuse for same hostname
@@ -70,10 +70,10 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test thread safety
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement SSH file operations
+- [x] 5. Implement SSH file operations
   - Add list_directory() method to SSHConnection
   - Add stat() method to SSHConnection for file metadata
   - Add read_file() method to SSHConnection
@@ -102,7 +102,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test rename operation
   - _Requirements: 5.1, 6.1, 6.2, 6.3, 9.1, 9.2, 9.4, 9.5, 9.6, 9.7_
 
-- [ ] 6. Implement SSHPathImpl class
+- [x] 6. Implement SSHPathImpl class
   - Create SSHPathImpl class in `src/tfm_ssh.py`
   - Implement PathImpl interface methods
   - Parse SSH URI format (ssh://hostname/path/to/file)
@@ -135,7 +135,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test storage-specific methods
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 7. Implement display and metadata methods for SSHPathImpl
+- [x] 7. Implement display and metadata methods for SSHPathImpl
   - Implement get_display_prefix() to return "SSH: "
   - Implement get_display_title() to return full ssh:// URI
   - Implement requires_extraction_for_reading() to return True
@@ -151,10 +151,10 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test extended metadata
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 8. Checkpoint - Ensure all tests pass
+- [x] 8. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Extend Path factory to recognize ssh:// URIs
+- [x] 9. Extend Path factory to recognize ssh:// URIs
   - Modify Path._create_implementation() in `src/tfm_path.py`
   - Add detection for ssh:// scheme
   - Import and instantiate SSHPathImpl for ssh:// URIs
@@ -167,7 +167,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test error handling for missing SSH support
   - _Requirements: 10.1, 10.2_
 
-- [ ] 10. Extend DriveEntry to support SSH hosts
+- [x] 10. Extend DriveEntry to support SSH hosts
   - Modify DriveEntry class in `src/tfm_drives_dialog.py`
   - Add 'ssh' as valid drive_type
   - Update get_display_text() to handle SSH entries
@@ -180,7 +180,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test display text formatting
   - _Requirements: 2.4_
 
-- [ ] 11. Extend DrivesDialog to load SSH hosts
+- [x] 11. Extend DrivesDialog to load SSH hosts
   - Add _load_ssh_hosts() method to DrivesDialog in `src/tfm_drives_dialog.py`
   - Use SSHConfigParser to load hosts from ~/.ssh/config
   - Create DriveEntry for each host with type='ssh'
@@ -195,7 +195,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test error handling
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
 
-- [ ] 12. Implement cross-storage copy operations
+- [x] 12. Implement cross-storage copy operations
   - Implement _copy_file_cross_storage() in Path class (`src/tfm_path.py`)
   - Handle local → remote transfers (read local, write remote)
   - Handle remote → local transfers (read remote, write local)
@@ -214,7 +214,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test directory creation
   - _Requirements: 11.1, 11.2, 11.3_
 
-- [ ] 13. Implement cross-storage move operations
+- [x] 13. Implement cross-storage move operations
   - Implement move_to() in Path class (`src/tfm_path.py`)
   - Use native rename for same-storage moves
   - Use copy + delete for cross-storage moves
@@ -237,7 +237,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test error handling
   - _Requirements: 11.4, 11.5_
 
-- [ ] 14. Implement recursive directory copy
+- [x] 14. Implement recursive directory copy
   - Implement _copy_directory_cross_storage() in Path class
   - Create destination directory
   - Recursively copy all contents
@@ -250,10 +250,10 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test mixed files and directories
   - _Requirements: 11.6_
 
-- [ ] 15. Checkpoint - Ensure all tests pass
+- [x] 15. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 16. Add progress display for large transfers
+- [x] 16. Add progress display for large transfers
   - Extend SSHConnection to track transfer progress
   - Emit progress events during file transfers
   - Integrate with existing progress display system
@@ -266,7 +266,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test threshold behavior
   - _Requirements: 11.7_
 
-- [ ] 17. Implement error handling for SSH operations
+- [x] 17. Implement error handling for SSH operations
   - Add specific exception types for SSH errors
   - Handle authentication failures with clear messages
   - Handle connection timeouts with retry logic
@@ -283,7 +283,7 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test error logging
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 18. Add connection lifecycle management
+- [x] 18. Add connection lifecycle management
   - Implement automatic reconnection on connection loss
   - Add connection health checks
   - Implement graceful connection shutdown
@@ -298,10 +298,10 @@ This implementation plan breaks down the remote SSH browsing feature into discre
   - Test cleanup on exit
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 19. Final checkpoint - Ensure all tests pass
+- [x] 19. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 20. Integration and wiring
+- [x] 20. Integration and wiring
   - Verify SSH hosts appear in Drives Dialog
   - Verify navigation to SSH hosts works
   - Verify file browsing on remote systems

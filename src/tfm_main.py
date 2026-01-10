@@ -4949,6 +4949,17 @@ def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profilin
         if fm is not None:
             fm.restore_stdio()
         
+        # Clean up SSH connections
+        try:
+            from tfm_ssh_connection import cleanup_ssh_connections
+            cleanup_ssh_connections()
+        except ImportError:
+            # SSH support not available, skip cleanup
+            pass
+        except Exception as e:
+            # Log error but don't fail shutdown
+            print(f"Warning: SSH connection cleanup failed: {e}", file=sys.stderr)
+        
         # Clean up state manager
         cleanup_state_manager()
 

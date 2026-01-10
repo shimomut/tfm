@@ -986,7 +986,7 @@ class Path:
         else:
             # Create new path from string arguments
             # Check for remote schemes first before using PathlibPath
-            if len(args) == 1 and isinstance(args[0], str) and args[0].startswith(('archive://', 's3://', 'scp://', 'ftp://')):
+            if len(args) == 1 and isinstance(args[0], str) and args[0].startswith(('archive://', 's3://', 'ssh://', 'scp://', 'ftp://')):
                 path_str = args[0]
             else:
                 path_str = str(PathlibPath(*args))
@@ -1017,6 +1017,18 @@ class Path:
                 return S3PathImpl(path_str)
             except ImportError as e:
                 raise ImportError(f"S3 support not available: {e}")
+        
+        # Detect SSH URIs
+        if path_str.startswith('ssh://'):
+            try:
+                # Try relative import first, then absolute
+                try:
+                    from .tfm_ssh import SSHPathImpl
+                except ImportError:
+                    from tfm_ssh import SSHPathImpl
+                return SSHPathImpl(path_str)
+            except ImportError as e:
+                raise ImportError(f"SSH support not available: {e}")
         
         # Default to local file system
         return LocalPathImpl(PathlibPath(path_str))
@@ -1393,7 +1405,8 @@ class Path:
         else:
             self.unlink()
     
-    def copy_to(self, destination: 'Path', overwrite: bool = False) -> bool:
+    def copy_to(self, destination: 'Path', overwrite: bool = False, 
+                progress_callback: Optional[callable] = None) -> bool:
         """
         Copy this file or directory to the destination path.
         
@@ -1402,6 +1415,7 @@ class Path:
         Args:
             destination: Target path where the file/directory should be copied
             overwrite: Whether to overwrite existing files
+            progress_callback: Optional callback for progress tracking (bytes_transferred, total_bytes)
             
         Returns:
             True if copy was successful, False otherwise
@@ -1432,38 +1446,82 @@ class Path:
                 if self.is_dir():
                     shutil.copytree(str(self), str(destination), dirs_exist_ok=overwrite)
                 else:
+                    # Create parent directories for local destination
+                    destination.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(str(self), str(destination))
                 return True
         
-        # Cross-storage copying
+        # Cross-storage copying with progress tracking
         if self.is_dir():
-            return self._copy_directory_cross_storage(destination, overwrite)
+            return self._copy_directory_cross_storage(destination, overwrite, progress_callback)
         else:
-            return self._copy_file_cross_storage(destination, overwrite)
+            return self._copy_file_cross_storage(destination, overwrite, progress_callback)
     
-    def _copy_file_cross_storage(self, destination: 'Path', overwrite: bool = False) -> bool:
-        """Copy a single file across different storage systems"""
+    def _copy_file_cross_storage(self, destination: 'Path', overwrite: bool = False, 
+                                 progress_callback: Optional[callable] = None) -> bool:
+        """Copy a single file across different storage systems.
+        
+        Handles transfers between different storage types:
+        - Local → Remote (SSH, S3)
+        - Remote → Local (SSH, S3)
+        - Remote → Remote (SSH, S3)
+        
+        Args:
+            destination: Target path for the copy
+            overwrite: Whether to overwrite existing files
+            progress_callback: Optional callback for progress tracking (bytes_transferred, total_bytes)
+            
+        Returns:
+            True if copy was successful
+            
+        Raises:
+            OSError: If copy operation fails
+        """
         try:
             # Create destination directory if needed (only for local destinations)
             if destination.get_scheme() == 'file':
                 destination.parent.mkdir(parents=True, exist_ok=True)
             
-            # Read from source and write to destination
-            if self.get_scheme() == 'file' and destination.get_scheme() == 's3':
-                # Local to S3
+            # Get source and destination schemes
+            source_scheme = self.get_scheme()
+            dest_scheme = destination.get_scheme()
+            
+            # Handle all cross-storage combinations with progress tracking
+            if source_scheme == 'file' and dest_scheme in ('s3', 'ssh'):
+                # Local → Remote (S3 or SSH)
+                # Read from local file and write to remote
                 with self.open('rb') as src:
                     data = src.read()
+                
+                # Use progress-aware write if available and callback provided
+                if dest_scheme == 'ssh' and progress_callback:
+                    destination._impl.write_bytes_with_progress(data, progress_callback)
+                else:
+                    destination.write_bytes(data)
+                    
+            elif source_scheme in ('s3', 'ssh') and dest_scheme == 'file':
+                # Remote → Local (S3 or SSH)
+                # Read from remote and write to local file
+                if source_scheme == 'ssh' and progress_callback:
+                    data = self._impl.read_bytes_with_progress(progress_callback)
+                else:
+                    data = self.read_bytes()
                 destination.write_bytes(data)
-            elif self.get_scheme() == 's3' and destination.get_scheme() == 'file':
-                # S3 to local
-                data = self.read_bytes()
-                destination.write_bytes(data)
-            elif self.get_scheme() == 's3' and destination.get_scheme() == 's3':
-                # S3 to S3
-                data = self.read_bytes()
-                destination.write_bytes(data)
+                
+            elif source_scheme in ('s3', 'ssh') and dest_scheme in ('s3', 'ssh'):
+                # Remote → Remote (S3 or SSH)
+                # Read from source remote and write to destination remote
+                if source_scheme == 'ssh' and progress_callback:
+                    data = self._impl.read_bytes_with_progress(progress_callback)
+                else:
+                    data = self.read_bytes()
+                
+                if dest_scheme == 'ssh' and progress_callback:
+                    destination._impl.write_bytes_with_progress(data, progress_callback)
+                else:
+                    destination.write_bytes(data)
             else:
-                # Generic cross-storage copy
+                # Generic cross-storage copy for any other combinations
                 data = self.read_bytes()
                 destination.write_bytes(data)
             
@@ -1471,20 +1529,44 @@ class Path:
         except Exception as e:
             raise OSError(f"Failed to copy file from {self} to {destination}: {e}")
     
-    def _copy_directory_cross_storage(self, destination: 'Path', overwrite: bool = False) -> bool:
-        """Copy a directory recursively across different storage systems"""
+    def _copy_directory_cross_storage(self, destination: 'Path', overwrite: bool = False,
+                                      progress_callback: Optional[callable] = None) -> bool:
+        """Copy a directory recursively across different storage systems.
+        
+        Handles recursive copying of directories and their contents across
+        different storage types (local, SSH, S3).
+        
+        Args:
+            destination: Target directory path
+            overwrite: Whether to overwrite existing files
+            progress_callback: Optional callback for progress tracking (bytes_transferred, total_bytes)
+            
+        Returns:
+            True if copy was successful
+            
+        Raises:
+            OSError: If copy operation fails
+        """
         try:
-            # Create destination directory (only for local destinations)
+            # Create destination directory
+            # For local destinations, use parents=True to create intermediate directories
+            # For remote destinations, mkdir should handle directory creation
             if destination.get_scheme() == 'file':
                 destination.mkdir(parents=True, exist_ok=overwrite)
+            else:
+                # For remote destinations (SSH, S3), create directory if it doesn't exist
+                if not destination.exists():
+                    destination.mkdir(exist_ok=True)
             
             # Copy all contents recursively
             for item in self.iterdir():
                 dest_item = destination / item.name
                 if item.is_dir():
-                    item._copy_directory_cross_storage(dest_item, overwrite)
+                    # Recursively copy subdirectories
+                    item._copy_directory_cross_storage(dest_item, overwrite, progress_callback)
                 else:
-                    item._copy_file_cross_storage(dest_item, overwrite)
+                    # Copy individual files with progress tracking
+                    item._copy_file_cross_storage(dest_item, overwrite, progress_callback)
             
             return True
         except Exception as e:

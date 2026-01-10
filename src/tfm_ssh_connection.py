@@ -1,0 +1,1117 @@
+"""
+SSH Connection Management for TFM
+
+This module provides SSH/SFTP connection management for remote file operations.
+It uses the standard sftp command-line tool via subprocess for all operations.
+"""
+
+import subprocess
+import threading
+import time
+from typing import Optional, Dict, List, Tuple
+from tfm_log_manager import getLogger
+
+
+# SSH-specific exception types
+class SSHError(Exception):
+    """Base exception for SSH-related errors"""
+    pass
+
+
+class SSHAuthenticationError(SSHError):
+    """Exception raised when SSH authentication fails"""
+    pass
+
+
+class SSHConnectionTimeoutError(SSHError):
+    """Exception raised when SSH connection times out"""
+    pass
+
+
+class SSHPathNotFoundError(SSHError):
+    """Exception raised when a remote path does not exist"""
+    pass
+
+
+class SSHPermissionDeniedError(SSHError):
+    """Exception raised when permission is denied for an operation"""
+    pass
+
+
+class SSHConnectionLostError(SSHError):
+    """Exception raised when an active connection is lost"""
+    pass
+
+
+class SSHConnection:
+    """
+    Manages an SSH/SFTP connection to a remote host.
+    
+    Provides methods for file operations over SFTP using subprocess
+    to invoke the sftp command-line tool.
+    """
+    
+    def __init__(self, hostname: str, config: Dict[str, str]):
+        """
+        Initialize SSH connection.
+        
+        Args:
+            hostname: Remote hostname (Host entry from SSH config)
+            config: SSH configuration dictionary with keys like:
+                    'HostName', 'User', 'Port', 'IdentityFile', etc.
+        """
+        self.hostname = hostname
+        self.config = config
+        self._connected = False
+        self._lock = threading.Lock()
+        self.logger = getLogger("SSHConn")
+        
+        # Extract connection parameters
+        self.actual_host = config.get('HostName', hostname)
+        self.user = config.get('User', None)
+        self.port = config.get('Port', '22')
+        self.identity_file = config.get('IdentityFile', None)
+        
+        # Progress tracking
+        self._progress_callback = None
+        self._progress_threshold = 1024 * 1024  # 1MB threshold for progress display
+        
+    def connect(self) -> bool:
+        """
+        Establish SSH connection.
+        
+        Tests the connection by executing a simple SFTP command.
+        
+        Returns:
+            True if connection successful
+            
+        Raises:
+            SSHAuthenticationError: If SSH key authentication fails
+            SSHConnectionTimeoutError: If connection times out
+            SSHError: For other connection errors
+        """
+        with self._lock:
+            if self._connected:
+                return True
+            
+            try:
+                # Test connection with a simple pwd command
+                stdout, stderr, returncode = self._execute_sftp_command(['pwd'], timeout=10)
+                
+                if returncode == 0:
+                    self._connected = True
+                    self.logger.info(f"Connected to {self.hostname}")
+                    return True
+                else:
+                    # Parse error message to determine specific error type
+                    stderr_lower = stderr.lower()
+                    
+                    if 'permission denied' in stderr_lower or 'authentication failed' in stderr_lower:
+                        error_msg = f"SSH authentication failed for {self.hostname}. Please check your SSH keys and permissions."
+                        self.logger.error(error_msg)
+                        self.logger.error(f"Detailed error: {stderr}")
+                        raise SSHAuthenticationError(error_msg)
+                    elif 'connection timed out' in stderr_lower or 'connection refused' in stderr_lower:
+                        error_msg = f"Connection timeout to {self.hostname}. Host may be unreachable or not responding."
+                        self.logger.error(error_msg)
+                        self.logger.error(f"Detailed error: {stderr}")
+                        raise SSHConnectionTimeoutError(error_msg)
+                    else:
+                        error_msg = f"Failed to connect to {self.hostname}: {stderr}"
+                        self.logger.error(error_msg)
+                        raise SSHError(error_msg)
+                    
+            except TimeoutError as e:
+                error_msg = f"Connection timeout to {self.hostname}: {e}"
+                self.logger.error(error_msg)
+                raise SSHConnectionTimeoutError(error_msg)
+            except (SSHAuthenticationError, SSHConnectionTimeoutError, SSHError):
+                # Re-raise SSH-specific errors
+                raise
+            except Exception as e:
+                error_msg = f"Unexpected connection error to {self.hostname}: {e}"
+                self.logger.error(error_msg)
+                raise SSHError(error_msg)
+    
+    def disconnect(self):
+        """Close the SSH connection."""
+        with self._lock:
+            if self._connected:
+                self._connected = False
+                self.logger.info(f"Disconnected from {self.hostname}")
+    
+    def is_connected(self) -> bool:
+        """
+        Check if connection is active.
+        
+        Returns:
+            True if connected, False otherwise
+        """
+        with self._lock:
+            return self._connected
+    
+    def set_progress_callback(self, callback: Optional[callable]):
+        """
+        Set progress callback for file transfers.
+        
+        The callback will be called with (bytes_transferred, total_bytes) during
+        file transfers that exceed the progress threshold (1MB).
+        
+        Args:
+            callback: Callable that takes (bytes_transferred: int, total_bytes: int)
+                     or None to disable progress tracking
+        """
+        self._progress_callback = callback
+
+    def _parse_ls_line(self, line: str) -> Optional[Dict[str, any]]:
+        """
+        Parse a single line from ls -la output.
+        
+        Args:
+            line: Single line from ls -la output
+            
+        Returns:
+            Dictionary with parsed metadata, or None if parsing fails
+            
+        Example line:
+            -rw-r--r--  1 user group  1234 Jan 15 10:30 filename.txt
+            drwxr-xr-x  5 user group  4096 Jan 15 10:30 dirname
+        """
+        import re
+        from datetime import datetime
+        
+        # Split line into parts
+        parts = line.split(None, 8)  # Split on whitespace, max 9 parts
+        
+        if len(parts) < 9:
+            return None
+        
+        permissions = parts[0]
+        # parts[1] is link count (not used)
+        # parts[2] is owner (not used)
+        # parts[3] is group (not used)
+        size_str = parts[4]
+        month = parts[5]
+        day = parts[6]
+        time_or_year = parts[7]
+        name = parts[8]
+        
+        # Parse file type and permissions
+        is_dir = permissions[0] == 'd'
+        is_file = permissions[0] == '-'
+        is_symlink = permissions[0] == 'l'
+        
+        # Convert permissions to octal mode
+        mode = 0
+        perm_str = permissions[1:]  # Remove first character (file type)
+        for i, char in enumerate(perm_str):
+            if char in 'rwx':
+                # Calculate bit position (rwxrwxrwx = 9 bits)
+                bit_pos = 8 - i
+                mode |= (1 << bit_pos)
+        
+        # Parse size
+        try:
+            size = int(size_str)
+        except ValueError:
+            size = 0
+        
+        # Parse modification time
+        # Format can be "Jan 15 10:30" or "Jan 15  2023"
+        try:
+            current_year = datetime.now().year
+            if ':' in time_or_year:
+                # Time format: assume current year
+                time_str = f"{month} {day} {current_year} {time_or_year}"
+                dt = datetime.strptime(time_str, "%b %d %Y %H:%M")
+            else:
+                # Year format
+                time_str = f"{month} {day} {time_or_year}"
+                dt = datetime.strptime(time_str, "%b %d %Y")
+            
+            mtime = dt.timestamp()
+        except Exception:
+            # If parsing fails, use current time
+            mtime = time.time()
+        
+        return {
+            'name': name,
+            'size': size,
+            'mtime': mtime,
+            'mode': mode,
+            'is_dir': is_dir,
+            'is_file': is_file,
+            'is_symlink': is_symlink,
+        }
+
+    
+    def _execute_sftp_command(self, commands: List[str], timeout: int = 30) -> Tuple[str, str, int]:
+        """
+        Execute SFTP batch commands.
+        
+        Args:
+            commands: List of SFTP commands to execute
+            timeout: Command timeout in seconds (default: 30)
+            
+        Returns:
+            (stdout, stderr, returncode) tuple
+            
+        Raises:
+            SSHConnectionTimeoutError: If command execution exceeds timeout
+            SSHConnectionLostError: If connection is lost during execution
+            SSHError: For other execution errors
+        """
+        # Build sftp command with batch mode
+        sftp_cmd = ['sftp', '-b', '-']
+        
+        # Add port if specified
+        if self.port and self.port != '22':
+            sftp_cmd.extend(['-P', str(self.port)])
+        
+        # Add identity file if specified
+        if self.identity_file:
+            sftp_cmd.extend(['-i', self.identity_file])
+        
+        # Add batch mode and quiet options
+        sftp_cmd.extend(['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new'])
+        
+        # Build connection string
+        if self.user:
+            connection_string = f"{self.user}@{self.actual_host}"
+        else:
+            connection_string = self.actual_host
+        
+        sftp_cmd.append(connection_string)
+        
+        # Join commands with newlines for batch input
+        batch_input = '\n'.join(commands) + '\n'
+        
+        try:
+            # Execute sftp command with timeout
+            process = subprocess.Popen(
+                sftp_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            try:
+                stdout, stderr = process.communicate(input=batch_input, timeout=timeout)
+                returncode = process.returncode
+                
+                # Check for connection loss indicators in stderr
+                if returncode != 0:
+                    stderr_lower = stderr.lower()
+                    if 'connection closed' in stderr_lower or 'broken pipe' in stderr_lower:
+                        error_msg = f"SSH connection lost to {self.hostname}"
+                        self.logger.error(error_msg)
+                        self.logger.error(f"Detailed error: {stderr}")
+                        self._connected = False  # Mark as disconnected
+                        raise SSHConnectionLostError(error_msg)
+                
+                return stdout, stderr, returncode
+                
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout, stderr = process.communicate()
+                error_msg = f"SFTP command timeout after {timeout}s for {self.hostname}"
+                self.logger.error(error_msg)
+                raise SSHConnectionTimeoutError(error_msg)
+                
+        except SSHConnectionLostError:
+            # Re-raise connection lost errors
+            raise
+        except SSHConnectionTimeoutError:
+            # Re-raise timeout errors
+            raise
+        except Exception as e:
+            error_msg = f"SFTP command execution error for {self.hostname}: {e}"
+            self.logger.error(error_msg)
+            raise SSHError(error_msg)
+    
+    def list_directory(self, remote_path: str) -> List[Dict[str, any]]:
+        """
+        List directory contents.
+        
+        Args:
+            remote_path: Remote directory path
+            
+        Returns:
+            List of file/directory entries with metadata. Each entry is a dict with:
+                - name: filename
+                - size: file size in bytes
+                - mtime: modification time as Unix timestamp
+                - mode: file permissions as integer
+                - is_dir: True if directory
+                - is_file: True if regular file
+                - is_symlink: True if symbolic link
+            
+        Raises:
+            SSHPathNotFoundError: If directory does not exist
+            SSHPermissionDeniedError: If permission is denied
+            SSHConnectionLostError: If connection is lost
+            SSHError: For other errors
+        """
+        if not self._connected:
+            raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        commands = [f'ls -la {remote_path}']
+        stdout, stderr, returncode = self._execute_sftp_command(commands)
+        
+        if returncode != 0:
+            # Parse error to determine specific type
+            stderr_lower = stderr.lower()
+            
+            if 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                error_msg = f"Remote path not found: {remote_path}"
+                self.logger.error(error_msg)
+                self.logger.error(f"Detailed error: {stderr}")
+                raise SSHPathNotFoundError(error_msg)
+            elif 'permission denied' in stderr_lower:
+                error_msg = f"Permission denied accessing: {remote_path}"
+                self.logger.error(error_msg)
+                self.logger.error(f"Detailed error: {stderr}")
+                raise SSHPermissionDeniedError(error_msg)
+            else:
+                error_msg = f"Failed to list directory {remote_path}: {stderr}"
+                self.logger.error(error_msg)
+                raise SSHError(error_msg)
+        
+        # Parse ls -la output
+        entries = []
+        for line in stdout.strip().split('\n'):
+            if not line or line.startswith('sftp>') or line.startswith('total'):
+                continue
+            
+            # Skip . and .. entries
+            if line.endswith(' .') or line.endswith(' ..'):
+                continue
+            
+            entry = self._parse_ls_line(line)
+            if entry:
+                entries.append(entry)
+        
+        return entries
+    
+    def stat(self, remote_path: str) -> Dict[str, any]:
+        """
+        Get file/directory metadata.
+        
+        Args:
+            remote_path: Remote file/directory path
+            
+        Returns:
+            Dictionary with stat information:
+                - name: filename
+                - size: file size in bytes
+                - mtime: modification time as Unix timestamp
+                - mode: file permissions as integer
+                - is_dir: True if directory
+                - is_file: True if regular file
+                - is_symlink: True if symbolic link
+            
+        Raises:
+            SSHPathNotFoundError: If path does not exist
+            SSHPermissionDeniedError: If permission is denied
+            SSHConnectionLostError: If connection is lost
+            SSHError: For other errors
+        """
+        if not self._connected:
+            raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        commands = [f'ls -ld {remote_path}']
+        stdout, stderr, returncode = self._execute_sftp_command(commands)
+        
+        if returncode != 0:
+            # Parse error to determine specific type
+            stderr_lower = stderr.lower()
+            
+            if 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                error_msg = f"Remote path not found: {remote_path}"
+                self.logger.error(error_msg)
+                self.logger.error(f"Detailed error: {stderr}")
+                raise SSHPathNotFoundError(error_msg)
+            elif 'permission denied' in stderr_lower:
+                error_msg = f"Permission denied accessing: {remote_path}"
+                self.logger.error(error_msg)
+                self.logger.error(f"Detailed error: {stderr}")
+                raise SSHPermissionDeniedError(error_msg)
+            else:
+                error_msg = f"Failed to stat path {remote_path}: {stderr}"
+                self.logger.error(error_msg)
+                raise SSHError(error_msg)
+        
+        # Parse ls -ld output (single line)
+        for line in stdout.strip().split('\n'):
+            if line and not line.startswith('sftp>'):
+                entry = self._parse_ls_line(line)
+                if entry:
+                    return entry
+        
+        error_msg = f"Failed to parse stat output for {remote_path}"
+        self.logger.error(error_msg)
+        raise SSHError(error_msg)
+    
+    def read_file(self, remote_path: str) -> bytes:
+        """
+        Read file contents.
+        
+        Args:
+            remote_path: Remote file path
+            
+        Returns:
+            File contents as bytes
+            
+        Raises:
+            SSHPathNotFoundError: If file does not exist
+            SSHPermissionDeniedError: If permission is denied
+            SSHConnectionLostError: If connection is lost
+            SSHError: For other errors
+        """
+        if not self._connected:
+            raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        import tempfile
+        import os
+        
+        # Create a temporary file to download to
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            # Get file size first for progress tracking
+            file_size = 0
+            try:
+                stat_info = self.stat(remote_path)
+                file_size = stat_info.get('size', 0)
+            except (SSHPathNotFoundError, SSHPermissionDeniedError):
+                # Re-raise these specific errors
+                raise
+            except Exception:
+                # If stat fails for other reasons, continue without progress tracking
+                pass
+            
+            # Download file using get command
+            commands = [f'get {remote_path} {tmp_path}']
+            
+            # For large files, emit progress events
+            if file_size > self._progress_threshold and self._progress_callback:
+                # Start progress tracking
+                self._progress_callback(0, file_size)
+                
+                # Execute download
+                try:
+                    stdout, stderr, returncode = self._execute_sftp_command(commands)
+                    
+                    if returncode != 0:
+                        # Parse error to determine specific type
+                        stderr_lower = stderr.lower()
+                        
+                        if 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                            error_msg = f"Remote file not found: {remote_path}"
+                            self.logger.error(error_msg)
+                            self.logger.error(f"Detailed error: {stderr}")
+                            raise SSHPathNotFoundError(error_msg)
+                        elif 'permission denied' in stderr_lower:
+                            error_msg = f"Permission denied reading: {remote_path}"
+                            self.logger.error(error_msg)
+                            self.logger.error(f"Detailed error: {stderr}")
+                            raise SSHPermissionDeniedError(error_msg)
+                        else:
+                            error_msg = f"Failed to read file {remote_path}: {stderr}"
+                            self.logger.error(error_msg)
+                            raise SSHError(error_msg)
+                    
+                    # Report completion
+                    self._progress_callback(file_size, file_size)
+                    
+                except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
+                    # Re-raise SSH-specific errors
+                    raise
+                except Exception as e:
+                    error_msg = f"Unexpected error reading file {remote_path}: {e}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
+            else:
+                # No progress tracking for small files
+                try:
+                    stdout, stderr, returncode = self._execute_sftp_command(commands)
+                    
+                    if returncode != 0:
+                        # Parse error to determine specific type
+                        stderr_lower = stderr.lower()
+                        
+                        if 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                            error_msg = f"Remote file not found: {remote_path}"
+                            self.logger.error(error_msg)
+                            self.logger.error(f"Detailed error: {stderr}")
+                            raise SSHPathNotFoundError(error_msg)
+                        elif 'permission denied' in stderr_lower:
+                            error_msg = f"Permission denied reading: {remote_path}"
+                            self.logger.error(error_msg)
+                            self.logger.error(f"Detailed error: {stderr}")
+                            raise SSHPermissionDeniedError(error_msg)
+                        else:
+                            error_msg = f"Failed to read file {remote_path}: {stderr}"
+                            self.logger.error(error_msg)
+                            raise SSHError(error_msg)
+                            
+                except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
+                    # Re-raise SSH-specific errors
+                    raise
+                except Exception as e:
+                    error_msg = f"Unexpected error reading file {remote_path}: {e}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
+            
+            # Read the downloaded file
+            with open(tmp_path, 'rb') as f:
+                data = f.read()
+            
+            return data
+            
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+    
+    def write_file(self, remote_path: str, data: bytes):
+        """
+        Write file contents.
+        
+        Args:
+            remote_path: Remote file path
+            data: File contents as bytes
+            
+        Raises:
+            SSHPermissionDeniedError: If permission is denied
+            SSHConnectionLostError: If connection is lost
+            SSHError: For other errors (e.g., disk full)
+        """
+        if not self._connected:
+            raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        import tempfile
+        import os
+        
+        # Create a temporary file with the data
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        
+        try:
+            file_size = len(data)
+            
+            # Upload file using put command
+            commands = [f'put {tmp_path} {remote_path}']
+            
+            # For large files, emit progress events
+            if file_size > self._progress_threshold and self._progress_callback:
+                # Start progress tracking
+                self._progress_callback(0, file_size)
+                
+                # Execute upload
+                try:
+                    stdout, stderr, returncode = self._execute_sftp_command(commands)
+                    
+                    if returncode != 0:
+                        # Parse error to determine specific type
+                        stderr_lower = stderr.lower()
+                        
+                        if 'permission denied' in stderr_lower:
+                            error_msg = f"Permission denied writing to: {remote_path}"
+                            self.logger.error(error_msg)
+                            self.logger.error(f"Detailed error: {stderr}")
+                            raise SSHPermissionDeniedError(error_msg)
+                        elif 'no space' in stderr_lower or 'disk full' in stderr_lower:
+                            error_msg = f"Disk full on remote system: {remote_path}"
+                            self.logger.error(error_msg)
+                            self.logger.error(f"Detailed error: {stderr}")
+                            raise SSHError(error_msg)
+                        else:
+                            error_msg = f"Failed to write file {remote_path}: {stderr}"
+                            self.logger.error(error_msg)
+                            raise SSHError(error_msg)
+                    
+                    # Report completion
+                    self._progress_callback(file_size, file_size)
+                    
+                except (SSHPermissionDeniedError, SSHConnectionLostError):
+                    # Re-raise SSH-specific errors
+                    raise
+                except Exception as e:
+                    error_msg = f"Unexpected error writing file {remote_path}: {e}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
+            else:
+                # No progress tracking for small files
+                try:
+                    stdout, stderr, returncode = self._execute_sftp_command(commands)
+                    
+                    if returncode != 0:
+                        # Parse error to determine specific type
+                        stderr_lower = stderr.lower()
+                        
+                        if 'permission denied' in stderr_lower:
+                            error_msg = f"Permission denied writing to: {remote_path}"
+                            self.logger.error(error_msg)
+                            self.logger.error(f"Detailed error: {stderr}")
+                            raise SSHPermissionDeniedError(error_msg)
+                        elif 'no space' in stderr_lower or 'disk full' in stderr_lower:
+                            error_msg = f"Disk full on remote system: {remote_path}"
+                            self.logger.error(error_msg)
+                            self.logger.error(f"Detailed error: {stderr}")
+                            raise SSHError(error_msg)
+                        else:
+                            error_msg = f"Failed to write file {remote_path}: {stderr}"
+                            self.logger.error(error_msg)
+                            raise SSHError(error_msg)
+                            
+                except (SSHPermissionDeniedError, SSHConnectionLostError):
+                    # Re-raise SSH-specific errors
+                    raise
+                except Exception as e:
+                    error_msg = f"Unexpected error writing file {remote_path}: {e}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
+                
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+    
+    def delete_file(self, remote_path: str):
+        """
+        Delete a file.
+        
+        Args:
+            remote_path: Remote file path
+            
+        Raises:
+            SSHPathNotFoundError: If file does not exist
+            SSHPermissionDeniedError: If permission is denied
+            SSHConnectionLostError: If connection is lost
+            SSHError: For other errors
+        """
+        if not self._connected:
+            raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        try:
+            commands = [f'rm {remote_path}']
+            stdout, stderr, returncode = self._execute_sftp_command(commands)
+            
+            if returncode != 0:
+                # Parse error to determine specific type
+                stderr_lower = stderr.lower()
+                
+                if 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                    error_msg = f"Remote file not found: {remote_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHPathNotFoundError(error_msg)
+                elif 'permission denied' in stderr_lower:
+                    error_msg = f"Permission denied deleting: {remote_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHPermissionDeniedError(error_msg)
+                else:
+                    error_msg = f"Failed to delete file {remote_path}: {stderr}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
+                    
+        except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
+            # Re-raise SSH-specific errors
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error deleting file {remote_path}: {e}"
+            self.logger.error(error_msg)
+            raise SSHError(error_msg)
+    
+    def delete_directory(self, remote_path: str):
+        """
+        Delete a directory (must be empty).
+        
+        Args:
+            remote_path: Remote directory path
+            
+        Raises:
+            SSHPathNotFoundError: If directory does not exist
+            SSHPermissionDeniedError: If permission is denied
+            SSHConnectionLostError: If connection is lost
+            SSHError: For other errors (e.g., directory not empty)
+        """
+        if not self._connected:
+            raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        try:
+            commands = [f'rmdir {remote_path}']
+            stdout, stderr, returncode = self._execute_sftp_command(commands)
+            
+            if returncode != 0:
+                # Parse error to determine specific type
+                stderr_lower = stderr.lower()
+                
+                if 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                    error_msg = f"Remote directory not found: {remote_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHPathNotFoundError(error_msg)
+                elif 'permission denied' in stderr_lower:
+                    error_msg = f"Permission denied deleting directory: {remote_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHPermissionDeniedError(error_msg)
+                elif 'not empty' in stderr_lower or 'directory not empty' in stderr_lower:
+                    error_msg = f"Directory not empty: {remote_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHError(error_msg)
+                else:
+                    error_msg = f"Failed to delete directory {remote_path}: {stderr}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
+                    
+        except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
+            # Re-raise SSH-specific errors
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error deleting directory {remote_path}: {e}"
+            self.logger.error(error_msg)
+            raise SSHError(error_msg)
+    
+    def create_directory(self, remote_path: str):
+        """
+        Create a directory.
+        
+        Args:
+            remote_path: Remote directory path
+            
+        Raises:
+            SSHPermissionDeniedError: If permission is denied
+            SSHConnectionLostError: If connection is lost
+            SSHError: For other errors (e.g., parent directory doesn't exist)
+        """
+        if not self._connected:
+            raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        try:
+            commands = [f'mkdir {remote_path}']
+            stdout, stderr, returncode = self._execute_sftp_command(commands)
+            
+            if returncode != 0:
+                # Parse error to determine specific type
+                stderr_lower = stderr.lower()
+                
+                if 'permission denied' in stderr_lower:
+                    error_msg = f"Permission denied creating directory: {remote_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHPermissionDeniedError(error_msg)
+                elif 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                    error_msg = f"Parent directory not found for: {remote_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHPathNotFoundError(error_msg)
+                else:
+                    error_msg = f"Failed to create directory {remote_path}: {stderr}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
+                    
+        except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
+            # Re-raise SSH-specific errors
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error creating directory {remote_path}: {e}"
+            self.logger.error(error_msg)
+            raise SSHError(error_msg)
+    
+    def rename(self, old_path: str, new_path: str):
+        """
+        Rename/move a file or directory.
+        
+        Args:
+            old_path: Current path
+            new_path: New path
+            
+        Raises:
+            SSHPathNotFoundError: If source path does not exist
+            SSHPermissionDeniedError: If permission is denied
+            SSHConnectionLostError: If connection is lost
+            SSHError: For other errors
+        """
+        if not self._connected:
+            raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        try:
+            commands = [f'rename {old_path} {new_path}']
+            stdout, stderr, returncode = self._execute_sftp_command(commands)
+            
+            if returncode != 0:
+                # Parse error to determine specific type
+                stderr_lower = stderr.lower()
+                
+                if 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                    error_msg = f"Remote path not found: {old_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHPathNotFoundError(error_msg)
+                elif 'permission denied' in stderr_lower:
+                    error_msg = f"Permission denied renaming {old_path} to {new_path}"
+                    self.logger.error(error_msg)
+                    self.logger.error(f"Detailed error: {stderr}")
+                    raise SSHPermissionDeniedError(error_msg)
+                else:
+                    error_msg = f"Failed to rename {old_path} to {new_path}: {stderr}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
+                    
+        except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
+            # Re-raise SSH-specific errors
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error renaming {old_path} to {new_path}: {e}"
+            self.logger.error(error_msg)
+            raise SSHError(error_msg)
+
+
+class SSHConnectionManager:
+    """
+    Manages SSH connections with connection pooling and lifecycle management.
+    
+    Singleton pattern ensures only one manager exists per application instance.
+    """
+    
+    _instance = None
+    _lock = threading.Lock()
+    
+    @classmethod
+    def get_instance(cls) -> 'SSHConnectionManager':
+        """
+        Get the singleton instance.
+        
+        Returns:
+            SSHConnectionManager singleton instance
+        """
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+    
+    def __init__(self):
+        """Initialize connection manager."""
+        if SSHConnectionManager._instance is not None:
+            raise RuntimeError("Use get_instance() to get SSHConnectionManager")
+        
+        self._connections: Dict[str, SSHConnection] = {}
+        self._connection_lock = threading.Lock()
+        self._last_used: Dict[str, float] = {}
+        self._timeout = 300  # 5 minutes idle timeout
+        self._health_check_interval = 60  # Check connection health every 60 seconds
+        self._last_health_check: Dict[str, float] = {}
+        self.logger = getLogger("SSHConnMgr")
+    
+    def _check_connection_health(self, hostname: str, conn: SSHConnection) -> bool:
+        """
+        Check if a connection is still healthy.
+        
+        Performs a lightweight health check by executing a simple command.
+        Health checks are rate-limited to avoid excessive overhead.
+        
+        Args:
+            hostname: Remote hostname
+            conn: SSHConnection to check
+            
+        Returns:
+            True if connection is healthy, False otherwise
+        """
+        current_time = time.time()
+        
+        # Check if we've done a health check recently
+        last_check = self._last_health_check.get(hostname, 0)
+        if current_time - last_check < self._health_check_interval:
+            # Skip health check if we checked recently
+            return conn.is_connected()
+        
+        # Perform health check
+        try:
+            # Execute a simple pwd command to verify connection
+            stdout, stderr, returncode = conn._execute_sftp_command(['pwd'], timeout=5)
+            
+            if returncode == 0:
+                self._last_health_check[hostname] = current_time
+                return True
+            else:
+                self.logger.warning(f"Health check failed for {hostname}: {stderr}")
+                return False
+                
+        except Exception as e:
+            self.logger.warning(f"Health check failed for {hostname}: {e}")
+            return False
+    
+    def get_connection(self, hostname: str, config: Dict[str, str]) -> SSHConnection:
+        """
+        Get or create connection for hostname.
+        
+        Implements automatic reconnection on connection loss and health checks.
+        
+        Args:
+            hostname: Remote hostname
+            config: SSH configuration
+            
+        Returns:
+            SSHConnection instance
+            
+        Raises:
+            SSHAuthenticationError: If authentication fails
+            SSHConnectionTimeoutError: If connection times out
+            SSHError: For other connection errors
+        """
+        with self._connection_lock:
+            # Check if connection exists
+            if hostname in self._connections:
+                conn = self._connections[hostname]
+                
+                # Perform health check
+                if self._check_connection_health(hostname, conn):
+                    self._last_used[hostname] = time.time()
+                    self.logger.info(f"Reusing connection to {hostname}")
+                    return conn
+                else:
+                    # Connection unhealthy, attempt reconnection
+                    self.logger.warning(f"Connection to {hostname} unhealthy, attempting reconnection")
+                    del self._connections[hostname]
+                    del self._last_used[hostname]
+                    if hostname in self._last_health_check:
+                        del self._last_health_check[hostname]
+                    
+                    # Try to reconnect once
+                    try:
+                        conn = SSHConnection(hostname, config)
+                        conn.connect()  # This will raise specific exceptions on failure
+                        
+                        self._connections[hostname] = conn
+                        self._last_used[hostname] = time.time()
+                        self._last_health_check[hostname] = time.time()
+                        self.logger.info(f"Reconnected to {hostname}")
+                        
+                        return conn
+                    except (SSHAuthenticationError, SSHConnectionTimeoutError, SSHError) as e:
+                        # Log the reconnection failure and re-raise
+                        self.logger.error(f"Reconnection to {hostname} failed: {e}")
+                        raise
+            
+            # Create new connection
+            conn = SSHConnection(hostname, config)
+            conn.connect()  # This will raise specific exceptions on failure
+            
+            self._connections[hostname] = conn
+            self._last_used[hostname] = time.time()
+            self._last_health_check[hostname] = time.time()
+            self.logger.info(f"Created new connection to {hostname}")
+            
+            return conn
+    
+    def close_connection(self, hostname: str):
+        """
+        Close connection for hostname.
+        
+        Args:
+            hostname: Remote hostname
+        """
+        with self._connection_lock:
+            if hostname in self._connections:
+                self._connections[hostname].disconnect()
+                del self._connections[hostname]
+                del self._last_used[hostname]
+                if hostname in self._last_health_check:
+                    del self._last_health_check[hostname]
+                self.logger.info(f"Closed connection to {hostname}")
+    
+    def close_all(self):
+        """Close all connections gracefully."""
+        with self._connection_lock:
+            for hostname in list(self._connections.keys()):
+                try:
+                    self._connections[hostname].disconnect()
+                except Exception as e:
+                    self.logger.error(f"Error disconnecting from {hostname}: {e}")
+            self._connections.clear()
+            self._last_used.clear()
+            self._last_health_check.clear()
+            self.logger.info("Closed all connections")
+    
+    def cleanup_idle_connections(self):
+        """Close connections that have been idle beyond timeout."""
+        current_time = time.time()
+        
+        with self._connection_lock:
+            idle_hosts = []
+            for hostname, last_used in self._last_used.items():
+                if current_time - last_used > self._timeout:
+                    idle_hosts.append(hostname)
+            
+            for hostname in idle_hosts:
+                self.logger.info(f"Closing idle connection to {hostname}")
+                try:
+                    self._connections[hostname].disconnect()
+                except Exception as e:
+                    self.logger.error(f"Error disconnecting from {hostname}: {e}")
+                del self._connections[hostname]
+                del self._last_used[hostname]
+                if hostname in self._last_health_check:
+                    del self._last_health_check[hostname]
+    
+    def check_connection_health(self, hostname: str) -> bool:
+        """
+        Check if a connection is healthy by executing a simple command.
+        
+        Args:
+            hostname: Remote hostname to check
+            
+        Returns:
+            True if connection is healthy, False otherwise
+        """
+        with self._connection_lock:
+            if hostname not in self._connections:
+                return False
+            
+            conn = self._connections[hostname]
+            if not conn.is_connected():
+                return False
+            
+            try:
+                # Execute a simple pwd command to test connection
+                stdout, stderr, returncode = conn._execute_sftp_command(['pwd'], timeout=5)
+                return returncode == 0
+            except Exception as e:
+                self.logger.warning(f"Health check failed for {hostname}: {e}")
+                return False
+    
+    def get_active_connections(self) -> list:
+        """
+        Get list of currently active connection hostnames.
+        
+        Returns:
+            List of hostnames with active connections
+        """
+        with self._connection_lock:
+            return list(self._connections.keys())
+
+
+def cleanup_ssh_connections():
+    """
+    Clean up all SSH connections on application exit.
+    
+    This function should be called during application shutdown to ensure
+    all SSH connections are properly closed.
+    """
+    try:
+        manager = SSHConnectionManager.get_instance()
+        manager.close_all()
+    except Exception as e:
+        # Use module-level logger for cleanup
+        logger = getLogger("SSHCleanup")
+        logger.error(f"Error during SSH connection cleanup: {e}")
+
