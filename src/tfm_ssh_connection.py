@@ -493,6 +493,10 @@ class SSHConnection:
         if not self._connected:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
         
+        # Normalize path to remove excessive ./ sequences
+        import posixpath
+        remote_path = posixpath.normpath(remote_path)
+        
         # Try to get from cache first
         cached_result = self._cache.get(
             operation='list_directory',
@@ -548,12 +552,12 @@ class SSHConnection:
             if not line or line.startswith('sftp>') or line.startswith('total'):
                 continue
             
-            # Skip . and .. entries
-            if line.endswith(' .') or line.endswith(' ..'):
-                continue
-            
             entry = self._parse_ls_line(line)
             if entry:
+                # Skip . and .. entries (check after parsing)
+                if entry['name'] in ('.', '..'):
+                    continue
+                
                 entries.append(entry)
                 
                 # Cache individual stat for this file
@@ -601,6 +605,10 @@ class SSHConnection:
         """
         if not self._connected:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
+        
+        # Normalize path to remove excessive ./ sequences
+        import posixpath
+        remote_path = posixpath.normpath(remote_path)
         
         # Try to get from cache first
         cached_result = self._cache.get(
