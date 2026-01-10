@@ -526,11 +526,6 @@ class SearchDialog(UILayer, BaseListDialog):
         help_text = "Enter: Select | Tab: Switch mode | ESC: Cancel"
         help_y = start_y + dialog_height - 2
         self.draw_help_text(help_text, help_y, start_x, dialog_width)
-        
-        # Automatically mark as not needing redraw after drawing (unless still searching)
-        is_searching = self.search_thread and self.search_thread.is_alive() and self.search_thread.searching
-        if not is_searching:
-            self.content_changed = False
     
     # UILayer interface implementation
     
