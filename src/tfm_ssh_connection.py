@@ -76,11 +76,20 @@ class SSHConnection:
         self._progress_callback = None
         self._progress_threshold = 1024 * 1024  # 1MB threshold for progress display
         
+        # SSH multiplexing (ControlMaster) for persistent connections
+        # Use a short path to avoid "path too long" errors
+        import tempfile
+        import os
+        import hashlib
+        # Create a short hash of the hostname to keep path length manageable
+        hostname_hash = hashlib.md5(hostname.encode()).hexdigest()[:8]
+        self._control_path = os.path.join(tempfile.gettempdir(), f'tfm-ssh-{hostname_hash}')
+        
     def connect(self) -> bool:
         """
         Establish SSH connection.
         
-        Tests the connection by executing a simple SFTP command.
+        Creates a master SSH connection using ControlMaster for efficient reuse.
         
         Returns:
             True if connection successful
@@ -91,10 +100,13 @@ class SSHConnection:
             SSHError: For other connection errors
         """
         with self._lock:
-            if self._connected:
+            if self._connected and self._check_control_master():
                 return True
             
             try:
+                # Establish master SSH connection
+                self._establish_control_master()
+                
                 # Test connection with a simple pwd command
                 stdout, stderr, returncode = self._execute_sftp_command(['pwd'], timeout=10)
                 
@@ -134,11 +146,17 @@ class SSHConnection:
                 raise SSHError(error_msg)
     
     def disconnect(self):
-        """Close the SSH connection."""
+        """Close the SSH connection and terminate control master."""
         with self._lock:
             if self._connected:
-                self._connected = False
-                self.logger.info(f"Disconnected from {self.hostname}")
+                try:
+                    # Close the control master connection
+                    self._close_control_master()
+                except Exception as e:
+                    self.logger.error(f"Error closing control master: {e}")
+                finally:
+                    self._connected = False
+                    self.logger.info(f"Disconnected from {self.hostname}")
     
     def is_connected(self) -> bool:
         """
@@ -148,7 +166,7 @@ class SSHConnection:
             True if connected, False otherwise
         """
         with self._lock:
-            return self._connected
+            return self._connected and self._check_control_master()
     
     def set_progress_callback(self, callback: Optional[callable]):
         """
@@ -162,6 +180,102 @@ class SSHConnection:
                      or None to disable progress tracking
         """
         self._progress_callback = callback
+    
+    def _establish_control_master(self):
+        """
+        Establish SSH control master connection for multiplexing.
+        
+        This creates a persistent SSH connection that can be reused by multiple
+        SFTP sessions, dramatically improving performance.
+        
+        Raises:
+            SSHError: If control master cannot be established
+        """
+        # Build SSH command to establish control master
+        ssh_cmd = ['ssh', '-N', '-f']  # -N: no command, -f: background
+        
+        # Add control master options
+        ssh_cmd.extend([
+            '-o', 'ControlMaster=yes',
+            '-o', f'ControlPath={self._control_path}',
+            '-o', 'ControlPersist=10m',  # Keep connection alive for 10 minutes after last use
+        ])
+        
+        # Add port if specified
+        if self.port and self.port != '22':
+            ssh_cmd.extend(['-p', str(self.port)])
+        
+        # Add identity file if specified
+        if self.identity_file:
+            ssh_cmd.extend(['-i', self.identity_file])
+        
+        # Add other options
+        ssh_cmd.extend(['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new'])
+        
+        # Add hostname (SSH config alias)
+        ssh_cmd.append(self.hostname)
+        
+        try:
+            # Establish control master
+            result = subprocess.run(
+                ssh_cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                error_msg = f"Failed to establish control master: {result.stderr}"
+                self.logger.error(error_msg)
+                raise SSHError(error_msg)
+                
+        except subprocess.TimeoutExpired:
+            error_msg = f"Timeout establishing control master for {self.hostname}"
+            self.logger.error(error_msg)
+            raise SSHConnectionTimeoutError(error_msg)
+        except Exception as e:
+            error_msg = f"Failed to establish control master: {e}"
+            self.logger.error(error_msg)
+            raise SSHError(error_msg)
+    
+    def _check_control_master(self) -> bool:
+        """
+        Check if control master is still active.
+        
+        Returns:
+            True if control master is active, False otherwise
+        """
+        try:
+            # Use ssh -O check to verify control master status
+            result = subprocess.run(
+                ['ssh', '-O', 'check', '-o', f'ControlPath={self._control_path}', self.hostname],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+    
+    def _close_control_master(self):
+        """
+        Close the control master connection.
+        
+        Raises:
+            SSHError: If control master cannot be closed
+        """
+        try:
+            # Use ssh -O exit to close control master
+            subprocess.run(
+                ['ssh', '-O', 'exit', '-o', f'ControlPath={self._control_path}', self.hostname],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+        except Exception as e:
+            error_msg = f"Failed to close control master: {e}"
+            self.logger.error(error_msg)
+            raise SSHError(error_msg)
 
     def _parse_ls_line(self, line: str) -> Optional[Dict[str, any]]:
         """
@@ -195,6 +309,11 @@ class SSHConnection:
         day = parts[6]
         time_or_year = parts[7]
         name = parts[8]
+        
+        # SFTP's ls output includes full paths in the name field
+        # Extract just the basename
+        import posixpath
+        name = posixpath.basename(name)
         
         # Parse file type and permissions
         is_dir = permissions[0] == 'd'
@@ -247,7 +366,9 @@ class SSHConnection:
     
     def _execute_sftp_command(self, commands: List[str], timeout: int = 30) -> Tuple[str, str, int]:
         """
-        Execute SFTP batch commands.
+        Execute SFTP commands using SSH multiplexing.
+        
+        Uses the control master connection for efficient command execution.
         
         Args:
             commands: List of SFTP commands to execute
@@ -261,8 +382,14 @@ class SSHConnection:
             SSHConnectionLostError: If connection is lost during execution
             SSHError: For other execution errors
         """
-        # Build sftp command with batch mode
-        sftp_cmd = ['sftp', '-b', '-']
+        # Build sftp command
+        sftp_cmd = ['sftp', '-b', '-']  # Read commands from stdin
+        
+        # Add control master options to reuse existing connection
+        sftp_cmd.extend([
+            '-o', f'ControlPath={self._control_path}',
+            '-o', 'ControlMaster=no',  # Don't create new master, use existing
+        ])
         
         # Add port if specified
         if self.port and self.port != '22':
@@ -272,22 +399,17 @@ class SSHConnection:
         if self.identity_file:
             sftp_cmd.extend(['-i', self.identity_file])
         
-        # Add batch mode and quiet options
+        # Add other options
         sftp_cmd.extend(['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new'])
         
-        # Build connection string
-        if self.user:
-            connection_string = f"{self.user}@{self.actual_host}"
-        else:
-            connection_string = self.actual_host
-        
-        sftp_cmd.append(connection_string)
-        
-        # Join commands with newlines for batch input
-        batch_input = '\n'.join(commands) + '\n'
+        # Add hostname (SSH config alias)
+        sftp_cmd.append(self.hostname)
         
         try:
-            # Execute sftp command with timeout
+            # Execute SFTP with commands from stdin
+            command_input = '\n'.join(commands) + '\n'
+            
+            # Use Popen for more control
             process = subprocess.Popen(
                 sftp_cmd,
                 stdin=subprocess.PIPE,
@@ -297,33 +419,18 @@ class SSHConnection:
             )
             
             try:
-                stdout, stderr = process.communicate(input=batch_input, timeout=timeout)
+                stdout, stderr = process.communicate(input=command_input, timeout=timeout)
                 returncode = process.returncode
-                
-                # Check for connection loss indicators in stderr
-                if returncode != 0:
-                    stderr_lower = stderr.lower()
-                    if 'connection closed' in stderr_lower or 'broken pipe' in stderr_lower:
-                        error_msg = f"SSH connection lost to {self.hostname}"
-                        self.logger.error(error_msg)
-                        self.logger.error(f"Detailed error: {stderr}")
-                        self._connected = False  # Mark as disconnected
-                        raise SSHConnectionLostError(error_msg)
-                
-                return stdout, stderr, returncode
-                
             except subprocess.TimeoutExpired:
                 process.kill()
-                stdout, stderr = process.communicate()
+                process.wait()
                 error_msg = f"SFTP command timeout after {timeout}s for {self.hostname}"
                 self.logger.error(error_msg)
                 raise SSHConnectionTimeoutError(error_msg)
-                
-        except SSHConnectionLostError:
-            # Re-raise connection lost errors
-            raise
+            
+            return stdout, stderr, returncode
+            
         except SSHConnectionTimeoutError:
-            # Re-raise timeout errors
             raise
         except Exception as e:
             error_msg = f"SFTP command execution error for {self.hostname}: {e}"
@@ -420,7 +527,9 @@ class SSHConnection:
         if not self._connected:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
         
-        commands = [f'ls -ld {remote_path}']
+        # SFTP's ls command doesn't support -d flag
+        # Try ls -l first (works for files and will list directory contents for dirs)
+        commands = [f'ls -l {remote_path}']
         stdout, stderr, returncode = self._execute_sftp_command(commands)
         
         if returncode != 0:
@@ -442,12 +551,54 @@ class SSHConnection:
                 self.logger.error(error_msg)
                 raise SSHError(error_msg)
         
-        # Parse ls -ld output (single line)
-        for line in stdout.strip().split('\n'):
-            if line and not line.startswith('sftp>'):
-                entry = self._parse_ls_line(line)
-                if entry:
-                    return entry
+        # Parse ls -l output
+        lines = [line for line in stdout.strip().split('\n') if line and not line.startswith('sftp>')]
+        
+        # If we got exactly one line, it's a file
+        if len(lines) == 1:
+            entry = self._parse_ls_line(lines[0])
+            if entry:
+                return entry
+        
+        # If we got multiple lines, it's a directory listing
+        # We need to get the parent directory and find this entry
+        if len(lines) > 1:
+            # Extract parent directory and basename
+            import posixpath
+            
+            # Normalize path to handle double slashes
+            normalized_path = posixpath.normpath(remote_path)
+            
+            # Special case for root directory
+            if normalized_path == '/':
+                # Root directory - create a synthetic entry
+                return {
+                    'name': '/',
+                    'size': 4096,
+                    'mtime': 0,
+                    'mode': 0o755,
+                    'is_dir': True,
+                    'is_file': False,
+                    'is_symlink': False,
+                }
+            
+            parent_dir = posixpath.dirname(normalized_path)
+            basename = posixpath.basename(normalized_path)
+            
+            # If parent is empty, it means we're at root level
+            if not parent_dir:
+                parent_dir = '/'
+            
+            # List parent directory
+            commands = [f'ls -l {parent_dir}']
+            stdout, stderr, returncode = self._execute_sftp_command(commands)
+            
+            if returncode == 0:
+                for line in stdout.strip().split('\n'):
+                    if line and not line.startswith('sftp>'):
+                        entry = self._parse_ls_line(line)
+                        if entry and entry['name'] == basename:
+                            return entry
         
         error_msg = f"Failed to parse stat output for {remote_path}"
         self.logger.error(error_msg)
@@ -916,7 +1067,7 @@ class SSHConnectionManager:
         """
         Check if a connection is still healthy.
         
-        Performs a lightweight health check by executing a simple command.
+        Performs a lightweight health check by verifying control master status.
         Health checks are rate-limited to avoid excessive overhead.
         
         Args:
@@ -934,16 +1085,13 @@ class SSHConnectionManager:
             # Skip health check if we checked recently
             return conn.is_connected()
         
-        # Perform health check
+        # Perform health check by checking control master status
         try:
-            # Execute a simple pwd command to verify connection
-            stdout, stderr, returncode = conn._execute_sftp_command(['pwd'], timeout=5)
-            
-            if returncode == 0:
+            if conn.is_connected():
                 self._last_health_check[hostname] = current_time
                 return True
             else:
-                self.logger.warning(f"Health check failed for {hostname}: {stderr}")
+                self.logger.warning(f"Health check failed for {hostname}: control master not active")
                 return False
                 
         except Exception as e:
@@ -1065,7 +1213,7 @@ class SSHConnectionManager:
     
     def check_connection_health(self, hostname: str) -> bool:
         """
-        Check if a connection is healthy by executing a simple command.
+        Check if a connection is healthy by verifying control master status.
         
         Args:
             hostname: Remote hostname to check
@@ -1078,13 +1226,8 @@ class SSHConnectionManager:
                 return False
             
             conn = self._connections[hostname]
-            if not conn.is_connected():
-                return False
-            
             try:
-                # Execute a simple pwd command to test connection
-                stdout, stderr, returncode = conn._execute_sftp_command(['pwd'], timeout=5)
-                return returncode == 0
+                return conn.is_connected()
             except Exception as e:
                 self.logger.warning(f"Health check failed for {hostname}: {e}")
                 return False
