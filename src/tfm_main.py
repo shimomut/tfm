@@ -1099,6 +1099,10 @@ class FileManager(UILayer):
             return self._action_copy_names()
         elif item_id == MenuManager.EDIT_COPY_PATHS:
             return self._action_copy_paths()
+        elif item_id == MenuManager.EDIT_COPY_VISIBLE_LOGS:
+            return self._action_copy_visible_logs()
+        elif item_id == MenuManager.EDIT_COPY_ALL_LOGS:
+            return self._action_copy_all_logs()
         
         # View menu
         elif item_id == MenuManager.VIEW_SHOW_HIDDEN:
@@ -1432,6 +1436,60 @@ class FileManager(UILayer):
         if self.renderer.set_clipboard_text(text):
             count = len(files_to_copy)
             self.logger.info(f"Copied {count} full path{'s' if count > 1 else ''} to clipboard")
+            self.mark_dirty()
+            return True
+        else:
+            self.logger.error("Failed to copy to clipboard")
+            return False
+    
+    def _action_copy_visible_logs(self):
+        """Copy visible log pane contents to system clipboard."""
+        if not self.is_desktop_mode():
+            self.logger.error("Clipboard operations only available in desktop mode")
+            return False
+        
+        if not self.renderer.supports_clipboard():
+            self.logger.error("Clipboard not supported on this backend")
+            return False
+        
+        # Get visible log lines
+        log_height = self._get_log_pane_height()
+        visible_logs = self.log_manager.get_visible_log_text(log_height)
+        
+        if not visible_logs:
+            self.logger.error("No visible logs to copy")
+            return False
+        
+        # Copy to clipboard
+        if self.renderer.set_clipboard_text(visible_logs):
+            self.logger.info("Copied visible logs to clipboard")
+            self.mark_dirty()
+            return True
+        else:
+            self.logger.error("Failed to copy to clipboard")
+            return False
+    
+    def _action_copy_all_logs(self):
+        """Copy all log pane contents to system clipboard."""
+        if not self.is_desktop_mode():
+            self.logger.error("Clipboard operations only available in desktop mode")
+            return False
+        
+        if not self.renderer.supports_clipboard():
+            self.logger.error("Clipboard not supported on this backend")
+            return False
+        
+        # Get all log lines
+        all_logs = self.log_manager.get_all_log_text()
+        
+        if not all_logs:
+            self.logger.error("No logs to copy")
+            return False
+        
+        # Copy to clipboard
+        if self.renderer.set_clipboard_text(all_logs):
+            line_count = len(all_logs.split('\n'))
+            self.logger.info(f"Copied all logs ({line_count} lines) to clipboard")
             self.mark_dirty()
             return True
         else:

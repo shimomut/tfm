@@ -33,6 +33,8 @@ class MenuManager:
     EDIT_SELECT_ALL = 'edit.select_all'
     EDIT_COPY_NAMES = 'edit.copy_names'
     EDIT_COPY_PATHS = 'edit.copy_paths'
+    EDIT_COPY_VISIBLE_LOGS = 'edit.copy_visible_logs'
+    EDIT_COPY_ALL_LOGS = 'edit.copy_all_logs'
     
     # View menu
     VIEW_SHOW_HIDDEN = 'view.show_hidden'
@@ -253,6 +255,17 @@ class MenuManager:
                     'label': 'Copy Full Paths to Clipboard',
                     'shortcut': f'{modifier}+Shift+C',
                     'enabled': True  # Always enabled - uses focused item if no selection
+                },
+                {'separator': True},
+                {
+                    'id': self.EDIT_COPY_VISIBLE_LOGS,
+                    'label': 'Copy Visible Logs to Clipboard',
+                    'enabled': True
+                },
+                {
+                    'id': self.EDIT_COPY_ALL_LOGS,
+                    'label': 'Copy All Logs to Clipboard',
+                    'enabled': True
                 }
             ]
         }
@@ -527,6 +540,8 @@ class MenuManager:
         states[self.EDIT_SELECT_ALL] = is_file_manager_active
         states[self.EDIT_COPY_NAMES] = is_file_manager_active
         states[self.EDIT_COPY_PATHS] = is_file_manager_active
+        states[self.EDIT_COPY_VISIBLE_LOGS] = is_file_manager_active
+        states[self.EDIT_COPY_ALL_LOGS] = is_file_manager_active
         
         # View menu states - disabled when FileManager is not active
         states[self.VIEW_SHOW_HIDDEN] = is_file_manager_active

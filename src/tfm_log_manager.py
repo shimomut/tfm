@@ -596,6 +596,67 @@ class LogManager:
         handler_messages = self._log_pane_handler.get_messages()
         return [formatted_msg for formatted_msg, record in handler_messages]
     
+    def get_visible_log_text(self, display_height):
+        """
+        Get visible log lines as text for clipboard copy.
+        
+        Returns the currently visible log lines based on scroll position,
+        with line wrapping applied as it appears on screen.
+        
+        Args:
+            display_height: Number of lines visible in the log pane
+            
+        Returns:
+            String containing visible log lines (one per line)
+        """
+        if self._log_pane_handler is None or display_height <= 0:
+            return ""
+        
+        # Get all messages
+        handler_messages = self._log_pane_handler.get_messages()
+        total_messages = len(handler_messages)
+        
+        if total_messages == 0:
+            return ""
+        
+        # For clipboard copy, we don't need to wrap - just get the visible messages
+        # Calculate which messages are visible based on scroll offset
+        max_scroll = max(0, total_messages - display_height)
+        scroll_offset = min(self.log_scroll_offset, max_scroll)
+        
+        start_idx = max(0, total_messages - display_height - scroll_offset)
+        end_idx = min(total_messages, start_idx + display_height)
+        
+        visible_messages = handler_messages[start_idx:end_idx]
+        
+        # Extract formatted text from tuples
+        lines = [formatted_msg for formatted_msg, record in visible_messages]
+        
+        return '\n'.join(lines)
+    
+    def get_all_log_text(self):
+        """
+        Get all log lines as text for clipboard copy.
+        
+        Returns all log messages including those not currently visible.
+        
+        Returns:
+            String containing all log lines (one per line)
+        """
+        if self._log_pane_handler is None:
+            return ""
+        
+        # Get all messages
+        handler_messages = self._log_pane_handler.get_messages()
+        
+        if not handler_messages:
+            return ""
+        
+        # Extract formatted text from tuples
+        lines = [formatted_msg for formatted_msg, record in handler_messages]
+        
+        return '\n'.join(lines)
+    
     def _wrap_line(self, text, width):
         """
         Wrap a single line of text to fit within the specified width.
