@@ -1857,13 +1857,25 @@ class FileManager(UILayer):
         """
         Calculate the maximum extension width for files in the current pane.
         Returns the display width needed for the extension column.
+        Uses cached file info to avoid filesystem calls.
         """
         max_width = 0
         max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
         
+        # Use cached file_info to avoid filesystem calls
+        file_info_cache = pane_data.get('file_info', {})
+        
         for file_path in pane_data['files']:
-            if file_path.is_file():
-                _, extension = self.separate_filename_extension(file_path.name, file_path.is_dir())
+            # Check if it's a file using cache (avoid is_file() call)
+            file_key = str(file_path)
+            if file_key in file_info_cache:
+                is_dir = file_info_cache[file_key]['is_dir']
+            else:
+                # Fallback if cache miss (shouldn't happen normally)
+                is_dir = file_path.is_dir()
+            
+            if not is_dir:  # is_file
+                _, extension = self.separate_filename_extension(file_path.name, is_dir)
                 if extension and len(extension) <= max_ext_length:
                     # Use display width instead of character count
                     ext_display_width = safe_get_display_width(extension)
@@ -1980,8 +1992,19 @@ class FileManager(UILayer):
             if self.ui_layer_stack.check_and_close_top_layer():
                 self.mark_dirty()
             
-            # Draw interface after event processing
-            self.draw_interface()
+
+            if 'rendering' in self.profiling_targets:
+                import cProfile
+                cProfile.runctx(
+                    "self.draw_interface()",
+                    globals(),
+                    locals()
+                )
+            else:
+                self.draw_interface()
+
+            # # Draw interface after event processing
+            # self.draw_interface()
         
         # Restore stdout/stderr before exiting
         self.restore_stdio()
@@ -2019,9 +2042,9 @@ class FileManager(UILayer):
         """Get a human-readable description of the current sort mode"""
         return self.file_list_manager.get_sort_description(pane_data)
             
-    def get_file_info(self, path):
+    def get_file_info(self, path, pane_data=None):
         """Get file information for display"""
-        return self.file_list_manager.get_file_info(path)
+        return self.file_list_manager.get_file_info(path, pane_data)
             
     def format_path_display(self, path_obj):
         """
@@ -2194,10 +2217,18 @@ class FileManager(UILayer):
                 
             file_path = pane_data['files'][file_index]
             
-            # Get file info (this is still per-file, but unavoidable)
+            # Get file info from cache (no filesystem calls during rendering)
             display_name = file_path.name
-            is_dir = file_path.is_dir()
-            size_str, mtime_str = self.get_file_info(file_path)
+            file_key = str(file_path)
+            
+            # Get is_dir from cache to avoid filesystem call
+            if file_key in pane_data.get('file_info', {}):
+                is_dir = pane_data['file_info'][file_key]['is_dir']
+            else:
+                # Fallback if cache miss (shouldn't happen normally)
+                is_dir = file_path.is_dir()
+            
+            size_str, mtime_str = self.get_file_info(file_path, pane_data)
             
             # Fast lookups using pre-computed sets
             is_selected = str(file_path) in selected_set
@@ -2205,7 +2236,9 @@ class FileManager(UILayer):
             is_focused = file_index == pane_data['focused_index']
             
             # Choose color
-            is_executable = file_path.is_file() and os.access(file_path, os.X_OK)
+            # For executable check, we still need to call is_file() and os.access()
+            # but only for files (not directories), which is much less common
+            is_executable = (not is_dir) and os.access(file_path, os.X_OK)
             color = get_file_color(is_dir, is_executable, is_focused, is_active)
             
             # Add underline for search matches
