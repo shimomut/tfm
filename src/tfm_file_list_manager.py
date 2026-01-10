@@ -276,7 +276,9 @@ class FileListManager:
             date_str = self._format_date(stat_info.st_mtime)
             
             return size_str, date_str
-        except (OSError, PermissionError):
+        except Exception:
+            # Catch all exceptions including SSH errors, permission errors, etc.
+            # Return placeholder values instead of propagating the error
             return "---", "---"
     
     def toggle_selection(self, pane_data, move_cursor=True, direction=1):
