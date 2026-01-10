@@ -251,12 +251,15 @@ class TFMEventCallback(EventCallback):
 
 
 class FileManager(UILayer):
-    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None, debug=False):
+    def __init__(self, renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None, debug=False, no_log_pane=False):
         self.renderer = renderer
         self.stdscr = renderer  # Keep stdscr as alias for compatibility during migration
         
         # Store profiling targets
         self.profiling_targets = profiling_targets or set()
+        
+        # Store no_log_pane flag
+        self.no_log_pane = no_log_pane
         
         # Load configuration early (needed for LogManager and colors)
         self.config = get_config()
@@ -266,7 +269,7 @@ class FileManager(UILayer):
         # Enable stream output in desktop mode (CoreGraphics), disable in terminal mode (Curses)
         is_desktop = renderer.is_desktop_mode()
         self.log_manager = LogManager(self.config, remote_port=remote_log_port, 
-                                     is_desktop_mode=is_desktop, log_file=log_file)
+                                     is_desktop_mode=is_desktop, log_file=log_file, no_log_pane=no_log_pane)
         
         # Set the global LogManager instance for module-level getLogger() calls
         from tfm_log_manager import set_log_manager
@@ -4945,12 +4948,12 @@ class FileManager(UILayer):
             self.logger.warning(f"Warning: Could not load search history: {e}")
             return []
 
-def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None, debug=False):
+def main(renderer, remote_log_port=None, left_dir=None, right_dir=None, profiling_targets=None, log_file=None, debug=False, no_log_pane=False):
     """Main function to run the file manager"""
     fm = None
     try:
         fm = FileManager(renderer, remote_log_port=remote_log_port, left_dir=left_dir, right_dir=right_dir, 
-                        profiling_targets=profiling_targets or set(), log_file=log_file, debug=debug)
+                        profiling_targets=profiling_targets or set(), log_file=log_file, debug=debug, no_log_pane=no_log_pane)
         fm.run()
     except KeyboardInterrupt:
         # Clean exit on Ctrl+C
@@ -5074,6 +5077,12 @@ def create_parser():
              'Example: --profile=event or --profile=rendering,event'
     )
     
+    parser.add_argument(
+        '--no-log-pane',
+        action='store_true',
+        help='Disable log output to log pane (useful for profiling rendering without log-triggered redraws)'
+    )
+    
     return parser
 
 def cli_main():
@@ -5163,7 +5172,8 @@ def cli_main():
                  right_dir=args.right,
                  profiling_targets=profile_targets,
                  log_file=args.log_file,
-                 debug=args.debug)
+                 debug=args.debug,
+                 no_log_pane=args.no_log_pane)
         finally:
             # Ensure renderer is properly shut down
             renderer.shutdown()
