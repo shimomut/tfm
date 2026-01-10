@@ -8,6 +8,7 @@ A powerful file manager that runs both in the terminal and as a native desktop a
 
 - **Dual-pane interface** with independent navigation and cross-pane operations
 - **Archive browsing** - Navigate ZIP, TAR, and compressed archives as virtual directories
+- **SFTP support** - Browse and manage remote servers via SSH with optimized performance
 - **Advanced search** with real-time filtering and background processing  
 - **Multi-selection** with bulk operations and progress tracking
 - **Built-in text viewer** with syntax highlighting for 20+ file formats
@@ -79,6 +80,7 @@ For comprehensive information about TFM's features and usage:
 ### User Documentation
 - **[Complete User Guide](doc/TFM_USER_GUIDE.md)** - Comprehensive guide covering all features, configuration, and usage
 - **[Configuration](doc/CONFIGURATION_FEATURE.md)** - Complete configuration reference and customization guide
+- **[SFTP Support](doc/SFTP_SUPPORT_FEATURE.md)** - Remote server access via SSH with file operations and search
 - **[AWS S3 Support](doc/S3_SUPPORT_FEATURE.md)** - Cloud storage integration and S3 bucket management
 - **[Archive Virtual Directory Browsing](doc/ARCHIVE_VIRTUAL_DIRECTORY_FEATURE.md)** - Browse archives as directories
 - **[Remote Log Monitoring](doc/REMOTE_LOG_MONITORING_FEATURE.md)** - Real-time log monitoring setup and usage
@@ -108,7 +110,10 @@ All key bindings are fully customizable through the configuration system. For co
 - **External Programs:** `x` for custom program integration
 - **Sub-shell Mode:** `X` to enter shell with TFM environment variables
 - **Configuration:** `Z` for settings menu
+- **SFTP Support:** Navigate remote servers using `ssh://hostname/path` syntax
 - **AWS S3 Support:** Navigate S3 buckets using `s3://bucket/path` syntax
+
+For comprehensive SFTP setup and usage, see the **[SFTP Support Feature Guide](doc/SFTP_SUPPORT_FEATURE.md)**.
 
 For comprehensive S3 setup and usage, see the **[AWS S3 Support Feature Guide](doc/S3_SUPPORT_FEATURE.md)**.
 
@@ -166,8 +171,9 @@ Type `exit` to return to TFM.
 ## Advanced Features
 
 - **Archive Virtual Directories:** Browse ZIP, TAR, and compressed archives as if they were directories - navigate, search, view files, and copy contents without extraction
+- **SFTP Support:** Access remote servers via SSH with full file operations, search, and optimized performance through connection multiplexing and bulk operations
 - **Batch Rename:** Regex-based renaming with capture groups and macros
-- **Threaded Search:** Non-blocking filename and content search with progress tracking (works inside archives)
+- **Threaded Search:** Non-blocking filename and content search with progress tracking (works inside archives and on remote servers)
 - **Pane Management:** Resizable layout, directory sync, state persistence
 - **External Integration:** VSCode, Beyond Compare, and custom program support
 - **Remote Log Monitoring:** Stream logs to remote terminals for debugging

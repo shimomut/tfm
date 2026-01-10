@@ -338,7 +338,7 @@ class SearchDialog(UILayer, BaseListDialog):
             if not file_path.suffix:
                 # Try to read first few bytes to check if it's text
                 try:
-                    with open(file_path, 'rb') as f:
+                    with file_path.open('rb') as f:
                         sample = f.read(512)
                         # Check if sample contains mostly printable characters
                         if sample:

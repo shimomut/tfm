@@ -41,6 +41,7 @@ class FileListManager:
         
         Updates:
             - pane_data['files']: List of file Path objects
+            - pane_data['file_info']: Cache of file info (size, date, is_dir)
             - pane_data['error']: Error message if refresh fails
         
         Error Handling:
@@ -77,6 +78,50 @@ class FileListManager:
                 pane_data['sort_mode'], 
                 pane_data['sort_reverse']
             )
+            
+            # Populate file info cache for all files
+            # This is done once at load time to avoid stat() calls during rendering
+            if 'file_info' not in pane_data:
+                pane_data['file_info'] = {}
+            else:
+                pane_data['file_info'].clear()
+            
+            for file_path in pane_data['files']:
+                file_key = str(file_path)
+                try:
+                    stat_info = file_path.stat()
+                    is_dir = file_path.is_dir()
+                    
+                    # Format size
+                    if is_dir:
+                        size_str = "<DIR>"
+                    else:
+                        size = stat_info.st_size
+                        if size < 1024:
+                            size_str = f"{size}B"
+                        elif size < 1024 * 1024:
+                            size_str = f"{size/1024:.1f}K"
+                        elif size < 1024 * 1024 * 1024:
+                            size_str = f"{size/(1024*1024):.1f}M"
+                        else:
+                            size_str = f"{size/(1024*1024*1024):.1f}G"
+                    
+                    # Format date
+                    date_str = self._format_date(stat_info.st_mtime)
+                    
+                    # Cache the formatted info
+                    pane_data['file_info'][file_key] = {
+                        'size_str': size_str,
+                        'date_str': date_str,
+                        'is_dir': is_dir
+                    }
+                except Exception:
+                    # Cache error result to avoid repeated stat() calls
+                    pane_data['file_info'][file_key] = {
+                        'size_str': '---',
+                        'date_str': '---',
+                        'is_dir': False
+                    }
             
             # Ensure focused index is valid
             if pane_data['files']:
@@ -202,9 +247,20 @@ class FileListManager:
                 # If we can't get file info, use name as fallback
                 return self._natural_sort_key(entry.name)
         
-        # Separate directories and files
-        directories = [entry for entry in entries if entry.is_dir()]
-        files = [entry for entry in entries if not entry.is_dir()]
+        # Cache is_dir() results to avoid redundant calls (optimization for remote filesystems)
+        # This reduces calls from 2N to N, providing 50% reduction in network operations
+        dirs_and_files = []
+        for entry in entries:
+            try:
+                is_directory = entry.is_dir()
+                dirs_and_files.append((entry, is_directory))
+            except (OSError, PermissionError):
+                # Treat as file on error
+                dirs_and_files.append((entry, False))
+        
+        # Separate directories and files using cached results
+        directories = [entry for entry, is_dir in dirs_and_files if is_dir]
+        files = [entry for entry, is_dir in dirs_and_files if not is_dir]
         
         # Sort each group separately
         sorted_dirs = sorted(directories, key=get_sort_key, reverse=reverse)
@@ -253,8 +309,27 @@ class FileListManager:
             # YY-MM-DD HH:mm
             return dt.strftime("%y-%m-%d %H:%M")
     
-    def get_file_info(self, path):
-        """Get file information for display"""
+    def get_file_info(self, path, pane_data=None):
+        """Get file information for display.
+        
+        This method first checks the file_info cache to avoid filesystem calls
+        during rendering. If cache miss, falls back to stat() call.
+        
+        Args:
+            path: Path object for the file
+            pane_data: Optional pane data dictionary containing file_info cache
+            
+        Returns:
+            Tuple of (size_str, date_str)
+        """
+        # Try cache first if pane_data provided
+        if pane_data and 'file_info' in pane_data:
+            file_key = str(path)
+            if file_key in pane_data['file_info']:
+                info = pane_data['file_info'][file_key]
+                return info['size_str'], info['date_str']
+        
+        # Cache miss or no pane_data - fall back to stat()
         try:
             stat_info = path.stat()
             
@@ -276,7 +351,9 @@ class FileListManager:
             date_str = self._format_date(stat_info.st_mtime)
             
             return size_str, date_str
-        except (OSError, PermissionError):
+        except Exception:
+            # Catch all exceptions including SSH errors, permission errors, etc.
+            # Return placeholder values instead of propagating the error
             return "---", "---"
     
     def toggle_selection(self, pane_data, move_cursor=True, direction=1):

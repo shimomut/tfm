@@ -734,6 +734,20 @@ class FileOperationExecutor:
             # Get file size
             file_size = source_file.stat().st_size
             
+            # Get source and destination schemes
+            source_scheme = source_file.get_scheme()
+            dest_scheme = dest_file.get_scheme()
+            
+            # For SSH transfers with large files (>1MB), use progress-aware copy
+            if (source_scheme == 'ssh' or dest_scheme == 'ssh') and file_size > 1024 * 1024:
+                # Create a progress callback that updates the ProgressManager
+                def ssh_progress_callback(bytes_transferred, total_bytes):
+                    self.progress_manager.update_file_byte_progress(bytes_transferred, total_bytes)
+                
+                # Use the progress-aware copy_to method
+                source_file.copy_to(dest_file, overwrite=overwrite, progress_callback=ssh_progress_callback)
+                return
+            
             # For files smaller than 10MB, use simple copy
             if file_size < 10 * 1024 * 1024:
                 source_file.copy_to(dest_file, overwrite=overwrite)
@@ -742,10 +756,6 @@ class FileOperationExecutor:
             # For large files, copy with byte-level progress and cancellation support
             chunk_size = 1024 * 1024  # 1MB chunks
             bytes_copied = 0
-            
-            # Handle different storage combinations
-            source_scheme = source_file.get_scheme()
-            dest_scheme = dest_file.get_scheme()
             
             # Create destination directory if needed (for local destinations)
             if dest_scheme == 'file':

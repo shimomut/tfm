@@ -294,20 +294,33 @@ class PaneManager:
             pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
     
     def count_files_and_dirs(self, pane_data):
-        """Count directories and files in a pane"""
+        """Count directories and files in a pane.
+        Uses cached file info to avoid filesystem calls.
+        """
         if not pane_data['files']:
             return 0, 0
             
         files = pane_data['files']
+        file_info_cache = pane_data.get('file_info', {})
         
         dir_count = 0
         file_count = 0
         
         for file_path in files:
-            if file_path.is_dir():
+            # Use cached is_dir to avoid filesystem call
+            file_key = str(file_path)
+            if file_key in file_info_cache:
+                is_dir = file_info_cache[file_key]['is_dir']
+            else:
+                # Fallback if cache miss (shouldn't happen normally)
+                is_dir = file_path.is_dir()
+            
+            if is_dir:
                 dir_count += 1
             else:
                 file_count += 1
+        
+        return dir_count, file_count
                 
         return dir_count, file_count
     

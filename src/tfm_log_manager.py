@@ -108,7 +108,7 @@ class LogCapture:
 class LogManager:
     """Manages logging system and log display"""
     
-    def __init__(self, config, remote_port=None, is_desktop_mode=False, log_file=None):
+    def __init__(self, config, remote_port=None, is_desktop_mode=False, log_file=None, no_log_pane=False):
         # Log scroll state
         self.log_scroll_offset = 0
         
@@ -136,6 +136,8 @@ class LogManager:
         # Configure file logging
         self._config.file_logging_enabled = log_file is not None
         self._config.file_logging_path = log_file
+        # Configure log pane (disabled if no_log_pane is True)
+        self._config.log_pane_enabled = not no_log_pane
         
         # Log level configuration
         # Global default level (defaults to INFO)
@@ -161,7 +163,7 @@ class LogManager:
         sys.stderr = LogCapture("STDERR", self.original_stderr, is_desktop_mode, logger=self._stream_logger)
         
         # Initialize handlers based on configuration
-        # This creates the LogPaneHandler by default (log_pane_enabled=True by default)
+        # This creates the LogPaneHandler by default unless no_log_pane is True
         self.configure_handlers()
     
     def configure_handlers(self, 
@@ -464,6 +466,8 @@ class LogManager:
     
     def has_log_updates(self):
         """Check if there are new log messages since last check"""
+        if self._log_pane_handler is None:
+            return False
         current_count = len(self._log_pane_handler.messages)
         if current_count != self.last_message_count or self.has_new_messages:
             return True
@@ -471,6 +475,8 @@ class LogManager:
     
     def mark_log_updates_processed(self):
         """Mark that log updates have been processed (redraw completed)"""
+        if self._log_pane_handler is None:
+            return
         self.has_new_messages = False
         self.last_message_count = len(self._log_pane_handler.messages)
     

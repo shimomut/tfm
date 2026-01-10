@@ -12,6 +12,7 @@ from tfm_base_list_dialog import BaseListDialog
 from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_progress_animator import ProgressAnimatorFactory
+from tfm_log_manager import getLogger
 
 # AWS S3 support - import boto3 with fallback
 try:
@@ -24,6 +25,14 @@ except ImportError:
     ClientError = Exception
     NoCredentialsError = Exception
 
+# SSH support - import SSHConfigParser with fallback
+try:
+    from tfm_ssh_config import SSHConfigParser
+    HAS_SSH_CONFIG = True
+except ImportError:
+    HAS_SSH_CONFIG = False
+    SSHConfigParser = None
+
 
 class DriveEntry:
     """Represents a drive/storage entry in the drives dialog"""
@@ -31,7 +40,7 @@ class DriveEntry:
     def __init__(self, name, path, drive_type, description=None):
         self.name = name
         self.path = path
-        self.drive_type = drive_type  # 'local', 's3'
+        self.drive_type = drive_type  # 'local', 's3', 'ssh'
         self.description = description or ""
     
     def __str__(self):
@@ -49,6 +58,10 @@ class DriveEntry:
                 display_name = f"s3://{self.name}"
             else:
                 display_name = self.name
+        elif self.drive_type == 'ssh':
+            icon = "🖥️ "
+            # Format display as "ssh://hostname"
+            display_name = f"ssh://{self.name}"
         else:
             icon = "💾"
             display_name = self.name
@@ -64,6 +77,9 @@ class DrivesDialog(UILayer, BaseListDialog):
     
     def __init__(self, config, renderer=None):
         super().__init__(config, renderer)
+        
+        # Initialize logger
+        self.logger = getLogger("DrivesDialog")
         
         # Drives dialog specific state
         self.drives = []  # List of all available drives
@@ -105,6 +121,9 @@ class DrivesDialog(UILayer, BaseListDialog):
         
         # Load local drives immediately
         self._load_local_drives()
+        
+        # Load SSH hosts immediately (synchronous, should be fast)
+        self._load_ssh_hosts()
         
         # Start S3 bucket loading in background
         self._start_s3_bucket_scan()
@@ -172,6 +191,44 @@ class DrivesDialog(UILayer, BaseListDialog):
         # Update drives list (thread-safe)
         with self.s3_lock:
             self.drives.extend(local_drives)
+            self._filter_drives_internal()
+            self.content_changed = True
+    
+    def _load_ssh_hosts(self):
+        """Load SSH hosts from ~/.ssh/config"""
+        if not HAS_SSH_CONFIG:
+            return  # Skip SSH host loading if SSHConfigParser not available
+        
+        ssh_drives = []
+        
+        try:
+            parser = SSHConfigParser()
+            hosts = parser.parse()
+            
+            for hostname, config in hosts.items():
+                # Get display name (use User@HostName if available)
+                user = config.get('User', '')
+                actual_host = config.get('HostName', hostname)
+                
+                if user:
+                    display_name = f"{user}@{actual_host}"
+                else:
+                    display_name = actual_host
+                
+                ssh_drives.append(DriveEntry(
+                    name=hostname,
+                    path=f"ssh://{hostname}/",
+                    drive_type="ssh",
+                    description=display_name if display_name != hostname else None
+                ))
+                
+        except Exception as e:
+            # Log error but don't fail
+            self.logger.warning(f"Failed to load SSH hosts: {e}")
+        
+        # Update drives list (thread-safe)
+        with self.s3_lock:
+            self.drives.extend(ssh_drives)
             self._filter_drives_internal()
             self.content_changed = True
     
@@ -341,7 +398,15 @@ class DrivesDialog(UILayer, BaseListDialog):
                     # Get animated status text
                     s3_count = sum(1 for drive in self.drives if drive.drive_type == 's3')
                     local_count = sum(1 for drive in self.drives if drive.drive_type == 'local')
-                    context_info = f"{local_count} local, {s3_count} S3"
+                    ssh_count = sum(1 for drive in self.drives if drive.drive_type == 'ssh')
+                    
+                    # Build context info with all drive types
+                    context_parts = [f"{local_count} local"]
+                    if s3_count > 0:
+                        context_parts.append(f"{s3_count} S3")
+                    if ssh_count > 0:
+                        context_parts.append(f"{ssh_count} SSH")
+                    context_info = ", ".join(context_parts)
                     
                     status_text = self.progress_animator.get_status_text("Loading S3", context_info, is_loading)
                     
@@ -354,7 +419,15 @@ class DrivesDialog(UILayer, BaseListDialog):
                     else:
                         s3_count = sum(1 for drive in self.drives if drive.drive_type == 's3')
                         local_count = sum(1 for drive in self.drives if drive.drive_type == 'local')
-                        status_text = f"Drives: {drive_count} ({local_count} local, {s3_count} S3)"
+                        ssh_count = sum(1 for drive in self.drives if drive.drive_type == 'ssh')
+                        
+                        # Build status text with all drive types
+                        status_parts = [f"{local_count} local"]
+                        if s3_count > 0:
+                            status_parts.append(f"{s3_count} S3")
+                        if ssh_count > 0:
+                            status_parts.append(f"{ssh_count} SSH")
+                        status_text = f"Drives: {drive_count} ({', '.join(status_parts)})"
                     
                     color_pair, attributes = get_status_color()
             
@@ -621,6 +694,9 @@ class DrivesDialogHelpers:
                     return
             elif drive_entry.drive_type == 's3':
                 # For S3, we'll let the S3PathImpl handle validation
+                pass
+            elif drive_entry.drive_type == 'ssh':
+                # For SSH, we'll let the SSHPathImpl handle validation
                 pass
             
             # Update the current pane
