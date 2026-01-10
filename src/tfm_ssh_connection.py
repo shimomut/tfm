@@ -529,6 +529,16 @@ class SSHConnection:
             entry = self._parse_ls_line(line)
             if entry:
                 entries.append(entry)
+                
+                # Cache individual stat for this file
+                import posixpath
+                file_path = posixpath.join(remote_path, entry['name'])
+                self._cache.put(
+                    operation='stat',
+                    hostname=self.hostname,
+                    path=file_path,
+                    data=entry
+                )
         
         # Store in cache
         self._cache.put(
@@ -574,9 +584,11 @@ class SSHConnection:
         )
         
         if cached_result is not None:
+            self.logger.debug(f"stat() cache HIT for {remote_path}")
             return cached_result
         
         # Cache miss - fetch from remote
+        self.logger.debug(f"stat() cache MISS for {remote_path}, fetching from remote")
         # SFTP's ls command doesn't support -d flag
         # Try ls -l first (works for files and will list directory contents for dirs)
         commands = [f'ls -l {remote_path}']
