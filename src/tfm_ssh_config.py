@@ -28,7 +28,7 @@ class SSHConfigParser:
             config_path: Path to SSH config file (default: ~/.ssh/config)
         """
         self.config_path = os.path.expanduser(config_path)
-        self.logger = getLogger("SSHConfig")
+        self.logger = getLogger("SSHCfg")
     
     def parse(self) -> dict:
         """

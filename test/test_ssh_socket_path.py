@@ -65,14 +65,20 @@ class TestSSHSocketPath(unittest.TestCase):
         config = {'HostName': 'test-host'}
         conn = SSHConnection('test-host', config)
         
-        # Verify path format: ~/.tfm/ssh_sockets/tfm-ssh-{hash}
+        # Verify path format: ~/.tfm/ssh_sockets/tfm-ssh-{hash}-{pid}
         socket_path = Path(conn._control_path)
         
         # Check filename starts with tfm-ssh-
         self.assertTrue(socket_path.name.startswith('tfm-ssh-'))
         
+        # Check format: tfm-ssh-{hash}-{pid}
+        parts = socket_path.name.split('-')
+        self.assertEqual(len(parts), 4)  # ['tfm', 'ssh', '{hash}', '{pid}']
+        self.assertEqual(parts[0], 'tfm')
+        self.assertEqual(parts[1], 'ssh')
+        
         # Check hash is 8 characters (MD5 truncated)
-        hash_part = socket_path.name.replace('tfm-ssh-', '')
+        hash_part = parts[2]
         self.assertEqual(len(hash_part), 8)
         
         # Check hash is hexadecimal
@@ -80,6 +86,13 @@ class TestSSHSocketPath(unittest.TestCase):
             int(hash_part, 16)
         except ValueError:
             self.fail(f"Hash part '{hash_part}' is not hexadecimal")
+        
+        # Check PID is numeric
+        pid_part = parts[3]
+        try:
+            int(pid_part)
+        except ValueError:
+            self.fail(f"PID part '{pid_part}' is not numeric")
     
     def test_different_hosts_different_paths(self):
         """Test that different hostnames get different socket paths"""
@@ -97,14 +110,17 @@ class TestSSHSocketPath(unittest.TestCase):
             Path(conn2._control_path).parent
         )
     
-    def test_same_host_same_path(self):
-        """Test that same hostname gets same socket path"""
+    def test_same_host_different_path_per_process(self):
+        """Test that same hostname gets different socket path per process (due to PID)"""
         config = {'HostName': 'test-host'}
         conn1 = SSHConnection('test-host', config)
         conn2 = SSHConnection('test-host', config)
         
-        # Verify paths are identical
+        # Since both are created in the same process, they should have the same path
         self.assertEqual(conn1._control_path, conn2._control_path)
+        
+        # Verify PID is in the path
+        self.assertIn(str(os.getpid()), conn1._control_path)
     
     def test_socket_path_length_reasonable(self):
         """Test that socket path length is reasonable"""
@@ -117,8 +133,10 @@ class TestSSHSocketPath(unittest.TestCase):
         self.assertLess(len(conn._control_path), 104)
         
         # Verify hash keeps it short
+        # Format: tfm-ssh-{8-char-hash}-{pid}
         socket_name = Path(conn._control_path).name
-        self.assertLess(len(socket_name), 20)  # tfm-ssh- + 8 char hash
+        # PID can be up to 7 digits, so max length is: 8 + 8 + 7 + 2 = 25
+        self.assertLess(len(socket_name), 30)
 
 
 if __name__ == '__main__':

@@ -176,7 +176,7 @@ class SSHCache:
                 del self._cache[key]
             
             if keys_to_remove:
-                self.logger.info(f"Invalidated {len(keys_to_remove)} cache entries for {hostname}")
+                self.logger.debug(f"Invalidated {len(keys_to_remove)} cache entries for {hostname}")
     
     def invalidate_path(self, hostname: str, path: str):
         """
@@ -219,7 +219,7 @@ class SSHCache:
                 del self._cache[key]
             
             if keys_to_remove:
-                self.logger.info(f"Invalidated {len(keys_to_remove)} cache entries for {hostname}:{path}")
+                self.logger.debug(f"Invalidated {len(keys_to_remove)} cache entries for {hostname}:{path}")
     
     def invalidate_directory(self, hostname: str, directory: str):
         """
@@ -252,7 +252,7 @@ class SSHCache:
                 del self._cache[key]
             
             if keys_to_remove:
-                self.logger.info(f"Invalidated {len(keys_to_remove)} cache entries for directory {hostname}:{directory}")
+                self.logger.debug(f"Invalidated {len(keys_to_remove)} cache entries for directory {hostname}:{directory}")
     
     def clear(self):
         """Clear all cache entries."""
@@ -260,7 +260,7 @@ class SSHCache:
             count = len(self._cache)
             self._cache.clear()
             if count > 0:
-                self.logger.info(f"Cleared {count} cache entries")
+                self.logger.debug(f"Cleared {count} cache entries")
     
     def _evict_lru(self):
         """Evict the least recently used cache entry."""
@@ -272,7 +272,7 @@ class SSHCache:
                         key=lambda k: self._cache[k]['last_access'])
         entry = self._cache[oldest_key]
         del self._cache[oldest_key]
-        self.logger.info(f"Evicted LRU cache entry for {entry['hostname']}:{entry['path']}")
+        self.logger.debug(f"Evicted LRU cache entry for {entry['hostname']}:{entry['path']}")
     
     def get_stats(self) -> Dict[str, Any]:
         """

@@ -35,7 +35,8 @@ self._control_path = os.path.join(tempfile.gettempdir(), f'tfm-ssh-{hostname_has
 from pathlib import Path
 ssh_socket_dir = Path.home() / '.tfm' / 'ssh_sockets'
 ssh_socket_dir.mkdir(parents=True, exist_ok=True)
-self._control_path = str(ssh_socket_dir / f'tfm-ssh-{hostname_hash}')
+pid = os.getpid()
+self._control_path = str(ssh_socket_dir / f'tfm-ssh-{hostname_hash}-{pid}')
 ```
 
 ## Why This Works
@@ -44,6 +45,7 @@ self._control_path = str(ssh_socket_dir / f'tfm-ssh-{hostname_hash}')
 2. **Persistent location**: Using `~/.tfm/` keeps all TFM-related files in one place
 3. **Explicit directory creation**: Ensures the directory exists before attempting to create sockets
 4. **No sandboxing conflicts**: Home directory access doesn't conflict with macOS app sandboxing
+5. **Process isolation**: Including PID ensures each TFM process has its own control socket, preventing race conditions when multiple instances connect to the same host
 
 ## Benefits
 
@@ -51,10 +53,17 @@ self._control_path = str(ssh_socket_dir / f'tfm-ssh-{hostname_hash}')
 2. **Better organization**: All TFM files are now under `~/.tfm/`
 3. **Debugging**: Easier to find and inspect control sockets
 4. **Cleanup**: Users can easily clean up old sockets by removing `~/.tfm/ssh_sockets/`
+5. **Process isolation**: Each TFM instance has its own control socket, preventing race conditions when:
+   - Process A creates a socket and connects
+   - Process B tries to use the same socket
+   - Process A exits and deletes the socket
+   - Process B gets connection errors
 
 ## File Locations
 
-- **Control sockets**: `~/.tfm/ssh_sockets/tfm-ssh-{hash}`
+- **Control sockets**: `~/.tfm/ssh_sockets/tfm-ssh-{hash}-{pid}`
+  - `{hash}`: 8-character MD5 hash of hostname
+  - `{pid}`: Process ID to ensure uniqueness per TFM instance
 - **Config file**: `~/.tfm/config.py`
 - **SSH cache**: `~/.tfm/ssh_cache.json`
 

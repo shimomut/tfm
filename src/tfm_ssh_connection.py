@@ -69,7 +69,7 @@ class SSHConnection:
         self.config = config
         self._connected = False
         self._lock = threading.Lock()
-        self.logger = getLogger("SSHConn")
+        self.logger = getLogger("SSHCon")
         
         # Extract connection parameters
         self.actual_host = config.get('HostName', hostname)
@@ -95,7 +95,11 @@ class SSHConnection:
         # This avoids issues with /tmp in sandboxed environments (DMG apps)
         ssh_socket_dir = Path.home() / '.tfm' / 'ssh_sockets'
         ssh_socket_dir.mkdir(parents=True, exist_ok=True)
-        self._control_path = str(ssh_socket_dir / f'tfm-ssh-{hostname_hash}')
+        
+        # Include process ID to ensure unique socket per process
+        # This prevents race conditions when multiple TFM processes connect to the same host
+        pid = os.getpid()
+        self._control_path = str(ssh_socket_dir / f'tfm-ssh-{hostname_hash}-{pid}')
         
         # Get cache instance
         self._cache = get_ssh_cache()
@@ -276,18 +280,25 @@ class SSHConnection:
                 stdout, stderr = process.communicate(timeout=10)
                 returncode = process.returncode
                 
-                # If process exited, something went wrong
-                self.logger.error(f"SSH process exited unexpectedly with code {returncode}")
+                # Check if socket was created
+                socket_created = os.path.exists(self._control_path)
                 
-                if stderr:
-                    stderr_lines = stderr.split('\n')
-                    self.logger.error(f"SSH stderr ({len(stderr_lines)} lines):")
-                    for i, line in enumerate(stderr_lines[:50]):
-                        self.logger.error(f"  stderr[{i}]: {line}")
-                
-                error_msg = f"Failed to establish control master: {stderr}"
-                self.logger.error(error_msg)
-                raise SSHError(error_msg)
+                if returncode == 0 and socket_created:
+                    # SSH exited successfully and socket exists - connection established
+                    self.logger.info(f"Connected to {self.hostname}")
+                else:
+                    # Process exited with error or socket not created
+                    self.logger.error(f"SSH process exited with code {returncode}")
+                    
+                    if stderr:
+                        stderr_lines = stderr.split('\n')
+                        self.logger.error(f"SSH stderr ({len(stderr_lines)} lines):")
+                        for i, line in enumerate(stderr_lines[:50]):
+                            self.logger.error(f"  stderr[{i}]: {line}")
+                    
+                    error_msg = f"Failed to establish control master: {stderr}"
+                    self.logger.error(error_msg)
+                    raise SSHError(error_msg)
                     
             except subprocess.TimeoutExpired:
                 # Timeout is expected - SSH is blocking with -N
@@ -1281,7 +1292,7 @@ class SSHConnectionManager:
         self._timeout = 300  # 5 minutes idle timeout
         self._health_check_interval = 60  # Check connection health every 60 seconds
         self._last_health_check: Dict[str, float] = {}
-        self.logger = getLogger("SSHConnMgr")
+        self.logger = getLogger("SSHCon")
     
     def _check_connection_health(self, hostname: str, conn: SSHConnection) -> bool:
         """
@@ -1478,6 +1489,6 @@ def cleanup_ssh_connections():
         manager.close_all()
     except Exception as e:
         # Use module-level logger for cleanup
-        logger = getLogger("SSHCleanup")
+        logger = getLogger("SSHCon")
         logger.error(f"Error during SSH connection cleanup: {e}")
 
