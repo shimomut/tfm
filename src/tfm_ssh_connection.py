@@ -10,6 +10,7 @@ import threading
 import time
 from typing import Optional, Dict, List, Tuple
 from tfm_log_manager import getLogger
+from tfm_ssh_cache import get_ssh_cache
 
 
 # SSH-specific exception types
@@ -84,6 +85,9 @@ class SSHConnection:
         # Create a short hash of the hostname to keep path length manageable
         hostname_hash = hashlib.md5(hostname.encode()).hexdigest()[:8]
         self._control_path = os.path.join(tempfile.gettempdir(), f'tfm-ssh-{hostname_hash}')
+        
+        # Get cache instance
+        self._cache = get_ssh_cache()
         
     def connect(self) -> bool:
         """
@@ -463,6 +467,17 @@ class SSHConnection:
         if not self._connected:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
         
+        # Try to get from cache first
+        cached_result = self._cache.get(
+            operation='list_directory',
+            hostname=self.hostname,
+            path=remote_path
+        )
+        
+        if cached_result is not None:
+            return cached_result
+        
+        # Cache miss - fetch from remote
         commands = [f'ls -la {remote_path}']
         stdout, stderr, returncode = self._execute_sftp_command(commands)
         
@@ -474,12 +489,28 @@ class SSHConnection:
                 error_msg = f"Remote path not found: {remote_path}"
                 self.logger.error(error_msg)
                 self.logger.error(f"Detailed error: {stderr}")
-                raise SSHPathNotFoundError(error_msg)
+                error = SSHPathNotFoundError(error_msg)
+                # Cache the error to avoid repeated SFTP calls
+                self._cache.put(
+                    operation='list_directory',
+                    hostname=self.hostname,
+                    path=remote_path,
+                    error=error
+                )
+                raise error
             elif 'permission denied' in stderr_lower:
                 error_msg = f"Permission denied accessing: {remote_path}"
                 self.logger.error(error_msg)
                 self.logger.error(f"Detailed error: {stderr}")
-                raise SSHPermissionDeniedError(error_msg)
+                error = SSHPermissionDeniedError(error_msg)
+                # Cache the error to avoid repeated SFTP calls
+                self._cache.put(
+                    operation='list_directory',
+                    hostname=self.hostname,
+                    path=remote_path,
+                    error=error
+                )
+                raise error
             else:
                 error_msg = f"Failed to list directory {remote_path}: {stderr}"
                 self.logger.error(error_msg)
@@ -498,6 +529,14 @@ class SSHConnection:
             entry = self._parse_ls_line(line)
             if entry:
                 entries.append(entry)
+        
+        # Store in cache
+        self._cache.put(
+            operation='list_directory',
+            hostname=self.hostname,
+            path=remote_path,
+            data=entries
+        )
         
         return entries
     
@@ -527,6 +566,17 @@ class SSHConnection:
         if not self._connected:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
         
+        # Try to get from cache first
+        cached_result = self._cache.get(
+            operation='stat',
+            hostname=self.hostname,
+            path=remote_path
+        )
+        
+        if cached_result is not None:
+            return cached_result
+        
+        # Cache miss - fetch from remote
         # SFTP's ls command doesn't support -d flag
         # Try ls -l first (works for files and will list directory contents for dirs)
         commands = [f'ls -l {remote_path}']
@@ -540,12 +590,28 @@ class SSHConnection:
                 error_msg = f"Remote path not found: {remote_path}"
                 self.logger.error(error_msg)
                 self.logger.error(f"Detailed error: {stderr}")
-                raise SSHPathNotFoundError(error_msg)
+                error = SSHPathNotFoundError(error_msg)
+                # Cache the error to avoid repeated SFTP calls
+                self._cache.put(
+                    operation='stat',
+                    hostname=self.hostname,
+                    path=remote_path,
+                    error=error
+                )
+                raise error
             elif 'permission denied' in stderr_lower:
                 error_msg = f"Permission denied accessing: {remote_path}"
                 self.logger.error(error_msg)
                 self.logger.error(f"Detailed error: {stderr}")
-                raise SSHPermissionDeniedError(error_msg)
+                error = SSHPermissionDeniedError(error_msg)
+                # Cache the error to avoid repeated SFTP calls
+                self._cache.put(
+                    operation='stat',
+                    hostname=self.hostname,
+                    path=remote_path,
+                    error=error
+                )
+                raise error
             else:
                 error_msg = f"Failed to stat path {remote_path}: {stderr}"
                 self.logger.error(error_msg)
@@ -558,11 +624,18 @@ class SSHConnection:
         if len(lines) == 1:
             entry = self._parse_ls_line(lines[0])
             if entry:
+                # Store in cache
+                self._cache.put(
+                    operation='stat',
+                    hostname=self.hostname,
+                    path=remote_path,
+                    data=entry
+                )
                 return entry
         
-        # If we got multiple lines, it's a directory listing
+        # If we got multiple lines OR zero lines (empty directory), it's a directory
         # We need to get the parent directory and find this entry
-        if len(lines) > 1:
+        if len(lines) != 1:
             # Extract parent directory and basename
             import posixpath
             
@@ -572,7 +645,7 @@ class SSHConnection:
             # Special case for root directory
             if normalized_path == '/':
                 # Root directory - create a synthetic entry
-                return {
+                root_entry = {
                     'name': '/',
                     'size': 4096,
                     'mtime': 0,
@@ -581,6 +654,14 @@ class SSHConnection:
                     'is_file': False,
                     'is_symlink': False,
                 }
+                # Store in cache
+                self._cache.put(
+                    operation='stat',
+                    hostname=self.hostname,
+                    path=remote_path,
+                    data=root_entry
+                )
+                return root_entry
             
             parent_dir = posixpath.dirname(normalized_path)
             basename = posixpath.basename(normalized_path)
@@ -598,6 +679,13 @@ class SSHConnection:
                     if line and not line.startswith('sftp>'):
                         entry = self._parse_ls_line(line)
                         if entry and entry['name'] == basename:
+                            # Store in cache
+                            self._cache.put(
+                                operation='stat',
+                                hostname=self.hostname,
+                                path=remote_path,
+                                data=entry
+                            )
                             return entry
         
         error_msg = f"Failed to parse stat output for {remote_path}"
@@ -826,6 +914,9 @@ class SSHConnection:
                     error_msg = f"Unexpected error writing file {remote_path}: {e}"
                     self.logger.error(error_msg)
                     raise SSHError(error_msg)
+            
+            # Invalidate cache after successful write
+            self._cache.invalidate_path(self.hostname, remote_path)
                 
         finally:
             # Clean up temporary file
@@ -878,6 +969,9 @@ class SSHConnection:
             error_msg = f"Unexpected error deleting file {remote_path}: {e}"
             self.logger.error(error_msg)
             raise SSHError(error_msg)
+        
+        # Invalidate cache after successful delete
+        self._cache.invalidate_path(self.hostname, remote_path)
     
     def delete_directory(self, remote_path: str):
         """
@@ -930,6 +1024,9 @@ class SSHConnection:
             error_msg = f"Unexpected error deleting directory {remote_path}: {e}"
             self.logger.error(error_msg)
             raise SSHError(error_msg)
+        
+        # Invalidate cache after successful delete
+        self._cache.invalidate_directory(self.hostname, remote_path)
     
     def create_directory(self, remote_path: str):
         """
@@ -976,6 +1073,9 @@ class SSHConnection:
             error_msg = f"Unexpected error creating directory {remote_path}: {e}"
             self.logger.error(error_msg)
             raise SSHError(error_msg)
+        
+        # Invalidate cache after successful create
+        self._cache.invalidate_path(self.hostname, remote_path)
     
     def rename(self, old_path: str, new_path: str):
         """
@@ -1024,6 +1124,10 @@ class SSHConnection:
             error_msg = f"Unexpected error renaming {old_path} to {new_path}: {e}"
             self.logger.error(error_msg)
             raise SSHError(error_msg)
+        
+        # Invalidate cache for both old and new paths after successful rename
+        self._cache.invalidate_path(self.hostname, old_path)
+        self._cache.invalidate_path(self.hostname, new_path)
 
 
 class SSHConnectionManager:
@@ -1124,7 +1228,7 @@ class SSHConnectionManager:
                 # Perform health check
                 if self._check_connection_health(hostname, conn):
                     self._last_used[hostname] = time.time()
-                    self.logger.info(f"Reusing connection to {hostname}")
+                    self.logger.debug(f"Reusing connection to {hostname}")
                     return conn
                 else:
                     # Connection unhealthy, attempt reconnection
