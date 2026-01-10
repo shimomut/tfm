@@ -177,6 +177,10 @@
         return;
     }
     
+    // Set up environment PATH to include common binary locations
+    // This ensures SSH ProxyCommand can find tools like 'aws', 'gcloud', etc.
+    [self setupEnvironmentPath];
+    
     // Import tfm_main module
     PyObject *tfmModule = PyImport_ImportModule("tfm.tfm_main");
     if (!tfmModule) {
@@ -220,6 +224,63 @@
     // Use exit() instead of [NSApp terminate:self] to avoid issues
     // when running directly from command line
     exit(0);
+}
+
+- (void)setupEnvironmentPath {
+    // Get current PATH
+    NSString *currentPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"PATH"];
+    if (!currentPath) {
+        currentPath = @"";
+    }
+    
+    // Common locations for CLI tools (aws, gcloud, etc.)
+    NSArray *additionalPaths = @[
+        @"/usr/local/bin",           // Homebrew (Intel Mac)
+        @"/usr/bin",                 // System binaries
+        @"/bin",                     // Core system binaries
+        [@"~/bin" stringByExpandingTildeInPath],                    // User binaries
+        [@"~/.local/bin" stringByExpandingTildeInPath]              // Python user binaries
+    ];
+    
+    // Build new PATH by prepending additional paths
+    NSMutableArray *pathComponents = [NSMutableArray array];
+    
+    // Add additional paths first (higher priority)
+    for (NSString *path in additionalPaths) {
+        // Check if path exists before adding
+        BOOL isDirectory;
+        if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && isDirectory) {
+            [pathComponents addObject:path];
+        }
+    }
+    
+    // Add current PATH components
+    if ([currentPath length] > 0) {
+        [pathComponents addObjectsFromArray:[currentPath componentsSeparatedByString:@":"]];
+    }
+    
+    // Remove duplicates while preserving order
+    NSMutableArray *uniquePaths = [NSMutableArray array];
+    NSMutableSet *seenPaths = [NSMutableSet set];
+    for (NSString *path in pathComponents) {
+        if (![seenPaths containsObject:path]) {
+            [uniquePaths addObject:path];
+            [seenPaths addObject:path];
+        }
+    }
+    
+    // Join into PATH string
+    NSString *newPath = [uniquePaths componentsJoinedByString:@":"];
+    
+    // Set environment variable for current process
+    setenv("PATH", [newPath UTF8String], 1);
+    
+    NSLog(@"Updated PATH: %@", newPath);
+    
+    // Also update Python's os.environ so subprocess calls see the new PATH
+    NSString *pythonCmd = [NSString stringWithFormat:@"import os; os.environ['PATH'] = '%@'", 
+                          [newPath stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"]];
+    PyRun_SimpleString([pythonCmd UTF8String]);
 }
 
 #pragma mark - Utility Methods

@@ -8,6 +8,10 @@ It uses the standard sftp command-line tool via subprocess for all operations.
 import subprocess
 import threading
 import time
+import os
+import shutil
+import traceback
+from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 from tfm_log_manager import getLogger
 from tfm_ssh_cache import get_ssh_cache
@@ -78,13 +82,20 @@ class SSHConnection:
         self._progress_threshold = 1024 * 1024  # 1MB threshold for progress display
         
         # SSH multiplexing (ControlMaster) for persistent connections
-        # Use a short path to avoid "path too long" errors
-        import tempfile
+        # Use user's home directory instead of /tmp to avoid sandboxing issues
+        # when running from DMG-packaged apps
         import os
         import hashlib
+        from pathlib import Path
+        
         # Create a short hash of the hostname to keep path length manageable
         hostname_hash = hashlib.md5(hostname.encode()).hexdigest()[:8]
-        self._control_path = os.path.join(tempfile.gettempdir(), f'tfm-ssh-{hostname_hash}')
+        
+        # Use ~/.tfm/ssh_sockets directory for control sockets
+        # This avoids issues with /tmp in sandboxed environments (DMG apps)
+        ssh_socket_dir = Path.home() / '.tfm' / 'ssh_sockets'
+        ssh_socket_dir.mkdir(parents=True, exist_ok=True)
+        self._control_path = str(ssh_socket_dir / f'tfm-ssh-{hostname_hash}')
         
         # Get cache instance
         self._cache = get_ssh_cache()
@@ -222,7 +233,9 @@ class SSHConnection:
             SSHError: If control master cannot be established
         """
         # Build SSH command to establish control master
-        ssh_cmd = ['ssh', '-N', '-f']  # -N: no command, -f: background
+        # Note: Removed -f flag to allow proper timeout handling and error capture
+        # The control master will still persist due to ControlPersist option
+        ssh_cmd = ['ssh', '-N']  # -N: no command
         
         # Add control master options
         ssh_cmd.extend([
@@ -247,18 +260,75 @@ class SSHConnection:
         
         try:
             # Establish control master
-            result = subprocess.run(
+            # Use Popen to capture output and control the process
+            process = subprocess.Popen(
                 ssh_cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
             )
             
-            if result.returncode != 0:
-                error_msg = f"Failed to establish control master: {result.stderr}"
+            # Wait for connection to establish (with timeout)
+            # SSH with -N will block, but we just need to verify it starts successfully
+            # The ControlPersist option will keep the socket alive after we terminate
+            try:
+                # Give it a few seconds to establish connection
+                stdout, stderr = process.communicate(timeout=10)
+                returncode = process.returncode
+                
+                # If process exited, something went wrong
+                self.logger.error(f"SSH process exited unexpectedly with code {returncode}")
+                
+                if stderr:
+                    stderr_lines = stderr.split('\n')
+                    self.logger.error(f"SSH stderr ({len(stderr_lines)} lines):")
+                    for i, line in enumerate(stderr_lines[:50]):
+                        self.logger.error(f"  stderr[{i}]: {line}")
+                
+                error_msg = f"Failed to establish control master: {stderr}"
                 self.logger.error(error_msg)
                 raise SSHError(error_msg)
+                    
+            except subprocess.TimeoutExpired:
+                # Timeout is expected - SSH is blocking with -N
+                # This means connection is likely established
+                # Capture any output so far
+                try:
+                    stdout, stderr = process.communicate(timeout=0.1)
+                except subprocess.TimeoutExpired:
+                    # Still running, which is good
+                    pass
                 
+                # Check if socket was created
+                socket_created = os.path.exists(self._control_path)
+                
+                if socket_created:
+                    self.logger.info(f"Connected to {self.hostname}")
+                    # Terminate the master process - ControlPersist will keep socket alive
+                    process.terminate()
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                else:
+                    # Socket not created after timeout - connection failed
+                    self.logger.error("Control socket not created after 10 seconds")
+                    
+                    # Kill process and get output
+                    process.kill()
+                    stdout, stderr = process.communicate()
+                    
+                    if stderr:
+                        stderr_lines = stderr.split('\n')
+                        self.logger.error(f"SSH stderr ({len(stderr_lines)} lines):")
+                        for i, line in enumerate(stderr_lines[:50]):
+                            self.logger.error(f"  stderr[{i}]: {line}")
+                    
+                    error_msg = f"Timeout establishing control master for {self.hostname}"
+                    self.logger.error(error_msg)
+                    raise SSHConnectionTimeoutError(error_msg)
+                    
         except subprocess.TimeoutExpired:
             error_msg = f"Timeout establishing control master for {self.hostname}"
             self.logger.error(error_msg)
