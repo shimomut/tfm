@@ -45,7 +45,7 @@ class SearchDialog(UILayer, BaseListDialog):
         # Threading support
         self.search_thread = None
         self.search_lock = threading.Lock()
-        self.cancel_search = threading.Event()
+        self.current_cancel_event = None  # Cancel event for current search thread
         self.last_search_pattern = ""
         
         # Animation support
@@ -134,8 +134,10 @@ class SearchDialog(UILayer, BaseListDialog):
             self.selected = 0
             self.scroll = 0
         
-        # Start new search thread
-        self.cancel_search.clear()
+        # Create a NEW cancel event for this search thread
+        cancel_event = threading.Event()
+        self.current_cancel_event = cancel_event
+        
         self.searching = True
         self.last_search_pattern = pattern_text
         
@@ -144,7 +146,7 @@ class SearchDialog(UILayer, BaseListDialog):
         
         self.search_thread = threading.Thread(
             target=self._search_worker,
-            args=(search_root, pattern_text, self.search_type),
+            args=(search_root, pattern_text, self.search_type, cancel_event),
             daemon=True
         )
         self.search_thread.start()
@@ -152,21 +154,25 @@ class SearchDialog(UILayer, BaseListDialog):
     def _cancel_current_search(self):
         """Cancel the current search operation"""
         if self.search_thread and self.search_thread.is_alive():
-            self.cancel_search.set()
-            # Give the thread a moment to finish
+            # Signal the thread to cancel using its own cancel event
+            if self.current_cancel_event:
+                self.current_cancel_event.set()
+            # Give the thread a moment to finish (but don't wait too long)
             self.search_thread.join(timeout=0.1)
         
         self.searching = False
         self.search_thread = None
+        self.current_cancel_event = None
         self.content_changed = True  # Mark content as changed when search is canceled
     
-    def _search_worker(self, search_root, pattern_text, search_type):
+    def _search_worker(self, search_root, pattern_text, search_type, cancel_event):
         """Worker thread for performing the actual search
         
         Args:
             search_root: Path object representing the root directory to search from
             pattern_text: The search pattern text
             search_type: 'filename' or 'content'
+            cancel_event: Threading event specific to this search thread for cancellation
         """
         temp_results = []
         
@@ -175,7 +181,7 @@ class SearchDialog(UILayer, BaseListDialog):
                 # Recursive filename search using fnmatch
                 for file_path in search_root.rglob('*'):
                     # Check for cancellation
-                    if self.cancel_search.is_set():
+                    if cancel_event.is_set():
                         with self.search_lock:
                             self.searching = False
                             self.content_changed = True  # Mark content as changed when search is canceled
@@ -212,7 +218,7 @@ class SearchDialog(UILayer, BaseListDialog):
                 
                 for file_path in search_root.rglob('*'):
                     # Check for cancellation
-                    if self.cancel_search.is_set():
+                    if cancel_event.is_set():
                         with self.search_lock:
                             self.searching = False
                             self.content_changed = True  # Mark content as changed when search is canceled
@@ -232,7 +238,7 @@ class SearchDialog(UILayer, BaseListDialog):
                                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                                     for line_num, line in enumerate(f, 1):
                                         # Check for cancellation periodically
-                                        if line_num % 100 == 0 and self.cancel_search.is_set():
+                                        if line_num % 100 == 0 and cancel_event.is_set():
                                             with self.search_lock:
                                                 self.searching = False
                                                 self.content_changed = True
@@ -265,7 +271,7 @@ class SearchDialog(UILayer, BaseListDialog):
                                 lines = content.splitlines()
                                 for line_num, line in enumerate(lines, 1):
                                     # Check for cancellation periodically
-                                    if line_num % 100 == 0 and self.cancel_search.is_set():
+                                    if line_num % 100 == 0 and cancel_event.is_set():
                                         with self.search_lock:
                                             self.searching = False
                                             self.content_changed = True
@@ -311,7 +317,7 @@ class SearchDialog(UILayer, BaseListDialog):
             pass
         
         # Final update of results if not cancelled
-        if not self.cancel_search.is_set():
+        if not cancel_event.is_set():
             with self.search_lock:
                 self.results = temp_results
                 if self.selected >= len(self.results):
@@ -634,7 +640,7 @@ class SearchDialog(UILayer, BaseListDialog):
             return True
         elif event.is_close():
             # Close the dialog and cancel any ongoing search
-            self.cancel_search()
+            self._cancel_current_search()
             self.is_active = False
             return True
         return False
