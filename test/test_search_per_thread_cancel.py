@@ -45,8 +45,9 @@ def test_per_thread_cancel_events():
     search_dialog.text_editor.text = "*.txt"
     search_dialog.perform_search(mock_path)
     
-    first_cancel_event = search_dialog.current_cancel_event
-    assert first_cancel_event is not None, "First search should have a cancel event"
+    first_thread = search_dialog.search_thread
+    assert first_thread is not None, "First search should have a thread"
+    first_cancel_event = first_thread.cancel_event
     
     time.sleep(0.05)
     
@@ -54,10 +55,12 @@ def test_per_thread_cancel_events():
     search_dialog.text_editor.text = "*.log"
     search_dialog.perform_search(mock_path)
     
-    second_cancel_event = search_dialog.current_cancel_event
-    assert second_cancel_event is not None, "Second search should have a cancel event"
+    second_thread = search_dialog.search_thread
+    assert second_thread is not None, "Second search should have a thread"
+    second_cancel_event = second_thread.cancel_event
     
-    # Verify they are different events
+    # Verify they are different threads with different events
+    assert first_thread is not second_thread, "Each search should have its own thread"
     assert first_cancel_event is not second_cancel_event, "Each search should have its own cancel event"
     
     # Verify first search's cancel event is set
@@ -66,6 +69,7 @@ def test_per_thread_cancel_events():
     # Verify second search's cancel event is NOT set
     assert not second_cancel_event.is_set(), "Second search's cancel event should not be set"
     
+    print("✓ Each search has its own thread")
     print("✓ Each search has its own cancel event")
     print("✓ First search's cancel event was set when cancelled")
     print("✓ Second search's cancel event remains clear")

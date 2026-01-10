@@ -27,6 +27,34 @@ from tfm_text_layout import (
 logger = getLogger("SearchDlg")
 
 
+class SearchThread(threading.Thread):
+    """Dedicated thread class for search operations with built-in cancellation support"""
+    
+    def __init__(self, search_root, pattern_text, search_type, worker_func, *args, **kwargs):
+        super().__init__(daemon=True, *args, **kwargs)
+        self.search_root = search_root
+        self.pattern_text = pattern_text
+        self.search_type = search_type
+        self.worker_func = worker_func
+        self.cancel_event = threading.Event()
+        self.searching = True
+        
+    def run(self):
+        """Execute the search worker function"""
+        try:
+            self.worker_func(self.search_root, self.pattern_text, self.search_type, self)
+        finally:
+            self.searching = False
+    
+    def cancel(self):
+        """Request cancellation of this search thread"""
+        self.cancel_event.set()
+    
+    def is_cancelled(self):
+        """Check if cancellation has been requested"""
+        return self.cancel_event.is_set()
+
+
 class SearchDialog(UILayer, BaseListDialog):
     """Search dialog component for filename and content search with threading support"""
     
@@ -36,16 +64,14 @@ class SearchDialog(UILayer, BaseListDialog):
         # Search dialog specific state
         self.search_type = 'filename'  # 'filename' or 'content'
         self.results = []  # List of search results
-        self.searching = False  # Whether search is in progress
         self.content_changed = True  # Track if content needs redraw
         self.search_root = None  # Root directory for search
         self._selected_result = None  # Selected result when dialog closes
         self.callback = None  # Callback function when result is selected
         
         # Threading support
-        self.search_thread = None
+        self.search_thread = None  # Current SearchThread instance
         self.search_lock = threading.Lock()
-        self.current_cancel_event = None  # Cancel event for current search thread
         self.last_search_pattern = ""
         
         # Animation support
@@ -75,7 +101,6 @@ class SearchDialog(UILayer, BaseListDialog):
         self.results = []
         self.selected = 0
         self.scroll = 0
-        self.searching = False
         self.last_search_pattern = ""
         self._selected_result = None  # Clear any previous selection
         
@@ -90,7 +115,6 @@ class SearchDialog(UILayer, BaseListDialog):
         super().exit()
         self.search_type = 'filename'
         self.results = []
-        self.searching = False
         self.last_search_pattern = ""
         self.search_root = None
         self.callback = None
@@ -134,45 +158,36 @@ class SearchDialog(UILayer, BaseListDialog):
             self.selected = 0
             self.scroll = 0
         
-        # Create a NEW cancel event for this search thread
-        cancel_event = threading.Event()
-        self.current_cancel_event = cancel_event
-        
-        self.searching = True
         self.last_search_pattern = pattern_text
         
         # Reset animation for new search
         self.progress_animator.reset()
         
-        self.search_thread = threading.Thread(
-            target=self._search_worker,
-            args=(search_root, pattern_text, self.search_type, cancel_event),
-            daemon=True
+        # Create new SearchThread with its own cancel_event and searching flag
+        self.search_thread = SearchThread(
+            search_root, pattern_text, self.search_type, self._search_worker
         )
         self.search_thread.start()
     
     def _cancel_current_search(self):
         """Cancel the current search operation"""
         if self.search_thread and self.search_thread.is_alive():
-            # Signal the thread to cancel using its own cancel event
-            if self.current_cancel_event:
-                self.current_cancel_event.set()
+            # Signal the thread to cancel
+            self.search_thread.cancel()
             # Give the thread a moment to finish (but don't wait too long)
             self.search_thread.join(timeout=0.1)
         
-        self.searching = False
         self.search_thread = None
-        self.current_cancel_event = None
         self.content_changed = True  # Mark content as changed when search is canceled
     
-    def _search_worker(self, search_root, pattern_text, search_type, cancel_event):
+    def _search_worker(self, search_root, pattern_text, search_type, search_thread):
         """Worker thread for performing the actual search
         
         Args:
             search_root: Path object representing the root directory to search from
             pattern_text: The search pattern text
             search_type: 'filename' or 'content'
-            cancel_event: Threading event specific to this search thread for cancellation
+            search_thread: SearchThread instance managing this search
         """
         temp_results = []
         
@@ -181,9 +196,8 @@ class SearchDialog(UILayer, BaseListDialog):
                 # Recursive filename search using fnmatch
                 for file_path in search_root.rglob('*'):
                     # Check for cancellation
-                    if cancel_event.is_set():
+                    if search_thread.is_cancelled():
                         with self.search_lock:
-                            self.searching = False
                             self.content_changed = True  # Mark content as changed when search is canceled
                         return
                     
@@ -218,9 +232,8 @@ class SearchDialog(UILayer, BaseListDialog):
                 
                 for file_path in search_root.rglob('*'):
                     # Check for cancellation
-                    if cancel_event.is_set():
+                    if search_thread.is_cancelled():
                         with self.search_lock:
-                            self.searching = False
                             self.content_changed = True  # Mark content as changed when search is canceled
                         return
                     
@@ -238,9 +251,8 @@ class SearchDialog(UILayer, BaseListDialog):
                                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                                     for line_num, line in enumerate(f, 1):
                                         # Check for cancellation periodically
-                                        if line_num % 100 == 0 and cancel_event.is_set():
+                                        if line_num % 100 == 0 and search_thread.is_cancelled():
                                             with self.search_lock:
-                                                self.searching = False
                                                 self.content_changed = True
                                             return
                                         
@@ -271,9 +283,8 @@ class SearchDialog(UILayer, BaseListDialog):
                                 lines = content.splitlines()
                                 for line_num, line in enumerate(lines, 1):
                                     # Check for cancellation periodically
-                                    if line_num % 100 == 0 and cancel_event.is_set():
+                                    if line_num % 100 == 0 and search_thread.is_cancelled():
                                         with self.search_lock:
-                                            self.searching = False
                                             self.content_changed = True
                                         return
                                     
@@ -317,13 +328,12 @@ class SearchDialog(UILayer, BaseListDialog):
             pass
         
         # Final update of results if not cancelled
-        if not cancel_event.is_set():
+        if not search_thread.is_cancelled():
             with self.search_lock:
                 self.results = temp_results
                 if self.selected >= len(self.results):
                     self.selected = max(0, len(self.results) - 1)
                     self._adjust_scroll(len(self.results))
-                self.searching = False
                 self.content_changed = True  # Mark content as changed when search completes
         
     def _is_text_file(self, file_path):
@@ -370,7 +380,8 @@ class SearchDialog(UILayer, BaseListDialog):
     def needs_redraw(self):
         """Check if this dialog needs to be redrawn"""
         # Always redraw when searching to animate progress indicator
-        return self.content_changed or self.searching
+        is_searching = self.search_thread and self.search_thread.is_alive() and self.search_thread.searching
+        return self.content_changed or is_searching
     
     def draw(self):
         """Draw the search dialog overlay"""
@@ -415,7 +426,7 @@ class SearchDialog(UILayer, BaseListDialog):
         if count_y < height:
             with self.search_lock:
                 result_count = len(self.results)
-                is_searching = self.searching
+                is_searching = self.search_thread and self.search_thread.is_alive() and self.search_thread.searching
                 
                 if is_searching:
                     # Get animated status text
@@ -517,7 +528,8 @@ class SearchDialog(UILayer, BaseListDialog):
         self.draw_help_text(help_text, help_y, start_x, dialog_width)
         
         # Automatically mark as not needing redraw after drawing (unless still searching)
-        if not self.searching:
+        is_searching = self.search_thread and self.search_thread.is_alive() and self.search_thread.searching
+        if not is_searching:
             self.content_changed = False
     
     # UILayer interface implementation
@@ -698,7 +710,8 @@ class SearchDialog(UILayer, BaseListDialog):
         Clear the dirty flag after rendering (UILayer interface).
         """
         # Only clear if not searching (searching keeps it dirty for animation)
-        if not self.searching:
+        is_searching = self.search_thread and self.search_thread.is_alive() and self.search_thread.searching
+        if not is_searching:
             self.content_changed = False
     
     def should_close(self) -> bool:
