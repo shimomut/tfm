@@ -89,6 +89,11 @@ class SSHConnection:
         # Get cache instance
         self._cache = get_ssh_cache()
         
+        # Control master check caching (optimization)
+        self._last_control_master_check = 0  # Timestamp of last check
+        self._control_master_check_interval = 5.0  # Seconds between checks
+        self._cached_control_master_status = False  # Cached status
+        
     def connect(self) -> bool:
         """
         Establish SSH connection.
@@ -164,13 +169,34 @@ class SSHConnection:
     
     def is_connected(self) -> bool:
         """
-        Check if connection is active.
+        Check if connection is active (with caching).
+        
+        Uses cached control master status to avoid redundant subprocess calls.
+        Only performs actual check if the cache interval has elapsed.
         
         Returns:
             True if connected, False otherwise
         """
         with self._lock:
-            return self._connected and self._check_control_master()
+            if not self._connected:
+                return False
+            
+            # Check if we need to verify control master
+            import time
+            current_time = time.time()
+            if current_time - self._last_control_master_check < self._control_master_check_interval:
+                # Use cached status (no subprocess call)
+                return self._cached_control_master_status
+            
+            # Perform actual check (subprocess call)
+            status = self._check_control_master()
+            self._cached_control_master_status = status
+            self._last_control_master_check = current_time
+            
+            if not status:
+                self._connected = False
+            
+            return status
     
     def set_progress_callback(self, callback: Optional[callable]):
         """
@@ -1181,10 +1207,11 @@ class SSHConnectionManager:
     
     def _check_connection_health(self, hostname: str, conn: SSHConnection) -> bool:
         """
-        Check if a connection is still healthy.
+        Check if a connection is still healthy (optimized).
         
         Performs a lightweight health check by verifying control master status.
         Health checks are rate-limited to avoid excessive overhead.
+        Uses cached connection status within the health check interval.
         
         Args:
             hostname: Remote hostname
@@ -1198,10 +1225,12 @@ class SSHConnectionManager:
         # Check if we've done a health check recently
         last_check = self._last_health_check.get(hostname, 0)
         if current_time - last_check < self._health_check_interval:
-            # Skip health check if we checked recently
-            return conn.is_connected()
+            # Trust the connection's internal status without forcing a check
+            # This avoids subprocess calls within the health check interval
+            with conn._lock:
+                return conn._connected
         
-        # Perform health check by checking control master status
+        # Health check interval elapsed, perform actual check
         try:
             if conn.is_connected():
                 self._last_health_check[hostname] = current_time

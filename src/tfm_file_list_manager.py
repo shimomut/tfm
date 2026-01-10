@@ -247,9 +247,20 @@ class FileListManager:
                 # If we can't get file info, use name as fallback
                 return self._natural_sort_key(entry.name)
         
-        # Separate directories and files
-        directories = [entry for entry in entries if entry.is_dir()]
-        files = [entry for entry in entries if not entry.is_dir()]
+        # Cache is_dir() results to avoid redundant calls (optimization for remote filesystems)
+        # This reduces calls from 2N to N, providing 50% reduction in network operations
+        dirs_and_files = []
+        for entry in entries:
+            try:
+                is_directory = entry.is_dir()
+                dirs_and_files.append((entry, is_directory))
+            except (OSError, PermissionError):
+                # Treat as file on error
+                dirs_and_files.append((entry, False))
+        
+        # Separate directories and files using cached results
+        directories = [entry for entry, is_dir in dirs_and_files if is_dir]
+        files = [entry for entry, is_dir in dirs_and_files if not is_dir]
         
         # Sort each group separately
         sorted_dirs = sorted(directories, key=get_sort_key, reverse=reverse)
