@@ -148,6 +148,10 @@ class AboutDialog(UILayer):
             # Draw all grid positions for this column
             for y in range(height):
                 if 0 <= column.x < width:
+                    # Bounds check: ensure y is within the grid_chars array
+                    if y >= len(column.grid_chars):
+                        continue
+                    
                     char = column.grid_chars[y]
                     
                     # Check if this position is part of a trail
@@ -350,6 +354,8 @@ class AboutDialog(UILayer):
             for x in range(0, width, 2):
                 self.matrix_columns.append(MatrixColumn(x, height))
             self.content_changed = True
+            # Clear previous drawn positions on resize
+            self.previous_drawn_positions = set()
             return True
         elif event.is_close():
             self.is_active = False
