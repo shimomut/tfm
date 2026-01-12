@@ -31,14 +31,12 @@ class MatrixColumn:
         self.y = random.randint(-height, 0)  # Start above screen
         self.speed = random.uniform(0.3, 1.0)  # Characters per frame
         self.length = random.randint(5, 15)  # Trail length
-        self.chars = self._generate_chars()
         
-    def _generate_chars(self):
-        """Generate random characters for this column"""
+        # Generate fixed characters for each grid position (authentic Matrix effect)
         # Use zenkaku katakana characters for authentic Matrix look
         # Full-width katakana range: U+30A0 to U+30FF
         katakana_chars = [chr(i) for i in range(0x30A0, 0x30FF)]
-        return [random.choice(katakana_chars) for _ in range(self.length)]
+        self.grid_chars = [random.choice(katakana_chars) for _ in range(height)]
     
     def update(self, dt):
         """Update column position
@@ -53,24 +51,22 @@ class MatrixColumn:
             self.y = random.randint(-self.height // 2, 0)
             self.speed = random.uniform(0.3, 1.0)
             self.length = random.randint(5, 15)
-            self.chars = self._generate_chars()
     
-    def get_visible_chars(self):
-        """Get list of (y, char, brightness) tuples for visible characters
+    def get_brightness_map(self):
+        """Get brightness value for each grid position
         
         Returns:
-            List of (y_pos, character, brightness) tuples
+            Dict mapping y_pos to brightness (0.0 to 1.0), only for positions with brightness > 0
         """
-        result = []
+        brightness_map = {}
         for i in range(self.length):
             y_pos = int(self.y - i)
             if 0 <= y_pos < self.height:
                 # Brightness increases toward the head (bottom)
                 # i=0 is the head (brightest), i=length-1 is the tail (dimmest)
                 brightness = 1.0 - (i / self.length)
-                char_idx = i % len(self.chars)
-                result.append((y_pos, self.chars[char_idx], brightness))
-        return result
+                brightness_map[y_pos] = brightness
+        return brightness_map
 
 
 class AboutDialog(UILayer):
@@ -134,35 +130,40 @@ class AboutDialog(UILayer):
         for column in self.matrix_columns:
             column.update(dt)
         
-        # Draw all visible characters with green color and brightness variation
-        # Use dedicated Matrix color pairs for proper green gradient
+        # Draw all grid characters with brightness based on falling trails
+        # In authentic Matrix effect, characters are fixed per grid position,
+        # and only brightness changes as trails pass through
         
         for column in self.matrix_columns:
-            for y, char, brightness in column.get_visible_chars():
-                if 0 <= y < height and 0 <= column.x < width:
-                    # Use different color pairs for different brightness levels
-                    # to create a proper brightness gradient
-                    # Head (bottom, i=0) is brightest, tail (top) is dimmest
+            brightness_map = column.get_brightness_map()
+            
+            # Draw all grid positions for this column
+            for y in range(height):
+                if 0 <= column.x < width:
+                    char = column.grid_chars[y]
+                    brightness = brightness_map.get(y, 0.0)
                     
-                    if brightness > 0.7:
-                        # Brightest - head of trail - bright green
-                        color_pair = COLOR_MATRIX_BRIGHT
-                        attr = TextAttribute.NORMAL
-                    elif brightness > 0.4:
-                        # Medium brightness - medium green
-                        color_pair = COLOR_MATRIX_MEDIUM
-                        attr = TextAttribute.NORMAL
-                    else:
-                        # Dimmest - tail - dim green
-                        color_pair = COLOR_MATRIX_DIM
-                        attr = TextAttribute.NORMAL
-                    
-                    try:
-                        self.renderer.draw_text(y, column.x, char, 
-                                              color_pair=color_pair, 
-                                              attributes=attr)
-                    except Exception:
-                        pass  # Ignore drawing errors at screen edges
+                    # Only draw if brightness > 0 (part of a trail)
+                    if brightness > 0:
+                        # Use different color pairs for different brightness levels
+                        # Head (bottom) is brightest, tail (top) is dimmest
+                        
+                        if brightness > 0.7:
+                            # Brightest - head of trail - bright green
+                            color_pair = COLOR_MATRIX_BRIGHT
+                        elif brightness > 0.4:
+                            # Medium brightness - medium green
+                            color_pair = COLOR_MATRIX_MEDIUM
+                        else:
+                            # Dimmest - tail - dim green
+                            color_pair = COLOR_MATRIX_DIM
+                        
+                        try:
+                            self.renderer.draw_text(y, column.x, char, 
+                                                  color_pair=color_pair, 
+                                                  attributes=TextAttribute.NORMAL)
+                        except Exception:
+                            pass  # Ignore drawing errors at screen edges
     
     def draw(self):
         """Draw the about dialog"""
