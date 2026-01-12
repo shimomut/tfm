@@ -28,7 +28,7 @@ class MatrixColumn:
         self.x = x
         self.height = height
         self.y = random.randint(-height, 0)  # Start above screen
-        self.speed = random.uniform(0.3, 1.0)  # Characters per frame
+        self.speed = random.uniform(20, 40)  # Characters per frame
         self.length = random.randint(25, 75)  # Trail length (5x longer: was 5-15, now 25-75)
         
         # Generate fixed characters for each grid position (authentic Matrix effect)
@@ -43,12 +43,12 @@ class MatrixColumn:
         Args:
             dt: Time delta since last update
         """
-        self.y += self.speed
+        self.y += self.speed * dt
         
         # Reset when column goes off screen
         if self.y - self.length > self.height:
             self.y = random.randint(-self.height // 2, 0)
-            self.speed = random.uniform(0.3, 1.0)
+            self.speed = random.uniform(20, 40)  # Characters per frame
             self.length = random.randint(25, 75)  # Trail length (5x longer)
     
     def get_brightness_map(self):
