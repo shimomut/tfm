@@ -47,6 +47,7 @@ from tfm_list_dialog import ListDialog, ListDialogHelpers
 from ttk.wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 
 from tfm_info_dialog import InfoDialog, InfoDialogHelpers
+from tfm_about_dialog import AboutDialog
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_drives_dialog import DrivesDialog, DrivesDialogHelpers
 from tfm_batch_rename_dialog import BatchRenameDialog, BatchRenameDialogHelpers
@@ -325,6 +326,7 @@ class FileManager(UILayer):
         self.pane_manager.file_list_manager = self.file_list_manager  # Set file_list_manager for refresh_files
         self.list_dialog = ListDialog(self.config, renderer)
         self.info_dialog = InfoDialog(self.config, renderer)
+        self.about_dialog = AboutDialog(self.config, renderer)
         self.search_dialog = SearchDialog(self.config, renderer)
         self.drives_dialog = DrivesDialog(self.config, renderer)
         self.batch_rename_dialog = BatchRenameDialog(self.config, renderer)
@@ -1206,44 +1208,9 @@ class FileManager(UILayer):
     
     # Menu action methods
     def _action_show_about(self):
-        """Show About TFM information in the log pane."""
-        from tfm_const import VERSION, GITHUB_URL
-        
-        # Add empty line and separator before
-        print("─" * 80)
-        
-        # TFM ASCII art logo (filled block style) with version and GitHub on the right
-        logo_lines = [
-            "  ████████╗███████╗███╗   ███╗",
-            "  ╚══██╔══╝██╔════╝████╗ ████║",
-            "     ██║   █████╗  ██╔████╔██║",
-            "     ██║   ██╔══╝  ██║╚██╔╝██║",
-            "     ██║   ██║     ██║ ╚═╝ ██║",
-            "     ╚═╝   ╚═╝     ╚═╝     ╚═╝"
-        ]
-        
-        # Add version and GitHub info on the right side of the logo
-        info_lines = [
-            "",
-            "",
-            f"Version: {VERSION}",
-            f"GitHub: {GITHUB_URL}",
-            "",
-            "",
-        ]
-        
-        # Print logo with info on the right
-        for logo_line, info_line in zip(logo_lines, info_lines):
-            if info_line:
-                print(f"{logo_line}  {info_line}")
-            else:
-                print(logo_line)
-        
-        # Add empty line and separator after
-        print("─" * 80)
-        
-        # Trigger redraw to show the messages
-        self.mark_dirty()
+        """Show About TFM dialog with Matrix-style animation."""
+        self.about_dialog.show()
+        self.push_layer(self.about_dialog)
         return True
     
     def _action_create_file(self):

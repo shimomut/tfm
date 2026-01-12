@@ -1,51 +1,123 @@
 #!/usr/bin/env python3
 """
-Demo: About TFM Menu
+Demo: About Dialog with Matrix-style Animation
 
-This demo tests the "About TFM" menu item functionality.
-It verifies that:
-1. The About menu item is enabled
-2. Clicking it displays the TFM logo, version, and GitHub URL in the log pane
-3. The menu event is properly handled
+This demo showcases the AboutDialog feature which displays:
+- TFM ASCII art logo
+- Version number
+- GitHub URL
+- Matrix-style falling green characters in the background
+
+The Matrix effect creates an animated background with falling characters
+similar to the iconic "Matrix" movie visual effect.
 
 Usage:
-    python demo/demo_about_menu.py
+    PYTHONPATH=.:src:ttk python demo/demo_about_menu.py
 
-Expected behavior:
-- In Desktop mode, the "About TFM" menu item should be enabled
-- Clicking it should display ASCII art logo, version, and GitHub URL in the log pane
+Controls:
+    - Press any key to close the About dialog
+    - Press 'q' to quit the demo
 """
 
 import sys
 import os
 
-# Add src directory to path
+# Add src and ttk directories to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ttk'))
+
+from ttk import TtkApplication, KeyCode
+from tfm_about_dialog import AboutDialog
+from tfm_config import get_config
+from tfm_log_manager import getLogger
+
+
+class AboutDialogDemo(TtkApplication):
+    """Demo application showing the About dialog with Matrix animation"""
+    
+    def __init__(self):
+        super().__init__()
+        self.logger = getLogger("AboutDemo")
+        self.config = get_config()
+        self.about_dialog = None
+        self.running = True
+        
+    def on_start(self):
+        """Called when application starts"""
+        self.logger.info("About Dialog Demo started")
+        
+        # Create and show the about dialog
+        self.about_dialog = AboutDialog(self.config, self.renderer)
+        self.about_dialog.show()
+        
+        # Draw initial frame
+        self.mark_dirty()
+        
+    def on_render(self):
+        """Called when rendering is needed"""
+        if self.about_dialog and self.about_dialog.is_active:
+            self.about_dialog.render(self.renderer)
+            # Keep marking dirty for continuous animation
+            self.mark_dirty()
+        else:
+            # Dialog closed, show exit message
+            height, width = self.renderer.get_dimensions()
+            msg = "About dialog closed. Press 'q' to quit."
+            x = (width - len(msg)) // 2
+            y = height // 2
+            self.renderer.draw_text(y, x, msg)
+    
+    def on_key_event(self, event):
+        """Handle key events"""
+        if self.about_dialog and self.about_dialog.is_active:
+            # Let dialog handle the event
+            consumed = self.about_dialog.handle_key_event(event)
+            if consumed:
+                self.mark_dirty()
+                return True
+        
+        # Handle quit
+        if event.key_code == KeyCode.ESCAPE or (event.char and event.char.lower() == 'q'):
+            self.logger.info("Quitting demo")
+            self.running = False
+            self.quit()
+            return True
+        
+        return False
+    
+    def on_char_event(self, event):
+        """Handle character events"""
+        if self.about_dialog and self.about_dialog.is_active:
+            consumed = self.about_dialog.handle_char_event(event)
+            if consumed:
+                self.mark_dirty()
+                return True
+        return False
+    
+    def on_system_event(self, event):
+        """Handle system events"""
+        if self.about_dialog and self.about_dialog.is_active:
+            consumed = self.about_dialog.handle_system_event(event)
+            if consumed:
+                self.mark_dirty()
+                return True
+        return False
+    
+    def on_mouse_event(self, event):
+        """Handle mouse events"""
+        if self.about_dialog and self.about_dialog.is_active:
+            consumed = self.about_dialog.handle_mouse_event(event)
+            if consumed:
+                self.mark_dirty()
+                return True
+        return False
+
 
 def main():
-    """Run the About TFM menu demo."""
-    print("About TFM Menu Demo")
-    print("=" * 50)
-    print()
-    print("This demo tests the About TFM menu functionality.")
-    print()
-    print("Instructions:")
-    print("1. Launch TFM in Desktop mode")
-    print("2. Click on 'TFM' menu in the menu bar")
-    print("3. Select 'About TFM'")
-    print("4. Check the log pane for:")
-    print("   - TFM ASCII art logo")
-    print("   - Version number")
-    print("   - GitHub URL")
-    print()
-    print("Starting TFM in Desktop mode...")
-    print()
-    
-    # Import and run TFM
-    from tfm_main import main as tfm_main
-    
-    # Run TFM (will use Desktop mode if available)
-    sys.exit(tfm_main())
+    """Run the demo"""
+    demo = AboutDialogDemo()
+    demo.run()
+
 
 if __name__ == '__main__':
     main()
