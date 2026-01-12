@@ -222,15 +222,15 @@ COLOR_SCHEMES = {
         # Matrix animation colors (bright white to black gradient)
         'MATRIX_BRIGHT_FG': {
             'color_num': 161,
-            'rgb': (220, 255, 220)  # Almost white with slight green tint for Matrix head
+            'rgb': (220, 255, 220)  # Almost white with slight green tint for Matrix head (1 char)
         },
         'MATRIX_MEDIUM_FG': {
             'color_num': 162,
-            'rgb': (90, 180, 90)      # Medium green for Matrix middle
+            'rgb': (0, 200, 0)      # Bright green for Matrix middle (main trail)
         },
         'MATRIX_DIM_FG': {
             'color_num': 163,
-            'rgb': (10, 50, 10)       # Black (invisible) for Matrix tail
+            'rgb': (0, 100, 0)      # Dim green for Matrix tail (2 chars)
         }
     },
     'light': {
@@ -365,15 +365,15 @@ COLOR_SCHEMES = {
         # Matrix animation colors (bright white to black gradient - same as dark theme)
         'MATRIX_BRIGHT_FG': {
             'color_num': 161,
-            'rgb': (220, 255, 220)  # Almost white with slight green tint for Matrix head
+            'rgb': (220, 255, 220)  # Almost white with slight green tint for Matrix head (1 char)
         },
         'MATRIX_MEDIUM_FG': {
             'color_num': 162,
-            'rgb': (90, 180, 90)      # Medium green for Matrix middle
+            'rgb': (0, 200, 0)      # Bright green for Matrix middle (main trail)
         },
         'MATRIX_DIM_FG': {
             'color_num': 163,
-            'rgb': (10, 60, 10)       # Black (invisible) for Matrix tail
+            'rgb': (0, 100, 0)      # Dim green for Matrix tail (2 chars)
         }
     }
 }

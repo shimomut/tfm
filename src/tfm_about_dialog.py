@@ -10,8 +10,7 @@ from ttk import TextAttribute, KeyCode, KeyEvent, CharEvent
 from ttk.wide_char_utils import get_display_width
 
 from tfm_ui_layer import UILayer
-from tfm_colors import (get_status_color, COLOR_REGULAR_FILE, 
-                        COLOR_MATRIX_BRIGHT, COLOR_MATRIX_MEDIUM, COLOR_MATRIX_DIM)
+from tfm_colors import (get_status_color, COLOR_MATRIX_BRIGHT, COLOR_MATRIX_MEDIUM, COLOR_MATRIX_DIM)
 from tfm_const import VERSION, GITHUB_URL
 from tfm_log_manager import getLogger
 
@@ -53,10 +52,10 @@ class MatrixColumn:
             self.length = random.randint(25, 75)  # Trail length (5x longer)
     
     def get_brightness_map(self):
-        """Get brightness value for each grid position
+        """Get brightness value and index for each grid position
         
         Returns:
-            Dict mapping y_pos to brightness (0.0 to 1.0), only for positions with brightness > 0
+            Dict mapping y_pos to (index, brightness) tuple
         """
         brightness_map = {}
         for i in range(self.length):
@@ -64,8 +63,12 @@ class MatrixColumn:
             if 0 <= y_pos < self.height:
                 # Brightness increases toward the head (bottom)
                 # i=0 is the head (brightest), i=length-1 is the tail (dimmest)
-                brightness = 1.0 - (i / self.length)
-                brightness_map[y_pos] = brightness
+                if i == 0:
+                    brightness = 1.0  # Only the head gets exactly 1.0
+                else:
+                    brightness = 1.0 - (i / self.length)
+                
+                brightness_map[y_pos] = (i, brightness)
         return brightness_map
 
 
@@ -86,6 +89,7 @@ class AboutDialog(UILayer):
         self.matrix_columns = []
         self.last_update_time = 0
         self.animation_enabled = True
+        self.previous_drawn_positions = set()  # Track positions that were drawn in previous frame
         
     def show(self):
         """Show the about dialog"""
@@ -131,6 +135,9 @@ class AboutDialog(UILayer):
         for column in self.matrix_columns:
             column.update(dt)
         
+        # Track which positions are drawn in this frame
+        current_drawn_positions = set()
+        
         # Draw all grid characters with brightness based on falling trails
         # In authentic Matrix effect, characters are fixed per grid position,
         # and only brightness changes as trails pass through
@@ -142,30 +149,50 @@ class AboutDialog(UILayer):
             for y in range(height):
                 if 0 <= column.x < width:
                     char = column.grid_chars[y]
-                    brightness = brightness_map.get(y, 0.0)
                     
-                    # Only draw if brightness > 0 (part of a trail)
-                    if brightness > 0:
-                        # Use different color pairs for different brightness levels
-                        # Only the head (i=0, brightness=1.0) gets the brightest color
-                        # Head (bottom) is brightest, tail (top) is dimmest
+                    # Check if this position is part of a trail
+                    if y in brightness_map:
+                        i, brightness = brightness_map[y]
                         
-                        if brightness >= 0.95:
-                            # Brightest - only the single head character - almost white
+                        # Use index-based logic for color selection:
+                        # i=0: white (head, 1 char)
+                        # i=1 to length-3: green (main trail)
+                        # i=length-2 to length-1: dim green (tail, 2 chars)
+                        # After trail: invisible (don't draw)
+                        
+                        if i == 0:
+                            # Head - single white character
                             color_pair = COLOR_MATRIX_BRIGHT
-                        elif brightness > 0.3:
-                            # Medium brightness - medium green
+                        elif i < column.length - 2:
+                            # Main trail - bright green
                             color_pair = COLOR_MATRIX_MEDIUM
                         else:
-                            # Dimmest - tail - black (invisible)
+                            # Tail (last 2 characters) - dim green
                             color_pair = COLOR_MATRIX_DIM
                         
                         try:
                             self.renderer.draw_text(y, column.x, char, 
                                                   color_pair=color_pair, 
                                                   attributes=TextAttribute.NORMAL)
+                            current_drawn_positions.add((column.x, y))
                         except Exception:
                             pass  # Ignore drawing errors at screen edges
+        
+        # Clear positions that were drawn in previous frame but not in current frame
+        # This ensures the tail properly disappears
+        positions_to_clear = self.previous_drawn_positions - current_drawn_positions
+        for x, y in positions_to_clear:
+            if 0 <= y < height and 0 <= x < width:
+                try:
+                    # Draw a space to clear the position
+                    self.renderer.draw_text(y, x, ' ', 
+                                          color_pair=0,  # Default color
+                                          attributes=TextAttribute.NORMAL)
+                except Exception:
+                    pass
+        
+        # Update previous positions for next frame
+        self.previous_drawn_positions = current_drawn_positions
     
     def draw(self):
         """Draw the about dialog"""
@@ -189,7 +216,7 @@ class AboutDialog(UILayer):
         
         # Draw dialog box with border
         border_color_pair, _ = get_status_color()
-        border_attributes = TextAttribute.BOLD
+        border_attributes = TextAttribute.NORMAL
         
         # Top border
         if start_y >= 0:
@@ -234,7 +261,6 @@ class AboutDialog(UILayer):
         ]
         
         # Draw logo centered
-        logo_color = COLOR_REGULAR_FILE
         for i, line in enumerate(logo):
             y = content_y + i
             if y < start_y + dialog_height - 2:
@@ -242,7 +268,7 @@ class AboutDialog(UILayer):
                 x = content_x + (content_width - line_width) // 2
                 if x >= content_x and x + line_width <= start_x + dialog_width - 2:
                     self.renderer.draw_text(y, x, line, 
-                                           color_pair=logo_color, 
+                                           color_pair=status_color_pair, 
                                            attributes=TextAttribute.BOLD)
         
         # Draw version and info
