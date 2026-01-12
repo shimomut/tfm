@@ -27,7 +27,8 @@ class MatrixColumn:
         """
         self.x = x
         self.height = height
-        self.y = random.randint(-height, 0)  # Start above screen
+        # Randomize starting position more - spread them out over 2x screen height
+        self.y = random.randint(-height * 2, 0)  # Start well above screen for staggered effect
         self.speed = random.uniform(20, 40)  # Characters per frame
         self.length = random.randint(25, 75)  # Trail length (5x longer: was 5-15, now 25-75)
         
