@@ -30,7 +30,7 @@ class MatrixColumn:
         self.height = height
         self.y = random.randint(-height, 0)  # Start above screen
         self.speed = random.uniform(0.3, 1.0)  # Characters per frame
-        self.length = random.randint(5, 15)  # Trail length
+        self.length = random.randint(25, 75)  # Trail length (5x longer: was 5-15, now 25-75)
         
         # Generate fixed characters for each grid position (authentic Matrix effect)
         # Use zenkaku katakana characters for authentic Matrix look
@@ -50,7 +50,7 @@ class MatrixColumn:
         if self.y - self.length > self.height:
             self.y = random.randint(-self.height // 2, 0)
             self.speed = random.uniform(0.3, 1.0)
-            self.length = random.randint(5, 15)
+            self.length = random.randint(25, 75)  # Trail length (5x longer)
     
     def get_brightness_map(self):
         """Get brightness value for each grid position
@@ -96,8 +96,9 @@ class AboutDialog(UILayer):
         # Initialize Matrix columns based on screen width
         height, width = self.renderer.get_dimensions()
         self.matrix_columns = []
-        # Create columns without spacing (every column)
-        for x in range(0, width):
+        # Create columns at every other position for zenkaku (full-width) characters
+        # Zenkaku katakana characters take 2 columns of screen space
+        for x in range(0, width, 2):
             self.matrix_columns.append(MatrixColumn(x, height))
         
         self.logger.info("About dialog opened")
@@ -146,16 +147,17 @@ class AboutDialog(UILayer):
                     # Only draw if brightness > 0 (part of a trail)
                     if brightness > 0:
                         # Use different color pairs for different brightness levels
+                        # Only the head (i=0, brightness=1.0) gets the brightest color
                         # Head (bottom) is brightest, tail (top) is dimmest
                         
-                        if brightness > 0.7:
-                            # Brightest - head of trail - bright green
+                        if brightness >= 0.95:
+                            # Brightest - only the single head character - almost white
                             color_pair = COLOR_MATRIX_BRIGHT
-                        elif brightness > 0.4:
+                        elif brightness > 0.3:
                             # Medium brightness - medium green
                             color_pair = COLOR_MATRIX_MEDIUM
                         else:
-                            # Dimmest - tail - dim green
+                            # Dimmest - tail - black (invisible)
                             color_pair = COLOR_MATRIX_DIM
                         
                         try:
@@ -318,7 +320,8 @@ class AboutDialog(UILayer):
             # Reinitialize Matrix columns for new dimensions
             height, width = self.renderer.get_dimensions()
             self.matrix_columns = []
-            for x in range(0, width):
+            # Create columns at every other position for zenkaku (full-width) characters
+            for x in range(0, width, 2):
                 self.matrix_columns.append(MatrixColumn(x, height))
             self.content_changed = True
             return True
