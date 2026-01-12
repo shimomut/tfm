@@ -73,6 +73,11 @@ COLOR_DIFF_FOCUSED = 35        # Focused difference (highlighted background)
 COLOR_DIFF_SEPARATOR_RED = 36  # Red separator for differences (red fg, status bg)
 COLOR_TREE_LINES = 37          # Gray color for tree lines (├─ └─ │)
 
+# Matrix animation colors (for About dialog)
+COLOR_MATRIX_BRIGHT = 38       # Bright green for Matrix head (brightest)
+COLOR_MATRIX_MEDIUM = 39       # Medium green for Matrix middle
+COLOR_MATRIX_DIM = 40          # Dim green for Matrix tail (dimmest)
+
 # Current color scheme
 current_color_scheme = 'dark'
 
@@ -213,6 +218,19 @@ COLOR_SCHEMES = {
         'DIFF_FOCUSED_BG': {
             'color_num': 157,
             'rgb': (60, 70, 140)    # Blue-based background for focused lines (more prominent than CHANGE)
+        },
+        # Matrix animation colors (bright green shades)
+        'MATRIX_BRIGHT_FG': {
+            'color_num': 161,
+            'rgb': (0, 255, 0)      # Bright green for Matrix head
+        },
+        'MATRIX_MEDIUM_FG': {
+            'color_num': 162,
+            'rgb': (0, 180, 0)      # Medium green for Matrix middle
+        },
+        'MATRIX_DIM_FG': {
+            'color_num': 163,
+            'rgb': (0, 100, 0)      # Dim green for Matrix tail
         }
     },
     'light': {
@@ -343,6 +361,19 @@ COLOR_SCHEMES = {
         'DIFF_FOCUSED_BG': {
             'color_num': 157,
             'rgb': (200, 210, 255)  # Light blue-based background for focused lines (more prominent than CHANGE)
+        },
+        # Matrix animation colors (bright green shades - same as dark theme)
+        'MATRIX_BRIGHT_FG': {
+            'color_num': 161,
+            'rgb': (0, 255, 0)      # Bright green for Matrix head
+        },
+        'MATRIX_MEDIUM_FG': {
+            'color_num': 162,
+            'rgb': (0, 180, 0)      # Medium green for Matrix middle
+        },
+        'MATRIX_DIM_FG': {
+            'color_num': 163,
+            'rgb': (0, 100, 0)      # Dim green for Matrix tail
         }
     }
 }
@@ -491,6 +522,14 @@ def init_colors(renderer, color_scheme=None):
     renderer.init_color_pair(COLOR_DIFF_SEPARATOR_RED, (255, 0, 0), status_bg)
     # Gray color for tree lines
     renderer.init_color_pair(COLOR_TREE_LINES, (128, 128, 128), default_bg)
+    
+    # Matrix animation colors (for About dialog)
+    matrix_bright_fg = rgb_colors['MATRIX_BRIGHT_FG']['rgb']
+    matrix_medium_fg = rgb_colors['MATRIX_MEDIUM_FG']['rgb']
+    matrix_dim_fg = rgb_colors['MATRIX_DIM_FG']['rgb']
+    renderer.init_color_pair(COLOR_MATRIX_BRIGHT, matrix_bright_fg, default_bg)
+    renderer.init_color_pair(COLOR_MATRIX_MEDIUM, matrix_medium_fg, default_bg)
+    renderer.init_color_pair(COLOR_MATRIX_DIM, matrix_dim_fg, default_bg)
 
 def get_file_color(is_dir, is_executable, is_focused, is_active):
     """
