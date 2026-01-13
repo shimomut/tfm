@@ -362,18 +362,18 @@ COLOR_SCHEMES = {
             'color_num': 157,
             'rgb': (200, 210, 255)  # Light blue-based background for focused lines (more prominent than CHANGE)
         },
-        # Matrix animation colors (bright white to black gradient - same as dark theme)
+        # Matrix animation colors (inverted for light theme: black to white gradient)
         'MATRIX_BRIGHT_FG': {
             'color_num': 161,
-            'rgb': (220, 255, 220)  # Almost white with slight green tint for Matrix head (1 char)
+            'rgb': (0, 0, 0)        # Black for Matrix head (1 char) - inverted from dark theme
         },
         'MATRIX_MEDIUM_FG': {
             'color_num': 162,
-            'rgb': (0, 200, 0)      # Bright green for Matrix middle (main trail)
+            'rgb': (0, 120, 0)      # Dark green for Matrix middle (main trail)
         },
         'MATRIX_DIM_FG': {
             'color_num': 163,
-            'rgb': (0, 100, 0)      # Dim green for Matrix tail (2 chars)
+            'rgb': (180, 220, 180)  # Light green (close to white) for Matrix tail (2 chars)
         }
     }
 }
