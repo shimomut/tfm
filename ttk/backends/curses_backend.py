@@ -665,7 +665,39 @@ class CursesBackend(Renderer):
             if attributes & TextAttribute.REVERSE:
                 attr |= curses.A_REVERSE
             
-            # Draw the text and update grid
+            # Calculate where the text will end to check for wide character overwrites
+            # We need to check BEFORE updating the grid
+            text_width = 0
+            for char in text:
+                if _is_wide_character(char):
+                    text_width += 2
+                else:
+                    text_width += 1
+            
+            end_col = col + text_width
+            needs_extra_space = False
+            original_wide_color = 0
+            original_wide_attrs = 0
+            
+            # Check if the position where our text ends has a wide character
+            # that we're about to partially overwrite
+            if end_col < self.cols and 0 <= row < self.rows:
+                end_char, end_color, end_attrs, end_is_wide = self.grid[row][end_col]
+                
+                # If there's a wide character placeholder at the end position,
+                # it means we're overwriting the second column of a wide character
+                if end_char == '' and end_col > 0:
+                    # Check the previous position to see if it has a wide character
+                    prev_char, prev_color, prev_attrs, prev_is_wide = self.grid[row][end_col - 1]
+                    
+                    # If the previous position has a wide character, we need to clear its second column
+                    if prev_is_wide and prev_char != '' and prev_char != ' ':
+                        needs_extra_space = True
+                        # Save the original wide character's color and attributes
+                        original_wide_color = prev_color
+                        original_wide_attrs = prev_attrs
+            
+            # Draw the text
             self.stdscr.addstr(row, col, text, attr)
             
             # Update grid to track what we drew
@@ -685,6 +717,24 @@ class CursesBackend(Renderer):
                         self.grid[row][current_col] = ('', color_pair, attributes, False)
                 
                 current_col += 1
+            
+            # If we overwrote a wide character, add an extra space with ORIGINAL character's color
+            if needs_extra_space and end_col < self.cols:
+                # Build attributes for the extra space using ORIGINAL wide character's style
+                extra_attr = curses.color_pair(original_wide_color)
+                if original_wide_attrs & TextAttribute.BOLD:
+                    extra_attr |= curses.A_BOLD
+                if original_wide_attrs & TextAttribute.UNDERLINE:
+                    extra_attr |= curses.A_UNDERLINE
+                if original_wide_attrs & TextAttribute.REVERSE:
+                    extra_attr |= curses.A_REVERSE
+                
+                # Draw space at the end column position with ORIGINAL character's color
+                self.stdscr.addstr(row, end_col, ' ', extra_attr)
+                
+                # Update grid for the extra space
+                self.grid[row][end_col] = (' ', original_wide_color, original_wide_attrs, False)
+                
         except curses.error:
             # Ignore out-of-bounds errors
             pass

@@ -26,8 +26,8 @@ class TestMatrixColumn(unittest.TestCase):
         
         self.assertEqual(column.x, 10)
         self.assertEqual(column.height, 24)
-        self.assertIsNotNone(column.chars)
-        self.assertGreater(len(column.chars), 0)
+        self.assertIsNotNone(column.grid_chars)
+        self.assertGreater(len(column.grid_chars), 0)
         self.assertGreater(column.speed, 0)
         self.assertGreater(column.length, 0)
     
@@ -42,22 +42,21 @@ class TestMatrixColumn(unittest.TestCase):
         # Y position should have changed
         self.assertNotEqual(column.y, initial_y)
     
-    def test_get_visible_chars(self):
-        """Test getting visible characters"""
+    def test_get_brightness_map(self):
+        """Test getting brightness map"""
         column = MatrixColumn(x=10, height=24)
         column.y = 10  # Set to visible position
         
-        visible = column.get_visible_chars()
+        brightness_map = column.get_brightness_map()
         
-        # Should return list of tuples
-        self.assertIsInstance(visible, list)
-        for item in visible:
-            self.assertEqual(len(item), 3)  # (y, char, brightness)
-            y, char, brightness = item
-            self.assertIsInstance(y, int)
-            self.assertIsInstance(char, str)
+        # Should return dict mapping y_pos to (index, brightness)
+        self.assertIsInstance(brightness_map, dict)
+        for y_pos, (index, brightness) in brightness_map.items():
+            self.assertIsInstance(y_pos, int)
+            self.assertIsInstance(index, int)
             self.assertIsInstance(brightness, float)
             self.assertGreaterEqual(brightness, 0.0)
+            self.assertLessEqual(brightness, 1.0)
             self.assertLessEqual(brightness, 1.0)
 
 

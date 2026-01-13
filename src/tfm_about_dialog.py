@@ -189,8 +189,8 @@ class AboutDialog(UILayer):
         for x, y in positions_to_clear:
             if 0 <= y < height and 0 <= x < width:
                 try:
-                    # Draw a space to clear the position
-                    self.renderer.draw_text(y, x, ' ', 
+                    # Draw 2 spaces to clear the position (zenkaku characters occupy 2 columns)
+                    self.renderer.draw_text(y, x, '  ', 
                                           color_pair=0,  # Default color
                                           attributes=TextAttribute.NORMAL)
                 except Exception:

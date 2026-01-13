@@ -76,6 +76,8 @@ def _cached_is_wide_character(char: str) -> bool:
         # Use East Asian Width property from Unicode database
         width = unicodedata.east_asian_width(char)
         # 'F' = Fullwidth, 'W' = Wide
+        # Note: 'A' (Ambiguous) characters are NOT treated as wide here
+        # because their rendering depends on terminal locale settings
         return width in ('F', 'W')
     except (UnicodeError, ValueError):
         # If we can't determine the width, assume it's not wide
