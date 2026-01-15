@@ -928,37 +928,64 @@ class S3PathImpl(PathImpl):
             return S3WriteFile(self._client, self._bucket, self._key, mode, encoding, 
                              cache_invalidate_callback=self._invalidate_cache_for_write)
         else:
-            # Read mode - use caching for get_object calls
+            # Read mode - use read_bytes() which handles caching properly
             try:
-                response = self._cached_api_call('get_object', Bucket=self._bucket, Key=self._key)
-                content = response['Body'].read()
+                content = self.read_bytes()
                 
                 if 'b' in mode:
                     return io.BytesIO(content)
                 else:
                     text_content = content.decode(encoding or 'utf-8')
                     return io.StringIO(text_content)
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'NoSuchKey':
-                    raise FileNotFoundError(f"S3 object not found: {self._uri}")
+            except FileNotFoundError:
+                raise
+            except OSError:
+                raise
+            except Exception as e:
                 raise OSError(f"Failed to open S3 object: {e}")
     
     def read_text(self, encoding=None, errors=None) -> str:
         """Open the file in text mode, read it, and close the file"""
         try:
-            response = self._cached_api_call('get_object', Bucket=self._bucket, Key=self._key)
-            content = response['Body'].read()
+            # Use read_bytes() which handles caching properly
+            content = self.read_bytes()
             return content.decode(encoding or 'utf-8', errors or 'strict')
-        except ClientError as e:
-            if e.response['Error']['Code'] == 'NoSuchKey':
-                raise FileNotFoundError(f"S3 object not found: {self._uri}")
+        except FileNotFoundError:
+            raise
+        except OSError:
+            raise
+        except Exception as e:
             raise OSError(f"Failed to read S3 object: {e}")
     
     def read_bytes(self) -> bytes:
         """Open the file in bytes mode, read it, and close the file"""
         try:
-            response = self._cached_api_call('get_object', Bucket=self._bucket, Key=self._key)
-            return response['Body'].read()
+            # Check if we have cached content bytes (not the response object)
+            cache_key_params = {'content_bytes': True}
+            cached_content = self._cache.get(
+                operation='get_object_content',
+                bucket=self._bucket,
+                key=self._key,
+                **cache_key_params
+            )
+            
+            if cached_content is not None:
+                return cached_content
+            
+            # Cache miss - fetch from S3 and read the stream immediately
+            response = self._client.get_object(Bucket=self._bucket, Key=self._key)
+            content = response['Body'].read()
+            
+            # Cache the actual bytes content, not the response object
+            self._cache.put(
+                operation='get_object_content',
+                bucket=self._bucket,
+                key=self._key,
+                data=content,
+                **cache_key_params
+            )
+            
+            return content
         except ClientError as e:
             if e.response['Error']['Code'] == 'NoSuchKey':
                 raise FileNotFoundError(f"S3 object not found: {self._uri}")
