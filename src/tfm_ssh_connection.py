@@ -77,6 +77,9 @@ class SSHConnection:
         self.port = config.get('Port', '22')
         self.identity_file = config.get('IdentityFile', None)
         
+        # Default remote directory (set during connection)
+        self.default_directory = None
+        
         # Progress tracking
         self._progress_callback = None
         self._progress_threshold = 1024 * 1024  # 1MB threshold for progress display
@@ -136,7 +139,19 @@ class SSHConnection:
                 
                 if returncode == 0:
                     self._connected = True
-                    self.logger.info(f"Connected to {self.hostname}")
+                    
+                    # Parse pwd output to get default directory
+                    # SFTP pwd output format: "Remote working directory: /path/to/dir"
+                    for line in stdout.strip().split('\n'):
+                        if line.startswith('Remote working directory:'):
+                            self.default_directory = line.split(':', 1)[1].strip()
+                            break
+                    
+                    # Fallback to root if we couldn't parse the directory
+                    if not self.default_directory:
+                        self.default_directory = '/'
+                    
+                    self.logger.info(f"Connected to {self.hostname}, default directory: {self.default_directory}")
                     return True
                 else:
                     # Parse error message to determine specific error type

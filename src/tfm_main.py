@@ -4315,6 +4315,31 @@ class FileManager(UILayer):
                             self.logger.error(f"Error: Drive path no longer exists or is not accessible: {drive_entry.path}")
                             self.mark_dirty()
                             return
+                    elif drive_entry.drive_type == 'ssh':
+                        # For SSH, connect and get the default directory
+                        try:
+                            from tfm_ssh_connection import SSHConnectionManager
+                            from tfm_ssh_config import SSHConfigParser
+                            
+                            # Extract hostname from ssh://hostname/ path
+                            hostname = drive_entry.path.replace('ssh://', '').rstrip('/')
+                            
+                            # Get SSH config
+                            parser = SSHConfigParser()
+                            hosts = parser.parse()
+                            config = hosts.get(hostname, {'HostName': hostname})
+                            
+                            # Get connection and retrieve default directory
+                            conn_manager = SSHConnectionManager.get_instance()
+                            conn = conn_manager.get_connection(hostname, config)
+                            
+                            # Use the default directory if available
+                            if conn.default_directory and conn.default_directory != '/':
+                                drive_path = Path(f"ssh://{hostname}{conn.default_directory}")
+                                self.logger.info(f"Using SSH default directory: {conn.default_directory}")
+                                
+                        except Exception as e:
+                            self.logger.warning(f"Failed to get SSH default directory: {e}")
                     
                     # Update the current pane
                     old_path = current_pane['path']
@@ -4327,7 +4352,7 @@ class FileManager(UILayer):
                     self.pane_manager.refresh_files(current_pane)
                     
                     pane_name = "left" if self.pane_manager.active_pane == 'left' else "right"
-                    self.logger.info(f"Switched to {drive_entry.name}: {drive_entry.path}")
+                    self.logger.info(f"Switched to {drive_entry.name}: {drive_path}")
                     self.mark_dirty()
                     
                 except Exception as e:
@@ -4822,11 +4847,39 @@ class FileManager(UILayer):
             left_state = self.state_manager.load_pane_state('left')
             if left_state and Path(left_state['path']).exists() and not self.cmdline_left_dir_provided:
                 # Only restore if the directory still exists and no command line argument was provided
-                self.pane_manager.left_pane['path'] = Path(left_state['path'])
+                restored_path = Path(left_state['path'])
+                
+                # For SSH paths at root, try to use default directory instead
+                path_str = str(restored_path)
+                if path_str.startswith('ssh://') and (path_str.endswith('/') or path_str.count('/') == 2):
+                    # This is an SSH path at root (ssh://hostname/ or ssh://hostname)
+                    try:
+                        from tfm_ssh_connection import SSHConnectionManager
+                        from tfm_ssh_config import SSHConfigParser
+                        
+                        # Extract hostname
+                        hostname = path_str.replace('ssh://', '').rstrip('/')
+                        
+                        # Get SSH config and connection
+                        parser = SSHConfigParser()
+                        hosts = parser.parse()
+                        config = hosts.get(hostname, {'HostName': hostname})
+                        
+                        conn_manager = SSHConnectionManager.get_instance()
+                        conn = conn_manager.get_connection(hostname, config)
+                        
+                        # Use default directory if available
+                        if conn.default_directory and conn.default_directory != '/':
+                            restored_path = Path(f"ssh://{hostname}{conn.default_directory}")
+                            self.logger.info(f"Redirected SSH root to default directory: {conn.default_directory}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to get SSH default directory, using saved path: {e}")
+                
+                self.pane_manager.left_pane['path'] = restored_path
                 self.pane_manager.left_pane['sort_mode'] = left_state.get('sort_mode', 'name')
                 self.pane_manager.left_pane['sort_reverse'] = left_state.get('sort_reverse', False)
                 self.pane_manager.left_pane['filter_pattern'] = left_state.get('filter_pattern', '')
-                self.logger.info(f"Restored left pane: {left_state['path']}")
+                self.logger.info(f"Restored left pane: {restored_path}")
             elif self.cmdline_left_dir_provided:
                 # Load other settings but keep command line directory
                 if left_state:
@@ -4838,11 +4891,39 @@ class FileManager(UILayer):
             right_state = self.state_manager.load_pane_state('right')
             if right_state and Path(right_state['path']).exists() and not self.cmdline_right_dir_provided:
                 # Only restore if the directory still exists and no command line argument was provided
-                self.pane_manager.right_pane['path'] = Path(right_state['path'])
+                restored_path = Path(right_state['path'])
+                
+                # For SSH paths at root, try to use default directory instead
+                path_str = str(restored_path)
+                if path_str.startswith('ssh://') and (path_str.endswith('/') or path_str.count('/') == 2):
+                    # This is an SSH path at root (ssh://hostname/ or ssh://hostname)
+                    try:
+                        from tfm_ssh_connection import SSHConnectionManager
+                        from tfm_ssh_config import SSHConfigParser
+                        
+                        # Extract hostname
+                        hostname = path_str.replace('ssh://', '').rstrip('/')
+                        
+                        # Get SSH config and connection
+                        parser = SSHConfigParser()
+                        hosts = parser.parse()
+                        config = hosts.get(hostname, {'HostName': hostname})
+                        
+                        conn_manager = SSHConnectionManager.get_instance()
+                        conn = conn_manager.get_connection(hostname, config)
+                        
+                        # Use default directory if available
+                        if conn.default_directory and conn.default_directory != '/':
+                            restored_path = Path(f"ssh://{hostname}{conn.default_directory}")
+                            self.logger.info(f"Redirected SSH root to default directory: {conn.default_directory}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to get SSH default directory, using saved path: {e}")
+                
+                self.pane_manager.right_pane['path'] = restored_path
                 self.pane_manager.right_pane['sort_mode'] = right_state.get('sort_mode', 'name')
                 self.pane_manager.right_pane['sort_reverse'] = right_state.get('sort_reverse', False)
                 self.pane_manager.right_pane['filter_pattern'] = right_state.get('filter_pattern', '')
-                self.logger.info(f"Restored right pane: {right_state['path']}")
+                self.logger.info(f"Restored right pane: {restored_path}")
             elif self.cmdline_right_dir_provided:
                 # Load other settings but keep command line directory
                 if right_state:
