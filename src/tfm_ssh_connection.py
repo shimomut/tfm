@@ -613,8 +613,9 @@ class SSHConnection:
             
             if 'no such file' in stderr_lower or 'not found' in stderr_lower:
                 error_msg = f"Remote path not found: {remote_path}"
-                self.logger.error(error_msg)
-                self.logger.error(f"Detailed error: {stderr}")
+                # Use debug level since this is often used to check if path exists
+                self.logger.debug(error_msg)
+                self.logger.debug(f"Detailed error: {stderr}")
                 error = SSHPathNotFoundError(error_msg)
                 # Cache the error to avoid repeated SFTP calls
                 self._cache.put(
@@ -730,8 +731,9 @@ class SSHConnection:
             
             if 'no such file' in stderr_lower or 'not found' in stderr_lower:
                 error_msg = f"Remote path not found: {remote_path}"
-                self.logger.error(error_msg)
-                self.logger.error(f"Detailed error: {stderr}")
+                # Use debug level since this is often used to check if path exists
+                self.logger.debug(error_msg)
+                self.logger.debug(f"Detailed error: {stderr}")
                 error = SSHPathNotFoundError(error_msg)
                 # Cache the error to avoid repeated SFTP calls
                 self._cache.put(
