@@ -403,6 +403,24 @@ class SSHConnection:
             self.logger.error(error_msg)
             raise SSHError(error_msg)
 
+    def _quote_path(self, path: str) -> str:
+        """
+        Quote a path for use in SFTP commands.
+        
+        SFTP batch mode requires paths with spaces or special characters to be quoted.
+        This method adds double quotes around the path and escapes any internal quotes.
+        
+        Args:
+            path: Path to quote
+            
+        Returns:
+            Quoted path safe for SFTP commands
+        """
+        # Escape any double quotes in the path
+        escaped_path = path.replace('"', '\\"')
+        # Wrap in double quotes
+        return f'"{escaped_path}"'
+    
     def _parse_ls_line(self, line: str) -> Optional[Dict[str, any]]:
         """
         Parse a single line from ls -la output.
@@ -605,7 +623,7 @@ class SSHConnection:
             return cached_result
         
         # Cache miss - fetch from remote
-        commands = [f'ls -la {remote_path}']
+        commands = [f'ls -la {self._quote_path(remote_path)}']
         stdout, stderr, returncode = self._execute_sftp_command(commands)
         
         if returncode != 0:
@@ -723,7 +741,7 @@ class SSHConnection:
         self.logger.debug(f"stat() cache MISS for {remote_path}, fetching from remote")
         # SFTP's ls command doesn't support -d flag
         # Try ls -l first (works for files and will list directory contents for dirs)
-        commands = [f'ls -l {remote_path}']
+        commands = [f'ls -l {self._quote_path(remote_path)}']
         stdout, stderr, returncode = self._execute_sftp_command(commands)
         
         if returncode != 0:
@@ -816,7 +834,7 @@ class SSHConnection:
                 parent_dir = '/'
             
             # List parent directory
-            commands = [f'ls -l {parent_dir}']
+            commands = [f'ls -l {self._quote_path(parent_dir)}']
             stdout, stderr, returncode = self._execute_sftp_command(commands)
             
             if returncode == 0:
@@ -877,7 +895,7 @@ class SSHConnection:
                 pass
             
             # Download file using get command
-            commands = [f'get {remote_path} {tmp_path}']
+            commands = [f'get {self._quote_path(remote_path)} {self._quote_path(tmp_path)}']
             
             # No timeout for file transfers - let SFTP handle it
             # SFTP has its own timeout mechanisms and will handle stalled transfers
@@ -967,7 +985,7 @@ class SSHConnection:
             file_size = len(data)
             
             # Upload file using put command
-            commands = [f'put {tmp_path} {remote_path}']
+            commands = [f'put {self._quote_path(tmp_path)} {self._quote_path(remote_path)}']
             
             # No timeout for file transfers - let SFTP handle it
             # SFTP has its own timeout mechanisms and will handle stalled transfers
@@ -1043,7 +1061,7 @@ class SSHConnection:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
         
         try:
-            commands = [f'rm {remote_path}']
+            commands = [f'rm {self._quote_path(remote_path)}']
             stdout, stderr, returncode = self._execute_sftp_command(commands)
             
             if returncode != 0:
@@ -1093,7 +1111,7 @@ class SSHConnection:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
         
         try:
-            commands = [f'rmdir {remote_path}']
+            commands = [f'rmdir {self._quote_path(remote_path)}']
             stdout, stderr, returncode = self._execute_sftp_command(commands)
             
             if returncode != 0:
@@ -1147,7 +1165,7 @@ class SSHConnection:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
         
         try:
-            commands = [f'mkdir {remote_path}']
+            commands = [f'mkdir {self._quote_path(remote_path)}']
             stdout, stderr, returncode = self._execute_sftp_command(commands)
             
             if returncode != 0:
@@ -1198,7 +1216,7 @@ class SSHConnection:
             raise SSHConnectionLostError(f"Not connected to {self.hostname}")
         
         try:
-            commands = [f'rename {old_path} {new_path}']
+            commands = [f'rename {self._quote_path(old_path)} {self._quote_path(new_path)}']
             stdout, stderr, returncode = self._execute_sftp_command(commands)
             
             if returncode != 0:
