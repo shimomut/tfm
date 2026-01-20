@@ -1512,19 +1512,53 @@ class FileManager(UILayer):
         self.adjust_log_boundary('down')
         return True
     
+    def _navigate_to_parent_with_focus(self, pane_data):
+        """
+        Navigate to parent directory and focus on the child directory we came from.
+        
+        Args:
+            pane_data: The pane data dictionary to navigate
+            
+        Returns:
+            bool: True if navigation occurred, False if already at root
+        """
+        parent = pane_data['path'].parent
+        if parent == pane_data['path']:  # Already at root
+            return False
+        
+        # Remember the child directory name we're leaving
+        child_dir_name = pane_data['path'].name
+        
+        self.save_cursor_position(pane_data)
+        pane_data['path'] = parent
+        pane_data['focused_index'] = 0
+        pane_data['scroll_offset'] = 0
+        pane_data['selected_files'].clear()
+        self.refresh_files(pane_data)
+        
+        # Focus on the child directory we just came from
+        for i, file_path in enumerate(pane_data['files']):
+            if file_path.name == child_dir_name:
+                pane_data['focused_index'] = i
+                
+                # Adjust scroll offset to keep focused item visible
+                height, width = self.renderer.get_dimensions()
+                display_height = height - 4  # Account for header, status bar, etc.
+                
+                if pane_data['focused_index'] < pane_data['scroll_offset']:
+                    pane_data['scroll_offset'] = pane_data['focused_index']
+                elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
+                    pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
+                
+                break
+        
+        self.mark_dirty()
+        return True
+    
     def _action_go_parent(self):
         """Navigate to parent directory."""
         current_pane = self.get_current_pane()
-        parent = current_pane['path'].parent
-        if parent != current_pane['path']:  # Not at root
-            self.save_cursor_position(current_pane)
-            current_pane['path'] = parent
-            current_pane['focused_index'] = 0
-            current_pane['scroll_offset'] = 0
-            current_pane['selected_files'].clear()
-            self.refresh_files(current_pane)
-            self.restore_cursor_position(current_pane)
-            self.mark_dirty()
+        self._navigate_to_parent_with_focus(current_pane)
         return True
     
     def _action_go_home(self):
@@ -4514,20 +4548,10 @@ class FileManager(UILayer):
             # Context-aware LEFT arrow: go to parent in left pane, switch pane in right pane
             if self.pane_manager.active_pane == 'left':
                 # Left arrow in left pane - go to parent directory
-                if current_pane['path'] != current_pane['path'].parent:
-                    try:
-                        self.save_cursor_position(current_pane)
-                        current_pane['path'] = current_pane['path'].parent
-                        current_pane['focused_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                        current_pane['selected_files'].clear()
-                        self.refresh_files(current_pane)
-                        if not self.restore_cursor_position(current_pane):
-                            current_pane['focused_index'] = 0
-                            current_pane['scroll_offset'] = 0
-                        self.mark_dirty()
-                    except PermissionError:
-                        self.logger.error("Permission denied")
+                try:
+                    self._navigate_to_parent_with_focus(current_pane)
+                except PermissionError:
+                    self.logger.error("Permission denied")
             else:
                 # Left arrow in right pane - switch to left pane
                 self.pane_manager.active_pane = 'left'
@@ -4537,20 +4561,10 @@ class FileManager(UILayer):
             # Context-aware RIGHT arrow: go to parent in right pane, switch pane in left pane
             if self.pane_manager.active_pane == 'right':
                 # Right arrow in right pane - go to parent directory
-                if current_pane['path'] != current_pane['path'].parent:
-                    try:
-                        self.save_cursor_position(current_pane)
-                        current_pane['path'] = current_pane['path'].parent
-                        current_pane['focused_index'] = 0
-                        current_pane['scroll_offset'] = 0
-                        current_pane['selected_files'].clear()
-                        self.refresh_files(current_pane)
-                        if not self.restore_cursor_position(current_pane):
-                            current_pane['focused_index'] = 0
-                            current_pane['scroll_offset'] = 0
-                        self.mark_dirty()
-                    except PermissionError:
-                        self.logger.error("Permission denied")
+                try:
+                    self._navigate_to_parent_with_focus(current_pane)
+                except PermissionError:
+                    self.logger.error("Permission denied")
             else:
                 # Right arrow in left pane - switch to right pane
                 self.pane_manager.active_pane = 'right'
