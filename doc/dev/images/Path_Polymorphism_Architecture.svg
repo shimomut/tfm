@@ -164,8 +164,8 @@
   </text>
   
   <!-- LocalPathImpl -->
-  <rect x="80" y="680" width="586" height="380" fill="#2d2d30" stroke="#ce9178" stroke-width="2" rx="8"/>
-  <text x="373" y="708" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ce9178" text-anchor="middle">
+  <rect x="80" y="680" width="430" height="380" fill="#2d2d30" stroke="#ce9178" stroke-width="2" rx="8"/>
+  <text x="295" y="708" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ce9178" text-anchor="middle">
     LocalPathImpl
   </text>
   <text x="100" y="733" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
@@ -223,130 +223,191 @@
     • All operations supported ✓
   </text>
   
-  <!-- S3PathImpl -->
-  <rect x="686" y="680" width="586" height="380" fill="#2d2d30" stroke="#ce9178" stroke-width="2" rx="8"/>
-  <text x="979" y="708" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ce9178" text-anchor="middle">
-    S3PathImpl
+  <!-- SSHPathImpl -->
+  <rect x="530" y="680" width="430" height="380" fill="#2d2d30" stroke="#ce9178" stroke-width="2" rx="8"/>
+  <text x="745" y="708" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    SSHPathImpl
   </text>
-  <text x="706" y="733" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+  <text x="550" y="733" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
     Display Methods:
   </text>
-  <text x="726" y="753" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
-    • get_display_prefix() → "S3: "
+  <text x="570" y="753" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • get_display_prefix() → "SSH: "
   </text>
-  <text x="726" y="771" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
-    • get_display_title() → "s3://bucket/key"
+  <text x="570" y="771" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • get_display_title() → "ssh://host/path"
   </text>
   
-  <text x="706" y="795" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+  <text x="550" y="795" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
     Content Strategy:
   </text>
-  <text x="726" y="815" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="570" y="815" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • requires_extraction_for_reading() → True
   </text>
-  <text x="726" y="833" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="570" y="833" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • supports_streaming_read() → False
   </text>
-  <text x="726" y="851" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="570" y="851" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • get_search_strategy() → "buffered"
   </text>
-  <text x="726" y="869" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="570" y="869" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • should_cache_for_search() → True
   </text>
   
-  <text x="706" y="893" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+  <text x="550" y="893" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
     Metadata:
   </text>
-  <text x="726" y="913" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="570" y="913" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • get_extended_metadata() →
   </text>
-  <text x="746" y="931" font-family="Arial, sans-serif" font-size="12" fill="#888888">
-    {'type': 's3',
+  <text x="590" y="931" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+    {'type': 'ssh',
   </text>
-  <text x="746" y="947" font-family="Arial, sans-serif" font-size="12" fill="#888888">
-     'details': [('Bucket', 'my-bucket'),
+  <text x="590" y="947" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+     'details': [('Host', 'server.com'),
   </text>
-  <text x="746" y="963" font-family="Arial, sans-serif" font-size="12" fill="#888888">
-                 ('Key', 'path/to/object'),
+  <text x="590" y="963" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+                 ('Path', '/remote/path'),
   </text>
-  <text x="746" y="979" font-family="Arial, sans-serif" font-size="12" fill="#888888">
-                 ('Storage Class', 'STANDARD')],
+  <text x="590" y="979" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+                 ('Protocol', 'SFTP')],
   </text>
-  <text x="746" y="995" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+  <text x="590" y="995" font-family="Arial, sans-serif" font-size="12" fill="#888888">
      'format_hint': 'remote'}
   </text>
   
-  <text x="706" y="1019" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+  <text x="550" y="1019" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
     Capabilities:
   </text>
-  <text x="726" y="1039" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="570" y="1039" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • All operations supported ✓
+  </text>
+  
+  <!-- S3PathImpl -->
+  <rect x="980" y="680" width="430" height="380" fill="#2d2d30" stroke="#ce9178" stroke-width="2" rx="8"/>
+  <text x="1195" y="708" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ce9178" text-anchor="middle">
+    S3PathImpl
+  </text>
+  <text x="1000" y="733" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+    Display Methods:
+  </text>
+  <text x="1020" y="753" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • get_display_prefix() → "S3: "
+  </text>
+  <text x="1020" y="771" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • get_display_title() → "s3://bucket/key"
+  </text>
+  
+  <text x="1000" y="795" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+    Content Strategy:
+  </text>
+  <text x="1020" y="815" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • requires_extraction_for_reading() → True
+  </text>
+  <text x="1020" y="833" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • supports_streaming_read() → False
+  </text>
+  <text x="1020" y="851" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • get_search_strategy() → "buffered"
+  </text>
+  <text x="1020" y="869" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • should_cache_for_search() → True
+  </text>
+  
+  <text x="1000" y="893" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+    Metadata:
+  </text>
+  <text x="1020" y="913" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • get_extended_metadata() →
+  </text>
+  <text x="1040" y="931" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+    {'type': 's3',
+  </text>
+  <text x="1040" y="947" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+     'details': [('Bucket', 'my-bucket'),
+  </text>
+  <text x="1040" y="963" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+                 ('Key', 'path/to/object'),
+  </text>
+  <text x="1040" y="979" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+                 ('Storage Class', 'STANDARD')],
+  </text>
+  <text x="1040" y="995" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+     'format_hint': 'remote'}
+  </text>
+  
+  <text x="1000" y="1019" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+    Capabilities:
+  </text>
+  <text x="1020" y="1039" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • No directory rename ✗
   </text>
   
   <!-- ArchivePathImpl -->
-  <rect x="1292" y="680" width="548" height="380" fill="#2d2d30" stroke="#ce9178" stroke-width="2" rx="8"/>
-  <text x="1566" y="708" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ce9178" text-anchor="middle">
+  <rect x="1430" y="680" width="410" height="380" fill="#2d2d30" stroke="#ce9178" stroke-width="2" rx="8"/>
+  <text x="1635" y="708" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ce9178" text-anchor="middle">
     ArchivePathImpl
   </text>
-  <text x="1312" y="733" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+  <text x="1450" y="733" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
     Display Methods:
   </text>
-  <text x="1332" y="753" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="1470" y="753" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • get_display_prefix() → "ARCHIVE: "
   </text>
-  <text x="1332" y="771" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
-    • get_display_title() → "archive:///path/file.zip#internal/path"
+  <text x="1470" y="771" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+    • get_display_title() → "archive:///.../file.zip#path"
   </text>
   
-  <text x="1312" y="795" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+  <text x="1450" y="795" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
     Content Strategy:
   </text>
-  <text x="1332" y="815" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="1470" y="815" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • requires_extraction_for_reading() → True
   </text>
-  <text x="1332" y="833" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="1470" y="833" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • supports_streaming_read() → False
   </text>
-  <text x="1332" y="851" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="1470" y="851" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • get_search_strategy() → "extracted"
   </text>
-  <text x="1332" y="869" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="1470" y="869" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • should_cache_for_search() → True
   </text>
   
-  <text x="1312" y="893" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+  <text x="1450" y="893" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
     Metadata:
   </text>
-  <text x="1332" y="913" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="1470" y="913" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • get_extended_metadata() →
   </text>
-  <text x="1352" y="931" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+  <text x="1490" y="931" font-family="Arial, sans-serif" font-size="12" fill="#888888">
     {'type': 'archive',
   </text>
-  <text x="1352" y="947" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+  <text x="1490" y="947" font-family="Arial, sans-serif" font-size="12" fill="#888888">
      'details': [('Archive', 'data.zip'),
   </text>
-  <text x="1352" y="963" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+  <text x="1490" y="963" font-family="Arial, sans-serif" font-size="12" fill="#888888">
                  ('Compressed', '512 KB'),
   </text>
-  <text x="1352" y="979" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+  <text x="1490" y="979" font-family="Arial, sans-serif" font-size="12" fill="#888888">
                  ('Uncompressed', '1.2 MB')],
   </text>
-  <text x="1352" y="995" font-family="Arial, sans-serif" font-size="12" fill="#888888">
+  <text x="1490" y="995" font-family="Arial, sans-serif" font-size="12" fill="#888888">
      'format_hint': 'archive'}
   </text>
   
-  <text x="1312" y="1019" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
+  <text x="1450" y="1019" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#dcdcaa">
     Capabilities:
   </text>
-  <text x="1332" y="1039" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
+  <text x="1470" y="1039" font-family="Arial, sans-serif" font-size="13" fill="#d4d4d4">
     • Read-only (no writes) ✗
   </text>
   
   <!-- Inheritance arrows (straight down to each implementation) -->
-  <line x1="500" y1="625" x2="500" y2="680" stroke="#ce9178" stroke-width="2" marker-end="url(#arrow-orange)"/>
-  <line x1="979" y1="625" x2="979" y2="680" stroke="#ce9178" stroke-width="2" marker-end="url(#arrow-orange)"/>
-  <line x1="1566" y1="625" x2="1566" y2="680" stroke="#ce9178" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <line x1="295" y1="625" x2="295" y2="680" stroke="#ce9178" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <line x1="745" y1="625" x2="745" y2="680" stroke="#ce9178" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <line x1="1195" y1="625" x2="1195" y2="680" stroke="#ce9178" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <line x1="1635" y1="625" x2="1635" y2="680" stroke="#ce9178" stroke-width="2" marker-end="url(#arrow-orange)"/>
   
-  <text x="1576" y="655" font-family="Arial, sans-serif" font-size="13" fill="#ce9178">implements</text>
+  <text x="1645" y="655" font-family="Arial, sans-serif" font-size="13" fill="#ce9178">implements</text>
 </svg>
