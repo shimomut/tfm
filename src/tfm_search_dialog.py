@@ -22,6 +22,12 @@ from tfm_text_layout import (
     AbbreviationSegment,
     AsIsSegment
 )
+from tfm_const import (
+    BINARY_FILE_EXTENSIONS,
+    TEXT_FILE_EXTENSIONS,
+    TEXT_DETECTION_SAMPLE_SIZE,
+    TEXT_DETECTION_THRESHOLD
+)
 
 # Module-level logger
 logger = getLogger("SearchDlg")
@@ -337,43 +343,59 @@ class SearchDialog(UILayer, BaseListDialog):
                 self.content_changed = True  # Mark content as changed when search completes
         
     def _is_text_file(self, file_path):
-        """Check if a file is likely to be a text file"""
+        """Check if a file is likely to be a text file
+        
+        Uses a three-tier approach:
+        1. Known binary extensions - immediately reject
+        2. Known text extensions - accept (fast path for common cases)
+        3. Content inspection - check actual file content for unknown extensions
+        """
         try:
-            # Check file extension
-            text_extensions = {
-                '.txt', '.py', '.js', '.html', '.css', '.json', '.xml', '.yaml', '.yml',
-                '.md', '.rst', '.c', '.cpp', '.h', '.hpp', '.java', '.php', '.rb',
-                '.go', '.rs', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd',
-                '.ini', '.cfg', '.conf', '.config', '.log', '.csv', '.tsv', '.sql'
-            }
+            suffix_lower = file_path.suffix.lower()
             
-            if file_path.suffix.lower() in text_extensions:
+            # Known binary extensions - immediately reject
+            if suffix_lower in BINARY_FILE_EXTENSIONS:
+                return False
+            
+            # Known text extensions - accept immediately
+            if suffix_lower in TEXT_FILE_EXTENSIONS:
                 return True
             
-            # Check if file has no extension (might be text)
-            if not file_path.suffix:
-                # Try to read first few bytes to check if it's text
-                try:
-                    with file_path.open('rb') as f:
-                        sample = f.read(512)
-                        # Check if sample contains mostly printable characters
-                        if sample:
-                            text_chars = sum(1 for byte in sample if 32 <= byte <= 126 or byte in [9, 10, 13])
-                            return text_chars / len(sample) > 0.7
-                except (OSError, IOError) as e:
-                    logger.warning(f"Could not read file for text detection {file_path}: {e}")
-                    pass
-                except Exception as e:
-                    logger.warning(f"Unexpected error in file text detection: {e}")
-                    pass
+            # No extension or unknown extension - inspect content
+            # Try to read first few bytes to check if it's text
+            try:
+                with file_path.open('rb') as f:
+                    sample = f.read(TEXT_DETECTION_SAMPLE_SIZE)
+                    
+                    if not sample:
+                        # Empty file - consider it text
+                        return True
+                    
+                    # Check for null bytes (strong indicator of binary)
+                    if b'\x00' in sample:
+                        return False
+                    
+                    # Count printable characters
+                    # Printable: space (32) to ~ (126), plus tab (9), newline (10), carriage return (13)
+                    text_chars = sum(1 for byte in sample if 32 <= byte <= 126 or byte in [9, 10, 13])
+                    
+                    # If more than threshold of printable characters, consider it text
+                    return text_chars / len(sample) > TEXT_DETECTION_THRESHOLD
+                    
+            except (OSError, IOError) as e:
+                logger.warning(f"Could not read file for text detection {file_path}: {e}")
+                return False
+            except Exception as e:
+                logger.warning(f"Unexpected error in file content inspection: {e}")
+                return False
             
-            return False
         except (OSError, PermissionError) as e:
             logger.warning(f"Could not access file {file_path}: {e}")
             return False
         except Exception as e:
             logger.warning(f"Unexpected error checking if file is text: {e}")
             return False
+
             
 
             

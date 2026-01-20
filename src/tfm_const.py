@@ -53,3 +53,70 @@ SEARCH_KEY = ord('f')  # Key to enter isearch mode (F key)
 # Text editor constants
 DEFAULT_TEXT_EDITOR = 'vim'  # Default text editor to use
 EDITOR_KEY = ord('e')  # Key to launch text editor (E key)
+
+# File type detection constants for content search
+# Known binary file extensions - immediately rejected from text search
+BINARY_FILE_EXTENSIONS = {
+    # Images
+    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.tiff', '.tif', '.webp',
+    '.psd', '.raw', '.cr2', '.nef', '.orf', '.sr2',
+    # Archives
+    '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar', '.dmg', '.iso',
+    '.tgz', '.tbz2', '.txz',
+    # Executables and libraries
+    '.exe', '.dll', '.so', '.dylib', '.bin', '.app', '.deb', '.rpm',
+    '.msi', '.pkg', '.apk',
+    # Media
+    '.mp3', '.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4a', '.wav',
+    '.flac', '.ogg', '.webm',
+    # Documents (binary formats)
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt', '.ods',
+    # Fonts
+    '.ttf', '.otf', '.woff', '.woff2', '.eot',
+    # Database
+    '.db', '.sqlite', '.sqlite3',
+    # Python bytecode
+    '.pyc', '.pyo', '.pyd',
+    # Java
+    '.class', '.jar', '.war', '.ear',
+    # Object files
+    '.o', '.obj', '.a', '.lib'
+}
+
+# Known text file extensions - immediately accepted for text search
+TEXT_FILE_EXTENSIONS = {
+    # Plain text and markup
+    '.txt', '.md', '.rst', '.asciidoc', '.adoc',
+    # Programming languages
+    '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.c', '.cpp', '.cc', '.cxx',
+    '.h', '.hpp', '.hh', '.hxx', '.cs', '.php', '.rb', '.go', '.rs', '.swift',
+    '.kt', '.scala', '.clj', '.erl', '.ex', '.exs', '.hs', '.ml', '.fs', '.fsx',
+    '.lua', '.pl', '.pm', '.r', '.m', '.mm',
+    # Shell scripts
+    '.sh', '.bash', '.zsh', '.fish', '.ksh', '.csh', '.tcsh',
+    # Web
+    '.html', '.htm', '.css', '.scss', '.sass', '.less', '.xml', '.svg',
+    '.vue', '.svelte',
+    # Data formats
+    '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.config',
+    '.properties', '.env',
+    # SQL and query languages
+    '.sql', '.graphql', '.gql',
+    # Logs and data
+    '.log', '.csv', '.tsv', '.psv',
+    # Build and config files
+    '.cmake', '.make', '.gradle', '.maven', '.sbt',
+    # Version control and project files
+    '.gitignore', '.gitattributes', '.dockerignore', '.editorconfig',
+    '.eslintrc', '.prettierrc', '.babelrc',
+    # Lock files
+    '.lock',
+    # Windows scripts
+    '.ps1', '.psm1', '.psd1', '.bat', '.cmd',
+    # Documentation
+    '.tex', '.bib', '.man', '.1', '.2', '.3', '.4', '.5', '.6', '.7', '.8'
+}
+
+# Content inspection thresholds for unknown file types
+TEXT_DETECTION_SAMPLE_SIZE = 8192  # Bytes to read for content inspection
+TEXT_DETECTION_THRESHOLD = 0.85    # Minimum ratio of printable characters to consider text
