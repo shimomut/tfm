@@ -473,14 +473,18 @@ class FilepathSegment(TextSegment):
                     # Find the first gap in kept indices
                     kept_indices = [i for i in range(num_dirs) if i not in removed_set]
                     if kept_indices:
-                        # Check if there's a gap (removed directories in the middle)
+                        # Check if there's a gap (removed directories anywhere)
                         has_gap = False
                         for i in range(len(kept_indices) - 1):
                             if kept_indices[i+1] - kept_indices[i] > 1:
                                 has_gap = True
                                 break
                         
-                        if has_gap or (kept_indices and kept_indices[0] > 0):
+                        # Check for gap at beginning or end
+                        has_gap_at_start = kept_indices[0] > 0
+                        has_gap_at_end = kept_indices[-1] < num_dirs - 1
+                        
+                        if has_gap or has_gap_at_start or has_gap_at_end:
                             # There's a gap, need ellipsis
                             # Split kept directories at the gap
                             start_dirs = []
@@ -494,10 +498,14 @@ class FilepathSegment(TextSegment):
                                         end_dirs = [directories[idx] for idx in kept_indices[i+1:]]
                                         gap_found = True
                             
-                            if not gap_found and kept_indices[0] > 0:
+                            if not gap_found and has_gap_at_start:
                                 # Gap at the beginning
                                 end_dirs = kept_dirs
                                 start_dirs = []
+                            elif not gap_found and has_gap_at_end:
+                                # Gap at the end only
+                                start_dirs = kept_dirs
+                                end_dirs = []
                             
                             if start_dirs or end_dirs:
                                 path_parts = start_dirs + [ellipsis] + end_dirs + [filename]
