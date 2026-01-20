@@ -774,6 +774,8 @@ class FileOperationTask(BaseTask):
         """
         # Store results in context
         if self.context:
+            # Update success count in results
+            self.context.results['success'].extend([None] * copied_count)
             # Update error count in results
             self.context.results['errors'].extend([None] * error_count)
             
@@ -881,6 +883,8 @@ class FileOperationTask(BaseTask):
         """
         # Store results in context
         if self.context:
+            # Update success count in results
+            self.context.results['success'].extend([None] * moved_count)
             # Update error count in results
             self.context.results['errors'].extend([None] * error_count)
             
@@ -930,6 +934,8 @@ class FileOperationTask(BaseTask):
         """
         # Store results in context
         if self.context:
+            # Update success count in results
+            self.context.results['success'].extend([None] * deleted_count)
             # Update error count in results
             self.context.results['errors'].extend([None] * error_count)
         
