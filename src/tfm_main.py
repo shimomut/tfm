@@ -2172,18 +2172,26 @@ class FileManager(UILayer):
             # Show "no items to show" message in the center of the pane
             message = "No items to show"
             message_y = 1 + display_height // 2  # Center vertically in the pane
+            
+            # Truncate message if pane is too narrow
+            usable_width = pane_width - 2  # Leave 1 column margin on each side
+            if usable_width < 1:
+                return  # Pane too narrow to show anything
+            
+            truncated_message = truncate_to_width(message, usable_width, ellipsis="…")
+            
             # Use display width for proper centering with wide characters
-            message_display_width = safe_get_display_width(message)
+            message_display_width = safe_get_display_width(truncated_message)
             message_x = start_x + (pane_width - message_display_width) // 2  # Center horizontally
             
             try:
                 from tfm_colors import get_error_color
                 error_color_pair, error_attributes = get_error_color()
-                self.renderer.draw_text(message_y, message_x, message, color_pair=error_color_pair, attributes=error_attributes)
+                self.renderer.draw_text(message_y, message_x, truncated_message, color_pair=error_color_pair, attributes=error_attributes)
             except (Exception, ImportError):
                 # Fallback if color function not available or position invalid
                 try:
-                    self.renderer.draw_text(message_y, start_x + 2, message)
+                    self.renderer.draw_text(message_y, start_x + 2, truncated_message)
                 except Exception:
                     pass
             return
