@@ -433,23 +433,81 @@ class FilepathSegment(TextSegment):
                 if path_width <= target_width:
                     return test_path
             
-            # Try removing directories from the middle, one at a time
-            # Start by removing the directory closest to the middle
-            for num_to_remove in range(1, num_dirs):
-                # Calculate which directories to remove (from middle)
-                num_to_keep = num_dirs - num_to_remove
+            # Try removing directories from the center outward, one at a time
+            # Generate removal order: center first, then alternate RIGHT-LEFT to maintain balance
+            # Rule: left_count <= right_count (where right includes filename)
+            # 
+            # Strategy: Remove center first, then alternate RIGHT-LEFT-RIGHT-LEFT
+            # This maintains balance because filename is always on the right side
+            
+            center = num_dirs // 2
+            
+            # Build removal order: center, then alternate RIGHT-LEFT
+            removal_order = [center]
+            
+            # After removing center, alternate starting with RIGHT (to balance filename)
+            left = center - 1
+            right = center + 1
+            
+            while left >= 0 or right < num_dirs:
+                # Add right first (to balance filename on right)
+                if right < num_dirs:
+                    removal_order.append(right)
+                    right += 1
+                # Then add left
+                if left >= 0:
+                    removal_order.append(left)
+                    left -= 1
+            
+            # Try removing directories in the calculated order
+            removed_set = set()
+            for remove_idx in removal_order:
+                removed_set.add(remove_idx)
                 
-                # Split kept directories between start and end
-                # Prefer balanced distribution
-                keep_from_start = (num_to_keep + 1) // 2  # Round up for start
-                keep_from_end = num_to_keep - keep_from_start
+                # Build path with remaining directories
+                kept_dirs = [directories[i] for i in range(num_dirs) if i not in removed_set]
                 
-                # Build path with ellipsis in middle
-                start_dirs = directories[:keep_from_start] if keep_from_start > 0 else []
-                end_dirs = directories[-keep_from_end:] if keep_from_end > 0 else []
-                
-                if start_dirs or end_dirs:
-                    path_parts = start_dirs + [ellipsis] + end_dirs + [filename]
+                if kept_dirs:
+                    path_parts = kept_dirs + [filename]
+                    # Insert ellipsis where directories were removed
+                    # Find the first gap in kept indices
+                    kept_indices = [i for i in range(num_dirs) if i not in removed_set]
+                    if kept_indices:
+                        # Check if there's a gap (removed directories in the middle)
+                        has_gap = False
+                        for i in range(len(kept_indices) - 1):
+                            if kept_indices[i+1] - kept_indices[i] > 1:
+                                has_gap = True
+                                break
+                        
+                        if has_gap or (kept_indices and kept_indices[0] > 0):
+                            # There's a gap, need ellipsis
+                            # Split kept directories at the gap
+                            start_dirs = []
+                            end_dirs = []
+                            gap_found = False
+                            
+                            for i in range(len(kept_indices)):
+                                if not gap_found:
+                                    if i < len(kept_indices) - 1 and kept_indices[i+1] - kept_indices[i] > 1:
+                                        start_dirs = [directories[idx] for idx in kept_indices[:i+1]]
+                                        end_dirs = [directories[idx] for idx in kept_indices[i+1:]]
+                                        gap_found = True
+                            
+                            if not gap_found and kept_indices[0] > 0:
+                                # Gap at the beginning
+                                end_dirs = kept_dirs
+                                start_dirs = []
+                            
+                            if start_dirs or end_dirs:
+                                path_parts = start_dirs + [ellipsis] + end_dirs + [filename]
+                            else:
+                                path_parts = [ellipsis] + [filename]
+                        else:
+                            # No gap, all kept directories are contiguous
+                            path_parts = kept_dirs + [filename]
+                    else:
+                        path_parts = [ellipsis, filename]
                 else:
                     path_parts = [ellipsis, filename]
                 
