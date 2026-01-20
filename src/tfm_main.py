@@ -3226,10 +3226,16 @@ class FileManager(UILayer):
         if not history_paths:
             history_paths = [f"No history available for {pane_name} pane"]
         
+        # Store original paths for selection callback
+        # (abbreviated paths are for display only)
+        self._history_path_mapping = {path: path for path in history_paths}
+        
         # Create callback function to handle selection
         def on_history_selected(selected_path):
-            if selected_path and not selected_path.startswith("No history available"):
-                self.navigate_to_history_path(selected_path)
+            # Look up original path from abbreviated display path
+            original_path = self._history_path_mapping.get(selected_path, selected_path)
+            if original_path and not original_path.startswith("No history available"):
+                self.navigate_to_history_path(original_path)
         
         # Create custom key handler for TAB switching
         def handle_custom_keys(key):
@@ -3244,11 +3250,54 @@ class FileManager(UILayer):
                 return True
             return False
         
-        # Show the list dialog with TAB switching support
+        # Show the list dialog with TAB switching support and filepath abbreviation
         title = f"History - {pane_name.title()}"
         other_pane_name = 'Right' if pane_name == 'left' else 'Left'
         help_text = f"↑↓:select  Enter:choose  TAB:switch to {other_pane_name}  Type:search  ESC:cancel"
+        
+        # Use custom format function for filepath abbreviation
+        from tfm_text_layout import FilepathSegment, draw_text_segments
+        
+        def format_history_item(item):
+            """Format history item with filepath abbreviation"""
+            # For "No history available" messages, return as-is
+            if item.startswith("No history available"):
+                return item
+            
+            # Get available width for the item
+            # Account for dialog margins and selection indicator
+            height, width = self.renderer.get_dimensions()
+            width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
+            min_width = getattr(self.config, 'LIST_DIALOG_MIN_WIDTH', 40)
+            dialog_width = max(min_width, int(width * width_ratio))
+            dialog_width = min(dialog_width, width)
+            
+            # Content width = dialog_width - 4 (margins) - 2 (selection indicator)
+            available_width = dialog_width - 6
+            
+            # Create filepath segment and abbreviate
+            segment = FilepathSegment(item, priority=0, min_length=10)
+            abbreviated = segment.shorten(available_width)
+            
+            # Store mapping from abbreviated to original
+            self._history_path_mapping[abbreviated] = item
+            
+            return abbreviated
+        
+        # Show dialog with custom formatter
         self.list_dialog.show(title, history_paths, on_history_selected, handle_custom_keys, help_text)
+        
+        # Override the list dialog's format function
+        # Store original draw_list_items method
+        original_draw_list_items = self.list_dialog.draw_list_items
+        
+        def custom_draw_list_items(items_list, start_y, end_y, start_x, content_width, format_item_func=None):
+            # Use our custom formatter
+            original_draw_list_items(items_list, start_y, end_y, start_x, content_width, format_history_item)
+        
+        # Temporarily replace draw_list_items
+        self.list_dialog.draw_list_items = custom_draw_list_items
+        
         # Push dialog onto layer stack
         self.push_layer(self.list_dialog)
         self.mark_dirty()

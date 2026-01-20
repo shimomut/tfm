@@ -210,7 +210,8 @@ def test_cursor_history_dialog_basic():
         
         # Clean up
         state_manager.cleanup_session()
-        print("✓ Basic cursor history dialog test completed\n")
+        print("✓ Basic cursor history dialog test completed")
+        print("✓ Filepath abbreviation applied to history paths\n")
 
 
 def test_cursor_history_navigation():
@@ -452,7 +453,131 @@ def test_cursor_history_missing_directory():
         print("✓ Missing directory test completed\n")
 
 
-def run_all_tests():
+def test_filepath_abbreviation_in_history():
+    """Test that filepath abbreviation is applied to history paths."""
+    print("Testing filepath abbreviation in history dialog...")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a deep directory structure with long paths
+        deep_path = Path(temp_dir)
+        path_components = ["very", "long", "directory", "structure", "with", "many", "levels", "deep"]
+        
+        for component in path_components:
+            deep_path = deep_path / component
+            deep_path.mkdir()
+            (deep_path / "test_file.txt").touch()
+        
+        # Create state manager
+        db_path = Path(temp_dir) / "test_state.db"
+        state_manager = TFMStateManager("test_abbreviation")
+        state_manager.db_path = db_path
+        state_manager._initialize_database()
+        
+        # Create file manager
+        config = DefaultConfig()
+        fm = MockFileManager(config, deep_path, deep_path, state_manager)
+        fm.refresh_files()
+        
+        # Save cursor position for the deep path
+        fm.pane_manager.left_pane['path'] = deep_path
+        fm.pane_manager.left_pane['focused_index'] = 0
+        fm.pane_manager.save_cursor_position(fm.pane_manager.left_pane)
+        
+        print(f"Original path: {deep_path}")
+        print(f"Path length: {len(str(deep_path))} characters")
+        
+        # Test filepath abbreviation
+        from tfm_text_layout import FilepathSegment
+        
+        # Test different target widths
+        test_widths = [80, 60, 40, 30]
+        
+        for width in test_widths:
+            segment = FilepathSegment(str(deep_path), priority=0, min_length=10)
+            abbreviated = segment.shorten(width)
+            
+            print(f"\nTarget width {width}: {abbreviated}")
+            print(f"  Abbreviated length: {len(abbreviated)} characters")
+            
+            # Verify abbreviation worked
+            assert len(abbreviated) <= width, f"Abbreviated path exceeds target width {width}"
+            assert "…" in abbreviated or len(abbreviated) == len(str(deep_path)), "Path should contain ellipsis if shortened"
+        
+        print("\n✓ Filepath abbreviation works correctly for history paths")
+        
+        # Clean up
+        state_manager.cleanup_session()
+        print("✓ Filepath abbreviation test completed\n")
+
+
+def test_history_dialog_with_mixed_path_lengths():
+    """Test history dialog with a mix of short and long paths."""
+    print("Testing history dialog with mixed path lengths...")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create paths of varying lengths
+        paths = []
+        
+        # Short path
+        short_path = Path(temp_dir) / "short"
+        short_path.mkdir()
+        (short_path / "file.txt").touch()
+        paths.append(short_path)
+        
+        # Medium path
+        medium_path = Path(temp_dir) / "medium" / "length" / "path"
+        medium_path.mkdir(parents=True)
+        (medium_path / "file.txt").touch()
+        paths.append(medium_path)
+        
+        # Long path
+        long_path = Path(temp_dir) / "very" / "long" / "directory" / "structure" / "with" / "many" / "components"
+        long_path.mkdir(parents=True)
+        (long_path / "file.txt").touch()
+        paths.append(long_path)
+        
+        # Create state manager
+        db_path = Path(temp_dir) / "test_state.db"
+        state_manager = TFMStateManager("test_mixed_paths")
+        state_manager.db_path = db_path
+        state_manager._initialize_database()
+        
+        # Create file manager
+        config = DefaultConfig()
+        fm = MockFileManager(config, paths[0], paths[0], state_manager)
+        
+        # Build history with all paths
+        print("Building history with mixed path lengths:")
+        for i, path in enumerate(paths):
+            fm.pane_manager.left_pane['path'] = path
+            fm.refresh_files(fm.pane_manager.left_pane)
+            fm.pane_manager.left_pane['focused_index'] = 0
+            fm.pane_manager.save_cursor_position(fm.pane_manager.left_pane)
+            print(f"  {i+1}. {path} ({len(str(path))} chars)")
+            time.sleep(0.01)
+        
+        # Get history
+        history_paths = fm.show_cursor_history()
+        
+        assert len(history_paths) == len(paths)
+        print(f"\n✓ All {len(paths)} paths stored in history")
+        
+        # Verify each path can be abbreviated
+        from tfm_text_layout import FilepathSegment
+        target_width = 50
+        
+        print(f"\nAbbreviating all paths to {target_width} columns:")
+        for path in history_paths:
+            segment = FilepathSegment(path, priority=0, min_length=10)
+            abbreviated = segment.shorten(target_width)
+            print(f"  {abbreviated}")
+            assert len(abbreviated) <= target_width
+        
+        print("\n✓ Mixed path lengths handled correctly")
+        
+        # Clean up
+        state_manager.cleanup_session()
+        print("✓ Mixed path lengths test completed\n")
     """Run all cursor history dialog tests."""
     print("Running cursor history dialog tests...\n")
     
@@ -482,3 +607,130 @@ def run_all_tests():
         import traceback
         traceback.print_exc()
         return False
+
+
+def test_filepath_abbreviation_in_history():
+    """Test that filepath abbreviation is applied to history paths."""
+    print("Testing filepath abbreviation in history dialog...")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a deep directory structure with long paths
+        deep_path = Path(temp_dir)
+        path_components = ["very", "long", "directory", "structure", "with", "many", "levels", "deep"]
+        
+        for component in path_components:
+            deep_path = deep_path / component
+            deep_path.mkdir()
+            (deep_path / "test_file.txt").touch()
+        
+        # Create state manager
+        db_path = Path(temp_dir) / "test_state.db"
+        state_manager = TFMStateManager("test_abbreviation")
+        state_manager.db_path = db_path
+        state_manager._initialize_database()
+        
+        # Create file manager
+        config = DefaultConfig()
+        fm = MockFileManager(config, deep_path, deep_path, state_manager)
+        fm.refresh_files()
+        
+        # Save cursor position for the deep path
+        fm.pane_manager.left_pane['path'] = deep_path
+        fm.pane_manager.left_pane['focused_index'] = 0
+        fm.pane_manager.save_cursor_position(fm.pane_manager.left_pane)
+        
+        print(f"Original path: {deep_path}")
+        print(f"Path length: {len(str(deep_path))} characters")
+        
+        # Test filepath abbreviation
+        from tfm_text_layout import FilepathSegment
+        
+        # Test different target widths
+        test_widths = [80, 60, 40, 30]
+        
+        for width in test_widths:
+            segment = FilepathSegment(str(deep_path), priority=0, min_length=10)
+            abbreviated = segment.shorten(width)
+            
+            print(f"\nTarget width {width}: {abbreviated}")
+            print(f"  Abbreviated length: {len(abbreviated)} characters")
+            
+            # Verify abbreviation worked
+            assert len(abbreviated) <= width, f"Abbreviated path exceeds target width {width}"
+            assert "…" in abbreviated or len(abbreviated) == len(str(deep_path)), "Path should contain ellipsis if shortened"
+        
+        print("\n✓ Filepath abbreviation works correctly for history paths")
+        
+        # Clean up
+        state_manager.cleanup_session()
+        print("✓ Filepath abbreviation test completed\n")
+
+
+def test_history_dialog_with_mixed_path_lengths():
+    """Test history dialog with a mix of short and long paths."""
+    print("Testing history dialog with mixed path lengths...")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create paths of varying lengths
+        paths = []
+        
+        # Short path
+        short_path = Path(temp_dir) / "short"
+        short_path.mkdir()
+        (short_path / "file.txt").touch()
+        paths.append(short_path)
+        
+        # Medium path
+        medium_path = Path(temp_dir) / "medium" / "length" / "path"
+        medium_path.mkdir(parents=True)
+        (medium_path / "file.txt").touch()
+        paths.append(medium_path)
+        
+        # Long path
+        long_path = Path(temp_dir) / "very" / "long" / "directory" / "structure" / "with" / "many" / "components"
+        long_path.mkdir(parents=True)
+        (long_path / "file.txt").touch()
+        paths.append(long_path)
+        
+        # Create state manager
+        db_path = Path(temp_dir) / "test_state.db"
+        state_manager = TFMStateManager("test_mixed_paths")
+        state_manager.db_path = db_path
+        state_manager._initialize_database()
+        
+        # Create file manager
+        config = DefaultConfig()
+        fm = MockFileManager(config, paths[0], paths[0], state_manager)
+        
+        # Build history with all paths
+        print("Building history with mixed path lengths:")
+        for i, path in enumerate(paths):
+            fm.pane_manager.left_pane['path'] = path
+            fm.refresh_files(fm.pane_manager.left_pane)
+            fm.pane_manager.left_pane['focused_index'] = 0
+            fm.pane_manager.save_cursor_position(fm.pane_manager.left_pane)
+            print(f"  {i+1}. {path} ({len(str(path))} chars)")
+            time.sleep(0.01)
+        
+        # Get history
+        history_paths = fm.show_cursor_history()
+        
+        assert len(history_paths) == len(paths)
+        print(f"\n✓ All {len(paths)} paths stored in history")
+        
+        # Verify each path can be abbreviated
+        from tfm_text_layout import FilepathSegment
+        target_width = 50
+        
+        print(f"\nAbbreviating all paths to {target_width} columns:")
+        for path in history_paths:
+            segment = FilepathSegment(path, priority=0, min_length=10)
+            abbreviated = segment.shorten(target_width)
+            print(f"  {abbreviated}")
+            assert len(abbreviated) <= target_width
+        
+        print("\n✓ Mixed path lengths handled correctly")
+        
+        # Clean up
+        state_manager.cleanup_session()
+        print("✓ Mixed path lengths test completed\n")

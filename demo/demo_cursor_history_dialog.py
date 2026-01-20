@@ -55,7 +55,7 @@ class DemoFileManager:
                 pane_data['files'] = sorted([f for f in path.iterdir() if f.is_file()])
     
     def show_cursor_history(self):
-        """Show cursor history for the current pane using the searchable list dialog"""
+        """Show cursor history for the current pane using the searchable list dialog with filepath abbreviation"""
         current_pane = self.get_current_pane()
         pane_name = 'left' if current_pane is self.pane_manager.left_pane else 'right'
         
@@ -81,10 +81,28 @@ class DemoFileManager:
             print(f"No cursor history available for {pane_name} pane")
             return []
         
-        print(f"\n📋 History - {pane_name.title()} Pane")
+        print(f"\n📋 History - {pane_name.title()} Pane (with Filepath Abbreviation)")
         print("=" * 50)
-        for i, path in enumerate(history_paths, 1):
-            print(f"  {i}. {path}")
+        
+        # Demonstrate filepath abbreviation
+        from tfm_text_layout import FilepathSegment
+        
+        # Simulate different terminal widths
+        terminal_widths = [80, 60, 40]
+        
+        for width in terminal_widths:
+            print(f"\nTerminal width: {width} columns")
+            print("-" * width)
+            
+            for i, path in enumerate(history_paths[:5], 1):  # Show first 5 for demo
+                # Calculate available width (accounting for dialog margins and selection indicator)
+                available_width = width - 10  # Approximate dialog overhead
+                
+                # Create filepath segment and abbreviate
+                segment = FilepathSegment(path, priority=0, min_length=10)
+                abbreviated = segment.shorten(available_width)
+                
+                print(f"  {i}. {abbreviated}")
         
         return history_paths
     
@@ -289,6 +307,11 @@ def demo_cursor_history_dialog():
         state_manager.cleanup_session()
         
         print("\n✅ Cursor history dialog demo completed!")
+        print("\nKey Features Demonstrated:")
+        print("  • Filepath abbreviation for long paths")
+        print("  • Intelligent path shortening preserves important components")
+        print("  • Adapts to different terminal widths")
+        print("  • Clean, readable display even with deep directory structures")
 
 
 def demo_history_dialog_benefits():
@@ -297,10 +320,18 @@ def demo_history_dialog_benefits():
     
     print("H Key Functionality:")
     print("  • Shows searchable list of previously visited directories")
+    print("  • Uses intelligent filepath abbreviation for long paths")
     print("  • Displays only directory paths (clean, focused view)")
     print("  • Most recent directories appear first")
     print("  • Separate histories for left and right panes")
     print("  • Quick navigation to any previous location")
+    
+    print("\nFilepath Abbreviation:")
+    print("  • Removes directory levels from middle of path")
+    print("  • Preserves filename and important path components")
+    print("  • Adapts to available terminal width")
+    print("  • Example: /home/user/projects/myapp/src/components/Button.tsx")
+    print("           → /home/…/components/Button.tsx")
     
     print("\nUser Experience:")
     print("  • No need to remember complex directory paths")

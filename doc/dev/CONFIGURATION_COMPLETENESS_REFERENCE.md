@@ -35,7 +35,7 @@ This document outlines the configuration parameters that were added to ensure bo
 - **`INFO_DIALOG_MIN_HEIGHT = 10`**: Minimum dialog height in lines
 
 #### List Dialog Settings
-- **`LIST_DIALOG_WIDTH_RATIO = 0.6`**: Width as ratio of screen width (60%)
+- **`LIST_DIALOG_WIDTH_RATIO = 0.8`**: Width as ratio of screen width (80%)
 - **`LIST_DIALOG_HEIGHT_RATIO = 0.7`**: Height as ratio of screen height (70%)
 - **`LIST_DIALOG_MIN_WIDTH = 40`**: Minimum dialog width in characters
 - **`LIST_DIALOG_MIN_HEIGHT = 15`**: Minimum dialog height in lines
@@ -95,7 +95,7 @@ class DefaultConfig:
     INFO_DIALOG_MIN_HEIGHT = 10
     
     # List dialog settings
-    LIST_DIALOG_WIDTH_RATIO = 0.6
+    LIST_DIALOG_WIDTH_RATIO = 0.8
     LIST_DIALOG_HEIGHT_RATIO = 0.7
     LIST_DIALOG_MIN_WIDTH = 40
     LIST_DIALOG_MIN_HEIGHT = 15
