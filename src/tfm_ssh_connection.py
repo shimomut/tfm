@@ -498,7 +498,7 @@ class SSHConnection:
         
         Args:
             commands: List of SFTP commands to execute
-            timeout: Command timeout in seconds (default: 30)
+            timeout: Command timeout in seconds (default: 30), or None for no timeout
             
         Returns:
             (stdout, stderr, returncode) tuple
@@ -544,6 +544,7 @@ class SSHConnection:
                 text=True
             )
             
+            # Standard timeout or no timeout
             try:
                 stdout, stderr = process.communicate(input=command_input, timeout=timeout)
                 returncode = process.returncode
@@ -878,75 +879,54 @@ class SSHConnection:
             # Download file using get command
             commands = [f'get {remote_path} {tmp_path}']
             
+            # No timeout for file transfers - let SFTP handle it
+            # SFTP has its own timeout mechanisms and will handle stalled transfers
+            timeout = None
+            
+            self.logger.info(f"Downloading {file_size} bytes (no timeout - SFTP handles it)")
+            
             # For large files, emit progress events
             if file_size > self._progress_threshold and self._progress_callback:
                 # Start progress tracking
                 self._progress_callback(0, file_size)
+            
+            # Execute download without timeout - SFTP handles timeouts internally
+            try:
+                stdout, stderr, returncode = self._execute_sftp_command(
+                    commands,
+                    timeout=timeout
+                )
                 
-                # Execute download
-                try:
-                    stdout, stderr, returncode = self._execute_sftp_command(commands)
+                if returncode != 0:
+                    # Parse error to determine specific type
+                    stderr_lower = stderr.lower()
                     
-                    if returncode != 0:
-                        # Parse error to determine specific type
-                        stderr_lower = stderr.lower()
-                        
-                        if 'no such file' in stderr_lower or 'not found' in stderr_lower:
-                            error_msg = f"Remote file not found: {remote_path}"
-                            self.logger.error(error_msg)
-                            self.logger.error(f"Detailed error: {stderr}")
-                            raise SSHPathNotFoundError(error_msg)
-                        elif 'permission denied' in stderr_lower:
-                            error_msg = f"Permission denied reading: {remote_path}"
-                            self.logger.error(error_msg)
-                            self.logger.error(f"Detailed error: {stderr}")
-                            raise SSHPermissionDeniedError(error_msg)
-                        else:
-                            error_msg = f"Failed to read file {remote_path}: {stderr}"
-                            self.logger.error(error_msg)
-                            raise SSHError(error_msg)
-                    
-                    # Report completion
+                    if 'no such file' in stderr_lower or 'not found' in stderr_lower:
+                        error_msg = f"Remote file not found: {remote_path}"
+                        self.logger.error(error_msg)
+                        self.logger.error(f"Detailed error: {stderr}")
+                        raise SSHPathNotFoundError(error_msg)
+                    elif 'permission denied' in stderr_lower:
+                        error_msg = f"Permission denied reading: {remote_path}"
+                        self.logger.error(error_msg)
+                        self.logger.error(f"Detailed error: {stderr}")
+                        raise SSHPermissionDeniedError(error_msg)
+                    else:
+                        error_msg = f"Failed to read file {remote_path}: {stderr}"
+                        self.logger.error(error_msg)
+                        raise SSHError(error_msg)
+                
+                # Report completion for large files
+                if file_size > self._progress_threshold and self._progress_callback:
                     self._progress_callback(file_size, file_size)
-                    
-                except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
-                    # Re-raise SSH-specific errors
-                    raise
-                except Exception as e:
-                    error_msg = f"Unexpected error reading file {remote_path}: {e}"
-                    self.logger.error(error_msg)
-                    raise SSHError(error_msg)
-            else:
-                # No progress tracking for small files
-                try:
-                    stdout, stderr, returncode = self._execute_sftp_command(commands)
-                    
-                    if returncode != 0:
-                        # Parse error to determine specific type
-                        stderr_lower = stderr.lower()
-                        
-                        if 'no such file' in stderr_lower or 'not found' in stderr_lower:
-                            error_msg = f"Remote file not found: {remote_path}"
-                            self.logger.error(error_msg)
-                            self.logger.error(f"Detailed error: {stderr}")
-                            raise SSHPathNotFoundError(error_msg)
-                        elif 'permission denied' in stderr_lower:
-                            error_msg = f"Permission denied reading: {remote_path}"
-                            self.logger.error(error_msg)
-                            self.logger.error(f"Detailed error: {stderr}")
-                            raise SSHPermissionDeniedError(error_msg)
-                        else:
-                            error_msg = f"Failed to read file {remote_path}: {stderr}"
-                            self.logger.error(error_msg)
-                            raise SSHError(error_msg)
-                            
-                except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
-                    # Re-raise SSH-specific errors
-                    raise
-                except Exception as e:
-                    error_msg = f"Unexpected error reading file {remote_path}: {e}"
-                    self.logger.error(error_msg)
-                    raise SSHError(error_msg)
+                
+            except (SSHPathNotFoundError, SSHPermissionDeniedError, SSHConnectionLostError):
+                # Re-raise SSH-specific errors
+                raise
+            except Exception as e:
+                error_msg = f"Unexpected error reading file {remote_path}: {e}"
+                self.logger.error(error_msg)
+                raise SSHError(error_msg)
             
             # Read the downloaded file
             with open(tmp_path, 'rb') as f:
@@ -989,75 +969,54 @@ class SSHConnection:
             # Upload file using put command
             commands = [f'put {tmp_path} {remote_path}']
             
+            # No timeout for file transfers - let SFTP handle it
+            # SFTP has its own timeout mechanisms and will handle stalled transfers
+            timeout = None
+            
+            self.logger.info(f"Uploading {file_size} bytes (no timeout - SFTP handles it)")
+            
             # For large files, emit progress events
             if file_size > self._progress_threshold and self._progress_callback:
                 # Start progress tracking
                 self._progress_callback(0, file_size)
+            
+            # Execute upload without timeout - SFTP handles timeouts internally
+            try:
+                stdout, stderr, returncode = self._execute_sftp_command(
+                    commands, 
+                    timeout=timeout
+                )
                 
-                # Execute upload
-                try:
-                    stdout, stderr, returncode = self._execute_sftp_command(commands)
+                if returncode != 0:
+                    # Parse error to determine specific type
+                    stderr_lower = stderr.lower()
                     
-                    if returncode != 0:
-                        # Parse error to determine specific type
-                        stderr_lower = stderr.lower()
-                        
-                        if 'permission denied' in stderr_lower:
-                            error_msg = f"Permission denied writing to: {remote_path}"
-                            self.logger.error(error_msg)
-                            self.logger.error(f"Detailed error: {stderr}")
-                            raise SSHPermissionDeniedError(error_msg)
-                        elif 'no space' in stderr_lower or 'disk full' in stderr_lower:
-                            error_msg = f"Disk full on remote system: {remote_path}"
-                            self.logger.error(error_msg)
-                            self.logger.error(f"Detailed error: {stderr}")
-                            raise SSHError(error_msg)
-                        else:
-                            error_msg = f"Failed to write file {remote_path}: {stderr}"
-                            self.logger.error(error_msg)
-                            raise SSHError(error_msg)
-                    
-                    # Report completion
+                    if 'permission denied' in stderr_lower:
+                        error_msg = f"Permission denied writing to: {remote_path}"
+                        self.logger.error(error_msg)
+                        self.logger.error(f"Detailed error: {stderr}")
+                        raise SSHPermissionDeniedError(error_msg)
+                    elif 'no space' in stderr_lower or 'disk full' in stderr_lower:
+                        error_msg = f"Disk full on remote system: {remote_path}"
+                        self.logger.error(error_msg)
+                        self.logger.error(f"Detailed error: {stderr}")
+                        raise SSHError(error_msg)
+                    else:
+                        error_msg = f"Failed to write file {remote_path}: {stderr}"
+                        self.logger.error(error_msg)
+                        raise SSHError(error_msg)
+                
+                # Report completion for large files
+                if file_size > self._progress_threshold and self._progress_callback:
                     self._progress_callback(file_size, file_size)
-                    
-                except (SSHPermissionDeniedError, SSHConnectionLostError):
-                    # Re-raise SSH-specific errors
-                    raise
-                except Exception as e:
-                    error_msg = f"Unexpected error writing file {remote_path}: {e}"
-                    self.logger.error(error_msg)
-                    raise SSHError(error_msg)
-            else:
-                # No progress tracking for small files
-                try:
-                    stdout, stderr, returncode = self._execute_sftp_command(commands)
-                    
-                    if returncode != 0:
-                        # Parse error to determine specific type
-                        stderr_lower = stderr.lower()
-                        
-                        if 'permission denied' in stderr_lower:
-                            error_msg = f"Permission denied writing to: {remote_path}"
-                            self.logger.error(error_msg)
-                            self.logger.error(f"Detailed error: {stderr}")
-                            raise SSHPermissionDeniedError(error_msg)
-                        elif 'no space' in stderr_lower or 'disk full' in stderr_lower:
-                            error_msg = f"Disk full on remote system: {remote_path}"
-                            self.logger.error(error_msg)
-                            self.logger.error(f"Detailed error: {stderr}")
-                            raise SSHError(error_msg)
-                        else:
-                            error_msg = f"Failed to write file {remote_path}: {stderr}"
-                            self.logger.error(error_msg)
-                            raise SSHError(error_msg)
-                            
-                except (SSHPermissionDeniedError, SSHConnectionLostError):
-                    # Re-raise SSH-specific errors
-                    raise
-                except Exception as e:
-                    error_msg = f"Unexpected error writing file {remote_path}: {e}"
-                    self.logger.error(error_msg)
-                    raise SSHError(error_msg)
+                
+            except (SSHPermissionDeniedError, SSHConnectionLostError):
+                # Re-raise SSH-specific errors
+                raise
+            except Exception as e:
+                error_msg = f"Unexpected error writing file {remote_path}: {e}"
+                self.logger.error(error_msg)
+                raise SSHError(error_msg)
             
             # Invalidate cache after successful write
             self._cache.invalidate_path(self.hostname, remote_path)
