@@ -106,6 +106,14 @@ class CandidateListOverlay:
         # Calculate number of candidates to display
         num_candidates = min(len(self.candidates), self.max_visible_candidates)
         
+        # Don't draw if no candidates to display
+        if num_candidates == 0:
+            return
+        
+        # Ensure scroll_offset is within valid bounds
+        max_scroll = max(0, len(self.candidates) - num_candidates)
+        self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
+        
         # Calculate overlay dimensions
         # Height: candidates + top border + bottom border
         overlay_height = num_candidates + 2
@@ -117,6 +125,12 @@ class CandidateListOverlay:
         
         # Ensure overlay fits on screen
         overlay_width = min(overlay_width, width - self.completion_start_x)
+        
+        # Don't draw if overlay is too narrow to show any content
+        # Minimum width is 5: left border (1) + left padding (1) + content (1) + right padding (1) + right border (1)
+        if overlay_width < 5:
+            self.logger.warning(f"Overlay too narrow ({overlay_width} chars), not drawing candidate list")
+            return
         
         # Calculate overlay Y position
         if self.show_above:
@@ -203,20 +217,24 @@ class CandidateListOverlay:
             # Draw left padding with normal color (no focused background)
             self._safe_draw_text(candidate_y, overlay_x + 1, " ", color_pair, attributes)
             
-            # Draw candidate text with focused background if applicable
-            self._safe_draw_text(candidate_y, overlay_x + 2, candidate + padding, candidate_color, candidate_attrs)
+            # Draw candidate text (without padding) with focused background if applicable
+            self._safe_draw_text(candidate_y, overlay_x + 2, candidate, candidate_color, candidate_attrs)
             
-            # Draw right padding with normal color (no focused background)
+            # Draw padding after candidate text with focused background if applicable
+            self._safe_draw_text(candidate_y, overlay_x + 2 + candidate_display_width, padding, candidate_color, candidate_attrs)
+            
+            # Draw right padding and border with normal color (no focused background)
             if show_scrollbar:
-                # Extra space for scrollbar
-                self._safe_draw_text(candidate_y, overlay_x + 2 + available_width, "  ", color_pair, attributes)
+                # Extra space for scrollbar (1 char)
+                self._safe_draw_text(candidate_y, overlay_x + 2 + available_width, " ", color_pair, attributes)
                 # Right border after scrollbar space
                 self._safe_draw_text(candidate_y, overlay_x + overlay_width - 1, self.border_char, color_pair, attributes)
             else:
-                # Single space padding
+                # Single space padding before right border
                 self._safe_draw_text(candidate_y, overlay_x + 2 + available_width, " ", color_pair, attributes)
                 # Right border
                 self._safe_draw_text(candidate_y, overlay_x + overlay_width - 1, self.border_char, color_pair, attributes)
+
         
         # Draw scrollbar if needed (inside the right border)
         if show_scrollbar:
