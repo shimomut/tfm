@@ -2308,11 +2308,11 @@ class FileManager(UILayer):
             # Selection marker
             selection_marker = "●" if is_selected else " "
             
-            # Format line based on pre-calculated layout
+            # Format line based on pre-calculated layout (without selection marker and separator space)
             if pane_width < 20:
                 # Very narrow: just truncate name
                 truncated_name = truncate_to_width(display_name, max_name_width, "…")
-                line = f"{selection_marker} {truncated_name}"
+                line = truncated_name
             else:
                 # Separate filename into basename and extension
                 basename, extension = self.separate_filename_extension(display_name, is_dir)
@@ -2325,14 +2325,14 @@ class FileManager(UILayer):
                             basename = truncate_to_width(basename, name_width, "…")
                         padded_basename = pad_to_width(basename, name_width, align='left')
                         padded_extension = pad_to_width(extension, ext_width, align='left')
-                        line = f"{selection_marker} {padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
+                        line = f"{padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
                     else:
                         # No extension - use full width (name_width + ext_width + 1 space)
                         full_name_width = name_width + ext_width + (1 if ext_width > 0 else 0)
                         if safe_get_display_width(display_name) > full_name_width:
                             display_name = truncate_to_width(display_name, full_name_width, "…")
                         padded_name = pad_to_width(display_name, full_name_width, align='left')
-                        line = f"{selection_marker} {padded_name} {size_str:>8} {mtime_str}"
+                        line = f"{padded_name} {size_str:>8} {mtime_str}"
                 else:
                     # Narrow layout without datetime
                     if extension and ext_width > 0:
@@ -2340,23 +2340,30 @@ class FileManager(UILayer):
                             basename = truncate_to_width(basename, name_width, "…")
                         padded_basename = pad_to_width(basename, name_width, align='left')
                         padded_extension = pad_to_width(extension, ext_width, align='left')
-                        line = f"{selection_marker} {padded_basename} {padded_extension} {size_str:>8}"
+                        line = f"{padded_basename} {padded_extension} {size_str:>8}"
                     else:
                         # No extension - use full width (name_width + ext_width + 1 space)
                         full_name_width = name_width + ext_width + (1 if ext_width > 0 else 0)
                         if safe_get_display_width(display_name) > full_name_width:
                             display_name = truncate_to_width(display_name, full_name_width, "…")
                         padded_name = pad_to_width(display_name, full_name_width, align='left')
-                        line = f"{selection_marker} {padded_name} {size_str:>8}"
+                        line = f"{padded_name} {size_str:>8}"
             
             try:
                 # Final truncation if needed
-                max_line_width = pane_width - 2
+                max_line_width = pane_width - 3  # Account for marker (1) + space (1) + content
                 if safe_get_display_width(line) > max_line_width:
                     line = truncate_to_width(line, max_line_width, "")
                 
+                # Draw selection marker with normal background (no focused background)
+                self.renderer.draw_text(y, start_x + 1, selection_marker, color_pair=COLOR_REGULAR_FILE, attributes=TextAttribute.NORMAL)
+                
+                # Draw separator space with normal background (no focused background)
+                self.renderer.draw_text(y, start_x + 2, " ", color_pair=COLOR_REGULAR_FILE, attributes=TextAttribute.NORMAL)
+                
+                # Draw the file content with focused background if applicable
                 color_pair, attributes = color
-                self.renderer.draw_text(y, start_x + 1, line, color_pair=color_pair, attributes=attributes)
+                self.renderer.draw_text(y, start_x + 3, line, color_pair=color_pair, attributes=attributes)
             except Exception:
                 pass  # Ignore if we can't write to screen edge
                 
