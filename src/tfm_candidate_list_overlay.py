@@ -197,13 +197,26 @@ class CandidateListOverlay:
                 candidate_color = color_pair
                 candidate_attrs = attributes
             
-            # Draw candidate line with borders
-            # If scrollbar is shown, add space for it before the right border
+            # Draw left border with normal color (no focused background)
+            self._safe_draw_text(candidate_y, overlay_x, self.border_char, color_pair, attributes)
+            
+            # Draw left padding with normal color (no focused background)
+            self._safe_draw_text(candidate_y, overlay_x + 1, " ", color_pair, attributes)
+            
+            # Draw candidate text with focused background if applicable
+            self._safe_draw_text(candidate_y, overlay_x + 2, candidate + padding, candidate_color, candidate_attrs)
+            
+            # Draw right padding with normal color (no focused background)
             if show_scrollbar:
-                line = f"{self.border_char} {candidate}{padding}  {self.border_char}"
+                # Extra space for scrollbar
+                self._safe_draw_text(candidate_y, overlay_x + 2 + available_width, "  ", color_pair, attributes)
+                # Right border after scrollbar space
+                self._safe_draw_text(candidate_y, overlay_x + overlay_width - 1, self.border_char, color_pair, attributes)
             else:
-                line = f"{self.border_char} {candidate}{padding} {self.border_char}"
-            self._safe_draw_text(candidate_y, overlay_x, line, candidate_color, candidate_attrs)
+                # Single space padding
+                self._safe_draw_text(candidate_y, overlay_x + 2 + available_width, " ", color_pair, attributes)
+                # Right border
+                self._safe_draw_text(candidate_y, overlay_x + overlay_width - 1, self.border_char, color_pair, attributes)
         
         # Draw scrollbar if needed (inside the right border)
         if show_scrollbar:
