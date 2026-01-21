@@ -8,12 +8,12 @@
       .label { font: 16px sans-serif; fill: #ecf0f1; }
       .small-label { font: 14px sans-serif; fill: #bdc3c7; }
       
-      .app-layer { fill: #3498db; stroke: #2980b9; stroke-width: 3; }
-      .manager-layer { fill: #e74c3c; stroke: #c0392b; stroke-width: 3; }
-      .ui-layer { fill: #2ecc71; stroke: #27ae60; stroke-width: 3; }
-      .storage-layer { fill: #f39c12; stroke: #d68910; stroke-width: 3; }
-      .ttk-layer { fill: #9b59b6; stroke: #8e44ad; stroke-width: 3; }
-      .backend-layer { fill: #1abc9c; stroke: #16a085; stroke-width: 3; }
+      .app-layer { fill: #1a5490; stroke: #154070; stroke-width: 3; }
+      .manager-layer { fill: #8b2e24; stroke: #6b1e14; stroke-width: 3; }
+      .ui-layer { fill: #1e7e34; stroke: #165a28; stroke-width: 3; }
+      .storage-layer { fill: #9a6308; stroke: #7a4d06; stroke-width: 3; }
+      .ttk-layer { fill: #5e2d70; stroke: #4a2358; stroke-width: 3; }
+      .backend-layer { fill: #0e7c66; stroke: #0a5c4a; stroke-width: 3; }
       
       .arrow { stroke: #7fb3d5; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
       .data-flow { stroke: #95a5a6; stroke-width: 2; fill: none; stroke-dasharray: 8,4; }
@@ -46,42 +46,42 @@
     
     <!-- Manager boxes -->
     <g transform="translate(40, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#c0392b" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#6b1e14" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">PaneManager</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">Dual pane navigation</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">Cursor history</text>
     </g>
     
     <g transform="translate(290, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#c0392b" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#6b1e14" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">FileOperations</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">Copy • Move • Delete</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">Threading • Progress</text>
     </g>
     
     <g transform="translate(540, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#c0392b" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#6b1e14" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">LogManager</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">Unified logging</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">Remote monitoring</text>
     </g>
     
     <g transform="translate(790, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#c0392b" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#6b1e14" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">StateManager</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">Persistence</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">History • Config</text>
     </g>
     
     <g transform="translate(1040, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#c0392b" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#6b1e14" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">ProgressManager</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">Progress tracking</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">Cancellation</text>
     </g>
     
     <g transform="translate(1290, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#c0392b" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#6b1e14" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">MenuManager</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">Desktop menus</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">Menu state</text>
@@ -95,21 +95,21 @@
     
     <!-- UI component groups -->
     <g transform="translate(40, 55)">
-      <rect x="0" y="0" width="320" height="65" fill="#27ae60" rx="5"/>
+      <rect x="0" y="0" width="320" height="65" fill="#165a28" rx="5"/>
       <text x="160" y="25" text-anchor="middle" class="label">Viewer Classes</text>
       <text x="160" y="45" text-anchor="middle" class="small-label">TextViewer • DiffViewer</text>
       <text x="160" y="60" text-anchor="middle" class="small-label">DirectoryDiffViewer</text>
     </g>
     
     <g transform="translate(380, 55)">
-      <rect x="0" y="0" width="320" height="65" fill="#27ae60" rx="5"/>
+      <rect x="0" y="0" width="320" height="65" fill="#165a28" rx="5"/>
       <text x="160" y="25" text-anchor="middle" class="label">Dialog Classes</text>
       <text x="160" y="45" text-anchor="middle" class="small-label">ListDialog • SearchDialog</text>
       <text x="160" y="60" text-anchor="middle" class="small-label">InfoDialog • BatchRename</text>
     </g>
     
     <g transform="translate(720, 55)">
-      <rect x="0" y="0" width="320" height="65" fill="#27ae60" rx="5"/>
+      <rect x="0" y="0" width="320" height="65" fill="#165a28" rx="5"/>
       <text x="160" y="25" text-anchor="middle" class="label">Input Components</text>
       <text x="160" y="45" text-anchor="middle" class="small-label">QuickChoiceBar</text>
       <text x="160" y="60" text-anchor="middle" class="small-label">QuickEditBar</text>
@@ -133,7 +133,7 @@
     
     <!-- Path interface -->
     <g transform="translate(40, 55)">
-      <rect x="0" y="0" width="480" height="65" fill="#d68910" rx="5"/>
+      <rect x="0" y="0" width="480" height="65" fill="#7a4d06" rx="5"/>
       <text x="240" y="25" text-anchor="middle" class="label">Path (Polymorphic Interface)</text>
       <text x="240" y="45" text-anchor="middle" class="small-label">Unified API for all storage types</text>
       <text x="240" y="60" text-anchor="middle" class="small-label">Storage-agnostic operations</text>
@@ -141,28 +141,28 @@
     
     <!-- Storage implementations -->
     <g transform="translate(560, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#d68910" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#7a4d06" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">LocalPathImpl</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">Local filesystem</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">pathlib wrapper</text>
     </g>
     
     <g transform="translate(810, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#d68910" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#7a4d06" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">SSHPathImpl</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">SFTP protocol</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">Connection pooling</text>
     </g>
     
     <g transform="translate(1060, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#d68910" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#7a4d06" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">S3PathImpl</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">AWS S3 buckets</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">Virtual directories</text>
     </g>
     
     <g transform="translate(1310, 55)">
-      <rect x="0" y="0" width="230" height="65" fill="#d68910" rx="5"/>
+      <rect x="0" y="0" width="230" height="65" fill="#7a4d06" rx="5"/>
       <text x="115" y="25" text-anchor="middle" class="label">ArchivePathImpl</text>
       <text x="115" y="45" text-anchor="middle" class="small-label">ZIP • TAR • GZ</text>
       <text x="115" y="60" text-anchor="middle" class="small-label">Virtual browsing</text>
@@ -175,21 +175,21 @@
     <text x="550" y="35" text-anchor="middle" class="subtitle">TTK Framework (Terminal Toolkit)</text>
     
     <g transform="translate(40, 55)">
-      <rect x="0" y="0" width="320" height="65" fill="#8e44ad" rx="5"/>
+      <rect x="0" y="0" width="320" height="65" fill="#4a2358" rx="5"/>
       <text x="160" y="25" text-anchor="middle" class="label">Event System</text>
       <text x="160" y="45" text-anchor="middle" class="small-label">KeyEvent • MouseEvent</text>
       <text x="160" y="60" text-anchor="middle" class="small-label">SystemEvent • MenuEvent</text>
     </g>
     
     <g transform="translate(380, 55)">
-      <rect x="0" y="0" width="320" height="65" fill="#8e44ad" rx="5"/>
+      <rect x="0" y="0" width="320" height="65" fill="#4a2358" rx="5"/>
       <text x="160" y="25" text-anchor="middle" class="label">Text Utilities</text>
       <text x="160" y="45" text-anchor="middle" class="small-label">Wide char support</text>
       <text x="160" y="60" text-anchor="middle" class="small-label">Text layout engine</text>
     </g>
     
     <g transform="translate(720, 55)">
-      <rect x="0" y="0" width="320" height="65" fill="#8e44ad" rx="5"/>
+      <rect x="0" y="0" width="320" height="65" fill="#4a2358" rx="5"/>
       <text x="160" y="25" text-anchor="middle" class="label">Rendering Abstractions</text>
       <text x="160" y="45" text-anchor="middle" class="small-label">Backend-agnostic API</text>
       <text x="160" y="60" text-anchor="middle" class="small-label">Color • Attributes</text>
@@ -202,13 +202,13 @@
     <text x="225" y="35" text-anchor="middle" class="subtitle">Backend Implementations</text>
     
     <g transform="translate(40, 55)">
-      <rect x="0" y="0" width="170" height="65" fill="#16a085" rx="5"/>
+      <rect x="0" y="0" width="170" height="65" fill="#0a5c4a" rx="5"/>
       <text x="85" y="30" text-anchor="middle" class="label">Curses</text>
       <text x="85" y="50" text-anchor="middle" class="small-label">Terminal mode</text>
     </g>
     
     <g transform="translate(230, 55)">
-      <rect x="0" y="0" width="170" height="65" fill="#16a085" rx="5"/>
+      <rect x="0" y="0" width="170" height="65" fill="#0a5c4a" rx="5"/>
       <text x="85" y="30" text-anchor="middle" class="label">CoreGraphics</text>
       <text x="85" y="50" text-anchor="middle" class="small-label">Desktop mode</text>
     </g>
