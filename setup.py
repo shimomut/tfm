@@ -41,6 +41,9 @@ setup(
         ],
     },
     install_requires=requirements,
+    extras_require={
+        'macos': ['pyobjc'],  # For macOS desktop mode
+    },
     python_requires=">=3.9",
     classifiers=[
         "Development Status :: 4 - Beta",

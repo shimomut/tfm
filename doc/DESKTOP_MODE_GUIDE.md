@@ -8,12 +8,31 @@ TFM can run as a native macOS desktop application with GPU acceleration, providi
 
 ### Installation
 
+**Option 1: Direct installation**
 ```bash
 # Install PyObjC (one-time setup)
-pip install pyobjc-framework-Cocoa
+pip install pyobjc
 
 # Run in desktop mode
 python3 tfm.py --desktop
+```
+
+**Option 2: Install with extras**
+```bash
+# Install TFM with macOS desktop mode support
+pip install -e .[macos]
+
+# Run in desktop mode
+python3 tfm.py --desktop
+```
+
+**Option 3: From PyPI (when published)**
+```bash
+# Install with macOS support
+pip install tfm[macos]
+
+# Run in desktop mode
+tfm --desktop
 ```
 
 ### First Launch
@@ -189,7 +208,11 @@ See the [User Guide](TFM_USER_GUIDE.md) for complete keyboard reference and [Fon
 
 2. Install PyObjC:
    ```bash
-   pip install pyobjc-framework-Cocoa
+   # Option 1: Direct installation
+   pip install pyobjc
+   
+   # Option 2: Install with extras
+   pip install -e .[macos]
    ```
 
 3. Verify installation:

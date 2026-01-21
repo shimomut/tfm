@@ -46,17 +46,22 @@ This application was developed using [Kiro](https://kiro.dev/) heavily - an AI-p
    git clone https://github.com/shimomut/tfm.git
    cd tfm
    ```
-3. Run the file manager:
+3. Install dependencies:
    
    **Terminal Mode** (all platforms):
    ```bash
+   pip install -r requirements.txt
    python3 tfm.py
    ```
    
    **Desktop Mode** (macOS only):
    ```bash
-   # Install PyObjC for desktop mode
-   pip install pyobjc-framework-Cocoa
+   # Install base dependencies plus PyObjC
+   pip install -r requirements.txt
+   pip install pyobjc
+   
+   # Or install with the macos extra
+   pip install -e .[macos]
    
    # Run as native desktop application
    python3 tfm.py --desktop
@@ -239,23 +244,40 @@ See the [User Guide](doc/TFM_USER_GUIDE.md#desktop-mode-macos) for detailed desk
 **Desktop Mode** (macOS only):
 - Python 3.9+ (3.13 supported)
 - macOS 10.13 (High Sierra) or later
-- PyObjC framework: `pip install pyobjc-framework-Cocoa`
+- PyObjC framework (see installation below)
 
-### Optional Dependencies
+### Dependencies
+
+**Base dependencies** (installed via `requirements.txt`):
 ```bash
 pip install pygments  # Enhanced syntax highlighting (20+ file formats)
 pip install boto3     # AWS S3 support (cloud storage operations)
-pip install pyobjc-framework-Cocoa  # Desktop mode (macOS only)
+```
+
+**macOS Desktop Mode** (optional):
+```bash
+# Option 1: Install pyobjc directly
+pip install pyobjc
+
+# Option 2: Install with the macos extra
+pip install -e .[macos]
+
+# Option 3: Install from PyPI with macos extra (when published)
+pip install tfm[macos]
 ```
 
 ### Installation Options
 
 #### Option 1: Run Directly (No Installation)
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
 # Terminal mode (all platforms)
 python3 tfm.py
 
-# Desktop mode (macOS only)
+# Desktop mode (macOS only - requires pyobjc)
+pip install pyobjc
 python3 tfm.py --desktop
 ```
 
@@ -263,18 +285,28 @@ python3 tfm.py --desktop
 ```bash
 # Install from source directory
 cd tfm
-python3 setup.py install
+
+# Terminal mode only
+pip install .
+
+# With macOS desktop mode support
+pip install .[macos]
 
 # Run from anywhere
 tfm                # Terminal mode
-tfm --desktop      # Desktop mode (macOS only)
+tfm --desktop      # Desktop mode (macOS only, if installed with [macos])
 ```
 
 #### Option 3: Development Installation
 ```bash
 # Install in editable mode (changes reflected immediately)
 cd tfm
+
+# Terminal mode only
 pip install -e .
+
+# With macOS desktop mode support
+pip install -e .[macos]
 
 # Run from anywhere
 tfm
@@ -326,12 +358,13 @@ The log client provides color-coded output for different log sources and handles
 **Installation Issues:**
 - Ensure Python 3.9+ is installed
 - Check terminal compatibility with curses library (terminal mode)
-- Install PyObjC for desktop mode: `pip install pyobjc-framework-Cocoa`
+- Install PyObjC for desktop mode: `pip install pyobjc` or `pip install .[macos]`
 
 **Desktop Mode Issues:**
 - Desktop mode only works on macOS
 - If PyObjC is missing, TFM automatically falls back to terminal mode
 - Check console output for backend initialization messages
+- See [Desktop Mode Guide](doc/DESKTOP_MODE_GUIDE.md) for detailed setup
 
 **Performance Issues:**
 - Install `pygments` for better text viewer performance

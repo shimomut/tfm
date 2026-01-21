@@ -2,7 +2,7 @@
 # Python 3.9+ required for modern language features and security
 # Optional: pygments for syntax highlighting (will fallback gracefully if not available)
 # boto3 for AWS S3 support
+# pyobjc for macOS desktop mode (install with: pip install tfm[macos])
 
-pyobjc
 pygments
 boto3
