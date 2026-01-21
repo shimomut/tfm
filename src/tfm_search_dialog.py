@@ -64,7 +64,7 @@ class SearchThread(threading.Thread):
 class SearchDialog(UILayer, BaseListDialog):
     """Search dialog component for filename and content search with threading support"""
     
-    def __init__(self, config, renderer=None):
+    def __init__(self, config, renderer=None, file_list_manager=None):
         super().__init__(config, renderer)
         
         # Search dialog specific state
@@ -74,6 +74,7 @@ class SearchDialog(UILayer, BaseListDialog):
         self.search_root = None  # Root directory for search
         self._selected_result = None  # Selected result when dialog closes
         self.callback = None  # Callback function when result is selected
+        self.file_list_manager = file_list_manager  # For accessing show_hidden setting
         
         # Threading support
         self.search_thread = None  # Current SearchThread instance
@@ -211,6 +212,14 @@ class SearchDialog(UILayer, BaseListDialog):
                     if len(temp_results) >= self.max_search_results:
                         break
                     
+                    # Filter hidden files if show_hidden is False
+                    if self.file_list_manager and not self.file_list_manager.show_hidden:
+                        # Check if any component of the path is hidden
+                        relative_path = file_path.relative_to(search_root)
+                        path_parts = str(relative_path).split('/')
+                        if any(part.startswith('.') for part in path_parts):
+                            continue  # Skip hidden files and files in hidden directories
+                    
                     if fnmatch.fnmatch(file_path.name.lower(), pattern_text.lower()):
                         relative_path = file_path.relative_to(search_root)
                         display_path = str(relative_path)
@@ -246,6 +255,14 @@ class SearchDialog(UILayer, BaseListDialog):
                     # Check result limit
                     if len(temp_results) >= self.max_search_results:
                         break
+                    
+                    # Filter hidden files if show_hidden is False
+                    if self.file_list_manager and not self.file_list_manager.show_hidden:
+                        # Check if any component of the path is hidden
+                        relative_path = file_path.relative_to(search_root)
+                        path_parts = str(relative_path).split('/')
+                        if any(part.startswith('.') for part in path_parts):
+                            continue  # Skip hidden files and files in hidden directories
                     
                     if file_path.is_file() and self._is_text_file(file_path):
                         try:

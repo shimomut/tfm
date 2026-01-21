@@ -327,7 +327,7 @@ class FileManager(UILayer):
         self.list_dialog = ListDialog(self.config, renderer)
         self.info_dialog = InfoDialog(self.config, renderer)
         self.about_dialog = AboutDialog(self.config, renderer)
-        self.search_dialog = SearchDialog(self.config, renderer)
+        self.search_dialog = SearchDialog(self.config, renderer, self.file_list_manager)
         self.drives_dialog = DrivesDialog(self.config, renderer)
         self.batch_rename_dialog = BatchRenameDialog(self.config, renderer)
         self.quick_choice_bar = QuickChoiceBar(self.config, renderer)
