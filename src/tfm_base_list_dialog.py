@@ -352,19 +352,27 @@ class BaseListDialog:
                 if get_width(item_text) > available_width:
                     item_text = truncate_text(item_text, available_width, "…")
                 
-                # Add selection indicator
+                # Determine selection indicator and attributes
                 status_color_pair, _ = get_status_color()
                 if is_selected:
-                    display_text = f"► {item_text}"
+                    indicator_text = "► "
                     item_attributes = TextAttribute.BOLD | TextAttribute.REVERSE
                 else:
-                    display_text = f"  {item_text}"
+                    indicator_text = "  "
                     item_attributes = TextAttribute.NORMAL
                 
+                # Draw selection indicator separately with normal attributes (no REVERSE)
+                self.renderer.draw_text(y, start_x, indicator_text, 
+                                      color_pair=status_color_pair, 
+                                      attributes=TextAttribute.NORMAL)
+                
+                # Draw item text with selection attributes if selected
                 # Ensure text fits using display width
-                if get_width(display_text) > content_width:
-                    display_text = truncate_text(display_text, content_width, "")
-                self.renderer.draw_text(y, start_x, display_text, color_pair=status_color_pair, attributes=item_attributes)
+                if get_width(item_text) > available_width:
+                    item_text = truncate_text(item_text, available_width, "")
+                self.renderer.draw_text(y, start_x + 2, item_text, 
+                                      color_pair=status_color_pair, 
+                                      attributes=item_attributes)
     
     def draw_list_items_with_segments(self, items_list, start_y, end_y, start_x, content_width, format_item_func):
         """Draw list items with selection highlighting using text layout segments
@@ -407,31 +415,30 @@ class BaseListDialog:
                 # Get segments from format function
                 segments = format_item_func(item)
                 
-                # Determine default attributes based on selection
+                # Determine attributes for content based on selection
                 if is_selected:
                     indicator_text = "► "
-                    default_attributes = TextAttribute.BOLD | TextAttribute.REVERSE
+                    content_attributes = TextAttribute.BOLD | TextAttribute.REVERSE
                 else:
                     indicator_text = "  "
-                    default_attributes = TextAttribute.NORMAL
+                    content_attributes = TextAttribute.NORMAL
                 
-                # Add selection indicator as first segment
-                # Use AsIsSegment without explicit attributes to let defaults apply
-                indicator_segment = AsIsSegment(indicator_text)
+                # Draw selection indicator separately with normal attributes (no REVERSE)
+                # This ensures the indicator area doesn't get the focused background
+                self.renderer.draw_text(y, start_x, indicator_text, 
+                                      color_pair=status_color_pair, 
+                                      attributes=TextAttribute.NORMAL)
                 
-                # Combine indicator with item segments
-                all_segments = [indicator_segment] + segments
-                
-                # Use text layout system to render with default attributes
+                # Draw item content with selection attributes if selected
                 # Segments without explicit color/attributes will use these defaults
                 draw_text_segments(
                     self.renderer,
                     row=y,
-                    col=start_x,
-                    segments=all_segments,
-                    rendering_width=content_width,
+                    col=start_x + 2,  # Start after indicator (2 chars)
+                    segments=segments,
+                    rendering_width=content_width - 2,  # Reduce width by indicator size
                     default_color=status_color_pair,
-                    default_attributes=default_attributes
+                    default_attributes=content_attributes
                 )
                 
     def draw_scrollbar(self, items_list, start_y, content_height, scrollbar_x):
