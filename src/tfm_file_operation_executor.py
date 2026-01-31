@@ -41,8 +41,7 @@ class FileOperationExecutor:
     in background threads with fine-grained progress tracking and error handling.
     
     The executor runs operations in background threads to keep the UI responsive,
-    uses progress_manager for tracking, and supports cancellation via the
-    operation_cancelled flag.
+    uses progress_manager for tracking, and supports cancellation via task.is_cancelled().
     
     Architecture:
         FileOperationExecutor is created by FileManager and used by FileOperationTask
@@ -51,7 +50,7 @@ class FileOperationExecutor:
     
     Threading:
         All operations run in background threads (daemon=True) to avoid blocking
-        the UI. The executor uses operation_cancelled flag for cancellation.
+        the UI. The executor checks task.is_cancelled() for cancellation support.
     
     Progress Tracking:
         Uses progress_manager to track operation progress with fine-grained updates
@@ -73,8 +72,22 @@ class FileOperationExecutor:
         self.progress_manager = file_manager.progress_manager
         self.cache_manager = file_manager.cache_manager
         self.logger = getLogger("FileOp")
+        self.task = None  # Track current task for cancellation checking
+    
+    def _is_cancelled(self) -> bool:
+        """Check if current operation has been cancelled.
+        
+        Returns:
+            True if operation cancelled, False otherwise
+        
+        Checks task cancellation if task is set. If no task is set, returns False
+        (assumes operation is not cancelled).
+        """
+        if self.task:
+            return self.task.is_cancelled()
+        return False
 
-    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, completion_callback=None, continue_progress=False):
+    def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, completion_callback=None, continue_progress=False, task=None):
         """Perform the actual copy operation with fine-grained progress tracking in a background thread
         
         This method runs the copy operation in a background thread with progress tracking
@@ -88,10 +101,11 @@ class FileOperationExecutor:
                                 Receives (copied_count, error_count) as arguments.
                                 If provided, suppresses the default summary logging.
             continue_progress: If True, continue existing progress operation instead of starting new one
+            task: Optional BaseTask instance for cancellation checking (new API)
         
         Threading:
             - Runs in background thread to keep UI responsive
-            - Uses operation_cancelled flag for cancellation
+            - Uses task.is_cancelled() for cancellation if task provided
             - Updates progress via progress_manager
             - Triggers UI refresh via mark_dirty()
         
@@ -103,7 +117,9 @@ class FileOperationExecutor:
         """
         # Reset cancellation flag (only if not continuing)
         if not continue_progress:
-            self.file_manager.operation_cancelled = False
+            self.task = task  # Store task for cancellation checking
+            if task:
+                task._cancelled = False
             
             # Show "Preparing..." message immediately
             self.progress_manager.start_operation(
@@ -162,7 +178,7 @@ class FileOperationExecutor:
             try:
                 for source_file in files_to_copy:
                     # Check for cancellation
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         self.logger.info("Copy operation cancelled by user")
                         break
                     
@@ -256,7 +272,7 @@ class FileOperationExecutor:
             
             # Print completion message (unless callback will handle it)
             if not completion_callback:
-                if self.file_manager.operation_cancelled:
+                if self._is_cancelled():
                     self.logger.info(f"Copy cancelled: {copied_count} items copied before cancellation")
                 elif error_count > 0:
                     self.logger.warning(f"Copy completed: {copied_count} items copied, {error_count} errors")
@@ -273,7 +289,7 @@ class FileOperationExecutor:
         thread = threading.Thread(target=copy_thread, daemon=True)
         thread.start()
 
-    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, completion_callback=None, continue_progress=False):
+    def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, completion_callback=None, continue_progress=False, task=None):
         """Perform the actual move operation with fine-grained progress tracking in a background thread
         
         This method runs the move operation in a background thread with progress tracking
@@ -287,10 +303,11 @@ class FileOperationExecutor:
                                 Receives (moved_count, error_count) as arguments.
                                 If provided, suppresses the default summary logging.
             continue_progress: If True, continue existing progress operation instead of starting new one
+            task: Optional BaseTask instance for cancellation checking (new API)
         
         Threading:
             - Runs in background thread to keep UI responsive
-            - Uses operation_cancelled flag for cancellation
+            - Uses task.is_cancelled() for cancellation if task provided
             - Updates progress via progress_manager
             - Triggers UI refresh via mark_dirty()
         
@@ -307,7 +324,9 @@ class FileOperationExecutor:
         """
         # Reset cancellation flag (only if not continuing)
         if not continue_progress:
-            self.file_manager.operation_cancelled = False
+            self.task = task  # Store task for cancellation checking
+            if task:
+                task._cancelled = False
             
             # Show "Preparing..." message immediately
             self.progress_manager.start_operation(
@@ -366,7 +385,7 @@ class FileOperationExecutor:
             try:
                 for source_file in files_to_move:
                     # Check for cancellation
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         self.logger.info("Move operation cancelled by user")
                         break
                     
@@ -481,7 +500,7 @@ class FileOperationExecutor:
                 
                 # Print completion message (unless callback will handle it)
                 if not completion_callback:
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         self.logger.info(f"Move cancelled: {moved_count} items moved before cancellation")
                     elif error_count > 0:
                         self.logger.warning(f"Move completed: {moved_count} items moved, {error_count} errors")
@@ -498,7 +517,7 @@ class FileOperationExecutor:
         thread = threading.Thread(target=move_thread, daemon=True)
         thread.start()
 
-    def perform_delete_operation(self, files_to_delete, completion_callback=None):
+    def perform_delete_operation(self, files_to_delete, completion_callback=None, task=None):
         """Perform the actual delete operation with fine-grained progress tracking in a background thread
         
         This method runs the delete operation in a background thread with progress tracking
@@ -509,10 +528,11 @@ class FileOperationExecutor:
             completion_callback: Optional callback function called when operation completes.
                                 Receives (deleted_count, error_count) as arguments.
                                 If provided, suppresses the default summary logging.
+            task: Optional BaseTask instance for cancellation checking (new API)
         
         Threading:
             - Runs in background thread to keep UI responsive
-            - Uses operation_cancelled flag for cancellation
+            - Uses task.is_cancelled() for cancellation if task provided
             - Updates progress via progress_manager
             - Triggers UI refresh via mark_dirty()
         
@@ -523,7 +543,9 @@ class FileOperationExecutor:
             - Shows completion summary
         """
         # Reset cancellation flag
-        self.file_manager.operation_cancelled = False
+        self.task = task  # Store task for cancellation checking
+        if task:
+            task._cancelled = False
         
         # Start operation without description
         self.progress_manager.start_operation(
@@ -560,7 +582,7 @@ class FileOperationExecutor:
             try:
                 for file_path in files_to_delete:
                     # Check for cancellation
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         self.logger.info("Delete operation cancelled by user")
                         break
                     
@@ -641,7 +663,7 @@ class FileOperationExecutor:
                 
                 # Print completion message (unless callback will handle it)
                 if not completion_callback:
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         self.logger.info(f"Delete cancelled: {deleted_count} files deleted before cancellation")
                     elif error_count > 0:
                         self.logger.warning(f"Delete completed: {deleted_count} files deleted, {error_count} errors")
@@ -786,7 +808,7 @@ class FileOperationExecutor:
             try:
                 while True:
                     # Check for cancellation
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         # Close files and remove partial copy
                         dst.close()
                         src.close()
@@ -826,7 +848,7 @@ class FileOperationExecutor:
                 # For archive paths, use rglob to iterate through all files
                 for item in source_dir.rglob('*'):
                     # Check for cancellation
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         return processed_files
                     
                     if item.is_file():
@@ -852,7 +874,7 @@ class FileOperationExecutor:
             # For non-archive paths, use os.walk
             for root, dirs, files in os.walk(source_dir):
                 # Check for cancellation
-                if self.file_manager.operation_cancelled:
+                if self._is_cancelled():
                     return processed_files
                 
                 root_path = Path(root)
@@ -867,7 +889,7 @@ class FileOperationExecutor:
                 # Copy files in current directory
                 for file_name in files:
                     # Check for cancellation
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         return processed_files
                     
                     source_file = root_path / file_name
@@ -922,7 +944,7 @@ class FileOperationExecutor:
             # Get all files in the source directory recursively
             for item in source_dir.rglob('*'):
                 # Check for cancellation
-                if self.file_manager.operation_cancelled:
+                if self._is_cancelled():
                     return processed_files
                 
                 if item.is_file():
@@ -954,7 +976,7 @@ class FileOperationExecutor:
         """Move directory using copy + delete with fine-grained progress updates"""
         try:
             # Check for cancellation
-            if self.file_manager.operation_cancelled:
+            if self._is_cancelled():
                 return processed_files
             
             if is_cross_storage:
@@ -1008,7 +1030,7 @@ class FileOperationExecutor:
             # Walk through directory and delete files one by one (bottom-up for safety)
             for root, dirs, files in os.walk(dir_path, topdown=False):
                 # Check for cancellation
-                if self.file_manager.operation_cancelled:
+                if self._is_cancelled():
                     return processed_files
                 
                 root_path = Path(root)
@@ -1016,7 +1038,7 @@ class FileOperationExecutor:
                 # Delete files in current directory
                 for file_name in files:
                     # Check for cancellation
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         return processed_files
                     file_path = root_path / file_name
                     processed_files += 1
@@ -1100,12 +1122,12 @@ class FileOperationExecutor:
             
             for page in page_iterator:
                 # Check for cancellation
-                if self.file_manager.operation_cancelled:
+                if self._is_cancelled():
                     return processed_files
                 
                 for obj in page.get('Contents', []):
                     # Check for cancellation
-                    if self.file_manager.operation_cancelled:
+                    if self._is_cancelled():
                         return processed_files
                     
                     processed_files += 1

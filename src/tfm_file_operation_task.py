@@ -99,7 +99,7 @@ class FileOperationTask(BaseTask):
         - State machine logic → FileOperationTask (this class)
     
     Example usage:
-        task = FileOperationTask(file_manager, file_operations_ui, executor)
+        task = FileOperationTask(file_manager, ui, executor)
         task.start_operation('copy', files, destination)
         file_manager.start_task(task)
     """
@@ -111,12 +111,11 @@ class FileOperationTask(BaseTask):
             file_manager: Reference to FileManager for task management
             ui: Reference to FileOperationUI for UI interactions
             executor: Reference to FileOperationExecutor for I/O operations
-                     (optional for backward compatibility during migration)
+                     (optional, primarily for testing state machine without I/O)
         """
         super().__init__(file_manager, logger_name="FileOp")
         self.ui = ui
         self.executor = executor
-        self.file_operations_ui = ui  # Keep for backward compatibility during migration
         self.state = State.IDLE
         self.context: Optional[OperationContext] = None
     
@@ -136,6 +135,7 @@ class FileOperationTask(BaseTask):
         and notifies FileManager that the task is complete.
         """
         if self.is_active():
+            self.request_cancellation()
             self._transition_to_state(State.IDLE)
             self.context = None
             self.logger.info("Task cancelled")
@@ -191,7 +191,7 @@ class FileOperationTask(BaseTask):
         
         # Check if confirmation is required based on configuration
         config_attr = f'CONFIRM_{operation_type.upper()}'
-        confirm_required = getattr(self.file_operations_ui.config, config_attr, True)
+        confirm_required = getattr(self.ui.config, config_attr, True)
         
         if confirm_required:
             # Transition to CONFIRMING state and show confirmation dialog
@@ -694,8 +694,15 @@ class FileOperationTask(BaseTask):
         """
         import threading
         
-        # Set operation cancelled flag
-        self.file_manager.operation_cancelled = False
+        # Check if executor is available
+        if not self.executor:
+            self.logger.error("Cannot execute copy operation: no executor available")
+            self._transition_to_state(State.COMPLETED)
+            self._complete_operation()
+            return
+        
+        # Reset cancellation flag
+        self._cancelled = False
         
         self.logger.info(f"Starting copy operation with {len(files_to_copy)} files")
         
@@ -716,9 +723,6 @@ class FileOperationTask(BaseTask):
                 if files_to_copy:
                     destination_dir = files_to_copy[0][1].parent
                     
-                    # Use executor if available, otherwise fall back to file_operations_ui
-                    operation_handler = self.executor if self.executor else self.file_operations_ui
-                    
                     # Track pending batches to know when all operations are complete
                     pending_batches = 0
                     if files_no_overwrite:
@@ -732,22 +736,24 @@ class FileOperationTask(BaseTask):
                     
                     # Copy files without overwrite first
                     if files_no_overwrite:
-                        operation_handler.perform_copy_operation(
+                        self.executor.perform_copy_operation(
                             files_no_overwrite,
                             destination_dir,
                             overwrite=False,
                             completion_callback=self._on_copy_complete,
-                            continue_progress=False  # Start new progress
+                            continue_progress=False,  # Start new progress
+                            task=self
                         )
                     
                     # Copy files with overwrite, continuing the same progress operation
                     if files_with_overwrite:
-                        operation_handler.perform_copy_operation(
+                        self.executor.perform_copy_operation(
                             files_with_overwrite,
                             destination_dir,
                             overwrite=True,
                             completion_callback=self._on_copy_complete,
-                            continue_progress=True  # Continue existing progress
+                            continue_progress=True,  # Continue existing progress
+                            task=self
                         )
                 else:
                     # No files to copy, complete immediately
@@ -801,8 +807,15 @@ class FileOperationTask(BaseTask):
         """
         import threading
         
-        # Set operation cancelled flag
-        self.file_manager.operation_cancelled = False
+        # Check if executor is available
+        if not self.executor:
+            self.logger.error("Cannot execute move operation: no executor available")
+            self._transition_to_state(State.COMPLETED)
+            self._complete_operation()
+            return
+        
+        # Reset cancellation flag
+        self._cancelled = False
         
         self.logger.info(f"Starting move operation with {len(files_to_move)} files")
         
@@ -823,9 +836,6 @@ class FileOperationTask(BaseTask):
                 if files_to_move:
                     destination_dir = files_to_move[0][1].parent
                     
-                    # Use executor if available, otherwise fall back to file_operations_ui
-                    operation_handler = self.executor if self.executor else self.file_operations_ui
-                    
                     # Track pending batches to know when all operations are complete
                     pending_batches = 0
                     if files_no_overwrite:
@@ -839,22 +849,24 @@ class FileOperationTask(BaseTask):
                     
                     # Move files without overwrite first
                     if files_no_overwrite:
-                        operation_handler.perform_move_operation(
+                        self.executor.perform_move_operation(
                             files_no_overwrite,
                             destination_dir,
                             overwrite=False,
                             completion_callback=self._on_move_complete,
-                            continue_progress=False  # Start new progress
+                            continue_progress=False,  # Start new progress
+                            task=self
                         )
                     
                     # Move files with overwrite, continuing the same progress operation
                     if files_with_overwrite:
-                        operation_handler.perform_move_operation(
+                        self.executor.perform_move_operation(
                             files_with_overwrite,
                             destination_dir,
                             overwrite=True,
                             completion_callback=self._on_move_complete,
-                            continue_progress=True  # Continue existing progress
+                            continue_progress=True,  # Continue existing progress
+                            task=self
                         )
                 else:
                     # No files to move, complete immediately
@@ -905,19 +917,24 @@ class FileOperationTask(BaseTask):
         Args:
             files_to_delete: List of Path objects to delete
         """
-        # Set operation cancelled flag
-        self.file_manager.operation_cancelled = False
+        # Check if executor is available
+        if not self.executor:
+            self.logger.error("Cannot execute delete operation: no executor available")
+            self._transition_to_state(State.COMPLETED)
+            self._complete_operation()
+            return
+        
+        # Reset cancellation flag
+        self._cancelled = False
         
         self.logger.info(f"Starting delete operation with {len(files_to_delete)} files")
         
-        # Use executor if available, otherwise fall back to file_operations_ui
-        operation_handler = self.executor if self.executor else self.file_operations_ui
-        
-        # Call operation handler to perform delete operation
-        # The handler will handle threading, progress tracking, and completion
-        operation_handler.perform_delete_operation(
+        # Call executor to perform delete operation
+        # The executor will handle threading, progress tracking, and completion
+        self.executor.perform_delete_operation(
             files_to_delete,
-            completion_callback=self._on_delete_complete
+            completion_callback=self._on_delete_complete,
+            task=self
         )
     
     def _on_delete_complete(self, deleted_count, error_count):
@@ -970,7 +987,7 @@ class FileOperationTask(BaseTask):
         total_count = len(self.context.files)
         
         # Check if operation was cancelled
-        was_cancelled = self.file_manager.operation_cancelled
+        was_cancelled = self.is_cancelled()
         
         # Build summary message
         if was_cancelled:

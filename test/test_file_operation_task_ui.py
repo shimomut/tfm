@@ -42,9 +42,6 @@ class TestFileOperationTaskUIInterface(unittest.TestCase):
         
         # Verify executor is stored
         self.assertEqual(self.task.executor, self.executor)
-        
-        # Verify backward compatibility
-        self.assertEqual(self.task.file_operations_ui, self.ui)
     
     def test_confirmation_dialog_delegates_to_ui(self):
         """Test that confirmation dialog is shown via UI."""

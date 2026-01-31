@@ -61,6 +61,7 @@ class BaseTask(ABC):
         """
         self.file_manager = file_manager
         self.logger = getLogger(logger_name if logger_name else self.__class__.__name__)
+        self._cancelled = False
     
     @abstractmethod
     def start(self):
@@ -106,6 +107,23 @@ class BaseTask(ABC):
         Subclasses must implement this method to report current task state.
         """
         pass
+    
+    def is_cancelled(self) -> bool:
+        """Check if the task has been cancelled.
+        
+        Returns:
+            True if task has been cancelled, False otherwise
+        """
+        return self._cancelled
+    
+    def request_cancellation(self):
+        """Request task cancellation.
+        
+        Sets the internal cancellation flag. Subclasses should check
+        this flag periodically during execution and stop processing
+        when cancellation is requested.
+        """
+        self._cancelled = True
     
     def on_state_enter(self, state):
         """Hook called when entering a new state.

@@ -136,7 +136,7 @@ class ArchiveOperationTask(BaseTask):
         if self.is_active():
             # Set cancellation flag if operation is executing
             if self.state == State.EXECUTING:
-                self.file_manager.operation_cancelled = True
+                self.request_cancellation()
                 self.logger.info("Cancellation requested during execution")
             
             self._transition_to_state(State.IDLE)
@@ -164,7 +164,7 @@ class ArchiveOperationTask(BaseTask):
         if event.key_code == KeyCode.ESCAPE:
             if self.state == State.EXECUTING:
                 # Set cancellation flag
-                self.file_manager.operation_cancelled = True
+                self.request_cancellation()
                 self.logger.info("Operation cancellation requested by user (ESC key)")
                 return True
         
@@ -483,7 +483,7 @@ class ArchiveOperationTask(BaseTask):
             return
         
         # Set operation cancelled flag
-        self.file_manager.operation_cancelled = False
+        self._cancelled = False
         
         operation_type = self.context.operation_type
         self.logger.info(f"Executing {operation_type} operation")
@@ -518,7 +518,8 @@ class ArchiveOperationTask(BaseTask):
             self.context.source_paths,
             self.context.destination,
             self.context.format_type,
-            completion_callback=self._on_operation_complete
+            completion_callback=self._on_operation_complete,
+            task=self
         )
     
     def _execute_extract(self):
@@ -568,7 +569,8 @@ class ArchiveOperationTask(BaseTask):
             overwrite_all,
             skip_files=skip_files,
             overwrite_files=overwrite_files,
-            completion_callback=self._on_operation_complete
+            completion_callback=self._on_operation_complete,
+            task=self
         )
     
     def _on_operation_complete(self, success_count: int, error_count: int):
@@ -587,7 +589,7 @@ class ArchiveOperationTask(BaseTask):
             self.context.executor_error_count = error_count
         
         # Refresh file manager if operation was successful and not cancelled
-        if success_count > 0 and not self.file_manager.operation_cancelled:
+        if success_count > 0 and not self.is_cancelled():
             # Refresh both panes since source and destination could be in the same directory
             # For 'create': archive file appears in destination, source files may have changed
             # For 'extract': extracted files appear in destination, archive may be in source
@@ -627,7 +629,7 @@ class ArchiveOperationTask(BaseTask):
         error_count = getattr(self.context, 'executor_error_count', len(self.context.results['errors']))
         
         # Check if operation was cancelled
-        was_cancelled = self.file_manager.operation_cancelled
+        was_cancelled = self.is_cancelled()
         
         # Build summary message
         if was_cancelled:

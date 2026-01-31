@@ -369,9 +369,6 @@ class FileManager(UILayer):
         # Dialog state (now handled by quick_edit_bar)
         self.rename_file_path = None  # Still needed for rename operations
         
-        # Operation state flags
-        self.operation_cancelled = False  # Flag to signal operation cancellation
-        
         # Task management
         self.current_task: Optional[BaseTask] = None
 

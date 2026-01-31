@@ -85,6 +85,7 @@ class ArchiveOperationExecutor:
         
         # Thread tracking
         self._current_thread: Optional[threading.Thread] = None
+        self.task = None  # Task for cancellation checking
     
     def is_archive(self, path: Path) -> bool:
         """
@@ -102,7 +103,8 @@ class ArchiveOperationExecutor:
         return self._get_archive_format(path.name) is not None
     
     def perform_create_operation(self, source_paths: List[Path], archive_path: Path,
-                                format_type: str, completion_callback: Optional[Callable] = None):
+                                format_type: str, completion_callback: Optional[Callable] = None,
+                                task=None):
         """
         Create archive in background thread with progress tracking.
         
@@ -113,7 +115,11 @@ class ArchiveOperationExecutor:
             archive_path: Destination path for the archive
             format_type: Archive format ('tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'zip')
             completion_callback: Optional callback(success_count, error_count) on completion
+            task: Optional task for cancellation checking
         """
+        # Store task for cancellation checking
+        self.task = task
+        
         # Create and start background thread
         thread = threading.Thread(
             target=self._create_archive_thread,
@@ -126,7 +132,8 @@ class ArchiveOperationExecutor:
     def perform_extract_operation(self, archive_path: Path, destination_dir: Path,
                                  overwrite: bool, skip_files: List[str] = None,
                                  overwrite_files: List[str] = None,
-                                 completion_callback: Optional[Callable] = None):
+                                 completion_callback: Optional[Callable] = None,
+                                 task=None):
         """
         Extract archive in background thread with progress tracking.
         
@@ -139,7 +146,11 @@ class ArchiveOperationExecutor:
             skip_files: List of filenames to skip during extraction (optional)
             overwrite_files: List of filenames to overwrite even if overwrite=False (optional)
             completion_callback: Optional callback(success_count, error_count) on completion
+            task: Optional task for cancellation checking
         """
+        # Store task for cancellation checking
+        self.task = task
+        
         # Create and start background thread
         thread = threading.Thread(
             target=self._extract_archive_thread,
@@ -444,8 +455,11 @@ class ArchiveOperationExecutor:
         Returns:
             True if operation should continue, False if cancelled
         """
-        return not (hasattr(self.file_manager, 'operation_cancelled') and 
-                   self.file_manager.operation_cancelled)
+        # Check task cancellation if task is available
+        if self.task:
+            return not self.task.is_cancelled()
+        # No task set, assume not cancelled
+        return True
     
     def _get_adjusted_member_path(self, member_name: str, strip_prefix: Optional[str]) -> Optional[str]:
         """Get adjusted member path after stripping prefix if needed.
