@@ -138,11 +138,14 @@ class ArchiveOperationTask(BaseTask):
             if self.state == State.EXECUTING:
                 self.request_cancellation()
                 self.logger.info("Cancellation requested during execution")
-            
-            self._transition_to_state(State.IDLE)
-            self.context = None
-            self.logger.info("Task cancelled")
-            self.file_manager._clear_task()
+                # Don't clear context yet - let _complete_operation handle it
+                # when the executor finishes
+            else:
+                # For non-executing states, we can clean up immediately
+                self._transition_to_state(State.IDLE)
+                self.context = None
+                self.logger.info("Task cancelled")
+                self.file_manager._clear_task()
     
     def handle_key_event(self, event):
         """Handle key events for the task.

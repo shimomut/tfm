@@ -4469,6 +4469,21 @@ class FileManager(UILayer):
         if not isinstance(event, KeyEvent):
             return False
         
+        # Handle ESC key to cancel active task
+        if event.key_code == KeyCode.ESCAPE:
+            if self.current_task and self.current_task.is_active():
+                self.logger.info("Cancelling task...")
+                self.cancel_current_task()
+                self.mark_dirty()
+                return True
+            # ESC with no active task - not handled here
+            return False
+        
+        # Block all actions while a task is active (except ESC handled above)
+        if self.current_task and self.current_task.is_active():
+            self.logger.warning("Action blocked: task in progress (press ESC to cancel)")
+            return True
+        
         # Check if there are selected files for action matching
         has_selection = len(current_pane['selected_files']) > 0
         
