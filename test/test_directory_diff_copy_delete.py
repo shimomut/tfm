@@ -50,7 +50,15 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         self.file_list_manager = Mock()
         self.file_list_manager.show_hidden = False
         
+        # Mock file_operations_ui and its dependencies
         self.file_operations_ui = Mock()
+        self.file_manager = Mock()
+        self.executor = Mock()
+        
+        # Set up the mock chain: file_operations_ui -> file_manager -> executor
+        self.file_operations_ui.file_manager = self.file_manager
+        self.file_manager.file_operations_executor = self.executor
+        
         self.config_manager = Mock()
         
         # Mock key bindings
@@ -103,14 +111,16 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         # Call copy method
         self.viewer._copy_focused_file()
         
-        # Verify file_operations_ui.copy_files_to_directory was called
-        self.file_operations_ui.copy_files_to_directory.assert_called_once()
-        args = self.file_operations_ui.copy_files_to_directory.call_args[0]
+        # Verify executor.perform_copy_operation was called
+        self.executor.perform_copy_operation.assert_called_once()
+        args, kwargs = self.executor.perform_copy_operation.call_args
         
         # Check that the correct file and destination were passed
         self.assertEqual(len(args[0]), 1)
         self.assertEqual(args[0][0], mock_node.left_path)
         self.assertEqual(args[1], Path(self.right_dir))
+        self.assertFalse(kwargs.get('overwrite', True))  # Should default to False
+        self.assertIsNotNone(kwargs.get('completion_callback'))  # Should have callback
     
     def test_copy_file_from_right_pane(self):
         """Test copying a file from right pane to left pane."""
@@ -129,9 +139,9 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         # Call copy method
         self.viewer._copy_focused_file()
         
-        # Verify file_operations_ui.copy_files_to_directory was called
-        self.file_operations_ui.copy_files_to_directory.assert_called_once()
-        args = self.file_operations_ui.copy_files_to_directory.call_args[0]
+        # Verify executor.perform_copy_operation was called
+        self.executor.perform_copy_operation.assert_called_once()
+        args, kwargs = self.executor.perform_copy_operation.call_args
         
         # Check that the correct file and destination were passed
         self.assertEqual(len(args[0]), 1)
@@ -155,8 +165,8 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         # Call copy method
         self.viewer._copy_focused_file()
         
-        # Verify file_operations_ui.copy_files_to_directory was NOT called
-        self.file_operations_ui.copy_files_to_directory.assert_not_called()
+        # Verify executor.perform_copy_operation was NOT called
+        self.executor.perform_copy_operation.assert_not_called()
     
     def test_delete_file_from_left_pane(self):
         """Test deleting a file from left pane."""
@@ -175,13 +185,14 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         # Call delete method
         self.viewer._delete_focused_file()
         
-        # Verify file_operations_ui.delete_files was called
-        self.file_operations_ui.delete_files.assert_called_once()
-        args = self.file_operations_ui.delete_files.call_args[0]
+        # Verify executor.perform_delete_operation was called
+        self.executor.perform_delete_operation.assert_called_once()
+        args, kwargs = self.executor.perform_delete_operation.call_args
         
         # Check that the correct file was passed
         self.assertEqual(len(args[0]), 1)
         self.assertEqual(args[0][0], mock_node.left_path)
+        self.assertIsNotNone(kwargs.get('completion_callback'))  # Should have callback
     
     def test_delete_file_from_right_pane(self):
         """Test deleting a file from right pane."""
@@ -200,9 +211,9 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         # Call delete method
         self.viewer._delete_focused_file()
         
-        # Verify file_operations_ui.delete_files was called
-        self.file_operations_ui.delete_files.assert_called_once()
-        args = self.file_operations_ui.delete_files.call_args[0]
+        # Verify executor.perform_delete_operation was called
+        self.executor.perform_delete_operation.assert_called_once()
+        args, kwargs = self.executor.perform_delete_operation.call_args
         
         # Check that the correct file was passed
         self.assertEqual(len(args[0]), 1)
@@ -225,8 +236,8 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         # Call delete method
         self.viewer._delete_focused_file()
         
-        # Verify file_operations_ui.delete_files was NOT called
-        self.file_operations_ui.delete_files.assert_not_called()
+        # Verify executor.perform_delete_operation was NOT called
+        self.executor.perform_delete_operation.assert_not_called()
     
     def test_copy_keybinding_triggers_copy(self):
         """Test that pressing the copy key triggers copy operation."""
@@ -256,7 +267,7 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         self.assertTrue(result)
         
         # Verify copy was called
-        self.file_operations_ui.copy_files_to_directory.assert_called_once()
+        self.executor.perform_copy_operation.assert_called_once()
     
     def test_delete_keybinding_triggers_delete(self):
         """Test that pressing the delete key triggers delete operation."""
@@ -286,7 +297,7 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         self.assertTrue(result)
         
         # Verify delete was called
-        self.file_operations_ui.delete_files.assert_called_once()
+        self.executor.perform_delete_operation.assert_called_once()
     
     def test_copy_without_file_operations_ui(self):
         """Test that copy logs warning when file_operations_ui is not available."""

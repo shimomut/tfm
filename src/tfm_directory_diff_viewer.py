@@ -4025,10 +4025,10 @@ class DirectoryDiffViewer(UILayer):
         Copy the focused file from the active pane to the opposite pane.
         
         This method copies the file/directory that is currently focused in the
-        active pane to the opposite directory. It uses the FileOperationUI
-        instance if available.
+        active pane to the opposite directory. It uses the FileOperationExecutor
+        to perform the actual copy operation.
         """
-        # Check if file_operations_ui is available
+        # Check if file_operations_ui is available (we need it to access the executor)
         if not self.file_operations_ui:
             self.logger.warning("Cannot copy file: file_operations_ui not provided to DirectoryDiffViewer")
             return
@@ -4053,25 +4053,51 @@ class DirectoryDiffViewer(UILayer):
             self.logger.info(f"File does not exist on {self.active_pane} side")
             return
         
-        # Copy the file using FileOperationUI
+        # Copy the file using FileOperationExecutor directly
         try:
             self.logger.info(f"Copying {source_path.name} from {self.active_pane} to opposite pane")
-            self.file_operations_ui.copy_files_to_directory([source_path], dest_dir)
+            self.logger.info(f"Source: {source_path}")
+            self.logger.info(f"Destination: {dest_dir}")
             
-            # Mark dirty to update display after operation completes
-            self.mark_dirty()
+            # Get the executor from file_manager
+            executor = self.file_operations_ui.file_manager.file_operations_executor
+            self.logger.info(f"Got executor: {executor}")
+            
+            # Define completion callback to refresh the diff viewer
+            def on_copy_complete(copied_count, error_count):
+                self.logger.info(f"Copy complete callback: copied={copied_count}, errors={error_count}")
+                if copied_count > 0:
+                    self.logger.info(f"Successfully copied {copied_count} item(s)")
+                    # Trigger a rescan to update the diff view
+                    self._trigger_rescan()
+                elif error_count > 0:
+                    self.logger.error(f"Copy failed with {error_count} error(s)")
+                self.mark_dirty()
+            
+            # Perform the copy operation
+            self.logger.info("Calling executor.perform_copy_operation...")
+            executor.perform_copy_operation(
+                [source_path],
+                dest_dir,
+                overwrite=True,  # Overwrite existing files in diff viewer context
+                completion_callback=on_copy_complete
+            )
+            self.logger.info("executor.perform_copy_operation called (running in background thread)")
             
         except Exception as e:
             self.logger.error(f"Error copying file: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
     
     def _delete_focused_file(self) -> None:
         """
         Delete the focused file from the active pane.
         
         This method deletes the file/directory that is currently focused in the
-        active pane. It uses the FileOperationUI instance if available.
+        active pane. It uses the FileOperationExecutor to perform the actual
+        delete operation.
         """
-        # Check if file_operations_ui is available
+        # Check if file_operations_ui is available (we need it to access the executor)
         if not self.file_operations_ui:
             self.logger.warning("Cannot delete file: file_operations_ui not provided to DirectoryDiffViewer")
             return
@@ -4094,13 +4120,82 @@ class DirectoryDiffViewer(UILayer):
             self.logger.info(f"File does not exist on {self.active_pane} side")
             return
         
-        # Delete the file using FileOperationUI
+        # Delete the file using FileOperationExecutor directly
         try:
             self.logger.info(f"Deleting {file_path.name} from {self.active_pane} pane")
-            self.file_operations_ui.delete_files([file_path])
             
-            # Mark dirty to update display after operation completes
-            self.mark_dirty()
+            # Get the executor from file_manager
+            executor = self.file_operations_ui.file_manager.file_operations_executor
+            
+            # Define completion callback to refresh the diff viewer
+            def on_delete_complete(deleted_count, error_count):
+                if deleted_count > 0:
+                    self.logger.info(f"Successfully deleted {deleted_count} item(s)")
+                    # Trigger a rescan to update the diff view
+                    self._trigger_rescan()
+                elif error_count > 0:
+                    self.logger.error(f"Delete failed with {error_count} error(s)")
+                self.mark_dirty()
+            
+            # Perform the delete operation
+            executor.perform_delete_operation(
+                [file_path],
+                completion_callback=on_delete_complete
+            )
             
         except Exception as e:
             self.logger.error(f"Error deleting file: {e}")
+    
+    def _trigger_rescan(self) -> None:
+        """
+        Trigger a rescan of both directories to update the diff view.
+        
+        This method is called after file operations (copy/delete) to refresh
+        the directory comparison and show the updated state.
+        """
+        try:
+            # Cancel any ongoing scan
+            self.cancelled = True
+            
+            # Wait briefly for worker threads to finish
+            if self.scanner_thread and self.scanner_thread.is_alive():
+                self.scanner_thread.join(timeout=0.5)
+            if self.comparator_thread and self.comparator_thread.is_alive():
+                self.comparator_thread.join(timeout=0.5)
+            
+            # Reset state
+            self.cancelled = False
+            self.scan_in_progress = False
+            self.scan_error = None
+            self.comparison_errors.clear()
+            
+            # Clear existing data
+            with self.data_lock:
+                self.left_files.clear()
+                self.right_files.clear()
+            
+            # Clear work queues
+            with self.queue_lock:
+                # Empty the queues
+                while not self.scan_queue.empty():
+                    try:
+                        self.scan_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                while not self.priority_queue.empty():
+                    try:
+                        self.priority_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                while not self.comparison_queue.empty():
+                    try:
+                        self.comparison_queue.get_nowait()
+                    except queue.Empty:
+                        break
+            
+            # Start a new scan
+            self.start_scan()
+            self.mark_dirty()
+            
+        except Exception as e:
+            self.logger.error(f"Error triggering rescan: {e}")
