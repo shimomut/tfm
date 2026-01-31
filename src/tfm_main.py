@@ -4161,6 +4161,14 @@ class FileManager(UILayer):
     
     def handle_isearch_input(self, event):
         """Handle input while in isearch mode"""
+        # Handle CharEvent - text input for search pattern
+        if isinstance(event, CharEvent):
+            self.isearch_pattern += event.char
+            self.update_isearch_matches()
+            self.mark_dirty()
+            return True
+        
+        # Handle KeyEvent
         if event.key_code == KeyCode.ESCAPE:
             # ESC - exit isearch mode
             self.exit_isearch_mode()
@@ -4194,12 +4202,10 @@ class FileManager(UILayer):
                 self.adjust_scroll_for_focus(current_pane)
                 self.mark_dirty()
             return True
-        
-        # Handle CharEvent - text input for search pattern
-        if isinstance(event, CharEvent):
-            self.isearch_pattern += event.char
-            self.update_isearch_matches()
-            self.mark_dirty()
+        elif event.key_code in (KeyCode.LEFT, KeyCode.RIGHT, KeyCode.HOME, KeyCode.END, 
+                                KeyCode.PAGE_UP, KeyCode.PAGE_DOWN, KeyCode.TAB, 
+                                KeyCode.DELETE, KeyCode.INSERT):
+            # Ignore navigation/control keys in isearch mode
             return True
         
         # Handle KeyEvent with printable character (for backward compatibility)
