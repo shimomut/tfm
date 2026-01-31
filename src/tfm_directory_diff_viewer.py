@@ -21,12 +21,13 @@ from tfm_colors import (
     get_color_with_attrs,
     get_status_color,
     get_log_color,
-    COLOR_DIFF_ONLY_ONE_SIDE,
-    COLOR_DIFF_CHANGE,
     COLOR_DIFF_BLANK,
-    COLOR_DIFF_FOCUSED,
     COLOR_REGULAR_FILE,
+    COLOR_REGULAR_FILE_FOCUSED,
+    COLOR_REGULAR_FILE_FOCUSED_INACTIVE,
     COLOR_DIRECTORIES,
+    COLOR_DIRECTORIES_FOCUSED,
+    COLOR_DIRECTORIES_FOCUSED_INACTIVE,
     COLOR_DIFF_SEPARATOR_RED,
     COLOR_TREE_LINES,
     COLOR_ERROR
@@ -606,6 +607,9 @@ class DirectoryDiffViewer(UILayer):
         self.cursor_position = 0
         self.horizontal_offset = 0
         
+        # Pane focus state (for future copy operations)
+        self.focused_pane = 'left'  # 'left' or 'right'
+        
         # Display options
         self.show_identical = True  # Whether to show identical files
         
@@ -734,6 +738,15 @@ class DirectoryDiffViewer(UILayer):
         # Reserve space for header (1 line), divider (1 line), details pane (4 lines), and status bar (1 line)
         display_height = height - 7
         
+        # Handle Tab key to switch focused pane
+        if event.key_code == KeyCode.TAB:
+            # Toggle focused pane between left and right
+            old_pane = self.focused_pane
+            self.focused_pane = 'right' if self.focused_pane == 'left' else 'left'
+            self.logger.info(f"Switched focus from {old_pane} to {self.focused_pane} pane")
+            self.mark_dirty()
+            return True
+        
         # Handle character-based commands (only from KeyEvent)
         if event.char:
             char_lower = event.char.lower()
@@ -850,40 +863,58 @@ class DirectoryDiffViewer(UILayer):
             return True
         
         elif event.key_code == KeyCode.RIGHT:
-            # Right arrow: Expand directory or move to first child if already expanded
-            if 0 <= self.cursor_position < len(self.visible_nodes):
-                node = self.visible_nodes[self.cursor_position]
-                if node.is_directory:
-                    if not node.is_expanded:
-                        # Expand collapsed directory
-                        self.expand_node(self.cursor_position)
-                    else:
-                        # Already expanded, move to first child if it exists
-                        if node.children and self.cursor_position + 1 < len(self.visible_nodes):
-                            self.cursor_position += 1
-                            # Ensure cursor is visible
-                            self._ensure_cursor_visible(display_height)
-                            self.mark_dirty()
+            # Check for Shift modifier for tree navigation
+            if event.modifiers & ModifierKey.SHIFT:
+                # Shift+Right: Expand directory or move to first child if already expanded
+                if 0 <= self.cursor_position < len(self.visible_nodes):
+                    node = self.visible_nodes[self.cursor_position]
+                    if node.is_directory:
+                        if not node.is_expanded:
+                            # Expand collapsed directory
+                            self.expand_node(self.cursor_position)
+                        else:
+                            # Already expanded, move to first child if it exists
+                            if node.children and self.cursor_position + 1 < len(self.visible_nodes):
+                                self.cursor_position += 1
+                                # Ensure cursor is visible
+                                self._ensure_cursor_visible(display_height)
+                                self.mark_dirty()
+            else:
+                # Right arrow without modifier: Switch to right pane
+                if self.focused_pane != 'right':
+                    old_pane = self.focused_pane
+                    self.focused_pane = 'right'
+                    self.logger.info(f"Switched focus from {old_pane} to right pane")
+                    self.mark_dirty()
             return True
         
         elif event.key_code == KeyCode.LEFT:
-            # Left arrow: Collapse directory or move to parent
-            if 0 <= self.cursor_position < len(self.visible_nodes):
-                node = self.visible_nodes[self.cursor_position]
-                if node.is_directory and node.is_expanded:
-                    # Collapse expanded directory
-                    self.collapse_node(self.cursor_position)
-                elif node.parent and node.parent.depth >= 0:
-                    # Move to parent (for files or collapsed directories)
-                    # Find parent in visible_nodes
-                    parent_node = node.parent
-                    for i, visible_node in enumerate(self.visible_nodes):
-                        if visible_node is parent_node:
-                            self.cursor_position = i
-                            # Ensure cursor is visible
-                            self._ensure_cursor_visible(display_height)
-                            self.mark_dirty()
-                            break
+            # Check for Shift modifier for tree navigation
+            if event.modifiers & ModifierKey.SHIFT:
+                # Shift+Left: Collapse directory or move to parent
+                if 0 <= self.cursor_position < len(self.visible_nodes):
+                    node = self.visible_nodes[self.cursor_position]
+                    if node.is_directory and node.is_expanded:
+                        # Collapse expanded directory
+                        self.collapse_node(self.cursor_position)
+                    elif node.parent and node.parent.depth >= 0:
+                        # Move to parent (for files or collapsed directories)
+                        # Find parent in visible_nodes
+                        parent_node = node.parent
+                        for i, visible_node in enumerate(self.visible_nodes):
+                            if visible_node is parent_node:
+                                self.cursor_position = i
+                                # Ensure cursor is visible
+                                self._ensure_cursor_visible(display_height)
+                                self.mark_dirty()
+                                break
+            else:
+                # Left arrow without modifier: Switch to left pane
+                if self.focused_pane != 'left':
+                    old_pane = self.focused_pane
+                    self.focused_pane = 'left'
+                    self.logger.info(f"Switched focus from {old_pane} to left pane")
+                    self.mark_dirty()
             return True
         
         return False
@@ -1064,7 +1095,7 @@ class DirectoryDiffViewer(UILayer):
     
     def _render_header(self, renderer, width: int) -> None:
         """
-        Render the header with directory paths.
+        Render the header with directory paths and focus indicators.
         
         Args:
             renderer: TTK renderer instance
@@ -1073,9 +1104,9 @@ class DirectoryDiffViewer(UILayer):
         # Get status color for header
         status_color_pair, status_attrs = get_status_color()
         
-        # Line 1: Directory paths
-        left_label = " " + str(self.left_path)  # Add 1-char space prefix
-        right_label = " " + str(self.right_path)  # Add 1-char space prefix
+        # Line 1: Directory paths with bold for focused pane
+        left_label = " " + str(self.left_path)
+        right_label = " " + str(self.right_path)
         
         # Reserve space for scrollbar to match content area
         reserved_scrollbar_width = 1
@@ -1102,12 +1133,27 @@ class DirectoryDiffViewer(UILayer):
         left_padding = " " * (left_width - left_actual_width)
         right_padding = " " * (right_width - right_actual_width)
         
-        # Build header line
-        header_separator = "   "  # 3 spaces to match separator width, no pipe
-        header_line = left_label + left_padding + header_separator + right_label + right_padding
+        # Apply bold attribute to focused pane
+        left_attrs = status_attrs | TextAttribute.BOLD if self.focused_pane == 'left' else status_attrs
+        right_attrs = status_attrs | TextAttribute.BOLD if self.focused_pane == 'right' else status_attrs
         
-        # Draw header with background color
-        renderer.draw_text(0, 0, header_line.ljust(width), status_color_pair, status_attrs)
+        # Draw left pane header
+        left_text = left_label + left_padding
+        renderer.draw_text(0, 0, left_text, status_color_pair, left_attrs)
+        
+        # Draw separator
+        header_separator = "   "  # 3 spaces to match separator width, no pipe
+        renderer.draw_text(0, left_width, header_separator, status_color_pair, status_attrs)
+        
+        # Draw right pane header
+        right_text = right_label + right_padding
+        renderer.draw_text(0, left_width + self.separator_width, right_text, status_color_pair, right_attrs)
+        
+        # Fill remaining space with status color
+        remaining_start = left_width + self.separator_width + len(right_text)
+        if remaining_start < width:
+            remaining_text = " " * (width - remaining_start)
+            renderer.draw_text(0, remaining_start, remaining_text, status_color_pair, status_attrs)
     
     def _render_progress_screen(self, renderer, width: int, height: int) -> None:
         """
@@ -1312,8 +1358,9 @@ class DirectoryDiffViewer(UILayer):
             node = self.visible_nodes[node_index]
             is_focused = (node_index == self.cursor_position)
             
-            # Get colors for this node based on difference type
-            color_pair, attrs = self._get_node_colors(node, is_focused)
+            # Get colors for this node based on difference type and which pane it's in
+            left_color_pair, left_attrs = self._get_node_colors(node, is_focused, 'left')
+            right_color_pair, right_attrs = self._get_node_colors(node, is_focused, 'right')
             blank_color_pair, blank_attrs = get_color_with_attrs(COLOR_DIFF_BLANK)
             
             # Build tree lines to show parent-child relationships
@@ -1400,7 +1447,7 @@ class DirectoryDiffViewer(UILayer):
                 content_text_width = get_display_width(content_text)
                 content_padding = " " * (left_column_width - tree_lines_len - content_text_width)
                 content_text = content_text + content_padding
-                renderer.draw_text(y_pos, left_column_x + tree_lines_len, content_text, color_pair, attrs)
+                renderer.draw_text(y_pos, left_column_x + tree_lines_len, content_text, left_color_pair, left_attrs)
             else:
                 # Node doesn't exist on left side - show tree lines for missing item
                 # Use continuation lines only (no branch connectors)
@@ -1408,11 +1455,15 @@ class DirectoryDiffViewer(UILayer):
                 if missing_tree_lines:
                     renderer.draw_text(y_pos, left_column_x, missing_tree_lines, COLOR_TREE_LINES, TextAttribute.NORMAL)
                 
-                # Fill rest with blank
+                # Fill rest with blank - use focused color if this item is focused
                 blank_len = left_column_width - len(missing_tree_lines)
                 if blank_len > 0:
                     blank_text = " " * blank_len
-                    renderer.draw_text(y_pos, left_column_x + len(missing_tree_lines), blank_text, blank_color_pair, blank_attrs)
+                    # Use focused color for blank area if item is focused
+                    if is_focused:
+                        renderer.draw_text(y_pos, left_column_x + len(missing_tree_lines), blank_text, left_color_pair, left_attrs)
+                    else:
+                        renderer.draw_text(y_pos, left_column_x + len(missing_tree_lines), blank_text, blank_color_pair, blank_attrs)
             
             # Render separator with appropriate color
             # Use red foreground (with status background) for difference separators
@@ -1446,7 +1497,7 @@ class DirectoryDiffViewer(UILayer):
                 content_text_width = get_display_width(content_text)
                 content_padding = " " * (right_column_width - tree_lines_len - content_text_width)
                 content_text = content_text + content_padding
-                renderer.draw_text(y_pos, right_column_x + tree_lines_len, content_text, color_pair, attrs)
+                renderer.draw_text(y_pos, right_column_x + tree_lines_len, content_text, right_color_pair, right_attrs)
             else:
                 # Node doesn't exist on right side - show tree lines for missing item
                 # Use continuation lines only (no branch connectors)
@@ -1454,11 +1505,15 @@ class DirectoryDiffViewer(UILayer):
                 if missing_tree_lines:
                     renderer.draw_text(y_pos, right_column_x, missing_tree_lines, COLOR_TREE_LINES, TextAttribute.NORMAL)
                 
-                # Fill rest with blank
+                # Fill rest with blank - use focused color if this item is focused
                 blank_len = right_column_width - len(missing_tree_lines)
                 if blank_len > 0:
                     blank_text = " " * blank_len
-                    renderer.draw_text(y_pos, right_column_x + len(missing_tree_lines), blank_text, blank_color_pair, blank_attrs)
+                    # Use focused color for blank area if item is focused
+                    if is_focused:
+                        renderer.draw_text(y_pos, right_column_x + len(missing_tree_lines), blank_text, right_color_pair, right_attrs)
+                    else:
+                        renderer.draw_text(y_pos, right_column_x + len(missing_tree_lines), blank_text, blank_color_pair, blank_attrs)
 
         
         # Draw scrollbar if needed
@@ -1506,20 +1561,34 @@ class DirectoryDiffViewer(UILayer):
         
         renderer.draw_text(message_y, message_x, message)
     
-    def _get_node_colors(self, node: TreeNode, is_focused: bool) -> tuple:
+    def _get_node_colors(self, node: TreeNode, is_focused: bool, pane: str = 'left') -> tuple:
         """
         Get color pair and attributes for a node based on its difference type.
         
         Args:
             node: TreeNode to get colors for
             is_focused: Whether this node is currently focused (cursor on it)
+            pane: Which pane this is being rendered in ('left' or 'right')
             
         Returns:
             Tuple of (color_pair, attributes)
         """
         if is_focused:
-            # Focused nodes always use focused color (with background)
-            return get_color_with_attrs(COLOR_DIFF_FOCUSED)
+            # Focused nodes use focused/inactive color pairs based on which pane is active
+            # Active pane uses focused colors (blue background)
+            # Inactive pane uses focused_inactive colors (gray background)
+            is_active_pane = (pane == self.focused_pane)
+            
+            if node.is_directory:
+                if is_active_pane:
+                    return get_color_with_attrs(COLOR_DIRECTORIES_FOCUSED)
+                else:
+                    return get_color_with_attrs(COLOR_DIRECTORIES_FOCUSED_INACTIVE)
+            else:
+                if is_active_pane:
+                    return get_color_with_attrs(COLOR_REGULAR_FILE_FOCUSED)
+                else:
+                    return get_color_with_attrs(COLOR_REGULAR_FILE_FOCUSED_INACTIVE)
         
         # Non-focused nodes: use regular colors without background
         # Differences are indicated by separator symbols and foreground colors
@@ -1559,8 +1628,12 @@ class DirectoryDiffViewer(UILayer):
             "  PgUp/PgDn     Scroll one page up/down",
             "  Home/End      Jump to first/last item",
             "",
+            "PANE FOCUS",
+            "  ←/→           Switch active pane (left/right)",
+            "  Tab           Switch active pane (alternate)",
+            "",
             "TREE OPERATIONS",
-            "  ←/→           Collapse/expand directory or move to parent/child",
+            "  Shift+←/→     Collapse/expand directory or move to parent/child",
             "  Enter         View file diff (files) or toggle expand (directories)",
             "",
             "DISPLAY OPTIONS",
@@ -1799,7 +1872,7 @@ class DirectoryDiffViewer(UILayer):
             self._scan_complete_shown = True
         else:
             # Normal navigation hints
-            left_status = " ?:help  q:quit  i:toggle-identical "
+            left_status = " ?:help  q:quit  ←/→:switch-pane  i:toggle-identical "
         
         # Right side: filter status and statistics
         right_parts = []
