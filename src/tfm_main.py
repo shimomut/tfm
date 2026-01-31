@@ -56,7 +56,6 @@ from tfm_quick_edit_bar import QuickEditBar, QuickEditBarHelpers
 from tfm_external_programs import ExternalProgramManager
 from tfm_progress_manager import ProgressManager, OperationType
 from tfm_state_manager import get_state_manager, cleanup_state_manager
-from tfm_archive_operation_task import ArchiveOperationTask
 from tfm_archive_operation_executor import ArchiveOperationExecutor
 from tfm_archive_operation_ui import ArchiveOperationUI
 from tfm_cache_manager import CacheManager
@@ -339,10 +338,6 @@ class FileManager(UILayer):
         self.archive_operations_executor = ArchiveOperationExecutor(self, self.progress_manager, self.cache_manager)
         self.archive_operation_ui = ArchiveOperationUI(self)
         self.file_operations_ui = FileOperationUI(self, self.file_list_manager)
-        
-        # Create ArchiveOperationTask for task-based archive operations
-        from tfm_archive_operation_task import ArchiveOperationTask
-        self.archive_operation_task = ArchiveOperationTask(self, self.archive_operation_ui, self.archive_operations_executor)
         
         # Initialize drag-and-drop components
         self.drag_gesture_detector = DragGestureDetector()
@@ -4094,9 +4089,11 @@ class FileManager(UILayer):
         # Hide the input bar
         self.quick_edit_bar.hide()
         
-        # Start the archive operation task
-        self.archive_operation_task.start_operation('create', self._pending_archive_files, archive_path, format_type)
-        self.start_task(self.archive_operation_task)
+        # Create and start the archive operation task
+        from tfm_archive_operation_task import ArchiveOperationTask
+        task = ArchiveOperationTask(self, self.archive_operation_ui, self.archive_operations_executor)
+        task.start_operation('create', self._pending_archive_files, archive_path, format_type)
+        self.start_task(task)
     
     def on_create_archive_cancel(self):
         """Handle create archive cancellation"""
@@ -4151,9 +4148,11 @@ class FileManager(UILayer):
         # Create extraction directory in the other pane
         extract_dir = other_pane['path'] / archive_basename
         
-        # Start the archive operation task
-        self.archive_operation_task.start_operation('extract', [focused_file], extract_dir)
-        self.start_task(self.archive_operation_task)
+        # Create and start the archive operation task
+        from tfm_archive_operation_task import ArchiveOperationTask
+        task = ArchiveOperationTask(self, self.archive_operation_ui, self.archive_operations_executor)
+        task.start_operation('extract', [focused_file], extract_dir)
+        self.start_task(task)
     
     def handle_isearch_input(self, event):
         """Handle input while in isearch mode"""
