@@ -674,30 +674,25 @@ class FileOperationExecutor:
 
     # Helper methods
     def _count_files_recursively(self, paths):
-        """Count total number of individual files in the given paths (including files in directories)"""
+        """Count total number of individual files in the given paths (including files in directories)
+        
+        Uses Path.rglob() for polymorphic directory traversal that works across all storage types
+        (local, S3, SSH, archive, etc.) without storage-specific code.
+        """
         total_files = 0
         for path in paths:
             if path.is_file() or path.is_symlink():
                 total_files += 1
             elif path.is_dir():
                 try:
-                    # Check if this is an archive path
-                    if path.get_scheme() == 'archive':
-                        # For archive paths, use iterdir recursively
-                        for item in path.rglob('*'):
-                            if item.is_file():
-                                total_files += 1
-                    else:
-                        # For local/S3 paths, use os.walk
-                        for root, dirs, files in os.walk(path):
-                            total_files += len(files)
-                            # Count symlinks to directories
-                            for d in dirs:
-                                dir_path = Path(root) / d
-                                if dir_path.is_symlink():
-                                    total_files += 1
-                except (PermissionError, OSError):
+                    # Use Path.rglob() for polymorphic directory traversal
+                    # This works correctly for all storage types (local, S3, SSH, archive)
+                    for item in path.rglob('*'):
+                        if item.is_file() or item.is_symlink():
+                            total_files += 1
+                except (PermissionError, OSError) as e:
                     # If we can't walk the directory, count it as 1 item
+                    self.logger.warning(f"Cannot count files in {path}: {e}")
                     total_files += 1
         return total_files
     

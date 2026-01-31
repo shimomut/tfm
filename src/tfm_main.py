@@ -4118,26 +4118,6 @@ class FileManager(UILayer):
         except Exception as e:
             self.logger.error(f"Warning: Progress callback display update failed: {e}")
     
-    def _count_files_recursively(self, paths):
-        """Count total number of individual files in the given paths (including files in directories)"""
-        total_files = 0
-        for path in paths:
-            if path.is_file() or path.is_symlink():
-                total_files += 1
-            elif path.is_dir():
-                try:
-                    for root, dirs, files in os.walk(path):
-                        total_files += len(files)
-                        # Count symlinks to directories as files
-                        for d in dirs:
-                            dir_path = Path(root) / d
-                            if dir_path.is_symlink():
-                                total_files += 1
-                except (PermissionError, OSError):
-                    # If we can't walk the directory, count it as 1 item
-                    total_files += 1
-        return total_files
-    
     def extract_selected_archive(self):
         """Extract the selected archive file to the other pane - uses task-based system"""
         current_pane = self.get_current_pane()
