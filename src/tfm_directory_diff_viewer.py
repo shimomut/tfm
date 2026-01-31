@@ -2884,6 +2884,15 @@ class DirectoryDiffViewer(UILayer):
                         existing_child.right_path = right_info.path
                     # Don't reset children_scanned, difference_type, or other state
                 else:
+                    # Determine content_compared status for new child
+                    # Files that exist only on one side don't need comparison
+                    if left_info and not right_info:
+                        content_compared = True  # One-sided files don't need comparison
+                    elif right_info and not left_info:
+                        content_compared = True  # One-sided files don't need comparison
+                    else:
+                        content_compared = False  # Files on both sides need comparison
+                    
                     # Create new child node only if it doesn't exist
                     child_node = TreeNode(
                         name=child_name,
@@ -2896,7 +2905,7 @@ class DirectoryDiffViewer(UILayer):
                         children=[],
                         parent=target_node,
                         children_scanned=False,
-                        content_compared=False,
+                        content_compared=content_compared,
                         scan_in_progress=False
                     )
                     # Add new child to the list
