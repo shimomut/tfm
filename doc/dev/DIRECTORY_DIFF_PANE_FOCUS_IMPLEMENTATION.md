@@ -8,14 +8,14 @@ This document describes the implementation of pane-level focus in DirectoryDiffV
 
 ### State Management
 
-Added a new state variable to track which pane is currently focused:
+Added a new state variable to track which pane is currently active:
 
 ```python
 # Pane focus state (for future copy operations)
-self.focused_pane = 'left'  # 'left' or 'right'
+self.active_pane = 'left'  # 'left' or 'right'
 ```
 
-The focused pane is initialized to `'left'` by default.
+The active pane is initialized to `'left'` by default.
 
 ### Key Binding
 
@@ -29,9 +29,9 @@ elif event.key_code == KeyCode.RIGHT:
         ...
     else:
         # Right arrow without modifier: Switch to right pane
-        if self.focused_pane != 'right':
-            old_pane = self.focused_pane
-            self.focused_pane = 'right'
+        if self.active_pane != 'right':
+            old_pane = self.active_pane
+            self.active_pane = 'right'
             self.logger.info(f"Switched focus from {old_pane} to right pane")
             self.mark_dirty()
     return True
@@ -43,9 +43,9 @@ elif event.key_code == KeyCode.LEFT:
         ...
     else:
         # Left arrow without modifier: Switch to left pane
-        if self.focused_pane != 'left':
-            old_pane = self.focused_pane
-            self.focused_pane = 'left'
+        if self.active_pane != 'left':
+            old_pane = self.active_pane
+            self.active_pane = 'left'
             self.logger.info(f"Switched focus from {old_pane} to left pane")
             self.mark_dirty()
     return True
@@ -55,8 +55,8 @@ Tree navigation (collapse/expand/parent/child) now requires the Shift modifier w
 
 ### Visual Indicator
 
-The focused pane is indicated by:
-1. **Bold text** in the header for the focused pane's directory path
+The active pane is indicated by:
+1. **Bold text** in the header for the active pane's directory path
 2. **Different background color** for the focused item using existing color pairs:
    - **Active pane** (where focus is): Uses focused colors (blue background)
      - `COLOR_DIRECTORIES_FOCUSED` for directories
@@ -68,9 +68,9 @@ The focused pane is indicated by:
 This means the focused item appears in both left and right columns, but with different background colors to indicate which pane is currently active.
 
 ```python
-# Apply bold attribute to focused pane
-left_attrs = status_attrs | TextAttribute.BOLD if self.focused_pane == 'left' else status_attrs
-right_attrs = status_attrs | TextAttribute.BOLD if self.focused_pane == 'right' else status_attrs
+# Apply bold attribute to active pane
+left_attrs = status_attrs | TextAttribute.BOLD if self.active_pane == 'left' else status_attrs
+right_attrs = status_attrs | TextAttribute.BOLD if self.active_pane == 'right' else status_attrs
 
 # Draw left pane header
 left_text = left_label + left_padding
@@ -84,7 +84,7 @@ def _get_node_colors(self, node: TreeNode, is_focused: bool, pane: str = 'left')
         # Focused nodes use focused/inactive color pairs based on which pane is active
         # Active pane uses focused colors (blue background)
         # Inactive pane uses focused_inactive colors (gray background)
-        is_active_pane = (pane == self.focused_pane)
+        is_active_pane = (pane == self.active_pane)
         
         if node.is_directory:
             if is_active_pane:

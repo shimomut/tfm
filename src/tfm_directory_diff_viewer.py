@@ -608,7 +608,7 @@ class DirectoryDiffViewer(UILayer):
         self.horizontal_offset = 0
         
         # Pane focus state (for future copy operations)
-        self.focused_pane = 'left'  # 'left' or 'right'
+        self.active_pane = 'left'  # 'left' or 'right'
         
         # Display options
         self.show_identical = True  # Whether to show identical files
@@ -738,12 +738,12 @@ class DirectoryDiffViewer(UILayer):
         # Reserve space for header (1 line), divider (1 line), details pane (4 lines), and status bar (1 line)
         display_height = height - 7
         
-        # Handle Tab key to switch focused pane
+        # Handle Tab key to switch active pane
         if event.key_code == KeyCode.TAB:
-            # Toggle focused pane between left and right
-            old_pane = self.focused_pane
-            self.focused_pane = 'right' if self.focused_pane == 'left' else 'left'
-            self.logger.info(f"Switched focus from {old_pane} to {self.focused_pane} pane")
+            # Toggle active pane between left and right
+            old_pane = self.active_pane
+            self.active_pane = 'right' if self.active_pane == 'left' else 'left'
+            self.logger.info(f"Switched focus from {old_pane} to {self.active_pane} pane")
             self.mark_dirty()
             return True
         
@@ -881,9 +881,9 @@ class DirectoryDiffViewer(UILayer):
                                 self.mark_dirty()
             else:
                 # Right arrow without modifier: Switch to right pane
-                if self.focused_pane != 'right':
-                    old_pane = self.focused_pane
-                    self.focused_pane = 'right'
+                if self.active_pane != 'right':
+                    old_pane = self.active_pane
+                    self.active_pane = 'right'
                     self.logger.info(f"Switched focus from {old_pane} to right pane")
                     self.mark_dirty()
             return True
@@ -910,9 +910,9 @@ class DirectoryDiffViewer(UILayer):
                                 break
             else:
                 # Left arrow without modifier: Switch to left pane
-                if self.focused_pane != 'left':
-                    old_pane = self.focused_pane
-                    self.focused_pane = 'left'
+                if self.active_pane != 'left':
+                    old_pane = self.active_pane
+                    self.active_pane = 'left'
                     self.logger.info(f"Switched focus from {old_pane} to left pane")
                     self.mark_dirty()
             return True
@@ -1133,9 +1133,9 @@ class DirectoryDiffViewer(UILayer):
         left_padding = " " * (left_width - left_actual_width)
         right_padding = " " * (right_width - right_actual_width)
         
-        # Apply bold attribute to focused pane
-        left_attrs = status_attrs | TextAttribute.BOLD if self.focused_pane == 'left' else status_attrs
-        right_attrs = status_attrs | TextAttribute.BOLD if self.focused_pane == 'right' else status_attrs
+        # Apply bold attribute to active pane
+        left_attrs = status_attrs | TextAttribute.BOLD if self.active_pane == 'left' else status_attrs
+        right_attrs = status_attrs | TextAttribute.BOLD if self.active_pane == 'right' else status_attrs
         
         # Draw left pane header
         left_text = left_label + left_padding
@@ -1577,7 +1577,7 @@ class DirectoryDiffViewer(UILayer):
             # Focused nodes use focused/inactive color pairs based on which pane is active
             # Active pane uses focused colors (blue background)
             # Inactive pane uses focused_inactive colors (gray background)
-            is_active_pane = (pane == self.focused_pane)
+            is_active_pane = (pane == self.active_pane)
             
             if node.is_directory:
                 if is_active_pane:

@@ -240,13 +240,13 @@ def _draw_dialogs_if_needed(self):
 ```python
 @staticmethod
 def navigate_to_drive(file_manager, drive_entry: DriveEntry):
-    """Navigate to selected drive in focused pane"""
+    """Navigate to selected drive in active pane"""
     try:
-        # Update focused pane path
-        focused_pane = file_manager.get_focused_pane()
-        focused_pane['path'] = Path(drive_entry.path)
-        focused_pane['selected_files'] = set()
-        focused_pane['scroll_offset'] = 0
+        # Update active pane path
+        active_pane = file_manager.get_active_pane()
+        active_pane['path'] = Path(drive_entry.path)
+        active_pane['selected_files'] = set()
+        active_pane['scroll_offset'] = 0
         
         # Refresh pane content
         file_manager.refresh_files()

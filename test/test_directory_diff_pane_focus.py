@@ -55,7 +55,7 @@ def test_initial_focus_is_left(mock_renderer, temp_directories):
     )
     
     # Verify initial focus is on left pane
-    assert viewer.focused_pane == 'left'
+    assert viewer.active_pane == 'left'
 
 
 def test_tab_switches_pane_focus(mock_renderer, temp_directories):
@@ -73,20 +73,20 @@ def test_tab_switches_pane_focus(mock_renderer, temp_directories):
     )
     
     # Initial focus should be left
-    assert viewer.focused_pane == 'left'
+    assert viewer.active_pane == 'left'
     
     # Press Tab to switch to right
     tab_event = KeyEvent(key_code=KeyCode.TAB, modifiers=ModifierKey.NONE, char=None)
     result = viewer.handle_key_event(tab_event)
     
     assert result is True
-    assert viewer.focused_pane == 'right'
+    assert viewer.active_pane == 'right'
     
     # Press Tab again to switch back to left
     result = viewer.handle_key_event(tab_event)
     
     assert result is True
-    assert viewer.focused_pane == 'left'
+    assert viewer.active_pane == 'left'
 
 
 def test_left_right_keys_switch_pane_focus(mock_renderer, temp_directories):
@@ -104,26 +104,26 @@ def test_left_right_keys_switch_pane_focus(mock_renderer, temp_directories):
     )
     
     # Initial focus should be left
-    assert viewer.focused_pane == 'left'
+    assert viewer.active_pane == 'left'
     
     # Press Right to switch to right pane
     right_event = KeyEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.NONE, char=None)
     result = viewer.handle_key_event(right_event)
     
     assert result is True
-    assert viewer.focused_pane == 'right'
+    assert viewer.active_pane == 'right'
     
     # Press Left to switch back to left pane
     left_event = KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.NONE, char=None)
     result = viewer.handle_key_event(left_event)
     
     assert result is True
-    assert viewer.focused_pane == 'left'
+    assert viewer.active_pane == 'left'
     
     # Press Right again
     result = viewer.handle_key_event(right_event)
     assert result is True
-    assert viewer.focused_pane == 'right'
+    assert viewer.active_pane == 'right'
 
 
 def test_focus_indicator_in_header(mock_renderer, temp_directories):
@@ -257,5 +257,5 @@ def test_status_bar_shows_tab_hint():
     assert 'Tab:switch-pane' in content
     assert 'left_status = ' in content
     
-    # Verify the focused_pane state variable exists
-    assert "self.focused_pane = 'left'" in content
+    # Verify the active_pane state variable exists
+    assert "self.active_pane = 'left'" in content
