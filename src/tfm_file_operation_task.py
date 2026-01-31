@@ -694,8 +694,7 @@ class FileOperationTask(BaseTask):
         """
         import threading
         
-        # Set operation in progress flag
-        self.file_manager.operation_in_progress = True
+        # Set operation cancelled flag
         self.file_manager.operation_cancelled = False
         
         self.logger.info(f"Starting copy operation with {len(files_to_copy)} files")
@@ -757,7 +756,6 @@ class FileOperationTask(BaseTask):
             except Exception as e:
                 self.logger.error(f"Error in copy worker thread: {e}")
                 # Ensure we clean up even on error
-                self.file_manager.operation_in_progress = False
                 self._transition_to_state(State.COMPLETED)
                 self._complete_operation()
         
@@ -803,8 +801,7 @@ class FileOperationTask(BaseTask):
         """
         import threading
         
-        # Set operation in progress flag
-        self.file_manager.operation_in_progress = True
+        # Set operation cancelled flag
         self.file_manager.operation_cancelled = False
         
         self.logger.info(f"Starting move operation with {len(files_to_move)} files")
@@ -866,7 +863,6 @@ class FileOperationTask(BaseTask):
             except Exception as e:
                 self.logger.error(f"Error in move worker thread: {e}")
                 # Ensure we clean up even on error
-                self.file_manager.operation_in_progress = False
                 self._transition_to_state(State.COMPLETED)
                 self._complete_operation()
         
@@ -909,8 +905,7 @@ class FileOperationTask(BaseTask):
         Args:
             files_to_delete: List of Path objects to delete
         """
-        # Set operation in progress flag
-        self.file_manager.operation_in_progress = True
+        # Set operation cancelled flag
         self.file_manager.operation_cancelled = False
         
         self.logger.info(f"Starting delete operation with {len(files_to_delete)} files")
@@ -1005,10 +1000,6 @@ class FileOperationTask(BaseTask):
         
         # Clear operation context
         self.context = None
-        
-        # Clear operation_in_progress flag if still set
-        if self.file_manager.operation_in_progress:
-            self.file_manager.operation_in_progress = False
         
         # Notify FileManager that task is complete
         self.file_manager._clear_task()

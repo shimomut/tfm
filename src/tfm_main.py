@@ -370,7 +370,6 @@ class FileManager(UILayer):
         self.rename_file_path = None  # Still needed for rename operations
         
         # Operation state flags
-        self.operation_in_progress = False  # Flag to block input during operations
         self.operation_cancelled = False  # Flag to signal operation cancellation
         
         # Task management
@@ -530,7 +529,7 @@ class FileManager(UILayer):
             return True
         elif event.is_close():
             # Handle window close request
-            if hasattr(self, 'operation_in_progress') and self.operation_in_progress:
+            if self.current_task and self.current_task.is_active():
                 # Ignore close event during operations
                 self.logger.error("Cannot close: file operation in progress")
                 return True

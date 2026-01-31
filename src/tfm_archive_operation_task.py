@@ -482,8 +482,7 @@ class ArchiveOperationTask(BaseTask):
             self.logger.error("_execute_operation called with no operation context")
             return
         
-        # Set operation in progress flag
-        self.file_manager.operation_in_progress = True
+        # Set operation cancelled flag
         self.file_manager.operation_cancelled = False
         
         operation_type = self.context.operation_type
@@ -658,10 +657,6 @@ class ArchiveOperationTask(BaseTask):
         
         # Clear operation context
         self.context = None
-        
-        # Clear operation_in_progress flag if still set
-        if self.file_manager.operation_in_progress:
-            self.file_manager.operation_in_progress = False
         
         # Notify FileManager that task is complete
         self.file_manager._clear_task()

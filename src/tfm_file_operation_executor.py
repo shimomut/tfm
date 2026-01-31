@@ -51,8 +51,7 @@ class FileOperationExecutor:
     
     Threading:
         All operations run in background threads (daemon=True) to avoid blocking
-        the UI. The executor uses file_manager.operation_in_progress flag to
-        block user input during operations and operation_cancelled for cancellation.
+        the UI. The executor uses operation_cancelled flag for cancellation.
     
     Progress Tracking:
         Uses progress_manager to track operation progress with fine-grained updates
@@ -92,7 +91,6 @@ class FileOperationExecutor:
         
         Threading:
             - Runs in background thread to keep UI responsive
-            - Uses operation_in_progress flag to block user input
             - Uses operation_cancelled flag for cancellation
             - Updates progress via progress_manager
             - Triggers UI refresh via mark_dirty()
@@ -103,9 +101,8 @@ class FileOperationExecutor:
             - Tracks errors separately
             - Shows completion summary
         """
-        # Set operation in progress flag to block user input (only if not continuing)
+        # Reset cancellation flag (only if not continuing)
         if not continue_progress:
-            self.file_manager.operation_in_progress = True
             self.file_manager.operation_cancelled = False
             
             # Show "Preparing..." message immediately
@@ -243,9 +240,6 @@ class FileOperationExecutor:
                 # Finish progress tracking (only if not continuing - let the last batch finish it)
                 if not continue_progress:
                     self.progress_manager.finish_operation()
-                    
-                    # Clear operation in progress flag
-                    self.file_manager.operation_in_progress = False
             
             # Invalidate cache for affected directories
             if copied_count > 0:
@@ -296,7 +290,6 @@ class FileOperationExecutor:
         
         Threading:
             - Runs in background thread to keep UI responsive
-            - Uses operation_in_progress flag to block user input
             - Uses operation_cancelled flag for cancellation
             - Updates progress via progress_manager
             - Triggers UI refresh via mark_dirty()
@@ -312,9 +305,8 @@ class FileOperationExecutor:
             - Implements as copy followed by delete
             - Handles both same-storage and cross-storage transparently
         """
-        # Set operation in progress flag to block user input (only if not continuing)
+        # Reset cancellation flag (only if not continuing)
         if not continue_progress:
-            self.file_manager.operation_in_progress = True
             self.file_manager.operation_cancelled = False
             
             # Show "Preparing..." message immediately
@@ -473,9 +465,6 @@ class FileOperationExecutor:
                 # Finish progress tracking (only if not continuing - let the last batch finish it)
                 if not continue_progress:
                     self.progress_manager.finish_operation()
-                    
-                    # Clear operation in progress flag
-                    self.file_manager.operation_in_progress = False
                 
                 # Invalidate cache for affected directories
                 if moved_count > 0:
@@ -523,7 +512,6 @@ class FileOperationExecutor:
         
         Threading:
             - Runs in background thread to keep UI responsive
-            - Uses operation_in_progress flag to block user input
             - Uses operation_cancelled flag for cancellation
             - Updates progress via progress_manager
             - Triggers UI refresh via mark_dirty()
@@ -534,8 +522,7 @@ class FileOperationExecutor:
             - Tracks errors separately
             - Shows completion summary
         """
-        # Set operation in progress flag to block user input
-        self.file_manager.operation_in_progress = True
+        # Reset cancellation flag
         self.file_manager.operation_cancelled = False
         
         # Start operation without description
@@ -635,9 +622,6 @@ class FileOperationExecutor:
                 
                 # Always finish progress tracking
                 self.progress_manager.finish_operation()
-                
-                # Clear operation in progress flag
-                self.file_manager.operation_in_progress = False
                 
                 # Invalidate cache for affected directories
                 if deleted_count > 0:
