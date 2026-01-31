@@ -1055,6 +1055,11 @@ class FileManager(UILayer):
         if not isinstance(event, MenuEvent):
             return False
         
+        # Block all menu actions while a task is active
+        if self.current_task and self.current_task.is_active():
+            self.logger.warning("Menu action blocked: task in progress (press ESC to cancel)")
+            return True
+        
         item_id = event.item_id
         
         # App menu

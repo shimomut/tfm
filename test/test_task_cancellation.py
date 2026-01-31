@@ -120,7 +120,7 @@ def test_actions_blocked_during_task(file_manager):
     
     assert task.is_active()
     
-    # Try various actions - they should all be blocked
+    # Try various keyboard actions - they should all be blocked
     test_keys = [
         KeyEvent(KeyCode.ENTER, '', set()),  # open_item
         KeyEvent(KeyCode.F5, '', set()),  # copy_files
@@ -134,6 +134,29 @@ def test_actions_blocked_during_task(file_manager):
         result = file_manager.handle_main_screen_key_event(key_event)
         # All actions should be blocked (return True = consumed)
         assert result is True, f"Action for {key_event.key_code} was not blocked"
+
+
+def test_menu_actions_blocked_during_task(file_manager):
+    """Test that menu actions are blocked while a task is active."""
+    from ttk import MenuEvent
+    
+    # Create and start a mock task
+    task = MockTask(file_manager)
+    file_manager.start_task(task)
+    
+    assert task.is_active()
+    
+    # Mock the logger to capture messages
+    with patch.object(file_manager.logger, 'warning') as mock_warning:
+        # Try a menu action - should be blocked
+        menu_event = MenuEvent(item_id=100)  # Any menu item ID
+        result = file_manager._handle_menu_event(menu_event)
+        
+        # Menu action should be blocked (return True = consumed)
+        assert result is True
+        
+        # Verify warning message
+        mock_warning.assert_called_once_with("Menu action blocked: task in progress (press ESC to cancel)")
 
 
 def test_actions_allowed_when_no_task(file_manager):

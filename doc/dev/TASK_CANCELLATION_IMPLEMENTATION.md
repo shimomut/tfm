@@ -34,7 +34,7 @@ class FileManager:
 
 ### Input Handling
 
-The `handle_main_screen_key_event()` method implements the cancellation and blocking logic:
+The `handle_main_screen_key_event()` method implements the cancellation and blocking logic for keyboard events:
 
 ```python
 def handle_main_screen_key_event(self, event):
@@ -55,6 +55,21 @@ def handle_main_screen_key_event(self, event):
     # Normal action processing continues...
 ```
 
+The `_handle_menu_event()` method implements the blocking logic for menu events:
+
+```python
+def _handle_menu_event(self, event):
+    if not isinstance(event, MenuEvent):
+        return False
+    
+    # Block all menu actions while a task is active
+    if self.current_task and self.current_task.is_active():
+        self.logger.warning("Menu action blocked: task in progress (press ESC to cancel)")
+        return True
+    
+    # Normal menu action processing continues...
+```
+
 ## Key Features
 
 ### 1. ESC Key Cancellation
@@ -65,9 +80,10 @@ def handle_main_screen_key_event(self, event):
 
 ### 2. Action Blocking
 
-- **Behavior**: All keyboard actions are blocked while a task is active
-- **Feedback**: Logs warning "Action blocked: task in progress (press ESC to cancel)"
-- **Scope**: Applies to all main screen actions (navigation, file operations, etc.)
+- **Behavior**: All keyboard and menu actions are blocked while a task is active
+- **Feedback**: Logs warning "Action blocked: task in progress (press ESC to cancel)" for keyboard actions
+- **Feedback**: Logs warning "Menu action blocked: task in progress (press ESC to cancel)" for menu actions
+- **Scope**: Applies to all main screen actions (navigation, file operations, etc.) and all menu items
 
 ### 3. Task State Management
 
@@ -144,8 +160,8 @@ class BaseTask(ABC):
 
 ### Action Blocking Flow
 
-1. User presses any key (except ESC)
-2. `handle_main_screen_key_event()` checks if task is active
+1. User presses any key or selects a menu item
+2. `handle_main_screen_key_event()` or `_handle_menu_event()` checks if task is active
 3. If active, logs warning and returns True (consumed)
 4. Action is not processed
 5. User sees warning in log pane
@@ -154,12 +170,13 @@ class BaseTask(ABC):
 
 ### Normal Operation
 
-1. User starts a file operation (F5 to copy)
+1. User starts a file operation (F5 to copy or File > Copy menu)
 2. Operation begins in background
 3. User can see progress in log pane
 4. User can press ESC to cancel
-5. Operation completes or is cancelled
-6. Normal keyboard input resumes
+5. All keyboard and menu input is blocked
+6. Operation completes or is cancelled
+7. Normal keyboard and menu input resumes
 
 ### Cancellation
 
@@ -171,8 +188,8 @@ class BaseTask(ABC):
 
 ### Blocked Actions
 
-1. User tries to perform action during operation
-2. Log shows "Action blocked: task in progress (press ESC to cancel)"
+1. User tries to perform action during operation (keyboard or menu)
+2. Log shows "Action blocked: task in progress (press ESC to cancel)" or "Menu action blocked: task in progress (press ESC to cancel)"
 3. Action is not performed
 4. User can press ESC to cancel and retry
 
@@ -184,7 +201,8 @@ See `test/test_task_cancellation.py`:
 
 - `test_esc_cancels_active_task`: ESC cancels active task
 - `test_esc_ignored_when_no_task`: ESC ignored when no task
-- `test_actions_blocked_during_task`: Actions blocked during task
+- `test_actions_blocked_during_task`: Keyboard actions blocked during task
+- `test_menu_actions_blocked_during_task`: Menu actions blocked during task
 - `test_actions_allowed_when_no_task`: Actions work when no task
 - `test_task_completion_allows_actions`: Actions work after completion
 - `test_esc_during_task_logs_message`: Cancellation logs message
