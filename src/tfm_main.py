@@ -32,7 +32,7 @@ from ttk import KeyEvent, KeyCode, ModifierKey, SystemEvent, SystemEventType, Me
 # Import constants and colors
 from tfm_const import *
 from tfm_colors import *
-from tfm_config import get_config, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association, find_action_for_event, get_keys_for_action, format_key_for_display
+from tfm_config import get_config, get_favorite_directories, get_programs, get_program_for_file, has_action_for_file, has_explicit_association, find_action_for_event, get_keys_for_action, format_key_for_display, config_manager
 from tfm_text_viewer import create_text_viewer, is_text_file
 from tfm_diff_viewer import create_diff_viewer
 from tfm_directory_diff_viewer import DirectoryDiffViewer
@@ -3890,7 +3890,15 @@ class FileManager(UILayer):
         
         # Create and launch directory diff viewer
         try:
-            viewer = DirectoryDiffViewer(self.renderer, left_path, right_path, self.ui_layer_stack, self.file_list_manager)
+            viewer = DirectoryDiffViewer(
+                self.renderer, 
+                left_path, 
+                right_path, 
+                self.ui_layer_stack, 
+                self.file_list_manager,
+                self.file_operations_ui,
+                config_manager
+            )
             if viewer:
                 # Push viewer onto layer stack
                 self.push_layer(viewer)

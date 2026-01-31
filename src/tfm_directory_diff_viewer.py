@@ -579,7 +579,7 @@ class DirectoryDiffViewer(UILayer):
     navigation between different views.
     """
     
-    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None):
+    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None, file_operations_ui=None, config_manager=None):
         """
         Initialize the directory diff viewer.
         
@@ -589,6 +589,8 @@ class DirectoryDiffViewer(UILayer):
             right_path: Path to right directory
             layer_stack: Optional UILayerStack for pushing new layers (e.g., DiffViewer)
             file_list_manager: Optional FileListManager instance for accessing show_hidden setting
+            file_operations_ui: Optional FileOperationUI instance for copy/delete operations
+            config_manager: Optional ConfigManager instance for key bindings
         """
         self.logger = getLogger("DirDiff")
         self.renderer = renderer
@@ -596,6 +598,8 @@ class DirectoryDiffViewer(UILayer):
         self.right_path = right_path
         self.layer_stack = layer_stack
         self.file_list_manager = file_list_manager
+        self.file_operations_ui = file_operations_ui
+        self.config_manager = config_manager
         
         # Tree structure
         self.root_node: Optional[TreeNode] = None
@@ -746,6 +750,21 @@ class DirectoryDiffViewer(UILayer):
             self.logger.info(f"Switched focus from {old_pane} to {self.active_pane} pane")
             self.mark_dirty()
             return True
+        
+        # Check for configured key bindings if config_manager is available
+        if self.config_manager:
+            key_bindings = self.config_manager.get_key_bindings()
+            # For directory diff viewer, having a focused file is equivalent to having a selection
+            # Always pass True so that actions with 'selection': 'required' will work
+            has_focused_file = (0 <= self.cursor_position < len(self.visible_nodes))
+            action = key_bindings.find_action_for_event(event, has_selection=has_focused_file)
+            
+            if action == 'copy_files':
+                self._copy_focused_file()
+                return True
+            elif action == 'delete_files':
+                self._delete_focused_file()
+                return True
         
         # Handle character-based commands (only from KeyEvent)
         if event.char:
@@ -1621,6 +1640,19 @@ class DirectoryDiffViewer(UILayer):
     def _show_help_dialog(self) -> None:
         """Show help dialog with keyboard shortcuts."""
         title = "Directory Diff Viewer - Help"
+        
+        # Get configured keybindings for copy and delete
+        copy_keys = "C"
+        delete_keys = "K/Del"
+        if self.config_manager:
+            key_bindings = self.config_manager.get_key_bindings()
+            copy_key_list, _ = key_bindings.get_keys_for_action('copy_files')
+            delete_key_list, _ = key_bindings.get_keys_for_action('delete_files')
+            if copy_key_list:
+                copy_keys = "/".join([key_bindings.format_key_for_display(k) for k in copy_key_list[:2]])
+            if delete_key_list:
+                delete_keys = "/".join([key_bindings.format_key_for_display(k) for k in delete_key_list[:2]])
+        
         help_lines = [
             "NAVIGATION",
             "  ↑/↓           Move cursor up/down",
@@ -1635,6 +1667,10 @@ class DirectoryDiffViewer(UILayer):
             "TREE OPERATIONS",
             "  Shift+←/→     Collapse/expand directory or move to parent/child",
             "  Enter         View file diff (files) or toggle expand (directories)",
+            "",
+            "FILE OPERATIONS",
+            f"  {copy_keys:<13} Copy focused file from active pane to opposite pane",
+            f"  {delete_keys:<13} Delete focused file from active pane",
             "",
             "DISPLAY OPTIONS",
             "  i             Toggle showing identical files",
@@ -3983,3 +4019,88 @@ class DirectoryDiffViewer(UILayer):
         except Exception as e:
             # Log error
             self.logger.error(f"Error opening file diff viewer: {e}")
+    
+    def _copy_focused_file(self) -> None:
+        """
+        Copy the focused file from the active pane to the opposite pane.
+        
+        This method copies the file/directory that is currently focused in the
+        active pane to the opposite directory. It uses the FileOperationUI
+        instance if available.
+        """
+        # Check if file_operations_ui is available
+        if not self.file_operations_ui:
+            self.logger.warning("Cannot copy file: file_operations_ui not provided to DirectoryDiffViewer")
+            return
+        
+        # Validate node index
+        if self.cursor_position < 0 or self.cursor_position >= len(self.visible_nodes):
+            self.logger.info("No file selected to copy")
+            return
+        
+        node = self.visible_nodes[self.cursor_position]
+        
+        # Determine source and destination based on active pane
+        if self.active_pane == 'left':
+            source_path = node.left_path
+            dest_dir = self.right_path
+        else:  # active_pane == 'right'
+            source_path = node.right_path
+            dest_dir = self.left_path
+        
+        # Check if file exists on the active pane
+        if not source_path:
+            self.logger.info(f"File does not exist on {self.active_pane} side")
+            return
+        
+        # Copy the file using FileOperationUI
+        try:
+            self.logger.info(f"Copying {source_path.name} from {self.active_pane} to opposite pane")
+            self.file_operations_ui.copy_files_to_directory([source_path], dest_dir)
+            
+            # Mark dirty to update display after operation completes
+            self.mark_dirty()
+            
+        except Exception as e:
+            self.logger.error(f"Error copying file: {e}")
+    
+    def _delete_focused_file(self) -> None:
+        """
+        Delete the focused file from the active pane.
+        
+        This method deletes the file/directory that is currently focused in the
+        active pane. It uses the FileOperationUI instance if available.
+        """
+        # Check if file_operations_ui is available
+        if not self.file_operations_ui:
+            self.logger.warning("Cannot delete file: file_operations_ui not provided to DirectoryDiffViewer")
+            return
+        
+        # Validate node index
+        if self.cursor_position < 0 or self.cursor_position >= len(self.visible_nodes):
+            self.logger.info("No file selected to delete")
+            return
+        
+        node = self.visible_nodes[self.cursor_position]
+        
+        # Determine which file to delete based on active pane
+        if self.active_pane == 'left':
+            file_path = node.left_path
+        else:  # active_pane == 'right'
+            file_path = node.right_path
+        
+        # Check if file exists on the active pane
+        if not file_path:
+            self.logger.info(f"File does not exist on {self.active_pane} side")
+            return
+        
+        # Delete the file using FileOperationUI
+        try:
+            self.logger.info(f"Deleting {file_path.name} from {self.active_pane} pane")
+            self.file_operations_ui.delete_files([file_path])
+            
+            # Mark dirty to update display after operation completes
+            self.mark_dirty()
+            
+        except Exception as e:
+            self.logger.error(f"Error deleting file: {e}")
