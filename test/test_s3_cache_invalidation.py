@@ -23,8 +23,7 @@ class TestS3CacheInvalidation(unittest.TestCase):
     
     def setUp(self):
         """Set up test environment"""
-        self.log_manager = Mock()
-        self.cache_manager = CacheManager(self.log_manager)
+        self.cache_manager = CacheManager()
         
         # Mock S3 cache
         self.mock_s3_cache = Mock()

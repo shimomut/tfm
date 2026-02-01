@@ -20,9 +20,8 @@ def demo_cache_invalidation():
     """Demonstrate S3 cache invalidation functionality"""
     print("=== TFM S3 Cache Invalidation Demo ===\n")
     
-    # Create cache manager with mock log manager
-    log_manager = Mock()
-    cache_manager = CacheManager(log_manager)
+    # Create cache manager
+    cache_manager = CacheManager()
     
     # Mock S3 cache
     mock_s3_cache = Mock()

@@ -333,7 +333,7 @@ class FileManager(UILayer):
         self.quick_edit_bar = QuickEditBar(self.config, renderer)
         self.external_program_manager = ExternalProgramManager(self.config, self.log_manager, renderer)
         self.progress_manager = ProgressManager()
-        self.cache_manager = CacheManager(self.log_manager)
+        self.cache_manager = CacheManager()
         self.file_operations_executor = FileOperationExecutor(self)
         self.archive_operations_executor = ArchiveOperationExecutor(self, self.progress_manager, self.cache_manager)
         self.archive_operation_ui = ArchiveOperationUI(self)

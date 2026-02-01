@@ -13,10 +13,8 @@ from tfm_path import Path
 class CacheManager:
     """Manages cache invalidation for file operations across different storage types"""
     
-    def __init__(self, log_manager=None):
-        """Initialize cache manager with optional logging"""
-        self.log_manager = log_manager
-        # Use module-level getLogger - no need to check if log_manager exists
+    def __init__(self):
+        """Initialize cache manager"""
         from tfm_log_manager import getLogger
         self.logger = getLogger("Cache")
 
