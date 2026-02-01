@@ -578,6 +578,23 @@ class DirectoryDiffViewer(UILayer):
     displaying differences in an expandable/collapsible tree structure with visual
     highlighting. It integrates with TFM's UILayer stack system for seamless
     navigation between different views.
+    
+    File Operations:
+        Supports copy and delete operations on focused files/directories using
+        FileManager's FileOperationExecutor. Operations complete successfully with
+        proper cache invalidation and completion callbacks.
+    
+    Progress Display Limitation:
+        Copy and delete operations use FileManager's FileOperationExecutor, which
+        reports progress to FileManager's UI (invisible when DirectoryDiffViewer
+        is active). Operations complete successfully and completion callbacks work
+        correctly, but progress updates are not visible to users during long
+        operations. This is a known architectural limitation that doesn't affect
+        functionality - only the progress display during operations is affected.
+        
+        Future improvement: Refactor FileOperationExecutor to accept optional
+        progress callbacks, allowing DirectoryDiffViewer to display progress in
+        its own status bar.
     """
     
     def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None, file_manager=None, config_manager=None):
@@ -590,7 +607,11 @@ class DirectoryDiffViewer(UILayer):
             right_path: Path to right directory
             layer_stack: Optional UILayerStack for pushing new layers (e.g., DiffViewer)
             file_list_manager: Optional FileListManager instance for accessing show_hidden setting
-            file_manager: Optional FileManager instance for accessing file_operations_executor
+            file_manager: Optional FileManager instance for accessing file_operations_executor.
+                         Note: Progress updates during copy/delete operations are not visible
+                         because FileOperationExecutor reports to FileManager's UI (which is
+                         invisible when DirectoryDiffViewer is active). Operations complete
+                         successfully - only progress display is affected.
             config_manager: Optional ConfigManager instance for key bindings
         """
         self.logger = getLogger("DirDiff")
@@ -4081,6 +4102,11 @@ class DirectoryDiffViewer(UILayer):
         active pane to the opposite directory, preserving the directory structure.
         It shows a confirmation dialog and uses FileOperationExecutor for the 
         actual copy with progress tracking.
+        
+        Note: Progress updates are not visible during the copy operation because
+        FileOperationExecutor reports progress to FileManager's UI (which is
+        invisible when DirectoryDiffViewer is active). The operation completes
+        successfully and the diff view is refreshed when done.
         """
         # Check if file_manager is available (we need it for executor)
         if not self.file_manager:
@@ -4176,6 +4202,11 @@ class DirectoryDiffViewer(UILayer):
         This method deletes the file/directory that is currently focused in the
         active pane. It shows a confirmation dialog and uses FileOperationExecutor
         for the actual delete with progress tracking.
+        
+        Note: Progress updates are not visible during the delete operation because
+        FileOperationExecutor reports progress to FileManager's UI (which is
+        invisible when DirectoryDiffViewer is active). The operation completes
+        successfully and the diff view is refreshed when done.
         """
         # Check if file_manager is available (we need it for executor)
         if not self.file_manager:
