@@ -98,11 +98,14 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         self.viewer.active_pane = 'left'
         self.viewer.cursor_position = 0
         
-        # Create a mock node
+        # Create a mock node with proper attributes
         mock_node = Mock()
         mock_node.left_path = Path(os.path.join(self.left_dir, "file1.txt"))
         mock_node.right_path = None
         mock_node.name = "file1.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         self.viewer.visible_nodes = [mock_node]
         
@@ -123,7 +126,7 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         # Check that the correct file and destination were passed
         self.assertEqual(len(args[0]), 1)
         self.assertEqual(args[0][0], mock_node.left_path)
-        self.assertEqual(args[1], Path(self.right_dir))
+        self.assertEqual(args[1], Path(self.right_dir))  # Should be root since parent.depth == 0
         self.assertTrue(kwargs.get('overwrite', False))  # Should be True for diff viewer
         self.assertIsNotNone(kwargs.get('completion_callback'))  # Should have callback
     
@@ -133,11 +136,14 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         self.viewer.active_pane = 'right'
         self.viewer.cursor_position = 0
         
-        # Create a mock node
+        # Create a mock node with proper attributes
         mock_node = Mock()
         mock_node.left_path = None
         mock_node.right_path = Path(os.path.join(self.right_dir, "file2.txt"))
         mock_node.name = "file2.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         self.viewer.visible_nodes = [mock_node]
         
@@ -171,6 +177,9 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.left_path = None
         mock_node.right_path = Path(os.path.join(self.right_dir, "file2.txt"))
         mock_node.name = "file2.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         self.viewer.visible_nodes = [mock_node]
         
@@ -191,6 +200,9 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.left_path = Path(os.path.join(self.left_dir, "file1.txt"))
         mock_node.right_path = None
         mock_node.name = "file1.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         self.viewer.visible_nodes = [mock_node]
         
@@ -224,6 +236,9 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.left_path = None
         mock_node.right_path = Path(os.path.join(self.right_dir, "file2.txt"))
         mock_node.name = "file2.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         self.viewer.visible_nodes = [mock_node]
         
@@ -256,6 +271,9 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.left_path = None
         mock_node.right_path = Path(os.path.join(self.right_dir, "file2.txt"))
         mock_node.name = "file2.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         self.viewer.visible_nodes = [mock_node]
         
@@ -276,6 +294,9 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.left_path = Path(os.path.join(self.left_dir, "file1.txt"))
         mock_node.right_path = None
         mock_node.name = "file1.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         self.viewer.visible_nodes = [mock_node]
         
@@ -313,6 +334,9 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.left_path = Path(os.path.join(self.left_dir, "file1.txt"))
         mock_node.right_path = None
         mock_node.name = "file1.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         self.viewer.visible_nodes = [mock_node]
         
@@ -360,6 +384,10 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node = Mock()
         mock_node.left_path = Path(os.path.join(self.left_dir, "file1.txt"))
         mock_node.right_path = None
+        mock_node.name = "file1.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         viewer.visible_nodes = [mock_node]
         
@@ -390,6 +418,10 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node = Mock()
         mock_node.left_path = Path(os.path.join(self.left_dir, "file1.txt"))
         mock_node.right_path = None
+        mock_node.name = "file1.txt"
+        mock_node.depth = 1
+        mock_node.parent = Mock()
+        mock_node.parent.depth = 0  # Root node
         
         viewer.visible_nodes = [mock_node]
         

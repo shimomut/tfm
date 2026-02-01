@@ -4078,8 +4078,9 @@ class DirectoryDiffViewer(UILayer):
         Copy the focused file from the active pane to the opposite pane.
         
         This method copies the file/directory that is currently focused in the
-        active pane to the opposite directory. It shows a confirmation dialog
-        and uses FileOperationExecutor for the actual copy with progress tracking.
+        active pane to the opposite directory, preserving the directory structure.
+        It shows a confirmation dialog and uses FileOperationExecutor for the 
+        actual copy with progress tracking.
         """
         # Check if file_manager is available (we need it for executor)
         if not self.file_manager:
@@ -4096,25 +4097,41 @@ class DirectoryDiffViewer(UILayer):
         # Determine source and destination based on active pane
         if self.active_pane == 'left':
             source_path = node.left_path
-            dest_dir = self.right_path
+            opposite_root = self.right_path
         else:  # active_pane == 'right'
             source_path = node.right_path
-            dest_dir = self.left_path
+            opposite_root = self.left_path
         
         # Check if file exists on the active pane
         if not source_path:
             self.logger.info(f"File does not exist on {self.active_pane} side")
             return
         
+        # Calculate destination directory (preserve directory structure)
+        # Get the relative path from the node
+        node_path = self._get_node_path(node)
+        
+        # If node has a parent (not at root level), get parent path
+        if node.parent and node.parent.depth > 0:
+            parent_path = self._get_node_path(node.parent)
+            dest_dir = opposite_root / parent_path
+        else:
+            # File is at root level
+            dest_dir = opposite_root
+        
         # Show confirmation and perform copy if confirmed
         try:
-            self.logger.info(f"Copying {source_path.name} from {self.active_pane} to opposite pane")
+            self.logger.info(f"Copying {source_path.name} from {self.active_pane} to {dest_dir}")
             
             # Get the executor from file_manager
             executor = self.file_manager.file_operations_executor
             
-            # Build confirmation message
-            message = f"Copy '{source_path.name}' to {dest_dir.name}?"
+            # Build confirmation message with relative path for clarity
+            if node.parent and node.parent.depth > 0:
+                parent_path = self._get_node_path(node.parent)
+                message = f"Copy '{node_path}' to {opposite_root.name}/{parent_path}?"
+            else:
+                message = f"Copy '{source_path.name}' to {opposite_root.name}?"
             
             # Define confirmation callback
             def on_confirmed(confirmed: bool):
