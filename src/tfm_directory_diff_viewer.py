@@ -37,6 +37,7 @@ from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_info_dialog import InfoDialog
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_log_manager import getLogger
+from tfm_quick_choice_bar import QuickChoiceBar
 
 
 class DifferenceType(Enum):
@@ -577,9 +578,26 @@ class DirectoryDiffViewer(UILayer):
     displaying differences in an expandable/collapsible tree structure with visual
     highlighting. It integrates with TFM's UILayer stack system for seamless
     navigation between different views.
+    
+    File Operations:
+        Supports copy and delete operations on focused files/directories using
+        FileManager's FileOperationExecutor. Operations complete successfully with
+        proper cache invalidation and completion callbacks.
+    
+    Progress Display Limitation:
+        Copy and delete operations use FileManager's FileOperationExecutor, which
+        reports progress to FileManager's UI (invisible when DirectoryDiffViewer
+        is active). Operations complete successfully and completion callbacks work
+        correctly, but progress updates are not visible to users during long
+        operations. This is a known architectural limitation that doesn't affect
+        functionality - only the progress display during operations is affected.
+        
+        Future improvement: Refactor FileOperationExecutor to accept optional
+        progress callbacks, allowing DirectoryDiffViewer to display progress in
+        its own status bar.
     """
     
-    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None):
+    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None, file_manager=None, config_manager=None):
         """
         Initialize the directory diff viewer.
         
@@ -589,6 +607,12 @@ class DirectoryDiffViewer(UILayer):
             right_path: Path to right directory
             layer_stack: Optional UILayerStack for pushing new layers (e.g., DiffViewer)
             file_list_manager: Optional FileListManager instance for accessing show_hidden setting
+            file_manager: Optional FileManager instance for accessing file_operations_executor.
+                         Note: Progress updates during copy/delete operations are not visible
+                         because FileOperationExecutor reports to FileManager's UI (which is
+                         invisible when DirectoryDiffViewer is active). Operations complete
+                         successfully - only progress display is affected.
+            config_manager: Optional ConfigManager instance for key bindings
         """
         self.logger = getLogger("DirDiff")
         self.renderer = renderer
@@ -596,6 +620,12 @@ class DirectoryDiffViewer(UILayer):
         self.right_path = right_path
         self.layer_stack = layer_stack
         self.file_list_manager = file_list_manager
+        self.file_manager = file_manager
+        self.config_manager = config_manager
+        
+        # Create our own QuickChoiceBar for confirmation dialogs
+        # (FileManager's QuickChoiceBar is invisible when DirectoryDiffViewer is active)
+        self.quick_choice_bar = QuickChoiceBar(config_manager, renderer)
         
         # Tree structure
         self.root_node: Optional[TreeNode] = None
@@ -696,6 +726,45 @@ class DirectoryDiffViewer(UILayer):
         if not isinstance(event, KeyEvent) or event is None:
             return False
         
+        # If QuickChoiceBar is active, let it handle the event first
+        if self.quick_choice_bar.is_active:
+            result = self.quick_choice_bar.handle_input(event)
+            
+            if result == True or (isinstance(result, tuple) and result[0] == True):
+                self.mark_dirty()
+                return True
+            elif isinstance(result, tuple):
+                # Handle both old 2-tuple and new 3-tuple formats
+                if len(result) == 3:
+                    action, data, apply_to_all = result
+                else:
+                    action, data = result
+                    apply_to_all = False
+                
+                if action == 'cancel':
+                    # Store callback before exiting mode
+                    callback = self.quick_choice_bar.callback
+                    # Exit quick choice mode
+                    self.quick_choice_bar.exit()
+                    # Call callback with None to indicate cancellation
+                    if callback:
+                        callback(None)
+                    self.mark_dirty()
+                    return True
+                elif action == 'selection_changed':
+                    self.mark_dirty()
+                    return True
+                elif action == 'execute':
+                    # Store callback before exiting mode
+                    callback = self.quick_choice_bar.callback
+                    # Exit quick choice mode
+                    self.quick_choice_bar.exit()
+                    # Then execute the callback
+                    if callback:
+                        callback(data)
+                    self.mark_dirty()
+                    return True
+        
         # Allow ESC to cancel scan or close viewer
         if event.key_code == KeyCode.ESCAPE:
             if self.scan_in_progress:
@@ -746,6 +815,21 @@ class DirectoryDiffViewer(UILayer):
             self.logger.info(f"Switched focus from {old_pane} to {self.active_pane} pane")
             self.mark_dirty()
             return True
+        
+        # Check for configured key bindings if config_manager is available
+        if self.config_manager:
+            key_bindings = self.config_manager.get_key_bindings()
+            # For directory diff viewer, having a focused file is equivalent to having a selection
+            # Always pass True so that actions with 'selection': 'required' will work
+            has_focused_file = (0 <= self.cursor_position < len(self.visible_nodes))
+            action = key_bindings.find_action_for_event(event, has_selection=has_focused_file)
+            
+            if action == 'copy_files':
+                self._copy_focused_file()
+                return True
+            elif action == 'delete_files':
+                self._delete_focused_file()
+                return True
         
         # Handle character-based commands (only from KeyEvent)
         if event.char:
@@ -1069,6 +1153,10 @@ class DirectoryDiffViewer(UILayer):
         # If scan error occurred, show error screen
         if self.scan_error:
             self._render_error_screen(renderer, width, height)
+            # Render QuickChoiceBar on top if active
+            if self.quick_choice_bar.is_active:
+                status_y = height - 1
+                self.quick_choice_bar.draw(status_y, width)
             return
         
         # Always render normal dual-pane view (even during scanning)
@@ -1092,6 +1180,11 @@ class DirectoryDiffViewer(UILayer):
         
         # Render status bar with progress indicator if scanning
         self._render_status_bar(renderer, width, height)
+        
+        # Render QuickChoiceBar on top if active (for confirmation dialogs)
+        if self.quick_choice_bar.is_active:
+            status_y = height - 1
+            self.quick_choice_bar.draw(status_y, width)
     
     def _render_header(self, renderer, width: int) -> None:
         """
@@ -1621,6 +1714,19 @@ class DirectoryDiffViewer(UILayer):
     def _show_help_dialog(self) -> None:
         """Show help dialog with keyboard shortcuts."""
         title = "Directory Diff Viewer - Help"
+        
+        # Get configured keybindings for copy and delete
+        copy_keys = "C"
+        delete_keys = "K/Del"
+        if self.config_manager:
+            key_bindings = self.config_manager.get_key_bindings()
+            copy_key_list, _ = key_bindings.get_keys_for_action('copy_files')
+            delete_key_list, _ = key_bindings.get_keys_for_action('delete_files')
+            if copy_key_list:
+                copy_keys = "/".join([key_bindings.format_key_for_display(k) for k in copy_key_list[:2]])
+            if delete_key_list:
+                delete_keys = "/".join([key_bindings.format_key_for_display(k) for k in delete_key_list[:2]])
+        
         help_lines = [
             "NAVIGATION",
             "  ↑/↓           Move cursor up/down",
@@ -1635,6 +1741,10 @@ class DirectoryDiffViewer(UILayer):
             "TREE OPERATIONS",
             "  Shift+←/→     Collapse/expand directory or move to parent/child",
             "  Enter         View file diff (files) or toggle expand (directories)",
+            "",
+            "FILE OPERATIONS",
+            f"  {copy_keys:<13} Copy focused file from active pane to opposite pane",
+            f"  {delete_keys:<13} Delete focused file from active pane",
             "",
             "DISPLAY OPTIONS",
             "  i             Toggle showing identical files",
@@ -3983,3 +4093,369 @@ class DirectoryDiffViewer(UILayer):
         except Exception as e:
             # Log error
             self.logger.error(f"Error opening file diff viewer: {e}")
+    
+    def _copy_focused_file(self) -> None:
+        """
+        Copy the focused file from the active pane to the opposite pane.
+        
+        This method copies the file/directory that is currently focused in the
+        active pane to the opposite directory, preserving the directory structure.
+        It shows a confirmation dialog and uses FileOperationExecutor for the 
+        actual copy with progress tracking.
+        
+        Note: Progress updates are not visible during the copy operation because
+        FileOperationExecutor reports progress to FileManager's UI (which is
+        invisible when DirectoryDiffViewer is active). The operation completes
+        successfully and the diff view is refreshed when done.
+        """
+        # Check if file_manager is available (we need it for executor)
+        if not self.file_manager:
+            self.logger.warning("Cannot copy file: file_manager not provided to DirectoryDiffViewer")
+            return
+        
+        # Validate node index
+        if self.cursor_position < 0 or self.cursor_position >= len(self.visible_nodes):
+            self.logger.info("No file selected to copy")
+            return
+        
+        node = self.visible_nodes[self.cursor_position]
+        
+        # Determine source and destination based on active pane
+        if self.active_pane == 'left':
+            source_path = node.left_path
+            opposite_root = self.right_path
+        else:  # active_pane == 'right'
+            source_path = node.right_path
+            opposite_root = self.left_path
+        
+        # Check if file exists on the active pane
+        if not source_path:
+            self.logger.info(f"File does not exist on {self.active_pane} side")
+            return
+        
+        # Calculate destination directory (preserve directory structure)
+        # Get the relative path from the node
+        node_path = self._get_node_path(node)
+        
+        # If node has a parent (not at root level), get parent path
+        if node.parent and node.parent.depth > 0:
+            parent_path = self._get_node_path(node.parent)
+            dest_dir = opposite_root / parent_path
+        else:
+            # File is at root level
+            dest_dir = opposite_root
+        
+        # Show confirmation and perform copy if confirmed
+        try:
+            self.logger.info(f"Copying {source_path.name} from {self.active_pane} to {dest_dir}")
+            
+            # Build confirmation message with relative path for clarity
+            if node.parent and node.parent.depth > 0:
+                parent_path = self._get_node_path(node.parent)
+                message = f"Copy '{node_path}' to {opposite_root.name}/{parent_path}?"
+            else:
+                message = f"Copy '{source_path.name}' to {opposite_root.name}?"
+            
+            # Define confirmation callback
+            def on_confirmed(confirmed: bool):
+                if not confirmed:
+                    self.logger.info("Copy cancelled by user")
+                    self.mark_dirty()
+                    return
+                
+                # Define completion callback to refresh the diff viewer
+                def on_copy_complete(copied_count, error_count):
+                    if copied_count > 0:
+                        self.logger.info(f"Successfully copied {copied_count} item(s)")
+                        # Trigger a rescan to update the diff view
+                        self._trigger_rescan()
+                    elif error_count > 0:
+                        self.logger.error(f"Copy failed with {error_count} error(s)")
+                    self.mark_dirty()
+                
+                # Perform the copy operation with progress tracking
+                self.file_manager.file_operations_executor.perform_copy_operation(
+                    [source_path],
+                    dest_dir,
+                    overwrite=True,  # Overwrite existing files in diff viewer context
+                    completion_callback=on_copy_complete
+                )
+            
+            # Show confirmation using our own QuickChoiceBar
+            # (FileManager's QuickChoiceBar is invisible when DirectoryDiffViewer is active)
+            choices = [
+                {"text": "Yes", "key": "y", "value": True},
+                {"text": "No", "key": "n", "value": False}
+            ]
+            self.quick_choice_bar.show(message, choices, on_confirmed)
+            self.mark_dirty()
+            
+        except Exception as e:
+            self.logger.error(f"Error copying file: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    def _delete_focused_file(self) -> None:
+        """
+        Delete the focused file from the active pane.
+        
+        This method deletes the file/directory that is currently focused in the
+        active pane. It shows a confirmation dialog and uses FileOperationExecutor
+        for the actual delete with progress tracking.
+        
+        Note: Progress updates are not visible during the delete operation because
+        FileOperationExecutor reports progress to FileManager's UI (which is
+        invisible when DirectoryDiffViewer is active). The operation completes
+        successfully and the diff view is refreshed when done.
+        """
+        # Check if file_manager is available (we need it for executor)
+        if not self.file_manager:
+            self.logger.warning("Cannot delete file: file_manager not provided to DirectoryDiffViewer")
+            return
+        
+        # Validate node index
+        if self.cursor_position < 0 or self.cursor_position >= len(self.visible_nodes):
+            self.logger.info("No file selected to delete")
+            return
+        
+        node = self.visible_nodes[self.cursor_position]
+        
+        # Determine which file to delete based on active pane
+        if self.active_pane == 'left':
+            file_path = node.left_path
+        else:  # active_pane == 'right'
+            file_path = node.right_path
+        
+        # Check if file exists on the active pane
+        if not file_path:
+            self.logger.info(f"File does not exist on {self.active_pane} side")
+            return
+        
+        # Show confirmation and perform delete if confirmed
+        try:
+            self.logger.info(f"Deleting {file_path.name} from {self.active_pane} pane")
+            
+            # Build confirmation message
+            message = f"Delete '{file_path.name}'?"
+            
+            # Define confirmation callback
+            def on_confirmed(confirmed: bool):
+                if not confirmed:
+                    self.logger.info("Delete cancelled by user")
+                    self.mark_dirty()
+                    return
+                
+                # Define completion callback to refresh the diff viewer
+                def on_delete_complete(deleted_count, error_count):
+                    if deleted_count > 0:
+                        self.logger.info(f"Successfully deleted {deleted_count} item(s)")
+                        # Trigger a rescan to update the diff view
+                        self._trigger_rescan()
+                    elif error_count > 0:
+                        self.logger.error(f"Delete failed with {error_count} error(s)")
+                    self.mark_dirty()
+                
+                # Perform the delete operation with progress tracking
+                self.file_manager.file_operations_executor.perform_delete_operation(
+                    [file_path],
+                    completion_callback=on_delete_complete
+                )
+            
+            # Show confirmation using our own QuickChoiceBar
+            # (FileManager's QuickChoiceBar is invisible when DirectoryDiffViewer is active)
+            choices = [
+                {"text": "Yes", "key": "y", "value": True},
+                {"text": "No", "key": "n", "value": False}
+            ]
+            self.quick_choice_bar.show(message, choices, on_confirmed)
+            self.mark_dirty()
+            
+        except Exception as e:
+            self.logger.error(f"Error deleting file: {e}")
+    
+    def _trigger_rescan(self) -> None:
+        """
+        Trigger a rescan of both directories to update the diff view.
+        
+        This method is called after file operations (copy/delete) to refresh
+        the directory comparison and show the updated state.
+        
+        The expansion state of the tree is preserved across rescans to maintain
+        good UX - users don't lose their place in the tree.
+        """
+        try:
+            # Save current expansion state before rescanning
+            expansion_state = self._save_expansion_state()
+            
+            # Save current cursor position (relative path)
+            cursor_path = None
+            if 0 <= self.cursor_position < len(self.visible_nodes):
+                focused_node = self.visible_nodes[self.cursor_position]
+                cursor_path = self._get_node_path(focused_node)
+            
+            # Cancel any ongoing scan
+            self.cancelled = True
+            
+            # Wait briefly for worker threads to finish
+            if self.scanner_thread and self.scanner_thread.is_alive():
+                self.scanner_thread.join(timeout=0.5)
+            if self.comparator_thread and self.comparator_thread.is_alive():
+                self.comparator_thread.join(timeout=0.5)
+            
+            # Reset state
+            self.cancelled = False
+            self.scan_in_progress = False
+            self.scan_error = None
+            self.comparison_errors.clear()
+            
+            # Clear existing data
+            with self.data_lock:
+                self.left_files.clear()
+                self.right_files.clear()
+            
+            # Clear work queues
+            with self.queue_lock:
+                # Empty the queues
+                while not self.scan_queue.empty():
+                    try:
+                        self.scan_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                while not self.priority_queue.empty():
+                    try:
+                        self.priority_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                while not self.comparison_queue.empty():
+                    try:
+                        self.comparison_queue.get_nowait()
+                    except queue.Empty:
+                        break
+            
+            # Start a new scan
+            self.start_scan()
+            
+            # Wait briefly for initial scan results
+            import time
+            time.sleep(0.1)
+            
+            # Restore expansion state after tree is rebuilt
+            if self.root_node:
+                self._restore_expansion_state(expansion_state)
+                self._update_visible_nodes()
+                
+                # Try to restore cursor position
+                if cursor_path:
+                    self._restore_cursor_position(cursor_path)
+            
+            self.mark_dirty()
+            
+        except Exception as e:
+            self.logger.error(f"Error triggering rescan: {e}")
+    
+    def _save_expansion_state(self) -> set:
+        """
+        Save the current expansion state of all nodes in the tree.
+        
+        Returns:
+            Set of paths (as strings) for all expanded nodes
+        """
+        expanded_paths = set()
+        
+        if self.root_node:
+            self._collect_expanded_paths(self.root_node, expanded_paths)
+        
+        return expanded_paths
+    
+    def _collect_expanded_paths(self, node: TreeNode, expanded_paths: set) -> None:
+        """
+        Recursively collect paths of all expanded nodes.
+        
+        Args:
+            node: Current node to check
+            expanded_paths: Set to add expanded node paths to
+        """
+        if node.is_expanded and node.depth > 0:
+            # Build path from root to this node
+            path = self._get_node_path(node)
+            expanded_paths.add(path)
+        
+        # Recurse to children
+        for child in node.children:
+            self._collect_expanded_paths(child, expanded_paths)
+    
+    def _get_node_path(self, node: TreeNode) -> str:
+        """
+        Get the full path from root to the given node.
+        
+        Args:
+            node: Node to get path for
+            
+        Returns:
+            Path as string (e.g., "dir1/dir2/file.txt")
+        """
+        path_parts = []
+        current = node
+        
+        while current and current.depth > 0:
+            path_parts.insert(0, current.name)
+            current = current.parent
+        
+        return "/".join(path_parts)
+    
+    def _restore_expansion_state(self, expanded_paths: set) -> None:
+        """
+        Restore the expansion state of nodes in the tree.
+        
+        Args:
+            expanded_paths: Set of paths (as strings) that should be expanded
+        """
+        if self.root_node:
+            self._apply_expansion_state(self.root_node, expanded_paths)
+    
+    def _apply_expansion_state(self, node: TreeNode, expanded_paths: set) -> None:
+        """
+        Recursively apply expansion state to nodes.
+        
+        Args:
+            node: Current node to process
+            expanded_paths: Set of paths that should be expanded
+        """
+        if node.depth > 0:
+            path = self._get_node_path(node)
+            node.is_expanded = path in expanded_paths
+        
+        # Recurse to children
+        for child in node.children:
+            self._apply_expansion_state(child, expanded_paths)
+    
+    def _restore_cursor_position(self, target_path: str) -> None:
+        """
+        Try to restore the cursor to the same file/directory after rescan.
+        
+        Args:
+            target_path: Path of the node that was focused before rescan
+        """
+        # Search for the node with matching path in visible_nodes
+        for i, node in enumerate(self.visible_nodes):
+            node_path = self._get_node_path(node)
+            if node_path == target_path:
+                self.cursor_position = i
+                return
+        
+        # If exact match not found, try to find closest parent directory
+        # This handles the case where the focused file was deleted
+        path_parts = target_path.split("/")
+        while len(path_parts) > 0:
+            path_parts.pop()
+            parent_path = "/".join(path_parts)
+            
+            for i, node in enumerate(self.visible_nodes):
+                node_path = self._get_node_path(node)
+                if node_path == parent_path:
+                    self.cursor_position = i
+                    return
+        
+        # If nothing found, keep cursor at current position (clamped to valid range)
+        if self.visible_nodes:
+            self.cursor_position = min(self.cursor_position, len(self.visible_nodes) - 1)
