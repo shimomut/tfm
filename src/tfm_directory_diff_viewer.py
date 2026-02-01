@@ -4123,9 +4123,6 @@ class DirectoryDiffViewer(UILayer):
         try:
             self.logger.info(f"Copying {source_path.name} from {self.active_pane} to {dest_dir}")
             
-            # Get the executor from file_manager
-            executor = self.file_manager.file_operations_executor
-            
             # Build confirmation message with relative path for clarity
             if node.parent and node.parent.depth > 0:
                 parent_path = self._get_node_path(node.parent)
@@ -4151,7 +4148,7 @@ class DirectoryDiffViewer(UILayer):
                     self.mark_dirty()
                 
                 # Perform the copy operation with progress tracking
-                executor.perform_copy_operation(
+                self.file_manager.file_operations_executor.perform_copy_operation(
                     [source_path],
                     dest_dir,
                     overwrite=True,  # Overwrite existing files in diff viewer context
@@ -4207,9 +4204,6 @@ class DirectoryDiffViewer(UILayer):
         try:
             self.logger.info(f"Deleting {file_path.name} from {self.active_pane} pane")
             
-            # Get the executor from file_manager
-            executor = self.file_manager.file_operations_executor
-            
             # Build confirmation message
             message = f"Delete '{file_path.name}'?"
             
@@ -4231,7 +4225,7 @@ class DirectoryDiffViewer(UILayer):
                     self.mark_dirty()
                 
                 # Perform the delete operation with progress tracking
-                executor.perform_delete_operation(
+                self.file_manager.file_operations_executor.perform_delete_operation(
                     [file_path],
                     completion_callback=on_delete_complete
                 )

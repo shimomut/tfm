@@ -73,7 +73,7 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
             Path(self.right_dir),
             self.layer_stack,
             self.file_list_manager,
-            self.file_manager,  # Pass file_manager directly
+            self.file_manager,  # Pass file_manager
             self.config_manager
         )
         
@@ -364,15 +364,15 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         self.executor.perform_delete_operation.assert_called_once()
     
     def test_copy_without_file_operations_ui(self):
-        """Test that copy logs warning when file_operations_ui is not available."""
-        # Create viewer without file_operations_ui
+        """Test that copy logs warning when file_manager is not available."""
+        # Create viewer without file_manager
         viewer = DirectoryDiffViewer(
             self.renderer,
             Path(self.left_dir),
             Path(self.right_dir),
             self.layer_stack,
             self.file_list_manager,
-            None,  # No file_operations_ui
+            None,  # No file_manager
             self.config_manager
         )
         
@@ -398,15 +398,15 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         # (Logger warning is tested separately)
     
     def test_delete_without_file_operations_ui(self):
-        """Test that delete logs warning when file_operations_ui is not available."""
-        # Create viewer without file_operations_ui
+        """Test that delete logs warning when file_manager is not available."""
+        # Create viewer without file_manager
         viewer = DirectoryDiffViewer(
             self.renderer,
             Path(self.left_dir),
             Path(self.right_dir),
             self.layer_stack,
             self.file_list_manager,
-            None,  # No file_operations_ui
+            None,  # No file_manager
             self.config_manager
         )
         
