@@ -4237,8 +4237,20 @@ class DirectoryDiffViewer(UILayer):
         
         This method is called after file operations (copy/delete) to refresh
         the directory comparison and show the updated state.
+        
+        The expansion state of the tree is preserved across rescans to maintain
+        good UX - users don't lose their place in the tree.
         """
         try:
+            # Save current expansion state before rescanning
+            expansion_state = self._save_expansion_state()
+            
+            # Save current cursor position (relative path)
+            cursor_path = None
+            if 0 <= self.cursor_position < len(self.visible_nodes):
+                focused_node = self.visible_nodes[self.cursor_position]
+                cursor_path = self._get_node_path(focused_node)
+            
             # Cancel any ongoing scan
             self.cancelled = True
             
@@ -4280,7 +4292,128 @@ class DirectoryDiffViewer(UILayer):
             
             # Start a new scan
             self.start_scan()
+            
+            # Wait briefly for initial scan results
+            import time
+            time.sleep(0.1)
+            
+            # Restore expansion state after tree is rebuilt
+            if self.root_node:
+                self._restore_expansion_state(expansion_state)
+                self._update_visible_nodes()
+                
+                # Try to restore cursor position
+                if cursor_path:
+                    self._restore_cursor_position(cursor_path)
+            
             self.mark_dirty()
             
         except Exception as e:
             self.logger.error(f"Error triggering rescan: {e}")
+    
+    def _save_expansion_state(self) -> set:
+        """
+        Save the current expansion state of all nodes in the tree.
+        
+        Returns:
+            Set of paths (as strings) for all expanded nodes
+        """
+        expanded_paths = set()
+        
+        if self.root_node:
+            self._collect_expanded_paths(self.root_node, expanded_paths)
+        
+        return expanded_paths
+    
+    def _collect_expanded_paths(self, node: TreeNode, expanded_paths: set) -> None:
+        """
+        Recursively collect paths of all expanded nodes.
+        
+        Args:
+            node: Current node to check
+            expanded_paths: Set to add expanded node paths to
+        """
+        if node.is_expanded and node.depth > 0:
+            # Build path from root to this node
+            path = self._get_node_path(node)
+            expanded_paths.add(path)
+        
+        # Recurse to children
+        for child in node.children:
+            self._collect_expanded_paths(child, expanded_paths)
+    
+    def _get_node_path(self, node: TreeNode) -> str:
+        """
+        Get the full path from root to the given node.
+        
+        Args:
+            node: Node to get path for
+            
+        Returns:
+            Path as string (e.g., "dir1/dir2/file.txt")
+        """
+        path_parts = []
+        current = node
+        
+        while current and current.depth > 0:
+            path_parts.insert(0, current.name)
+            current = current.parent
+        
+        return "/".join(path_parts)
+    
+    def _restore_expansion_state(self, expanded_paths: set) -> None:
+        """
+        Restore the expansion state of nodes in the tree.
+        
+        Args:
+            expanded_paths: Set of paths (as strings) that should be expanded
+        """
+        if self.root_node:
+            self._apply_expansion_state(self.root_node, expanded_paths)
+    
+    def _apply_expansion_state(self, node: TreeNode, expanded_paths: set) -> None:
+        """
+        Recursively apply expansion state to nodes.
+        
+        Args:
+            node: Current node to process
+            expanded_paths: Set of paths that should be expanded
+        """
+        if node.depth > 0:
+            path = self._get_node_path(node)
+            node.is_expanded = path in expanded_paths
+        
+        # Recurse to children
+        for child in node.children:
+            self._apply_expansion_state(child, expanded_paths)
+    
+    def _restore_cursor_position(self, target_path: str) -> None:
+        """
+        Try to restore the cursor to the same file/directory after rescan.
+        
+        Args:
+            target_path: Path of the node that was focused before rescan
+        """
+        # Search for the node with matching path in visible_nodes
+        for i, node in enumerate(self.visible_nodes):
+            node_path = self._get_node_path(node)
+            if node_path == target_path:
+                self.cursor_position = i
+                return
+        
+        # If exact match not found, try to find closest parent directory
+        # This handles the case where the focused file was deleted
+        path_parts = target_path.split("/")
+        while len(path_parts) > 0:
+            path_parts.pop()
+            parent_path = "/".join(path_parts)
+            
+            for i, node in enumerate(self.visible_nodes):
+                node_path = self._get_node_path(node)
+                if node_path == parent_path:
+                    self.cursor_position = i
+                    return
+        
+        # If nothing found, keep cursor at current position (clamped to valid range)
+        if self.visible_nodes:
+            self.cursor_position = min(self.cursor_position, len(self.visible_nodes) - 1)
