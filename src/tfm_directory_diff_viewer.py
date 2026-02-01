@@ -37,6 +37,7 @@ from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_info_dialog import InfoDialog
 from tfm_progress_animator import ProgressAnimatorFactory
 from tfm_log_manager import getLogger
+from tfm_quick_choice_bar import QuickChoiceBar
 
 
 class DifferenceType(Enum):
@@ -579,7 +580,7 @@ class DirectoryDiffViewer(UILayer):
     navigation between different views.
     """
     
-    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None, file_operations_ui=None, config_manager=None):
+    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None, file_manager=None, config_manager=None):
         """
         Initialize the directory diff viewer.
         
@@ -589,7 +590,7 @@ class DirectoryDiffViewer(UILayer):
             right_path: Path to right directory
             layer_stack: Optional UILayerStack for pushing new layers (e.g., DiffViewer)
             file_list_manager: Optional FileListManager instance for accessing show_hidden setting
-            file_operations_ui: Optional FileOperationUI instance for copy/delete operations
+            file_manager: Optional FileManager instance for accessing file_operations_executor
             config_manager: Optional ConfigManager instance for key bindings
         """
         self.logger = getLogger("DirDiff")
@@ -598,8 +599,12 @@ class DirectoryDiffViewer(UILayer):
         self.right_path = right_path
         self.layer_stack = layer_stack
         self.file_list_manager = file_list_manager
-        self.file_operations_ui = file_operations_ui
+        self.file_manager = file_manager
         self.config_manager = config_manager
+        
+        # Create our own QuickChoiceBar for confirmation dialogs
+        # (FileManager's QuickChoiceBar is invisible when DirectoryDiffViewer is active)
+        self.quick_choice_bar = QuickChoiceBar(config_manager, renderer)
         
         # Tree structure
         self.root_node: Optional[TreeNode] = None
@@ -699,6 +704,45 @@ class DirectoryDiffViewer(UILayer):
         # Only handle KeyEvents, not CharEvents
         if not isinstance(event, KeyEvent) or event is None:
             return False
+        
+        # If QuickChoiceBar is active, let it handle the event first
+        if self.quick_choice_bar.is_active:
+            result = self.quick_choice_bar.handle_input(event)
+            
+            if result == True or (isinstance(result, tuple) and result[0] == True):
+                self.mark_dirty()
+                return True
+            elif isinstance(result, tuple):
+                # Handle both old 2-tuple and new 3-tuple formats
+                if len(result) == 3:
+                    action, data, apply_to_all = result
+                else:
+                    action, data = result
+                    apply_to_all = False
+                
+                if action == 'cancel':
+                    # Store callback before exiting mode
+                    callback = self.quick_choice_bar.callback
+                    # Exit quick choice mode
+                    self.quick_choice_bar.exit()
+                    # Call callback with None to indicate cancellation
+                    if callback:
+                        callback(None)
+                    self.mark_dirty()
+                    return True
+                elif action == 'selection_changed':
+                    self.mark_dirty()
+                    return True
+                elif action == 'execute':
+                    # Store callback before exiting mode
+                    callback = self.quick_choice_bar.callback
+                    # Exit quick choice mode
+                    self.quick_choice_bar.exit()
+                    # Then execute the callback
+                    if callback:
+                        callback(data)
+                    self.mark_dirty()
+                    return True
         
         # Allow ESC to cancel scan or close viewer
         if event.key_code == KeyCode.ESCAPE:
@@ -1088,6 +1132,10 @@ class DirectoryDiffViewer(UILayer):
         # If scan error occurred, show error screen
         if self.scan_error:
             self._render_error_screen(renderer, width, height)
+            # Render QuickChoiceBar on top if active
+            if self.quick_choice_bar.is_active:
+                status_y = height - 1
+                self.quick_choice_bar.draw(status_y, width)
             return
         
         # Always render normal dual-pane view (even during scanning)
@@ -1111,6 +1159,11 @@ class DirectoryDiffViewer(UILayer):
         
         # Render status bar with progress indicator if scanning
         self._render_status_bar(renderer, width, height)
+        
+        # Render QuickChoiceBar on top if active (for confirmation dialogs)
+        if self.quick_choice_bar.is_active:
+            status_y = height - 1
+            self.quick_choice_bar.draw(status_y, width)
     
     def _render_header(self, renderer, width: int) -> None:
         """
@@ -4025,12 +4078,12 @@ class DirectoryDiffViewer(UILayer):
         Copy the focused file from the active pane to the opposite pane.
         
         This method copies the file/directory that is currently focused in the
-        active pane to the opposite directory. It uses the FileOperationExecutor
-        to perform the actual copy operation.
+        active pane to the opposite directory. It shows a confirmation dialog
+        and uses FileOperationExecutor for the actual copy with progress tracking.
         """
-        # Check if file_operations_ui is available (we need it to access the executor)
-        if not self.file_operations_ui:
-            self.logger.warning("Cannot copy file: file_operations_ui not provided to DirectoryDiffViewer")
+        # Check if file_manager is available (we need it for executor)
+        if not self.file_manager:
+            self.logger.warning("Cannot copy file: file_manager not provided to DirectoryDiffViewer")
             return
         
         # Validate node index
@@ -4053,36 +4106,49 @@ class DirectoryDiffViewer(UILayer):
             self.logger.info(f"File does not exist on {self.active_pane} side")
             return
         
-        # Copy the file using FileOperationExecutor directly
+        # Show confirmation and perform copy if confirmed
         try:
             self.logger.info(f"Copying {source_path.name} from {self.active_pane} to opposite pane")
-            self.logger.info(f"Source: {source_path}")
-            self.logger.info(f"Destination: {dest_dir}")
             
             # Get the executor from file_manager
-            executor = self.file_operations_ui.file_manager.file_operations_executor
-            self.logger.info(f"Got executor: {executor}")
+            executor = self.file_manager.file_operations_executor
             
-            # Define completion callback to refresh the diff viewer
-            def on_copy_complete(copied_count, error_count):
-                self.logger.info(f"Copy complete callback: copied={copied_count}, errors={error_count}")
-                if copied_count > 0:
-                    self.logger.info(f"Successfully copied {copied_count} item(s)")
-                    # Trigger a rescan to update the diff view
-                    self._trigger_rescan()
-                elif error_count > 0:
-                    self.logger.error(f"Copy failed with {error_count} error(s)")
-                self.mark_dirty()
+            # Build confirmation message
+            message = f"Copy '{source_path.name}' to {dest_dir.name}?"
             
-            # Perform the copy operation
-            self.logger.info("Calling executor.perform_copy_operation...")
-            executor.perform_copy_operation(
-                [source_path],
-                dest_dir,
-                overwrite=True,  # Overwrite existing files in diff viewer context
-                completion_callback=on_copy_complete
-            )
-            self.logger.info("executor.perform_copy_operation called (running in background thread)")
+            # Define confirmation callback
+            def on_confirmed(confirmed: bool):
+                if not confirmed:
+                    self.logger.info("Copy cancelled by user")
+                    self.mark_dirty()
+                    return
+                
+                # Define completion callback to refresh the diff viewer
+                def on_copy_complete(copied_count, error_count):
+                    if copied_count > 0:
+                        self.logger.info(f"Successfully copied {copied_count} item(s)")
+                        # Trigger a rescan to update the diff view
+                        self._trigger_rescan()
+                    elif error_count > 0:
+                        self.logger.error(f"Copy failed with {error_count} error(s)")
+                    self.mark_dirty()
+                
+                # Perform the copy operation with progress tracking
+                executor.perform_copy_operation(
+                    [source_path],
+                    dest_dir,
+                    overwrite=True,  # Overwrite existing files in diff viewer context
+                    completion_callback=on_copy_complete
+                )
+            
+            # Show confirmation using our own QuickChoiceBar
+            # (FileManager's QuickChoiceBar is invisible when DirectoryDiffViewer is active)
+            choices = [
+                {"text": "Yes", "key": "y", "value": True},
+                {"text": "No", "key": "n", "value": False}
+            ]
+            self.quick_choice_bar.show(message, choices, on_confirmed)
+            self.mark_dirty()
             
         except Exception as e:
             self.logger.error(f"Error copying file: {e}")
@@ -4094,12 +4160,12 @@ class DirectoryDiffViewer(UILayer):
         Delete the focused file from the active pane.
         
         This method deletes the file/directory that is currently focused in the
-        active pane. It uses the FileOperationExecutor to perform the actual
-        delete operation.
+        active pane. It shows a confirmation dialog and uses FileOperationExecutor
+        for the actual delete with progress tracking.
         """
-        # Check if file_operations_ui is available (we need it to access the executor)
-        if not self.file_operations_ui:
-            self.logger.warning("Cannot delete file: file_operations_ui not provided to DirectoryDiffViewer")
+        # Check if file_manager is available (we need it for executor)
+        if not self.file_manager:
+            self.logger.warning("Cannot delete file: file_manager not provided to DirectoryDiffViewer")
             return
         
         # Validate node index
@@ -4120,28 +4186,47 @@ class DirectoryDiffViewer(UILayer):
             self.logger.info(f"File does not exist on {self.active_pane} side")
             return
         
-        # Delete the file using FileOperationExecutor directly
+        # Show confirmation and perform delete if confirmed
         try:
             self.logger.info(f"Deleting {file_path.name} from {self.active_pane} pane")
             
             # Get the executor from file_manager
-            executor = self.file_operations_ui.file_manager.file_operations_executor
+            executor = self.file_manager.file_operations_executor
             
-            # Define completion callback to refresh the diff viewer
-            def on_delete_complete(deleted_count, error_count):
-                if deleted_count > 0:
-                    self.logger.info(f"Successfully deleted {deleted_count} item(s)")
-                    # Trigger a rescan to update the diff view
-                    self._trigger_rescan()
-                elif error_count > 0:
-                    self.logger.error(f"Delete failed with {error_count} error(s)")
-                self.mark_dirty()
+            # Build confirmation message
+            message = f"Delete '{file_path.name}'?"
             
-            # Perform the delete operation
-            executor.perform_delete_operation(
-                [file_path],
-                completion_callback=on_delete_complete
-            )
+            # Define confirmation callback
+            def on_confirmed(confirmed: bool):
+                if not confirmed:
+                    self.logger.info("Delete cancelled by user")
+                    self.mark_dirty()
+                    return
+                
+                # Define completion callback to refresh the diff viewer
+                def on_delete_complete(deleted_count, error_count):
+                    if deleted_count > 0:
+                        self.logger.info(f"Successfully deleted {deleted_count} item(s)")
+                        # Trigger a rescan to update the diff view
+                        self._trigger_rescan()
+                    elif error_count > 0:
+                        self.logger.error(f"Delete failed with {error_count} error(s)")
+                    self.mark_dirty()
+                
+                # Perform the delete operation with progress tracking
+                executor.perform_delete_operation(
+                    [file_path],
+                    completion_callback=on_delete_complete
+                )
+            
+            # Show confirmation using our own QuickChoiceBar
+            # (FileManager's QuickChoiceBar is invisible when DirectoryDiffViewer is active)
+            choices = [
+                {"text": "Yes", "key": "y", "value": True},
+                {"text": "No", "key": "n", "value": False}
+            ]
+            self.quick_choice_bar.show(message, choices, on_confirmed)
+            self.mark_dirty()
             
         except Exception as e:
             self.logger.error(f"Error deleting file: {e}")

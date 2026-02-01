@@ -50,13 +50,11 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         self.file_list_manager = Mock()
         self.file_list_manager.show_hidden = False
         
-        # Mock file_operations_ui and its dependencies
-        self.file_operations_ui = Mock()
+        # Mock file_manager and its dependencies
         self.file_manager = Mock()
         self.executor = Mock()
         
-        # Set up the mock chain: file_operations_ui -> file_manager -> executor
-        self.file_operations_ui.file_manager = self.file_manager
+        # Set up the mock chain: file_manager -> executor
         self.file_manager.file_operations_executor = self.executor
         
         self.config_manager = Mock()
@@ -75,7 +73,7 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
             Path(self.right_dir),
             self.layer_stack,
             self.file_list_manager,
-            self.file_operations_ui,
+            self.file_manager,  # Pass file_manager directly
             self.config_manager
         )
         
@@ -108,6 +106,13 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         
         self.viewer.visible_nodes = [mock_node]
         
+        # Mock quick_choice_bar.show to capture the callback and simulate confirmation
+        def mock_show(message, choices, callback):
+            # Simulate user confirming with "Yes"
+            callback(True)
+        
+        self.viewer.quick_choice_bar.show = mock_show
+        
         # Call copy method
         self.viewer._copy_focused_file()
         
@@ -119,7 +124,7 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         self.assertEqual(len(args[0]), 1)
         self.assertEqual(args[0][0], mock_node.left_path)
         self.assertEqual(args[1], Path(self.right_dir))
-        self.assertFalse(kwargs.get('overwrite', True))  # Should default to False
+        self.assertTrue(kwargs.get('overwrite', False))  # Should be True for diff viewer
         self.assertIsNotNone(kwargs.get('completion_callback'))  # Should have callback
     
     def test_copy_file_from_right_pane(self):
@@ -135,6 +140,13 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.name = "file2.txt"
         
         self.viewer.visible_nodes = [mock_node]
+        
+        # Mock quick_choice_bar.show to capture the callback and simulate confirmation
+        def mock_show(message, choices, callback):
+            # Simulate user confirming with "Yes"
+            callback(True)
+        
+        self.viewer.quick_choice_bar.show = mock_show
         
         # Call copy method
         self.viewer._copy_focused_file()
@@ -182,6 +194,13 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         
         self.viewer.visible_nodes = [mock_node]
         
+        # Mock quick_choice_bar.show to capture the callback and simulate confirmation
+        def mock_show(message, choices, callback):
+            # Simulate user confirming with "Yes"
+            callback(True)
+        
+        self.viewer.quick_choice_bar.show = mock_show
+        
         # Call delete method
         self.viewer._delete_focused_file()
         
@@ -207,6 +226,13 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.name = "file2.txt"
         
         self.viewer.visible_nodes = [mock_node]
+        
+        # Mock quick_choice_bar.show to capture the callback and simulate confirmation
+        def mock_show(message, choices, callback):
+            # Simulate user confirming with "Yes"
+            callback(True)
+        
+        self.viewer.quick_choice_bar.show = mock_show
         
         # Call delete method
         self.viewer._delete_focused_file()
@@ -253,6 +279,13 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         
         self.viewer.visible_nodes = [mock_node]
         
+        # Mock quick_choice_bar.show to capture the callback and simulate confirmation
+        def mock_show(message, choices, callback):
+            # Simulate user confirming with "Yes"
+            callback(True)
+        
+        self.viewer.quick_choice_bar.show = mock_show
+        
         # Mock key bindings to return 'copy_files' action
         key_bindings = self.config_manager.get_key_bindings.return_value
         key_bindings.find_action_for_event.return_value = 'copy_files'
@@ -282,6 +315,13 @@ class TestDirectoryDiffCopyDelete(unittest.TestCase):
         mock_node.name = "file1.txt"
         
         self.viewer.visible_nodes = [mock_node]
+        
+        # Mock quick_choice_bar.show to capture the callback and simulate confirmation
+        def mock_show(message, choices, callback):
+            # Simulate user confirming with "Yes"
+            callback(True)
+        
+        self.viewer.quick_choice_bar.show = mock_show
         
         # Mock key bindings to return 'delete_files' action
         key_bindings = self.config_manager.get_key_bindings.return_value

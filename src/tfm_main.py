@@ -3896,7 +3896,7 @@ class FileManager(UILayer):
                 right_path, 
                 self.ui_layer_stack, 
                 self.file_list_manager,
-                self.file_operations_ui,
+                self,  # Pass FileManager directly instead of file_operations_ui
                 config_manager
             )
             if viewer:

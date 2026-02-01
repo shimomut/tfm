@@ -123,8 +123,13 @@ def main():
         # Create UI layer stack
         layer_stack = UILayerStack(app.renderer)
         
-        # Create file operations UI
-        file_operations_ui = FileOperationUI(
+        # Create a minimal mock FileManager for copy/delete operations
+        # In a real application, this would be the actual FileManager instance
+        from unittest.mock import Mock
+        from tfm_file_operation_executor import FileOperationExecutor
+        
+        file_manager = Mock()
+        file_manager.file_operations_executor = FileOperationExecutor(
             app.renderer,
             layer_stack,
             config_manager,
@@ -141,7 +146,7 @@ def main():
             right_path,
             layer_stack,
             file_list_manager,
-            file_operations_ui,
+            file_manager,  # Pass file_manager directly
             config_manager
         )
         
