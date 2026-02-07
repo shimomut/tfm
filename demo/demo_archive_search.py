@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from tfm_path import Path
 from tfm_search_dialog import SearchDialog
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 def create_demo_archive():
@@ -139,7 +139,7 @@ def demo_filename_search():
         print(f"Archive path: {archive_uri}")
         
         # Create search dialog
-        config = DefaultConfig()
+        config = Config()
         search_dialog = SearchDialog(config)
         
         # Test 1: Search for Python files
@@ -211,7 +211,7 @@ def demo_content_search():
         print(f"\nCreated demo archive: {os.path.basename(zip_path)}")
         
         # Create search dialog
-        config = DefaultConfig()
+        config = Config()
         search_dialog = SearchDialog(config)
         
         # Test 1: Search for "helper" in content
@@ -279,7 +279,7 @@ def demo_scoped_search():
     
     try:
         # Create search dialog
-        config = DefaultConfig()
+        config = Config()
         search_dialog = SearchDialog(config)
         
         # Test 1: Search from archive root

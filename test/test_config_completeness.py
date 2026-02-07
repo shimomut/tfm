@@ -8,7 +8,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_config_completeness.py -v
 from pathlib import Path
 import unittest
 
-from tfm_config import DefaultConfig
+from _config import Config
 from _config import Config
 
 class TestConfigCompleteness(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestConfigCompleteness(unittest.TestCase):
     
     def setUp(self):
         """Set up test environment"""
-        self.default_config = DefaultConfig()
+        self.default_config = Config()
         self.user_config = Config()
     
     def test_performance_settings_exist(self):
@@ -43,11 +43,11 @@ class TestConfigCompleteness(unittest.TestCase):
                 user_value = getattr(self.user_config, setting)
                 
                 self.assertIsInstance(default_value, int, 
-                                    f"DefaultConfig.{setting} should be int")
+                                    f"Config.{setting} should be int")
                 self.assertIsInstance(user_value, int, 
                                     f"Config.{setting} should be int")
                 self.assertGreater(default_value, 0, 
-                                 f"DefaultConfig.{setting} should be positive")
+                                 f"Config.{setting} should be positive")
                 self.assertGreater(user_value, 0, 
                                  f"Config.{setting} should be positive")
     
@@ -81,21 +81,21 @@ class TestConfigCompleteness(unittest.TestCase):
                 if 'RATIO' in setting:
                     # Ratio values should be floats between 0 and 1
                     self.assertIsInstance(default_value, (int, float), 
-                                        f"DefaultConfig.{setting} should be numeric")
+                                        f"Config.{setting} should be numeric")
                     self.assertIsInstance(user_value, (int, float), 
                                         f"Config.{setting} should be numeric")
                     self.assertGreater(default_value, 0, 
-                                     f"DefaultConfig.{setting} should be positive")
+                                     f"Config.{setting} should be positive")
                     self.assertLessEqual(default_value, 1, 
-                                       f"DefaultConfig.{setting} should be <= 1")
+                                       f"Config.{setting} should be <= 1")
                 else:
                     # Min width/height values should be positive integers
                     self.assertIsInstance(default_value, int, 
-                                        f"DefaultConfig.{setting} should be int")
+                                        f"Config.{setting} should be int")
                     self.assertIsInstance(user_value, int, 
                                         f"Config.{setting} should be int")
                     self.assertGreater(default_value, 0, 
-                                     f"DefaultConfig.{setting} should be positive")
+                                     f"Config.{setting} should be positive")
     
     def test_animation_settings_exist(self):
         """Test that animation settings are defined"""

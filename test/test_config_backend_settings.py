@@ -20,7 +20,7 @@ from tfm_config import ConfigManager, DefaultConfig
 
 def test_default_backend_config():
     """Test that default configuration includes backend settings"""
-    config = DefaultConfig()
+    config = Config()
     
     # Check backend settings exist
     assert hasattr(config, 'PREFERRED_BACKEND'), "DefaultConfig should have PREFERRED_BACKEND"

@@ -12,7 +12,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 try:
-    from tfm_config import DefaultConfig, get_config
+    from _config import Config, get_config
     from tfm_s3 import get_s3_cache
 except ImportError as e:
     print(f"Import error: {e}")
@@ -25,7 +25,7 @@ def demo_default_ttl():
     print("=== S3 Cache TTL Configuration Demo ===\n")
     
     print("1. Default Configuration:")
-    print(f"   DefaultConfig.S3_CACHE_TTL = {DefaultConfig.S3_CACHE_TTL} seconds")
+    print(f"   Config.S3_CACHE_TTL = {Config.S3_CACHE_TTL} seconds")
     
     # Get current config
     config = get_config()

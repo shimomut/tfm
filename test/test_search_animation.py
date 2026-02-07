@@ -11,7 +11,7 @@ import shutil
 
 from tfm_search_dialog import SearchDialog
 from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class AnimationTestConfig(DefaultConfig):

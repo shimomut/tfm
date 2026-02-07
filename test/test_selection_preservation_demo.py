@@ -8,7 +8,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_selection_preservation_demo.py -
 import tempfile
 import time
 
-from tfm_config import DefaultConfig
+from _config import Config
 
 def create_test_directories():
     """Create a test directory structure"""
@@ -42,7 +42,7 @@ def demo_selection_preservation():
     print(f"Created test directory: {test_path}")
     
     # Initialize jump dialog
-    config = DefaultConfig()
+    config = Config()
     jump_dialog = JumpDialog(config)
     
     try:

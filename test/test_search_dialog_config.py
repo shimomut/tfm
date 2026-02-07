@@ -7,7 +7,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_search_dialog_config.py -v
 
 import unittest
 
-from tfm_config import DefaultConfig
+from _config import Config
 from _config import Config
 from tfm_search_dialog import SearchDialog
 
@@ -17,7 +17,7 @@ class TestSearchDialogConfig(unittest.TestCase):
     
     def setUp(self):
         """Set up test environment"""
-        self.default_config = DefaultConfig()
+        self.default_config = Config()
         self.user_config = Config()
     
     def test_search_dialog_max_results_access(self):

@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_search_dialog import SearchDialog
-from tfm_config import DefaultConfig
+from _config import Config
 from tfm_colors import init_colors
 
 

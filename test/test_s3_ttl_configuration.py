@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 try:
-    from tfm_config import DefaultConfig
+    from _config import Config
     from tfm_s3 import get_s3_cache, S3Cache
     S3_AVAILABLE = True
 except ImportError as e:
@@ -38,7 +38,7 @@ class TestS3TTLConfiguration(unittest.TestCase):
     def test_default_s3_cache_ttl(self):
         """Test that DefaultConfig has S3_CACHE_TTL set to 60"""
         self.assertTrue(hasattr(DefaultConfig, 'S3_CACHE_TTL'))
-        self.assertEqual(DefaultConfig.S3_CACHE_TTL, 60)
+        self.assertEqual(Config.S3_CACHE_TTL, 60)
     
     def test_s3_cache_uses_default_ttl(self):
         """Test that S3Cache uses the default TTL from configuration"""

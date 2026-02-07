@@ -8,7 +8,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_animator_generalized.py
 import time
 
 from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class GeneralizedTestConfig(DefaultConfig):

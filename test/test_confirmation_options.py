@@ -10,7 +10,7 @@ def test_confirmation_config_options():
     print("Testing confirmation configuration options...")
     
     try:
-        from tfm_config import DefaultConfig, get_config
+        from _config import Config, get_config
         
         # Test that new confirmation options exist in DefaultConfig
         assert hasattr(DefaultConfig, 'CONFIRM_COPY'), "CONFIRM_COPY not found in DefaultConfig"
@@ -18,9 +18,9 @@ def test_confirmation_config_options():
         assert hasattr(DefaultConfig, 'CONFIRM_EXTRACT_ARCHIVE'), "CONFIRM_EXTRACT_ARCHIVE not found in DefaultConfig"
         
         # Test default values
-        assert DefaultConfig.CONFIRM_COPY == True, "CONFIRM_COPY should default to True"
-        assert DefaultConfig.CONFIRM_MOVE == True, "CONFIRM_MOVE should default to True"
-        assert DefaultConfig.CONFIRM_EXTRACT_ARCHIVE == True, "CONFIRM_EXTRACT_ARCHIVE should default to True"
+        assert Config.CONFIRM_COPY == True, "CONFIRM_COPY should default to True"
+        assert Config.CONFIRM_MOVE == True, "CONFIRM_MOVE should default to True"
+        assert Config.CONFIRM_EXTRACT_ARCHIVE == True, "CONFIRM_EXTRACT_ARCHIVE should default to True"
         
         print("✓ All new confirmation options found in DefaultConfig with correct defaults")
         
