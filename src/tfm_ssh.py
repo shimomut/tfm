@@ -11,6 +11,7 @@ import stat as stat_module
 from typing import Iterator, List, Optional
 from datetime import datetime
 from tfm_log_manager import getLogger
+from tfm_str_format import format_size
 
 
 class SSHPathImpl:
@@ -633,7 +634,7 @@ class SSHPathImpl:
                 ('Host', host_display),
                 ('Remote Path', self.remote_path),
                 ('Type', file_type),
-                ('Size', self._format_size(stat_info.st_size)),
+                ('Size', format_size(stat_info.st_size)),
                 ('Modified', self._format_time(stat_info.st_mtime))
             ]
             
@@ -653,13 +654,6 @@ class SSHPathImpl:
                 'format_hint': 'remote'
             }
     
-    def _format_size(self, size: int) -> str:
-        """Format size in human-readable format"""
-        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} PB"
     
     def _format_time(self, timestamp: float) -> str:
         """Format timestamp as readable date/time"""

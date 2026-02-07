@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path as PathlibPath
 from tfm_path import Path, PathImpl
 from tfm_progress_manager import ProgressManager, OperationType
+from tfm_str_format import format_size
 from typing import List, Optional, Union, Tuple, Dict, Any, Iterator
 
 
@@ -1854,8 +1855,8 @@ class ArchivePathImpl(PathImpl):
                 ('Archive', self._archive_path.name),
                 ('Internal Path', self._internal_path or '/'),
                 ('Type', 'Directory' if entry.is_dir else 'File'),
-                ('Compressed Size', self._format_size(entry.compressed_size)),
-                ('Uncompressed Size', self._format_size(entry.size)),
+                ('Compressed Size', format_size(entry.compressed_size)),
+                ('Uncompressed Size', format_size(entry.size)),
                 ('Compression', self._get_compression_name(entry.archive_type)),
                 ('Modified', self._format_archive_time(entry.mtime))
             ]
@@ -1865,27 +1866,6 @@ class ArchivePathImpl(PathImpl):
             'details': details,
             'format_hint': 'archive'
         }
-    
-    def _format_size(self, size: int) -> str:
-        """Format size in human-readable format.
-        
-        Args:
-            size: Size in bytes
-            
-        Returns:
-            str: Formatted size string (e.g., '1.2 MB', '345 KB')
-        """
-        if size < 0:
-            return '0 B'
-        
-        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-            if size < 1024.0:
-                if unit == 'B':
-                    return f"{int(size)} {unit}"
-                else:
-                    return f"{size:.1f} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} PB"
     
     def _get_compression_name(self, archive_type: str) -> str:
         """Convert archive type to compression name.

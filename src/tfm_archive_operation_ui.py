@@ -5,6 +5,7 @@ TFM Archive Operation UI - Handles archive operation UI interactions
 
 from tfm_path import Path
 from tfm_log_manager import getLogger
+from tfm_str_format import format_size
 from typing import List, Dict, Callable, Optional
 
 
@@ -165,7 +166,7 @@ class ArchiveOperationUI:
             
             if conflict_size is not None:
                 # Format size in human-readable format
-                size_str = self._format_size(conflict_size)
+                size_str = format_size(conflict_size)
                 message_segments.append(AsIsSegment(f" ({size_str})"))
             
             if total_conflicts > 1:
@@ -196,7 +197,7 @@ class ArchiveOperationUI:
             ]
             
             if conflict_size is not None and not is_directory:
-                size_str = self._format_size(conflict_size)
+                size_str = format_size(conflict_size)
                 message_segments.append(AsIsSegment(f" ({size_str})"))
             
             if total_conflicts > 1:
@@ -249,21 +250,3 @@ class ArchiveOperationUI:
             dialog_callback,
             enable_shift_modifier=True
         )
-    
-    def _format_size(self, size_bytes: int) -> str:
-        """Format file size in human-readable format.
-        
-        Args:
-            size_bytes: Size in bytes
-        
-        Returns:
-            Formatted size string (e.g., "1.5 MB", "234 KB")
-        """
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        elif size_bytes < 1024 * 1024 * 1024:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
-        else:
-            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"

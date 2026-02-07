@@ -7,6 +7,7 @@ import time
 from enum import Enum
 from typing import Optional, Callable, Dict, Any
 from tfm_progress_animator import ProgressAnimator
+from tfm_str_format import format_size
 
 
 class OperationType(Enum):
@@ -37,26 +38,7 @@ class ProgressManager:
                 PROGRESS_ANIMATION_SPEED = 0.08
             self.animator = ProgressAnimator(MinimalConfig())
     
-    @staticmethod
-    def _format_bytes(bytes_value: int) -> str:
-        """Format bytes into human-readable format (B, K, M, G, T)
-        
-        Args:
-            bytes_value: Number of bytes
-            
-        Returns:
-            Formatted string like "15M", "2.3G", etc.
-        """
-        if bytes_value < 1024:
-            return f"{bytes_value}B"
-        elif bytes_value < 1024 * 1024:
-            return f"{bytes_value / 1024:.0f}K"
-        elif bytes_value < 1024 * 1024 * 1024:
-            return f"{bytes_value / (1024 * 1024):.0f}M"
-        elif bytes_value < 1024 * 1024 * 1024 * 1024:
-            return f"{bytes_value / (1024 * 1024 * 1024):.1f}G"
-        else:
-            return f"{bytes_value / (1024 * 1024 * 1024 * 1024):.1f}T"
+
     
     def start_operation(self, operation_type: OperationType, total_items: int, 
                        description: str = "", progress_callback: Optional[Callable] = None):
@@ -274,8 +256,8 @@ class ProgressManager:
             # Only show byte progress for large files (>1MB) that require multiple read/write operations
             byte_progress_text = ""
             if file_bytes_total > 1024 * 1024 and file_bytes_copied > 0:
-                bytes_copied_str = self._format_bytes(file_bytes_copied)
-                bytes_total_str = self._format_bytes(file_bytes_total)
+                bytes_copied_str = format_size(file_bytes_copied, compact=True)
+                bytes_total_str = format_size(file_bytes_total, compact=True)
                 byte_progress_text = f" [{bytes_copied_str}/{bytes_total_str}]"
                 available_space -= len(byte_progress_text)
             

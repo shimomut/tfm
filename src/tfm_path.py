@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path as PathlibPath, PurePath
 from datetime import datetime
 from typing import Union, Iterator, List, Optional, Any
+from tfm_str_format import format_size
 
 
 
@@ -893,7 +894,7 @@ class LocalPathImpl(PathImpl):
             # Build details list
             details = [
                 ('Type', file_type),
-                ('Size', self._format_size(stat_info.st_size)),
+                ('Size', format_size(stat_info.st_size)),
                 ('Permissions', self._format_permissions(stat_info.st_mode)),
                 ('Modified', self._format_time(stat_info.st_mtime))
             ]
@@ -914,20 +915,6 @@ class LocalPathImpl(PathImpl):
                 'format_hint': 'standard'
             }
     
-    def _format_size(self, size: int) -> str:
-        """Format size in human-readable format.
-        
-        Args:
-            size: Size in bytes
-            
-        Returns:
-            str: Formatted size string (e.g., '1.2 MB')
-        """
-        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} PB"
     
     def _format_permissions(self, mode: int) -> str:
         """Format permissions as rwxrwxrwx string.

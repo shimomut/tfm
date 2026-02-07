@@ -15,6 +15,7 @@ import time
 from threading import Thread
 from tfm_path import Path
 from tfm_ui_layer import UILayer
+from tfm_str_format import format_size
 from ttk import KeyEvent, KeyCode, ModifierKey, CharEvent, SystemEvent, TextAttribute
 from ttk.wide_char_utils import get_display_width, truncate_to_width
 
@@ -1895,14 +1896,7 @@ class DirectoryDiffViewer(UILayer):
                 if file_info.is_directory:
                     return "-"
                 size = file_info.size
-                if size < 1024:
-                    return f"{size}B"
-                elif size < 1024 * 1024:
-                    return f"{size / 1024:.1f}KB"
-                elif size < 1024 * 1024 * 1024:
-                    return f"{size / (1024 * 1024):.1f}MB"
-                else:
-                    return f"{size / (1024 * 1024 * 1024):.1f}GB"
+                return format_size(size, compact=True)
             elif field == "permission":
                 if not file_info.is_accessible:
                     return "-"

@@ -16,6 +16,7 @@ import hashlib
 import json
 from datetime import datetime
 from typing import Iterator, List, Dict, Any, Optional, Tuple
+from tfm_str_format import format_size
 
 # Import the PathImpl base class
 try:
@@ -1379,7 +1380,7 @@ class S3PathImpl(PathImpl):
                     storage_class = response.get('StorageClass', 'STANDARD')
                 
                 # Format size
-                details.append(('Size', self._format_size(size)))
+                details.append(('Size', format_size(size)))
                 
                 # Add storage class
                 details.append(('Storage Class', storage_class))
@@ -1411,14 +1412,6 @@ class S3PathImpl(PathImpl):
             'details': details,
             'format_hint': 'remote'
         }
-    
-    def _format_size(self, size: int) -> str:
-        """Format size in human-readable format"""
-        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} PB"
 
 
 # Cache management functions
