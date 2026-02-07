@@ -200,6 +200,13 @@ class Config:
     # - Desktop mode (coregraphics): code (VS Code)
     TEXT_EDITOR = 'code' if is_desktop_mode() else 'vim'
     
+    # Text diff tool settings
+    # Tool invoked when pressing 'E' (edit_file) key in DiffViewer or DirectoryDiffViewer
+    # Automatically set based on actual running backend mode:
+    # - Terminal mode (curses): vimdiff
+    # - Desktop mode (coregraphics): code --diff (VS Code diff mode)
+    TEXT_DIFF = ['code', '--diff'] if is_desktop_mode() else ['vimdiff']
+    
     # S3 settings
     S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
     

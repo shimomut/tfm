@@ -3848,7 +3848,7 @@ class FileManager(UILayer):
         
         # Launch diff viewer
         try:
-            viewer = create_diff_viewer(self.renderer, file1, file2, self.ui_layer_stack)
+            viewer = create_diff_viewer(self.renderer, file1, file2, self.ui_layer_stack, self.config)
             if viewer:
                 # Push viewer onto layer stack
                 self.push_layer(viewer)
@@ -3897,7 +3897,8 @@ class FileManager(UILayer):
                 self.ui_layer_stack, 
                 self.file_list_manager,
                 self,  # Pass FileManager for access to file_operations_executor
-                config_manager
+                config_manager,
+                self.config
             )
             if viewer:
                 # Push viewer onto layer stack

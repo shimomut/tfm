@@ -44,20 +44,22 @@ class Config:
 
 ## Implementation Details
 
-### Curses Management
-The implementation properly handles curses suspension and resumption:
+### Renderer Suspension
+The implementation properly handles renderer suspension and resumption using the TTK Renderer API:
 
 ```python
-def suspend_curses(self):
-    """Suspend the curses system to allow external programs to run"""
-    curses.endwin()
-    
-def resume_curses(self):
-    """Resume the curses system after external program execution"""
-    self.stdscr.refresh()
-    curses.curs_set(0)  # Hide cursor
-    self.needs_full_redraw = True
+# Suspend renderer to allow external program to run
+self.renderer.suspend()
+
+# Launch the editor
+result = subprocess.run([editor, str(selected_file)], 
+                      cwd=str(current_pane['path']))
+
+# Resume renderer after editor exits
+self.renderer.resume()
 ```
+
+The `suspend()` and `resume()` methods are part of the TTK Renderer interface and work across all backends (curses, CoreGraphics, etc.). For the curses backend, this internally calls `curses.endwin()` and `curses.reset_prog_mode()` respectively.
 
 ### Editor Execution
 The editor is launched as a subprocess with proper error handling:
@@ -104,7 +106,8 @@ The implementation includes comprehensive error handling:
 ## Technical Notes
 
 - The feature uses `subprocess.run()` for editor execution
-- Curses is properly suspended with `curses.endwin()`
+- The renderer is properly suspended with `renderer.suspend()` before launching external programs
+- The renderer is restored with `renderer.resume()` after the external program exits
 - The working directory is set to the current pane's directory
 - Full screen redraw is triggered after editor exit
 - Log messages provide feedback on editor operations

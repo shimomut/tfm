@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Optional, List, Dict, Tuple
 import threading
 import queue
+import subprocess
 import time
 from threading import Thread
 from tfm_path import Path
@@ -598,7 +599,7 @@ class DirectoryDiffViewer(UILayer):
         its own status bar.
     """
     
-    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None, file_manager=None, config_manager=None):
+    def __init__(self, renderer, left_path: Path, right_path: Path, layer_stack=None, file_list_manager=None, file_manager=None, config_manager=None, config=None):
         """
         Initialize the directory diff viewer.
         
@@ -614,6 +615,7 @@ class DirectoryDiffViewer(UILayer):
                          invisible when DirectoryDiffViewer is active). Operations complete
                          successfully - only progress display is affected.
             config_manager: Optional ConfigManager instance for key bindings
+            config: Optional config object for accessing TEXT_DIFF setting
         """
         self.logger = getLogger("DirDiff")
         self.renderer = renderer
@@ -623,6 +625,7 @@ class DirectoryDiffViewer(UILayer):
         self.file_list_manager = file_list_manager
         self.file_manager = file_manager
         self.config_manager = config_manager
+        self.config = config
         
         # Create our own QuickChoiceBar for confirmation dialogs
         # (FileManager's QuickChoiceBar is invisible when DirectoryDiffViewer is active)
@@ -839,6 +842,10 @@ class DirectoryDiffViewer(UILayer):
                 # Quit viewer
                 self._should_close = True
                 self.mark_dirty()
+                return True
+            elif char_lower == 'e':
+                # Launch external diff tool for focused file
+                self._launch_external_diff()
                 return True
             elif char_lower == 'i':
                 # Toggle showing identical files
@@ -1746,6 +1753,7 @@ class DirectoryDiffViewer(UILayer):
             "FILE OPERATIONS",
             f"  {copy_keys:<13} Copy focused file from active pane to opposite pane",
             f"  {delete_keys:<13} Delete focused file from active pane",
+            "  e             Open focused file in external diff tool",
             "",
             "DISPLAY OPTIONS",
             "  i             Toggle showing identical files",
@@ -1765,6 +1773,65 @@ class DirectoryDiffViewer(UILayer):
         if self.layer_stack:
             self.layer_stack.push(self.info_dialog)
         self.mark_dirty()
+    
+    def _launch_external_diff(self) -> None:
+        """Launch external diff tool for the focused file."""
+        if not self.config:
+            self.logger.warning("Cannot launch external diff: config not available")
+            return
+        
+        # Get focused node
+        if not (0 <= self.cursor_position < len(self.visible_nodes)):
+            self.logger.warning("No file focused")
+            return
+        
+        node = self.visible_nodes[self.cursor_position]
+        
+        # Only launch diff for files (not directories)
+        if node.is_directory:
+            self.logger.info("Cannot launch diff tool for directories")
+            return
+        
+        # Check if both files exist
+        if not node.left_path or not node.right_path:
+            self.logger.info("Cannot launch diff tool: file only exists on one side")
+            return
+        
+        # Get TEXT_DIFF configuration
+        text_diff = getattr(self.config, 'TEXT_DIFF', ['vimdiff'])
+        
+        # Convert TEXT_DIFF to list if it's a string
+        if isinstance(text_diff, str):
+            diff_command = [text_diff]
+        else:
+            diff_command = list(text_diff)
+        
+        # Add file paths
+        file1_str = str(node.left_path)
+        file2_str = str(node.right_path)
+        diff_command.extend([file1_str, file2_str])
+        
+        self.logger.info(f"Launching external diff tool: {' '.join(diff_command)}")
+        
+        try:
+            # Suspend rendering before launching external program
+            if hasattr(self.renderer, 'suspend'):
+                self.renderer.suspend()
+            
+            # Launch the diff tool
+            subprocess.run(diff_command, check=False)
+            
+            # Resume rendering after external program exits
+            if hasattr(self.renderer, 'resume'):
+                self.renderer.resume()
+            
+            # Mark as dirty to trigger redraw
+            self.mark_dirty()
+            
+        except FileNotFoundError:
+            self.logger.error(f"External diff tool not found: {diff_command[0]}")
+        except Exception as e:
+            self.logger.error(f"Error launching external diff tool: {e}")
     
     def _render_details_pane(self, renderer, width: int, height: int) -> None:
         """
@@ -4083,7 +4150,7 @@ class DirectoryDiffViewer(UILayer):
         
         # Create DiffViewer instance
         try:
-            diff_viewer = DiffViewer(self.renderer, node.left_path, node.right_path, self.layer_stack)
+            diff_viewer = DiffViewer(self.renderer, node.left_path, node.right_path, self.layer_stack, self.config)
             
             # Push onto UI layer stack
             self.layer_stack.push(diff_viewer)

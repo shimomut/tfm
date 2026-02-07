@@ -474,6 +474,9 @@ class DefaultConfig:
     # Text editor settings
     TEXT_EDITOR = 'vim'  # Default text editor command
     
+    # Text diff tool settings
+    TEXT_DIFF = ['vimdiff']  # Default diff tool (invoked in DiffViewer/DirectoryDiffViewer)
+    
     # Dialog settings
     INFO_DIALOG_WIDTH_RATIO = 0.8
     INFO_DIALOG_HEIGHT_RATIO = 0.8
