@@ -2636,15 +2636,15 @@ class FileManager(UILayer):
             if command:
                 # Use configured program from file associations
                 try:
-                    # Suspend curses
-                    self.external_program_manager.suspend_curses()
+                    # Suspend renderer
+                    self.renderer.suspend()
                     
                     # Launch the program
                     result = subprocess.run(command + [str(focused_file)], 
                                           cwd=str(current_pane['path']))
                     
-                    # Resume curses
-                    self.external_program_manager.resume_curses()
+                    # Resume renderer
+                    self.renderer.resume()
                     
                     if result.returncode == 0:
                         self.logger.info(f"Opened file: {focused_file.name}")
@@ -2654,8 +2654,8 @@ class FileManager(UILayer):
                     self.mark_dirty()
                     
                 except Exception as e:
-                    # Resume curses even if there's an error
-                    self.external_program_manager.resume_curses()
+                    # Resume renderer even if there's an error
+                    self.renderer.resume()
                     self.logger.error(f"Error opening file: {e}")
                     self.mark_dirty()
             elif is_text_file(focused_file):
@@ -3517,14 +3517,14 @@ class FileManager(UILayer):
                     from tfm_const import DEFAULT_TEXT_EDITOR
                     editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
                     
-                    # Suspend curses
-                    self.external_program_manager.suspend_curses()
+                    # Suspend renderer
+                    self.renderer.suspend()
                     
                     # Launch the text editor as a subprocess
                     result = subprocess.run([editor, config_path])
                     
-                    # Resume curses
-                    self.external_program_manager.resume_curses()
+                    # Resume renderer
+                    self.renderer.resume()
                     
                     if result.returncode == 0:
                         self.logger.info(f"Edited config file: {config_path}")
@@ -3534,13 +3534,13 @@ class FileManager(UILayer):
                     self.mark_dirty()
                     
                 except FileNotFoundError:
-                    # Resume curses even if editor not found
-                    self.external_program_manager.resume_curses()
+                    # Resume renderer even if editor not found
+                    self.renderer.resume()
                     self.logger.error(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
                     self.logger.info("You can manually edit the file at: " + config_path)
                 except Exception as e:
-                    # Resume curses even if there's an error
-                    self.external_program_manager.resume_curses()
+                    # Resume renderer even if there's an error
+                    self.renderer.resume()
                     self.logger.error(f"Error opening config file: {e}")
                     self.logger.info("You can manually edit the file at: " + config_path)
                 
@@ -3767,15 +3767,15 @@ class FileManager(UILayer):
         if command:
             # Use configured program from file associations
             try:
-                # Suspend curses
-                self.external_program_manager.suspend_curses()
+                # Suspend renderer
+                self.renderer.suspend()
                 
                 # Launch the viewer
                 result = subprocess.run(command + [str(focused_file)], 
                                       cwd=str(current_pane['path']))
                 
-                # Resume curses
-                self.external_program_manager.resume_curses()
+                # Resume renderer
+                self.renderer.resume()
                 
                 if result.returncode == 0:
                     self.logger.info(f"Viewed file: {focused_file.name}")
@@ -3785,8 +3785,8 @@ class FileManager(UILayer):
                 self.mark_dirty()
                 
             except Exception as e:
-                # Resume curses even if there's an error
-                self.external_program_manager.resume_curses()
+                # Resume renderer even if there's an error
+                self.renderer.resume()
                 self.logger.error(f"Error viewing file: {e}")
                 self.mark_dirty()
         else:
@@ -3937,15 +3937,15 @@ class FileManager(UILayer):
         if command:
             # Use configured program from file associations
             try:
-                # Suspend curses
-                self.external_program_manager.suspend_curses()
+                # Suspend renderer
+                self.renderer.suspend()
                 
                 # Launch the editor
                 result = subprocess.run(command + [str(focused_file)], 
                                       cwd=str(current_pane['path']))
                 
-                # Resume curses
-                self.external_program_manager.resume_curses()
+                # Resume renderer
+                self.renderer.resume()
                 
                 if result.returncode == 0:
                     self.logger.info(f"Edited file: {focused_file.name}")
@@ -3953,27 +3953,27 @@ class FileManager(UILayer):
                     self.logger.info(f"Editor exited with code {result.returncode}")
                     
             except FileNotFoundError:
-                # Resume curses even if editor not found
-                self.external_program_manager.resume_curses()
+                # Resume renderer even if editor not found
+                self.renderer.resume()
                 self.logger.error(f"Editor not found. Please check your file associations configuration.")
             except Exception as e:
-                # Resume curses even if there's an error
-                self.external_program_manager.resume_curses()
+                # Resume renderer even if there's an error
+                self.renderer.resume()
                 self.logger.error(f"Error launching editor: {e}")
         else:
             # Fallback to TEXT_EDITOR config for files without association
             editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
             
             try:
-                # Suspend curses
-                self.external_program_manager.suspend_curses()
+                # Suspend renderer
+                self.renderer.suspend()
                 
                 # Launch the text editor
                 result = subprocess.run([editor, str(focused_file)], 
                                       cwd=str(current_pane['path']))
                 
-                # Resume curses
-                self.external_program_manager.resume_curses()
+                # Resume renderer
+                self.renderer.resume()
                 
                 if result.returncode == 0:
                     self.logger.info(f"Edited file: {focused_file.name}")
@@ -3981,12 +3981,12 @@ class FileManager(UILayer):
                     self.logger.info(f"Editor exited with code {result.returncode}")
                     
             except FileNotFoundError:
-                # Resume curses even if editor not found
-                self.external_program_manager.resume_curses()
+                # Resume renderer even if editor not found
+                self.renderer.resume()
                 self.logger.error(f"Text editor '{editor}' not found. Please install it or configure a different editor.")
             except Exception as e:
-                # Resume curses even if there's an error
-                self.external_program_manager.resume_curses()
+                # Resume renderer even if there's an error
+                self.renderer.resume()
                 self.logger.error(f"Error launching editor: {e}")
     
     def copy_selected_files(self):
