@@ -21,6 +21,7 @@ from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_ui_layer import UILayer
 from tfm_info_dialog import InfoDialog
 from tfm_log_manager import getLogger
+from tfm_config import config_manager
 
 # Try to import pygments for syntax highlighting
 try:
@@ -471,6 +472,11 @@ class DiffViewer(UILayer):
     
     def _show_help_dialog(self) -> None:
         """Show help dialog with keyboard shortcuts."""
+        # Get the configured key for edit_file action
+        key_bindings = config_manager.get_key_bindings()
+        edit_keys, _ = key_bindings.get_keys_for_action('edit_file')
+        edit_key = key_bindings.format_key_for_display(edit_keys[0]) if edit_keys else 'e'
+        
         title = "Diff Viewer - Help"
         help_lines = [
             "NAVIGATION",
@@ -488,7 +494,7 @@ class DiffViewer(UILayer):
             "  i             Toggle ignore whitespace",
             "",
             "GENERAL",
-            "  e             Open in external diff tool",
+            f"  {edit_key:<13} Open in external diff tool",
             "  ?             Show this help",
             "  q/ESC         Close viewer",
         ]
@@ -1128,7 +1134,11 @@ class DiffViewer(UILayer):
                 # Show help dialog
                 self._show_help_dialog()
                 return True
-            elif char_lower == 'e':
+            
+            # Check if this key matches the edit_file action
+            key_bindings = config_manager.get_key_bindings()
+            action = key_bindings.find_action_for_event(event, has_selection=False)
+            if action == 'edit_file':
                 # Launch external diff tool
                 self._launch_external_diff()
                 return True

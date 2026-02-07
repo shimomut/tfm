@@ -834,6 +834,10 @@ class DirectoryDiffViewer(UILayer):
             elif action == 'delete_files':
                 self._delete_focused_file()
                 return True
+            elif action == 'edit_file':
+                # Launch external diff tool for focused file
+                self._launch_external_diff()
+                return True
         
         # Handle character-based commands (only from KeyEvent)
         if event.char:
@@ -842,10 +846,6 @@ class DirectoryDiffViewer(UILayer):
                 # Quit viewer
                 self._should_close = True
                 self.mark_dirty()
-                return True
-            elif char_lower == 'e':
-                # Launch external diff tool for focused file
-                self._launch_external_diff()
                 return True
             elif char_lower == 'i':
                 # Toggle showing identical files
@@ -1723,17 +1723,21 @@ class DirectoryDiffViewer(UILayer):
         """Show help dialog with keyboard shortcuts."""
         title = "Directory Diff Viewer - Help"
         
-        # Get configured keybindings for copy and delete
+        # Get configured keybindings for copy, delete, and edit_file
         copy_keys = "C"
         delete_keys = "K/Del"
+        edit_key = "e"
         if self.config_manager:
             key_bindings = self.config_manager.get_key_bindings()
             copy_key_list, _ = key_bindings.get_keys_for_action('copy_files')
             delete_key_list, _ = key_bindings.get_keys_for_action('delete_files')
+            edit_key_list, _ = key_bindings.get_keys_for_action('edit_file')
             if copy_key_list:
                 copy_keys = "/".join([key_bindings.format_key_for_display(k) for k in copy_key_list[:2]])
             if delete_key_list:
                 delete_keys = "/".join([key_bindings.format_key_for_display(k) for k in delete_key_list[:2]])
+            if edit_key_list:
+                edit_key = key_bindings.format_key_for_display(edit_key_list[0])
         
         help_lines = [
             "NAVIGATION",
@@ -1753,7 +1757,7 @@ class DirectoryDiffViewer(UILayer):
             "FILE OPERATIONS",
             f"  {copy_keys:<13} Copy focused file from active pane to opposite pane",
             f"  {delete_keys:<13} Delete focused file from active pane",
-            "  e             Open focused file in external diff tool",
+            f"  {edit_key:<13} Open focused file in external diff tool",
             "",
             "DISPLAY OPTIONS",
             "  i             Toggle showing identical files",
