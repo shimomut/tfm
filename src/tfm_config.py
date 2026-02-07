@@ -498,15 +498,7 @@ class ConfigManager:
         
         # Rebuild if config changed or not yet built
         if self._key_bindings is None:
-            # Get key bindings config - should always exist after load_config
-            if hasattr(config, 'KEY_BINDINGS') and config.KEY_BINDINGS:
-                key_bindings_config = config.KEY_BINDINGS
-            else:
-                # This shouldn't happen after _copy_missing_fields, but handle it
-                self.logger.warning("KEY_BINDINGS not found in config, using empty bindings")
-                key_bindings_config = {}
-            
-            self._key_bindings = KeyBindings(key_bindings_config)
+            self._key_bindings = KeyBindings(config.KEY_BINDINGS)
         
         return self._key_bindings
     
@@ -515,64 +507,55 @@ class ConfigManager:
         errors = []
         
         # Validate backend selection
-        if hasattr(config, 'PREFERRED_BACKEND'):
-            if config.PREFERRED_BACKEND not in ['curses', 'coregraphics']:
-                errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
+        if config.PREFERRED_BACKEND not in ['curses', 'coregraphics']:
+            errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
         
         # Validate desktop mode settings
-        if hasattr(config, 'DESKTOP_FONT_NAME'):
-            # Accept both string (single font) and list (with fallbacks)
-            if isinstance(config.DESKTOP_FONT_NAME, str):
-                if not config.DESKTOP_FONT_NAME.strip():
-                    errors.append("DESKTOP_FONT_NAME must be a non-empty string")
-            elif isinstance(config.DESKTOP_FONT_NAME, list):
-                if not config.DESKTOP_FONT_NAME:
-                    errors.append("DESKTOP_FONT_NAME list must not be empty")
-                elif not all(isinstance(name, str) and name.strip() for name in config.DESKTOP_FONT_NAME):
-                    errors.append("DESKTOP_FONT_NAME list must contain only non-empty strings")
-            else:
-                errors.append("DESKTOP_FONT_NAME must be a string or list of strings")
+        # Accept both string (single font) and list (with fallbacks)
+        if isinstance(config.DESKTOP_FONT_NAME, str):
+            if not config.DESKTOP_FONT_NAME.strip():
+                errors.append("DESKTOP_FONT_NAME must be a non-empty string")
+        elif isinstance(config.DESKTOP_FONT_NAME, list):
+            if not config.DESKTOP_FONT_NAME:
+                errors.append("DESKTOP_FONT_NAME list must not be empty")
+            elif not all(isinstance(name, str) and name.strip() for name in config.DESKTOP_FONT_NAME):
+                errors.append("DESKTOP_FONT_NAME list must contain only non-empty strings")
+        else:
+            errors.append("DESKTOP_FONT_NAME must be a string or list of strings")
         
-        if hasattr(config, 'DESKTOP_FONT_SIZE'):
-            if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
-                errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")
+        if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
+            errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")
         
-        if hasattr(config, 'DESKTOP_WINDOW_WIDTH'):
-            if not isinstance(config.DESKTOP_WINDOW_WIDTH, int) or config.DESKTOP_WINDOW_WIDTH < 400:
-                errors.append("DESKTOP_WINDOW_WIDTH must be an integer >= 400")
+        if not isinstance(config.DESKTOP_WINDOW_WIDTH, int) or config.DESKTOP_WINDOW_WIDTH < 400:
+            errors.append("DESKTOP_WINDOW_WIDTH must be an integer >= 400")
         
-        if hasattr(config, 'DESKTOP_WINDOW_HEIGHT'):
-            if not isinstance(config.DESKTOP_WINDOW_HEIGHT, int) or config.DESKTOP_WINDOW_HEIGHT < 300:
-                errors.append("DESKTOP_WINDOW_HEIGHT must be an integer >= 300")
+        if not isinstance(config.DESKTOP_WINDOW_HEIGHT, int) or config.DESKTOP_WINDOW_HEIGHT < 300:
+            errors.append("DESKTOP_WINDOW_HEIGHT must be an integer >= 300")
         
         # Validate ratios
-        if hasattr(config, 'DEFAULT_LEFT_PANE_RATIO'):
-            if not (0.1 <= config.DEFAULT_LEFT_PANE_RATIO <= 0.9):
-                errors.append("DEFAULT_LEFT_PANE_RATIO must be between 0.1 and 0.9")
+        if not (0.1 <= config.DEFAULT_LEFT_PANE_RATIO <= 0.9):
+            errors.append("DEFAULT_LEFT_PANE_RATIO must be between 0.1 and 0.9")
         
-        if hasattr(config, 'DEFAULT_LOG_HEIGHT_RATIO'):
-            if not (0.1 <= config.DEFAULT_LOG_HEIGHT_RATIO <= 0.5):
-                errors.append("DEFAULT_LOG_HEIGHT_RATIO must be between 0.1 and 0.5")
+        if not (0.1 <= config.DEFAULT_LOG_HEIGHT_RATIO <= 0.5):
+            errors.append("DEFAULT_LOG_HEIGHT_RATIO must be between 0.1 and 0.5")
         
         # Validate sort mode
-        if hasattr(config, 'DEFAULT_SORT_MODE'):
-            if config.DEFAULT_SORT_MODE not in ['name', 'ext', 'size', 'date']:
-                errors.append("DEFAULT_SORT_MODE must be 'name', 'ext', 'size', or 'date'")
+        if config.DEFAULT_SORT_MODE not in ['name', 'ext', 'size', 'date']:
+            errors.append("DEFAULT_SORT_MODE must be 'name', 'ext', 'size', or 'date'")
         
         # Validate color scheme
-        if hasattr(config, 'COLOR_SCHEME'):
-            if config.COLOR_SCHEME not in ['dark', 'light']:
-                errors.append("COLOR_SCHEME must be 'dark' or 'light'")
+        if config.COLOR_SCHEME not in ['dark', 'light']:
+            errors.append("COLOR_SCHEME must be 'dark' or 'light'")
         
         # Validate Unicode mode
-        if hasattr(config, 'UNICODE_MODE'):
-            if config.UNICODE_MODE not in ['auto', 'full', 'basic', 'ascii']:
-                errors.append("UNICODE_MODE must be 'auto', 'full', 'basic', or 'ascii'")
+        if config.UNICODE_MODE not in ['auto', 'full', 'basic', 'ascii']:
+            errors.append("UNICODE_MODE must be 'auto', 'full', 'basic', or 'ascii'")
         
         # Validate Unicode fallback character
-        if hasattr(config, 'UNICODE_FALLBACK_CHAR'):
-            if not isinstance(config.UNICODE_FALLBACK_CHAR, str) or len(config.UNICODE_FALLBACK_CHAR) != 1:
-                errors.append("UNICODE_FALLBACK_CHAR must be a single character string")
+        if not isinstance(config.UNICODE_FALLBACK_CHAR, str) or len(config.UNICODE_FALLBACK_CHAR) != 1:
+            errors.append("UNICODE_FALLBACK_CHAR must be a single character string")
+        
+        return errors
         
         return errors
     
@@ -580,7 +563,7 @@ class ConfigManager:
         """Get the key binding for a specific action"""
         config = self.get_config()
         
-        if hasattr(config, 'KEY_BINDINGS') and action in config.KEY_BINDINGS:
+        if action in config.KEY_BINDINGS:
             binding = config.KEY_BINDINGS[action]
         else:
             return []
@@ -597,7 +580,7 @@ class ConfigManager:
         """Get the selection requirement for a specific action"""
         config = self.get_config()
         
-        if hasattr(config, 'KEY_BINDINGS') and action in config.KEY_BINDINGS:
+        if action in config.KEY_BINDINGS:
             binding = config.KEY_BINDINGS[action]
         else:
             return 'any'
@@ -676,29 +659,20 @@ def get_favorite_directories():
     
     favorites = []
     
-    # Get favorites from config (should always exist after _copy_missing_fields)
-    if hasattr(config, 'FAVORITE_DIRECTORIES') and config.FAVORITE_DIRECTORIES:
-        favorites_config = config.FAVORITE_DIRECTORIES
-    else:
-        # This shouldn't happen, but handle gracefully
-        logger.warning("FAVORITE_DIRECTORIES not found in config")
-        return []
-    
-    if favorites_config:
-        for fav in favorites_config:
-            if isinstance(fav, dict) and 'name' in fav and 'path' in fav:
-                try:
-                    # Expand user path and resolve
-                    path = Path(fav['path']).expanduser().resolve()
-                    if path.exists() and path.is_dir():
-                        favorites.append({
-                            'name': fav['name'],
-                            'path': str(path)
-                        })
-                    else:
-                        logger.warning(f"Favorite directory does not exist: {fav['name']} -> {fav['path']}")
-                except Exception as e:
-                    logger.warning(f"Invalid favorite directory path: {fav['name']} -> {fav['path']}: {e}")
+    for fav in config.FAVORITE_DIRECTORIES:
+        if isinstance(fav, dict) and 'name' in fav and 'path' in fav:
+            try:
+                # Expand user path and resolve
+                path = Path(fav['path']).expanduser().resolve()
+                if path.exists() and path.is_dir():
+                    favorites.append({
+                        'name': fav['name'],
+                        'path': str(path)
+                    })
+                else:
+                    logger.warning(f"Favorite directory does not exist: {fav['name']} -> {fav['path']}")
+            except Exception as e:
+                logger.warning(f"Invalid favorite directory path: {fav['name']} -> {fav['path']}: {e}")
     
     return favorites
 
@@ -709,27 +683,25 @@ def get_programs():
     
     programs = []
     
-    # Get programs from user config
-    if hasattr(config, 'PROGRAMS') and config.PROGRAMS:
-        for prog in config.PROGRAMS:
-            if isinstance(prog, dict) and 'name' in prog and 'command' in prog:
-                if isinstance(prog['command'], list) and prog['command']:
-                    program_entry = {
-                        'name': prog['name'],
-                        'command': prog['command']
-                    }
-                    
-                    # Add options if present
-                    if 'options' in prog and isinstance(prog['options'], dict):
-                        program_entry['options'] = prog['options']
-                    else:
-                        program_entry['options'] = {}
-                    
-                    programs.append(program_entry)
+    for prog in config.PROGRAMS:
+        if isinstance(prog, dict) and 'name' in prog and 'command' in prog:
+            if isinstance(prog['command'], list) and prog['command']:
+                program_entry = {
+                    'name': prog['name'],
+                    'command': prog['command']
+                }
+                
+                # Add options if present
+                if 'options' in prog and isinstance(prog['options'], dict):
+                    program_entry['options'] = prog['options']
                 else:
-                    logger.warning(f"Program command must be a non-empty list: {prog['name']}")
+                    program_entry['options'] = {}
+                
+                programs.append(program_entry)
             else:
-                logger.warning(f"Invalid program configuration: {prog}")
+                logger.warning(f"Program command must be a non-empty list: {prog['name']}")
+        else:
+            logger.warning(f"Invalid program configuration: {prog}")
     
     return programs
 
@@ -738,13 +710,7 @@ def get_file_associations():
     """Get the file extension associations from configuration"""
     config = get_config()
     
-    # Get associations from config (should always exist after _copy_missing_fields)
-    if hasattr(config, 'FILE_ASSOCIATIONS') and config.FILE_ASSOCIATIONS:
-        return config.FILE_ASSOCIATIONS
-    
-    # This shouldn't happen, but handle gracefully
-    logger.warning("FILE_ASSOCIATIONS not found in config")
-    return []
+    return config.FILE_ASSOCIATIONS
 
 
 def _expand_association_entry(entry):

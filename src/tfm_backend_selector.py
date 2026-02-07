@@ -86,8 +86,7 @@ def _get_requested_backend(args):
     try:
         from tfm_config import get_config
         config = get_config()
-        if hasattr(config, 'PREFERRED_BACKEND'):
-            return config.PREFERRED_BACKEND
+        return config.PREFERRED_BACKEND
     except Exception as e:
         # If config loading fails, just use default
         logger.warning(f"Could not load configuration: {e}")
@@ -175,22 +174,15 @@ def _get_backend_options(backend_name, args):
             from tfm_config import get_config
             config = get_config()
             
-            # Override with user configuration if available
-            if hasattr(config, 'DESKTOP_FONT_NAME'):
-                # Support both string (single font) and list (with fallbacks)
-                if isinstance(config.DESKTOP_FONT_NAME, str):
-                    font_names = [config.DESKTOP_FONT_NAME]
-                elif isinstance(config.DESKTOP_FONT_NAME, list):
-                    font_names = config.DESKTOP_FONT_NAME
+            # Support both string (single font) and list (with fallbacks)
+            if isinstance(config.DESKTOP_FONT_NAME, str):
+                font_names = [config.DESKTOP_FONT_NAME]
+            elif isinstance(config.DESKTOP_FONT_NAME, list):
+                font_names = config.DESKTOP_FONT_NAME
             
-            if hasattr(config, 'DESKTOP_FONT_SIZE'):
-                font_size = config.DESKTOP_FONT_SIZE
-            
-            if hasattr(config, 'DESKTOP_WINDOW_WIDTH'):
-                window_width = config.DESKTOP_WINDOW_WIDTH
-            
-            if hasattr(config, 'DESKTOP_WINDOW_HEIGHT'):
-                window_height = config.DESKTOP_WINDOW_HEIGHT
+            font_size = config.DESKTOP_FONT_SIZE
+            window_width = config.DESKTOP_WINDOW_WIDTH
+            window_height = config.DESKTOP_WINDOW_HEIGHT
         
         except Exception as e:
             # If config loading fails, just use defaults

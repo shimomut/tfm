@@ -1802,7 +1802,7 @@ class DirectoryDiffViewer(UILayer):
             return
         
         # Get TEXT_DIFF configuration
-        text_diff = getattr(self.config, 'TEXT_DIFF', ['vimdiff'])
+        text_diff = self.config.TEXT_DIFF
         
         # Convert TEXT_DIFF to list if it's a string
         if isinstance(text_diff, str):

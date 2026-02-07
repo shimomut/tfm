@@ -285,7 +285,7 @@ class ExternalProgramManager:
             
             # Reinitialize colors with configured scheme
             from tfm_colors import init_colors
-            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+            color_scheme = self.config.COLOR_SCHEME
             init_colors(self.renderer, color_scheme)
             
             # Restore stdout/stderr capture (only needed in terminal mode)
@@ -417,7 +417,7 @@ class ExternalProgramManager:
             
             # Reinitialize colors with configured scheme
             from tfm_colors import init_colors
-            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+            color_scheme = self.config.COLOR_SCHEME
             init_colors(self.renderer, color_scheme)
             
             # Restore stdout/stderr capture  

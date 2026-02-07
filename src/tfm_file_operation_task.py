@@ -198,7 +198,7 @@ class FileOperationTask(BaseTask):
         
         # Check if confirmation is required based on configuration
         config_attr = f'CONFIRM_{operation_type.upper()}'
-        confirm_required = getattr(self.ui.config, config_attr, True)
+        confirm_required = getattr(self.ui.config, config_attr)
         
         if confirm_required:
             # Transition to CONFIRMING state and show confirmation dialog

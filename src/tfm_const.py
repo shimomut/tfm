@@ -120,3 +120,13 @@ TEXT_FILE_EXTENSIONS = {
 # Content inspection thresholds for unknown file types
 TEXT_DETECTION_SAMPLE_SIZE = 8192  # Bytes to read for content inspection
 TEXT_DETECTION_THRESHOLD = 0.85    # Minimum ratio of printable characters to consider text
+
+# Dialog dimension constants
+LIST_DIALOG_WIDTH_RATIO = 0.6   # Width ratio for list dialogs (0.1 to 1.0)
+LIST_DIALOG_HEIGHT_RATIO = 0.7  # Height ratio for list dialogs (0.1 to 1.0)
+LIST_DIALOG_MIN_WIDTH = 40      # Minimum width for list dialogs
+LIST_DIALOG_MIN_HEIGHT = 15     # Minimum height for list dialogs
+INFO_DIALOG_WIDTH_RATIO = 0.8   # Width ratio for info dialogs (0.1 to 1.0)
+INFO_DIALOG_HEIGHT_RATIO = 0.8  # Height ratio for info dialogs (0.1 to 1.0)
+INFO_DIALOG_MIN_WIDTH = 20      # Minimum width for info dialogs
+INFO_DIALOG_MIN_HEIGHT = 10     # Minimum height for info dialogs

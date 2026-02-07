@@ -1205,10 +1205,10 @@ def get_archive_cache() -> ArchiveCache:
         try:
             from tfm_config import get_config
             config = get_config()
-            max_open = getattr(config, 'ARCHIVE_CACHE_MAX_OPEN', 5)
-            ttl = getattr(config, 'ARCHIVE_CACHE_TTL', 300)
+            max_open = config.ARCHIVE_CACHE_MAX_OPEN
+            ttl = config.ARCHIVE_CACHE_TTL
         except (ImportError, Exception):
-            # Fallback to defaults
+            # Fallback to defaults if config not available
             max_open = 5
             ttl = 300
         

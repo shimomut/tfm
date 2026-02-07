@@ -288,7 +288,7 @@ class FileManager(UILayer):
             self.logger.debug("Debug logging enabled - showing detailed diagnostic information")
         
         # Initialize colors (can happen after LogManager since it doesn't use stdout/stderr)
-        color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+        color_scheme = self.config.COLOR_SCHEME
         init_colors(renderer, color_scheme)
         
         # Create TFM user directories if they don't exist
@@ -351,7 +351,7 @@ class FileManager(UILayer):
             self._setup_menu_bar()
         
         # Layout settings
-        self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', DEFAULT_LOG_HEIGHT_RATIO)
+        self.log_height_ratio = self.config.DEFAULT_LOG_HEIGHT_RATIO
         
         # Isearch mode state
         self.isearch_mode = False
@@ -1891,7 +1891,7 @@ class FileManager(UILayer):
             return filename, ""
         
         # Check if extension separation is enabled
-        if not getattr(self.config, 'SEPARATE_EXTENSIONS', True):
+        if not self.config.SEPARATE_EXTENSIONS:
             return filename, ""
         
         # Find the last dot in the filename
@@ -1905,7 +1905,7 @@ class FileManager(UILayer):
         extension = filename[dot_index:]
         
         # Check extension length limit
-        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
+        max_ext_length = self.config.MAX_EXTENSION_LENGTH
         if len(extension) > max_ext_length:
             return filename, ""
         
@@ -1918,7 +1918,7 @@ class FileManager(UILayer):
         Uses cached file info to avoid filesystem calls.
         """
         max_width = 0
-        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
+        max_ext_length = self.config.MAX_EXTENSION_LENGTH
         
         # Use cached file_info to avoid filesystem calls
         file_info_cache = pane_data.get('file_info', {})
@@ -1950,7 +1950,7 @@ class FileManager(UILayer):
         """
         from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
         
-        date_format = getattr(self.config, 'DATE_FORMAT', 'short')
+        date_format = self.config.DATE_FORMAT
         
         if date_format == DATE_FORMAT_FULL:
             # YYYY-MM-DD HH:mm:ss = 19 characters
@@ -3304,8 +3304,8 @@ class FileManager(UILayer):
             # Get available width for the item
             # Account for dialog margins and selection indicator
             height, width = self.renderer.get_dimensions()
-            width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
-            min_width = getattr(self.config, 'LIST_DIALOG_MIN_WIDTH', 40)
+            width_ratio = LIST_DIALOG_WIDTH_RATIO
+            min_width = LIST_DIALOG_MIN_WIDTH
             dialog_width = max(min_width, int(width * width_ratio))
             dialog_width = min(dialog_width, width)
             
@@ -3466,7 +3466,7 @@ class FileManager(UILayer):
                 
             elif option == "Cycle date format":
                 from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
-                current_format = getattr(self.config, 'DATE_FORMAT', 'short')
+                current_format = self.config.DATE_FORMAT
                 
                 # Toggle between formats: short <-> full
                 if current_format == DATE_FORMAT_FULL:
@@ -3515,7 +3515,7 @@ class FileManager(UILayer):
                 try:
                     # Get the configured text editor
                     from tfm_const import DEFAULT_TEXT_EDITOR
-                    editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
+                    editor = self.config.TEXT_EDITOR
                     
                     # Normalize editor to list format (supports both string and list)
                     editor_cmd = [editor] if isinstance(editor, str) else editor
@@ -3966,7 +3966,7 @@ class FileManager(UILayer):
                 self.logger.error(f"Error launching editor: {e}")
         else:
             # Fallback to TEXT_EDITOR config for files without association
-            editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
+            editor = self.config.TEXT_EDITOR
             
             # Normalize editor to list format (supports both string and list)
             editor_cmd = [editor] if isinstance(editor, str) else editor
@@ -4541,7 +4541,7 @@ class FileManager(UILayer):
                     self.should_quit = True
             
             # Check if quit confirmation is enabled
-            if getattr(self.config, 'CONFIRM_QUIT', True):
+            if self.config.CONFIRM_QUIT:
                 self.show_confirmation("Are you sure you want to quit TFM?", quit_callback)
             else:
                 quit_callback(True)
@@ -4842,7 +4842,7 @@ class FileManager(UILayer):
             self.adjust_log_boundary('down')
             return True
         elif action == 'reset_log_height':  # Reset log pane height
-            self.log_height_ratio = getattr(self.config, 'DEFAULT_LOG_HEIGHT_RATIO', 0.25)
+            self.log_height_ratio = self.config.DEFAULT_LOG_HEIGHT_RATIO
             self.mark_dirty()
             self.logger.info(f"Log pane height reset to {int(self.log_height_ratio * 100)}%")
             return True
@@ -5322,9 +5322,9 @@ def cli_main():
         
         # Get configuration values
         config = get_config()
-        show_warnings = getattr(config, 'UNICODE_WARNINGS', True)
-        terminal_detection = getattr(config, 'UNICODE_TERMINAL_DETECTION', True)
-        fallback_char = getattr(config, 'UNICODE_FALLBACK_CHAR', '?')
+        show_warnings = config.UNICODE_WARNINGS
+        terminal_detection = config.UNICODE_TERMINAL_DETECTION
+        fallback_char = config.UNICODE_FALLBACK_CHAR
         
         # Determine Unicode mode based on backend
         if backend_name == 'coregraphics':
@@ -5332,7 +5332,7 @@ def cli_main():
             unicode_mode = 'full'
         else:
             # Terminal backends use configured mode
-            unicode_mode = getattr(config, 'UNICODE_MODE', 'full')
+            unicode_mode = config.UNICODE_MODE
         
         # Initialize wide character utilities with all configuration
         initialize_wide_char_utils(

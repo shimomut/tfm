@@ -12,6 +12,7 @@ from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_config import config_manager
 from tfm_scrollbar import draw_scrollbar
+import tfm_const
 
 
 class InfoDialog(UILayer, BaseListDialog):
@@ -54,11 +55,11 @@ class InfoDialog(UILayer, BaseListDialog):
         """Draw the info dialog overlay"""
         height, width = self.renderer.get_dimensions()
         
-        # Calculate dialog dimensions using configuration
-        width_ratio = getattr(self.config, 'INFO_DIALOG_WIDTH_RATIO', 0.8)
-        height_ratio = getattr(self.config, 'INFO_DIALOG_HEIGHT_RATIO', 0.8)
-        min_width = getattr(self.config, 'INFO_DIALOG_MIN_WIDTH', 20)
-        min_height = getattr(self.config, 'INFO_DIALOG_MIN_HEIGHT', 10)
+        # Calculate dialog dimensions using constants
+        width_ratio = tfm_const.INFO_DIALOG_WIDTH_RATIO
+        height_ratio = tfm_const.INFO_DIALOG_HEIGHT_RATIO
+        min_width = tfm_const.INFO_DIALOG_MIN_WIDTH
+        min_height = tfm_const.INFO_DIALOG_MIN_HEIGHT
         
         dialog_width = max(min_width, int(width * width_ratio))
         dialog_height = max(min_height, int(height * height_ratio))

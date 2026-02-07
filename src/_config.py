@@ -49,6 +49,7 @@ class Config:
     CONFIRM_COPY = True     # Show confirmation dialog before copying files/directories
     CONFIRM_MOVE = True     # Show confirmation dialog before moving files/directories
     CONFIRM_EXTRACT_ARCHIVE = True  # Show confirmation dialog before extracting archives
+    CONFIRM_ARCHIVE_CREATE = True   # Show confirmation dialog before creating archives
     
     # Key bindings - customize your shortcuts
     # Each action can have multiple keys assigned to it
@@ -215,6 +216,14 @@ class Config:
     
     # S3 settings
     S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
+    
+    # SSH/SFTP cache settings
+    SSH_CACHE_TTL = 30        # SSH cache TTL in seconds for successful results (default: 30 seconds)
+    SSH_CACHE_ERROR_TTL = 300  # SSH cache TTL in seconds for cached errors (default: 300 seconds / 5 minutes)
+    
+    # Archive cache settings
+    ARCHIVE_CACHE_MAX_OPEN = 5   # Maximum number of archives to keep open simultaneously
+    ARCHIVE_CACHE_TTL = 300       # Archive cache TTL in seconds (default: 300 seconds / 5 minutes)
     
     # Unicode and wide character settings
     UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
