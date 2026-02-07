@@ -8,6 +8,7 @@ import stat
 import fnmatch
 from tfm_path import Path
 from datetime import datetime
+from tfm_str_format import format_size
 
 
 class FileListManager:
@@ -96,15 +97,7 @@ class FileListManager:
                     if is_dir:
                         size_str = "<DIR>"
                     else:
-                        size = stat_info.st_size
-                        if size < 1024:
-                            size_str = f"{size}B"
-                        elif size < 1024 * 1024:
-                            size_str = f"{size/1024:.1f}K"
-                        elif size < 1024 * 1024 * 1024:
-                            size_str = f"{size/(1024*1024):.1f}M"
-                        else:
-                            size_str = f"{size/(1024*1024*1024):.1f}G"
+                        size_str = format_size(stat_info.st_size, compact=True)
                     
                     # Format date
                     date_str = self._format_date(stat_info.st_mtime)
@@ -337,15 +330,7 @@ class FileListManager:
             if path.is_dir():
                 size_str = "<DIR>"
             else:
-                size = stat_info.st_size
-                if size < 1024:
-                    size_str = f"{size}B"
-                elif size < 1024 * 1024:
-                    size_str = f"{size/1024:.1f}K"
-                elif size < 1024 * 1024 * 1024:
-                    size_str = f"{size/(1024*1024):.1f}M"
-                else:
-                    size_str = f"{size/(1024*1024*1024):.1f}G"
+                size_str = format_size(stat_info.st_size, compact=True)
             
             # Format date based on configured format
             date_str = self._format_date(stat_info.st_mtime)
