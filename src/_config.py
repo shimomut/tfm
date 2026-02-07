@@ -290,6 +290,7 @@ class Config:
         {'name': 'Compare Files (BeyondCompare)', 'command': [tfm_python, tfm_tool('bcompare_files.py')], 'options': {'auto_return': True}},
         {'name': 'Compare Directories (BeyondCompare)', 'command': [tfm_python, tfm_tool('bcompare_dirs.py')], 'options': {'auto_return': True}},
         {'name': 'Open in VSCode', 'command': [tfm_python, tfm_tool('vscode.py')], 'options': {'auto_return': True}},
+        {'name': 'Open in Kiro', 'command': [tfm_python, tfm_tool('kiro.py')], 'options': {'auto_return': True}},
         {'name': 'Preview Files', 'command': [tfm_python, tfm_tool('preview_files.py')], 'options': {'auto_return': True}},
         {'name': 'Reveal in File Manager', 'command': [tfm_python, tfm_tool('reveal_in_finder.py')], 'options': {'auto_return': True}},
 
