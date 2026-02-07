@@ -2228,12 +2228,12 @@ class FileManager(UILayer):
         
         # Pre-calculate layout constants (once per pane, not per file)
         datetime_width = self.get_date_column_width()
-        size_width = 8
+        size_width = 7
         marker_width = 2
         usable_width = pane_width - 2
         
         # Determine layout mode based on pane width
-        min_width_for_datetime = 2 + 1 + 16 + 1 + 4 + 1 + 8 + 1 + datetime_width
+        min_width_for_datetime = 2 + 1 + 16 + 1 + 4 + 1 + 7 + 1 + datetime_width
         show_datetime = pane_width >= min_width_for_datetime
         
         # Pre-calculate extension width once for the entire pane
@@ -2246,15 +2246,15 @@ class FileManager(UILayer):
         elif show_datetime:
             # Wide layout: marker + name + ext + size + datetime
             if ext_width > 0:
-                name_width = usable_width - (13 + ext_width + datetime_width)
+                name_width = usable_width - (12 + ext_width + datetime_width)
             else:
-                name_width = usable_width - (12 + datetime_width)
+                name_width = usable_width - (11 + datetime_width)
         else:
             # Narrow layout: marker + name + ext + size (no datetime)
             if ext_width > 0:
-                name_width = usable_width - (12 + ext_width)
+                name_width = usable_width - (11 + ext_width)
             else:
-                name_width = usable_width - 11
+                name_width = usable_width - 10
         
         # Cache for isearch matches (convert to set for O(1) lookup)
         isearch_match_set = set(self.isearch_matches) if self.isearch_mode and is_active else set()
@@ -2321,14 +2321,14 @@ class FileManager(UILayer):
                             basename = truncate_to_width(basename, name_width, "…")
                         padded_basename = pad_to_width(basename, name_width, align='left')
                         padded_extension = pad_to_width(extension, ext_width, align='left')
-                        line = f"{padded_basename} {padded_extension} {size_str:>8} {mtime_str}"
+                        line = f"{padded_basename} {padded_extension} {size_str:>7} {mtime_str}"
                     else:
                         # No extension - use full width (name_width + ext_width + 1 space)
                         full_name_width = name_width + ext_width + (1 if ext_width > 0 else 0)
                         if safe_get_display_width(display_name) > full_name_width:
                             display_name = truncate_to_width(display_name, full_name_width, "…")
                         padded_name = pad_to_width(display_name, full_name_width, align='left')
-                        line = f"{padded_name} {size_str:>8} {mtime_str}"
+                        line = f"{padded_name} {size_str:>7} {mtime_str}"
                 else:
                     # Narrow layout without datetime
                     if extension and ext_width > 0:
@@ -2336,14 +2336,14 @@ class FileManager(UILayer):
                             basename = truncate_to_width(basename, name_width, "…")
                         padded_basename = pad_to_width(basename, name_width, align='left')
                         padded_extension = pad_to_width(extension, ext_width, align='left')
-                        line = f"{padded_basename} {padded_extension} {size_str:>8}"
+                        line = f"{padded_basename} {padded_extension} {size_str:>7}"
                     else:
                         # No extension - use full width (name_width + ext_width + 1 space)
                         full_name_width = name_width + ext_width + (1 if ext_width > 0 else 0)
                         if safe_get_display_width(display_name) > full_name_width:
                             display_name = truncate_to_width(display_name, full_name_width, "…")
                         padded_name = pad_to_width(display_name, full_name_width, align='left')
-                        line = f"{padded_name} {size_str:>8}"
+                        line = f"{padded_name} {size_str:>7}"
             
             try:
                 # Final truncation if needed

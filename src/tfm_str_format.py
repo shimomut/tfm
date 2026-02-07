@@ -25,7 +25,7 @@ def format_size(size: int, compact: bool = False) -> str:
         >>> format_size(1536)
         '1.5 KB'
         >>> format_size(1536, compact=True)
-        '2K'
+        '1.5K'
         >>> format_size(1048576)
         '1.0 MB'
         >>> format_size(1073741824)
@@ -35,15 +35,15 @@ def format_size(size: int, compact: bool = False) -> str:
         size = 0
     
     if compact:
-        # Compact format: no space, single letter, rounded to integer
+        # Compact format: no space, single letter, 1 decimal place
         for unit in ['B', 'K', 'M', 'G', 'T']:
             if size < 1024.0:
                 if unit == 'B':
                     return f"{int(size)}{unit}"
                 else:
-                    return f"{size:.0f}{unit}"
+                    return f"{size:.1f}{unit}"
             size /= 1024.0
-        return f"{size:.0f}P"
+        return f"{size:.1f}P"
     else:
         # Standard format: with space, full unit name, 1 decimal place
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
