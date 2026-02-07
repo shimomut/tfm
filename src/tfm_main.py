@@ -3517,11 +3517,14 @@ class FileManager(UILayer):
                     from tfm_const import DEFAULT_TEXT_EDITOR
                     editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
                     
+                    # Normalize editor to list format (supports both string and list)
+                    editor_cmd = [editor] if isinstance(editor, str) else editor
+                    
                     # Suspend renderer
                     self.renderer.suspend()
                     
                     # Launch the text editor as a subprocess
-                    result = subprocess.run([editor, config_path])
+                    result = subprocess.run(editor_cmd + [config_path])
                     
                     # Resume renderer
                     self.renderer.resume()
@@ -3965,12 +3968,15 @@ class FileManager(UILayer):
             # Fallback to TEXT_EDITOR config for files without association
             editor = getattr(self.config, 'TEXT_EDITOR', DEFAULT_TEXT_EDITOR)
             
+            # Normalize editor to list format (supports both string and list)
+            editor_cmd = [editor] if isinstance(editor, str) else editor
+            
             try:
                 # Suspend renderer
                 self.renderer.suspend()
                 
                 # Launch the text editor
-                result = subprocess.run([editor, str(focused_file)], 
+                result = subprocess.run(editor_cmd + [str(focused_file)], 
                                       cwd=str(current_pane['path']))
                 
                 # Resume renderer

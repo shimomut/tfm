@@ -472,10 +472,16 @@ class DefaultConfig:
     MAX_EXTENSION_LENGTH = 5    # Maximum extension length to show separately
     
     # Text editor settings
+    # Supports both string and list formats:
+    # - String format: 'vim' (single command, no arguments)
+    # - List format: ['code', '--wait'] (command with arguments)
     TEXT_EDITOR = 'vim'  # Default text editor command
     
     # Text diff tool settings
-    TEXT_DIFF = ['vimdiff']  # Default diff tool (invoked in DiffViewer/DirectoryDiffViewer)
+    # Supports both string and list formats:
+    # - String format: 'vimdiff' (single command, no arguments)
+    # - List format: ['code', '--diff'] (command with arguments)
+    TEXT_DIFF = 'vimdiff'  # Default diff tool (invoked in DiffViewer/DirectoryDiffViewer)
     
     # Dialog settings
     INFO_DIALOG_WIDTH_RATIO = 0.8

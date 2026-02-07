@@ -195,6 +195,9 @@ class Config:
     MAX_EXTENSION_LENGTH = 5    # Maximum extension length to show separately
     
     # Text editor settings
+    # Supports both string and list formats:
+    # - String format: 'vim' (single command, no arguments)
+    # - List format: ['code', '--wait'] (command with arguments)
     # Automatically set based on actual running backend mode:
     # - Terminal mode (curses): vim
     # - Desktop mode (coregraphics): code (VS Code)
@@ -202,10 +205,13 @@ class Config:
     
     # Text diff tool settings
     # Tool invoked when pressing 'E' (edit_file) key in DiffViewer or DirectoryDiffViewer
+    # Supports both string and list formats:
+    # - String format: 'vimdiff' (single command, no arguments)
+    # - List format: ['code', '--diff'] (command with arguments)
     # Automatically set based on actual running backend mode:
-    # - Terminal mode (curses): vimdiff
-    # - Desktop mode (coregraphics): code --diff (VS Code diff mode)
-    TEXT_DIFF = ['code', '--diff'] if is_desktop_mode() else ['vimdiff']
+    # - Terminal mode (curses): vimdiff (string format example)
+    # - Desktop mode (coregraphics): code --diff (list format example)
+    TEXT_DIFF = ['code', '--diff'] if is_desktop_mode() else 'vimdiff'
     
     # S3 settings
     S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
