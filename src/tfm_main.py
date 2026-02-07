@@ -3514,7 +3514,6 @@ class FileManager(UILayer):
                 # Try to open the config file with the configured text editor
                 try:
                     # Get the configured text editor
-                    from tfm_const import DEFAULT_TEXT_EDITOR
                     editor = self.config.TEXT_EDITOR
                     
                     # Normalize editor to list format (supports both string and list)

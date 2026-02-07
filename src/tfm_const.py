@@ -47,13 +47,6 @@ MIN_LOG_HEIGHT_RATIO = 0.0   # Minimum log pane height (0% - can be hidden)
 MAX_LOG_HEIGHT_RATIO = 0.9   # Maximum log pane height (60%)
 LOG_HEIGHT_ADJUST_STEP = 0.05  # 5% adjustment per key press
 
-# Isearch mode constants
-SEARCH_KEY = ord('f')  # Key to enter isearch mode (F key)
-
-# Text editor constants
-DEFAULT_TEXT_EDITOR = 'vim'  # Default text editor to use
-EDITOR_KEY = ord('e')  # Key to launch text editor (E key)
-
 # File type detection constants for content search
 # Known binary file extensions - immediately rejected from text search
 BINARY_FILE_EXTENSIONS = {
