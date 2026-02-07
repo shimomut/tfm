@@ -23,8 +23,8 @@ class PaneManager:
             'scroll_offset': 0,
             'files': [],
             'selected_files': set(),  # Track selected files for batch operations
-            'sort_mode': getattr(config, 'DEFAULT_SORT_MODE', 'name'),
-            'sort_reverse': getattr(config, 'DEFAULT_SORT_REVERSE', False),
+            'sort_mode': config.DEFAULT_SORT_MODE,
+            'sort_reverse': config.DEFAULT_SORT_REVERSE,
             'filter_pattern': "",  # Filename filter pattern for this pane
         }
         self.right_pane = {
@@ -33,15 +33,15 @@ class PaneManager:
             'scroll_offset': 0,
             'files': [],
             'selected_files': set(),  # Track selected files for batch operations
-            'sort_mode': getattr(config, 'DEFAULT_SORT_MODE', 'name'),
-            'sort_reverse': getattr(config, 'DEFAULT_SORT_REVERSE', False),
+            'sort_mode': config.DEFAULT_SORT_MODE,
+            'sort_reverse': config.DEFAULT_SORT_REVERSE,
             'filter_pattern': "",  # Filename filter pattern for this pane
         }
         
         self.active_pane = 'left'  # 'left' or 'right'
         
         # Pane layout - track left pane width ratio (0.1 to 0.9)
-        self.left_pane_ratio = getattr(config, 'DEFAULT_LEFT_PANE_RATIO', 0.5)
+        self.left_pane_ratio = config.DEFAULT_LEFT_PANE_RATIO
     
     def get_current_pane(self):
         """Get the currently active pane"""
@@ -71,7 +71,7 @@ class PaneManager:
         pane_name = 'left' if pane_data is self.left_pane else 'right'
         
         # Get max entries from config
-        max_entries = getattr(self.config, 'MAX_HISTORY_ENTRIES', 100)
+        max_entries = self.config.MAX_HISTORY_ENTRIES
         
         # Use the StateManager's method with pane-specific key
         self.state_manager.save_pane_cursor_position(pane_name, current_dir, current_file.name, max_entries)

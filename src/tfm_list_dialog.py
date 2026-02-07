@@ -11,6 +11,7 @@ from tfm_ui_layer import UILayer
 from tfm_colors import get_status_color
 from tfm_config import get_favorite_directories, get_programs
 from tfm_log_manager import getLogger
+import tfm_const
 
 
 class ListDialog(UILayer, BaseListDialog):
@@ -85,11 +86,10 @@ class ListDialog(UILayer, BaseListDialog):
     
     def draw(self):
         """Draw the searchable list dialog overlay"""
-        # Get configuration values
-        width_ratio = getattr(self.config, 'LIST_DIALOG_WIDTH_RATIO', 0.6)
-        height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
-        min_width = getattr(self.config, 'LIST_DIALOG_MIN_WIDTH', 40)
-        min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
+        width_ratio = tfm_const.LIST_DIALOG_WIDTH_RATIO
+        height_ratio = tfm_const.LIST_DIALOG_HEIGHT_RATIO
+        min_width = tfm_const.LIST_DIALOG_MIN_WIDTH
+        min_height = tfm_const.LIST_DIALOG_MIN_HEIGHT
         
         # Draw dialog frame
         start_y, start_x, dialog_width, dialog_height = self.draw_dialog_frame(

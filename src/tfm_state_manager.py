@@ -644,7 +644,7 @@ class TFMStateManager(StateManager):
                 try:
                     from tfm_config import get_config
                     config = get_config()
-                    max_entries = getattr(config, 'MAX_HISTORY_ENTRIES', 100)
+                    max_entries = config.MAX_HISTORY_ENTRIES
                 except ImportError as e:
                     self.logger.warning(f"Could not import config module: {e}")
                     max_entries = 100

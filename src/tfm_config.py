@@ -314,221 +314,72 @@ class KeyBindings:
         return '-'.join(formatted_parts)
 
 
-class DefaultConfig:
-    """Default configuration values for TFM"""
+def _load_template_config():
+    """
+    Load the Config class from _config.py template.
     
-    # Backend settings
-    PREFERRED_BACKEND = 'curses'  # 'curses' or 'coregraphics'
+    Returns:
+        Config class from _config.py, or None if loading fails
+    """
+    try:
+        # Get the directory where this module is located
+        current_dir = Path(__file__).parent
+        template_file = current_dir / '_config.py'
+        
+        # Check if template file exists
+        if not template_file.exists():
+            logger.warning(f"Template file not found at {template_file}")
+            return None
+        
+        # Load the template module
+        spec = importlib.util.spec_from_file_location("_config_template", template_file)
+        if spec is None or spec.loader is None:
+            logger.warning("Could not create spec for template config")
+            return None
+        
+        template_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(template_module)
+        
+        # Get the Config class
+        if hasattr(template_module, 'Config'):
+            return template_module.Config
+        else:
+            logger.warning("Config class not found in template file")
+            return None
     
-    # Desktop mode settings (for CoreGraphics backend)
-    DESKTOP_FONT_NAME = ['Menlo', 'Monaco', 'Courier', 'Osaka-Mono', 'Hiragino Sans GB']  # Font names for desktop mode (first is primary, rest are cascade fallbacks)
-    DESKTOP_FONT_SIZE = 12  # Font size for desktop mode (8-72 points)
-    DESKTOP_WINDOW_WIDTH = 1200
-    DESKTOP_WINDOW_HEIGHT = 800
+    except Exception as e:
+        logger.error(f"Error loading template config: {e}")
+        return None
+
+
+def _copy_missing_fields(user_config, template_config_class):
+    """
+    Copy missing fields from template Config class to user config instance.
     
-    # Display settings
-    SHOW_HIDDEN_FILES = False
-    DEFAULT_LEFT_PANE_RATIO = 0.5
-    DEFAULT_LOG_HEIGHT_RATIO = 0.25
-    DATE_FORMAT = 'short'  # 'full' or 'short'
+    Args:
+        user_config: User's config instance (may be incomplete or empty)
+        template_config_class: Template Config class from _config.py
+    """
+    if template_config_class is None:
+        return
     
-    # Sorting settings
-    DEFAULT_SORT_MODE = 'name'  # 'name', 'size', 'date'
-    DEFAULT_SORT_REVERSE = False
-    
-    # Color settings
-    USE_COLORS = True
-    COLOR_SCHEME = 'dark'  # 'dark', 'light'
-    
-    # Behavior settings
-    CONFIRM_DELETE = True
-    CONFIRM_QUIT = True
-    CONFIRM_COPY = True
-    CONFIRM_MOVE = True
-    CONFIRM_EXTRACT_ARCHIVE = True
-    
-    # Key bindings (can be customized)
-    # Each action can have multiple keys assigned to it
-    KEY_BINDINGS = {
-        # === Application Control ===
-        'quit': ['Q'],                         # Exit TFM application
-        'help': ['?'],                         # Show help dialog with all key bindings
-        
-        # === Navigation ===
-        'cursor_up': ['UP'],                   # Move cursor up one item
-        'cursor_down': ['DOWN'],               # Move cursor down one item
-        'page_up': ['PAGE_UP'],                # Move cursor up one page
-        'page_down': ['PAGE_DOWN'],            # Move cursor down one page
-        'open_item': ['ENTER'],                # Open file/directory or enter directory
-        'go_parent': ['BACKSPACE'],            # Go to parent directory
-        'switch_pane': ['TAB'],                # Switch between left and right panes
-        'nav_left': ['LEFT'],                  # Left pane: go to parent, Right pane: switch to left pane
-        'nav_right': ['RIGHT'],                # Right pane: go to parent, Left pane: switch to right pane
-        
-        # === File Selection ===
-        'select_file': ['SPACE'],              # Toggle selection of current file
-        'select_file_up': ['Shift-SPACE'],     # Toggle selection and move up
-        'select_all': ['HOME'],                # Select all items (Home key)
-        'unselect_all': ['END'],               # Unselect all items (End key)
-        'select_all_files': ['A'],             # Toggle selection of all files in current pane
-        'select_all_items': ['Shift-A'],       # Toggle selection of all items (files + dirs)
-        
-        # === File Operations ===
-        'copy_files': {'keys': ['C'], 'selection': 'required'},  # Copy selected files to other pane
-        'move_files': {'keys': ['M'], 'selection': 'required'},  # Move selected files to other pane
-        'delete_files': {'keys': ['K', 'DELETE', 'Command-Backspace'], 'selection': 'required'}, # Delete selected files/directories
-        'rename_file': ['R'],                  # Rename selected file/directory
-        'create_file': ['Shift-E'],            # Create new file (prompts for filename)
-        'create_directory': {'keys': ['M'], 'selection': 'none'},  # Create new directory (only when no files selected)
-        
-        # === File Viewing & Editing ===
-        'view_file': ['V'],                    # View file using configured viewer
-        'edit_file': ['E'],                    # Edit selected file with configured text editor
-        'file_details': ['I'],                 # Show detailed file information dialog
-        
-        # === File Comparison ===
-        'diff_files': ['EQUAL'],               # Compare two selected files side-by-side
-        'diff_directories': ['Shift-EQUAL'],   # Compare directories recursively
-        
-        # === Archive Operations ===
-        'create_archive': {'keys': ['P'], 'selection': 'required'}, # Create archive from selected files
-        'extract_archive': ['U'],              # Extract selected archive file
-        
-        # === Search & Filter ===
-        'search': ['F'],                       # Enter incremental search mode (isearch)
-        'search_dialog': ['Shift-F'],          # Show filename search dialog
-        'search_content': ['Shift-G'],         # Show content search dialog (grep)
-        'filter': [';'],                       # Enter filter mode to show only matching files
-        'clear_filter': [':'],                 # Clear current file filter
-        
-        # === Sorting ===
-        'sort_menu': ['S'],                    # Show sort options menu
-        'quick_sort_name': ['1'],              # Quick sort by filename
-        'quick_sort_ext': ['2'],               # Quick sort by file extension
-        'quick_sort_size': ['3'],              # Quick sort by file size
-        'quick_sort_date': ['4'],              # Quick sort by modification date
-        
-        # === Directory Navigation ===
-        'favorites': ['J'],                    # Show favorite directories dialog
-        'jump_to_path': ['Shift-J'],           # Jump to path
-        'history': ['H'],                      # Show history for current pane
-        'drives_dialog': ['D'],                # Show drives/volumes dialog
-        
-        # === Pane Management ===
-        'sync_current_to_other': ['O'],        # Sync current pane directory to other pane
-        'sync_other_to_current': ['Shift-O'],  # Sync other pane directory to current pane
-        'compare_selection': ['W'],            # Show file and directory comparison options
-        'adjust_pane_left': ['['],             # Make left pane smaller (move boundary left)
-        'adjust_pane_right': [']'],            # Make left pane larger (move boundary right)
-        'reset_pane_boundary': ['-'],          # Reset pane split to 50% | 50%
-        
-        # === Log Pane Control ===
-        'adjust_log_up': ['{'],                # Make log pane larger (Shift+[)
-        'adjust_log_down': ['}'],              # Make log pane smaller (Shift+])
-        'reset_log_height': ['_'],             # Reset log pane height to default (Shift+-)
-        'scroll_log_up': ['Shift-UP'],         # Scroll log pane up one line
-        'scroll_log_down': ['Shift-DOWN'],     # Scroll log pane down one line
-        'scroll_log_page_up': ['Shift-LEFT'],  # Scroll log pane up one page (to older messages)
-        'scroll_log_page_down': ['Shift-RIGHT'], # Scroll log pane down one page (to newer messages)
-        
-        # === Display & Appearance ===
-        'toggle_hidden': ['.'],                # Toggle visibility of hidden files (dotfiles)
-        'toggle_color_scheme': ['T'],          # Switch between dark and light color schemes
-        'toggle_fallback_colors': ['Shift-T'], # Toggle fallback color mode for compatibility
-        'view_options': ['Z'],                 # Show view options menu
-        'settings_menu': ['Shift-Z'],          # Show settings and configuration menu
-        
-        # === External Programs ===
-        'programs': ['X'],                     # Show external programs menu
-        'subshell': ['Shift-X'],               # Enter subshell (command line) mode
+    # Get all class attributes from template (excluding private/magic attributes)
+    template_attrs = {
+        name: value 
+        for name, value in vars(template_config_class).items()
+        if not name.startswith('_')
     }
     
-    # Favorite directories - list of dictionaries with 'name' and 'path' keys
-    FAVORITE_DIRECTORIES = [
-        {'name': 'Home', 'path': '~'},
-        {'name': 'Documents', 'path': '~/Documents'},
-        {'name': 'Downloads', 'path': '~/Downloads'},
-        {'name': 'Desktop', 'path': '~/Desktop'},
-        {'name': 'Projects', 'path': '~/Projects'},
-        {'name': 'Root', 'path': '/'},
-        {'name': 'Temp', 'path': '/tmp'},
-        {'name': 'Config', 'path': '~/.config'},
-    ]
+    # Copy missing attributes to user config
+    copied_count = 0
+    for name, value in template_attrs.items():
+        if not hasattr(user_config, name):
+            setattr(user_config, name, value)
+            copied_count += 1
+            logger.info(f"Added missing config field: {name}")
     
-    # Performance settings
-    MAX_LOG_MESSAGES = 1000
-    MAX_SEARCH_RESULTS = 10000  # Maximum number of search results to prevent memory issues
-    MAX_JUMP_DIRECTORIES = 5000  # Maximum directories to scan for jump dialog
-    
-    # Progress animation settings
-    PROGRESS_ANIMATION_PATTERN = 'spinner'  # 'spinner', 'dots', 'progress', 'bounce', 'pulse', 'wave', 'clock', 'arrow'
-    PROGRESS_ANIMATION_SPEED = 0.2  # Animation frame update interval in seconds
-    
-    # History settings
-    MAX_HISTORY_ENTRIES = 100  # Maximum number of history entries to keep
-    
-    # File display settings
-    SEPARATE_EXTENSIONS = True  # Show file extensions separately from basenames
-    MAX_EXTENSION_LENGTH = 5    # Maximum extension length to show separately
-    
-    # Text editor settings
-    TEXT_EDITOR = 'vim'  # Default text editor command
-    
-    # Dialog settings
-    INFO_DIALOG_WIDTH_RATIO = 0.8
-    INFO_DIALOG_HEIGHT_RATIO = 0.8
-    INFO_DIALOG_MIN_WIDTH = 20
-    INFO_DIALOG_MIN_HEIGHT = 10
-    
-    # List dialog settings
-    LIST_DIALOG_WIDTH_RATIO = 0.6
-    LIST_DIALOG_HEIGHT_RATIO = 0.7
-    LIST_DIALOG_MIN_WIDTH = 40
-    LIST_DIALOG_MIN_HEIGHT = 15
-    
-    # S3 settings
-    S3_CACHE_TTL = 60  # S3 cache TTL in seconds (default: 60 seconds)
-    
-    # Unicode and wide character settings
-    UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
-    UNICODE_WARNINGS = True  # Show warnings for Unicode processing errors
-    UNICODE_FALLBACK_CHAR = '?'  # Character to use for unrepresentable characters in ASCII mode
-    UNICODE_TERMINAL_DETECTION = True  # Enable automatic terminal capability detection
-    
-    # File extension associations
-    # Maps file patterns to programs for different actions (open, view, edit)
-    # 
-    # Compact Format:
-    # - Pattern: Can be a string '*.pdf' or list ['*.jpg', '*.jpeg', '*.png']
-    # - Actions: Use 'open|view' to assign same command to multiple actions
-    # - Commands: List ['open', '-a', 'Preview'] or string 'open -a Preview'
-    # - None: Action not available
-    #
-    # Examples:
-    #   {'pattern': ['*.jpg', '*.png'], 'open|view': ['open', '-a', 'Preview'], 'edit': ['photoshop']}
-    #   {'pattern': '*.pdf', 'open|view': ['preview'], 'edit': ['acrobat']}
-    FILE_ASSOCIATIONS = [
-        # PDF files
-        {
-            'pattern': '*.pdf',
-            'open|view': ['open', '-a', 'Preview'],
-        },
-        # Image files
-        {
-            'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
-            'open|view': ['open', '-a', 'Preview'],
-        },
-        # Video files
-        {
-            'pattern': ['*.mp4', '*.mov'],
-            'open|view': ['open', '-a', 'Preview'],
-        },
-        # Audio files
-        {
-            'pattern': ['*.mp3', '*.wav'],
-            'open|view': ['open', '-a', 'Music'],
-        },
-    ]
+    if copied_count > 0:
+        logger.info(f"Copied {copied_count} missing fields from template config")
 
 
 class ConfigManager:
@@ -582,14 +433,21 @@ class ConfigManager:
     
     def load_config(self):
         """Load configuration from file or create default if not exists"""
+        # Load template config class for filling in missing fields
+        template_config_class = _load_template_config()
+        
         # Check if config file exists
         if not self.config_file.exists():
             self.logger.info(f"Configuration file not found at: {self.config_file}")
             if self.create_default_config():
                 self.logger.info("Created default configuration file")
             else:
-                self.logger.info("Using built-in default configuration")
-                self.config = DefaultConfig()
+                self.logger.warning("Could not create default configuration file")
+                # Create empty config and fill from template
+                class EmptyConfig:
+                    pass
+                self.config = EmptyConfig()
+                _copy_missing_fields(self.config, template_config_class)
                 return self.config
         
         # Try to load the configuration file
@@ -611,8 +469,14 @@ class ConfigManager:
                 
         except Exception as e:
             self.logger.error(f"Error loading configuration: {e}")
-            self.logger.info("Using built-in default configuration")
-            self.config = DefaultConfig()
+            self.logger.info("Creating empty config and filling from template")
+            # Create empty config and fill from template
+            class EmptyConfig:
+                pass
+            self.config = EmptyConfig()
+        
+        # Copy any missing fields from template
+        _copy_missing_fields(self.config, template_config_class)
         
         return self.config
     
@@ -634,14 +498,7 @@ class ConfigManager:
         
         # Rebuild if config changed or not yet built
         if self._key_bindings is None:
-            # Get key bindings config with fallback to defaults
-            if hasattr(config, 'KEY_BINDINGS') and config.KEY_BINDINGS:
-                key_bindings_config = config.KEY_BINDINGS
-            else:
-                self.logger.info("Using default key bindings")
-                key_bindings_config = DefaultConfig.KEY_BINDINGS
-            
-            self._key_bindings = KeyBindings(key_bindings_config)
+            self._key_bindings = KeyBindings(config.KEY_BINDINGS)
         
         return self._key_bindings
     
@@ -650,78 +507,65 @@ class ConfigManager:
         errors = []
         
         # Validate backend selection
-        if hasattr(config, 'PREFERRED_BACKEND'):
-            if config.PREFERRED_BACKEND not in ['curses', 'coregraphics']:
-                errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
+        if config.PREFERRED_BACKEND not in ['curses', 'coregraphics']:
+            errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
         
         # Validate desktop mode settings
-        if hasattr(config, 'DESKTOP_FONT_NAME'):
-            # Accept both string (single font) and list (with fallbacks)
-            if isinstance(config.DESKTOP_FONT_NAME, str):
-                if not config.DESKTOP_FONT_NAME.strip():
-                    errors.append("DESKTOP_FONT_NAME must be a non-empty string")
-            elif isinstance(config.DESKTOP_FONT_NAME, list):
-                if not config.DESKTOP_FONT_NAME:
-                    errors.append("DESKTOP_FONT_NAME list must not be empty")
-                elif not all(isinstance(name, str) and name.strip() for name in config.DESKTOP_FONT_NAME):
-                    errors.append("DESKTOP_FONT_NAME list must contain only non-empty strings")
-            else:
-                errors.append("DESKTOP_FONT_NAME must be a string or list of strings")
+        # Accept both string (single font) and list (with fallbacks)
+        if isinstance(config.DESKTOP_FONT_NAME, str):
+            if not config.DESKTOP_FONT_NAME.strip():
+                errors.append("DESKTOP_FONT_NAME must be a non-empty string")
+        elif isinstance(config.DESKTOP_FONT_NAME, list):
+            if not config.DESKTOP_FONT_NAME:
+                errors.append("DESKTOP_FONT_NAME list must not be empty")
+            elif not all(isinstance(name, str) and name.strip() for name in config.DESKTOP_FONT_NAME):
+                errors.append("DESKTOP_FONT_NAME list must contain only non-empty strings")
+        else:
+            errors.append("DESKTOP_FONT_NAME must be a string or list of strings")
         
-        if hasattr(config, 'DESKTOP_FONT_SIZE'):
-            if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
-                errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")
+        if not isinstance(config.DESKTOP_FONT_SIZE, int) or config.DESKTOP_FONT_SIZE < 8 or config.DESKTOP_FONT_SIZE > 72:
+            errors.append("DESKTOP_FONT_SIZE must be an integer between 8 and 72")
         
-        if hasattr(config, 'DESKTOP_WINDOW_WIDTH'):
-            if not isinstance(config.DESKTOP_WINDOW_WIDTH, int) or config.DESKTOP_WINDOW_WIDTH < 400:
-                errors.append("DESKTOP_WINDOW_WIDTH must be an integer >= 400")
+        if not isinstance(config.DESKTOP_WINDOW_WIDTH, int) or config.DESKTOP_WINDOW_WIDTH < 400:
+            errors.append("DESKTOP_WINDOW_WIDTH must be an integer >= 400")
         
-        if hasattr(config, 'DESKTOP_WINDOW_HEIGHT'):
-            if not isinstance(config.DESKTOP_WINDOW_HEIGHT, int) or config.DESKTOP_WINDOW_HEIGHT < 300:
-                errors.append("DESKTOP_WINDOW_HEIGHT must be an integer >= 300")
+        if not isinstance(config.DESKTOP_WINDOW_HEIGHT, int) or config.DESKTOP_WINDOW_HEIGHT < 300:
+            errors.append("DESKTOP_WINDOW_HEIGHT must be an integer >= 300")
         
         # Validate ratios
-        if hasattr(config, 'DEFAULT_LEFT_PANE_RATIO'):
-            if not (0.1 <= config.DEFAULT_LEFT_PANE_RATIO <= 0.9):
-                errors.append("DEFAULT_LEFT_PANE_RATIO must be between 0.1 and 0.9")
+        if not (0.1 <= config.DEFAULT_LEFT_PANE_RATIO <= 0.9):
+            errors.append("DEFAULT_LEFT_PANE_RATIO must be between 0.1 and 0.9")
         
-        if hasattr(config, 'DEFAULT_LOG_HEIGHT_RATIO'):
-            if not (0.1 <= config.DEFAULT_LOG_HEIGHT_RATIO <= 0.5):
-                errors.append("DEFAULT_LOG_HEIGHT_RATIO must be between 0.1 and 0.5")
+        if not (0.1 <= config.DEFAULT_LOG_HEIGHT_RATIO <= 0.5):
+            errors.append("DEFAULT_LOG_HEIGHT_RATIO must be between 0.1 and 0.5")
         
         # Validate sort mode
-        if hasattr(config, 'DEFAULT_SORT_MODE'):
-            if config.DEFAULT_SORT_MODE not in ['name', 'ext', 'size', 'date']:
-                errors.append("DEFAULT_SORT_MODE must be 'name', 'ext', 'size', or 'date'")
+        if config.DEFAULT_SORT_MODE not in ['name', 'ext', 'size', 'date']:
+            errors.append("DEFAULT_SORT_MODE must be 'name', 'ext', 'size', or 'date'")
         
         # Validate color scheme
-        if hasattr(config, 'COLOR_SCHEME'):
-            if config.COLOR_SCHEME not in ['dark', 'light']:
-                errors.append("COLOR_SCHEME must be 'dark' or 'light'")
+        if config.COLOR_SCHEME not in ['dark', 'light']:
+            errors.append("COLOR_SCHEME must be 'dark' or 'light'")
         
         # Validate Unicode mode
-        if hasattr(config, 'UNICODE_MODE'):
-            if config.UNICODE_MODE not in ['auto', 'full', 'basic', 'ascii']:
-                errors.append("UNICODE_MODE must be 'auto', 'full', 'basic', or 'ascii'")
+        if config.UNICODE_MODE not in ['auto', 'full', 'basic', 'ascii']:
+            errors.append("UNICODE_MODE must be 'auto', 'full', 'basic', or 'ascii'")
         
         # Validate Unicode fallback character
-        if hasattr(config, 'UNICODE_FALLBACK_CHAR'):
-            if not isinstance(config.UNICODE_FALLBACK_CHAR, str) or len(config.UNICODE_FALLBACK_CHAR) != 1:
-                errors.append("UNICODE_FALLBACK_CHAR must be a single character string")
+        if not isinstance(config.UNICODE_FALLBACK_CHAR, str) or len(config.UNICODE_FALLBACK_CHAR) != 1:
+            errors.append("UNICODE_FALLBACK_CHAR must be a single character string")
+        
+        return errors
         
         return errors
     
     def get_key_for_action(self, action):
         """Get the key binding for a specific action"""
         config = self.get_config()
-        binding = None
         
-        if hasattr(config, 'KEY_BINDINGS') and action in config.KEY_BINDINGS:
+        if action in config.KEY_BINDINGS:
             binding = config.KEY_BINDINGS[action]
-        elif hasattr(DefaultConfig, 'KEY_BINDINGS') and action in DefaultConfig.KEY_BINDINGS:
-            binding = DefaultConfig.KEY_BINDINGS[action]
-        
-        if binding is None:
+        else:
             return []
         
         # Handle both simple and extended formats
@@ -735,14 +579,10 @@ class ConfigManager:
     def get_selection_requirement(self, action):
         """Get the selection requirement for a specific action"""
         config = self.get_config()
-        binding = None
         
-        if hasattr(config, 'KEY_BINDINGS') and action in config.KEY_BINDINGS:
+        if action in config.KEY_BINDINGS:
             binding = config.KEY_BINDINGS[action]
-        elif hasattr(DefaultConfig, 'KEY_BINDINGS') and action in DefaultConfig.KEY_BINDINGS:
-            binding = DefaultConfig.KEY_BINDINGS[action]
-        
-        if binding is None:
+        else:
             return 'any'
         
         # Handle extended format
@@ -819,29 +659,20 @@ def get_favorite_directories():
     
     favorites = []
     
-    # Get favorites from user config or fall back to defaults
-    favorites_config = None
-    if hasattr(config, 'FAVORITE_DIRECTORIES') and config.FAVORITE_DIRECTORIES:
-        favorites_config = config.FAVORITE_DIRECTORIES
-    else:
-        # Fall back to default favorites if not configured
-        favorites_config = DefaultConfig.FAVORITE_DIRECTORIES
-    
-    if favorites_config:
-        for fav in favorites_config:
-            if isinstance(fav, dict) and 'name' in fav and 'path' in fav:
-                try:
-                    # Expand user path and resolve
-                    path = Path(fav['path']).expanduser().resolve()
-                    if path.exists() and path.is_dir():
-                        favorites.append({
-                            'name': fav['name'],
-                            'path': str(path)
-                        })
-                    else:
-                        logger.warning(f"Favorite directory does not exist: {fav['name']} -> {fav['path']}")
-                except Exception as e:
-                    logger.warning(f"Invalid favorite directory path: {fav['name']} -> {fav['path']}: {e}")
+    for fav in config.FAVORITE_DIRECTORIES:
+        if isinstance(fav, dict) and 'name' in fav and 'path' in fav:
+            try:
+                # Expand user path and resolve
+                path = Path(fav['path']).expanduser().resolve()
+                if path.exists() and path.is_dir():
+                    favorites.append({
+                        'name': fav['name'],
+                        'path': str(path)
+                    })
+                else:
+                    logger.warning(f"Favorite directory does not exist: {fav['name']} -> {fav['path']}")
+            except Exception as e:
+                logger.warning(f"Invalid favorite directory path: {fav['name']} -> {fav['path']}: {e}")
     
     return favorites
 
@@ -852,27 +683,25 @@ def get_programs():
     
     programs = []
     
-    # Get programs from user config
-    if hasattr(config, 'PROGRAMS') and config.PROGRAMS:
-        for prog in config.PROGRAMS:
-            if isinstance(prog, dict) and 'name' in prog and 'command' in prog:
-                if isinstance(prog['command'], list) and prog['command']:
-                    program_entry = {
-                        'name': prog['name'],
-                        'command': prog['command']
-                    }
-                    
-                    # Add options if present
-                    if 'options' in prog and isinstance(prog['options'], dict):
-                        program_entry['options'] = prog['options']
-                    else:
-                        program_entry['options'] = {}
-                    
-                    programs.append(program_entry)
+    for prog in config.PROGRAMS:
+        if isinstance(prog, dict) and 'name' in prog and 'command' in prog:
+            if isinstance(prog['command'], list) and prog['command']:
+                program_entry = {
+                    'name': prog['name'],
+                    'command': prog['command']
+                }
+                
+                # Add options if present
+                if 'options' in prog and isinstance(prog['options'], dict):
+                    program_entry['options'] = prog['options']
                 else:
-                    logger.warning(f"Program command must be a non-empty list: {prog['name']}")
+                    program_entry['options'] = {}
+                
+                programs.append(program_entry)
             else:
-                logger.warning(f"Invalid program configuration: {prog}")
+                logger.warning(f"Program command must be a non-empty list: {prog['name']}")
+        else:
+            logger.warning(f"Invalid program configuration: {prog}")
     
     return programs
 
@@ -881,13 +710,7 @@ def get_file_associations():
     """Get the file extension associations from configuration"""
     config = get_config()
     
-    # Get associations from user config or fall back to defaults
-    if hasattr(config, 'FILE_ASSOCIATIONS') and config.FILE_ASSOCIATIONS:
-        return config.FILE_ASSOCIATIONS
-    elif hasattr(DefaultConfig, 'FILE_ASSOCIATIONS'):
-        return DefaultConfig.FILE_ASSOCIATIONS
-    
-    return []
+    return config.FILE_ASSOCIATIONS
 
 
 def _expand_association_entry(entry):

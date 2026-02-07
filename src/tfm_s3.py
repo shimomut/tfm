@@ -188,12 +188,12 @@ def get_s3_cache() -> S3Cache:
         try:
             from .tfm_config import get_config
             config = get_config()
-            ttl = getattr(config, 'S3_CACHE_TTL', 60)
+            ttl = config.S3_CACHE_TTL
         except ImportError:
             try:
                 from tfm_config import get_config
                 config = get_config()
-                ttl = getattr(config, 'S3_CACHE_TTL', 60)
+                ttl = config.S3_CACHE_TTL
             except (ImportError, Exception):
                 ttl = 60  # Fallback to default
         

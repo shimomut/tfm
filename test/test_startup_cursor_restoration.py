@@ -13,7 +13,7 @@ from pathlib import Path
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class MockStdscr:
@@ -132,7 +132,7 @@ def test_startup_cursor_restoration_basic():
         # === Session 1: Set up cursor positions ===
         print("--- Session 1: Setting up cursor positions ---")
         
-        config = DefaultConfig()
+        config = Config()
         fm1 = MockFileManager(config, left_dir, right_dir, state_manager)
         fm1.refresh_files()
         
@@ -217,7 +217,7 @@ def test_startup_restoration_with_missing_files():
         state_manager._initialize_database()
         
         # === Session 1: Save cursor position ===
-        config = DefaultConfig()
+        config = Config()
         fm1 = MockFileManager(config, test_dir, test_dir, state_manager)
         fm1.refresh_files()
         
@@ -277,7 +277,7 @@ def test_startup_restoration_with_empty_directories():
         state_manager.db_path = db_path
         state_manager._initialize_database()
         
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, left_dir, right_dir, state_manager)
         
         # Simulate startup with empty directories
@@ -331,7 +331,7 @@ def test_startup_restoration_separate_panes():
         state_manager._initialize_database()
         
         # === Session 1: Set different cursor positions ===
-        config = DefaultConfig()
+        config = Config()
         fm1 = MockFileManager(config, left_dir, right_dir, state_manager)
         fm1.refresh_files()
         
@@ -405,7 +405,7 @@ def test_startup_restoration_scroll_adjustment():
         state_manager._initialize_database()
         
         # === Session 1: Set cursor to a file that would require scrolling ===
-        config = DefaultConfig()
+        config = Config()
         fm1 = MockFileManager(config, test_dir, test_dir, state_manager)
         fm1.refresh_files()
         

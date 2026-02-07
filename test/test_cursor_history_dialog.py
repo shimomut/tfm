@@ -14,7 +14,7 @@ from pathlib import Path
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
 from tfm_list_dialog import ListDialog
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class MockStdscr:
@@ -162,7 +162,7 @@ def test_cursor_history_dialog_basic():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, dirs[0], dirs[1], state_manager)
         
         # Build up cursor history by navigating through directories
@@ -240,7 +240,7 @@ def test_cursor_history_navigation():
         state_manager._initialize_database()
         
         # Create file manager starting in source directory
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, source_dir, source_dir, state_manager)
         fm.refresh_files()
         
@@ -314,7 +314,7 @@ def test_cursor_history_separate_panes():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, left_dirs[0], right_dirs[0], state_manager)
         
         # Build left pane history
@@ -392,7 +392,7 @@ def test_cursor_history_empty_history():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, test_dir, test_dir, state_manager)
         
         # Test showing cursor history with no history
@@ -425,7 +425,7 @@ def test_cursor_history_missing_directory():
         state_manager._initialize_database()
         
         # Create file manager and save history
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, test_dir, test_dir, state_manager)
         fm.refresh_files()
         fm.pane_manager.left_pane['focused_index'] = 0
@@ -474,7 +474,7 @@ def test_filepath_abbreviation_in_history():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, deep_path, deep_path, state_manager)
         fm.refresh_files()
         
@@ -543,7 +543,7 @@ def test_history_dialog_with_mixed_path_lengths():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, paths[0], paths[0], state_manager)
         
         # Build history with all paths
@@ -630,7 +630,7 @@ def test_filepath_abbreviation_in_history():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, deep_path, deep_path, state_manager)
         fm.refresh_files()
         
@@ -699,7 +699,7 @@ def test_history_dialog_with_mixed_path_lengths():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, paths[0], paths[0], state_manager)
         
         # Build history with all paths

@@ -7,14 +7,14 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_copy_overwrite_complete.py -v
 import tempfile
 
 from tfm_quick_choice_bar import QuickChoiceBar
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class MockFileManager:
     """Mock file manager to test the copy operation flow"""
     
     def __init__(self):
-        self.config = DefaultConfig()
+        self.config = Config()
         self.quick_choice_bar = QuickChoiceBar(self.config)
         self.needs_full_redraw = False
         self.dialog_log = []

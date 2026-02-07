@@ -221,8 +221,12 @@ class ArchiveOperationTask(BaseTask):
         self.logger.info(f"Starting {operation_type} operation with {len(source_paths)} file(s)")
         
         # Check if confirmation is required based on configuration
-        config_attr = f'CONFIRM_ARCHIVE_{operation_type.upper()}'
-        confirm_required = getattr(self.ui.config, config_attr, True)
+        if operation_type == 'create':
+            confirm_required = self.ui.config.CONFIRM_ARCHIVE_CREATE
+        elif operation_type == 'extract':
+            confirm_required = self.ui.config.CONFIRM_EXTRACT_ARCHIVE
+        else:
+            confirm_required = True  # Default to requiring confirmation for unknown operations
         
         if confirm_required:
             # Transition to CONFIRMING state and show confirmation dialog

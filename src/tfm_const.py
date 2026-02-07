@@ -21,14 +21,6 @@ DEFAULT_LOG_HEIGHT_RATIO = 0.25  # Log pane takes 1/4 of screen
 MIN_LOG_HEIGHT = 5
 MAX_LOG_MESSAGES = 1000
 
-# Terminal-specific key codes have been moved to TTK's curses backend
-# Use KeyCode with ModifierKey.SHIFT for Shift+Arrow combinations instead
-
-# File size formatting thresholds
-SIZE_KB = 1024
-SIZE_MB = 1024 * 1024
-SIZE_GB = 1024 * 1024 * 1024
-
 # Date/time formats
 DATETIME_FORMAT = "%Y-%m-%d %H:%M"
 LOG_TIME_FORMAT = "%H:%M:%S"
@@ -46,13 +38,6 @@ PANE_ADJUST_STEP = 0.05  # 5% adjustment per key press
 MIN_LOG_HEIGHT_RATIO = 0.0   # Minimum log pane height (0% - can be hidden)
 MAX_LOG_HEIGHT_RATIO = 0.9   # Maximum log pane height (60%)
 LOG_HEIGHT_ADJUST_STEP = 0.05  # 5% adjustment per key press
-
-# Isearch mode constants
-SEARCH_KEY = ord('f')  # Key to enter isearch mode (F key)
-
-# Text editor constants
-DEFAULT_TEXT_EDITOR = 'vim'  # Default text editor to use
-EDITOR_KEY = ord('e')  # Key to launch text editor (E key)
 
 # File type detection constants for content search
 # Known binary file extensions - immediately rejected from text search
@@ -120,3 +105,13 @@ TEXT_FILE_EXTENSIONS = {
 # Content inspection thresholds for unknown file types
 TEXT_DETECTION_SAMPLE_SIZE = 8192  # Bytes to read for content inspection
 TEXT_DETECTION_THRESHOLD = 0.85    # Minimum ratio of printable characters to consider text
+
+# Dialog dimension constants
+LIST_DIALOG_WIDTH_RATIO = 0.6   # Width ratio for list dialogs (0.1 to 1.0)
+LIST_DIALOG_HEIGHT_RATIO = 0.7  # Height ratio for list dialogs (0.1 to 1.0)
+LIST_DIALOG_MIN_WIDTH = 40      # Minimum width for list dialogs
+LIST_DIALOG_MIN_HEIGHT = 15     # Minimum height for list dialogs
+INFO_DIALOG_WIDTH_RATIO = 0.8   # Width ratio for info dialogs (0.1 to 1.0)
+INFO_DIALOG_HEIGHT_RATIO = 0.8  # Height ratio for info dialogs (0.1 to 1.0)
+INFO_DIALOG_MIN_WIDTH = 20      # Minimum width for info dialogs
+INFO_DIALOG_MIN_HEIGHT = 10     # Minimum height for info dialogs

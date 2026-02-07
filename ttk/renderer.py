@@ -1138,6 +1138,147 @@ class Renderer(ABC):
         """
         pass
 
+    @abstractmethod
+    def suspend(self) -> None:
+        """
+        Temporarily suspend the renderer to allow external programs to use the terminal.
+        
+        This method suspends the rendering backend, releasing control of the terminal
+        or display so that external programs can run with full terminal access. This
+        is essential for launching external editors, viewers, or shell commands that
+        need to interact with the user through the terminal.
+        
+        After calling suspend(), the renderer is in a suspended state where:
+        - Terminal control is released (for curses backend)
+        - The display is cleared or hidden
+        - Input events are not processed
+        - Drawing operations should not be performed
+        
+        The renderer must be resumed with resume() before normal operations can continue.
+        
+        Platform-Specific Behavior:
+            Terminal (Curses):
+                - Calls curses.def_prog_mode() to save terminal state
+                - Calls curses.endwin() to release terminal control
+                - Restores normal terminal mode for external programs
+                - External programs can use stdin/stdout/stderr normally
+            
+            Desktop (CoreGraphics):
+                - Typically a no-op (desktop windows don't block terminal)
+                - May hide or minimize the window
+                - External programs run in separate terminal windows
+            
+            Windows (future):
+                - Will release console control
+                - Restore original console mode
+            
+            Linux (future):
+                - Similar to curses behavior
+                - Release terminal control for external programs
+        
+        Usage Pattern:
+            1. Call suspend() before launching external program
+            2. Run external program (blocks until completion)
+            3. Call resume() to restore renderer state
+            4. Redraw the interface with refresh()
+        
+        Note: This method should only be called when the renderer is in a normal
+        (non-suspended) state. Calling suspend() when already suspended is safe
+        but has no effect.
+        
+        Raises:
+            RuntimeError: If called before initialize() or after shutdown()
+        
+        Example:
+            # Launch external editor
+            renderer.suspend()
+            try:
+                subprocess.run(['vim', 'file.txt'])
+            finally:
+                renderer.resume()
+                renderer.clear()
+                renderer.refresh()
+            
+            # Launch external viewer
+            renderer.suspend()
+            os.system('less file.txt')
+            renderer.resume()
+            redraw_interface()
+        """
+        pass
+    
+    @abstractmethod
+    def resume(self) -> None:
+        """
+        Resume the renderer after suspension.
+        
+        This method restores the rendering backend to normal operation after it
+        has been suspended with suspend(). It reclaims terminal control, restores
+        the display state, and prepares the renderer for drawing operations.
+        
+        After calling resume(), the renderer is back in normal state where:
+        - Terminal control is restored (for curses backend)
+        - The display is ready for drawing
+        - Input events can be processed
+        - Drawing operations can be performed
+        
+        The application should redraw the interface after resuming, as the display
+        content may have been lost or corrupted during suspension.
+        
+        Platform-Specific Behavior:
+            Terminal (Curses):
+                - Calls curses.reset_prog_mode() to restore terminal state
+                - Calls curses.doupdate() to refresh the display
+                - Restores curses mode for the application
+                - May need to redraw the entire interface
+            
+            Desktop (CoreGraphics):
+                - Typically a no-op (desktop windows maintain their state)
+                - May restore or show the window if it was hidden
+                - Display content is preserved
+            
+            Windows (future):
+                - Will restore console control
+                - Restore application console mode
+            
+            Linux (future):
+                - Similar to curses behavior
+                - Restore terminal control for the application
+        
+        Usage Pattern:
+            1. Call suspend() before launching external program
+            2. Run external program (blocks until completion)
+            3. Call resume() to restore renderer state
+            4. Redraw the interface with refresh()
+        
+        Note: This method should only be called when the renderer is in a suspended
+        state. Calling resume() when not suspended is safe but has no effect.
+        
+        Raises:
+            RuntimeError: If called before initialize() or after shutdown()
+        
+        Example:
+            # Launch external editor
+            renderer.suspend()
+            try:
+                subprocess.run(['vim', 'file.txt'])
+            finally:
+                renderer.resume()
+                renderer.clear()
+                renderer.refresh()
+            
+            # Launch external viewer with error handling
+            renderer.suspend()
+            try:
+                result = subprocess.run(['less', 'file.txt'])
+                if result.returncode != 0:
+                    print(f"Viewer exited with code {result.returncode}")
+            finally:
+                renderer.resume()
+                redraw_interface()
+        """
+        pass
+
     def is_desktop_mode(self) -> bool:
         """
         Check if the renderer is running in desktop mode.

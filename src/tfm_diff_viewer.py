@@ -7,6 +7,7 @@ between two text files with syntax highlighting support.
 """
 
 import difflib
+import subprocess
 from typing import List, Tuple, Optional
 
 # TTK imports
@@ -20,6 +21,7 @@ from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_ui_layer import UILayer
 from tfm_info_dialog import InfoDialog
 from tfm_log_manager import getLogger
+from tfm_config import config_manager
 
 # Try to import pygments for syntax highlighting
 try:
@@ -38,12 +40,13 @@ logger = getLogger("DiffViewer")
 class DiffViewer(UILayer):
     """Side-by-side text diff viewer that implements UILayer interface"""
     
-    def __init__(self, renderer, file1_path: Path, file2_path: Path, layer_stack=None):
+    def __init__(self, renderer, file1_path: Path, file2_path: Path, layer_stack=None, config=None):
         self.logger = getLogger("DiffViewer")
         self.renderer = renderer
         self.file1_path = file1_path
         self.file2_path = file2_path
         self.layer_stack = layer_stack
+        self.config = config
         self.file1_lines = []
         self.file2_lines = []
         self.file1_original_lines = []  # Original lines with tabs preserved
@@ -469,6 +472,11 @@ class DiffViewer(UILayer):
     
     def _show_help_dialog(self) -> None:
         """Show help dialog with keyboard shortcuts."""
+        # Get the configured key for edit_file action
+        key_bindings = config_manager.get_key_bindings()
+        edit_keys, _ = key_bindings.get_keys_for_action('edit_file')
+        edit_key = key_bindings.format_key_for_display(edit_keys[0]) if edit_keys else 'e'
+        
         title = "Diff Viewer - Help"
         help_lines = [
             "NAVIGATION",
@@ -486,6 +494,7 @@ class DiffViewer(UILayer):
             "  i             Toggle ignore whitespace",
             "",
             "GENERAL",
+            f"  {edit_key:<13} Open in external diff tool",
             "  ?             Show this help",
             "  q/ESC         Close viewer",
         ]
@@ -494,6 +503,48 @@ class DiffViewer(UILayer):
         if self.layer_stack:
             self.layer_stack.push(self.info_dialog)
         self._dirty = True
+    
+    def _launch_external_diff(self) -> None:
+        """Launch external diff tool with the two files."""
+        if not self.config:
+            self.logger.warning("Cannot launch external diff: config not available")
+            return
+        
+        # Get TEXT_DIFF configuration
+        text_diff = self.config.TEXT_DIFF
+        
+        # Convert TEXT_DIFF to list if it's a string
+        if isinstance(text_diff, str):
+            diff_command = [text_diff]
+        else:
+            diff_command = list(text_diff)
+        
+        # Add file paths
+        file1_str = str(self.file1_path)
+        file2_str = str(self.file2_path)
+        diff_command.extend([file1_str, file2_str])
+        
+        self.logger.info(f"Launching external diff tool: {' '.join(diff_command)}")
+        
+        try:
+            # Suspend rendering before launching external program
+            if hasattr(self.renderer, 'suspend'):
+                self.renderer.suspend()
+            
+            # Launch the diff tool
+            subprocess.run(diff_command, check=False)
+            
+            # Resume rendering after external program exits
+            if hasattr(self.renderer, 'resume'):
+                self.renderer.resume()
+            
+            # Mark as dirty to trigger redraw
+            self._dirty = True
+            
+        except FileNotFoundError:
+            self.logger.error(f"External diff tool not found: {diff_command[0]}")
+        except Exception as e:
+            self.logger.error(f"Error launching external diff tool: {e}")
     
     def draw_header(self):
         """Draw the viewer header"""
@@ -1083,6 +1134,14 @@ class DiffViewer(UILayer):
                 # Show help dialog
                 self._show_help_dialog()
                 return True
+            
+            # Check if this key matches the edit_file action
+            key_bindings = config_manager.get_key_bindings()
+            action = key_bindings.find_action_for_event(event, has_selection=False)
+            if action == 'edit_file':
+                # Launch external diff tool
+                self._launch_external_diff()
+                return True
             elif char_lower == 'n':
                 # Toggle line numbers
                 self.show_line_numbers = not self.show_line_numbers
@@ -1408,7 +1467,7 @@ class DiffViewer(UILayer):
         pass
 
 
-def create_diff_viewer(renderer, file1_path: Path, file2_path: Path, layer_stack=None):
+def create_diff_viewer(renderer, file1_path: Path, file2_path: Path, layer_stack=None, config=None):
     """
     Create a diff viewer instance
     
@@ -1417,6 +1476,7 @@ def create_diff_viewer(renderer, file1_path: Path, file2_path: Path, layer_stack
         file1_path: Path to the first file
         file2_path: Path to the second file
         layer_stack: Optional UILayerStack for pushing dialogs
+        config: Optional config object for accessing TEXT_DIFF setting
         
     Returns:
         DiffViewer instance or None if files cannot be viewed
@@ -1430,7 +1490,7 @@ def create_diff_viewer(renderer, file1_path: Path, file2_path: Path, layer_stack
         return None
     
     try:
-        return DiffViewer(renderer, file1_path, file2_path, layer_stack)
+        return DiffViewer(renderer, file1_path, file2_path, layer_stack, config)
     except (OSError, IOError) as e:
         logger.error(f"Could not open files for diff: {e}")
         return None

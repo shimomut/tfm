@@ -20,7 +20,7 @@ class FileListManager:
     
     def __init__(self, config):
         self.config = config
-        self.show_hidden = getattr(config, 'SHOW_HIDDEN_FILES', False)
+        self.show_hidden = config.SHOW_HIDDEN_FILES
         self.log_manager = None  # Will be set by FileManager if available
         # Use module-level getLogger - no need to check if log_manager exists
         from tfm_log_manager import getLogger
@@ -237,7 +237,7 @@ class FileListManager:
                             return ""  # No extension
                         extension = filename[dot_index:]
                         # Check extension length limit (same as rendering)
-                        max_ext_length = getattr(self.config, 'MAX_EXTENSION_LENGTH', 5)
+                        max_ext_length = self.config.MAX_EXTENSION_LENGTH
                         if len(extension) > max_ext_length:
                             return ""  # Extension too long, treat as no extension
                         return extension.lower()
@@ -300,7 +300,7 @@ class FileListManager:
         from tfm_const import DATE_FORMAT_FULL, DATE_FORMAT_SHORT
         
         dt = datetime.fromtimestamp(timestamp)
-        date_format = getattr(self.config, 'DATE_FORMAT', 'short')
+        date_format = self.config.DATE_FORMAT
         
         if date_format == DATE_FORMAT_FULL:
             # YYYY-MM-DD HH:mm:ss

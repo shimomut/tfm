@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class MockStdscr:
@@ -203,7 +203,7 @@ def demo_quit_cursor_saving():
         print("\n--- Working Session ---")
         
         state_manager = TFMStateManager("demo_quit_session")
-        config = DefaultConfig()
+        config = Config()
         fm = DemoFileManager(config, src_dir, tests_dir, state_manager)
         
         print("Developer starts TFM and begins working:")
@@ -321,7 +321,7 @@ def demo_quit_saving_scenarios():
         
         # Simulate scenario 1
         state_manager = TFMStateManager("scenario1")
-        fm = DemoFileManager(DefaultConfig(), project_dir, logs_dir, state_manager)
+        fm = DemoFileManager(Config(), project_dir, logs_dir, state_manager)
         fm.refresh_files()
         
         fm.pane_manager.left_pane['selected_index'] = 1   # server.py
@@ -346,7 +346,7 @@ def demo_quit_saving_scenarios():
         
         # Simulate scenario 2
         state_manager2 = TFMStateManager("scenario2")
-        fm2 = DemoFileManager(DefaultConfig(), project_dir, logs_dir, state_manager2)
+        fm2 = DemoFileManager(Config(), project_dir, logs_dir, state_manager2)
         fm2.refresh_files()
         
         fm2.pane_manager.left_pane['selected_index'] = 0   # app.py

@@ -85,7 +85,7 @@ class SearchDialog(UILayer, BaseListDialog):
         self.progress_animator = ProgressAnimatorFactory.create_search_animator(config)
         
         # Get configurable search result limit
-        self.max_search_results = getattr(config, 'MAX_SEARCH_RESULTS', 10000)
+        self.max_search_results = config.MAX_SEARCH_RESULTS
         
     def show(self, search_type='filename', search_root=None, callback=None):
         """Show the search dialog for filename or content search

@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
 from tfm_list_dialog import ListDialog
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class MockStdscr:
@@ -191,7 +191,7 @@ def demo_cursor_history_dialog():
         
         # Create state manager and file manager
         state_manager = TFMStateManager("demo_history_dialog")
-        config = DefaultConfig()
+        config = Config()
         fm = DemoFileManager(config, created_dirs['src'], created_dirs['docs'], state_manager)
         
         # === Simulate user working session ===
@@ -380,7 +380,7 @@ def demo_history_dialog_workflow():
         
         # Create file manager
         state_manager = TFMStateManager("workflow_demo")
-        config = DefaultConfig()
+        config = Config()
         fm = DemoFileManager(config, dirs['frontend'], dirs['backend'], state_manager)
         
         # === Development workflow ===

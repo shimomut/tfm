@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class DemoConfig(DefaultConfig):

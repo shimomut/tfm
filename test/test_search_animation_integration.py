@@ -12,7 +12,7 @@ import shutil
 
 from tfm_search_dialog import SearchDialog, SearchDialogHelpers
 from tfm_progress_animator import ProgressAnimator
-from tfm_config import DefaultConfig
+from _config import Config
 from tfm_pane_manager import PaneManager
 from tfm_file_list_manager import FileListManager
 

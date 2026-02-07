@@ -11,7 +11,7 @@ from pathlib import Path
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 def test_cursor_history_persistence():
@@ -35,7 +35,7 @@ def test_cursor_history_persistence():
         state_manager._initialize_database()
         
         # Create pane manager with state manager
-        config = DefaultConfig()
+        config = Config()
         pane_manager = PaneManager(config, test_dir, test_dir, state_manager)
         
         # Simulate file list for the pane
@@ -116,7 +116,7 @@ def test_cursor_history_without_state_manager():
             (test_dir / filename).touch()
         
         # Create pane manager without state manager
-        config = DefaultConfig()
+        config = Config()
         pane_manager = PaneManager(config, test_dir, test_dir, None)
         
         # Simulate file list
@@ -160,7 +160,7 @@ def test_cursor_history_with_missing_files():
         (test_dir / "file2.py").unlink()
         
         # Create pane manager with remaining files
-        config = DefaultConfig()
+        config = Config()
         pane_manager = PaneManager(config, test_dir, test_dir, state_manager)
         remaining_files = ["file1.txt", "file3.log"]
         pane_manager.left_pane['files'] = [test_dir / f for f in remaining_files]

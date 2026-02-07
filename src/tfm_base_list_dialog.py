@@ -11,6 +11,7 @@ from tfm_single_line_text_edit import SingleLineTextEdit
 from tfm_colors import get_status_color
 from tfm_scrollbar import draw_scrollbar
 from tfm_text_layout import draw_text_segments, AsIsSegment
+import tfm_const
 
 
 class BaseListDialog:
@@ -145,8 +146,8 @@ class BaseListDialog:
             else:
                 # Fallback: estimate content height from dialog dimensions
                 # This is only used before first draw or if draw hasn't been called
-                height_ratio = getattr(self.config, 'LIST_DIALOG_HEIGHT_RATIO', 0.7)
-                min_height = getattr(self.config, 'LIST_DIALOG_MIN_HEIGHT', 15)
+                height_ratio = tfm_const.LIST_DIALOG_HEIGHT_RATIO
+                min_height = tfm_const.LIST_DIALOG_MIN_HEIGHT
                 
                 # Get actual terminal height from renderer
                 if self.renderer:

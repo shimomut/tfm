@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 def demo_cursor_history_persistence():
@@ -53,7 +53,7 @@ def demo_cursor_history_persistence():
         
         # Create state manager and pane manager
         state_manager = TFMStateManager("cursor_demo_session1")
-        config = DefaultConfig()
+        config = Config()
         pane_manager = PaneManager(config, projects_dir, documents_dir, state_manager)
         
         # Simulate browsing projects directory

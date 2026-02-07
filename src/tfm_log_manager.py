@@ -126,7 +126,7 @@ class LogManager:
         self._stream_logger.propagate = False
         
         # Store configuration for handler management
-        max_log_messages = getattr(config, 'MAX_LOG_MESSAGES', MAX_LOG_MESSAGES)
+        max_log_messages = config.MAX_LOG_MESSAGES
         self._config = LoggingConfig()
         self._config.max_log_messages = max_log_messages
         self._config.remote_monitoring_enabled = remote_port is not None

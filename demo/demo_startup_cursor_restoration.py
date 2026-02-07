@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class MockStdscr:
@@ -152,7 +152,7 @@ def demo_startup_cursor_restoration():
         print("\n--- TFM Session 1: Working Session ---")
         
         state_manager = TFMStateManager("demo_startup_session1")
-        config = DefaultConfig()
+        config = Config()
         fm1 = DemoFileManager(config, projects_dir, documents_dir, state_manager)
         
         print("Starting TFM...")
@@ -270,7 +270,7 @@ def demo_startup_workflow():
         print("\n--- Day 1: Working Session ---")
         
         state_manager = TFMStateManager("workflow_day1")
-        config = DefaultConfig()
+        config = Config()
         fm = DemoFileManager(config, src_dir, docs_dir, state_manager)
         fm.refresh_files()
         

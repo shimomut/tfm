@@ -11,7 +11,7 @@ import tempfile
 import shutil
 
 from tfm_search_dialog import SearchDialog
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class MockConfig(DefaultConfig):

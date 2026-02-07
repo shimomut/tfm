@@ -13,7 +13,7 @@ from pathlib import Path
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class TestConfig(DefaultConfig):

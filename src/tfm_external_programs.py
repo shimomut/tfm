@@ -134,11 +134,7 @@ class ExternalProgramManager:
         self.log_manager = log_manager
         self.renderer = renderer
         self.logger = getLogger("ExtProg")
-    
 
-
-
-    
     def execute_external_program(self, pane_manager, program):
         """Execute an external program with environment variables set"""
         # Detect if running in desktop mode
@@ -289,7 +285,7 @@ class ExternalProgramManager:
             
             # Reinitialize colors with configured scheme
             from tfm_colors import init_colors
-            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+            color_scheme = self.config.COLOR_SCHEME
             init_colors(self.renderer, color_scheme)
             
             # Restore stdout/stderr capture (only needed in terminal mode)
@@ -421,7 +417,7 @@ class ExternalProgramManager:
             
             # Reinitialize colors with configured scheme
             from tfm_colors import init_colors
-            color_scheme = getattr(self.config, 'COLOR_SCHEME', 'dark')
+            color_scheme = self.config.COLOR_SCHEME
             init_colors(self.renderer, color_scheme)
             
             # Restore stdout/stderr capture  
@@ -433,15 +429,3 @@ class ExternalProgramManager:
             
             # Log return from sub-shell
             self.logger.info("Returned from sub-shell mode")
-    
-    def suspend_curses(self):
-        """Suspend the renderer to allow external programs to run"""
-        # Check if the renderer has a suspend method (CursesBackend does)
-        if hasattr(self.renderer, 'suspend'):
-            self.renderer.suspend()
-        
-    def resume_curses(self):
-        """Resume the renderer after external program execution"""
-        # Check if the renderer has a resume method (CursesBackend does)
-        if hasattr(self.renderer, 'resume'):
-            self.renderer.resume()

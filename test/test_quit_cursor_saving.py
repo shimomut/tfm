@@ -13,7 +13,7 @@ from pathlib import Path
 
 from tfm_state_manager import TFMStateManager
 from tfm_pane_manager import PaneManager
-from tfm_config import DefaultConfig
+from _config import Config
 
 
 class MockStdscr:
@@ -144,7 +144,7 @@ def test_quit_cursor_saving_basic():
         state_manager._initialize_database()
         
         # Create file manager and set up files
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, left_dir, right_dir, state_manager)
         fm.refresh_files()
         
@@ -204,7 +204,7 @@ def test_quit_saving_with_empty_panes():
         state_manager._initialize_database()
         
         # Create file manager with empty directories
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, left_dir, right_dir, state_manager)
         fm.refresh_files()
         
@@ -243,7 +243,7 @@ def test_quit_saving_with_invalid_cursor():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, test_dir, test_dir, state_manager)
         fm.refresh_files()
         
@@ -297,7 +297,7 @@ def test_quit_saving_integration_with_startup():
         state_manager1.db_path = db_path
         state_manager1._initialize_database()
         
-        fm1 = MockFileManager(DefaultConfig(), work_dir, docs_dir, state_manager1)
+        fm1 = MockFileManager(Config(), work_dir, docs_dir, state_manager1)
         fm1.refresh_files()
         
         # Set focus positions during work
@@ -324,7 +324,7 @@ def test_quit_saving_integration_with_startup():
         state_manager2 = TFMStateManager("integration_session2")
         state_manager2.db_path = db_path
         
-        fm2 = MockFileManager(DefaultConfig(), work_dir, docs_dir, state_manager2)
+        fm2 = MockFileManager(Config(), work_dir, docs_dir, state_manager2)
         fm2.refresh_files()
         
         # Initially cursors should be at default positions
@@ -392,7 +392,7 @@ def test_quit_saving_separate_pane_histories():
         state_manager._initialize_database()
         
         # Create file manager
-        config = DefaultConfig()
+        config = Config()
         fm = MockFileManager(config, left_dir, right_dir, state_manager)
         fm.refresh_files()
         

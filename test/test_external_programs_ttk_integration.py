@@ -37,16 +37,6 @@ class TestExternalProgramsTTKIntegration(unittest.TestCase):
         self.assertEqual(self.manager.log_manager, self.mock_log_manager)
         self.assertEqual(self.manager.renderer, self.mock_renderer)
     
-    def test_suspend_curses_uses_renderer(self):
-        """Test that suspend_curses uses renderer.suspend()"""
-        self.manager.suspend_curses()
-        self.mock_renderer.suspend.assert_called_once()
-    
-    def test_resume_curses_uses_renderer(self):
-        """Test that resume_curses uses renderer.resume()"""
-        self.manager.resume_curses()
-        self.mock_renderer.resume.assert_called_once()
-    
     @patch('tfm_external_programs.subprocess.run')
     @patch('tfm_external_programs.os.chdir')
     @patch('tfm_colors.init_colors')

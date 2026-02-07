@@ -319,8 +319,8 @@ def get_ssh_cache() -> SSHCache:
         try:
             from tfm_config import get_config
             config = get_config()
-            ttl = getattr(config, 'SSH_CACHE_TTL', 30)
-            error_ttl = getattr(config, 'SSH_CACHE_ERROR_TTL', 300)
+            ttl = config.SSH_CACHE_TTL
+            error_ttl = config.SSH_CACHE_ERROR_TTL
         except (ImportError, Exception):
             ttl = 30  # Fallback to default
             error_ttl = 300  # Fallback to 5 minutes for errors
