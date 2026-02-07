@@ -289,6 +289,7 @@ class DiffEngine:
             left_files: Dictionary of files from left directory (relative_path -> FileInfo)
             right_files: Dictionary of files from right directory (relative_path -> FileInfo)
         """
+        self.logger = getLogger("DirDiff")
         self.left_files = left_files
         self.right_files = right_files
         self.comparison_errors: Dict[str, str] = {}  # Track file comparison errors
