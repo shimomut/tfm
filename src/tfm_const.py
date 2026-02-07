@@ -21,14 +21,6 @@ DEFAULT_LOG_HEIGHT_RATIO = 0.25  # Log pane takes 1/4 of screen
 MIN_LOG_HEIGHT = 5
 MAX_LOG_MESSAGES = 1000
 
-# Terminal-specific key codes have been moved to TTK's curses backend
-# Use KeyCode with ModifierKey.SHIFT for Shift+Arrow combinations instead
-
-# File size formatting thresholds
-SIZE_KB = 1024
-SIZE_MB = 1024 * 1024
-SIZE_GB = 1024 * 1024 * 1024
-
 # Date/time formats
 DATETIME_FORMAT = "%Y-%m-%d %H:%M"
 LOG_TIME_FORMAT = "%H:%M:%S"
