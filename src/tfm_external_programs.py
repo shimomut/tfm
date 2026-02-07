@@ -63,7 +63,7 @@ def tfm_tool(tool_name):
     
     # Check each candidate
     for candidate_path in candidates:
-        if candidate_path.exists() and os.access(candidate_path, os.X_OK):
+        if candidate_path.exists():
             return str(candidate_path)
     
     # Tool not found, return original name (will likely fail later with clear error)
