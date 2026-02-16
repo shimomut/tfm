@@ -255,6 +255,7 @@ class Config:
         {
             'pattern': '*.pdf',
             'open|view': ['open', '-a', 'Preview'],
+            'edit': None,
         },
         # Image files
         {

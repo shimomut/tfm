@@ -3935,9 +3935,16 @@ class FileManager(UILayer):
         
         # Try to use file association for 'edit' action
         filename = focused_file.name
-        command = get_program_for_file(filename, 'edit')
         
-        if command:
+        # Check if there's an explicit association (even if None)
+        if has_explicit_association(filename, 'edit'):
+            command = get_program_for_file(filename, 'edit')
+            
+            # If explicitly set to None, don't open any editor
+            if command is None:
+                self.logger.info(f"No editor configured for {focused_file.name}")
+                return
+            
             # Use configured program from file associations
             try:
                 # Suspend renderer
