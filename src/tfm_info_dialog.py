@@ -426,6 +426,8 @@ class InfoDialogHelpers:
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('create_directory')} Create new directory")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('create_file')} Create new file")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('rename_file')} Rename file/directory")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('open_with_os')} Open with OS default application")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('reveal_in_os')} Reveal in OS file manager")
         help_lines.append("")
         
         # View & Search (configurable)
