@@ -309,18 +309,10 @@ class Config:
     # The "options" field is a dictionary with program-specific options:
     #   - auto_return: if True, automatically returns to TFM without waiting for user input
     PROGRAMS = [
-        {'name': 'Git Status', 'command': ['git', 'status']},
-        {'name': 'Git Log', 'command': ['git', 'log', '--oneline', '-10']},
-        {'name': 'Disk Usage', 'command': ['du', '-sh', '*']},
-        {'name': 'List Processes', 'command': ['ps', 'aux']},
-        {'name': 'System Info', 'command': ['uname', '-a']},
-        {'name': 'Network Connections', 'command': ['netstat', '-tuln']},
         {'name': 'Compare Files (BeyondCompare)', 'command': [tfm_python, tfm_tool('bcompare_files.py')], 'options': {'auto_return': True}},
         {'name': 'Compare Directories (BeyondCompare)', 'command': [tfm_python, tfm_tool('bcompare_dirs.py')], 'options': {'auto_return': True}},
         {'name': 'Open in VSCode', 'command': [tfm_python, tfm_tool('vscode.py')], 'options': {'auto_return': True}},
         {'name': 'Open in Kiro', 'command': [tfm_python, tfm_tool('kiro.py')], 'options': {'auto_return': True}},
-        {'name': 'Preview Files', 'command': [tfm_python, tfm_tool('preview_files.py')], 'options': {'auto_return': True}},
-        {'name': 'Reveal in File Manager', 'command': [tfm_python, tfm_tool('reveal_in_finder.py')], 'options': {'auto_return': True}},
 
         # Add your own programs here:
         # {'name': 'My Custom Tool', 'command': [tfm_python, tfm_tool('my_custom_tool.py')], 'options': {'auto_return': True}},
