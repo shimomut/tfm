@@ -98,7 +98,7 @@ class Config:
         # === File Operations ===
         'copy_files': {'keys': ['C'], 'selection': 'required'},  # Copy selected files to other pane
         'move_files': {'keys': ['M'], 'selection': 'required'},  # Move selected files to other pane
-        'delete_files': {'keys': ['K', 'DELETE', 'Command-Backspace'], 'selection': 'required'}, # Delete selected files/directories
+        'delete_files': {'keys': ['K', 'DELETE'], 'selection': 'required'}, # Delete selected files/directories
         'rename_file': ['R'],                  # Rename selected file/directory
         'create_file': ['Shift-E'],            # Create new file (prompts for filename)
         'create_directory': {'keys': ['M'], 'selection': 'none'},  # Create new directory (only when no files selected)
