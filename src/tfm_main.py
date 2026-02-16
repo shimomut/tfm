@@ -4972,6 +4972,10 @@ class FileManager(UILayer):
             self.logger.info("Pane split reset to 50% | 50%")
             return True
         elif action == 'subshell':  # Sub-shell mode
+            if self.is_desktop_mode():
+                # Subshell mode not available in desktop mode
+                self.logger.info("Subshell mode is not available in desktop mode")
+                return True
             self.external_program_manager.enter_subshell_mode(
                 self.pane_manager
             )
