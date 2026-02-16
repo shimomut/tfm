@@ -261,16 +261,19 @@ class Config:
         {
             'pattern': ['*.jpg', '*.jpeg', '*.png', '*.gif'],
             'open|view': ['open', '-a', 'Preview'],
+            'edit': ['open', '-a', 'GIMP'],
         },
         # Video files
         {
             'pattern': ['*.mp4', '*.mov'],
             'open|view': ['open', '-a', 'QuickTime Player'],
+            'edit': None,
         },
         # Audio files
         {
             'pattern': ['*.mp3', '*.wav'],
             'open': ['open', '-a', 'Music'],
+            'edit': None,
         },
         # Microsoft Word documents
         {
