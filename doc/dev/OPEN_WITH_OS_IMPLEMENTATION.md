@@ -1,8 +1,10 @@
-# Open with OS Default Application - Implementation
+# Open with OS and Reveal in File Manager - Implementation
 
 ## Overview
 
-This document describes the implementation of the "Open with OS" feature, which allows users to open files using the operating system's default file associations.
+This document describes the implementation of two related features:
+1. **Open with OS** - Opens files using the operating system's default file associations
+2. **Reveal in File Manager** - Opens the OS file manager and selects the focused file
 
 ## Architecture
 
@@ -10,20 +12,23 @@ This document describes the implementation of the "Open with OS" feature, which 
 
 1. **Menu Manager** (`src/tfm_menu_manager.py`)
    - Added `FILE_OPEN_WITH_OS` menu item constant
-   - Added menu item to File menu with `Command+Enter` shortcut
+   - Added `FILE_REVEAL_IN_FILE_MANAGER` menu item constant
+   - Added both menu items to File menu with keyboard shortcuts
 
 2. **Main Application** (`src/tfm_main.py`)
-   - Added `_action_open_with_os()` method
-   - Added menu event handler case for `FILE_OPEN_WITH_OS`
-   - Added keyboard action handler for `open_with_os`
    - Added `platform` module import
+   - Added `_action_open_with_os()` method
+   - Added `_action_reveal_in_file_manager()` method
+   - Added menu event handlers for both actions
+   - Added keyboard action handlers for both actions
 
 3. **Configuration** (`src/_config.py`)
    - Added `open_with_os` keyboard action with `Command-ENTER` binding
+   - Added `reveal_in_file_manager` keyboard action with `Alt-ENTER` binding
 
 ## Implementation Details
 
-### Action Method
+### Open with OS Action
 
 ```python
 def _action_open_with_os(self):
@@ -40,6 +45,26 @@ The method:
    - Windows: `start "" <file>`
 5. Logs success or error messages
 6. Marks the UI as dirty for redraw
+
+### Reveal in File Manager Action
+
+```python
+def _action_reveal_in_file_manager(self):
+    """Reveal the focused file in OS file manager (Finder/Explorer)."""
+```
+
+The method:
+1. Gets the current pane
+2. Uses only the focused file (ignores selection)
+3. Detects the operating system
+4. Calls the appropriate OS command:
+   - macOS: `open -R <item>` (reveals/selects item in Finder, works for both files and directories)
+   - Linux: Tries common file managers with `--select` flag, falls back to opening parent directory
+   - Windows: `explorer /select, <item>` (selects item in Explorer, works for both files and directories)
+5. Logs success or error messages
+6. Marks the UI as dirty for redraw
+
+Note: For all platforms, directories are revealed/selected in their parent directory, not opened.
 
 ### Error Handling
 

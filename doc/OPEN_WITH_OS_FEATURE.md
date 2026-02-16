@@ -1,71 +1,92 @@
-# Open with OS Default Application Feature
+# Open with OS and Reveal in File Manager Features
 
 ## Overview
 
-The "Open with OS" feature allows you to open files using your operating system's default file associations, bypassing TFM's configured file associations. This is useful when you want to quickly open a file with the system's preferred application without configuring TFM's file associations.
+TFM provides two convenient actions for interacting with the operating system's file management:
 
-## Usage
+1. **Open with OS** - Opens files using the OS's default file associations
+2. **Reveal in File Manager** - Opens the OS file manager and selects the focused file
 
-### Keyboard Shortcut
+These features allow quick access to system-level file operations without leaving TFM.
 
-- **macOS**: `Command+Enter`
-- **Linux/Windows**: `Ctrl+Enter`
+## Open with OS
 
-### Menu Access
+### Usage
 
-Navigate to: **File > Open with Default App**
+- **Keyboard**: `Command+Enter` (macOS) / `Ctrl+Enter` (Linux/Windows)
+- **Menu**: File > Open with Default App
 
 ### Behavior
 
-1. **Single File**: When no files are selected, pressing `Command+Enter` opens the focused file with the OS default application.
+Opens selected files (or focused file if none selected) using the operating system's default application for each file type.
 
-2. **Multiple Files**: When files are selected (using `Space`), pressing `Command+Enter` opens all selected files with their respective default applications.
+## Reveal in File Manager
 
-3. **Directories**: Opening a directory with the default app will open it in your system's file manager (Finder on macOS, File Explorer on Windows, etc.).
+### Usage
 
-## Comparison with Regular Open
+- **Keyboard**: `Alt+Enter`
+- **Menu**: File > Reveal in File Manager
 
-TFM provides two ways to open files:
+### Behavior
 
-| Feature | Regular Open (`Command+O`) | Open with OS (`Command+Enter`) |
-|---------|---------------------------|--------------------------------|
-| Uses | TFM's file associations | OS default associations |
-| Configurable | Yes (via `_config.py`) | No (system-wide) |
-| Fallback | Built-in text viewer | None |
-| Best for | Customized workflows | Quick system-default access |
+Opens the system file manager and reveals/selects the focused file or directory:
+- **macOS**: Opens Finder and selects the item (both files and directories are revealed in their parent)
+- **Windows**: Opens Explorer and selects the item (both files and directories are revealed in their parent)
+- **Linux**: Opens the default file manager (nautilus, nemo, dolphin, etc.)
+
+Note: This action always uses the focused item, not the selection. When a directory is focused, it will be revealed/selected in its parent directory (showing the directory as a selected item), not opened to show its contents.
+
+## Comparison Table
+
+| Feature | Open with OS | Reveal in File Manager |
+|---------|-------------|------------------------|
+| Shortcut | Command+Enter | Alt+Enter |
+| Uses | Selected files or focused | Focused file only |
+| Action | Opens files | Opens file manager |
+| Multiple files | Yes | No (focused only) |
+
+## Platform Support
+
+Both features work across all supported platforms:
+- **macOS**: Uses `open` and `open -R` commands
+- **Linux**: Uses `xdg-open` and file manager detection
+- **Windows**: Uses `start` and `explorer` commands
 
 ## Examples
 
-### Opening a PDF
+### Opening Files with OS Default
 
-- `Command+O`: Opens with the application configured in TFM (e.g., Preview)
-- `Command+Enter`: Opens with your system's default PDF viewer
+1. Focus on a PDF file
+2. Press `Command+Enter`
+3. PDF opens in your default PDF viewer (e.g., Preview, Adobe Reader)
 
-### Opening a Text File
+### Revealing File in File Manager
 
-- `Command+O`: Opens with TFM's configured text editor
-- `Command+Enter`: Opens with your system's default text editor
+1. Focus on a file deep in a directory structure
+2. Press `Alt+Enter`
+3. Finder/Explorer opens with the file selected
 
-### Opening Multiple Images
+### Opening Multiple Files
 
 1. Select multiple image files using `Space`
 2. Press `Command+Enter`
 3. All images open in your default image viewer
 
-## Platform Support
+## Comparison with TFM's Regular Open
 
-The feature works across all supported platforms:
-
-- **macOS**: Uses the `open` command
-- **Linux**: Uses `xdg-open`
-- **Windows**: Uses the `start` command
+| Feature | Regular Open (Cmd+O) | Open with OS (Cmd+Enter) | Reveal (Alt+Enter) |
+|---------|---------------------|--------------------------|-------------------|
+| Uses | TFM file associations | OS default associations | N/A |
+| Configurable | Yes | No (system-wide) | No |
+| Fallback | Built-in text viewer | None | None |
+| Opens file manager | No | No | Yes |
 
 ## Tips
 
-- Use `Command+Enter` when you want to quickly open a file without worrying about TFM's configuration
-- Use `Command+O` when you want consistent behavior based on your TFM file associations
-- Select multiple files and use `Command+Enter` to open them all at once
-- This feature respects your system-wide file associations set in your OS preferences
+- Use `Command+Enter` when you want to quickly open files with system defaults
+- Use `Alt+Enter` to locate a file in your file manager for further operations
+- Use `Command+O` for consistent behavior based on TFM's configuration
+- The reveal action is useful for drag-and-drop operations or accessing file context menus
 
 ## Related Features
 

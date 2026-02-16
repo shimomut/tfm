@@ -1078,6 +1078,8 @@ class FileManager(UILayer):
             return self._action_open_file()
         elif item_id == MenuManager.FILE_OPEN_WITH_OS:
             return self._action_open_with_os()
+        elif item_id == MenuManager.FILE_REVEAL_IN_OS:
+            return self._action_reveal_in_os()
         elif item_id == MenuManager.FILE_VIEW:
             return self._action_view_file()
         elif item_id == MenuManager.FILE_EDIT:
@@ -1260,6 +1262,72 @@ class FileManager(UILayer):
                 self.logger.error(f"Failed to open {file_path.name}: {e}")
             except Exception as e:
                 self.logger.error(f"Error opening {file_path.name}: {e}")
+        
+        self.mark_dirty()
+        return True
+    
+    def _action_reveal_in_os(self):
+        """Reveal the focused file in OS file manager (Finder/Explorer)."""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            return True
+        
+        # Always use focused file (not selection)
+        focused_file = current_pane['files'][current_pane['focused_index']]
+        
+        system = platform.system()
+        
+        try:
+            if system == 'Darwin':  # macOS
+                # Always use 'open -R' to reveal/select the item in Finder
+                # This works for both files and directories
+                subprocess.run(['open', '-R', str(focused_file)], check=True)
+            elif system == 'Linux':
+                # Try common file managers
+                file_managers = ['nautilus', 'nemo', 'dolphin', 'thunar', 'pcmanfm']
+                opened = False
+                
+                for fm in file_managers:
+                    # Check if file manager is available
+                    try:
+                        result = subprocess.run(['which', fm], capture_output=True)
+                        if result.returncode == 0:
+                            # Some file managers support selecting items
+                            if fm in ['nautilus', 'nemo']:
+                                subprocess.run([fm, '--select', str(focused_file)], check=True)
+                            else:
+                                # Fallback: open parent directory
+                                parent_dir = focused_file.parent
+                                subprocess.run([fm, str(parent_dir)], check=True)
+                            opened = True
+                            break
+                    except Exception:
+                        continue
+                
+                if not opened:
+                    # Fallback to xdg-open with parent directory
+                    parent_dir = focused_file.parent
+                    subprocess.run(['xdg-open', str(parent_dir)], check=True)
+            elif system == 'Windows':
+                # Always use '/select,' to select the item in Explorer
+                # This works for both files and directories
+                subprocess.run(['explorer', '/select,', str(focused_file)], check=True)
+            else:
+                self.logger.error(f"Unsupported platform: {system}")
+                return True
+            
+            file_manager_name = {
+                'Darwin': 'Finder',
+                'Windows': 'Explorer',
+                'Linux': 'file manager'
+            }.get(system, 'file manager')
+            
+            self.logger.info(f"Revealed in {file_manager_name}: {focused_file.name}")
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Failed to reveal {focused_file.name}: {e}")
+        except Exception as e:
+            self.logger.error(f"Error revealing {focused_file.name}: {e}")
         
         self.mark_dirty()
         return True
@@ -4615,6 +4683,9 @@ class FileManager(UILayer):
             return True
         elif action == 'open_with_os':
             self._action_open_with_os()
+            return True
+        elif action == 'reveal_in_os':
+            self._action_reveal_in_os()
             return True
         elif action == 'nav_left':
             # Context-aware LEFT arrow: go to parent in left pane, switch pane in right pane
