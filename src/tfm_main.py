@@ -7,6 +7,7 @@ import os
 import stat
 import shutil
 import subprocess
+import platform
 import sys
 import io
 import fnmatch
@@ -1075,6 +1076,8 @@ class FileManager(UILayer):
             return self._action_create_directory()
         elif item_id == MenuManager.FILE_OPEN:
             return self._action_open_file()
+        elif item_id == MenuManager.FILE_OPEN_WITH_OS:
+            return self._action_open_with_os()
         elif item_id == MenuManager.FILE_VIEW:
             return self._action_view_file()
         elif item_id == MenuManager.FILE_EDIT:
@@ -1222,6 +1225,43 @@ class FileManager(UILayer):
     def _action_open_file(self):
         """Open the selected file or directory."""
         self.handle_enter()
+        return True
+    
+    def _action_open_with_os(self):
+        """Open the selected file(s) or directory with OS default application."""
+        current_pane = self.get_current_pane()
+        
+        if not current_pane['files']:
+            return True
+        
+        # Get selected files or focused file
+        selected_files = [f for f in current_pane['files'] if f in current_pane['selected_files']]
+        if not selected_files:
+            focused_file = current_pane['files'][current_pane['focused_index']]
+            selected_files = [focused_file]
+        
+        # Open each file with OS default application
+        system = platform.system()
+        
+        for file_path in selected_files:
+            try:
+                if system == 'Darwin':  # macOS
+                    subprocess.run(['open', str(file_path)], check=True)
+                elif system == 'Linux':
+                    subprocess.run(['xdg-open', str(file_path)], check=True)
+                elif system == 'Windows':
+                    subprocess.run(['start', '', str(file_path)], shell=True, check=True)
+                else:
+                    self.logger.error(f"Unsupported platform: {system}")
+                    return True
+                
+                self.logger.info(f"Opened with default app: {file_path.name}")
+            except subprocess.CalledProcessError as e:
+                self.logger.error(f"Failed to open {file_path.name}: {e}")
+            except Exception as e:
+                self.logger.error(f"Error opening {file_path.name}: {e}")
+        
+        self.mark_dirty()
         return True
     
     def _action_delete(self):
@@ -4572,6 +4612,9 @@ class FileManager(UILayer):
         elif action == 'open_item':
             self.handle_enter()
             self.mark_dirty()
+            return True
+        elif action == 'open_with_os':
+            self._action_open_with_os()
             return True
         elif action == 'nav_left':
             # Context-aware LEFT arrow: go to parent in left pane, switch pane in right pane

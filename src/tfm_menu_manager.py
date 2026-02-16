@@ -21,6 +21,7 @@ class MenuManager:
     FILE_NEW_FILE = 'file.new_file'
     FILE_NEW_FOLDER = 'file.new_folder'
     FILE_OPEN = 'file.open'
+    FILE_OPEN_WITH_OS = 'file.open_with_os'
     FILE_COPY_TO_OTHER_PANE = 'file.copy_to_other_pane'
     FILE_MOVE_TO_OTHER_PANE = 'file.move_to_other_pane'
     FILE_DELETE = 'file.delete'
@@ -174,6 +175,12 @@ class MenuManager:
                     'id': self.FILE_OPEN,
                     'label': 'Open',
                     'shortcut': f'{modifier}+O',
+                    'enabled': True
+                },
+                {
+                    'id': self.FILE_OPEN_WITH_OS,
+                    'label': 'Open with Default App',
+                    'shortcut': f'{modifier}+Enter',
                     'enabled': True
                 },
                 {

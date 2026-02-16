@@ -80,6 +80,7 @@ class Config:
         'page_up': ['PAGE_UP'],                # Move cursor up one page
         'page_down': ['PAGE_DOWN'],            # Move cursor down one page
         'open_item': ['ENTER'],                # Open file/directory or enter directory
+        'open_with_os': ['Command-ENTER'],     # Open file(s) with OS default application
         'go_parent': ['BACKSPACE'],            # Go to parent directory
         'switch_pane': ['TAB'],                # Switch between left and right panes
         'nav_left': ['LEFT'],                  # Left pane: go to parent, Right pane: switch to left pane
