@@ -186,7 +186,7 @@ class MenuManager:
                 },
                 {
                     'id': self.FILE_REVEAL_IN_OS,
-                    'label': 'Reveal in File Manager',
+                    'label': 'Reveal in Finder' if platform.system() == 'Darwin' else 'Reveal in Explorer' if platform.system() == 'Windows' else 'Reveal in File Manager',
                     'shortcut': 'Alt+Enter',
                     'enabled': True
                 },
