@@ -12,6 +12,7 @@ from tfm_colors import get_status_color
 from tfm_config import get_favorite_directories, get_programs
 from tfm_log_manager import getLogger
 import tfm_const
+import unicodedata
 
 
 class ListDialog(UILayer, BaseListDialog):
@@ -456,9 +457,10 @@ class ListDialogHelpers:
                 return
             
             # Get files and directories from other pane for comparison
+            # Normalize filenames to NFC for consistent comparison across platforms
             other_items = {}
             for item_path in other_pane['files']:
-                name = item_path.name
+                name = unicodedata.normalize('NFC', item_path.name)
                 try:
                     if item_path.is_file():
                         size = item_path.stat().st_size if item_path.exists() else 0
@@ -487,7 +489,7 @@ class ListDialogHelpers:
             
             for item_path in current_pane['files']:
                 total_items += 1
-                name = item_path.name
+                name = unicodedata.normalize('NFC', item_path.name)
                 
                 if name in other_items:
                     other_item = other_items[name]
