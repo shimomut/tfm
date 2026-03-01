@@ -2547,11 +2547,21 @@ class FileManager(UILayer):
             status_line = " " * width
             self.safe_addstr(status_y, 0, status_line, get_status_color())
             
-            # Get formatted progress text from progress manager
-            progress_text = self.progress_manager.get_progress_text(width - 4)
+            # Get progress segments from progress manager
+            from tfm_text_layout import draw_text_segments
+            segments = self.progress_manager.get_progress_segments()
             
-            # Draw progress text
-            self.safe_addstr(status_y, 2, progress_text, get_status_color())
+            # Draw progress segments using text layout system
+            status_color_pair, status_attributes = get_status_color()
+            draw_text_segments(
+                self.renderer,
+                row=status_y,
+                col=2,
+                segments=segments,
+                rendering_width=width - 4,
+                default_color=status_color_pair,
+                default_attributes=status_attributes
+            )
             return
 
         # If in quick choice mode, show quick choice bar

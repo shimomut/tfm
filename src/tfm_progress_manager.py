@@ -8,6 +8,12 @@ from enum import Enum
 from typing import Optional, Callable, Dict, Any
 from tfm_progress_animator import ProgressAnimator
 from tfm_str_format import format_size
+from tfm_text_layout import (
+    AsIsSegment,
+    FilepathSegment,
+    SpacerSegment,
+    AllOrNothingSegment
+)
 
 
 class OperationType(Enum):
@@ -194,17 +200,14 @@ class ProgressManager:
         
         return int((self.current_operation['processed_items'] / self.current_operation['total_items']) * 100)
     
-    def get_progress_text(self, max_width: int = 80) -> str:
-        """Get formatted progress text for display
+    def get_progress_segments(self):
+        """Get progress segments for rendering with text layout system
         
-        Args:
-            max_width: Maximum width for the progress text
-            
         Returns:
-            Formatted progress string
+            List of text segments, or empty list if no operation is active
         """
         if not self.current_operation:
-            return ""
+            return []
         
         op = self.current_operation
         op_type = op['type']
@@ -232,41 +235,51 @@ class ProgressManager:
         # Hide count during counting phase
         is_counting = op.get('counting', False)
         
+        # Build segments using text layout system
+        segments = []
+        
+        # Animation frame and verb (always visible)
         if is_counting:
             # During counting, show "Preparing..." without count
             if op['description']:
-                progress_text = f"{animation_frame} {verb} ({op['description']})... Preparing"
+                base_text = f"{animation_frame} {verb} ({op['description']})... Preparing"
             else:
-                progress_text = f"{animation_frame} {verb}... Preparing"
+                base_text = f"{animation_frame} {verb}... Preparing"
+            segments.append(AsIsSegment(base_text))
         else:
             # After counting, show actual progress count
             if op['description']:
-                progress_text = f"{animation_frame} {verb} ({op['description']})... {processed}/{total}"
+                base_text = f"{animation_frame} {verb} ({op['description']})... {processed}/{total}"
             else:
-                progress_text = f"{animation_frame} {verb}... {processed}/{total}"
+                base_text = f"{animation_frame} {verb}... {processed}/{total}"
+            segments.append(AsIsSegment(base_text))
         
-        # Add current item if there's space
+        # Add current item if present
         if current_item:
-            # Calculate available space for filename
-            base_len = len(progress_text)
-            separator = " - "
-            available_space = max_width - base_len - len(separator)
+            # Add separator
+            segments.append(AsIsSegment(" - "))
             
-            # Reserve space for byte progress if applicable
+            # Add filename with intelligent truncation
+            # Use FilepathSegment for paths, which intelligently abbreviates them
+            segments.append(FilepathSegment(
+                text=current_item,
+                priority=2,  # Shortened before byte progress
+                min_length=10,  # Keep at least 10 characters
+                abbrev_position='middle'  # Abbreviate from the middle
+            ))
+            
+            # Add byte progress if applicable (all-or-nothing)
             # Only show byte progress for large files (>1MB) that require multiple read/write operations
-            byte_progress_text = ""
             if file_bytes_total > 1024 * 1024 and file_bytes_copied > 0:
                 bytes_copied_str = format_size(file_bytes_copied, compact=True)
                 bytes_total_str = format_size(file_bytes_total, compact=True)
                 byte_progress_text = f" [{bytes_copied_str}/{bytes_total_str}]"
-                available_space -= len(byte_progress_text)
-            
-            if available_space > 10:  # Only show filename if we have reasonable space
-                # Truncate filename if too long
-                if len(current_item) > available_space:
-                    truncate_at = max(1, available_space - 1)
-                    current_item = "…" + current_item[-truncate_at:]
                 
-                progress_text += separator + current_item + byte_progress_text
+                # Use AllOrNothingSegment so byte progress is only shown if there's enough space
+                # Higher priority (lower number) than filepath - keep byte progress, shorten path first
+                segments.append(AllOrNothingSegment(
+                    text=byte_progress_text,
+                    priority=1  # Keep this before shortening filepath
+                ))
         
-        return progress_text
+        return segments
