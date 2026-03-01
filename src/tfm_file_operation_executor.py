@@ -28,6 +28,7 @@ See Also:
 
 import os
 import shutil
+import errno
 import threading
 from tfm_path import Path
 from tfm_progress_manager import OperationType
@@ -449,9 +450,19 @@ class FileOperationExecutor:
                                 source_file.unlink()
                                 self.logger.info(f"Moved file (cross-storage): {source_file.name}")
                             else:
-                                # Same-storage move: use rename
-                                source_file.rename(dest_path)
-                                self.logger.info(f"Moved file: {source_file.name}")
+                                # Same-storage move: try rename, fall back to copy+delete if cross-device
+                                try:
+                                    source_file.rename(dest_path)
+                                    self.logger.info(f"Moved file: {source_file.name}")
+                                except OSError as e:
+                                    # errno.EXDEV is Cross-device link
+                                    if e.errno == errno.EXDEV:
+                                        self.logger.info(f"Cross-device move detected, using copy+delete for {source_file.name}")
+                                        source_file.copy_to(dest_path, overwrite=overwrite)
+                                        source_file.unlink()
+                                        self.logger.info(f"Moved file (cross-device): {source_file.name}")
+                                    else:
+                                        raise
                         
                         moved_count += 1
                         
@@ -1242,14 +1253,33 @@ class FileOperationExecutor:
                     else:
                         self._delete_directory_with_progress(source_file, 0, 1)
                 else:
-                    source_file.copy_to(dest_path, overwrite=overwrite)
-                    self._delete_directory_with_progress(source_file, 0, 1)
+                    # Try rename first, fall back to copy+delete if cross-device
+                    try:
+                        source_file.rename(dest_path)
+                    except OSError as e:
+                        # errno.EXDEV is Cross-device link
+                        if e.errno == errno.EXDEV:
+                            self.logger.info(f"Cross-device move detected, using copy+delete for directory {source_file.name}")
+                            source_file.copy_to(dest_path, overwrite=overwrite)
+                            self._delete_directory_with_progress(source_file, 0, 1)
+                        else:
+                            raise
             else:
                 if is_cross_storage:
                     source_file.copy_to(dest_path, overwrite=overwrite)
                     source_file.unlink()
                 else:
-                    source_file.rename(dest_path)
+                    # Try rename first, fall back to copy+delete if cross-device
+                    try:
+                        source_file.rename(dest_path)
+                    except OSError as e:
+                        # errno.EXDEV is Cross-device link
+                        if e.errno == errno.EXDEV:
+                            self.logger.info(f"Cross-device move detected, using copy+delete for {source_file.name}")
+                            source_file.copy_to(dest_path, overwrite=overwrite)
+                            source_file.unlink()
+                        else:
+                            raise
             
             if not suppress_log:
                 action = "Overwrote" if overwrite else "Moved"

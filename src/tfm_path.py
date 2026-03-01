@@ -7,6 +7,7 @@ import os
 import stat
 import fnmatch
 import io
+import errno
 from abc import ABC, abstractmethod
 from pathlib import Path as PathlibPath, PurePath
 from datetime import datetime
@@ -1345,8 +1346,11 @@ class Path:
             try:
                 self.rename(destination)
                 return True
-            except Exception as e:
-                raise OSError(f"Failed to move {self} to {destination}: {e}")
+            except OSError as e:
+                # errno 18 is EXDEV (Cross-device link) - different mount points
+                # Fall through to copy+delete approach
+                if e.errno != 18:
+                    raise OSError(f"Failed to move {self} to {destination}: {e}")
         
         # Cross-storage moving: copy then delete
         try:
