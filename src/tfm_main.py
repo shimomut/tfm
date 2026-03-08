@@ -5352,6 +5352,12 @@ class FileManager(UILayer):
             # Refresh file lists after loading state
             self.refresh_files()
             
+            # Update file monitoring to watch the restored directories
+            # This ensures monitoring tracks the correct directories after state restoration
+            if hasattr(self, 'file_monitor_manager') and self.file_monitor_manager.is_monitoring_enabled():
+                self.file_monitor_manager.update_monitored_directory('left', self.pane_manager.left_pane['path'])
+                self.file_monitor_manager.update_monitored_directory('right', self.pane_manager.right_pane['path'])
+            
             # Restore cursor positions after files are loaded
             self.restore_startup_cursor_positions()
             
