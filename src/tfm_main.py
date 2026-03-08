@@ -2195,7 +2195,46 @@ class FileManager(UILayer):
 
         # Mark dirty to trigger UI update
         self.mark_dirty()
-
+    
+    def validate_monitoring_sync(self):
+        """
+        Validate that file monitoring is watching the correct directories.
+        
+        This method checks if the monitored paths match the current pane paths.
+        If mismatches are found, they are logged as warnings.
+        
+        Returns:
+            dict: Validation results with 'valid' (bool) and 'issues' (list)
+        """
+        if not hasattr(self, 'file_monitor_manager'):
+            return {'valid': True, 'issues': []}
+        
+        if not self.file_monitor_manager.is_monitoring_enabled():
+            return {'valid': True, 'issues': []}
+        
+        issues = []
+        
+        for pane_name in ['left', 'right']:
+            pane_data = self.pane_manager.left_pane if pane_name == 'left' else self.pane_manager.right_pane
+            pane_path = pane_data['path']
+            
+            # Get monitored path from file monitor manager
+            monitored_path = self.file_monitor_manager.monitoring_state[pane_name]['path']
+            
+            if pane_path != monitored_path:
+                issue = {
+                    'pane': pane_name,
+                    'pane_path': str(pane_path),
+                    'monitored_path': str(monitored_path) if monitored_path else None,
+                    'message': f"{pane_name} pane path ({pane_path}) != monitored path ({monitored_path})"
+                }
+                issues.append(issue)
+                self.logger.warning(f"Monitoring sync issue detected: {issue['message']}")
+        
+        return {
+            'valid': len(issues) == 0,
+            'issues': issues
+        }
     
     def run(self):
         """

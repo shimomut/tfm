@@ -792,6 +792,13 @@ class SearchDialogHelpers:
             current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()
+            
+            # Update file monitoring for the current pane (CRITICAL)
+            # This ensures auto-reload continues working after navigation
+            pane_name = "left" if pane_manager.active_pane == 'left' else "right"
+            if hasattr(pane_manager, 'file_manager') and hasattr(pane_manager.file_manager, 'file_monitor_manager'):
+                pane_manager.file_manager.file_monitor_manager.update_monitored_directory(pane_name, target_path)
+            
             print_func(f"Navigated to directory: {result['relative_path']}")
         else:
             # Navigate to file's directory and select the file
@@ -801,6 +808,12 @@ class SearchDialogHelpers:
             
             # Refresh files and find the target file
             file_list_manager.refresh_files(current_pane)
+            
+            # Update file monitoring for the current pane (CRITICAL)
+            # This ensures auto-reload continues working after navigation
+            pane_name = "left" if pane_manager.active_pane == 'left' else "right"
+            if hasattr(pane_manager, 'file_manager') and hasattr(pane_manager.file_manager, 'file_monitor_manager'):
+                pane_manager.file_manager.file_monitor_manager.update_monitored_directory(pane_name, parent_dir)
             
             # Find and select the target file
             for i, file_path in enumerate(current_pane['files']):

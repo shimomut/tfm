@@ -706,7 +706,12 @@ class DrivesDialogHelpers:
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()
             
+            # Update file monitoring for the current pane (CRITICAL)
+            # This ensures auto-reload continues working after navigation
             pane_name = "left" if pane_manager.active_pane == 'left' else "right"
+            if hasattr(pane_manager, 'file_manager') and hasattr(pane_manager.file_manager, 'file_monitor_manager'):
+                pane_manager.file_manager.file_monitor_manager.update_monitored_directory(pane_name, drive_path)
+            
             print_func(f"Switched to {drive_entry.name}: {drive_entry.path}")
             
         except Exception as e:

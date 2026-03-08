@@ -395,7 +395,12 @@ class ListDialogHelpers:
                             # Refresh the file list for the current pane
                             pane_manager.refresh_files(current_pane)
                             
+                            # Update file monitoring for the current pane (CRITICAL)
+                            # This ensures auto-reload continues working after navigation
                             pane_name = "left" if pane_manager.active_pane == 'left' else "right"
+                            if hasattr(pane_manager, 'file_manager') and hasattr(pane_manager.file_manager, 'file_monitor_manager'):
+                                pane_manager.file_manager.file_monitor_manager.update_monitored_directory(pane_name, target_path)
+                            
                             print_func(f"Changed {pane_name} pane to favorite: {old_path} → {target_path}")
                         else:
                             print_func(f"Error: Directory no longer exists: {selected_path}")

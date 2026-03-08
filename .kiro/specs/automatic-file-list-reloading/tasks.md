@@ -141,7 +141,7 @@ This implementation plan breaks down the automatic file list reloading feature i
 - [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Integrate FileMonitorManager with FileManager
+- [x] 7. Integrate FileMonitorManager with FileManager
   - [x] 7.1 Add reload_queue to FileManager
     - Import queue module in FileManager
     - Add self.reload_queue = queue.Queue() in FileManager.__init__()
@@ -197,7 +197,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Test suppression after user actions
     - _Requirements: 7.1, 7.2, 8.1, 8.2, 8.3, 8.4, 11.2_
 
-- [ ] 8. Implement runtime monitoring toggle
+- [x] 8. Implement runtime monitoring toggle
   - [x] 8.1 Add toggle_monitoring() method to FileManager
     - Implement method to enable/disable monitoring at runtime
     - Call file_monitor_manager.stop_monitoring() when disabling
@@ -211,7 +211,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Verify no automatic reloads when disabled
     - _Requirements: 10.4_
 
-- [ ] 9. Add comprehensive logging
+- [x] 9. Add comprehensive logging
   - [x] 9.1 Add initialization logging
     - Log monitoring mode (native/polling/disabled) on initialization
     - Log watched directories on start_monitoring()
@@ -238,7 +238,7 @@ This implementation plan breaks down the automatic file list reloading feature i
 - [x] 10. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Handle platform-specific monitoring
+- [x] 11. Handle platform-specific monitoring
   - [x] 11.1 Add platform detection logic
     - Detect Linux and verify inotify availability
     - Detect macOS and verify FSEvents availability
@@ -253,7 +253,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Test fallback when native API unavailable
     - _Requirements: 5.1, 5.2, 5.3, 6.1, 6.2_
 
-- [ ] 12. Implement fallback polling mode
+- [x] 12. Implement fallback polling mode
   - [x] 12.1 Add polling observer implementation
     - Configure watchdog to use PollingObserver when native monitoring unavailable
     - Set polling interval to 5 seconds (configurable)
