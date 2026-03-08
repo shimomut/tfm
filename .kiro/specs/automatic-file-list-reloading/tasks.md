@@ -6,7 +6,7 @@ This implementation plan breaks down the automatic file list reloading feature i
 
 ## Tasks
 
-- [ ] 1. Set up dependencies and project structure
+- [x] 1. Set up dependencies and project structure
   - Add watchdog library to project dependencies
   - Create src/tfm_file_monitor_manager.py module
   - Create src/tfm_file_monitor_observer.py module
@@ -14,7 +14,7 @@ This implementation plan breaks down the automatic file list reloading feature i
   - _Requirements: 5.1, 5.2, 5.3, 6.2_
 
 - [ ] 2. Implement configuration schema and loading
-  - [ ] 2.1 Add file_monitoring configuration section to TFM config schema
+  - [x] 2.1 Add file_monitoring configuration section to TFM config schema
     - Add enabled, coalesce_delay_ms, max_reloads_per_second, suppress_after_action_ms, fallback_poll_interval_s fields
     - Implement default values (enabled=true, coalesce_delay_ms=200, max_reloads_per_second=5, suppress_after_action_ms=1000, fallback_poll_interval_s=5)
     - Add configuration validation logic
@@ -27,7 +27,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - _Requirements: 10.1_
 
 - [ ] 3. Implement FileMonitorObserver class
-  - [ ] 3.1 Create FileMonitorObserver class with watchdog integration
+  - [x] 3.1 Create FileMonitorObserver class with watchdog integration
     - Implement __init__(path, event_callback, logger) constructor
     - Implement start() method to initialize watchdog Observer
     - Implement stop() method for cleanup
@@ -36,7 +36,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Add error handling for initialization failures
     - _Requirements: 5.1, 5.2, 5.3, 6.1, 6.2, 7.4_
   
-  - [ ] 3.2 Implement TFMFileSystemEventHandler class
+  - [x] 3.2 Implement TFMFileSystemEventHandler class
     - Create event handler class extending watchdog.events.FileSystemEventHandler
     - Implement on_created() to detect file creation
     - Implement on_deleted() to detect file deletion
@@ -67,11 +67,11 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Test subdirectory event filtering
     - _Requirements: 1.1, 2.1, 3.1, 4.1, 4.3, 4.4, 1.4, 2.4_
 
-- [ ] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 5. Implement FileMonitorManager class
-  - [ ] 5.1 Create FileMonitorManager class structure
+  - [x] 5.1 Create FileMonitorManager class structure
     - Implement __init__(config, file_manager) constructor
     - Initialize logger with name "FileMonitor"
     - Store reference to file_manager.reload_queue for thread-safe communication
@@ -79,7 +79,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Set up event coalescing timer and rate limiting state
     - _Requirements: 12.4, 11.1, 11.3_
   
-  - [ ] 5.2 Implement monitoring lifecycle methods
+  - [x] 5.2 Implement monitoring lifecycle methods
     - Implement start_monitoring(left_path, right_path) to start dual-pane monitoring
     - Implement update_monitored_directory(pane_name, new_path) for directory navigation
     - Implement stop_monitoring() for cleanup
@@ -88,7 +88,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Add logic to detect unsupported backends (S3, network mounts) and use fallback mode
     - _Requirements: 7.1, 7.2, 6.1, 6.2, 6.4, 6.5_
   
-  - [ ] 5.3 Implement event coalescing and rate limiting
+  - [x] 5.3 Implement event coalescing and rate limiting
     - Implement event coalescing with 200ms window (batch multiple events into single reload)
     - Implement rate limiting (max 5 reloads per second)
     - Implement suppress_reloads(duration_ms) for suppression after user actions
@@ -96,13 +96,13 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Use threading.Timer for coalescing delay
     - _Requirements: 1.3, 2.3, 3.3, 11.1, 11.2, 11.3, 11.4_
   
-  - [ ] 5.4 Implement reload request posting
+  - [x] 5.4 Implement reload request posting
     - Implement _post_reload_request(pane_name) to post to file_manager.reload_queue
     - Ensure thread-safe queue operations
     - Add logging for reload requests
     - _Requirements: 12.2_
   
-  - [ ] 5.5 Implement error handling and recovery
+  - [x] 5.5 Implement error handling and recovery
     - Add error handling in event callbacks
     - Implement reinitialization logic with retry (up to 3 attempts with exponential backoff)
     - Implement fallback to polling mode after repeated failures
@@ -138,23 +138,23 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Test error recovery and retry logic
     - _Requirements: 7.1, 7.2, 6.4, 6.5, 9.2, 9.3_
 
-- [ ] 6. Checkpoint - Ensure all tests pass
+- [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 7. Integrate FileMonitorManager with FileManager
-  - [ ] 7.1 Add reload_queue to FileManager
+  - [x] 7.1 Add reload_queue to FileManager
     - Import queue module in FileManager
     - Add self.reload_queue = queue.Queue() in FileManager.__init__()
     - _Requirements: Threading model_
   
-  - [ ] 7.2 Initialize FileMonitorManager in FileManager
+  - [x] 7.2 Initialize FileMonitorManager in FileManager
     - Create FileMonitorManager instance in FileManager.__init__()
     - Pass config and self reference to FileMonitorManager
     - Call start_monitoring() with initial left and right paths
     - Add monitoring cleanup in FileManager shutdown/cleanup
     - _Requirements: 10.2_
   
-  - [ ] 7.3 Implement reload queue processing in main event loop
+  - [x] 7.3 Implement reload queue processing in main event loop
     - Add reload queue check at start of FileManager.run() main loop
     - Implement _handle_reload_request(pane_name) method
     - Call appropriate refresh_files() method for the pane
@@ -162,13 +162,13 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Use queue.get_nowait() with try/except queue.Empty
     - _Requirements: 1.2, 2.2, 3.2, 4.2_
   
-  - [ ] 7.4 Update directory navigation to notify monitor
+  - [x] 7.4 Update directory navigation to notify monitor
     - Call file_monitor_manager.update_monitored_directory() in navigate_to_dir()
     - Pass pane name and new path to monitor manager
     - Implement suppression of automatic reloads for 1 second after navigation
     - _Requirements: 7.1, 7.2, 7.3, 11.2_
   
-  - [ ] 7.5 Implement user context preservation during reloads
+  - [x] 7.5 Implement user context preservation during reloads
     - Store current cursor position and selected filename before reload
     - After reload, restore cursor to same filename if it still exists
     - If selected file deleted, position cursor on nearest file by alphabetical order
@@ -198,7 +198,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - _Requirements: 7.1, 7.2, 8.1, 8.2, 8.3, 8.4, 11.2_
 
 - [ ] 8. Implement runtime monitoring toggle
-  - [ ] 8.1 Add toggle_monitoring() method to FileManager
+  - [x] 8.1 Add toggle_monitoring() method to FileManager
     - Implement method to enable/disable monitoring at runtime
     - Call file_monitor_manager.stop_monitoring() when disabling
     - Call file_monitor_manager.start_monitoring() when enabling
@@ -212,17 +212,17 @@ This implementation plan breaks down the automatic file list reloading feature i
     - _Requirements: 10.4_
 
 - [ ] 9. Add comprehensive logging
-  - [ ] 9.1 Add initialization logging
+  - [x] 9.1 Add initialization logging
     - Log monitoring mode (native/polling/disabled) on initialization
     - Log watched directories on start_monitoring()
     - _Requirements: 12.1_
   
-  - [ ] 9.2 Add event logging
+  - [x] 9.2 Add event logging
     - Log each detected filesystem event with event type and filename
     - Log reload requests posted to queue
     - _Requirements: 12.2_
   
-  - [ ] 9.3 Add error and transition logging
+  - [x] 9.3 Add error and transition logging
     - Log all errors with context for debugging
     - Log monitoring mode transitions with reasons
     - Log retry attempts and fallback mode activation
@@ -235,11 +235,11 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Verify mode transition messages are logged
     - _Requirements: 12.1, 12.2, 12.3, 12.5_
 
-- [ ] 10. Checkpoint - Ensure all tests pass
+- [x] 10. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 11. Handle platform-specific monitoring
-  - [ ] 11.1 Add platform detection logic
+  - [x] 11.1 Add platform detection logic
     - Detect Linux and verify inotify availability
     - Detect macOS and verify FSEvents availability
     - Detect Windows and verify ReadDirectoryChangesW availability
@@ -254,7 +254,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - _Requirements: 5.1, 5.2, 5.3, 6.1, 6.2_
 
 - [ ] 12. Implement fallback polling mode
-  - [ ] 12.1 Add polling observer implementation
+  - [x] 12.1 Add polling observer implementation
     - Configure watchdog to use PollingObserver when native monitoring unavailable
     - Set polling interval to 5 seconds (configurable)
     - Add detection logic for S3 paths, network mounts, and other unsupported backends
@@ -275,7 +275,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - _Requirements: 6.2, 6.3, 6.4, 6.5_
 
 - [ ] 13. Add status indicator for fallback mode
-  - [ ] 13.1 Implement status indicator in UI
+  - [x] 13.1 Implement status indicator in UI
     - Add visual indicator when operating in fallback mode due to errors
     - Display indicator in status bar or appropriate UI location
     - Update indicator when monitoring mode changes
@@ -288,7 +288,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - _Requirements: 9.4_
 
 - [ ] 14. Final integration and end-to-end testing
-  - [ ] 14.1 Perform end-to-end testing
+  - [x] 14.1 Perform end-to-end testing
     - Test complete workflow: start TFM, create file externally, verify automatic reload
     - Test dual-pane monitoring with changes in both panes
     - Test directory navigation with monitoring updates
@@ -312,7 +312,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - _Requirements: 7.1, 7.2_
 
 - [ ] 15. Update documentation
-  - [ ] 15.1 Create end-user documentation
+  - [x] 15.1 Create end-user documentation
     - Create doc/FILE_MONITORING_FEATURE.md
     - Document automatic file list reloading feature
     - Explain configuration options
@@ -321,7 +321,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Provide troubleshooting guidance
     - _Requirements: All requirements_
   
-  - [ ] 15.2 Create developer documentation
+  - [x] 15.2 Create developer documentation
     - Create doc/dev/FILE_MONITORING_IMPLEMENTATION.md
     - Document architecture and component interactions
     - Document threading model and queue-based communication
@@ -330,7 +330,7 @@ This implementation plan breaks down the automatic file list reloading feature i
     - Document testing approach and property-based tests
     - _Requirements: All requirements_
 
-- [ ] 16. Final checkpoint - Ensure all tests pass
+- [x] 16. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

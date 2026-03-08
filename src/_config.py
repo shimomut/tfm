@@ -227,6 +227,13 @@ class Config:
     ARCHIVE_CACHE_MAX_OPEN = 5   # Maximum number of archives to keep open simultaneously
     ARCHIVE_CACHE_TTL = 300       # Archive cache TTL in seconds (default: 300 seconds / 5 minutes)
     
+    # File monitoring settings
+    FILE_MONITORING_ENABLED = True                      # Enable/disable automatic file list reloading
+    FILE_MONITORING_COALESCE_DELAY_MS = 200            # Event coalescing window in milliseconds
+    FILE_MONITORING_MAX_RELOADS_PER_SECOND = 5         # Maximum reloads per second (rate limiting)
+    FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS = 1000    # Suppress automatic reloads after user actions (milliseconds)
+    FILE_MONITORING_FALLBACK_POLL_INTERVAL_S = 5       # Polling interval for fallback mode (seconds)
+    
     # Unicode and wide character settings
     UNICODE_MODE = 'auto'  # 'auto', 'full', 'basic', 'ascii'
     # - 'auto': Automatically detect terminal capabilities (recommended)
