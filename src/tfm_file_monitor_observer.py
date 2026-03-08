@@ -90,7 +90,7 @@ if WATCHDOG_AVAILABLE:
                 
                 filename = self._get_filename(event.src_path)
                 item_type = "Directory" if event.is_directory else "File"
-                self.logger.info(f"{item_type} created: {filename}")
+                self.logger.debug(f"{item_type} created: {filename}")
                 self.callback("created", filename)
             except Exception as e:
                 self.logger.error(f"Error handling creation event: {e}")
@@ -109,7 +109,7 @@ if WATCHDOG_AVAILABLE:
                 
                 filename = self._get_filename(event.src_path)
                 item_type = "Directory" if event.is_directory else "File"
-                self.logger.info(f"{item_type} deleted: {filename}")
+                self.logger.debug(f"{item_type} deleted: {filename}")
                 self.callback("deleted", filename)
             except Exception as e:
                 self.logger.error(f"Error handling deletion event: {e}")
@@ -130,7 +130,7 @@ if WATCHDOG_AVAILABLE:
                 # We should trigger a reload but not log a specific filename.
                 if event_path_obj.resolve() == self.watched_path.resolve():
                     if event.is_directory:
-                        self.logger.info(f"Directory contents modified: {self.watched_path.name}")
+                        self.logger.debug(f"Directory contents modified: {self.watched_path.name}")
                         self.callback("modified", "")
                         return
                 
@@ -140,7 +140,7 @@ if WATCHDOG_AVAILABLE:
                 
                 filename = self._get_filename(event.src_path)
                 item_type = "Directory" if event.is_directory else "File"
-                self.logger.info(f"{item_type} modified: {filename}")
+                self.logger.debug(f"{item_type} modified: {filename}")
                 self.callback("modified", filename)
             except Exception as e:
                 self.logger.error(f"Error handling modification event: {e}")
@@ -170,7 +170,7 @@ if WATCHDOG_AVAILABLE:
                     # We could treat this as a delete + create, but a single "modified" is more efficient
                     src_filename = self._get_filename(event.src_path)
                     dest_filename = self._get_filename(event.dest_path)
-                    self.logger.info(f"{item_type} renamed: {src_filename} -> {dest_filename}")
+                    self.logger.debug(f"{item_type} renamed: {src_filename} -> {dest_filename}")
                     # Trigger a reload to show both the deletion and creation
                     self.callback("modified", dest_filename)
                 
@@ -178,14 +178,14 @@ if WATCHDOG_AVAILABLE:
                 elif not src_is_child and dest_is_child:
                     # File/directory moved into the watched directory - treat as creation
                     filename = self._get_filename(event.dest_path)
-                    self.logger.info(f"{item_type} moved in: {filename}")
+                    self.logger.debug(f"{item_type} moved in: {filename}")
                     self.callback("created", filename)
                 
                 # Case 3: Move out of watched directory (move-out)
                 elif src_is_child and not dest_is_child:
                     # File/directory moved out of the watched directory - treat as deletion
                     filename = self._get_filename(event.src_path)
-                    self.logger.info(f"{item_type} moved out: {filename}")
+                    self.logger.debug(f"{item_type} moved out: {filename}")
                     self.callback("deleted", filename)
                 
                 # Case 4: Move within subdirectory - ignore
@@ -232,7 +232,7 @@ class FileMonitorObserver:
         
         # Log initialization with monitoring mode (Requirement 12.1)
         mode = "polling" if force_polling else "native (will attempt, may fallback to polling)"
-        self.logger.info(f"FileMonitorObserver initialized for {path} - monitoring mode: {mode}, polling interval: {polling_interval}s")
+        self.logger.debug(f"FileMonitorObserver initialized for {path} - monitoring mode: {mode}, polling interval: {polling_interval}s")
     
     def _detect_platform_and_api(self) -> tuple[str, str]:
         """
@@ -299,21 +299,21 @@ class FileMonitorObserver:
         
         # Detect platform and monitoring API (Requirement 5.1, 5.2, 5.3)
         platform_name, api_name = self._detect_platform_and_api()
-        self.logger.info(f"Platform detected: {platform_name}, Native monitoring API: {api_name}")
+        self.logger.debug(f"Platform detected: {platform_name}, Native monitoring API: {api_name}")
         
         # If force_polling is True, skip native monitoring and go straight to polling
         if self.force_polling:
-            self.logger.info(f"Force polling mode requested for: {self.path}")
+            self.logger.debug(f"Force polling mode requested for: {self.path}")
             return self._start_polling_observer()
         
         # If native API is unavailable, use polling
         if api_name == "unavailable":
-            self.logger.info(f"Native monitoring API not available on {platform_name}, using polling mode")
+            self.logger.debug(f"Native monitoring API not available on {platform_name}, using polling mode")
             return self._start_polling_observer()
         
         try:
             # Try to use native Observer first
-            self.logger.info(f"Attempting to start native monitoring for: {self.path} using {api_name}")
+            self.logger.debug(f"Attempting to start native monitoring for: {self.path} using {api_name}")
             self.observer = Observer()
             self.monitoring_mode = "native"
             
@@ -327,12 +327,12 @@ class FileMonitorObserver:
             # Start the observer thread
             self.observer.start()
             
-            self.logger.info(f"Successfully started native monitoring for: {self.path} using {api_name}")
+            self.logger.debug(f"Successfully started native monitoring for: {self.path} using {api_name}")
             return True
             
         except Exception as e:
             self.logger.error(f"Native monitoring failed for {self.path}: {e}")
-            self.logger.info(f"Mode transition: native -> polling (reason: native monitoring initialization failed - {e})")
+            self.logger.debug(f"Mode transition: native -> polling (reason: native monitoring initialization failed - {e})")
             
             return self._start_polling_observer()
     
@@ -348,7 +348,7 @@ class FileMonitorObserver:
             True if polling started successfully, False otherwise
         """
         try:
-            self.logger.info(f"Starting polling observer for: {self.path} with interval: {self.polling_interval}s")
+            self.logger.debug(f"Starting polling observer for: {self.path} with interval: {self.polling_interval}s")
             
             # Fall back to polling observer with configured interval
             # The timeout parameter sets how often the observer checks for changes
@@ -361,7 +361,7 @@ class FileMonitorObserver:
             self.observer.schedule(self._event_handler, str(self.path), recursive=False)
             self.observer.start()
             
-            self.logger.info(f"Successfully started polling monitoring for: {self.path} (interval: {self.polling_interval}s)")
+            self.logger.debug(f"Successfully started polling monitoring for: {self.path} (interval: {self.polling_interval}s)")
             return True
             
         except Exception as e:
@@ -374,18 +374,18 @@ class FileMonitorObserver:
     def stop(self) -> None:
         """Stop monitoring and cleanup resources."""
         if self.observer is None:
-            self.logger.info(f"No active monitoring to stop for: {self.path}")
+            self.logger.debug(f"No active monitoring to stop for: {self.path}")
             return
         
         try:
-            self.logger.info(f"Stopping monitoring for: {self.path}")
+            self.logger.debug(f"Stopping monitoring for: {self.path}")
             self.observer.stop()
             self.observer.join(timeout=5.0)  # Wait up to 5 seconds for thread to finish
             
             if self.observer.is_alive():
                 self.logger.warning(f"Observer thread did not stop cleanly for: {self.path}")
             else:
-                self.logger.info(f"Successfully stopped monitoring for: {self.path}")
+                self.logger.debug(f"Successfully stopped monitoring for: {self.path}")
             
         except Exception as e:
             self.logger.error(f"Error stopping observer for {self.path}: {e}")

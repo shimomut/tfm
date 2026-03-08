@@ -96,9 +96,9 @@ class FileMonitorManager:
         
         # Log initialization with monitoring status (Requirement 12.1)
         if self.enabled:
-            self.logger.info("FileMonitorManager initialized - monitoring enabled")
+            self.logger.debug("FileMonitorManager initialized - monitoring enabled")
         else:
-            self.logger.info("FileMonitorManager initialized - monitoring disabled by configuration")
+            self.logger.debug("FileMonitorManager initialized - monitoring disabled by configuration")
     
     def start_monitoring(self, left_path: Path, right_path: Path) -> None:
         """
@@ -109,11 +109,11 @@ class FileMonitorManager:
             right_path: Path object for right pane directory
         """
         if not self.enabled:
-            self.logger.info("Monitoring is disabled by configuration")
+            self.logger.debug("Monitoring is disabled by configuration")
             return
         
         # Log watched directories on start_monitoring (Requirement 12.1)
-        self.logger.info(f"Starting monitoring for directories - left: {left_path}, right: {right_path}")
+        self.logger.debug(f"Starting monitoring for directories - left: {left_path}, right: {right_path}")
         
         # Start monitoring for left pane
         self._start_pane_monitoring('left', left_path)
@@ -148,11 +148,11 @@ class FileMonitorManager:
             # Check if the other pane is already monitoring this same directory
             # If so, share the observer instead of creating a new one
             if other_state['path'] == path and other_state['observer'] is not None:
-                self.logger.info(f"Both panes monitoring same directory: {path} - sharing observer")
+                self.logger.debug(f"Both panes monitoring same directory: {path} - sharing observer")
                 
                 # Stop existing observer for this pane if any
                 if state['observer'] is not None and state['observer'] != other_state['observer']:
-                    self.logger.info(f"Stopping separate observer for {pane_name} pane")
+                    self.logger.debug(f"Stopping separate observer for {pane_name} pane")
                     state['observer'].stop()
                 
                 # Share the other pane's observer
@@ -163,14 +163,14 @@ class FileMonitorManager:
                 state['error_count'] = 0
                 state['retry_count'] = 0
                 state['last_successful_start'] = time.time()
-                self.logger.info(f"Successfully started monitoring for {pane_name} pane: {path} (shared observer, mode: {state['observer'].get_monitoring_mode()})")
+                self.logger.debug(f"Successfully started monitoring for {pane_name} pane: {path} (shared observer, mode: {state['observer'].get_monitoring_mode()})")
                 return
             
             # Stop existing observer if any (and it's not shared with the other pane)
             if state['observer'] is not None:
                 # Only stop if this observer is not shared with the other pane
                 if state['observer'] != other_state['observer']:
-                    self.logger.info(f"Stopping existing observer for {pane_name} pane")
+                    self.logger.debug(f"Stopping existing observer for {pane_name} pane")
                     state['observer'].stop()
                 state['observer'] = None
             
@@ -183,7 +183,7 @@ class FileMonitorManager:
             force_polling = (monitoring_mode == "polling")
             
             if force_polling:
-                self.logger.info(f"Unsupported backend detected for {pane_name} pane: {path} - forcing polling mode")
+                self.logger.debug(f"Unsupported backend detected for {pane_name} pane: {path} - forcing polling mode")
             
             # Create event callback for this pane
             def event_callback(event_type: str, filename: str):
@@ -198,14 +198,14 @@ class FileMonitorManager:
                 state['error_count'] = 0
                 state['retry_count'] = 0
                 state['last_successful_start'] = time.time()
-                self.logger.info(f"Successfully started monitoring for {pane_name} pane: {path} (mode: {observer.get_monitoring_mode()})")
+                self.logger.debug(f"Successfully started monitoring for {pane_name} pane: {path} (mode: {observer.get_monitoring_mode()})")
             else:
                 self.logger.error(f"Failed to start monitoring for {pane_name} pane: {path} (error_count: {state['error_count'] + 1})")
                 state['observer'] = None
                 state['error_count'] += 1
                 
                 # Attempt reinitialization with retry logic (requirement 9.2)
-                self.logger.info(f"Scheduling retry for {pane_name} pane (attempt will be {state['retry_count'] + 1}/3)")
+                self.logger.debug(f"Scheduling retry for {pane_name} pane (attempt will be {state['retry_count'] + 1}/3)")
                 self._schedule_retry(pane_name, path)
     
     def _schedule_retry(self, pane_name: str, path: Path) -> None:
@@ -224,8 +224,8 @@ class FileMonitorManager:
         # Check if we've exceeded retry limit
         if state['retry_count'] >= 3:
             self.logger.error(f"Monitoring initialization failed 3 times for {pane_name} pane at {path}")
-            self.logger.info(f"Mode transition: native -> polling (reason: 3 consecutive initialization failures)")
-            self.logger.info(f"Marking {pane_name} pane as failed permanently, attempting final polling fallback")
+            self.logger.debug(f"Mode transition: native -> polling (reason: 3 consecutive initialization failures)")
+            self.logger.debug(f"Marking {pane_name} pane as failed permanently, attempting final polling fallback")
             state['failed_permanently'] = True
             
             # Try one last time with polling mode explicitly
@@ -236,11 +236,11 @@ class FileMonitorManager:
         backoff_delay = 2 ** state['retry_count']
         state['retry_count'] += 1
         
-        self.logger.info(f"Retry attempt {state['retry_count']}/3 scheduled for {pane_name} pane in {backoff_delay}s (exponential backoff)")
+        self.logger.debug(f"Retry attempt {state['retry_count']}/3 scheduled for {pane_name} pane in {backoff_delay}s (exponential backoff)")
         
         # Schedule retry with exponential backoff
         def retry_monitoring():
-            self.logger.info(f"Executing retry attempt {state['retry_count']}/3 for {pane_name} pane at {path}")
+            self.logger.debug(f"Executing retry attempt {state['retry_count']}/3 for {pane_name} pane at {path}")
             with self.state_lock:
                 # Create event callback for this pane
                 def event_callback(event_type: str, filename: str):
@@ -255,7 +255,7 @@ class FileMonitorManager:
                     state['error_count'] = 0
                     state['retry_count'] = 0
                     state['last_successful_start'] = time.time()
-                    self.logger.info(f"Retry {state['retry_count']}/3 successful for {pane_name} pane: {path} (mode: {observer.get_monitoring_mode()})")
+                    self.logger.debug(f"Retry {state['retry_count']}/3 successful for {pane_name} pane: {path} (mode: {observer.get_monitoring_mode()})")
                 else:
                     self.logger.error(f"Retry {state['retry_count']}/3 failed for {pane_name} pane at {path}")
                     state['error_count'] += 1
@@ -284,7 +284,7 @@ class FileMonitorManager:
         """
         state = self.monitoring_state[pane_name]
         
-        self.logger.info(f"Attempting polling mode fallback for {pane_name} pane at {path}")
+        self.logger.debug(f"Attempting polling mode fallback for {pane_name} pane at {path}")
         
         # Create event callback for this pane
         def event_callback(event_type: str, filename: str):
@@ -298,8 +298,8 @@ class FileMonitorManager:
             state['observer'] = observer
             state['error_count'] = 0
             state['last_successful_start'] = time.time()
-            self.logger.info(f"Polling mode fallback successful for {pane_name} pane: {path}")
-            self.logger.info(f"Fallback mode activated: using polling observer after repeated native monitoring failures")
+            self.logger.debug(f"Polling mode fallback successful for {pane_name} pane: {path}")
+            self.logger.debug(f"Fallback mode activated: using polling observer after repeated native monitoring failures")
         else:
             self.logger.error(f"Polling mode fallback failed for {pane_name} pane at {path}")
             self.logger.error(f"Monitoring completely disabled for {pane_name} pane - all monitoring methods exhausted")
@@ -323,20 +323,20 @@ class FileMonitorManager:
         # Check for S3 paths (requirement 6.4)
         # Note: Path() normalizes "s3://" to "s3:", so check for both
         if path_str.startswith('s3:') or path_str.startswith('/s3/'):
-            self.logger.info(f"Detected S3 path: {path} - will use polling mode")
+            self.logger.debug(f"Detected S3 path: {path} - will use polling mode")
             return "polling"
         
         # Check for SSH/remote paths
         # Note: Path() normalizes "ssh://" to "ssh:", so check for both
         if path_str.startswith('ssh:') or path_str.startswith('sftp:'):
-            self.logger.info(f"Detected SSH/remote path: {path} - will use polling mode")
+            self.logger.debug(f"Detected SSH/remote path: {path} - will use polling mode")
             return "polling"
         
         # Check for network mounts (common patterns)
         # This is a heuristic - network mounts can be mounted anywhere
         # but commonly appear in /mnt, /net, or have network-like names
         if any(pattern in path_str for pattern in ['/mnt/', '/net/', '//']) and not path.exists():
-            self.logger.info(f"Detected potential network mount: {path} - will use polling mode")
+            self.logger.debug(f"Detected potential network mount: {path} - will use polling mode")
             return "polling"
         
         # For local filesystem, let FileMonitorObserver try native first
@@ -371,7 +371,7 @@ class FileMonitorManager:
                 panes_to_reload = [pane_name]
                 if other_state['path'] == state['path'] and other_state['observer'] == state['observer']:
                     panes_to_reload.append(other_pane)
-                    self.logger.info(f"Event detected in shared directory, will reload both panes (event: {event_type}, file: {filename})")
+                    self.logger.debug(f"Event detected in shared directory, will reload both panes (event: {event_type}, file: {filename})")
                 
                 # Process reload for each pane that's monitoring this directory
                 for pane in panes_to_reload:
@@ -380,7 +380,7 @@ class FileMonitorManager:
                     # Check if reloads are currently suppressed for this pane
                     current_time = time.time()
                     if current_time < self.suppress_until[pane]:
-                        self.logger.info(f"Reload suppressed for {pane} pane (event: {event_type}, file: {filename})")
+                        self.logger.debug(f"Reload suppressed for {pane} pane (event: {event_type}, file: {filename})")
                         continue
                     
                     # Check rate limiting for this pane
@@ -460,7 +460,7 @@ class FileMonitorManager:
             
             # Post to reload queue (thread-safe)
             self.reload_queue.put(pane_name)
-            self.logger.info(f"Posted reload request for {pane_name} pane")
+            self.logger.debug(f"Posted reload request for {pane_name} pane")
     
     def update_monitored_directory(self, pane_name: str, new_path: Path) -> None:
         """
@@ -473,14 +473,14 @@ class FileMonitorManager:
         if not self.enabled:
             return
         
-        self.logger.info(f"Updating monitored directory: pane={pane_name}, path={new_path}")
+        self.logger.debug(f"Updating monitored directory: pane={pane_name}, path={new_path}")
         
         # Stop monitoring the old directory and start monitoring the new one
         self._start_pane_monitoring(pane_name, new_path)
     
     def stop_monitoring(self) -> None:
         """Stop all monitoring and cleanup resources."""
-        self.logger.info("Stopping all monitoring")
+        self.logger.debug("Stopping all monitoring")
         
         with self.state_lock:
             # Stop observers for both panes
@@ -494,7 +494,7 @@ class FileMonitorManager:
                 
                 # Stop observer if any
                 if state['observer'] is not None:
-                    self.logger.info(f"Stopping observer for {pane_name} pane")
+                    self.logger.debug(f"Stopping observer for {pane_name} pane")
                     state['observer'].stop()
                     state['observer'] = None
                 
@@ -502,7 +502,7 @@ class FileMonitorManager:
                 state['path'] = None
                 state['pending_reload'] = False
         
-        self.logger.info("All monitoring stopped")
+        self.logger.debug("All monitoring stopped")
     
     def is_monitoring_enabled(self) -> bool:
         """Check if monitoring is currently enabled."""
@@ -543,7 +543,7 @@ class FileMonitorManager:
             for pane_name in ['left', 'right']:
                 self.suppress_until[pane_name] = suppress_until
         
-        self.logger.info(f"Suppressing reloads for {duration_ms}ms")
+        self.logger.debug(f"Suppressing reloads for {duration_ms}ms")
     
     def check_observer_health(self) -> None:
         """
@@ -564,7 +564,7 @@ class FileMonitorManager:
                 if not state['observer'].is_alive():
                     path = state['path']
                     self.logger.error(f"Observer for {pane_name} pane has died unexpectedly (path: {path})")
-                    self.logger.info(f"Connection loss detected for {pane_name} pane, attempting recovery")
+                    self.logger.debug(f"Connection loss detected for {pane_name} pane, attempting recovery")
                     
                     # Stop the dead observer
                     try:
@@ -576,7 +576,7 @@ class FileMonitorManager:
                     state['error_count'] += 1
                     
                     # Attempt reinitialization
-                    self.logger.info(f"Initiating reinitialization for {pane_name} pane after connection loss")
+                    self.logger.debug(f"Initiating reinitialization for {pane_name} pane after connection loss")
                     self._schedule_retry(pane_name, path)
     
     def is_in_fallback_mode(self) -> bool:
