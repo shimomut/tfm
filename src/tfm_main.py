@@ -1903,6 +1903,10 @@ class FileManager(UILayer):
             if self.pane_manager.sync_current_to_other(print):
                 self.refresh_files(current_pane)
                 
+                # Update file monitoring for the current pane
+                current_pane_name = self.pane_manager.active_pane
+                self.file_monitor_manager.update_monitored_directory(current_pane_name, current_pane['path'])
+                
                 # Try to restore cursor position for this directory
                 height, width = self.renderer.get_dimensions()
                 calculated_height = int(height * self.log_height_ratio)
@@ -1937,6 +1941,10 @@ class FileManager(UILayer):
             # Different directories, sync directory
             if self.pane_manager.sync_other_to_current(print):
                 self.refresh_files(other_pane)
+                
+                # Update file monitoring for the other pane
+                other_pane_name = 'right' if self.pane_manager.active_pane == 'left' else 'left'
+                self.file_monitor_manager.update_monitored_directory(other_pane_name, other_pane['path'])
                 
                 # Try to restore cursor position for this directory
                 height, width = self.renderer.get_dimensions()
