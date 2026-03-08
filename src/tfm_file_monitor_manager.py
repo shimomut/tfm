@@ -128,22 +128,50 @@ class FileMonitorManager:
         Includes retry logic with exponential backoff and automatic fallback to polling
         mode after repeated failures (requirement 9.2, 9.3).
         
+        If both panes are monitoring the same directory, they will share the same observer
+        to avoid FSEvents "already scheduled" errors.
+        
         Args:
             pane_name: "left" or "right"
             path: Directory path to monitor
         """
         with self.state_lock:
             state = self.monitoring_state[pane_name]
+            other_pane = 'right' if pane_name == 'left' else 'left'
+            other_state = self.monitoring_state[other_pane]
             
             # Check if this pane has failed permanently
             if state['failed_permanently']:
                 self.logger.warning(f"Monitoring for {pane_name} pane has failed permanently, not retrying")
                 return
             
-            # Stop existing observer if any
+            # Check if the other pane is already monitoring this same directory
+            # If so, share the observer instead of creating a new one
+            if other_state['path'] == path and other_state['observer'] is not None:
+                self.logger.info(f"Both panes monitoring same directory: {path} - sharing observer")
+                
+                # Stop existing observer for this pane if any
+                if state['observer'] is not None and state['observer'] != other_state['observer']:
+                    self.logger.info(f"Stopping separate observer for {pane_name} pane")
+                    state['observer'].stop()
+                
+                # Share the other pane's observer
+                # Note: The observer's callback will trigger events for both panes
+                # because _on_filesystem_event checks which panes are monitoring the path
+                state['observer'] = other_state['observer']
+                state['path'] = path
+                state['error_count'] = 0
+                state['retry_count'] = 0
+                state['last_successful_start'] = time.time()
+                self.logger.info(f"Successfully started monitoring for {pane_name} pane: {path} (shared observer, mode: {state['observer'].get_monitoring_mode()})")
+                return
+            
+            # Stop existing observer if any (and it's not shared with the other pane)
             if state['observer'] is not None:
-                self.logger.info(f"Stopping existing observer for {pane_name} pane")
-                state['observer'].stop()
+                # Only stop if this observer is not shared with the other pane
+                if state['observer'] != other_state['observer']:
+                    self.logger.info(f"Stopping existing observer for {pane_name} pane")
+                    state['observer'].stop()
                 state['observer'] = None
             
             # Update path
@@ -323,45 +351,62 @@ class FileMonitorManager:
         It implements event coalescing and rate limiting before posting reload requests.
         Includes error handling to ensure monitoring continues even if event processing fails.
         
+        When both panes are monitoring the same directory, this method will be called
+        with the pane_name of whichever pane created the observer first. We need to
+        check if both panes are monitoring the same path and post reload requests for both.
+        
         Args:
-            pane_name: "left" or "right"
+            pane_name: "left" or "right" (the pane that created the observer)
             event_type: Type of event ("created", "deleted", "modified")
             filename: Name of the affected file
         """
         try:
             with self.state_lock:
                 state = self.monitoring_state[pane_name]
+                other_pane = 'right' if pane_name == 'left' else 'left'
+                other_state = self.monitoring_state[other_pane]
                 
-                # Check if reloads are currently suppressed
-                current_time = time.time()
-                if current_time < self.suppress_until[pane_name]:
-                    self.logger.info(f"Reload suppressed for {pane_name} pane (event: {event_type}, file: {filename})")
-                    return
+                # Check if both panes are monitoring the same directory
+                # If so, we need to post reload requests for both panes
+                panes_to_reload = [pane_name]
+                if other_state['path'] == state['path'] and other_state['observer'] == state['observer']:
+                    panes_to_reload.append(other_pane)
+                    self.logger.info(f"Event detected in shared directory, will reload both panes (event: {event_type}, file: {filename})")
                 
-                # Check rate limiting
-                if not self._check_rate_limit(pane_name):
-                    self.logger.warning(f"Rate limit exceeded for {pane_name} pane, skipping reload (event: {event_type}, file: {filename})")
-                    return
-                
-                # Cancel existing coalesce timer if any
-                if self.coalesce_timers[pane_name] is not None:
-                    self.coalesce_timers[pane_name].cancel()
-                
-                # Mark that a reload is pending
-                state['pending_reload'] = True
-                
-                # Set up coalescing timer
-                coalesce_delay_s = self.config.FILE_MONITORING_COALESCE_DELAY_MS / 1000.0
-                
-                def coalesced_reload():
-                    try:
-                        self._post_reload_request(pane_name)
-                    except Exception as e:
-                        self.logger.error(f"Error posting reload request for {pane_name} pane: {e}")
-                
-                timer = threading.Timer(coalesce_delay_s, coalesced_reload)
-                self.coalesce_timers[pane_name] = timer
-                timer.start()
+                # Process reload for each pane that's monitoring this directory
+                for pane in panes_to_reload:
+                    pane_state = self.monitoring_state[pane]
+                    
+                    # Check if reloads are currently suppressed for this pane
+                    current_time = time.time()
+                    if current_time < self.suppress_until[pane]:
+                        self.logger.info(f"Reload suppressed for {pane} pane (event: {event_type}, file: {filename})")
+                        continue
+                    
+                    # Check rate limiting for this pane
+                    if not self._check_rate_limit(pane):
+                        self.logger.warning(f"Rate limit exceeded for {pane} pane, skipping reload (event: {event_type}, file: {filename})")
+                        continue
+                    
+                    # Cancel existing coalesce timer if any
+                    if self.coalesce_timers[pane] is not None:
+                        self.coalesce_timers[pane].cancel()
+                    
+                    # Mark that a reload is pending
+                    pane_state['pending_reload'] = True
+                    
+                    # Set up coalescing timer
+                    coalesce_delay_s = self.config.FILE_MONITORING_COALESCE_DELAY_MS / 1000.0
+                    
+                    def coalesced_reload(pane_to_reload=pane):
+                        try:
+                            self._post_reload_request(pane_to_reload)
+                        except Exception as e:
+                            self.logger.error(f"Error posting reload request for {pane_to_reload} pane: {e}")
+                    
+                    timer = threading.Timer(coalesce_delay_s, coalesced_reload)
+                    self.coalesce_timers[pane] = timer
+                    timer.start()
         
         except Exception as e:
             # Log error but continue monitoring (requirement 9.1)

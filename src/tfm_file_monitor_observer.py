@@ -84,19 +84,16 @@ if WATCHDOG_AVAILABLE:
                 event: FileSystemEvent from watchdog
             """
             try:
-                # Ignore directory creation events - we only care about files
-                if event.is_directory:
-                    return
-                
-                # Filter out subdirectory events
+                # Filter out subdirectory events first
                 if not self._is_immediate_child(event.src_path):
                     return
                 
                 filename = self._get_filename(event.src_path)
-                self.logger.info(f"File created: {filename}")
+                item_type = "Directory" if event.is_directory else "File"
+                self.logger.info(f"{item_type} created: {filename}")
                 self.callback("created", filename)
             except Exception as e:
-                self.logger.error(f"Error handling file creation event: {e}")
+                self.logger.error(f"Error handling creation event: {e}")
         
         def on_deleted(self, event):
             """
@@ -106,19 +103,16 @@ if WATCHDOG_AVAILABLE:
                 event: FileSystemEvent from watchdog
             """
             try:
-                # Ignore directory deletion events - we only care about files
-                if event.is_directory:
-                    return
-                
-                # Filter out subdirectory events
+                # Filter out subdirectory events first
                 if not self._is_immediate_child(event.src_path):
                     return
                 
                 filename = self._get_filename(event.src_path)
-                self.logger.info(f"File deleted: {filename}")
+                item_type = "Directory" if event.is_directory else "File"
+                self.logger.info(f"{item_type} deleted: {filename}")
                 self.callback("deleted", filename)
             except Exception as e:
-                self.logger.error(f"Error handling file deletion event: {e}")
+                self.logger.error(f"Error handling deletion event: {e}")
         
         def on_modified(self, event):
             """
@@ -128,19 +122,28 @@ if WATCHDOG_AVAILABLE:
                 event: FileSystemEvent from watchdog
             """
             try:
-                # Ignore directory modification events - we only care about files
-                if event.is_directory:
-                    return
+                event_path_obj = Path(event.src_path)
+                
+                # Special case: If the modified path IS the watched directory itself,
+                # this indicates a change to its contents (child added/removed/modified).
+                # This is how FSEvents reports directory content changes on macOS.
+                # We should trigger a reload but not log a specific filename.
+                if event_path_obj.resolve() == self.watched_path.resolve():
+                    if event.is_directory:
+                        self.logger.info(f"Directory contents modified: {self.watched_path.name}")
+                        self.callback("modified", "")
+                        return
                 
                 # Filter out subdirectory events
                 if not self._is_immediate_child(event.src_path):
                     return
                 
                 filename = self._get_filename(event.src_path)
-                self.logger.info(f"File modified: {filename}")
+                item_type = "Directory" if event.is_directory else "File"
+                self.logger.info(f"{item_type} modified: {filename}")
                 self.callback("modified", filename)
             except Exception as e:
-                self.logger.error(f"Error handling file modification event: {e}")
+                self.logger.error(f"Error handling modification event: {e}")
         
         def on_moved(self, event):
             """
@@ -156,12 +159,10 @@ if WATCHDOG_AVAILABLE:
                 event: FileSystemMovedEvent from watchdog
             """
             try:
-                # Ignore directory move events - we only care about files
-                if event.is_directory:
-                    return
-                
                 src_is_child = self._is_immediate_child(event.src_path)
                 dest_is_child = self._is_immediate_child(event.dest_path)
+                
+                item_type = "Directory" if event.is_directory else "File"
                 
                 # Case 1: Move within watched directory (rename)
                 if src_is_child and dest_is_child:
@@ -169,28 +170,28 @@ if WATCHDOG_AVAILABLE:
                     # We could treat this as a delete + create, but a single "modified" is more efficient
                     src_filename = self._get_filename(event.src_path)
                     dest_filename = self._get_filename(event.dest_path)
-                    self.logger.info(f"File renamed: {src_filename} -> {dest_filename}")
+                    self.logger.info(f"{item_type} renamed: {src_filename} -> {dest_filename}")
                     # Trigger a reload to show both the deletion and creation
                     self.callback("modified", dest_filename)
                 
                 # Case 2: Move into watched directory from outside (move-in)
                 elif not src_is_child and dest_is_child:
-                    # File moved into the watched directory - treat as creation
+                    # File/directory moved into the watched directory - treat as creation
                     filename = self._get_filename(event.dest_path)
-                    self.logger.info(f"File moved in: {filename}")
+                    self.logger.info(f"{item_type} moved in: {filename}")
                     self.callback("created", filename)
                 
                 # Case 3: Move out of watched directory (move-out)
                 elif src_is_child and not dest_is_child:
-                    # File moved out of the watched directory - treat as deletion
+                    # File/directory moved out of the watched directory - treat as deletion
                     filename = self._get_filename(event.src_path)
-                    self.logger.info(f"File moved out: {filename}")
+                    self.logger.info(f"{item_type} moved out: {filename}")
                     self.callback("deleted", filename)
                 
                 # Case 4: Move within subdirectory - ignore
                 # (both src_is_child and dest_is_child are False)
             except Exception as e:
-                self.logger.error(f"Error handling file move event: {e}")
+                self.logger.error(f"Error handling move event: {e}")
 
 else:
     # Dummy class when watchdog is not available

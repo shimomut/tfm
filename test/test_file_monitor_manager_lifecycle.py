@@ -273,7 +273,11 @@ class TestFileMonitorManagerLifecycle(unittest.TestCase):
         """Test that event coalescing batches multiple events"""
         # Start monitoring
         self.manager.start_monitoring(self.left_path, self.right_path)
-        time.sleep(0.2)
+        time.sleep(0.5)  # Wait for initialization events
+        
+        # Drain initialization events
+        while not self.file_manager.reload_queue.empty():
+            self.file_manager.reload_queue.get_nowait()
         
         # Create multiple files rapidly (within coalescing window)
         for i in range(5):
@@ -302,7 +306,11 @@ class TestFileMonitorManagerLifecycle(unittest.TestCase):
         """Test that left and right panes are monitored independently"""
         # Start monitoring
         self.manager.start_monitoring(self.left_path, self.right_path)
-        time.sleep(0.2)
+        time.sleep(0.5)  # Wait for initialization events
+        
+        # Drain initialization events
+        while not self.file_manager.reload_queue.empty():
+            self.file_manager.reload_queue.get_nowait()
         
         # Create file in left pane
         left_file = self.left_path / "left_test.txt"

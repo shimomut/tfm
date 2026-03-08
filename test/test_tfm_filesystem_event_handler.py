@@ -91,8 +91,8 @@ class TestTFMFileSystemEventHandler(unittest.TestCase):
         self.assertEqual(len(self.events_received), 1)
         self.assertEqual(self.events_received[0], ("created", "test.txt"))
     
-    def test_on_created_directory_ignored(self):
-        """Test on_created ignores directory creation"""
+    def test_on_created_directory_detected(self):
+        """Test on_created detects directory creation in immediate directory"""
         handler = TFMFileSystemEventHandler(self.event_callback, str(self.temp_path))
         
         class MockEvent:
@@ -103,7 +103,8 @@ class TestTFMFileSystemEventHandler(unittest.TestCase):
         event = MockEvent(str(self.temp_path / "newdir"), True)
         handler.on_created(event)
         
-        self.assertEqual(len(self.events_received), 0)
+        self.assertEqual(len(self.events_received), 1)
+        self.assertEqual(self.events_received[0], ("created", "newdir"))
     
     def test_on_created_subdirectory_file_ignored(self):
         """Test on_created ignores files in subdirectories"""

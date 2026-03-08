@@ -181,7 +181,11 @@ class TestDualPaneMonitoring(unittest.TestCase):
         """Test that changes in left pane only trigger left pane reload."""
         # Start monitoring both panes
         self.manager.start_monitoring(self.left_path, self.right_path)
-        time.sleep(0.2)
+        time.sleep(0.5)  # Wait for initialization events
+        
+        # Drain initialization events
+        while not self.file_manager.reload_queue.empty():
+            self.file_manager.reload_queue.get_nowait()
         
         # Create file in left pane
         left_file = self.left_path / "left_test.txt"
@@ -204,7 +208,11 @@ class TestDualPaneMonitoring(unittest.TestCase):
         """Test that changes in right pane only trigger right pane reload."""
         # Start monitoring both panes
         self.manager.start_monitoring(self.left_path, self.right_path)
-        time.sleep(0.2)
+        time.sleep(0.5)  # Wait for initialization events
+        
+        # Drain initialization events
+        while not self.file_manager.reload_queue.empty():
+            self.file_manager.reload_queue.get_nowait()
         
         # Create file in right pane
         right_file = self.right_path / "right_test.txt"
@@ -227,7 +235,11 @@ class TestDualPaneMonitoring(unittest.TestCase):
         """Test that changes in both panes trigger both pane reloads."""
         # Start monitoring both panes
         self.manager.start_monitoring(self.left_path, self.right_path)
-        time.sleep(0.2)
+        time.sleep(0.5)  # Wait for initialization events
+        
+        # Drain initialization events
+        while not self.file_manager.reload_queue.empty():
+            self.file_manager.reload_queue.get_nowait()
         
         # Create files in both panes
         left_file = self.left_path / "left_test.txt"
@@ -610,7 +622,11 @@ class TestEventCoalescing(unittest.TestCase):
         """Test that rapid changes are coalesced into single reload."""
         # Start monitoring
         self.manager.start_monitoring(self.left_path, self.right_path)
-        time.sleep(0.2)
+        time.sleep(0.5)  # Wait for initialization events
+        
+        # Drain initialization events
+        while not self.file_manager.reload_queue.empty():
+            self.file_manager.reload_queue.get_nowait()
         
         # Create multiple files rapidly (within coalescing window)
         for i in range(5):
@@ -637,7 +653,11 @@ class TestEventCoalescing(unittest.TestCase):
         """Test that reloads are suppressed after user action."""
         # Start monitoring
         self.manager.start_monitoring(self.left_path, self.right_path)
-        time.sleep(0.2)
+        time.sleep(0.5)  # Wait for initialization events
+        
+        # Drain initialization events
+        while not self.file_manager.reload_queue.empty():
+            self.file_manager.reload_queue.get_nowait()
         
         # Suppress reloads for 500ms
         self.manager.suppress_reloads(500)
