@@ -15,6 +15,7 @@ import shlex
 import zipfile
 import tarfile
 import time
+import queue
 import webbrowser
 import importlib
 import traceback
@@ -44,6 +45,8 @@ from tfm_pane_manager import PaneManager
 from tfm_file_list_manager import FileListManager
 from tfm_file_operation_ui import FileOperationUI
 from tfm_file_operation_executor import FileOperationExecutor
+from tfm_file_monitor_manager import FileMonitorManager
+from tfm_file_monitor_observer import FileMonitorObserver
 from tfm_list_dialog import ListDialog, ListDialogHelpers
 from ttk.wide_char_utils import get_display_width, truncate_to_width, pad_to_width, safe_get_display_width
 
@@ -300,6 +303,9 @@ class FileManager(UILayer):
         
         self.state_manager = get_state_manager()
         
+        # Initialize thread-safe queue for file monitoring reload requests
+        self.reload_queue = queue.Queue()
+        
         # Track whether command line directories were provided
         self.cmdline_left_dir_provided = left_dir is not None
         self.cmdline_right_dir_provided = right_dir is not None
@@ -324,6 +330,15 @@ class FileManager(UILayer):
         self.file_list_manager.log_manager = self.log_manager  # Set log_manager for error reporting
         self.file_list_manager.logger = self.log_manager.getLogger("FileOp")  # Set logger for file operations
         self.pane_manager.file_list_manager = self.file_list_manager  # Set file_list_manager for refresh_files
+        
+        # Initialize file monitoring manager for automatic file list reloading
+        # This must happen after pane_manager is created so we have initial paths
+        self.file_monitor_manager = FileMonitorManager(self.config, self)
+        # Start monitoring both panes with their initial directories
+        self.file_monitor_manager.start_monitoring(
+            self.pane_manager.left_pane['path'],
+            self.pane_manager.right_pane['path']
+        )
         self.list_dialog = ListDialog(self.config, renderer)
         self.info_dialog = InfoDialog(self.config, renderer)
         self.about_dialog = AboutDialog(self.config, renderer)
@@ -1634,7 +1649,7 @@ class FileManager(UILayer):
         child_dir_name = pane_data['path'].name
         
         self.save_cursor_position(pane_data)
-        pane_data['path'] = parent
+        self.navigate_to_dir(pane_data, parent)
         pane_data['focused_index'] = 0
         pane_data['scroll_offset'] = 0
         pane_data['selected_files'].clear()
@@ -1671,7 +1686,7 @@ class FileManager(UILayer):
         home_path = Path.home()
         if current_pane['path'] != home_path:
             self.save_cursor_position(current_pane)
-            current_pane['path'] = home_path
+            self.navigate_to_dir(current_pane, home_path)
             current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()
@@ -1888,6 +1903,10 @@ class FileManager(UILayer):
             if self.pane_manager.sync_current_to_other(print):
                 self.refresh_files(current_pane)
                 
+                # Update file monitoring for the current pane
+                current_pane_name = self.pane_manager.active_pane
+                self.file_monitor_manager.update_monitored_directory(current_pane_name, current_pane['path'])
+                
                 # Try to restore cursor position for this directory
                 height, width = self.renderer.get_dimensions()
                 calculated_height = int(height * self.log_height_ratio)
@@ -1922,6 +1941,10 @@ class FileManager(UILayer):
             # Different directories, sync directory
             if self.pane_manager.sync_other_to_current(print):
                 self.refresh_files(other_pane)
+                
+                # Update file monitoring for the other pane
+                other_pane_name = 'right' if self.pane_manager.active_pane == 'left' else 'left'
+                self.file_monitor_manager.update_monitored_directory(other_pane_name, other_pane['path'])
                 
                 # Try to restore cursor position for this directory
                 height, width = self.renderer.get_dimensions()
@@ -2110,6 +2133,109 @@ class FileManager(UILayer):
         """Get the inactive pane"""
         return self.pane_manager.get_inactive_pane()
     
+    def navigate_to_dir(self, pane_data, new_path):
+        """
+        Navigate to a new directory and notify the file monitor.
+        
+        This is the centralized method for directory navigation that ensures
+        the file monitor is updated and reloads are suppressed appropriately.
+        
+        Args:
+            pane_data: The pane dictionary to update
+            new_path: Path object for the new directory
+        """
+        # Update the pane's path
+        pane_data['path'] = new_path
+        
+        # Determine which pane this is
+        pane_name = "left" if pane_data is self.pane_manager.left_pane else "right"
+        
+        # Notify file monitor manager about the directory change
+        if hasattr(self, 'file_monitor_manager'):
+            self.file_monitor_manager.update_monitored_directory(pane_name, new_path)
+            
+            # Suppress automatic reloads for 1 second after navigation
+            # This prevents redundant reloads since we're about to manually refresh
+            self.file_monitor_manager.suppress_reloads(1000)
+
+    def toggle_monitoring(self):
+        """
+        Toggle file monitoring on/off at runtime.
+
+        This method enables or disables automatic file list reloading without
+        restarting TFM. When enabling, it starts monitoring both pane directories.
+        When disabling, it stops all monitoring and updates the configuration state.
+
+        Validates: Requirement 10.4
+        """
+        # Check current monitoring state
+        if self.file_monitor_manager.is_monitoring_enabled():
+            # Currently enabled - disable it
+            self.file_monitor_manager.stop_monitoring()
+
+            # Update configuration state
+            self.config.FILE_MONITORING_ENABLED = False
+
+            # Log the state change
+            self.logger.info("File monitoring disabled")
+        else:
+            # Currently disabled - enable it
+            # Update configuration state first
+            self.config.FILE_MONITORING_ENABLED = True
+
+            # Start monitoring both panes with their current paths
+            self.file_monitor_manager.enabled = True
+            self.file_monitor_manager.start_monitoring(
+                self.pane_manager.left_pane['path'],
+                self.pane_manager.right_pane['path']
+            )
+
+            # Log the state change
+            self.logger.info("File monitoring enabled")
+
+        # Mark dirty to trigger UI update
+        self.mark_dirty()
+    
+    def validate_monitoring_sync(self):
+        """
+        Validate that file monitoring is watching the correct directories.
+        
+        This method checks if the monitored paths match the current pane paths.
+        If mismatches are found, they are logged as warnings.
+        
+        Returns:
+            dict: Validation results with 'valid' (bool) and 'issues' (list)
+        """
+        if not hasattr(self, 'file_monitor_manager'):
+            return {'valid': True, 'issues': []}
+        
+        if not self.file_monitor_manager.is_monitoring_enabled():
+            return {'valid': True, 'issues': []}
+        
+        issues = []
+        
+        for pane_name in ['left', 'right']:
+            pane_data = self.pane_manager.left_pane if pane_name == 'left' else self.pane_manager.right_pane
+            pane_path = pane_data['path']
+            
+            # Get monitored path from file monitor manager
+            monitored_path = self.file_monitor_manager.monitoring_state[pane_name]['path']
+            
+            if pane_path != monitored_path:
+                issue = {
+                    'pane': pane_name,
+                    'pane_path': str(pane_path),
+                    'monitored_path': str(monitored_path) if monitored_path else None,
+                    'message': f"{pane_name} pane path ({pane_path}) != monitored path ({monitored_path})"
+                }
+                issues.append(issue)
+                self.logger.warning(f"Monitoring sync issue detected: {issue['message']}")
+        
+        return {
+            'valid': len(issues) == 0,
+            'issues': issues
+        }
+    
     def run(self):
         """
         Run the main application loop using callback-based event handling.
@@ -2126,6 +2252,15 @@ class FileManager(UILayer):
             # Check if we should quit
             if self.should_quit:
                 break
+            
+            # Check reload queue for file monitoring requests (at start of each loop iteration)
+            try:
+                while True:
+                    pane_name = self.reload_queue.get_nowait()
+                    self._handle_reload_request(pane_name)
+                    self.mark_dirty()  # Trigger redraw after reload
+            except queue.Empty:
+                pass
             
             # Check for startup redraw trigger
             if hasattr(self, 'startup_time') and time.time() - self.startup_time >= 0.033:
@@ -2161,6 +2296,10 @@ class FileManager(UILayer):
             # Draw interface after event processing
             self.draw_interface()
         
+        # Stop file monitoring before cleanup
+        if hasattr(self, 'file_monitor_manager'):
+            self.file_monitor_manager.stop_monitoring()
+        
         # Restore stdout/stderr before exiting
         self.restore_stdio()
         
@@ -2188,6 +2327,99 @@ class FileManager(UILayer):
         
         for pane_data in panes_to_refresh:
             self.file_list_manager.refresh_files(pane_data)
+    
+    def _handle_reload_request(self, pane_name):
+            """
+            Handle a reload request from the file monitoring system.
+
+            This method is called from the main event loop when a reload request
+            is posted to the reload_queue by the FileMonitorManager thread.
+
+            Preserves user context during reload:
+            - Stores currently selected filename and cursor position
+            - After reload, restores cursor to same filename if it still exists
+            - If selected file deleted, positions cursor on nearest file alphabetically
+            - Preserves scroll position when possible
+
+            Args:
+                pane_name: "left" or "right" - which pane to reload
+            """
+            # Get the appropriate pane data
+            if pane_name == "left":
+                pane_data = self.pane_manager.left_pane
+            elif pane_name == "right":
+                pane_data = self.pane_manager.right_pane
+            else:
+                self.logger.error(f"Invalid pane name in reload request: {pane_name}")
+                return
+
+            # Store current context before reload
+            old_focused_index = pane_data['focused_index']
+            old_scroll_offset = pane_data['scroll_offset']
+            selected_filename = None
+
+            # Get currently selected filename (if any files exist)
+            if pane_data['files'] and 0 <= old_focused_index < len(pane_data['files']):
+                selected_file = pane_data['files'][old_focused_index]
+                selected_filename = selected_file.name
+
+            # Refresh the file list for this pane
+            self.refresh_files(pane_data)
+
+            # Restore cursor position after reload
+            if selected_filename and pane_data['files']:
+                # Try to find the same file in the refreshed list
+                found = False
+                for i, file_path in enumerate(pane_data['files']):
+                    if file_path.name == selected_filename:
+                        # File still exists - restore cursor to it
+                        pane_data['focused_index'] = i
+                        found = True
+                        break
+
+                if not found:
+                    # Selected file no longer exists - find nearest file alphabetically
+                    # Build sorted list of filenames for comparison
+                    filenames = [f.name for f in pane_data['files']]
+
+                    # Find insertion point where selected_filename would go
+                    nearest_index = 0
+                    for i, filename in enumerate(filenames):
+                        if filename < selected_filename:
+                            nearest_index = i + 1
+                        else:
+                            break
+
+                    # Clamp to valid range
+                    if nearest_index >= len(pane_data['files']):
+                        nearest_index = len(pane_data['files']) - 1
+
+                    pane_data['focused_index'] = nearest_index
+                    self.logger.info(f"Selected file deleted, moved cursor to nearest file: {pane_data['files'][nearest_index].name}")
+
+                # Preserve scroll position when possible
+                # Adjust scroll offset to keep focused item visible
+                height, width = self.renderer.get_dimensions()
+                calculated_height = int(height * self.log_height_ratio)
+                log_height = calculated_height if self.log_height_ratio > 0 else 0
+                file_pane_bottom = height - log_height - 2
+                display_height = file_pane_bottom - 1  # Account for header
+
+                # Try to maintain the same scroll offset if possible
+                max_offset = max(0, len(pane_data['files']) - display_height)
+                pane_data['scroll_offset'] = min(old_scroll_offset, max_offset)
+
+                # Ensure focused item is visible
+                if pane_data['focused_index'] < pane_data['scroll_offset']:
+                    pane_data['scroll_offset'] = pane_data['focused_index']
+                elif pane_data['focused_index'] >= pane_data['scroll_offset'] + display_height:
+                    pane_data['scroll_offset'] = pane_data['focused_index'] - display_height + 1
+            elif not pane_data['files']:
+                # No files after reload - reset cursor
+                pane_data['focused_index'] = 0
+                pane_data['scroll_offset'] = 0
+
+            self.logger.info(f"Processed reload request for {pane_name} pane")
     
     def sort_entries(self, entries, sort_mode, reverse=False):
         """Sort file entries based on the specified mode"""
@@ -2622,6 +2854,10 @@ class FileManager(UILayer):
         if current_path_str.startswith('archive://'):
             status_parts.append("📦 archive")
         
+        # Check if file monitoring is in fallback mode (requirement 9.4)
+        if hasattr(self, 'file_monitor_manager') and self.file_monitor_manager.is_in_fallback_mode():
+            status_parts.append("⚠ polling mode")
+        
         if self.file_list_manager.show_hidden:
             status_parts.append("showing hidden")
 
@@ -2680,7 +2916,7 @@ class FileManager(UILayer):
                 # Save current cursor position before changing directory
                 self.save_cursor_position(current_pane)
                 
-                current_pane['path'] = focused_file
+                self.navigate_to_dir(current_pane, focused_file)
                 current_pane['focused_index'] = 0
                 current_pane['scroll_offset'] = 0
                 current_pane['selected_files'].clear()  # Clear selections when changing directory
@@ -2712,7 +2948,7 @@ class FileManager(UILayer):
                 archive_path = Path(archive_uri)
                 
                 # Navigate into the archive
-                current_pane['path'] = archive_path
+                self.navigate_to_dir(current_pane, archive_path)
                 current_pane['focused_index'] = 0
                 current_pane['scroll_offset'] = 0
                 current_pane['selected_files'].clear()  # Clear selections when entering archive
@@ -3478,7 +3714,7 @@ class FileManager(UILayer):
             
             # Navigate to the selected path
             old_path = current_pane['path']
-            current_pane['path'] = target_path
+            self.navigate_to_dir(current_pane, target_path)
             current_pane['focused_index'] = 0
             current_pane['scroll_offset'] = 0
             current_pane['selected_files'].clear()  # Clear selections when changing directory
@@ -4480,7 +4716,7 @@ class FileManager(UILayer):
                 self.save_cursor_position(current_pane)
                 
                 # Navigate to the path
-                current_pane['path'] = target_path
+                self.navigate_to_dir(current_pane, target_path)
                 current_pane['focused_index'] = 0
                 current_pane['scroll_offset'] = 0
                 current_pane['selected_files'].clear()
@@ -4566,7 +4802,7 @@ class FileManager(UILayer):
                     
                     # Update the current pane
                     old_path = current_pane['path']
-                    current_pane['path'] = drive_path
+                    self.navigate_to_dir(current_pane, drive_path)
                     current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                     current_pane['selected_files'].clear()
@@ -4781,7 +5017,7 @@ class FileManager(UILayer):
                     archive_filename = archive_file_path.name
                     
                     # Navigate to the parent directory
-                    current_pane['path'] = parent_dir
+                    self.navigate_to_dir(current_pane, parent_dir)
                     current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                     current_pane['selected_files'].clear()
@@ -4813,7 +5049,7 @@ class FileManager(UILayer):
                     # Remember the child directory name we're leaving
                     child_directory_name = current_pane['path'].name
                     
-                    current_pane['path'] = current_pane['path'].parent
+                    self.navigate_to_dir(current_pane, current_pane['path'].parent)
                     current_pane['focused_index'] = 0
                     current_pane['scroll_offset'] = 0
                     current_pane['selected_files'].clear()  # Clear selections when changing directory
@@ -5162,6 +5398,12 @@ class FileManager(UILayer):
             
             # Refresh file lists after loading state
             self.refresh_files()
+            
+            # Update file monitoring to watch the restored directories
+            # This ensures monitoring tracks the correct directories after state restoration
+            if hasattr(self, 'file_monitor_manager') and self.file_monitor_manager.is_monitoring_enabled():
+                self.file_monitor_manager.update_monitored_directory('left', self.pane_manager.left_pane['path'])
+                self.file_monitor_manager.update_monitored_directory('right', self.pane_manager.right_pane['path'])
             
             # Restore cursor positions after files are loaded
             self.restore_startup_cursor_positions()

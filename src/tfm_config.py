@@ -555,7 +555,21 @@ class ConfigManager:
         if not isinstance(config.UNICODE_FALLBACK_CHAR, str) or len(config.UNICODE_FALLBACK_CHAR) != 1:
             errors.append("UNICODE_FALLBACK_CHAR must be a single character string")
         
-        return errors
+        # Validate file monitoring settings
+        if not isinstance(config.FILE_MONITORING_ENABLED, bool):
+            errors.append("FILE_MONITORING_ENABLED must be a boolean")
+        
+        if not isinstance(config.FILE_MONITORING_COALESCE_DELAY_MS, int) or config.FILE_MONITORING_COALESCE_DELAY_MS < 0:
+            errors.append("FILE_MONITORING_COALESCE_DELAY_MS must be a non-negative integer")
+        
+        if not isinstance(config.FILE_MONITORING_MAX_RELOADS_PER_SECOND, int) or config.FILE_MONITORING_MAX_RELOADS_PER_SECOND < 1:
+            errors.append("FILE_MONITORING_MAX_RELOADS_PER_SECOND must be a positive integer")
+        
+        if not isinstance(config.FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS, int) or config.FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS < 0:
+            errors.append("FILE_MONITORING_SUPPRESS_AFTER_ACTION_MS must be a non-negative integer")
+        
+        if not isinstance(config.FILE_MONITORING_FALLBACK_POLL_INTERVAL_S, (int, float)) or config.FILE_MONITORING_FALLBACK_POLL_INTERVAL_S <= 0:
+            errors.append("FILE_MONITORING_FALLBACK_POLL_INTERVAL_S must be a positive number")
         
         return errors
     
