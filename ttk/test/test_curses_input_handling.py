@@ -221,6 +221,66 @@ class TestCursesInputHandling(unittest.TestCase):
         event = self.backend._translate_curses_key(127)
         self.assertEqual(event.key_code, KeyCode.BACKSPACE)
     
+    def test_translate_ctrl_letter(self):
+        """Test translation of Ctrl+letter control characters (1-26)."""
+        # Ctrl-A (1) through Ctrl-Z (26) map to KeyCode.A-Z with CONTROL,
+        # except bytes reserved for special keys (8, 9, 10, 13).
+        letter_keycodes = [
+            KeyCode.A, KeyCode.B, KeyCode.C, KeyCode.D, KeyCode.E, KeyCode.F,
+            KeyCode.G, KeyCode.H, KeyCode.I, KeyCode.J, KeyCode.K, KeyCode.L,
+            KeyCode.M, KeyCode.N, KeyCode.O, KeyCode.P, KeyCode.Q, KeyCode.R,
+            KeyCode.S, KeyCode.T, KeyCode.U, KeyCode.V, KeyCode.W, KeyCode.X,
+            KeyCode.Y, KeyCode.Z,
+        ]
+        reserved = {8, 9, 10, 13}  # Backspace, Tab, Enter (LF), Enter (CR)
+        
+        for byte in range(1, 27):
+            if byte in reserved:
+                continue
+            event = self.backend._translate_curses_key(byte)
+            expected_keycode = letter_keycodes[byte - 1]
+            self.assertEqual(event.key_code, expected_keycode,
+                             f"Ctrl byte {byte} should map to {expected_keycode}")
+            self.assertEqual(event.modifiers, ModifierKey.CONTROL,
+                             f"Ctrl byte {byte} should have CONTROL modifier")
+    
+    def test_translate_ctrl_l(self):
+        """Test that Ctrl-L (byte 12) maps to KeyCode.L with CONTROL modifier."""
+        event = self.backend._translate_curses_key(12)
+        self.assertEqual(event.key_code, KeyCode.L)
+        self.assertEqual(event.modifiers, ModifierKey.CONTROL)
+    
+    def test_ctrl_reserved_bytes_keep_special_meaning(self):
+        """Test that reserved control bytes are not treated as Ctrl+letter."""
+        # Tab (Ctrl-I) stays Tab without a CONTROL modifier
+        event = self.backend._translate_curses_key(9)
+        self.assertEqual(event.key_code, KeyCode.TAB)
+        self.assertEqual(event.modifiers, ModifierKey.NONE)
+        
+        # Enter (Ctrl-J / Ctrl-M) stays Enter
+        for byte in (10, 13):
+            event = self.backend._translate_curses_key(byte)
+            self.assertEqual(event.key_code, KeyCode.ENTER)
+            self.assertEqual(event.modifiers, ModifierKey.NONE)
+        
+        # Backspace (ASCII 127) stays Backspace; raw byte 8 (Ctrl-H) is not in
+        # the key map and must not be turned into a CONTROL key event (this
+        # preserves the pre-existing unmapped behavior for byte 8).
+        event = self.backend._translate_curses_key(127)
+        self.assertEqual(event.key_code, KeyCode.BACKSPACE)
+        self.assertEqual(event.modifiers, ModifierKey.NONE)
+        
+        event = self.backend._translate_curses_key(8)
+        self.assertEqual(event.modifiers, ModifierKey.NONE)
+    
+    def test_force_repaint_invalidates_screen(self):
+        """Test that force_repaint() redraws the window and refreshes."""
+        self.backend.force_repaint()
+        
+        # redrawwin() invalidates the curses screen model and refresh() re-sends it
+        self.backend.stdscr.redrawwin.assert_called_once()
+        self.backend.stdscr.refresh.assert_called_once()
+    
     def test_translate_resize_event(self):
         """Test translation of window resize event."""
         from ttk import SystemEvent, SystemEventType

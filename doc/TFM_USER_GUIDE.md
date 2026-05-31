@@ -970,6 +970,8 @@ TFM provides extensive keyboard shortcuts for efficient file management. All sho
 | ? | Show help dialog |
 | q, Q | Quit TFM |
 | Ctrl+R | Refresh file list |
+| Ctrl+L | Redraw screen (always available; recovers display after terminal multiplexer switch) |
+| F5 | Redraw screen (configurable in config.py) |
 | . | Toggle visibility of hidden files |
 | t | Switch color schemes |
 | T | Toggle fallback color mode |

@@ -884,6 +884,31 @@ class CursesBackend(Renderer):
         """
         self.stdscr.refresh()
     
+    def force_repaint(self) -> None:
+        """
+        Force a complete repaint of the terminal on the next refresh.
+        
+        Curses maintains an internal model of the physical screen and only
+        sends the cells that changed on refresh(). When the terminal contents
+        are altered behind curses' back - for example after switching windows
+        in a terminal multiplexer (tmux/screen) - that model becomes stale and
+        the display is not restored.
+        
+        This method calls redrawwin() to mark the entire window as needing to
+        be rewritten, then refreshes so every cell is re-sent to the terminal.
+        """
+        try:
+            if self.stdscr:
+                self.stdscr.redrawwin()
+                # Restore caret position before refreshing (matches refresh())
+                try:
+                    self.stdscr.move(self.caret_y, self.caret_x)
+                except curses.error:
+                    pass
+                self.stdscr.refresh()
+        except (curses.error, OSError) as e:
+            print(f"Warning: Error forcing repaint: {e}")
+    
     def init_color_pair(self, pair_id: int, fg_color: Tuple[int, int, int],
                        bg_color: Tuple[int, int, int]) -> None:
         """
@@ -1257,6 +1282,19 @@ class CursesBackend(Renderer):
             return KeyEvent(key_code=KeyCode.LEFT, modifiers=ModifierKey.SHIFT)
         elif key in (_KEY_SHIFT_RIGHT_1, _KEY_SHIFT_RIGHT_2):
             return KeyEvent(key_code=KeyCode.RIGHT, modifiers=ModifierKey.SHIFT)
+        
+        # Handle Ctrl+letter combinations (control characters 1-26).
+        # These map to Ctrl-A (1) through Ctrl-Z (26). Bytes with established
+        # special-key semantics are excluded so their behavior is preserved:
+        #   8  -> Backspace (Ctrl-H)
+        #   9  -> Tab       (Ctrl-I)
+        #   10 -> Enter     (Ctrl-J, line feed)
+        #   13 -> Enter     (Ctrl-M, carriage return)
+        if 1 <= key <= 26 and key not in (8, 9, 10, 13):
+            letter = chr(ord('a') + key - 1)
+            letter_keycode = self._key_map.get(ord(letter))
+            if letter_keycode is not None:
+                return KeyEvent(key_code=letter_keycode, modifiers=ModifierKey.CONTROL)
         
         # Detect Shift modifier using the shifted characters set
         if key in self._shifted_chars:

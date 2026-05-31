@@ -198,6 +198,55 @@ def test_full_screen_optimization():
     assert top.render_calls == 1
 
 
+def test_mark_all_dirty():
+    """Test that mark_all_dirty marks every layer in the stack as dirty."""
+    bottom = MockLayer("bottom", full_screen=True)
+    stack = UILayerStack(bottom)
+    
+    middle = MockLayer("middle")
+    top = MockLayer("top")
+    stack.push(middle)
+    stack.push(top)
+    
+    # Clear dirty flags on all layers
+    bottom.dirty = False
+    middle.dirty = False
+    top.dirty = False
+    
+    stack.mark_all_dirty()
+    
+    assert bottom.dirty is True
+    assert middle.dirty is True
+    assert top.dirty is True
+
+
+def test_mark_all_dirty_triggers_full_render():
+    """Test that after mark_all_dirty all visible layers are re-rendered."""
+    bottom = MockLayer("bottom", full_screen=True)
+    stack = UILayerStack(bottom)
+    
+    top = MockLayer("top")
+    stack.push(top)
+    
+    # Initial render clears dirty flags
+    renderer = MockRenderer()
+    stack.render(renderer)
+    bottom_renders_after_first = bottom.render_calls
+    top_renders_after_first = top.render_calls
+    
+    # A second render with no changes should not re-render
+    stack.render(renderer)
+    assert bottom.render_calls == bottom_renders_after_first
+    assert top.render_calls == top_renders_after_first
+    
+    # After mark_all_dirty, the next render redraws every visible layer
+    stack.mark_all_dirty()
+    stack.render(renderer)
+    assert bottom.render_calls == bottom_renders_after_first + 1
+    assert top.render_calls == top_renders_after_first + 1
+
+
+
 def test_check_and_close_top_layer():
     """Test that layers can signal they want to close."""
     bottom = MockLayer("bottom")

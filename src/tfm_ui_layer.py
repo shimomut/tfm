@@ -355,6 +355,18 @@ class UILayerStack:
         """
         return self._layers[-1]
     
+    def mark_all_dirty(self) -> None:
+        """
+        Mark every layer in the stack as needing a redraw.
+        
+        This is used to force a complete repaint of the interface, for example
+        when the user requests a redraw (Ctrl-L) to recover the display after a
+        terminal multiplexer context switch. On the next render() call, all
+        visible layers will be redrawn.
+        """
+        for layer in self._layers:
+            layer.mark_dirty()
+    
     def get_layer_count(self) -> int:
         """
         Get the number of layers in the stack.

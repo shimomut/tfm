@@ -73,6 +73,7 @@ class Config:
         # === Application Control ===
         'quit': ['Q'],                         # Exit TFM application
         'help': ['?'],                         # Show help dialog with all key bindings
+        'redraw': ['F5'],                      # Additional redraw trigger (Ctrl-L is always hardcoded)
         
         # === Navigation ===
         'cursor_up': ['UP'],                   # Move cursor up one item

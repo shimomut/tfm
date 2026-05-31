@@ -106,6 +106,22 @@ class TFMEventCallback(EventCallback):
             # Mark activity for adaptive FPS
             self.file_manager.adaptive_fps.mark_activity()
             
+            # Handle global redraw shortcut (works in all contexts/views).
+            # This recovers the display after a terminal multiplexer context
+            # switch (tmux/screen) where the terminal contents were altered
+            # behind the backend's back.
+            #
+            # Ctrl-L is hardcoded as a redraw trigger BY DESIGN: it is the
+            # universal terminal convention for "redraw the screen", so it
+            # always works regardless of configuration (including for users
+            # whose config.py predates this action). Users can bind ADDITIONAL
+            # keys to the configurable 'redraw' action (e.g. F5 by default).
+            is_ctrl_l = (event.key_code == KeyCode.L and
+                         event.modifiers == ModifierKey.CONTROL)
+            if is_ctrl_l or find_action_for_event(event, has_selection=False) == 'redraw':
+                self.file_manager.force_redraw()
+                return True
+            
             # Handle global desktop mode shortcuts (work in all contexts)
             if self.file_manager.is_desktop_mode() and event.has_modifier(ModifierKey.COMMAND):
                 # Cmd-Plus or Cmd-= (increase font size)
@@ -1757,6 +1773,32 @@ class FileManager(UILayer):
         except Exception:
             pass  # Ignore rendering errors
     
+    def force_redraw(self):
+        """
+        Force a complete repaint of the entire interface.
+        
+        This is triggered by the 'redraw' action (Ctrl-L by default). It is
+        primarily useful for recovering the display after a terminal multiplexer
+        (tmux/screen) context switch, where the terminal contents are changed
+        behind the backend's back and the normal dirty-tracking refresh sends
+        nothing because the backend believes the screen is already correct.
+        
+        It marks every UI layer as dirty (so the application re-renders all of
+        its content) and asks the renderer to invalidate its physical-screen
+        model so every cell is re-sent on the next refresh.
+        """
+        self.logger.info("Redrawing screen")
+        
+        # Invalidate the renderer's physical-screen model so the next refresh
+        # rewrites every cell (recovers from multiplexer context switches).
+        try:
+            self.renderer.force_repaint()
+        except Exception as e:
+            self.logger.error(f"Force repaint failed: {e}")
+        
+        # Mark all UI layers dirty so the full interface is re-rendered.
+        self.ui_layer_stack.mark_all_dirty()
+
     def clear_screen_with_background(self):
         """Clear screen and apply proper background color for current scheme"""
         try:

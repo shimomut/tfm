@@ -382,6 +382,27 @@ class Renderer(ABC):
         """
         pass
     
+    def force_repaint(self) -> None:
+        """
+        Force a complete repaint of the display on the next refresh.
+        
+        Some backends maintain an internal model of the physical display and
+        only transmit cells that have changed. When the display is altered
+        outside the backend's knowledge - for example after switching windows
+        in a terminal multiplexer (tmux/screen) - that model can become stale
+        and the screen is not restored correctly.
+        
+        This method instructs the backend to treat the entire display as
+        invalid so that the next render rewrites every cell. Backends that do
+        not maintain such a model (e.g. desktop backends that always redraw
+        from a grid) may implement this as a no-op.
+        
+        This is a concrete method with a default no-op implementation so that
+        existing backends remain compatible. Backends that need it should
+        override this method.
+        """
+        pass
+    
     @abstractmethod
     def init_color_pair(self, pair_id: int, fg_color: Tuple[int, int, int],
                        bg_color: Tuple[int, int, int]) -> None:

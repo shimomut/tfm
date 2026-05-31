@@ -195,6 +195,68 @@ def test_main_loop_uses_callback_mode():
         print("✓ Main loop callback mode test passed")
 
 
+def test_ctrl_l_triggers_force_redraw():
+    """Test that Ctrl-L is globally routed to force_redraw via the callback."""
+    mock_renderer = Mock()
+    mock_renderer.get_dimensions.return_value = (24, 80)
+    mock_renderer.set_event_callback = Mock()
+    
+    with patch('tfm_main.get_config'), \
+         patch('tfm_main.LogManager'), \
+         patch('tfm_main.get_state_manager'), \
+         patch('tfm_main.init_colors'):
+        
+        fm = FileManager(mock_renderer)
+        fm.log_height_ratio = 0.25
+        
+        # Grab the event callback registered during initialization
+        callback = mock_renderer.set_event_callback.call_args[0][0]
+        
+        # Replace force_redraw with a spy so we can assert it was invoked
+        fm.force_redraw = Mock()
+        
+        ctrl_l_event = KeyEvent(key_code=KeyCode.L, modifiers=ModifierKey.CONTROL)
+        
+        # Ctrl-L is handled by a hardcoded global fallback, so it works even
+        # when the user's config has no 'redraw' binding. find_action_for_event
+        # is mocked to None to prove the fallback (not the action) fired.
+        with patch('tfm_main.find_action_for_event', return_value=None):
+            consumed = callback.on_key_event(ctrl_l_event)
+        
+        assert consumed is True, "Ctrl-L should be consumed by the global handler"
+        fm.force_redraw.assert_called_once()
+        
+        print("✓ Ctrl-L force redraw routing test passed")
+
+
+def test_redraw_action_triggers_force_redraw():
+    """Test that a configured 'redraw' action also triggers force_redraw."""
+    mock_renderer = Mock()
+    mock_renderer.get_dimensions.return_value = (24, 80)
+    mock_renderer.set_event_callback = Mock()
+    
+    with patch('tfm_main.get_config'), \
+         patch('tfm_main.LogManager'), \
+         patch('tfm_main.get_state_manager'), \
+         patch('tfm_main.init_colors'):
+        
+        fm = FileManager(mock_renderer)
+        fm.log_height_ratio = 0.25
+        
+        callback = mock_renderer.set_event_callback.call_args[0][0]
+        fm.force_redraw = Mock()
+        
+        # A non-Ctrl-L key that the config maps to 'redraw' should still work
+        rebind_event = KeyEvent(key_code=KeyCode.F5, modifiers=ModifierKey.NONE)
+        with patch('tfm_main.find_action_for_event', return_value='redraw'):
+            consumed = callback.on_key_event(rebind_event)
+        
+        assert consumed is True, "Rebound redraw key should be consumed"
+        fm.force_redraw.assert_called_once()
+        
+        print("✓ Rebound redraw action routing test passed")
+
+
 def test_special_keys_use_keycode_enum():
     """Test that special keys use KeyCode enum values"""
     # Create mock renderer

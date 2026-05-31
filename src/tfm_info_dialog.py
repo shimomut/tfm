@@ -479,6 +479,8 @@ class InfoDialogHelpers:
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('help')} Show this help")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('quit')} Quit TFM")
         help_lines.append(f"• {'Ctrl+R'.ljust(12)} Refresh file list")
+        help_lines.append(f"• {'Ctrl+L'.ljust(12)} Redraw screen (recover display after terminal multiplexer switch)")
+        help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('redraw')} Redraw screen (configurable; Ctrl+L always works)")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('toggle_hidden')} Toggle visibility of hidden files")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('toggle_color_scheme')} Switch color schemes")
         help_lines.append(f"• {InfoDialogHelpers._format_key_bindings('toggle_fallback_colors')} Toggle fallback color mode")
