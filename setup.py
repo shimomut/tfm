@@ -19,8 +19,9 @@ if requirements_path.exists():
     requirements = requirements_path.read_text().strip().split('\n')
     requirements = [req.strip() for req in requirements if req.strip() and not req.startswith('#')]
 
-# Add Windows-specific requirements using environment markers
-requirements.append('windows-curses; sys_platform == "win32"')
+# Platform-specific dependencies (pyobjc on macOS, windows-curses on Windows)
+# are declared with environment markers in requirements.txt, which is the single
+# source of truth for both `make venv` and install_requires here.
 
 setup(
     name="tfm",
@@ -41,9 +42,6 @@ setup(
         ],
     },
     install_requires=requirements,
-    extras_require={
-        'macos': ['pyobjc'],  # For macOS desktop mode
-    },
     python_requires=">=3.9",
     classifiers=[
         "Development Status :: 4 - Beta",

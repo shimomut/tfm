@@ -1,10 +1,16 @@
-# No external dependencies required - uses built-in curses library
 # Python 3.9+ required for modern language features and security
-# Optional: pygments for syntax highlighting (will fallback gracefully if not available)
+# pygments for syntax highlighting (will fallback gracefully if not available)
 # boto3 for AWS S3 support
 # watchdog for automatic file list reloading
-# pyobjc for macOS desktop mode (install with: pip install tfm[macos])
+#
+# Platform-specific dependencies are selected automatically via environment
+# markers below, so this file is the single source of truth for both
+# `make venv` (pip install -r requirements.txt) and setup.py install_requires:
+#   - pyobjc         : macOS desktop mode (CoreGraphics backend)
+#   - windows-curses : curses support on Windows
 
 pygments
 boto3
 watchdog
+pyobjc; sys_platform == "darwin"
+windows-curses; sys_platform == "win32"
