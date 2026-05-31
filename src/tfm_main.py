@@ -2222,6 +2222,16 @@ class FileManager(UILayer):
             self.logger.info("File monitoring disabled")
         else:
             # Currently disabled - enable it
+            # If watchdog is not installed, monitoring cannot run. Inform the
+            # user with a single clear message instead of silently failing.
+            if not self.file_monitor_manager.is_watchdog_available():
+                self.logger.warning(
+                    "Cannot enable file monitoring: the 'watchdog' library is not installed. "
+                    "Install it with 'pip install watchdog'."
+                )
+                self.mark_dirty()
+                return
+
             # Update configuration state first
             self.config.FILE_MONITORING_ENABLED = True
 

@@ -11,7 +11,7 @@ from typing import Optional, Dict
 import threading
 import time
 from tfm_log_manager import getLogger
-from tfm_file_monitor_observer import FileMonitorObserver
+from tfm_file_monitor_observer import FileMonitorObserver, WATCHDOG_AVAILABLE
 
 
 class FileMonitorManager:
@@ -93,6 +93,17 @@ class FileMonitorManager:
         
         # Read monitoring enabled flag from configuration (requirement 11.1)
         self.enabled = config.FILE_MONITORING_ENABLED
+        
+        # If the watchdog library is not installed, filesystem monitoring cannot
+        # run at all (even polling mode is provided by watchdog). Disable monitoring
+        # up front and emit a single clear message instead of letting every pane
+        # cascade through retries and polling fallbacks that all fail the same way.
+        if self.enabled and not WATCHDOG_AVAILABLE:
+            self.logger.warning(
+                "File monitoring disabled: the 'watchdog' library is not installed. "
+                "Install it with 'pip install watchdog' to enable automatic file list reloading."
+            )
+            self.enabled = False
         
         # Log initialization with monitoring status (Requirement 12.1)
         if self.enabled:
@@ -507,6 +518,18 @@ class FileMonitorManager:
     def is_monitoring_enabled(self) -> bool:
         """Check if monitoring is currently enabled."""
         return self.enabled
+    
+    def is_watchdog_available(self) -> bool:
+        """
+        Check whether the watchdog library is installed.
+        
+        Filesystem monitoring (including polling fallback) requires the watchdog
+        library. When it is not installed, monitoring cannot be enabled.
+        
+        Returns:
+            True if watchdog is available, False otherwise
+        """
+        return WATCHDOG_AVAILABLE
     
     def get_monitoring_mode(self, path: Path) -> str:
         """
