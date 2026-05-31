@@ -1,16 +1,29 @@
 # TFM Makefile
 
-.PHONY: help run run-desktop run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config
+.PHONY: help run run-desktop run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config venv venv-clean check-venv
 
 # Backend selection (default: curses)
 # Usage: make run BACKEND=coregraphics
 # Valid options: curses, coregraphics
 BACKEND ?= curses
 
+# Python interpreter selection
+# All Python is run through the project virtual environment (.venv). There is no
+# fallback to a system python3 - run 'make venv' first to create the environment.
+# An absolute path is used so targets that change directories (e.g. "cd ttk && ...")
+# still resolve the same interpreter.
+PYTHON := $(abspath .venv/bin/python)
+PIP := $(PYTHON) -m pip
+
 help:
 	@echo "TFM - Terminal File Manager"
 	@echo ""
+	@echo "Using Python: $(PYTHON)"
+	@echo "(run 'make venv' first if .venv does not exist)"
+	@echo ""
 	@echo "Available commands:"
+	@echo "  venv           - Create .venv using the latest python3 in PATH and install deps"
+	@echo "  venv-clean     - Remove the .venv directory"
 	@echo "  run            - Run TFM"
 	@echo "  run-desktop    - Run TFM in desktop mode (--desktop flag)"
 	@echo "  run-debug      - Run TFM with debug mode and remote log monitoring"
@@ -47,35 +60,84 @@ help:
 	@echo "  make macos-app-install          # Install to /Applications"
 	@echo "  make macos-dmg                  # Create DMG installer"
 
-run:
+venv:
+	@if [ -d .venv ]; then \
+		echo ".venv already exists. Run 'make venv-clean' first to recreate it."; \
+		exit 1; \
+	fi
+	@echo "Searching for the latest python3 in PATH..."
+	@best=""; best_key=0; \
+	for dir in $$(echo "$$PATH" | tr ':' '\n'); do \
+		for py in "$$dir"/python3.[0-9] "$$dir"/python3.[0-9][0-9]; do \
+			[ -x "$$py" ] || continue; \
+			key=$$("$$py" -c 'import sys; print(sys.version_info[0]*100 + sys.version_info[1])' 2>/dev/null) || continue; \
+			if [ -n "$$key" ] && [ "$$key" -gt "$$best_key" ]; then \
+				best_key=$$key; best="$$py"; \
+			fi; \
+		done; \
+	done; \
+	if [ -z "$$best" ]; then \
+		if command -v python3 >/dev/null 2>&1; then \
+			best=$$(command -v python3); \
+			echo "No versioned python3.x found; falling back to python3"; \
+		else \
+			echo "Error: no python3 interpreter found in PATH"; \
+			exit 1; \
+		fi; \
+	fi; \
+	echo "Using $$best ($$($$best --version 2>&1)) to create .venv..."; \
+	"$$best" -m venv .venv
+	@echo "Upgrading pip..."
+	@.venv/bin/python -m pip install --upgrade pip
+	@echo "Installing dependencies from requirements.txt..."
+	@.venv/bin/python -m pip install -r requirements.txt
+	@echo ""
+	@echo ".venv created successfully with $$(.venv/bin/python --version 2>&1)"
+	@echo "Run 'make run' to launch TFM using the new environment."
+
+venv-clean:
+	@echo "Removing .venv..."
+	@rm -rf .venv
+	@echo ".venv removed"
+
+# Guard target: ensure the virtual environment exists before running any
+# Python-based target. Fails with a clear message instead of falling back to
+# system python.
+check-venv:
+	@if [ ! -x .venv/bin/python ]; then \
+		echo "Error: .venv not found. Run 'make venv' to create it first."; \
+		exit 1; \
+	fi
+
+run: check-venv
 	@echo "Running TFM (backend: $(BACKEND))..."
-	@python3 tfm.py --backend $(BACKEND)
+	@$(PYTHON) tfm.py --backend $(BACKEND)
 
-run-desktop:
+run-desktop: check-venv
 	@echo "Running TFM in desktop mode..."
-	@python3 tfm.py --desktop
+	@$(PYTHON) tfm.py --desktop
 
-run-debug:
+run-debug: check-venv
 	@echo "Running TFM with debug mode and remote log monitoring (backend: $(BACKEND))..."
-	@python3 tfm.py --backend $(BACKEND) --debug --remote-log-port 8123
+	@$(PYTHON) tfm.py --backend $(BACKEND) --debug --remote-log-port 8123
 
-run-profile:
+run-profile: check-venv
 	@echo "Running TFM with performance profiling (backend: $(BACKEND))..."
-	@python3 tfm.py --backend $(BACKEND) --profile
+	@$(PYTHON) tfm.py --backend $(BACKEND) --profile
 
-monitor-log:
-	@python3 src/tools/tfm_log_client.py localhost 8123
+monitor-log: check-venv
+	@$(PYTHON) src/tools/tfm_log_client.py localhost 8123
 
-test:
+test: check-venv
 	@echo "Running TFM tests (backend: $(BACKEND))..."
-	@cd test && PYTHONPATH=../src python3 -m pytest . -v || echo "pytest not available, running individual tests..."
-	@cd test && for test in test_*.py; do echo "Running $$test..."; PYTHONPATH=../src python3 "$$test" || exit 1; done
+	@cd test && PYTHONPATH=../src $(PYTHON) -m pytest . -v || echo "pytest not available, running individual tests..."
+	@cd test && for test in test_*.py; do echo "Running $$test..."; PYTHONPATH=../src $(PYTHON) "$$test" || exit 1; done
 
-test-quick:
+test-quick: check-venv
 	@echo "Running quick verification tests (backend: $(BACKEND))..."
-	@cd test && PYTHONPATH=../src python3 test_cursor_movement.py
-	@cd test && PYTHONPATH=../src python3 test_delete_feature.py
-	@cd test && PYTHONPATH=../src python3 test_integration.py
+	@cd test && PYTHONPATH=../src $(PYTHON) test_cursor_movement.py
+	@cd test && PYTHONPATH=../src $(PYTHON) test_delete_feature.py
+	@cd test && PYTHONPATH=../src $(PYTHON) test_integration.py
 
 clean:
 	@echo "Cleaning up..."
@@ -85,23 +147,23 @@ clean:
 	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 	@rm -rf build/ dist/ 2>/dev/null || true
 
-install:
+install: check-venv
 	@echo "Installing TTK..."
-	@cd ttk && pip3 install .
+	@cd ttk && $(PIP) install .
 	@echo "Installing TFM..."
-	@pip3 install .
+	@$(PIP) install .
 
-uninstall:
+uninstall: check-venv
 	@echo "Uninstalling TFM..."
-	@pip3 uninstall -y tfm
+	@$(PIP) uninstall -y tfm
 	@echo "Uninstalling TTK..."
-	@pip3 uninstall -y ttk
+	@$(PIP) uninstall -y ttk
 
-dev-install:
+dev-install: check-venv
 	@echo "Installing TTK in development mode..."
-	@cd ttk && pip3 install -e .
+	@cd ttk && $(PIP) install -e .
 	@echo "Installing TFM in development mode..."
-	@pip3 install -e .
+	@$(PIP) install -e .
 
 install-config:
 	@echo "Installing default configuration to ~/.tfm/config.py..."
@@ -123,19 +185,19 @@ install-config:
 		echo "Configuration installed successfully"; \
 	fi
 
-lint:
+lint: check-venv
 	@echo "Running linting..."
-	@python3 -m flake8 src/ --max-line-length=120 --ignore=E501,W503 || echo "flake8 not available"
-	@python3 -m pylint src/ || echo "pylint not available"
+	@$(PYTHON) -m flake8 src/ --max-line-length=120 --ignore=E501,W503 || echo "flake8 not available"
+	@$(PYTHON) -m pylint src/ || echo "pylint not available"
 
-format:
+format: check-venv
 	@echo "Formatting code..."
-	@python3 -m black src/ --line-length=120 || echo "black not available"
-	@python3 -m isort src/ || echo "isort not available"
+	@$(PYTHON) -m black src/ --line-length=120 || echo "black not available"
+	@$(PYTHON) -m isort src/ || echo "isort not available"
 
-demo:
+demo: check-venv
 	@echo "Running TFM demo..."
-	@cd test && python3 demo_delete_feature.py
+	@cd test && $(PYTHON) demo_delete_feature.py
 
 # ============================================================================
 # macOS App Bundle Targets
