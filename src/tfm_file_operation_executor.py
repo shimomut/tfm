@@ -90,12 +90,15 @@ class FileOperationExecutor:
 
     def perform_copy_operation(self, files_to_copy, destination_dir, overwrite=False, completion_callback=None, continue_progress=False, task=None):
         """Perform the actual copy operation with fine-grained progress tracking in a background thread
-        
+
         This method runs the copy operation in a background thread with progress tracking
         and cancellation support.
-        
+
         Args:
-            files_to_copy: List of Path objects to copy
+            files_to_copy: List of items to copy. Each item may be either a Path
+                (destination is computed as destination_dir / source.name) or a
+                (source, dest_path) tuple to specify an explicit destination
+                (used for rename-on-conflict resolution).
             destination_dir: Destination directory Path
             overwrite: If True, overwrite existing files without prompting
             completion_callback: Optional callback function called when operation completes.
@@ -145,11 +148,12 @@ class FileOperationExecutor:
         
         # Run the copy operation in a background thread
         def copy_thread():
+            source_files = self._sources_only(files_to_copy)
             # Count files and update total (only if not continuing)
             if not continue_progress:
                 # Count files in background thread so "Preparing" message displays
-                total_individual_files = self._count_files_recursively(files_to_copy)
-                
+                total_individual_files = self._count_files_recursively(source_files)
+
                 # Update progress with correct total
                 self.progress_manager.update_operation_total(
                     total_individual_files if total_individual_files > 0 else 1,
@@ -161,7 +165,7 @@ class FileOperationExecutor:
                 if self.progress_manager.current_operation:
                     processed_files = self.progress_manager.current_operation['processed_items']
                     # Add files from this batch to the total
-                    additional_files = self._count_files_recursively(files_to_copy)
+                    additional_files = self._count_files_recursively(source_files)
                     current_total = self.progress_manager.current_operation['total_items']
                     self.progress_manager.update_operation_total(
                         current_total + additional_files,
@@ -171,21 +175,20 @@ class FileOperationExecutor:
                     total_individual_files = current_total + additional_files
                 else:
                     processed_files = 0
-                    total_individual_files = self._count_files_recursively(files_to_copy)
-            
+                    total_individual_files = self._count_files_recursively(source_files)
+
             copied_count = 0
             error_count = 0
-            
+
             try:
-                for source_file in files_to_copy:
+                for item in files_to_copy:
+                    source_file, dest_path = self._normalize_item(item, destination_dir)
                     # Check for cancellation
                     if self._is_cancelled():
                         self.logger.info("Copy operation cancelled by user")
                         break
-                    
+
                     try:
-                        dest_path = destination_dir / source_file.name
-                        
                         # Skip if file exists and we're not overwriting
                         if dest_path.exists() and not overwrite:
                             # Still need to count skipped files for progress
@@ -260,7 +263,7 @@ class FileOperationExecutor:
             
             # Invalidate cache for affected directories
             if copied_count > 0:
-                self.cache_manager.invalidate_cache_for_copy_operation(files_to_copy, destination_dir)
+                self.cache_manager.invalidate_cache_for_copy_operation(source_files, destination_dir)
             
             # Refresh both panes to show the copied files
             self.file_manager.refresh_files()
@@ -292,12 +295,15 @@ class FileOperationExecutor:
 
     def perform_move_operation(self, files_to_move, destination_dir, overwrite=False, completion_callback=None, continue_progress=False, task=None):
         """Perform the actual move operation with fine-grained progress tracking in a background thread
-        
+
         This method runs the move operation in a background thread with progress tracking
         and cancellation support.
-        
+
         Args:
-            files_to_move: List of Path objects to move
+            files_to_move: List of items to move. Each item may be either a Path
+                (destination is computed as destination_dir / source.name) or a
+                (source, dest_path) tuple to specify an explicit destination
+                (used for rename-on-conflict resolution).
             destination_dir: Destination directory Path
             overwrite: If True, overwrite existing files without prompting
             completion_callback: Optional callback function called when operation completes.
@@ -352,11 +358,12 @@ class FileOperationExecutor:
         
         # Run the move operation in a background thread
         def move_thread():
+            source_files = self._sources_only(files_to_move)
             # Count files and update total (only if not continuing)
             if not continue_progress:
                 # Count files in background thread
-                total_individual_files = self._count_files_recursively(files_to_move)
-                
+                total_individual_files = self._count_files_recursively(source_files)
+
                 # Update progress with correct total
                 self.progress_manager.update_operation_total(
                     total_individual_files if total_individual_files > 0 else 1,
@@ -368,7 +375,7 @@ class FileOperationExecutor:
                 if self.progress_manager.current_operation:
                     processed_files = self.progress_manager.current_operation['processed_items']
                     # Add files from this batch to the total
-                    additional_files = self._count_files_recursively(files_to_move)
+                    additional_files = self._count_files_recursively(source_files)
                     current_total = self.progress_manager.current_operation['total_items']
                     self.progress_manager.update_operation_total(
                         current_total + additional_files,
@@ -378,21 +385,20 @@ class FileOperationExecutor:
                     total_individual_files = current_total + additional_files
                 else:
                     processed_files = 0
-                    total_individual_files = self._count_files_recursively(files_to_move)
-            
+                    total_individual_files = self._count_files_recursively(source_files)
+
             moved_count = 0
             error_count = 0
-            
+
             try:
-                for source_file in files_to_move:
+                for item in files_to_move:
+                    source_file, dest_path = self._normalize_item(item, destination_dir)
                     # Check for cancellation
                     if self._is_cancelled():
                         self.logger.info("Move operation cancelled by user")
                         break
-                    
+
                     try:
-                        dest_path = destination_dir / source_file.name
-                        
                         # Skip if file exists and we're not overwriting
                         if dest_path.exists() and not overwrite:
                             # Still need to count skipped files for progress
@@ -498,7 +504,7 @@ class FileOperationExecutor:
                 
                 # Invalidate cache for affected directories
                 if moved_count > 0:
-                    self.cache_manager.invalidate_cache_for_move_operation(files_to_move, destination_dir)
+                    self.cache_manager.invalidate_cache_for_move_operation(source_files, destination_dir)
                 
                 # Refresh both panes to show the moved files
                 self.file_manager.refresh_files()
@@ -690,6 +696,20 @@ class FileOperationExecutor:
         thread.start()
 
     # Helper methods
+    def _normalize_item(self, item, destination_dir):
+        """Normalize a copy/move list item to (source, dest_path).
+
+        Items may be either a bare Path (dest derived from source name) or a
+        (source, dest_path) tuple for explicit destinations (rename-on-conflict).
+        """
+        if isinstance(item, tuple):
+            return item[0], item[1]
+        return item, destination_dir / item.name
+
+    def _sources_only(self, items):
+        """Extract just the source paths from a mixed list of Path / tuple items."""
+        return [item[0] if isinstance(item, tuple) else item for item in items]
+
     def _count_files_recursively(self, paths):
         """Count total number of individual files in the given paths (including files in directories)
         
