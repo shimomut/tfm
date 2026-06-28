@@ -1,16 +1,19 @@
 # PuiKit keyboard contract (proposal + evidence)
 
-Status: **contract implemented** — defines the keyboard semantics TFM needs
-before porting `tfm_config` (plan §9 item 1; inventory §1.3).
+Status: **contract implemented (curses, macOS, Windows)** — defines the keyboard
+semantics TFM needs; `tfm_config`'s matcher is ported onto it (inventory §1.3).
 Last updated: 2026-06-28
 
-The §3 backend changes are **landed**: the headless spec
-(`test/test_puikit_keyboard_contract.py`) passes **17/17, 0 xfail**, and the
-full PuiKit suite still passes (667 passed, 3 skipped on macOS). The reference
+The §3 backend changes are **landed on all three backends**, with the
+printable-glyph rules consolidated into one shared helper
+(`puikit.event.char_key_event`) so they can't drift per backend again. The
+headless spec (`test/test_puikit_keyboard_contract.py`) passes (incl. a
+cross-platform `char_key_event` suite that covers Windows on any OS), and the
+full PuiKit suite still passes (677 passed, 3 skipped on macOS). The reference
 matcher tests confirm the §2 contract expresses TFM's hard bindings (`a` vs
 `Shift-A`, `?`, `Shift-SPACE`, GUI-only `Cmd-Enter`). The interactive probe
 (`tools/puikit_key_probe.py`) drives a real keyboard for terminal/GUI sanity
-checks. **Next: port `tfm_config`'s matcher onto this contract.**
+checks.
 
 PuiKit's event model has driven mouse/focus flows (the demo catalog) but **not a
 full keyboard-driven keymap**. TFM is the first real user with ~80 bindings
@@ -124,21 +127,42 @@ documented PuiKit contract instead of ttk's `KeyCode`/`ModifierKey`.
 
 ## 3. Concrete PuiKit changes — **LANDED** ✅
 
-Small, localized, and covered by the spec test (17 passing, 0 xfail). The full
-PuiKit suite still passes (667 passed, 3 skipped on macOS).
+The printable-glyph contract (space-as-named, letter-lowercase + Shift, Rule-3
+shift-drop) lives in **one shared helper** so every backend agrees by
+construction — the duplicated-per-backend version drifted (curses and macOS were
+fixed first; **Windows** kept reporting `("!", {shift})` for `Shift+1` and
+`key="A"` for `Shift+a` until this consolidation). Covered by the spec test (the
+full PuiKit suite passes, 677 passed / 3 skipped on macOS).
+
+**`puikit/event.py` — `char_key_event(char, modifiers)`** (the shared contract)
+- space → `("space", char=" ")`; letter → lowercase `key`, `char` as typed, Shift
+  kept (Rule 2); other printable → glyph identity with Shift **dropped**, ctrl/
+  alt/cmd kept (Rule 3). Pure and platform-neutral, so it is unit-tested on any
+  OS — including on Windows's behalf (its backend module can't import off-Windows).
 
 **`puikit/backends/curses_backend.py`** — done
-- `_translate_char`: uppercase ASCII letter → `Event(key=ch.lower(), char=ch,
-  modifiers={"shift"})` (Rule 2); space → `Event(key="space", char=" ")`
-  (named key). The `_translate` int path now delegates printable codes to
-  `_translate_char`, so normalization lives in one place.
-- `_KEY_NAMES`: F1–F12 added via `curses.KEY_F1…KEY_F12 → "f1"…"f12"` (Rule 1).
+- `_translate_char`: printable path infers Shift from an uppercase letter (a
+  terminal can't report it) then defers to `char_key_event`. The `_translate` int
+  path delegates printable codes here too, so it lives in one place.
+- `_KEY_NAMES`: F1–F12 via `curses.KEY_F1…KEY_F12 → "f1"…"f12"` (Rule 1).
 
 **`puikit/backends/macos_backend.py`** — done
-- `translate_key`: letter → lowercase `key` (keep `char` as typed, keep the
-  `shift` flag) (Rule 2); space → `key="space", char=" "`. Other printables keep
-  the literal char as identity (Rule 3); the matcher ignores their shift/alt.
-- `_FUNCTION_KEYS`: F1–F12 (`0xF704…0xF70F`) → `"f1"…"f12"` added.
+- macOS routes input through `NSTextInputClient`, so there are **two** key paths
+  and both now go through `char_key_event`: typed text commits via `insertText:`
+  (letters, digits, punctuation, IME), and non-text keys via
+  `doCommandBySelector:` → `translate_key` (arrows, enter, …). The `insertText:`
+  path was the live one for letters and originally dispatched the raw glyph
+  (`Shift+A` → `("A", {})`); it now applies the contract with modifiers decoded
+  from the originating key event (`_modifier_names`), so `Shift+A` → `("a", "A",
+  {shift})` like every backend.
+- `translate_key`: printable path defers to `char_key_event` (`charactersIgnoring
+  Modifiers` keeps Shift in the glyph but drops Cmd/Ctrl/Option, so those
+  survive). F1–F12 (`0xF704…0xF70F`) added.
+
+**`puikit/backends/windows_backend.py`** — done
+- `_on_char`: printable WM_CHAR path defers to `char_key_event` (fixes letters
+  not being lowercased, space not named, and Shift not dropped from shifted
+  glyphs). `_VK_KEYS`: F1–F12 (`0x70…0x7B`) added.
 
 **No new event types or fields.** The contract is expressible in the existing
 `Event(key, char, modifiers)` shape — it only standardizes *what backends put
@@ -189,3 +213,45 @@ TFM's config tokens map to PuiKit identities:
    real default keymap) and the legacy `test_key_bindings_input_event.py` (9,
    ttk events). The transitional ttk branch is removed once the runtime emits
    PuiKit events (Phase 2).
+
+---
+
+## 5. Command keys vs. text input — focus-gated IME
+
+A keyboard contract is only half the story: a key press is sometimes a **command**
+(navigate a list, trigger an action, fire a shortcut) and sometimes **text** (a
+character typed into a field). They must not be conflated, and a GUI's input
+method (IME) makes this sharp: with a CJK input source selected, *every* keystroke
+fed to the IME starts composition — so a file manager's single-letter bindings
+(`j`, `f`, `v`) would compose instead of dispatch.
+
+**How TTK did it (reference).** ttk's CoreGraphics backend kept `KeyEvent` and
+`CharEvent` as *distinct* types and used a **consume-first** `keyDown`: translate
+to a `KeyEvent`, offer it to the app as a command; only if **unconsumed** pass it
+to `interpretKeyEvents` (→ `insertText` → `CharEvent`, or IME composition); while
+composing, keystrokes bypass the app entirely. The consumption decision did the
+gating — the backend never needed to know widget types.
+
+**How PuiKit does it (chosen: focus-gated, single event type).** PuiKit keeps one
+`Event(KEY, key, char)` (+ `IME_COMPOSITION`) and gates on **focus** instead:
+
+- A widget that edits text declares `wants_text_input = True` (`TextEdit`,
+  `ComboBox`). The Panel resolves the focused **leaf** (`Panel.focused_leaf`,
+  descending through focus containers) every render and, on a transition, calls
+  `backend.begin_text_input()` / `end_text_input()` (new `Backend` methods;
+  default no-op).
+- **Text widget focused** → macOS `keyDown` routes through `interpretKeyEvents`
+  (insertText / IME composition / editing commands), the full text path.
+- **Anything else focused** → macOS `keyDown` translates **directly** to a command
+  KEY event (`translate_key(charactersIgnoringModifiers, modifierFlags)`) and does
+  **not** engage the IME. So `j` dispatches as a command even under a Japanese
+  input source. `end_text_input` also tears down any marked text so a half-finished
+  composition can't leak into the next field.
+
+This is more foolproof than consume-first for non-text contexts (the IME is simply
+*off* there, not relying on every widget remembering to consume) and needs no new
+event type — a non-text widget reads `key`+`modifiers`, a text widget reads `char`.
+curses/Windows/memory backends inherit the no-op default (a terminal has no IME;
+Windows IME is deferred). Covered by `tests/test_text_input_gating.py` in PuiKit
+(focus transitions toggle `begin`/`end`; the leaf resolver descends into
+containers).

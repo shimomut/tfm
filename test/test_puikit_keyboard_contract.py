@@ -20,7 +20,7 @@ import curses
 
 import pytest
 
-from puikit.event import EventType
+from puikit.event import EventType, char_key_event
 
 
 # --------------------------------------------------------------------------- #
@@ -142,6 +142,53 @@ class TestMacOSContract:
     def test_function_key_f5(self):
         ev = self._translate(chr(0xF708), 0)  # NSF5FunctionKey
         assert ev is not None and ev.key == "f5"
+
+
+# --------------------------------------------------------------------------- #
+# Shared printable-glyph contract (puikit.event.char_key_event). Every backend
+# (curses, macOS, AND Windows) routes its printable-char path through this, so
+# testing it here covers all three on any OS — including the Windows backend,
+# whose module can't even import off-Windows.
+# --------------------------------------------------------------------------- #
+
+class TestCharKeyEventContract:
+    def test_plain_letter(self):
+        ev = char_key_event("a")
+        assert (ev.key, ev.char, ev.modifiers) == ("a", "a", frozenset())
+
+    def test_shift_letter_lowercases_and_keeps_shift(self):
+        ev = char_key_event("A", frozenset({"shift"}))
+        assert (ev.key, ev.char) == ("a", "A")
+        assert ev.modifiers == frozenset({"shift"})
+
+    def test_digit(self):
+        ev = char_key_event("1")
+        assert (ev.key, ev.char, ev.modifiers) == ("1", "1", frozenset())
+
+    def test_shifted_symbol_drops_shift(self):
+        # Shift+1 -> '!': identity is the glyph; shift must be dropped so every
+        # backend (incl. Windows, which used to report ('!', {shift})) agrees.
+        ev = char_key_event("!", frozenset({"shift"}))
+        assert (ev.key, ev.char) == ("!", "!")
+        assert ev.modifiers == frozenset()
+
+    def test_shifted_symbol_keeps_cmd_drops_shift(self):
+        ev = char_key_event("!", frozenset({"shift", "cmd"}))
+        assert ev.key == "!"
+        assert ev.modifiers == frozenset({"cmd"})
+
+    def test_punctuation_keeps_ctrl(self):
+        ev = char_key_event("1", frozenset({"ctrl"}))
+        assert ev.modifiers == frozenset({"ctrl"})
+
+    def test_space_is_named_keeps_char(self):
+        ev = char_key_event(" ")
+        assert (ev.key, ev.char) == ("space", " ")
+
+    def test_shift_space_distinct(self):
+        ev = char_key_event(" ", frozenset({"shift"}))
+        assert ev.key == "space"
+        assert ev.modifiers == frozenset({"shift"})
 
 
 # --------------------------------------------------------------------------- #
