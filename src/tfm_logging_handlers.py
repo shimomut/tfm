@@ -183,9 +183,8 @@ class LogPaneHandler(logging.Handler):
             (color_pair, attributes) tuple
         """
         # Import here to avoid circular dependency
-        from tfm_colors import get_log_color, COLOR_ERROR, COLOR_LOG_WARNING
-        from ttk import TextAttribute
-        
+        from tfm_colors import get_log_color, COLOR_ERROR, COLOR_LOG_WARNING, TextAttribute
+
         # Check if this is a stream capture (stdout/stderr) or logger message
         if not should_format_record(record):
             # For stdout/stderr: use record.name ("STDOUT"/"STDERR") to determine color

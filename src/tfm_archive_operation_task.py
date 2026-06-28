@@ -153,24 +153,26 @@ class ArchiveOperationTask(BaseTask):
         This method handles ESC key to cancel operations in progress.
         
         Args:
-            event: KeyEvent to handle
-        
+            event: key event to handle (PuiKit Event, or legacy ttk KeyEvent)
+
         Returns:
             True if the event was consumed, False otherwise
         """
-        from ttk.input_event import KeyEvent, KeyCode
-        
-        if not isinstance(event, KeyEvent):
+        if event is None:
             return False
-        
+
+        # The escape key identity is "escape" on both a PuiKit Event (``key``)
+        # and a legacy ttk KeyEvent (``key_code``, a StrEnum equal to "escape").
+        # Non-key events report neither and are ignored.
+        key = getattr(event, "key", None) or getattr(event, "key_code", None)
+
         # Handle ESC key to cancel operation
-        if event.key_code == KeyCode.ESCAPE:
-            if self.state == State.EXECUTING:
-                # Set cancellation flag
-                self.request_cancellation()
-                self.logger.info("Operation cancellation requested by user (ESC key)")
-                return True
-        
+        if key == "escape" and self.state == State.EXECUTING:
+            # Set cancellation flag
+            self.request_cancellation()
+            self.logger.info("Operation cancellation requested by user (ESC key)")
+            return True
+
         return False
     
     def is_active(self) -> bool:

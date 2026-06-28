@@ -4,11 +4,12 @@ Color definitions and initialization for TFM (Terminal File Manager)
 from typing import Tuple, Optional
 
 try:
-    from ttk import TextAttribute
+    from puikit import TextAttribute
 except ImportError:
-    # Fallback for when TTK is not available (during testing)
-    from enum import IntEnum
-    class TextAttribute(IntEnum):
+    # Fallback for when PuiKit is not available (during testing). Mirrors
+    # puikit.TextAttribute (an IntFlag) for the attributes TFM uses.
+    from enum import IntFlag
+    class TextAttribute(IntFlag):
         NORMAL = 0
         BOLD = 1
         UNDERLINE = 2

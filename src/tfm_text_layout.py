@@ -61,8 +61,9 @@ from dataclasses import dataclass
 from typing import List, Union, Optional
 import unicodedata
 
-# TTK imports for wide character support
-from ttk.wide_char_utils import get_display_width, truncate_to_width
+# PuiKit text helpers for wide-character support. display_width is aliased to
+# the historical name get_display_width to avoid churning every call site.
+from puikit.text import display_width as get_display_width, truncate_to_width
 
 # TFM unified logging system
 from tfm_log_manager import getLogger
@@ -74,8 +75,8 @@ logger = getLogger("TextLayout")
 # ============================================================================
 # Wide Character Support Utilities
 # ============================================================================
-# Note: We use TTK's truncate_to_width() directly with ellipsis="" for pure truncation.
-# No wrapper needed - TTK handles all edge cases correctly.
+# Note: We use PuiKit's truncate_to_width() directly with ellipsis="" for pure
+# truncation. No wrapper needed - it handles the wide-character edge cases.
 
 
 @dataclass

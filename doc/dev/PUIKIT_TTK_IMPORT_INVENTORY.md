@@ -43,7 +43,7 @@ logic, and PuiKit's `text` module** — and some (`pad_to_width`) are actively
 | `ttk` function | Destination | Effort | Notes |
 |---|---|---|---|
 | `get_display_width(s)` | `puikit.text.display_width(s)` | **swap** | Rename. Grid-cell width; widgets prefer `ctx.measure_text` where a font is involved. |
-| `truncate_to_width(s, w[, ellipsis])` | **enhance PuiKit `text`** | **upstream** | PuiKit's `truncate_to_width(s, w)` has no `ellipsis` arg and is grid-based. Add a measure-aware, ellipsis-capable truncate to `puikit.text` (general & backend-correct), rather than wrapping it in TFM. |
+| `truncate_to_width(s, w[, ellipsis])` | `puikit.text.truncate_to_width(s, w, ellipsis)` | **DONE (upstreamed)** | PuiKit's `truncate_to_width` gained the `ellipsis` arg. **Also added `puikit.text.elide(s, w, ellipsis, where)`** (end/middle/start, glyph-aware) — this covers TFM's `AbbreviationSegment` (middle/left/right) logic, so `tfm_text_layout`'s abbreviation can fold onto `elide` when those UI helpers are reworked. Demoed on the catalog's **Truncate** page. |
 | `pad_to_width(s, w, align, fill)` | **widget/layout (drop)** | **drop** | Space-padding to align columns **breaks on GUI proportional fonts**. The FilePane widget aligns columns by *positioning* (`ctx.fill_rect` background + measured `ctx.draw_text` at an x-offset), exactly like PuiKit's `draw_list_row`. Not a text util at all. |
 | `split_at_width(s, w)` | **widget (`wrap_text`/ScrollView)** | **drop** | Used by the text viewer for h-scroll/wrap. Handled inside `SyntaxTextView` via `puikit.text.wrap_text` / scroll offset, not a carried util. |
 | `safe_get_display_width` / `get_safe_functions` | **harden PuiKit `display_width`** | **drop** | ttk's tolerate-bad-unicode + warn wrappers. PuiKit's `display_width` should simply be robust; if a real input breaks it, fix it upstream. No TFM "safe" layer. |
@@ -121,10 +121,10 @@ zero `ttk` after Phase 1); "UI" = rewritten in later phases anyway.
 | File | Imports | Class | Phase-1 action |
 |---|---|---|---|
 | `tfm_config.py` / `_config.py` | ~~`KeyCode`, `ModifierKey`~~ → **none** | logic | **DONE.** Matcher ported onto the PuiKit keyboard contract: `_parse_key_expression` now yields `(identity, modifiers, mode)`; `_event_identity` reads `(key, char, modifiers)` from a `puikit.Event` (with a transitional ttk-event branch); `_matches` implements the §2 rules. `tfm_config` imports no `ttk`. Covered by `test/test_keybindings_puikit_contract.py` (14) + the legacy `test_key_bindings_input_event.py` (9). |
-| `tfm_text_layout.py` | `get_display_width`, `truncate_to_width` | logic | `display_width` → swap; ellipsis truncate → **PuiKit `text` enhancement** (§1.2), not a TFM wrapper. |
-| `tfm_colors.py` | `TextAttribute` (lazy) | logic→theme | Swap `TextAttribute`; full color-pair→Theme rework is Phase 2. |
-| `tfm_logging_handlers.py` | `TextAttribute` (lazy) | logic | Swap. |
-| `tfm_archive_operation_task.py` | `KeyEvent`, `KeyCode` (lazy) | logic | Adapt — small; only for an input prompt path. |
+| `tfm_text_layout.py` | ~~`get_display_width`, `truncate_to_width`~~ → **none** | logic | **DONE.** `from puikit.text import display_width as get_display_width, truncate_to_width`; PuiKit's `truncate_to_width` gained `ellipsis`. |
+| `tfm_colors.py` | ~~`TextAttribute`~~ → **none** | logic→theme | **DONE.** `from puikit import TextAttribute` (IntFlag fallback). Full color-pair→Theme rework still Phase 2. |
+| `tfm_logging_handlers.py` | ~~`TextAttribute`~~ → **none** | logic | **DONE.** `TextAttribute` now sourced from `tfm_colors`. |
+| `tfm_archive_operation_task.py` | ~~`KeyEvent`, `KeyCode`~~ → **none** | logic | **DONE.** ESC check reads `event.key`/`key_code == "escape"`; both event types. |
 | `tfm_single_line_text_edit.py` | events + wide-char | UI→replaced | Superseded by `puikit.widgets.TextEdit`; no port, just delete after rewire. |
 | `tfm_main.py` | the full set (events, wide-char, mouse, backends) | UI | Largest. The `EventCallback` class and direct-draw code dissolve into Panel + widgets (Phase 2). |
 | dialogs: `tfm_base_list_dialog`, `tfm_list_dialog`, `tfm_info_dialog`, `tfm_about_dialog`, `tfm_drives_dialog`, `tfm_search_dialog`, `tfm_batch_rename_dialog`, `tfm_quick_choice_bar`, `tfm_quick_edit_bar`, `tfm_candidate_list_overlay` | events + wide-char + `TextAttribute` + `MouseEventType` | UI | Rewritten as `push_layer` widgets (Phase 3); not import-swapped. |
@@ -155,9 +155,15 @@ Two pieces of work feed Phase 1, both partly **in PuiKit**:
    landed, spec 17/17.
 2. ~~`tfm_config.py` / `_config.py` — point TFM's matcher at the contract.~~
    **DONE** — `tfm_config` is ttk-free; 23 keybinding tests pass.
-3. **PuiKit text** enhancement (ellipsis truncate); then `tfm_text_layout.py`,
-   `tfm_colors.py`, `tfm_logging_handlers.py` → `puikit.text` / `Style.attr`.
-   Run logic tests.
-4. `tfm_archive_operation_task.py` lazy event import → adapt.
-5. Verify: `grep -rn "import ttk\|from ttk" src/` shows only UI files left
-   (dialogs/viewers/`tfm_main`), which Phases 2–4 rewrite as widgets.
+3. ~~**PuiKit text** enhancement (ellipsis truncate); then `tfm_text_layout.py`,
+   `tfm_colors.py`, `tfm_logging_handlers.py` → `puikit.text` / `Style.attr`.~~
+   **DONE** — `puikit.text.truncate_to_width` gained an `ellipsis` arg (19
+   text tests); the three modules import `puikit` (no `ttk`); migrated-function
+   tests green (NFD/wide-char/abbreviation: 46 passed).
+4. ~~`tfm_archive_operation_task.py` lazy event import → adapt.~~ **DONE** — its
+   ESC-to-cancel check reads `event.key`/`key_code == "escape"`, works for both
+   PuiKit and ttk events; ttk-free.
+5. ~~Verify: only UI files left.~~ **DONE** — `grep "from ttk" src/` now shows
+   only the 15 UI modules (dialogs, viewers, `tfm_main`,
+   `tfm_single_line_text_edit`, overlays), which Phases 2–4 rewrite as widgets.
+   **No logic module imports ttk.** Phase 1 (logic decoupling) complete.

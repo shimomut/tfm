@@ -417,10 +417,15 @@ the Panel/widget patterns are established in Phase 2.
    now ttk-free; matcher rewritten to the contract triple with a transitional
    ttk-event branch so the app keeps running pre-backend-swap. 23 keybinding
    tests pass (`test/test_keybindings_puikit_contract.py` + the legacy ttk one).
-4. **Next: Phase 1 continued** — `tfm_text_layout` / `tfm_colors` /
-   `tfm_logging_handlers` → `puikit.text` / `Style.attr` (per inventory order),
-   plus the small PuiKit `text` ellipsis-truncate enhancement.
-5. Phase 0 spike: two-pane PuiKit shell on curses + macOS.
+4. ~~Phase 1 logic decoupling — text/colors/logging/archive-task off ttk.~~
+   **Done** — `puikit.text.truncate_to_width` gained `ellipsis`; `tfm_text_layout`,
+   `tfm_colors`, `tfm_logging_handlers`, `tfm_archive_operation_task` are
+   ttk-free. **No logic module imports ttk** — every remaining `from ttk` in
+   `src/` is a UI module (dialogs/viewers/`tfm_main`) that Phases 2–4 rewrite as
+   widgets. **Phase 1 complete.**
+5. **Next: Phase 0/2 spike** — stand up a two-pane PuiKit shell (Panel + layout
+   + `FilePane` skeleton) on curses + macOS, wiring the now-decoupled config /
+   keymap / state into it.
 6. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
    symbol used in `src/` mapped to its PuiKit equivalent, with a per-file
