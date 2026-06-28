@@ -26,7 +26,11 @@ import _config  # noqa: E402  (the canonical default Config template)
 from puikit import EventType, Item, Panel, Style, TextAttribute, VSplit, HSplit  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.text import elide  # noqa: E402
+from puikit.widgets import LogView  # noqa: E402
 from puikit.widgets.base import Widget  # noqa: E402
+
+#: Height (base units) of the log pane at the bottom of the window.
+LOG_HEIGHT = 6
 
 from tfm_config import KeyBindings  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
@@ -35,29 +39,54 @@ from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 
 
+class PaneHeader(Widget):
+    """The location bar above a pane: its current path, brighter when active."""
+
+    def __init__(self, app: "TfmApp", pane_name: str):
+        self.app = app
+        self.pane_name = pane_name
+
+    def draw(self, ctx) -> None:
+        pane = self.app.pane(self.pane_name)
+        active = self.app.pm.active_pane == self.pane_name
+        text = elide(" " + str(pane["path"]), ctx.width, where="middle", measure=ctx.measure_text)
+        fg = ctx.theme.accent if active else ctx.theme.text
+        ctx.draw_text(0, 0, text, Style(fg=fg, attr=TextAttribute.BOLD))
+
+
+class PaneFooter(Widget):
+    """The info bar below a pane: dir/file counts, selection, sort, filter."""
+
+    def __init__(self, app: "TfmApp", pane_name: str):
+        self.app = app
+        self.pane_name = pane_name
+
+    def draw(self, ctx) -> None:
+        pane = self.app.pane(self.pane_name)
+        active = self.app.pm.active_pane == self.pane_name
+        dirs, files = self.app.counts(pane)
+        nsel = len(pane["selected_files"])
+        sel = f" ({nsel} selected)" if nsel else ""
+        filt = f"  |  Filter: {pane['filter_pattern']}" if pane["filter_pattern"] else ""
+        sort = self.app.flm.get_sort_description(pane)
+        text = f" {dirs} dirs, {files} files{sel}  |  {sort}{filt}"
+        fg = ctx.theme.text if active else ctx.theme.muted_text
+        attr = TextAttribute.BOLD if active else TextAttribute.NORMAL
+        ctx.draw_text(0, 0, elide(text, ctx.width, measure=ctx.measure_text), Style(fg=fg, attr=attr))
+
+
 class StatusBar(Widget):
-    """One-line status: the active pane's path and cursor position, plus a hint."""
+    """The bottom bar: global key hints (TFM's dynamic status line, simplified)."""
+
+    HINTS = ("q quit   tab switch    space select   a all-files   ↵ open   "
+             "⌫ parent   . hidden")
 
     def __init__(self, app: "TfmApp"):
         self.app = app
 
     def draw(self, ctx) -> None:
-        theme = ctx.theme
-        pane = self.app.active_pane()
-        n = len(pane["files"])
-        pos = (pane["focused_index"] + 1) if n else 0
-        nsel = len(pane["selected_files"])
-        left = f" {pane['path']}"
-        sel = f"{nsel} sel  ·  " if nsel else ""
-        right = f"{sel}{pos}/{n}  ·  q quit  tab switch  spc select  ↵ open  ⌫ up "
-        width = ctx.width
-        # Path on the left (elided), counters/hints on the right.
-        rt = elide(right, width, where="start", measure=ctx.measure_text)
-        rw = ctx.measure_text(rt)
-        lt = elide(left, max(0, width - rw - 1), where="middle", measure=ctx.measure_text)
-        fg = theme.text
-        ctx.draw_text(0, 0, lt, Style(fg=fg, attr=TextAttribute.BOLD))
-        ctx.draw_text(width - rw, 0, rt, Style(fg=theme.muted_text))
+        text = elide(" " + self.HINTS, ctx.width, where="end", measure=ctx.measure_text)
+        ctx.draw_text(0, 0, text, Style(fg=ctx.theme.muted_text))
 
 
 class TfmApp:
@@ -75,27 +104,59 @@ class TfmApp:
         self.panel = Panel(backend)
         self.left_view = FilePane(self.pm.left_pane, on_click=lambda i: self._on_click("left", i))
         self.right_view = FilePane(self.pm.right_pane, on_click=lambda i: self._on_click("right", i))
+        self.log = LogView(max_lines=2000, auto_scroll=True, wrap=True)
         self.status = StatusBar(self)
         self._sync_active()
         self.panel.set_layout(
             VSplit(
+                # The dual-pane area: each pane is its own column of
+                # header / file list / footer, so one strong divider runs the
+                # full height between them.
                 Item(
                     HSplit(
-                        Item(self.left_view, weight=1, hints={"surface": "content"}),
-                        Item(self.right_view, weight=1, hints={"surface": "content"}),
+                        Item(self._pane_column("left", self.left_view), weight=1),
+                        Item(self._pane_column("right", self.right_view), weight=1),
                         divider="strong",
                     ),
                     weight=1,
                 ),
+                Item(self.log, size=LOG_HEIGHT, hints={"surface": "content"}),
                 Item(self.status, size=1, hints={"surface": "status"}),
+                divider="subtle",
             ),
             margin_px=4,
+        )
+        self.log_info(f"TFM on PuiKit — {self.pm.left_pane['path']}")
+
+    def _pane_column(self, name: str, view: FilePane) -> VSplit:
+        return VSplit(
+            Item(PaneHeader(self, name), size=1, hints={"surface": "header"}),
+            Item(view, weight=1, hints={"surface": "content"}),
+            Item(PaneFooter(self, name), size=1, hints={"surface": "status"}),
         )
 
     # --- state ---------------------------------------------------------------
 
     def active_pane(self) -> dict:
         return self.pm.get_current_pane()
+
+    def pane(self, name: str) -> dict:
+        return self.pm.left_pane if name == "left" else self.pm.right_pane
+
+    def counts(self, pane: dict) -> tuple[int, int]:
+        """(dirs, files) in a pane, read from the file-info cache."""
+        info = pane.get("file_info", {})
+        dirs = sum(1 for f in pane["files"] if info.get(str(f), {}).get("is_dir"))
+        return dirs, len(pane["files"]) - dirs
+
+    def log_info(self, message: str) -> None:
+        """Append a line to the log pane."""
+        self.log.append(message, Style(fg=(180, 200, 230)))
+
+    def _log_result(self, result) -> None:
+        """Log the (success, message) a FileListManager action returns."""
+        if isinstance(result, tuple) and len(result) == 2 and result[1]:
+            self.log_info(result[1])
 
     def _sync_active(self) -> None:
         self.left_view.active = self.pm.active_pane == "left"
@@ -136,13 +197,13 @@ class TfmApp:
             pane["focused_index"] = min(last, idx + 10)
         # --- selection (reuses FileListManager) ---
         elif action == "select_file":  # SPACE: toggle current, move down
-            self.flm.toggle_selection(pane, move_cursor=True, direction=1)
+            self._log_result(self.flm.toggle_selection(pane, move_cursor=True, direction=1))
         elif action == "select_file_up":  # Shift-SPACE: toggle, move up
-            self.flm.toggle_selection(pane, move_cursor=True, direction=-1)
+            self._log_result(self.flm.toggle_selection(pane, move_cursor=True, direction=-1))
         elif action == "select_all_files":  # A: toggle all files
-            self.flm.toggle_all_files_selection(pane)
+            self._log_result(self.flm.toggle_all_files_selection(pane))
         elif action == "select_all_items":  # Shift-A: toggle all items
-            self.flm.toggle_all_items_selection(pane)
+            self._log_result(self.flm.toggle_all_items_selection(pane))
         elif action == "select_all":  # HOME: select every item
             pane["selected_files"] = {str(f) for f in files}
         elif action == "unselect_all":  # END: clear selection
@@ -157,6 +218,7 @@ class TfmApp:
         elif action == "toggle_hidden":
             self.flm.show_hidden = not self.flm.show_hidden
             self.flm.refresh_files(pane)
+            self.log_info(f"Hidden files: {'shown' if self.flm.show_hidden else 'hidden'}")
         else:
             return False
         return True
@@ -170,8 +232,9 @@ class TfmApp:
             if entry.is_dir():
                 pane["path"] = entry
                 self._refresh(pane)
-        except Exception:
-            pass
+                self.log_info(f"Entered {entry.name}/")
+        except Exception as exc:
+            self.log_info(f"Cannot open {entry.name}: {exc}")
 
     def _go_parent(self, pane: dict) -> None:
         parent = pane["path"].parent
@@ -179,6 +242,7 @@ class TfmApp:
             child_name = pane["path"].name
             pane["path"] = parent
             self._refresh(pane)
+            self.log_info(f"Up to {parent}")
             # Land the cursor on the directory we came from.
             for i, f in enumerate(pane["files"]):
                 if f.name == child_name:

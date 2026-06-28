@@ -456,12 +456,22 @@ the Panel/widget patterns are established in Phase 2.
    gutter (names don't shift), selected names in a distinct amber; the status bar
    shows the count. Fixed a bug: Home/End were cursor-jump, now select/unselect
    per TFM's bindings.
-8. **Next: Phase 2 continued** — quick-sort keys (1–4) + a per-pane sort/filter
-   header indicator; pane resize (`[` `]` `-`); the log pane (→ `LogView`). Then
-   the items that need a **text-input bar** (Phase 3's first piece, exercising
-   the focus-gated text input): filter (`;`/`:`), incremental search, and
-   rename/mkdir/create-file — plus file operations (copy/move/delete) now that
-   selection exists. Double-click to open still awaits a backend click-count.
+8. ~~Window chrome — header / footer / log pane / status bar.~~ **Done.** The
+   layout is now TFM-shaped: each pane is a column of `VSplit(PaneHeader,
+   FilePane, PaneFooter)` (one strong divider runs full height), over a
+   full-width `LogView` log pane and a `StatusBar`. **PaneHeader** shows the
+   pane's path (accent when active); **PaneFooter** shows `N dirs, M files
+   (K selected) | Sort: Name ↑ | Filter: …` (reusing `get_sort_description`);
+   the **log pane** is a tail-following `LogView` the controller appends action
+   messages to (selection/navigation/hidden-toggle); the **status bar** shows
+   global key hints. Surfaces: header/content/status roles per row.
+9. **Next: Phase 2 continued** — quick-sort keys (1–4) wired to the footer's
+   sort indicator; pane/log resize (`[` `]` `-` `{` `}`); then the **text-input
+   bar** (Phase 3's first piece, exercising focus-gated text input): filter,
+   incremental search, rename/mkdir — plus file operations (copy/move/delete)
+   now that selection exists. Later: wire TFM's `LogManager` to feed the log
+   pane (currently fed by action messages); double-click (needs backend
+   click-count).
 6. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
    symbol used in `src/` mapped to its PuiKit equivalent, with a per-file
