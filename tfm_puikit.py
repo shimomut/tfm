@@ -23,14 +23,14 @@ from pathlib import Path as _StdPath
 sys.path.insert(0, str(_StdPath(__file__).parent / "src"))
 
 import _config  # noqa: E402  (the canonical default Config template)
-from puikit import EventType, Item, Panel, Style, TextAttribute, VSplit, HSplit  # noqa: E402
+from puikit import EventType, Item, Panel, Style, TextAttribute, VSplit  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.text import elide  # noqa: E402
-from puikit.widgets import LogView  # noqa: E402
+from puikit.widgets import LayoutView, LogView, Splitter  # noqa: E402
 from puikit.widgets.base import Widget  # noqa: E402
 
-#: Height (base units) of the log pane at the bottom of the window.
-LOG_HEIGHT = 6
+#: Initial share of the content area given to the file panes (vs the log pane).
+PANES_FRACTION = 0.74
 
 from tfm_config import KeyBindings  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
@@ -107,20 +107,26 @@ class TfmApp:
         self.log = LogView(max_lines=2000, auto_scroll=True, wrap=True)
         self.status = StatusBar(self)
         self._sync_active()
+
+        # Two draggable splitters: the file panes side-by-side (vertical handle),
+        # and the panes-over-log split (horizontal handle). The status bar stays
+        # a fixed bottom row outside the splitters.
+        self.pane_splitter = Splitter(
+            self._pane_column("left", self.left_view),
+            self._pane_column("right", self.right_view),
+            orientation="horizontal",
+            fraction=self.pm.left_pane_ratio,
+            min_first=10, min_second=10,
+        )
+        self.content_splitter = Splitter(
+            self.pane_splitter, self.log,
+            orientation="vertical",
+            fraction=PANES_FRACTION,
+            min_first=5, min_second=2,
+        )
         self.panel.set_layout(
             VSplit(
-                # The dual-pane area: each pane is its own column of
-                # header / file list / footer, so one strong divider runs the
-                # full height between them.
-                Item(
-                    HSplit(
-                        Item(self._pane_column("left", self.left_view), weight=1),
-                        Item(self._pane_column("right", self.right_view), weight=1),
-                        divider="strong",
-                    ),
-                    weight=1,
-                ),
-                Item(self.log, size=LOG_HEIGHT, hints={"surface": "content"}),
+                Item(self.content_splitter, weight=1, hints={"surface": "content"}),
                 Item(self.status, size=1, hints={"surface": "status"}),
                 divider="subtle",
             ),
@@ -128,12 +134,14 @@ class TfmApp:
         )
         self.log_info(f"TFM on PuiKit — {self.pm.left_pane['path']}")
 
-    def _pane_column(self, name: str, view: FilePane) -> VSplit:
-        return VSplit(
+    def _pane_column(self, name: str, view: FilePane) -> LayoutView:
+        # A LayoutView wraps the header/list/footer sub-layout as a single widget
+        # so it can be a Splitter child (Splitter hosts widgets, not layouts).
+        return LayoutView(VSplit(
             Item(PaneHeader(self, name), size=1, hints={"surface": "header"}),
             Item(view, weight=1, hints={"surface": "content"}),
             Item(PaneFooter(self, name), size=1, hints={"surface": "status"}),
-        )
+        ))
 
     # --- state ---------------------------------------------------------------
 

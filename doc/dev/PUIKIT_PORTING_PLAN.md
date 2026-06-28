@@ -465,13 +465,21 @@ the Panel/widget patterns are established in Phase 2.
    the **log pane** is a tail-following `LogView` the controller appends action
    messages to (selection/navigation/hidden-toggle); the **status bar** shows
    global key hints. Surfaces: header/content/status roles per row.
-9. **Next: Phase 2 continued** — quick-sort keys (1–4) wired to the footer's
-   sort indicator; pane/log resize (`[` `]` `-` `{` `}`); then the **text-input
-   bar** (Phase 3's first piece, exercising focus-gated text input): filter,
-   incremental search, rename/mkdir — plus file operations (copy/move/delete)
-   now that selection exists. Later: wire TFM's `LogManager` to feed the log
-   pane (currently fed by action messages); double-click (needs backend
-   click-count).
+9. ~~Draggable splitters (mouse resize).~~ **Done.** The static dividers are now
+   two `Splitter` widgets: a **horizontal** one between the file panes (drag the
+   vertical handle to re-apportion left/right) nested inside a **vertical** one
+   between the panes-area and the log pane (drag the horizontal handle to resize
+   the log). Each pane column is a `LayoutView(VSplit(header, list, footer))` so
+   it can be a Splitter child. Click/scroll still route correctly through the
+   deeper Splitter→LayoutView→FilePane nesting; the handle shows a
+   col-/row-resize cursor and accent highlight on hover/drag. `Splitter.fraction`
+   is now the pane-ratio source of truth (wire `[`/`]`/`-` keys to nudge it).
+10. **Next: Phase 2 continued** — quick-sort keys (1–4) → footer sort indicator;
+    keyboard pane/log resize (`[` `]` `-` `{` `}` nudging the splitter fractions);
+    then the **text-input bar** (Phase 3's first piece, exercising focus-gated
+    text input): filter, incremental search, rename/mkdir — plus file operations
+    (copy/move/delete) now that selection exists. Later: wire TFM's `LogManager`
+    to feed the log pane; double-click (needs backend click-count).
 6. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
    symbol used in `src/` mapped to its PuiKit equivalent, with a per-file
