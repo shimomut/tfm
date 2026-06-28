@@ -33,6 +33,13 @@ from puikit.widgets.base import Widget, draw_list_row
 
 #: Base-unit width reserved at the right edge for the size column.
 SIZE_COL = 9
+#: Left gutter (base units) for the selection marker, reserved always so names
+#: don't shift when you select.
+MARK_W = 1
+#: Selection marker glyph + color (a warm amber, distinct from the blue dir
+#: color). TODO: promote to a theme token when TFM's color schemes are ported.
+MARKER = "•"
+MARKED_FG = (229, 192, 123)
 
 
 class FilePane(Widget):
@@ -109,7 +116,8 @@ class FilePane(Widget):
         # Fractional inner width (up to the scrollbar's left edge) so a row fill
         # and the right-aligned size reach the true pane edge.
         full_w = ctx.size_units[0] - (1.0 if show_bar else 0.0)
-        name_w = max(1, int(full_w) - SIZE_COL - 1)
+        name_w = max(1, int(full_w) - MARK_W - SIZE_COL - 1)
+        selected = self.pane["selected_files"]
 
         def measure(s: str) -> float:
             return ctx.measure_text(s)
@@ -123,7 +131,9 @@ class FilePane(Widget):
             if y >= view_h or i >= count:
                 break
             if i >= 0:
-                self._draw_row(ctx, y, files[i], i == cursor, name_w, full_w, measure)
+                entry = files[i]
+                self._draw_row(ctx, y, entry, i == cursor,
+                               str(entry) in selected, name_w, full_w, measure)
             row += 1
 
         if show_bar:
@@ -133,7 +143,7 @@ class FilePane(Widget):
             pos = self.offset / denom if denom > 0 else 0.0
             ctx.draw_scrollbar(ctx.size_units[0] - 1, 0, view_h, max(0.0, min(1.0, pos)), ratio)
 
-    def _draw_row(self, ctx, y, entry, is_cursor, name_w, full_w, measure) -> None:
+    def _draw_row(self, ctx, y, entry, is_cursor, selected, name_w, full_w, measure) -> None:
         theme = ctx.theme
         info = self._info(entry)
         is_dir = info["is_dir"]
@@ -142,14 +152,22 @@ class FilePane(Widget):
         name_text = elide(name, name_w, where="end", measure=measure)
 
         if is_cursor:
+            # Cursor row: a full-width fill (louder on the active pane); the
+            # marker still shows so a selected-and-focused row is unambiguous.
             bg = theme.selection_active_bg if self.active else theme.selection_inactive_bg
             fg = (255, 255, 255) if self.active else theme.text
-            draw_list_row(ctx, y, name_text, name_w, Style(fg=fg, bg=bg), fill_w=full_w)
+            draw_list_row(ctx, y, name_text, name_w, Style(fg=fg, bg=bg), x=MARK_W, fill_w=full_w)
+            if selected:
+                ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, bg=bg, attr=TextAttribute.BOLD))
             if size:
                 ctx.draw_text(full_w - measure(size), y, size, Style(fg=fg, bg=bg))
         else:
-            fg = theme.accent if is_dir else theme.text
-            ctx.draw_text(0, y, name_text, Style(fg=fg))
+            if selected:
+                ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, attr=TextAttribute.BOLD))
+                fg = MARKED_FG
+            else:
+                fg = theme.accent if is_dir else theme.text
+            ctx.draw_text(MARK_W, y, name_text, Style(fg=fg))
             if size:
                 ctx.draw_text(full_w - measure(size), y, size, Style(fg=theme.muted_text))
 

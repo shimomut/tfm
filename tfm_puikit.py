@@ -46,8 +46,10 @@ class StatusBar(Widget):
         pane = self.app.active_pane()
         n = len(pane["files"])
         pos = (pane["focused_index"] + 1) if n else 0
+        nsel = len(pane["selected_files"])
         left = f" {pane['path']}"
-        right = f"{pos}/{n}  ·  q quit  tab switch  ↵ open  ⌫ up  . hidden "
+        sel = f"{nsel} sel  ·  " if nsel else ""
+        right = f"{sel}{pos}/{n}  ·  q quit  tab switch  spc select  ↵ open  ⌫ up "
         width = ctx.width
         # Path on the left (elided), counters/hints on the right.
         rt = elide(right, width, where="start", measure=ctx.measure_text)
@@ -132,10 +134,19 @@ class TfmApp:
             pane["focused_index"] = max(0, idx - 10)
         elif action == "page_down":
             pane["focused_index"] = min(last, idx + 10)
-        elif action == "select_all":  # HOME -> jump to top (selection later)
-            pane["focused_index"] = 0
-        elif action == "unselect_all":  # END -> jump to bottom
-            pane["focused_index"] = last
+        # --- selection (reuses FileListManager) ---
+        elif action == "select_file":  # SPACE: toggle current, move down
+            self.flm.toggle_selection(pane, move_cursor=True, direction=1)
+        elif action == "select_file_up":  # Shift-SPACE: toggle, move up
+            self.flm.toggle_selection(pane, move_cursor=True, direction=-1)
+        elif action == "select_all_files":  # A: toggle all files
+            self.flm.toggle_all_files_selection(pane)
+        elif action == "select_all_items":  # Shift-A: toggle all items
+            self.flm.toggle_all_items_selection(pane)
+        elif action == "select_all":  # HOME: select every item
+            pane["selected_files"] = {str(f) for f in files}
+        elif action == "unselect_all":  # END: clear selection
+            pane["selected_files"].clear()
         elif action == "switch_pane":
             self.pm.active_pane = "right" if self.pm.active_pane == "left" else "left"
             self._sync_active()

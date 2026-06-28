@@ -449,11 +449,19 @@ the Panel/widget patterns are established in Phase 2.
    outgrows the pane, and measured fitting. Mouse routes via
    `Panel.dispatch_event` (keyboard stays on TFM's global keymap). Verified
    headlessly (per-pane routing, fractional offset, cursor-follow).
-7. **Next: Phase 2 continued** — selection (Space, select-all) with the
-   focused-item marker; remaining columns/indicators (date, sort/filter header);
-   double-click to open (needs a backend click-count, currently Enter only);
-   then Phase 3 bars/dialogs/menus (a `TextEdit` quick-edit bar exercises the
-   focus-gated text input).
+7. ~~Selection + focused-item marker.~~ **Done.** Space (toggle + move),
+   Shift-Space (toggle + up), `A` (all files), Shift-A (all items), Home (select
+   all), End (clear) — all reuse `FileListManager`'s selection methods on
+   `pane_data['selected_files']`. `FilePane` renders a `•` marker in a left
+   gutter (names don't shift), selected names in a distinct amber; the status bar
+   shows the count. Fixed a bug: Home/End were cursor-jump, now select/unselect
+   per TFM's bindings.
+8. **Next: Phase 2 continued** — quick-sort keys (1–4) + a per-pane sort/filter
+   header indicator; pane resize (`[` `]` `-`); the log pane (→ `LogView`). Then
+   the items that need a **text-input bar** (Phase 3's first piece, exercising
+   the focus-gated text input): filter (`;`/`:`), incremental search, and
+   rename/mkdir/create-file — plus file operations (copy/move/delete) now that
+   selection exists. Double-click to open still awaits a backend click-count.
 6. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
    symbol used in `src/` mapped to its PuiKit equivalent, with a per-file
