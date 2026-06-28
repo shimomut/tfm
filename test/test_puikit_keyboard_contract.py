@@ -119,10 +119,19 @@ class TestMacOSContract:
         assert ev.key == "enter"
         assert "cmd" in ev.modifiers
 
-    def test_punctuation_identity(self):
-        # macOS may also report 'shift' here; the matcher ignores it (Rule 3).
+    def test_punctuation_identity_drops_shift(self):
+        # Shift+/ produces '?'; the shifted glyph is the identity and Shift is
+        # already baked into it, so it must NOT appear in modifiers — matching
+        # the curses backend, which has no shift to report (Rule 3).
         ev = self._translate("?", _NS_SHIFT)
         assert (ev.key, ev.char) == ("?", "?")
+        assert "shift" not in ev.modifiers
+
+    def test_punctuation_keeps_cmd_drops_shift(self):
+        # Shift+Cmd+1 -> '!': drop Shift (in the glyph), keep Cmd (significant).
+        ev = self._translate("!", _NS_SHIFT | _NS_CMD)
+        assert ev.key == "!"
+        assert ev.modifiers == frozenset({"cmd"})
 
     def test_shift_letter_normalized(self):
         ev = self._translate("A", _NS_SHIFT)

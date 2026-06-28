@@ -34,7 +34,7 @@ directly with synthetic input:
 | `a` | `("a", "a", [])` | `("a", "a", [])` | ✅ |
 | `Shift`+`a` (→ `A`) | `("A", "A", [])` | `("A", "A", ["shift"])` | ❌ **shift modifier differs; key not normalized** |
 | `Ctrl`+`a` | `("a", None, ["ctrl"])` | `("a", "a", ["ctrl"])` | ⚠️ key/mods agree; `char` differs |
-| `?` (Shift+/) | `("?", "?", [])` | `("?", "?", ["shift"])` | ❌ **macOS adds `shift` to punctuation** |
+| `?` (Shift+/) | `("?", "?", [])` | was `("?", "?", ["shift"])`, now `("?", "?", [])` | ✅ **fixed** — macOS drops `shift` for non-letter printables (Rule 3) |
 | `=` | `("=", "=", [])` | `("=", "=", [])` | ✅ |
 | `Cmd`+`Enter` | *terminal cannot send* | `("enter", None, ["cmd"])` | ⚠️ GUI-only (OK) |
 | `Alt`+`Enter` | *ESC-prefixed; unhandled* | `("enter", None, ["alt"])` | ⚠️ GUI-only (OK) |
@@ -45,8 +45,11 @@ directly with synthetic input:
 1. **Shift on letters is inconsistent.** curses: `key="A"`, no modifier. macOS:
    `key="A"`, `modifiers={"shift"}`. Neither normalizes `key` to lowercase, so a
    matcher can't reliably tell `a` from `Shift-A` the same way on both backends.
-2. **Shift on punctuation is inconsistent.** macOS tags `?` with `shift`; curses
-   doesn't. A matcher that compares modifier sets exactly would disagree.
+2. **Shift on punctuation is inconsistent.** macOS tagged `?` / `!` with `shift`;
+   curses doesn't. *(Fixed: the GUI backend now drops `shift` for non-letter
+   printables — see Rule 3. This was deferred as "optional" in an earlier pass
+   and resurfaced via the Keys demo: `Shift+1` showed `("!", {shift})` on GUI but
+   `("!", {})` in a terminal.)*
 3. **F1–F12 are missing** from both backends' key tables. TFM binds `F5`
    (redraw); other apps will want function keys.
 4. **Name vocabulary differs from ttk/TFM.** PuiKit uses concatenated names
@@ -80,12 +83,21 @@ produced. So **Shift-A is `key="a", modifiers={"shift"}` on every backend.**
 - macOS **lowercases** `key` while keeping its real `shift` flag.
 
 ### Rule 3 — Other printable characters (digits, punctuation, shifted symbols)
-`key` = `char` = the **literal produced character** (`"?"`, `"@"`, `"="`).
-`"shift"` / `"alt"` are **not** part of the identity — the glyph already encodes
-them — and the matcher **ignores** shift/alt for these. `ctrl`/`cmd` may still
-appear (they don't change the glyph) and remain significant.
-- Backends *may* still report `shift`/`alt` here (harmless); the **matcher**
-  guarantees the contract by ignoring them for single non-letter chars.
+`key` = `char` = the **literal produced character** (`"?"`, `"@"`, `"="`, `"!"`).
+The shifted symbol *is* the identity — you bind `"!"`, never `"Shift-1"`.
+- **`shift` must NOT appear in `modifiers`.** The shift is already baked into the
+  produced glyph, so a backend that knows shift was held (a GUI window) **drops
+  it** here, so `Shift+1` reports `("!", {})` on the GUI exactly as a terminal
+  reports it (a terminal never knew shift was held). Otherwise the same keypress
+  would read `("!", {shift})` on one backend and `("!", {})` on another —
+  breaking the "same Event everywhere" guarantee. (macOS: `translate_key` strips
+  `shift` for non-letter printables, since `charactersIgnoringModifiers` keeps
+  Shift in the glyph.)
+- `alt` (Option) is **kept**: `charactersIgnoringModifiers` *ignores* Option, so
+  the glyph is the base character and `alt` is a genuine separate modifier
+  (`Alt+1` → `("1", {alt})`).
+- `ctrl`/`cmd` are **kept** (they don't change the glyph): `Shift+Cmd+1` →
+  `("!", {cmd})`. The matcher honors ctrl/cmd for these and ignores shift/alt.
 
 ### Rule 4 — Ctrl/Cmd + letter
 `key` = lowercase letter, `modifiers ⊇ {"ctrl"}` (or `{"cmd"}`). Already holds.
