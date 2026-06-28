@@ -440,10 +440,20 @@ the Panel/widget patterns are established in Phase 2.
    macOS punctuation-shift, the whole Windows printable path, macOS `insertText`
    letter handling, and the always-on IME (now focus-gated). See
    [PUIKIT_KEYBOARD_CONTRACT.md](PUIKIT_KEYBOARD_CONTRACT.md) §§3,5.
-6. **Next: Phase 2 continued** — selection (Space, select-all) with the
+6. ~~`FilePane` interaction parity with `ListView`.~~ **Done.** `FilePane` now
+   matches `ListView` on the interaction/rendering features: **virtualized**
+   draw (only the visible window), **smooth scroll** (float `offset` in base
+   units; GUI trackpad/precise-wheel `scroll_units` → pixel-granular; TUI stays
+   grid-aligned), **click**-to-select-and-activate, **wheel/trackpad** scroll
+   (viewport-only, the pane under the pointer), a **scrollbar** when the list
+   outgrows the pane, and measured fitting. Mouse routes via
+   `Panel.dispatch_event` (keyboard stays on TFM's global keymap). Verified
+   headlessly (per-pane routing, fractional offset, cursor-follow).
+7. **Next: Phase 2 continued** — selection (Space, select-all) with the
    focused-item marker; remaining columns/indicators (date, sort/filter header);
-   mouse (click-to-focus, wheel, double-click); then Phase 3 bars/dialogs/menus
-   (a `TextEdit` quick-edit bar exercises the focus-gated text input).
+   double-click to open (needs a backend click-count, currently Enter only);
+   then Phase 3 bars/dialogs/menus (a `TextEdit` quick-edit bar exercises the
+   focus-gated text input).
 6. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
    symbol used in `src/` mapped to its PuiKit equivalent, with a per-file

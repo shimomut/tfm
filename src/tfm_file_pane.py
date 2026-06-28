@@ -3,15 +3,31 @@
 A thin PuiKit view over a ``pane_data`` dict (the same model
 ``tfm_pane_manager.PaneManager`` builds and ``tfm_file_list_manager`` populates),
 so the storage-agnostic business logic is reused unchanged. The controller owns
-navigation and mutates ``pane_data``; this widget only draws the current state:
-a scrollable list of entries with a cursor row, name + size columns, and a
-directory/file color distinction. Fitting is measured (``ctx.measure_text``), so
-it renders correctly with a proportional font on GUI and on the TUI grid alike.
+the keymap and mutates ``pane_data['focused_index']``; this widget owns the
+*rendering and pointer interaction* — and deliberately matches ``ListView``'s
+quality there:
+
+- **Virtualized**: only the visible window of rows is drawn, however long the
+  directory.
+- **Smooth scroll**: ``offset`` is a float in base units; a trackpad/precise
+  wheel carries a sub-unit ``scroll_units`` delta, so GUI scrolling is
+  pixel-granular (the first row slides partly off the top, clipped). Whole-unit
+  backends only deliver whole deltas, so the TUI stays grid-aligned.
+- **Mouse**: click selects a row (and activates the pane); wheel/trackpad scroll
+  moves the viewport without moving the cursor — the pane *under the pointer*
+  scrolls.
+- **Scrollbar**: shown when the list outgrows the pane, flush to the right edge
+  at fractional width.
+- **Measured fitting**: names are elided by ``ctx.measure_text`` so a
+  proportional GUI font and the TUI grid both render correctly.
 """
 
 from __future__ import annotations
 
+from typing import Callable
+
 from puikit.backend import Style, TextAttribute
+from puikit.event import Event, EventType
 from puikit.text import elide
 from puikit.widgets.base import Widget, draw_list_row
 
@@ -20,11 +36,20 @@ SIZE_COL = 9
 
 
 class FilePane(Widget):
-    def __init__(self, pane_data: dict):
+    def __init__(self, pane_data: dict, on_click: Callable[[int], None] | None = None):
         self.pane = pane_data
-        #: Whether this is the active pane (controller sets it on switch_pane);
-        #: drives the louder cursor highlight.
+        #: Active pane (controller sets it on switch_pane / click); drives the
+        #: louder cursor highlight.
         self.active = False
+        #: Called with the clicked row index — the controller makes this pane
+        #: active and moves the cursor there.
+        self.on_click = on_click
+        #: First visible row in base units. Whole on whole-unit backends;
+        #: fractional on backends whose scroll carries sub-unit deltas (smooth).
+        self.offset: float = 0.0
+        self._last_cursor = -1
+        self._view_h = 1.0
+        self._viewport_rows = 1
 
     # --- helpers -------------------------------------------------------------
 
@@ -39,64 +64,110 @@ class FilePane(Widget):
             is_dir = False
         return {"size_str": "<DIR>" if is_dir else "", "date_str": "", "is_dir": is_dir}
 
-    def _scroll_to_cursor(self, height: int) -> int:
-        """Keep the cursor row visible; returns (and stores) the scroll offset."""
-        files = self.pane["files"]
-        cursor = self.pane["focused_index"]
-        offset = self.pane.get("scroll_offset", 0)
-        if cursor < offset:
-            offset = cursor
-        elif cursor >= offset + height:
-            offset = cursor - height + 1
-        offset = max(0, min(offset, max(0, len(files) - height)))
-        self.pane["scroll_offset"] = offset
-        return offset
+    def _clamp(self, count: int, view_h: float) -> None:
+        self.offset = max(0.0, min(self.offset, max(0.0, count - view_h)))
+
+    def _ensure_cursor_visible(self, cursor: int, view_h: float) -> None:
+        if cursor < self.offset:
+            self.offset = float(cursor)
+        elif cursor + 1 > self.offset + view_h:
+            self.offset = cursor + 1 - view_h
+
+    def scroll_by(self, amount: float) -> None:
+        """Move the viewport (not the cursor) by ``amount`` base units; clamped
+        on the next draw against the real viewport height."""
+        self.offset += amount
 
     # --- draw ----------------------------------------------------------------
 
     def draw(self, ctx) -> None:
         theme = ctx.theme
-        text_fg = theme.text
-        muted_fg = theme.muted_text
-        accent = theme.accent
         files = self.pane["files"]
-        width = ctx.width
-        height = ctx.height
+        count = len(files)
+        # Exact (fractional) extent so the last partial row and the scroll bounds
+        # line up with the pane edge at pixel granularity, not whole base units.
+        view_h = ctx.size_units[1]
+        self._view_h = view_h
+        self._viewport_rows = max(1, int(view_h))
 
-        if not files:
+        if count == 0:
             msg = "(empty)" if not self.pane.get("error") else str(self.pane["error"])
-            ctx.draw_text(1, 0, elide(msg, max(0, width - 2)), Style(fg=muted_fg, attr=TextAttribute.DIM))
+            ctx.draw_text(1, 0, elide(msg, max(0, ctx.width - 2)),
+                          Style(fg=theme.muted_text, attr=TextAttribute.DIM))
             return
+
+        cursor = self.pane["focused_index"]
+        # Auto-scroll to the cursor only when it *moved* (keyboard nav). A wheel
+        # scroll leaves the cursor put, so the viewport stays where the user put
+        # it instead of snapping back.
+        if cursor != self._last_cursor:
+            self._ensure_cursor_visible(cursor, view_h)
+            self._last_cursor = cursor
+        self._clamp(count, view_h)
+
+        show_bar = count > view_h
+        # Fractional inner width (up to the scrollbar's left edge) so a row fill
+        # and the right-aligned size reach the true pane edge.
+        full_w = ctx.size_units[0] - (1.0 if show_bar else 0.0)
+        name_w = max(1, int(full_w) - SIZE_COL - 1)
 
         def measure(s: str) -> float:
             return ctx.measure_text(s)
 
-        cursor = self.pane["focused_index"]
-        offset = self._scroll_to_cursor(height)
-        name_w = max(1, width - SIZE_COL - 1)
-
-        for row in range(height):
-            i = offset + row
-            if i >= len(files):
+        first = int(self.offset)
+        frac = self.offset - first
+        row = 0
+        while True:
+            i = first + row
+            y = row - frac
+            if y >= view_h or i >= count:
                 break
-            entry = files[i]
-            info = self._info(entry)
-            is_dir = info["is_dir"]
-            name = entry.name + ("/" if is_dir else "")
-            size = info["size_str"]
-            is_cursor = i == cursor
+            if i >= 0:
+                self._draw_row(ctx, y, files[i], i == cursor, name_w, full_w, measure)
+            row += 1
 
-            name_text = elide(name, name_w, where="end", measure=measure)
+        if show_bar:
+            content_h = float(count)
+            ratio = view_h / content_h
+            denom = content_h - view_h
+            pos = self.offset / denom if denom > 0 else 0.0
+            ctx.draw_scrollbar(ctx.size_units[0] - 1, 0, view_h, max(0.0, min(1.0, pos)), ratio)
 
-            if is_cursor:
-                # Cursor row: a full-width fill, louder on the active pane.
-                bg = theme.selection_active_bg if self.active else theme.selection_inactive_bg
-                fg = (255, 255, 255) if self.active else text_fg
-                draw_list_row(ctx, row, name_text, name_w, Style(fg=fg, bg=bg), fill_w=width)
-                if size:
-                    ctx.draw_text(width - measure(size), row, size, Style(fg=fg, bg=bg))
-            else:
-                fg = accent if is_dir else text_fg
-                ctx.draw_text(0, row, name_text, Style(fg=fg))
-                if size:
-                    ctx.draw_text(width - measure(size), row, size, Style(fg=muted_fg))
+    def _draw_row(self, ctx, y, entry, is_cursor, name_w, full_w, measure) -> None:
+        theme = ctx.theme
+        info = self._info(entry)
+        is_dir = info["is_dir"]
+        name = entry.name + ("/" if is_dir else "")
+        size = info["size_str"]
+        name_text = elide(name, name_w, where="end", measure=measure)
+
+        if is_cursor:
+            bg = theme.selection_active_bg if self.active else theme.selection_inactive_bg
+            fg = (255, 255, 255) if self.active else theme.text
+            draw_list_row(ctx, y, name_text, name_w, Style(fg=fg, bg=bg), fill_w=full_w)
+            if size:
+                ctx.draw_text(full_w - measure(size), y, size, Style(fg=fg, bg=bg))
+        else:
+            fg = theme.accent if is_dir else theme.text
+            ctx.draw_text(0, y, name_text, Style(fg=fg))
+            if size:
+                ctx.draw_text(full_w - measure(size), y, size, Style(fg=theme.muted_text))
+
+    # --- events --------------------------------------------------------------
+
+    def handle_event(self, event: Event) -> bool:
+        if event.type is EventType.MOUSE_SCROLL:
+            # A precise (trackpad) scroll carries a sub-unit delta; a plain wheel
+            # moves one row per notch. The viewport moves; the cursor does not.
+            amount = event.hints.get("scroll_units")
+            if amount is None:
+                amount = float(event.scroll)
+            self.scroll_by(-amount)
+            return True
+        if event.type is EventType.MOUSE_CLICK and event.button == "left":
+            index = int(self.offset + (event.y or 0.0))
+            if 0 <= index < len(self.pane["files"]):
+                if self.on_click is not None:
+                    self.on_click(index)
+                return True
+        return False

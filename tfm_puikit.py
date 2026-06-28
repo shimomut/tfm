@@ -71,8 +71,8 @@ class TfmApp:
         self.flm.refresh_files(self.pm.right_pane)
 
         self.panel = Panel(backend)
-        self.left_view = FilePane(self.pm.left_pane)
-        self.right_view = FilePane(self.pm.right_pane)
+        self.left_view = FilePane(self.pm.left_pane, on_click=lambda i: self._on_click("left", i))
+        self.right_view = FilePane(self.pm.right_pane, on_click=lambda i: self._on_click("right", i))
         self.status = StatusBar(self)
         self._sync_active()
         self.panel.set_layout(
@@ -98,6 +98,12 @@ class TfmApp:
     def _sync_active(self) -> None:
         self.left_view.active = self.pm.active_pane == "left"
         self.right_view.active = self.pm.active_pane == "right"
+
+    def _on_click(self, pane_name: str, index: int) -> None:
+        """A FilePane was left-clicked: make it active and move the cursor."""
+        self.pm.active_pane = pane_name
+        self._sync_active()
+        self.active_pane()["focused_index"] = index
 
     def _refresh(self, pane: dict) -> None:
         pane["focused_index"] = 0
@@ -170,6 +176,13 @@ class TfmApp:
 
     # --- run -----------------------------------------------------------------
 
+    #: Mouse events routed to the widget under the pointer (the FilePanes own
+    #: click + wheel/trackpad scroll); keyboard uses TFM's global keymap.
+    _MOUSE = frozenset({
+        EventType.MOUSE_DOWN, EventType.MOUSE_UP, EventType.MOUSE_CLICK,
+        EventType.MOUSE_DRAG, EventType.MOUSE_SCROLL,
+    })
+
     def on_event(self, event) -> None:
         if event.type is EventType.RESIZE:
             self.panel.render()
@@ -178,6 +191,10 @@ class TfmApp:
             has_sel = bool(self.active_pane()["selected_files"])
             action = self.keys.find_action_for_event(event, has_sel)
             if self.dispatch(action):
+                self.panel.render()
+            return
+        if event.type in self._MOUSE:
+            if self.panel.dispatch_event(event):
                 self.panel.render()
 
     def run(self) -> None:
