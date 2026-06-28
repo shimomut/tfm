@@ -339,31 +339,45 @@ on **curses first** (fastest loop, no compiled deps), then macOS, then Windows.
 
 ---
 
-## 8. Open questions / decisions needed
+## 8. Resolved decisions
 
-1. **Repo topology.** Does TFM depend on PuiKit as an installed package
-   (`pip install puikit`, separate repo) or vendor it? Current setup has
-   `puikit` as a sibling working dir. Recommendation: develop against an
-   editable install of the sibling repo; the `file_manager` example may live in
-   PuiKit during bring-up, then graduate to TFM.
-2. **Where do new widgets live?** `FilePane` is general enough to propose
-   upstream to PuiKit; the diff viewers are TFM-specific. Decide per widget.
-3. **`FileManager` decomposition depth.** How aggressively to break up the
+- **Repo topology — DECIDED.** PuiKit stays a **separate repo**; TFM will
+  eventually depend on it from **PyPI** (`pip install puikit`). During this
+  project both repos are edited together, so PuiKit is installed into TFM's venv
+  in **editable mode**:
+  ```bash
+  .venv/bin/python -m pip install -e /Users/crftwr/projects/puikit
+  ```
+  This resolves `import puikit` straight to the sibling source tree
+  (`/Users/crftwr/projects/puikit/puikit/`), so PuiKit edits are picked up live
+  with **no reinstall** — reinstall is only needed if PuiKit's package layout or
+  entry points in `pyproject.toml` change, not for ordinary code edits. Add this
+  to TFM's dev setup (`Makefile` `venv` target / dev requirements) so the
+  editable link is reproducible.
+- **Where new widgets live — DECIDED.** `FilePane` and the other TFM-specific
+  widgets (`SyntaxTextView`, diff views) live in **TFM's repo**, not upstream in
+  PuiKit. They draw purely through `DrawContext`, so they remain backend-
+  agnostic and could be proposed upstream later if they prove general — but the
+  default home is TFM.
+
+## 9. Open questions / decisions needed
+
+1. **`FileManager` decomposition depth.** How aggressively to break up the
    5829-line god-class — full MVC split vs. pragmatic "move rendering out,
    keep an orchestrator." Recommendation: pragmatic, guided by what the Panel
    model naturally pulls apart.
-4. **Theme fidelity.** Reproduce TFM's existing color schemes as `Theme`s, or
+2. **Theme fidelity.** Reproduce TFM's existing color schemes as `Theme`s, or
    redesign around PuiKit's surface-role palette? Recommendation: start from
    PuiKit's defaults (VS Code-like flat), port the popular schemes later.
-5. **Wide-char/NFD handling.** TFM has extensive macOS NFD normalization logic.
+3. **Wide-char/NFD handling.** TFM has extensive macOS NFD normalization logic.
    Confirm PuiKit's `text` module covers it or carry TFM's helpers forward.
-6. **Compiled backends.** macOS C++ extension and Windows ctypes layer are
+4. **Compiled backends.** macOS C++ extension and Windows ctypes layer are
    PuiKit's responsibility; confirm they're stable enough for TFM's needs early
    (Phase 0 spike).
 
 ---
 
-## 9. Effort shape (rough)
+## 10. Effort shape (rough)
 
 | Phase | Relative size | Risk |
 |---|---|---|
@@ -381,10 +395,12 @@ the Panel/widget patterns are established in Phase 2.
 
 ---
 
-## 10. Immediate next steps
+## 11. Immediate next steps
 
-1. Review/approve this plan and resolve §8 Q1 (repo topology) and Q2 (widget
-   home).
+1. ~~Resolve repo topology and widget home.~~ **Done** — see §8 (PyPI dependency,
+   editable install for dev; new widgets live in TFM's repo).
 2. Phase 0 spike: two-pane PuiKit shell on curses + macOS.
-3. Phase 1 import inventory: grep every `ttk` symbol used in `src/` and draft
-   the compatibility mapping table.
+3. ~~Phase 1 import inventory.~~ **Done** — see
+   [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
+   symbol used in `src/` mapped to its PuiKit equivalent, with a compat-shim
+   strategy and a suggested Phase-1 execution order.

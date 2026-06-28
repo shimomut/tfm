@@ -1,6 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-desktop run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config venv venv-clean check-venv
+.PHONY: help run run-desktop run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config venv venv-clean check-venv install-puikit
 
 # Backend selection (default: curses)
 # Usage: make run BACKEND=coregraphics
@@ -15,6 +15,11 @@ BACKEND ?= curses
 PYTHON := $(abspath .venv/bin/python)
 PIP := $(PYTHON) -m pip
 
+# PuiKit source checkout (sibling repo). Installed editable into .venv so edits
+# to PuiKit are picked up live with no reinstall. Override if it lives elsewhere:
+#   make venv PUIKIT_DIR=/path/to/puikit
+PUIKIT_DIR ?= ../puikit
+
 help:
 	@echo "TFM - Terminal File Manager"
 	@echo ""
@@ -24,6 +29,7 @@ help:
 	@echo "Available commands:"
 	@echo "  venv           - Create .venv using the latest python3 in PATH and install deps"
 	@echo "  venv-clean     - Remove the .venv directory"
+	@echo "  install-puikit - Install PuiKit (editable) from PUIKIT_DIR into .venv"
 	@echo "  run            - Run TFM"
 	@echo "  run-desktop    - Run TFM in desktop mode (--desktop flag)"
 	@echo "  run-debug      - Run TFM with debug mode and remote log monitoring"
@@ -91,9 +97,20 @@ venv:
 	@.venv/bin/python -m pip install --upgrade pip
 	@echo "Installing dependencies from requirements.txt..."
 	@.venv/bin/python -m pip install -r requirements.txt
+	@$(MAKE) install-puikit
 	@echo ""
 	@echo ".venv created successfully with $$(.venv/bin/python --version 2>&1)"
 	@echo "Run 'make run' to launch TFM using the new environment."
+
+# Install PuiKit editable from its sibling checkout (PUIKIT_DIR). Run standalone
+# to (re)link PuiKit into an existing .venv without recreating it.
+install-puikit: check-venv
+	@if [ ! -d "$(PUIKIT_DIR)" ]; then \
+		echo "Error: PuiKit not found at $(PUIKIT_DIR). Set PUIKIT_DIR=/path/to/puikit."; \
+		exit 1; \
+	fi
+	@echo "Installing PuiKit (editable) from $(PUIKIT_DIR)..."
+	@$(PIP) install -e "$(PUIKIT_DIR)"
 
 venv-clean:
 	@echo "Removing .venv..."
