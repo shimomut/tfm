@@ -17,45 +17,83 @@ Legend for **Effort**:
 
 ### 1.1 Rendering / style
 
+> **Altitude note — these are widget-internal, not app-level.** `ttk` and PuiKit
+> sit at *different abstraction levels*. With `ttk`, TFM's app/controller called
+> `draw_text`/`init_color_pair` directly. With PuiKit, **only widgets draw**, and
+> they draw through `DrawContext` — `ctx.draw_text(style=Style(attr=…))`,
+> `ctx.measure_text(…)`. So `TextAttribute`, `Style`, and width measurement
+> belong **inside the custom widgets** (`FilePane`, `SyntaxTextView`, diff views),
+> not in controller/business-logic code. Inside a widget the preferred tool is
+> usually `ctx.measure_text` (correct on GUI proportional fonts); raw
+> `display_width` is only for monospace grid-cell counting.
+
 | `ttk` symbol | Source | PuiKit equivalent | Effort | Notes |
 |---|---|---|---|---|
-| `TextAttribute` | `ttk` / `ttk.renderer` | `puikit.TextAttribute` | **swap** | Same members/values for `NORMAL/BOLD/UNDERLINE/REVERSE`. PuiKit is an `IntFlag` (ttk: `IntEnum`) and adds `DIM/BLINK/ITALIC`. OR-able pattern preserved. |
+| `TextAttribute` | `ttk` / `ttk.renderer` | `puikit.TextAttribute` (via `Style.attr`) | **swap (widget-internal)** | Same members/values for `NORMAL/BOLD/UNDERLINE/REVERSE`. PuiKit is an `IntFlag` (ttk: `IntEnum`) and adds `DIM/BLINK/ITALIC`. Used only when a widget builds a `Style`. |
 | color pairs (`init_color_pair`, integer pair ids) | `ttk.Renderer` | `puikit.Style(fg, bg, attr, font)` + `puikit.Theme` | **adapt** | TFM's whole color model (`tfm_colors.py`) changes from registered pairs to per-draw `Style` + semantic surface roles. Covered in plan Phase 2, not a 1:1 import swap. |
 
 ### 1.2 Text / wide-char utilities
 
-`ttk.wide_char_utils` → `puikit.text`. PuiKit covers the two core functions but
-**not** the safe/fallback/pad/split family TFM relies on.
+`ttk.wide_char_utils` → `puikit.text`. **Most of this family should NOT become a
+TFM shim.** These functions exist in `ttk` because TFM hand-rendered a character
+grid; in PuiKit the same needs are met by the **layout system, the widget's draw
+logic, and PuiKit's `text` module** — and some (`pad_to_width`) are actively
+*wrong* on GUI proportional fonts. Each splits into one of three destinations:
 
-| `ttk` function | PuiKit equivalent | Effort | Notes |
+| `ttk` function | Destination | Effort | Notes |
 |---|---|---|---|
-| `get_display_width(s)` | `puikit.text.display_width(s)` | **swap** | Rename only. |
-| `truncate_to_width(s, w[, ellipsis])` | `puikit.text.truncate_to_width(s, w)` | **adapt** | PuiKit signature has **no `ellipsis` arg** (ttk default `"…"`). Either extend PuiKit or wrap. |
-| `safe_get_display_width` | — | **gap** | PuiKit has no "safe" variant (ttk's tolerate-bad-unicode + warn path). Likely fold into `display_width` or carry a tiny TFM helper. |
-| `pad_to_width(s, w, align, fill)` | — | **gap** | No PuiKit equivalent. Carry forward (pure string op) or add to PuiKit `text`. |
-| `split_at_width(s, w)` | — | **gap** | Used by `tfm_text_viewer`. Carry forward or add to PuiKit. |
-| `get_safe_functions()` | — | **gap** | Returns the safe-function bundle; a TFM-internal convenience. Retire in favor of direct calls. |
-| `initialize_wide_char_utils(...)` | — | **gap** | Global unicode-mode init (`tfm_main` startup). PuiKit has no global mode; review whether still needed. |
+| `get_display_width(s)` | `puikit.text.display_width(s)` | **swap** | Rename. Grid-cell width; widgets prefer `ctx.measure_text` where a font is involved. |
+| `truncate_to_width(s, w[, ellipsis])` | **enhance PuiKit `text`** | **upstream** | PuiKit's `truncate_to_width(s, w)` has no `ellipsis` arg and is grid-based. Add a measure-aware, ellipsis-capable truncate to `puikit.text` (general & backend-correct), rather than wrapping it in TFM. |
+| `pad_to_width(s, w, align, fill)` | **widget/layout (drop)** | **drop** | Space-padding to align columns **breaks on GUI proportional fonts**. The FilePane widget aligns columns by *positioning* (`ctx.fill_rect` background + measured `ctx.draw_text` at an x-offset), exactly like PuiKit's `draw_list_row`. Not a text util at all. |
+| `split_at_width(s, w)` | **widget (`wrap_text`/ScrollView)** | **drop** | Used by the text viewer for h-scroll/wrap. Handled inside `SyntaxTextView` via `puikit.text.wrap_text` / scroll offset, not a carried util. |
+| `safe_get_display_width` / `get_safe_functions` | **harden PuiKit `display_width`** | **drop** | ttk's tolerate-bad-unicode + warn wrappers. PuiKit's `display_width` should simply be robust; if a real input breaks it, fix it upstream. No TFM "safe" layer. |
+| `initialize_wide_char_utils(...)` | **drop** | **drop** | ttk global unicode-mode init. PuiKit has no global mode and shouldn't; remove from TFM startup. |
 
-> **Decision needed (plan §9 Q3):** push the missing helpers (`pad_to_width`,
-> `split_at_width`, ellipsis-aware truncate, safe widths) **into PuiKit's `text`
-> module** (general, reusable) vs. keep a small `tfm.textutil` shim. Recommend
-> upstreaming the pure ones; they're broadly useful and keep TFM thin.
+> **Net:** one **PuiKit enhancement** (measure-aware truncate-with-ellipsis),
+> possibly one **PuiKit hardening** (robust `display_width`), and the rest become
+> **widget/layout responsibilities** inside the custom widgets. The
+> `tfm_text_compat.py` shim proposed in an earlier draft is **dropped** — it would
+> just re-import the grid-era model we're replacing.
 
-### 1.3 Events
+### 1.3 Events — **compare first; likely enrich PuiKit, do not adapt TFM down**
 
-ttk's multi-class, scancode-centric model → PuiKit's single `Event` dataclass
-with `EventType` and **symbolic string keys**. This is the largest *adapt*.
+This is **not** a simple "adapt TFM to PuiKit" item. TFM/ttk's keyboard model is
+**battle-tested across ~80 keybindings with modifiers and case rules**; PuiKit's
+event model is **unverified for real keyboard-driven control** (it has driven the
+demo catalog's mouse/focus flows, not a full keymap). The proven spec is TFM's;
+the work is to **define and verify PuiKit's keyboard contract by importing ttk's
+concepts**, then port TFM's matcher onto it. TFM is the verification PuiKit lacks.
 
-| `ttk` symbol | Source | PuiKit equivalent | Effort | Notes |
-|---|---|---|---|---|
-| `KeyEvent` | `ttk` / `ttk.input_event` | `puikit.Event` (`type == EventType.KEY`) | **adapt** | One unified event type; handlers branch on `event.type`. |
-| `CharEvent` | `ttk` / `ttk.input_event` | `puikit.Event` (KEY with `event.char`) | **adapt** | PuiKit carries the printable char on the same KEY event (`event.char`); no separate char event. IME text arrives via `EventType.IME_COMPOSITION`. |
-| `KeyCode` (enum: `ENTER`, `UP`, `A`, …) | `ttk` / `ttk.input_event` | `event.key` **strings** (`"enter"`, `"up"`, `"a"`) | **adapt** | No enum. Every `event.key_code == KeyCode.X` → `event.key == "x"`. Affects all key handlers **and** the key-binding config parser (`tfm_config.py`, `_config.py`). |
-| `ModifierKey` (enum) | `ttk` | `event.modifiers` (`frozenset[str]`, e.g. `{"shift","ctrl"}`) | **adapt** | Membership test instead of bitmask/enum. |
-| `SystemEvent` / `SystemEventType` | `ttk` | `puikit.Event` (`EventType.RESIZE`, …) | **adapt** | Resize etc. fold into the unified event stream. |
-| `MenuEvent` | `ttk` | `puikit.menu.Menu` item `on_select` callbacks | **adapt** | Menu selection is a callback on the `Menu`/`MenuItem`, not an event class. |
-| `EventCallback` (interface w/ `on_key_event`, …) | `ttk` | `Backend.run_event_loop(handler)` single handler | **adapt** | One `def on_event(event)`; routing/focus handled by `Panel.dispatch_event`. The `FileManagerCallback` class in `tfm_main` collapses. |
+**The vocabularies already match.** `ttk.KeyCode` is a **`StrEnum`** whose values
+are exactly `"a"`, `"enter"`, `"page_up"`, … — the same strings PuiKit puts in
+`event.key`. So this is about *modifier/case semantics*, not the key names.
+
+| Aspect | ttk (proven) | PuiKit (current, unverified) | Gap to close |
+|---|---|---|---|
+| Key identity | `KeyCode` StrEnum (`"a"`, `"enter"`) | `event.key` string (same values) | none — vocabularies align |
+| Letter + Shift | `KeyCode.A` + `ModifierKey.SHIFT`; `"A"`(=a) distinct from `"Shift-A"` | curses folds case **into the char**: `'A'` → `key="A"`, **no** shift modifier | **PuiKit can't express "Shift-A" as a modifier today.** Pick & document one contract (e.g. lowercase key + `shift` modifier) and implement on every backend. |
+| Modifiers | `ModifierKey` bitflags: SHIFT/CONTROL/ALT/COMMAND | `event.modifiers` frozenset (`{"shift","ctrl","alt","cmd"}`) | frozenset is fine/cleaner; **but Command/Alt across letters is untested** on PuiKit GUI backends. |
+| Punctuation | matched on `char`, case-sensitive, modifier-agnostic | `event.char` present on KEY events | align matcher; confirm PuiKit sets `char` consistently |
+| Char vs key | separate `CharEvent` | char rides the KEY event (`event.char`); IME via `IME_COMPOSITION` | reconcile in matcher |
+
+| `ttk` symbol | PuiKit equivalent | Effort | Notes |
+|---|---|---|---|
+| `KeyEvent` / `CharEvent` | `puikit.Event` (KEY; char on `event.char`) | **adapt** | Unified event; matcher branches on `event.type`. |
+| `KeyCode` (StrEnum) | `event.key` strings (same values) | **swap-ish** | Same vocabulary; keep TFM's name→key mapping, source from `event.key`. |
+| `ModifierKey` (bitflags) | `event.modifiers` (`frozenset[str]`) | **adapt + verify** | Bitmask→set is mechanical; the *coverage* (Command/Alt/Shift on all backends) is the unverified part. |
+| `SystemEvent` / `SystemEventType` | `EventType.RESIZE`, … | **adapt** | Folds into the unified stream. |
+| `MenuEvent` | `Menu`/`MenuItem` `on_select` callbacks | **adapt** | Selection is a callback, not an event. |
+| `EventCallback` (interface) | `run_event_loop(handler)` + `Panel.dispatch_event` | **adapt** | One `on_event(event)`; `FileManagerCallback` collapses. |
+
+> **Recommended approach:**
+> 1. Treat TFM's `_parse_key_expression` / `_match_key_event` as the spec.
+> 2. **Decide PuiKit's keyboard contract** for the Shift/case question and rich
+>    modifiers, importing ttk's `ModifierKey` semantics into PuiKit's frozenset
+>    model; document it in `puikit` and implement consistently per backend.
+> 3. Port TFM's matcher onto `(event.key, event.modifiers)` — it already keys on
+>    exactly that pair; only the field source and the case contract change.
+> 4. **Verify with TFM's real keymap** on curses + macOS (+ Windows). Upstream
+>    any modifier-normalization that belongs in PuiKit.
 
 ### 1.4 Mouse
 
@@ -82,8 +120,8 @@ zero `ttk` after Phase 1); "UI" = rewritten in later phases anyway.
 
 | File | Imports | Class | Phase-1 action |
 |---|---|---|---|
-| `tfm_config.py` / `_config.py` | `KeyCode`, `ModifierKey` | logic | **Key.** Key-binding parser maps config strings → `KeyCode`. Re-target to PuiKit string keys + `modifiers`. Unblocks every key handler. |
-| `tfm_text_layout.py` | `get_display_width`, `truncate_to_width` | logic | Swap to `puikit.text`; resolve ellipsis-truncate gap. |
+| `tfm_config.py` / `_config.py` | `KeyCode`, `ModifierKey` | logic | **Key & gating.** Keep TFM's matcher (the proven spec). First **decide/verify PuiKit's keyboard contract** (§1.3), then source `(key, modifiers)` from `puikit.Event`. Same key-name vocabulary; the Shift/case + rich-modifier contract is the real work. |
+| `tfm_text_layout.py` | `get_display_width`, `truncate_to_width` | logic | `display_width` → swap; ellipsis truncate → **PuiKit `text` enhancement** (§1.2), not a TFM wrapper. |
 | `tfm_colors.py` | `TextAttribute` (lazy) | logic→theme | Swap `TextAttribute`; full color-pair→Theme rework is Phase 2. |
 | `tfm_logging_handlers.py` | `TextAttribute` (lazy) | logic | Swap. |
 | `tfm_archive_operation_task.py` | `KeyEvent`, `KeyCode` (lazy) | logic | Adapt — small; only for an input prompt path. |
@@ -94,26 +132,31 @@ zero `ttk` after Phase 1); "UI" = rewritten in later phases anyway.
 
 ---
 
-## 3. Compatibility-shim strategy for Phase 1
+## 3. Phase-1 strategy (no TFM compat shim)
 
-To let the **logic** modules (§3.1 of the plan) drop `ttk` *before* the UI is
-ported, introduce a tiny internal module — `src/tfm_text_compat.py` (working
-name) — that re-exports the text helpers from `puikit.text` and provides the
-handful of **gap** functions (`pad_to_width`, `split_at_width`, ellipsis-aware
-`truncate_to_width`, `safe_get_display_width`) until they're either upstreamed
-to PuiKit or confirmed unnecessary. Logic modules import from there, not `ttk`.
+An earlier draft proposed a `tfm_text_compat.py` shim; it is **dropped**. The
+text helpers split cleanly into PuiKit enhancements vs. widget responsibilities
+(§1.2), and the event model is a *contract* question, not a re-import (§1.3).
+Carrying a shim would preserve the grid-era model we're replacing.
 
-Events/keys are **not** shimmed: the key-binding layer (`tfm_config`) is
-re-targeted to PuiKit string keys directly, because a faithful `KeyCode` shim
-would just preserve the model we're replacing.
+Two pieces of work feed Phase 1, both partly **in PuiKit**:
+
+- **PuiKit text:** add measure-aware truncate-with-ellipsis; harden
+  `display_width` if needed. Small, general, upstreamable.
+- **PuiKit keyboard contract:** decide & document the Shift/case + rich-modifier
+  semantics (importing ttk's `ModifierKey` concepts into the frozenset model),
+  implement per backend, and **verify with TFM's real keymap**. This is the gate
+  for every later phase.
 
 ### Suggested Phase-1 order
 
-1. `tfm_text_compat.py` shim + resolve which gap helpers upstream to PuiKit.
-2. `tfm_text_layout.py`, `tfm_colors.py`, `tfm_logging_handlers.py` → compat
-   imports (`TextAttribute`, widths). Run logic tests.
-3. `tfm_config.py` / `_config.py` key model → PuiKit string keys + `modifiers`.
-   This is the gate for all later phases; do it deliberately, with tests.
+1. **PuiKit keyboard contract** (§1.3) — decide/document/implement; this gates
+   all key handling. Verify on curses first, then macOS.
+2. `tfm_config.py` / `_config.py` — point TFM's existing matcher at
+   `puikit.Event` `(key, modifiers)`; run config + keybinding tests.
+3. **PuiKit text** enhancement (ellipsis truncate); then `tfm_text_layout.py`,
+   `tfm_colors.py`, `tfm_logging_handlers.py` → `puikit.text` / `Style.attr`.
+   Run logic tests.
 4. `tfm_archive_operation_task.py` lazy event import → adapt.
 5. Verify: `grep -rn "import ttk\|from ttk" src/` shows only UI files left
-   (dialogs/viewers/`tfm_main`), which Phases 2–4 rewrite.
+   (dialogs/viewers/`tfm_main`), which Phases 2–4 rewrite as widgets.

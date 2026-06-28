@@ -362,16 +362,24 @@ on **curses first** (fastest loop, no compiled deps), then macOS, then Windows.
 
 ## 9. Open questions / decisions needed
 
-1. **`FileManager` decomposition depth.** How aggressively to break up the
+1. **PuiKit keyboard contract (gating).** PuiKit's event model is unverified for
+   real keyboard-driven control; TFM's ttk-based keymap is the proven spec.
+   Before porting key handling we must decide & implement PuiKit's Shift/case +
+   rich-modifier semantics (Command/Alt/Shift across all backends), importing
+   ttk's `ModifierKey` concepts. See
+   [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md) §1.3.
+   Recommendation: keep TFM's matcher; define the contract in PuiKit; verify
+   with TFM's real keymap. This is the first Phase-1 task.
+2. **`FileManager` decomposition depth.** How aggressively to break up the
    5829-line god-class — full MVC split vs. pragmatic "move rendering out,
    keep an orchestrator." Recommendation: pragmatic, guided by what the Panel
    model naturally pulls apart.
-2. **Theme fidelity.** Reproduce TFM's existing color schemes as `Theme`s, or
+3. **Theme fidelity.** Reproduce TFM's existing color schemes as `Theme`s, or
    redesign around PuiKit's surface-role palette? Recommendation: start from
    PuiKit's defaults (VS Code-like flat), port the popular schemes later.
-3. **Wide-char/NFD handling.** TFM has extensive macOS NFD normalization logic.
+4. **Wide-char/NFD handling.** TFM has extensive macOS NFD normalization logic.
    Confirm PuiKit's `text` module covers it or carry TFM's helpers forward.
-4. **Compiled backends.** macOS C++ extension and Windows ctypes layer are
+5. **Compiled backends.** macOS C++ extension and Windows ctypes layer are
    PuiKit's responsibility; confirm they're stable enough for TFM's needs early
    (Phase 0 spike).
 
