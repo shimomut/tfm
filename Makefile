@@ -1,11 +1,6 @@
 # TFM Makefile
 
-.PHONY: help run run-desktop run-debug run-profile monitor-log test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config venv venv-clean check-venv install-puikit
-
-# Backend selection (default: curses)
-# Usage: make run BACKEND=coregraphics
-# Valid options: curses, coregraphics
-BACKEND ?= curses
+.PHONY: help run run-gui test test-quick clean install uninstall dev-install lint format demo macos-app macos-app-clean macos-app-install macos-refresh-icon macos-dmg install-config venv venv-clean check-venv install-puikit
 
 # Python interpreter selection
 # All Python is run through the project virtual environment (.venv). There is no
@@ -30,11 +25,8 @@ help:
 	@echo "  venv           - Create .venv using the latest python3 in PATH and install deps"
 	@echo "  venv-clean     - Remove the .venv directory"
 	@echo "  install-puikit - Install PuiKit (editable) from PUIKIT_DIR into .venv"
-	@echo "  run            - Run TFM"
-	@echo "  run-desktop    - Run TFM in desktop mode (--desktop flag)"
-	@echo "  run-debug      - Run TFM with debug mode and remote log monitoring"
-	@echo "  run-profile    - Run TFM with performance profiling enabled"
-	@echo "  monitor-log    - Connect to remote log monitoring (port 8123)"
+	@echo "  run            - Run TFM (terminal); LEFT=/RIGHT= set startup dirs"
+	@echo "  run-gui        - Run TFM in a native macOS GUI window"
 	@echo "  test           - Run all tests"
 	@echo "  test-quick     - Run quick verification tests"
 	@echo "  clean          - Clean up temporary files"
@@ -52,15 +44,10 @@ help:
 	@echo "  macos-refresh-icon - Refresh macOS icon cache (after icon changes)"
 	@echo "  macos-dmg         - Create DMG installer for distribution"
 	@echo ""
-	@echo "Backend Selection:"
-	@echo "  BACKEND=curses         - Use curses (terminal) backend (default)"
-	@echo "  BACKEND=coregraphics   - Use CoreGraphics (macOS desktop) backend"
-	@echo ""
 	@echo "Examples:"
-	@echo "  make run                        # Run with curses backend (default)"
-	@echo "  make run-desktop                # Run with --desktop flag"
-	@echo "  make run BACKEND=coregraphics   # Run with CoreGraphics backend"
-	@echo "  make test BACKEND=coregraphics  # Test with CoreGraphics backend"
+	@echo "  make run                        # Run TFM in the terminal"
+	@echo "  make run-gui                    # Run TFM in a macOS GUI window"
+	@echo "  make run LEFT=./src RIGHT=./doc # Run with custom startup directories"
 	@echo "  make install-config             # Install/update user config file"
 	@echo "  make macos-app                  # Build macOS app bundle"
 	@echo "  make macos-app-install          # Install to /Applications"
@@ -126,32 +113,24 @@ check-venv:
 		exit 1; \
 	fi
 
+# Run TFM (PuiKit). Optional startup directories: make run LEFT=./src RIGHT=./doc
+PUIKIT_DIRS := $(if $(LEFT),--left $(LEFT)) $(if $(RIGHT),--right $(RIGHT))
+
 run: check-venv
-	@echo "Running TFM (backend: $(BACKEND))..."
-	@$(PYTHON) tfm.py --backend $(BACKEND)
+	@echo "Running TFM on PuiKit (terminal)..."
+	@$(PYTHON) tfm_puikit.py $(PUIKIT_DIRS)
 
-run-desktop: check-venv
-	@echo "Running TFM in desktop mode..."
-	@$(PYTHON) tfm.py --desktop
-
-run-debug: check-venv
-	@echo "Running TFM with debug mode and remote log monitoring (backend: $(BACKEND))..."
-	@$(PYTHON) tfm.py --backend $(BACKEND) --debug --remote-log-port 8123
-
-run-profile: check-venv
-	@echo "Running TFM with performance profiling (backend: $(BACKEND))..."
-	@$(PYTHON) tfm.py --backend $(BACKEND) --profile
-
-monitor-log: check-venv
-	@$(PYTHON) src/tools/tfm_log_client.py localhost 8123
+run-gui: check-venv
+	@echo "Running TFM on PuiKit (macOS GUI)..."
+	@$(PYTHON) tfm_puikit.py --backend gui $(PUIKIT_DIRS)
 
 test: check-venv
-	@echo "Running TFM tests (backend: $(BACKEND))..."
+	@echo "Running TFM tests..."
 	@cd test && PYTHONPATH=../src $(PYTHON) -m pytest . -v || echo "pytest not available, running individual tests..."
 	@cd test && for test in test_*.py; do echo "Running $$test..."; PYTHONPATH=../src $(PYTHON) "$$test" || exit 1; done
 
 test-quick: check-venv
-	@echo "Running quick verification tests (backend: $(BACKEND))..."
+	@echo "Running quick verification tests..."
 	@cd test && PYTHONPATH=../src $(PYTHON) test_cursor_movement.py
 	@cd test && PYTHONPATH=../src $(PYTHON) test_delete_feature.py
 	@cd test && PYTHONPATH=../src $(PYTHON) test_integration.py

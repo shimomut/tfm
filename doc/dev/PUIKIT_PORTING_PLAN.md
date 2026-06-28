@@ -423,9 +423,27 @@ the Panel/widget patterns are established in Phase 2.
    ttk-free. **No logic module imports ttk** — every remaining `from ttk` in
    `src/` is a UI module (dialogs/viewers/`tfm_main`) that Phases 2–4 rewrite as
    widgets. **Phase 1 complete.**
-5. **Next: Phase 0/2 spike** — stand up a two-pane PuiKit shell (Panel + layout
-   + `FilePane` skeleton) on curses + macOS, wiring the now-decoupled config /
-   keymap / state into it.
+5. ~~Phase 0/2 spike — two-pane PuiKit shell.~~ **Done (first slice).** TFM runs
+   on PuiKit for the first time: `tfm_puikit.py` (entry point + `TfmApp`
+   controller + `StatusBar`) hosts two custom `FilePane` widgets
+   (`src/tfm_file_pane.py`) in a `VSplit(HSplit(left, right, divider), status)`
+   layout. It **reuses the decoupled business logic unchanged** — `tfm_path.Path`
+   for listing, `PaneManager`/`FileListManager` for pane state, `tfm_config`'s
+   contract keymap for dispatch — and the input foundation just built (command
+   keys, IME-gated). Working: browse, cursor up/down/page/home/end, switch pane
+   (Tab), descend (Enter), go-parent (Backspace, cursor lands on origin dir),
+   toggle hidden, quit; name + size columns, dirs-first sort, theme colors.
+   Verified headlessly on `MemoryBackend`; runs on curses + macOS.
+
+   **Before keyboard-input work could even start, GUI testing surfaced (and we
+   fixed) four cross-backend input bugs the headless tests couldn't catch:**
+   macOS punctuation-shift, the whole Windows printable path, macOS `insertText`
+   letter handling, and the always-on IME (now focus-gated). See
+   [PUIKIT_KEYBOARD_CONTRACT.md](PUIKIT_KEYBOARD_CONTRACT.md) §§3,5.
+6. **Next: Phase 2 continued** — selection (Space, select-all) with the
+   focused-item marker; remaining columns/indicators (date, sort/filter header);
+   mouse (click-to-focus, wheel, double-click); then Phase 3 bars/dialogs/menus
+   (a `TextEdit` quick-edit bar exercises the focus-gated text input).
 6. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
    symbol used in `src/` mapped to its PuiKit equivalent, with a per-file
