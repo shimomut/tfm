@@ -168,6 +168,12 @@ TFM's config tokens map to PuiKit identities:
    prints, for each real keypress, the raw `Event`, the contract-normalized
    form, and the TFM action it matches. Run it in a real terminal (modifier
    reporting varies by emulator) and on macOS to sanity-check live input.
-3. **Next:** port `tfm_config`'s matcher (`_parse_key_expression` /
-   `_match_key_event`) onto `(event.key, event.modifiers)` per §2, using the
-   token map above; reuse the reference matcher in the spec test as the oracle.
+3. ~~Port `tfm_config`'s matcher onto the contract.~~ **DONE.**
+   `_parse_key_expression` now yields `(identity, modifiers, mode)`,
+   `_event_identity` reads the contract triple from a `puikit.Event` (with a
+   transitional ttk-event branch so the app keeps running until the runtime is
+   swapped), and `_matches` implements §2. `tfm_config` imports no `ttk`.
+   Verified by `test/test_keybindings_puikit_contract.py` (14, PuiKit events,
+   real default keymap) and the legacy `test_key_bindings_input_event.py` (9,
+   ttk events). The transitional ttk branch is removed once the runtime emits
+   PuiKit events (Phase 2).

@@ -120,7 +120,7 @@ zero `ttk` after Phase 1); "UI" = rewritten in later phases anyway.
 
 | File | Imports | Class | Phase-1 action |
 |---|---|---|---|
-| `tfm_config.py` / `_config.py` | `KeyCode`, `ModifierKey` | logic | **Key & gating.** Keep TFM's matcher (the proven spec). First **decide/verify PuiKit's keyboard contract** (§1.3), then source `(key, modifiers)` from `puikit.Event`. Same key-name vocabulary; the Shift/case + rich-modifier contract is the real work. |
+| `tfm_config.py` / `_config.py` | ~~`KeyCode`, `ModifierKey`~~ → **none** | logic | **DONE.** Matcher ported onto the PuiKit keyboard contract: `_parse_key_expression` now yields `(identity, modifiers, mode)`; `_event_identity` reads `(key, char, modifiers)` from a `puikit.Event` (with a transitional ttk-event branch); `_matches` implements the §2 rules. `tfm_config` imports no `ttk`. Covered by `test/test_keybindings_puikit_contract.py` (14) + the legacy `test_key_bindings_input_event.py` (9). |
 | `tfm_text_layout.py` | `get_display_width`, `truncate_to_width` | logic | `display_width` → swap; ellipsis truncate → **PuiKit `text` enhancement** (§1.2), not a TFM wrapper. |
 | `tfm_colors.py` | `TextAttribute` (lazy) | logic→theme | Swap `TextAttribute`; full color-pair→Theme rework is Phase 2. |
 | `tfm_logging_handlers.py` | `TextAttribute` (lazy) | logic | Swap. |
@@ -150,10 +150,11 @@ Two pieces of work feed Phase 1, both partly **in PuiKit**:
 
 ### Suggested Phase-1 order
 
-1. **PuiKit keyboard contract** (§1.3) — decide/document/implement; this gates
-   all key handling. Verify on curses first, then macOS.
-2. `tfm_config.py` / `_config.py` — point TFM's existing matcher at
-   `puikit.Event` `(key, modifiers)`; run config + keybinding tests.
+1. ~~**PuiKit keyboard contract** (§1.3) — decide/document/implement.~~ **DONE**
+   ([PUIKIT_KEYBOARD_CONTRACT.md](PUIKIT_KEYBOARD_CONTRACT.md)); backend changes
+   landed, spec 17/17.
+2. ~~`tfm_config.py` / `_config.py` — point TFM's matcher at the contract.~~
+   **DONE** — `tfm_config` is ttk-free; 23 keybinding tests pass.
 3. **PuiKit text** enhancement (ellipsis truncate); then `tfm_text_layout.py`,
    `tfm_colors.py`, `tfm_logging_handlers.py` → `puikit.text` / `Style.attr`.
    Run logic tests.

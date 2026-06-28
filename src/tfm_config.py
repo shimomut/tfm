@@ -11,7 +11,6 @@ import importlib.util
 import os
 import sys
 from tfm_path import Path
-from ttk import KeyCode
 from tfm_log_manager import getLogger
 
 
@@ -19,6 +18,62 @@ from tfm_log_manager import getLogger
 
 # Module-level logger
 logger = getLogger("Config")
+
+
+# --------------------------------------------------------------------------- #
+# Key-binding tables (PuiKit keyboard contract)
+#
+# Key matching follows doc/dev/PUIKIT_KEYBOARD_CONTRACT.md: events carry a
+# canonical ``key`` string, the produced ``char``, and a ``modifiers`` set.
+# A config token resolves to (identity, modifiers, mode):
+#   mode "key"  -> match on event.key + exact modifiers (shift significant);
+#                  letters and named keys.
+#   mode "char" -> match on event.char (case-sensitive), ignoring shift/alt;
+#                  digits and punctuation (the produced glyph is the identity).
+# --------------------------------------------------------------------------- #
+
+# ttk.ModifierKey bit values, inlined so this module no longer imports ttk.
+# Used only by the transitional legacy-event path in _event_identity().
+_TTK_MOD_BITS = (("shift", 1), ("ctrl", 2), ("alt", 4), ("cmd", 8))
+
+# Config modifier token (upper) -> contract modifier name.
+_MODIFIER_ALIASES = {
+    "SHIFT": "shift", "CONTROL": "ctrl", "CTRL": "ctrl",
+    "ALT": "alt", "OPTION": "alt", "COMMAND": "cmd", "CMD": "cmd",
+}
+
+# Named non-text keys: config token (upper) -> PuiKit key identity.
+_NAMED_KEYS = {
+    "ENTER": "enter", "RETURN": "enter", "ESCAPE": "escape", "ESC": "escape",
+    "TAB": "tab", "BACKSPACE": "backspace", "DELETE": "delete", "DEL": "delete",
+    "INSERT": "insert", "SPACE": "space",
+    "UP": "up", "DOWN": "down", "LEFT": "left", "RIGHT": "right",
+    "HOME": "home", "END": "end",
+    "PAGE_UP": "pageup", "PAGEUP": "pageup",
+    "PAGE_DOWN": "pagedown", "PAGEDOWN": "pagedown",
+}
+_NAMED_KEYS.update({f"F{n}": f"f{n}" for n in range(1, 13)})
+
+# Named punctuation: config token (upper) -> base (unshifted) glyph.
+_PUNCT_NAMES = {
+    "MINUS": "-", "EQUAL": "=", "EQUALS": "=",
+    "LEFT_BRACKET": "[", "RIGHT_BRACKET": "]", "BACKSLASH": "\\",
+    "SEMICOLON": ";", "QUOTE": "'", "APOSTROPHE": "'",
+    "COMMA": ",", "PERIOD": ".", "DOT": ".", "SLASH": "/",
+    "GRAVE": "`", "BACKTICK": "`", "BACKQUOTE": "`",
+}
+
+# US-layout shifted glyphs: a "Shift-<punct>" / "Shift-<digit>" token resolves
+# to the character that key actually produces (matched on char).
+_SHIFT_SYMBOL = {
+    "-": "_", "=": "+", "[": "{", "]": "}", "\\": "|", ";": ":",
+    "'": '"', ",": "<", ".": ">", "/": "?", "`": "~",
+    "1": "!", "2": "@", "3": "#", "4": "$", "5": "%",
+    "6": "^", "7": "&", "8": "*", "9": "(", "0": ")",
+}
+
+# PuiKit identity aliases for legacy ttk KeyCode names that differ.
+_KEY_ALIASES = {"page_up": "pageup", "page_down": "pagedown"}
 
 
 class KeyBindings:
@@ -47,90 +102,110 @@ class KeyBindings:
     
     def _parse_key_expression(self, key_expr: str) -> tuple:
         """
-        Parse a key expression into main key and modifier flags.
-        
-        Args:
-            key_expr: Key expression string (e.g., "Shift-Down", "Command-Shift-X", "q", "?")
-        
+        Parse a config key token into ``(identity, modifiers, mode)`` per the
+        PuiKit keyboard contract (doc/dev/PUIKIT_KEYBOARD_CONTRACT.md §2).
+
         Returns:
-            Tuple of (main_key, modifier_flags)
-            - main_key: The main key as string
-              * Non-alphabet single chars: preserved as-is (e.g., "?" stays "?")
-              * Alphabet single chars: normalized to uppercase (e.g., "q" -> "Q", "A" -> "A")
-              * Multi-char keys: normalized to uppercase (e.g., "Down" -> "DOWN")
-            - modifier_flags: Bitwise OR of ModifierKey values
-              * Single chars (both alphabet and non-alphabet): always 0
-              * Multi-char expressions: parsed from prefix (e.g., "Shift-Down" -> SHIFT)
-        
-        Key Behavior:
-            - Non-alphabet single characters (?, /, ., etc.): Case-sensitive, match on char, ignore modifiers
-            - Alphabet single characters (a-z, A-Z): Case-insensitive (normalized to uppercase), 
-              match on KeyCode, RESPECT modifiers (modifiers=0 means no modifiers)
-            - Multi-character keys (KeyCode names): Match on KeyCode with modifiers
-        
-        Important:
-            To bind uppercase letters separately, users must use "Shift-A" instead of just "A".
-            Just "A" or "a" in config will match KeyCode.A with NO modifiers (lowercase 'a' press).
-        
+            Tuple ``(identity, modifiers, mode)``
+            - identity: PuiKit key name (``"a"``, ``"enter"``, ``"pageup"``) for
+              ``mode == "key"``, or the produced glyph (``"?"``, ``"="``, ``"+"``)
+              for ``mode == "char"``.
+            - modifiers: ``frozenset`` of contract modifier names
+              (``shift``/``ctrl``/``alt``/``cmd``).
+            - mode: ``"key"`` (match on ``event.key`` + exact modifiers; letters
+              and named keys) or ``"char"`` (match on ``event.char``, ignoring
+              shift/alt; digits and punctuation).
+
         Examples:
-            "q" -> ("Q", 0)  # Matches lowercase 'q' press (no Shift)
-            "A" -> ("A", 0)  # Matches lowercase 'a' press (no Shift) - same as "q"
-            "Shift-A" -> ("A", SHIFT)  # Matches uppercase 'A' press (with Shift)
-            "?" -> ("?", 0)  # Matches '?' character regardless of modifiers
-            "/" -> ("/", 0)  # Matches '/' character regardless of modifiers
-            "Shift-Down" -> ("DOWN", ModifierKey.SHIFT)
-            "Command-Shift-X" -> ("X", ModifierKey.COMMAND | ModifierKey.SHIFT)
+            "Q" / "q"      -> ("q", frozenset(), "key")         # lowercase press
+            "Shift-A"      -> ("a", {"shift"}, "key")           # uppercase press
+            "?"            -> ("?", frozenset(), "char")
+            "Shift-Down"   -> ("down", {"shift"}, "key")
+            "EQUAL"        -> ("=", frozenset(), "char")
+            "Shift-EQUAL"  -> ("+", frozenset(), "char")        # shifted glyph
+            "Command-ENTER"-> ("enter", {"cmd"}, "key")         # GUI-only chord
         """
-        # Import ModifierKey here to avoid circular dependency
-        from ttk import ModifierKey
-        
-        # Single non-alphabet character - preserve case for case-sensitive matching
-        if len(key_expr) == 1 and not key_expr.isalpha():
-            return (key_expr, 0)
-        
-        # Multi-character - parse as key expression
+        # Single-character token: letter -> key mode (lowercased); anything else
+        # (digit or punctuation) -> char mode on the produced glyph.
+        if len(key_expr) == 1:
+            if key_expr.isalpha():
+                return (key_expr.lower(), frozenset(), "key")
+            return (key_expr, frozenset(), "char")
+
+        # Modifier-prefixed token: split into modifier parts + the final key.
         parts = key_expr.split('-')
-        
-        # Last part is the main key
-        main_key = parts[-1].upper()
-        
-        # Earlier parts are modifiers
-        modifiers = 0
+        key_part = parts[-1]
+        mods = set()
         for part in parts[:-1]:
-            modifier_name = part.upper()
-            if modifier_name == 'SHIFT':
-                modifiers |= ModifierKey.SHIFT
-            elif modifier_name == 'CONTROL' or modifier_name == 'CTRL':
-                modifiers |= ModifierKey.CONTROL
-            elif modifier_name == 'ALT' or modifier_name == 'OPTION':
-                modifiers |= ModifierKey.ALT
-            elif modifier_name == 'COMMAND' or modifier_name == 'CMD':
-                modifiers |= ModifierKey.COMMAND
+            name = _MODIFIER_ALIASES.get(part.upper())
+            if name:
+                mods.add(name)
             else:
                 self.logger.warning(f"Unknown modifier in key expression: {part}")
-        
-        return (main_key, modifiers)
-    
-    def _keycode_from_string(self, key_str: str):
+
+        upper = key_part.upper()
+        if upper in _NAMED_KEYS:
+            return (_NAMED_KEYS[upper], frozenset(mods), "key")
+        if upper in _PUNCT_NAMES:
+            return self._punct_binding(_PUNCT_NAMES[upper], mods)
+        if len(key_part) == 1 and key_part.isalpha():
+            return (key_part.lower(), frozenset(mods), "key")
+        if len(key_part) == 1:
+            # Digit or literal punctuation carrying a modifier.
+            return self._punct_binding(key_part, mods)
+
+        self.logger.warning(f"Unknown key in expression: {key_expr}")
+        return (key_part.lower(), frozenset(mods), "key")
+
+    @staticmethod
+    def _punct_binding(glyph: str, mods: set) -> tuple:
+        """Build a char-mode binding for a punctuation/digit glyph, folding a
+        Shift modifier into the produced (shifted) glyph so the identity is the
+        character the key actually emits."""
+        mods = set(mods)
+        if "shift" in mods:
+            glyph = _SHIFT_SYMBOL.get(glyph, glyph)
+            mods.discard("shift")
+        return (glyph, frozenset(mods), "char")
+
+    @staticmethod
+    def _event_identity(event) -> tuple:
+        """Reduce a key event to the contract triple ``(key, char, modifiers)``.
+
+        Accepts a PuiKit ``Event`` (native) or a legacy ttk ``KeyEvent``
+        (transitional, until the runtime emits PuiKit events). ttk's ``KeyCode``
+        is a ``StrEnum`` whose values already match the contract vocabulary;
+        only ``page_up``/``page_down`` need aliasing.
         """
-        Convert a KeyCode name string to its integer value.
-        
-        Args:
-            key_str: KeyCode name (e.g., "DOWN", "ENTER", "A")
-        
-        Returns:
-            KeyCode integer value, or None if not found
-        """
-        try:
-            # KeyCode is a StrEnum, so we can access by name
-            keycode = getattr(KeyCode, key_str, None)
-            if keycode is None:
-                self.logger.warning(f"Unknown KeyCode name: {key_str}")
-            return keycode
-        except AttributeError:
-            self.logger.warning(f"Invalid KeyCode name: {key_str}")
-            return None
-    
+        if hasattr(event, "key"):                       # PuiKit Event
+            key = event.key
+            char = getattr(event, "char", None)
+            mods = frozenset(getattr(event, "modifiers", ()) or ())
+        else:                                           # legacy ttk KeyEvent
+            kc = getattr(event, "key_code", None)
+            if kc is None:
+                key = None
+            else:
+                key = kc.value if hasattr(kc, "value") else str(kc)
+            char = getattr(event, "char", None)
+            flags = getattr(event, "modifiers", 0) or 0
+            mods = frozenset(name for name, bit in _TTK_MOD_BITS if flags & bit)
+        if key in _KEY_ALIASES:
+            key = _KEY_ALIASES[key]
+        return key, char, mods
+
+    @staticmethod
+    def _matches(parsed: tuple, key, char, mods) -> bool:
+        """Match a parsed binding against an event's contract triple."""
+        identity, required, mode = parsed
+        if mode == "char":
+            # Ignore shift/alt (the glyph already encodes them); honour ctrl/cmd
+            # only if the binding named them.
+            sig = frozenset(m for m in mods if m in ("ctrl", "cmd"))
+            want = frozenset(m for m in required if m in ("ctrl", "cmd"))
+            return char is not None and char == identity and sig == want
+        return key == identity and frozenset(mods) == required
+
     def _build_key_lookup(self) -> dict:
         """
         Build a reverse lookup table from key expressions to actions.
@@ -153,61 +228,12 @@ class KeyBindings:
             
             # Process each key expression
             for key_expr in keys:
-                # Parse key expression to get main key and modifiers
-                main_key, modifiers = self._parse_key_expression(key_expr)
-                
-                # Add to lookup table
-                lookup_key = (main_key, modifiers)
-                if lookup_key not in lookup:
-                    lookup[lookup_key] = []
-                lookup[lookup_key].append((action, selection_req))
-        
+                # Parse to (identity, modifiers, mode) and index by it.
+                parsed = self._parse_key_expression(key_expr)
+                lookup.setdefault(parsed, []).append((action, selection_req))
+
         return lookup
-    
-    def _match_key_event(self, event, main_key: str, modifiers: int) -> bool:
-        """
-        Check if a KeyEvent matches a key expression.
-        
-        This method implements the key matching logic that distinguishes between:
-        1. Non-alphabet single characters: Match on event.char (case-sensitive, ignore modifiers)
-        2. Alphabet characters: Match on event.key_code (case-insensitive, RESPECT modifiers)
-        3. Multi-character keys: Match on event.key_code (respect modifiers)
-        
-        Args:
-            event: KeyEvent from TTK
-            main_key: Main key string from _parse_key_expression()
-              * Non-alphabet single chars: original case (e.g., "?", "/")
-              * Alphabet chars: uppercase (e.g., "Q", "A")
-              * Multi-char keys: uppercase KeyCode name (e.g., "DOWN", "ENTER")
-            modifiers: Expected modifier flags (0 for non-alphabet single chars, may be non-zero for alphabet)
-        
-        Returns:
-            True if event matches the key expression
-        
-        Examples:
-            - "?" matches KeyEvent(char="?") regardless of modifiers
-            - "q" matches KeyEvent(key_code=KeyCode.Q, modifiers=0) but NOT with Shift
-            - "Shift-A" matches KeyEvent(key_code=KeyCode.A, modifiers=SHIFT)
-        
-        Note:
-            To bind uppercase letters separately from lowercase, users must use "Shift-A" 
-            instead of just "A" in the configuration.
-        """
-        # Single non-alphabet character - match on char field (case-sensitive, ignore modifiers)
-        if len(main_key) == 1 and not main_key.isalpha():
-            return event.char and event.char == main_key
-        
-        # Alphabet or multi-character keys - check modifiers first
-        if event.modifiers != modifiers:
-            return False
-        
-        # Match against KeyCode (case-insensitive for alphabet, exact for multi-char)
-        expected_keycode = self._keycode_from_string(main_key)
-        if expected_keycode is None:
-            return False
-        
-        return event.key_code == expected_keycode
-    
+
     def _check_selection_requirement(self, requirement: str, has_selection: bool) -> bool:
         """
         Check if selection requirement is satisfied.
@@ -226,28 +252,30 @@ class KeyBindings:
         else:  # 'any'
             return True
     
-    def find_action_for_event(self, event, has_selection: bool):
+    def find_action_for_event(self, event, has_selection: bool = False):
         """
-        Find the action bound to a KeyEvent, respecting selection requirements.
-        
+        Find the action bound to a key event, respecting selection requirements.
+
         Args:
-            event: KeyEvent from TTK
+            event: PuiKit ``Event`` (or, transitionally, a ttk ``KeyEvent``)
             has_selection: Whether files are currently selected
-        
+
         Returns:
             Action name if found, None otherwise
         """
         if not event:
             return None
-        
+
+        key, char, mods = self._event_identity(event)
+
         # Try to match against all key bindings
-        for (main_key, modifiers), actions in self._key_to_actions.items():
-            if self._match_key_event(event, main_key, modifiers):
+        for parsed, actions in self._key_to_actions.items():
+            if self._matches(parsed, key, char, mods):
                 # Found a matching key - check selection requirements
                 for action, selection_req in actions:
                     if self._check_selection_requirement(selection_req, has_selection):
                         return action
-        
+
         return None
     
     def get_keys_for_action(self, action: str) -> tuple:

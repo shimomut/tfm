@@ -412,9 +412,16 @@ the Panel/widget patterns are established in Phase 2.
    The contract is defined, the 5 PuiKit-side changes (curses + macOS
    shift-letter normalization, F1–F12, SPACE-as-named) are implemented, and the
    spec (`test/test_puikit_keyboard_contract.py`) passes 17/17 with PuiKit's full
-   suite still green. Next: port `tfm_config`'s matcher onto the contract.
-3. Phase 0 spike: two-pane PuiKit shell on curses + macOS.
-4. ~~Phase 1 import inventory.~~ **Done** — see
+   suite still green.
+3. ~~Port `tfm_config`'s matcher onto the contract.~~ **Done** — `tfm_config` is
+   now ttk-free; matcher rewritten to the contract triple with a transitional
+   ttk-event branch so the app keeps running pre-backend-swap. 23 keybinding
+   tests pass (`test/test_keybindings_puikit_contract.py` + the legacy ttk one).
+4. **Next: Phase 1 continued** — `tfm_text_layout` / `tfm_colors` /
+   `tfm_logging_handlers` → `puikit.text` / `Style.attr` (per inventory order),
+   plus the small PuiKit `text` ellipsis-truncate enhancement.
+5. Phase 0 spike: two-pane PuiKit shell on curses + macOS.
+6. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
-   symbol used in `src/` mapped to its PuiKit equivalent, with a compat-shim
+   symbol used in `src/` mapped to its PuiKit equivalent, with a per-file
    strategy and a suggested Phase-1 execution order.
