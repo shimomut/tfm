@@ -407,8 +407,14 @@ the Panel/widget patterns are established in Phase 2.
 
 1. ~~Resolve repo topology and widget home.~~ **Done** — see §8 (PyPI dependency,
    editable install for dev; new widgets live in TFM's repo).
-2. Phase 0 spike: two-pane PuiKit shell on curses + macOS.
-3. ~~Phase 1 import inventory.~~ **Done** — see
+2. ~~Pin down the PuiKit keyboard contract **and land the backend changes**.~~
+   **Done** — see [PUIKIT_KEYBOARD_CONTRACT.md](PUIKIT_KEYBOARD_CONTRACT.md).
+   The contract is defined, the 5 PuiKit-side changes (curses + macOS
+   shift-letter normalization, F1–F12, SPACE-as-named) are implemented, and the
+   spec (`test/test_puikit_keyboard_contract.py`) passes 17/17 with PuiKit's full
+   suite still green. Next: port `tfm_config`'s matcher onto the contract.
+3. Phase 0 spike: two-pane PuiKit shell on curses + macOS.
+4. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
    symbol used in `src/` mapped to its PuiKit equivalent, with a compat-shim
    strategy and a suggested Phase-1 execution order.
