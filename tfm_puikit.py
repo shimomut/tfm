@@ -25,16 +25,18 @@ sys.path.insert(0, str(_StdPath(__file__).parent / "src"))
 import _config  # noqa: E402  (the canonical default Config template)
 from puikit import EventType, Item, Panel, Style, TextAttribute, VSplit  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
+from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
 from puikit.text import elide  # noqa: E402
-from puikit.widgets import LayoutView, LogView, Splitter  # noqa: E402
+from puikit.widgets import LayoutView, LogView, MenuBar, Splitter, show_message_box  # noqa: E402
 from puikit.widgets.base import Widget  # noqa: E402
 
 #: Initial share of the content area given to the file panes (vs the log pane).
 PANES_FRACTION = 0.74
 
-from tfm_config import KeyBindings  # noqa: E402
+from tfm_config import KeyBindings, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
+from tfm_filter_list_dialog import show_filter_list  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 
@@ -102,10 +104,21 @@ class TfmApp:
         self.flm.refresh_files(self.pm.right_pane)
 
         self.panel = Panel(backend)
-        self.left_view = FilePane(self.pm.left_pane, on_click=lambda i: self._on_click("left", i))
-        self.right_view = FilePane(self.pm.right_pane, on_click=lambda i: self._on_click("right", i))
+        self.left_view = FilePane(
+            self.pm.left_pane,
+            on_click=lambda i: self._on_click("left", i),
+            on_context=lambda i, x, y: self._show_context_menu("left", i, x, y),
+        )
+        self.right_view = FilePane(
+            self.pm.right_pane,
+            on_click=lambda i: self._on_click("right", i),
+            on_context=lambda i, x, y: self._show_context_menu("right", i, x, y),
+        )
         self.log = LogView(max_lines=2000, auto_scroll=True, wrap=True)
         self.status = StatusBar(self)
+        # One Menu model drives the OS-native menu bar on macOS (an NSMenu) and an
+        # in-window strip on curses — the Panel resolves which, so we never branch.
+        self.menu_bar = MenuBar(self._build_menu())
         self._sync_active()
 
         # Two draggable splitters: the file panes side-by-side (vertical handle),
@@ -126,6 +139,9 @@ class TfmApp:
         )
         self.panel.set_layout(
             VSplit(
+                # The MenuBar self-sizes: a 1-row strip on curses, zero height on
+                # macOS (it installs the native bar instead), so no row branch.
+                Item(self.menu_bar, hints={"surface": "header"}),
                 Item(self.content_splitter, weight=1, hints={"surface": "content"}),
                 Item(self.status, size=1, hints={"surface": "status"}),
                 divider="subtle",
@@ -193,7 +209,7 @@ class TfmApp:
         idx = pane["focused_index"]
 
         if action == "quit":
-            self.backend.quit()
+            self.confirm_quit()
             return False
         if action == "cursor_up":
             pane["focused_index"] = max(0, idx - 1)
@@ -227,6 +243,9 @@ class TfmApp:
             self.flm.show_hidden = not self.flm.show_hidden
             self.flm.refresh_files(pane)
             self.log_info(f"Hidden files: {'shown' if self.flm.show_hidden else 'hidden'}")
+        elif action == "favorites":
+            self.show_favorites()
+            return False  # the dialog drives its own redraw
         else:
             return False
         return True
@@ -257,6 +276,144 @@ class TfmApp:
                     pane["focused_index"] = i
                     break
 
+    # --- menus & dialogs -----------------------------------------------------
+
+    def _build_menu(self) -> Menu:
+        """The app menu model — one tree, realized as the macOS menu bar or an
+        in-window strip. Items reuse the same callbacks the keymap and context
+        menu drive, and ``checked``/``enabled`` predicates re-evaluate on open so
+        the menu always mirrors live pane state."""
+        def has_files() -> bool:
+            return bool(self.active_pane()["files"])
+
+        sort_modes = (("Name", "name"), ("Size", "size"), ("Date", "date"), ("Type", "type"))
+        sort_menu = Menu(*[
+            MenuItem(label, on_select=(lambda m=mode: self._set_sort(m)),
+                     checked=(lambda m=mode: self.active_pane()["sort_mode"] == m))
+            for label, mode in sort_modes
+        ], title="Sort By")
+
+        file_menu = Menu(
+            MenuItem("Open", on_select=lambda: self._menu("open_item"),
+                     enabled=has_files, shortcut="Enter"),
+            MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
+                     shortcut="Backspace"),
+            MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut="J"),
+            SEPARATOR,
+            MenuItem("Quit", on_select=self.confirm_quit, shortcut="q"),
+            title="File",
+        )
+        select_menu = Menu(
+            MenuItem("Toggle Selection", on_select=lambda: self._menu("select_file"),
+                     enabled=has_files, shortcut="Space"),
+            MenuItem("Select All Items", on_select=lambda: self._menu("select_all")),
+            MenuItem("Clear Selection", on_select=lambda: self._menu("unselect_all"),
+                     enabled=lambda: bool(self.active_pane()["selected_files"])),
+            title="Select",
+        )
+        view_menu = Menu(
+            MenuItem("Show Hidden Files", on_select=lambda: self._menu("toggle_hidden"),
+                     checked=lambda: self.flm.show_hidden, shortcut="."),
+            MenuItem("Reverse Sort", on_select=self._toggle_reverse,
+                     checked=lambda: self.active_pane()["sort_reverse"]),
+            MenuItem("Sort By", submenu=sort_menu),
+            SEPARATOR,
+            MenuItem("Switch Pane", on_select=lambda: self._menu("switch_pane"), shortcut="Tab"),
+            title="View",
+        )
+        help_menu = Menu(MenuItem("About TFM", on_select=self.show_about), title="Help")
+        return Menu(
+            MenuItem("File", submenu=file_menu),
+            MenuItem("Select", submenu=select_menu),
+            MenuItem("View", submenu=view_menu),
+            MenuItem("Help", submenu=help_menu),
+        )
+
+    def _menu(self, action: str) -> None:
+        """Run a keymap action from a menu/context-menu selection and redraw."""
+        if self.dispatch(action):
+            self.panel.render()
+
+    def _set_sort(self, mode: str) -> None:
+        pane = self.active_pane()
+        pane["sort_mode"] = mode
+        self.flm.refresh_files(pane)
+        self.log_info(f"Sort: {self.flm.get_sort_description(pane)}")
+        self.panel.render()
+
+    def _toggle_reverse(self) -> None:
+        pane = self.active_pane()
+        pane["sort_reverse"] = not pane["sort_reverse"]
+        self.flm.refresh_files(pane)
+        self.log_info(f"Sort: {self.flm.get_sort_description(pane)}")
+        self.panel.render()
+
+    def confirm_quit(self) -> None:
+        """A modal confirm before quitting — the canonical message-box pattern."""
+        show_message_box(
+            self.panel, "Quit TFM?", title="Confirm", icon="warning",
+            buttons=("Quit", "Cancel"), default=1, cancel=1,
+            on_result=lambda label: self.backend.quit() if label == "Quit" else None,
+        )
+        self.panel.render()
+
+    def show_favorites(self) -> None:
+        """The modal filter-list dialog: pick a favorite directory and jump the
+        active pane there. The canonical searchable-list-picker pattern (TFM's
+        ``BaseListDialog`` workhorse), built from PuiKit's TextEdit + ListView."""
+        favorites = get_favorite_directories()
+        if not favorites:
+            show_message_box(self.panel, "No favorite directories configured.",
+                             title="Favorites", icon="info")
+            self.panel.render()
+            return
+        show_filter_list(
+            self.panel, favorites, title="Go to Favorite",
+            to_label=lambda fav: f"{fav['name']}  —  {fav['path']}",
+            on_accept=self._jump_to_favorite,
+        )
+        self.panel.render()
+
+    def _jump_to_favorite(self, fav: dict) -> None:
+        pane = self.active_pane()
+        pane["path"] = Path(fav["path"])
+        self._refresh(pane)
+        self.log_info(f"Jumped to {fav['name']} ({fav['path']})")
+        self.panel.render()
+
+    def show_about(self) -> None:
+        from tfm_const import VERSION
+        show_message_box(
+            self.panel,
+            f"TFM on PuiKit\nVersion {VERSION}\n\nA dual-pane file manager.",
+            title="About", icon="info", buttons=("OK",),
+        )
+        self.panel.render()
+
+    def _show_context_menu(self, pane_name: str, index: int, x: float, y: float) -> None:
+        """Right-click on a row: activate that row, then pop a context menu at the
+        pointer (native on macOS, a widget popup on curses)."""
+        self.pm.active_pane = pane_name
+        self._sync_active()
+        pane = self.active_pane()
+        pane["focused_index"] = index
+        entry = pane["files"][index] if 0 <= index < len(pane["files"]) else None
+        selected = entry is not None and str(entry) in pane["selected_files"]
+        menu = Menu(
+            MenuItem("Open", on_select=lambda: self._menu("open_item")),
+            MenuItem("Deselect" if selected else "Select",
+                     on_select=lambda: self._menu("select_file")),
+            SEPARATOR,
+            MenuItem("Copy", enabled=False),   # file ops land in a later phase
+            MenuItem("Move", enabled=False),
+            MenuItem("Delete", enabled=False),
+            SEPARATOR,
+            MenuItem("Show Hidden Files", on_select=lambda: self._menu("toggle_hidden"),
+                     checked=lambda: self.flm.show_hidden),
+        )
+        self.panel.popup_menu(menu, x, y)
+        self.panel.render()
+
     # --- run -----------------------------------------------------------------
 
     #: Mouse events routed to the widget under the pointer (the FilePanes own
@@ -276,6 +433,12 @@ class TfmApp:
             # out). GUI emits these; the TUI does not, so it's a GUI-only affordance.
             self.panel.dispatch_event(event)
             self.panel.render()
+            return
+        # A modal layer (message box, menu popup) owns events while open: route
+        # everything to it and let TFM's global keymap stand down.
+        if self.panel.has_layers:
+            if self.panel.dispatch_event(event):
+                self.panel.render()
             return
         if event.type is EventType.KEY:
             has_sel = bool(self.active_pane()["selected_files"])

@@ -474,12 +474,81 @@ the Panel/widget patterns are established in Phase 2.
    deeper Splitter→LayoutView→FilePane nesting; the handle shows a
    col-/row-resize cursor and accent highlight on hover/drag. `Splitter.fraction`
    is now the pane-ratio source of truth (wire `[`/`]`/`-` keys to nudge it).
-10. **Next: Phase 2 continued** — quick-sort keys (1–4) → footer sort indicator;
-    keyboard pane/log resize (`[` `]` `-` `{` `}` nudging the splitter fractions);
-    then the **text-input bar** (Phase 3's first piece, exercising focus-gated
-    text input): filter, incremental search, rename/mkdir — plus file operations
-    (copy/move/delete) now that selection exists. Later: wire TFM's `LogManager`
-    to feed the log pane; double-click (needs backend click-count).
+10. ~~Major UI patterns — capability spike (message box, menu, context menu).~~
+    **Done.** A deliberate check that PuiKit can express TFM's interactive UI
+    vocabulary *before* committing to a specific dialog UX. Wired into
+    `tfm_puikit.py`: a **`MenuBar`** from one `puikit.menu.Menu` model
+    (File / Select / View / Help) — the OS-native NSMenu on macOS, an in-window
+    strip on curses, no app branch; **`show_message_box`** modals for a quit
+    confirmation (`q` and File → Quit) and an About box; a **right-click context
+    menu** on `FilePane` rows via `Panel.popup_menu` (open / select / show-hidden,
+    file-ops disabled until their phase). Menu `checked`/`enabled` are **live
+    predicates** (Show Hidden ✓ tracks state, Open/Clear-Selection enable on
+    content/selection), and View → Sort By drives a real re-sort
+    (`FileListManager`). Integration seams added: `Panel.has_layers` (public
+    modal check) so TFM's global keymap stands down while a layer owns events,
+    and `FilePane.on_context` (captures `screen_rect`, maps the pointer to screen
+    coords for the popup). Verified headlessly on `MemoryBackend` (menu shape,
+    predicate tracking, quit-confirm push/cancel, sort, context-menu push/close,
+    strip render). **Finding: PuiKit covers these patterns with no gaps** — the
+    only additions were the two small seams above.
+
+    **Open UX question (deferred deliberately):** TTK's single bottom *text-input
+    bar* multiplexes many roles (filter, incremental search, rename, mkdir,
+    create-archive…). Before porting it verbatim, decide whether a bottom bar is
+    still the best UI on PuiKit or whether some of those roles read better as
+    **modal input dialogs** (the searchable list dialog — `BaseListDialog` — is
+    TFM's real workhorse and is itself a modal: a filter field + scrollable list
+    + on-select).
+
+11. ~~Modal list/input dialog (the searchable-list workhorse).~~ **Done.**
+    `src/tfm_filter_list_dialog.py` — a `FilterListDialog(FocusContainer, Widget)`
+    pushed as a modal layer by `show_filter_list`, the PuiKit equivalent of ttk's
+    `BaseListDialog`. It **composes PuiKit primitives** instead of re-rolling
+    them: a `TextEdit` filter field over a `ListView` of results. Typing filters
+    (substring, case-insensitive); ↑/↓/PageUp/PageDown drive the list while the
+    field keeps focus; Enter accepts; Esc / outside-click cancels; reports through
+    `on_accept(value)` / `on_cancel()`. Wired to TFM's **favorites** (plain `j`,
+    and File → "Go to Favorite…") — pick a favorite dir, jump the active pane
+    there — reusing `get_favorite_directories()`. Verified headlessly (filter,
+    nav, accept, cancel, outside-click) on `MemoryBackend`.
+
+    **Gap found & fixed in PuiKit (the point of the spike):** text input inside a
+    modal layer didn't engage. `Panel.focused_leaf()` (which gates IME) descended
+    only from the *page* focus (`_focused`), and `_apply_layout` resets that to a
+    page widget every render — so a `TextEdit` in a pushed layer (this dialog, or
+    even `Drawer`) never turned on the IME, even though `dispatch_event` already
+    treats the top layer as modal for *events*. Fixed by making `focused_leaf()`
+    descend from the **top layer** when one is open (focus now follows the same
+    modal rule as events). Regression test added
+    (`tests/test_text_input_gating.py::test_modal_layer_owns_the_focus_leaf`); full
+    suite green (680 passed). This is the second PuiKit seam this Phase-2/3 work
+    needed, after `Panel.has_layers`.
+
+    **Finding — bar vs. modal (the UX question):** the modal list dialog is the
+    right home for **discrete selection** (favorites, drives, programs, jump-to)
+    — a filter that narrows a fixed set to one choice. It is *not* the right home
+    for **live, incremental** roles (filter-the-current-pane, incremental search)
+    where the result updates the pane as you type and there is no "accept one row"
+    moment — those still read better as a lightweight **bottom input bar**. So the
+    recommendation is to **split TTK's single multiplexed bar by role**: modal
+    list dialog for pickers; a small bottom bar for live filter/search and for
+    one-line text entry (rename / mkdir). Both reuse `TextEdit` (focus-gated IME).
+
+    **Follow-up (config nuance, non-blocking):** under the keyboard contract a
+    bare uppercase-letter binding parses with shift *dropped* (`'J'` → key `j`,
+    no modifier — same as `'j'`), while `'Shift-J'` keeps the shift. So the
+    default config's `favorites: ['J']` fires on **plain `j`**, and
+    `jump_to_path: ['Shift-J']` on Shift+J — likely inverting the author's intent
+    (they probably meant Shift+J for favorites). Revisit the default bindings (or
+    decide bare-uppercase should imply shift) when porting the full keymap.
+
+12. **Next** — the **bottom input bar** for the live/one-line roles (filter,
+    incremental search, rename, mkdir), completing the bar-vs-modal split above;
+    then file operations (copy/move/delete) now that selection + context menu
+    exist; the quick-sort keys (1–4) and keyboard pane/log resize
+    (`[` `]` `-` `{` `}`). Later: wire TFM's `LogManager` to feed the log pane;
+    double-click (needs backend click-count).
 6. ~~Phase 1 import inventory.~~ **Done** — see
    [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
    symbol used in `src/` mapped to its PuiKit equivalent, with a per-file

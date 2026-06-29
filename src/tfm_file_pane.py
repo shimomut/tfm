@@ -43,7 +43,12 @@ MARKED_FG = (229, 192, 123)
 
 
 class FilePane(Widget):
-    def __init__(self, pane_data: dict, on_click: Callable[[int], None] | None = None):
+    def __init__(
+        self,
+        pane_data: dict,
+        on_click: Callable[[int], None] | None = None,
+        on_context: Callable[[int, float, float], None] | None = None,
+    ):
         self.pane = pane_data
         #: Active pane (controller sets it on switch_pane / click); drives the
         #: louder cursor highlight.
@@ -51,6 +56,12 @@ class FilePane(Widget):
         #: Called with the clicked row index — the controller makes this pane
         #: active and moves the cursor there.
         self.on_click = on_click
+        #: Called with (row index, screen_x, screen_y) on right-click, so the
+        #: controller can pop a context menu anchored at the pointer.
+        self.on_context = on_context
+        #: This pane's absolute rect, captured each draw, to map a widget-local
+        #: pointer back to screen coords for ``popup_menu``.
+        self._abs: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
         #: First visible row in base units. Whole on whole-unit backends;
         #: fractional on backends whose scroll carries sub-unit deltas (smooth).
         self.offset: float = 0.0
@@ -89,6 +100,7 @@ class FilePane(Widget):
 
     def draw(self, ctx) -> None:
         theme = ctx.theme
+        self._abs = ctx.screen_rect
         files = self.pane["files"]
         count = len(files)
         # Exact (fractional) extent so the last partial row and the scroll bounds
@@ -187,5 +199,11 @@ class FilePane(Widget):
             if 0 <= index < len(self.pane["files"]):
                 if self.on_click is not None:
                     self.on_click(index)
+                return True
+        if event.type is EventType.MOUSE_CLICK and event.button == "right":
+            index = int(self.offset + (event.y or 0.0))
+            if 0 <= index < len(self.pane["files"]) and self.on_context is not None:
+                rx, ry, *_ = self._abs
+                self.on_context(index, rx + (event.x or 0.0), ry + (event.y or 0.0))
                 return True
         return False
