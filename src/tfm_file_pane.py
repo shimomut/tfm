@@ -33,6 +33,11 @@ from puikit.widgets.base import Widget, draw_list_row
 
 #: Base-unit width reserved at the right edge for the size column.
 SIZE_COL = 9
+#: Gap (base units) between adjacent columns (name|size, size|date).
+COL_GAP = 1
+#: Smallest name column we'll allow before dropping the date column on a narrow
+#: pane — mirrors ttk TFM, which hides the datetime when the pane gets tight.
+MIN_NAME_W = 12
 #: Left gutter (base units) for the selection marker, reserved always so names
 #: don't shift when you select.
 MARK_W = 1
@@ -82,6 +87,20 @@ class FilePane(Widget):
             is_dir = False
         return {"size_str": "<DIR>" if is_dir else "", "date_str": "", "is_dir": is_dir}
 
+    def _date_width(self) -> int:
+        """Character width of the date column, from the first dated entry.
+
+        ``tfm_file_list_manager`` formats every entry in a pane with the same
+        ``config.DATE_FORMAT`` (short ``YY-MM-DD HH:MM`` = 14, full
+        ``YYYY-MM-DD HH:MM:SS`` = 19), so one sample gives the column width.
+        Returns 0 when nothing carries a date (so the column is dropped).
+        """
+        for info in self.pane.get("file_info", {}).values():
+            date_str = info.get("date_str")
+            if date_str:
+                return len(date_str)
+        return 0
+
     def _clamp(self, count: int, view_h: float) -> None:
         self.offset = max(0.0, min(self.offset, max(0.0, count - view_h)))
 
@@ -126,9 +145,19 @@ class FilePane(Widget):
 
         show_bar = count > view_h
         # Fractional inner width (up to the scrollbar's left edge) so a row fill
-        # and the right-aligned size reach the true pane edge.
+        # and the right-aligned columns reach the true pane edge.
         full_w = ctx.size_units[0] - (1.0 if show_bar else 0.0)
-        name_w = max(1, int(full_w) - MARK_W - SIZE_COL - 1)
+
+        # Date column, shown to the right of size — but only while the name still
+        # has room to breathe, matching ttk TFM's narrow-pane behaviour.
+        date_w = self._date_width()
+        name_if_dated = int(full_w) - MARK_W - SIZE_COL - date_w - COL_GAP * 2
+        show_date = date_w > 0 and name_if_dated >= MIN_NAME_W
+        tail = SIZE_COL + COL_GAP + (date_w + COL_GAP if show_date else 0)
+        name_w = max(1, int(full_w) - MARK_W - tail)
+        # Right edges of the size / date columns.
+        date_right = full_w
+        size_right = (full_w - date_w - COL_GAP) if show_date else full_w
         selected = self.pane["selected_files"]
 
         def measure(s: str) -> float:
@@ -144,8 +173,8 @@ class FilePane(Widget):
                 break
             if i >= 0:
                 entry = files[i]
-                self._draw_row(ctx, y, entry, i == cursor,
-                               str(entry) in selected, name_w, full_w, measure)
+                self._draw_row(ctx, y, entry, i == cursor, str(entry) in selected,
+                               name_w, size_right, show_date, date_right, measure)
             row += 1
 
         if show_bar:
@@ -155,12 +184,14 @@ class FilePane(Widget):
             pos = self.offset / denom if denom > 0 else 0.0
             ctx.draw_scrollbar(ctx.size_units[0] - 1, 0, view_h, max(0.0, min(1.0, pos)), ratio)
 
-    def _draw_row(self, ctx, y, entry, is_cursor, selected, name_w, full_w, measure) -> None:
+    def _draw_row(self, ctx, y, entry, is_cursor, selected,
+                  name_w, size_right, show_date, date_right, measure) -> None:
         theme = ctx.theme
         info = self._info(entry)
         is_dir = info["is_dir"]
         name = entry.name + ("/" if is_dir else "")
         size = info["size_str"]
+        date = info["date_str"] if show_date else ""
         name_text = elide(name, name_w, where="end", measure=measure)
 
         if is_cursor:
@@ -168,11 +199,13 @@ class FilePane(Widget):
             # marker still shows so a selected-and-focused row is unambiguous.
             bg = theme.selection_active_bg if self.active else theme.selection_inactive_bg
             fg = (255, 255, 255) if self.active else theme.text
-            draw_list_row(ctx, y, name_text, name_w, Style(fg=fg, bg=bg), x=MARK_W, fill_w=full_w)
+            draw_list_row(ctx, y, name_text, name_w, Style(fg=fg, bg=bg), x=MARK_W, fill_w=date_right)
             if selected:
                 ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, bg=bg, attr=TextAttribute.BOLD))
             if size:
-                ctx.draw_text(full_w - measure(size), y, size, Style(fg=fg, bg=bg))
+                ctx.draw_text(size_right - measure(size), y, size, Style(fg=fg, bg=bg))
+            if date:
+                ctx.draw_text(date_right - measure(date), y, date, Style(fg=fg, bg=bg))
         else:
             if selected:
                 ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, attr=TextAttribute.BOLD))
@@ -181,7 +214,9 @@ class FilePane(Widget):
                 fg = theme.accent if is_dir else theme.text
             ctx.draw_text(MARK_W, y, name_text, Style(fg=fg))
             if size:
-                ctx.draw_text(full_w - measure(size), y, size, Style(fg=theme.muted_text))
+                ctx.draw_text(size_right - measure(size), y, size, Style(fg=theme.muted_text))
+            if date:
+                ctx.draw_text(date_right - measure(date), y, date, Style(fg=theme.muted_text))
 
     # --- events --------------------------------------------------------------
 
