@@ -270,6 +270,13 @@ class TfmApp:
         if event.type is EventType.RESIZE:
             self.panel.render()
             return
+        if event.type is EventType.MOUSE_MOVE:
+            # Pointer movement only updates hover state — let the Splitters under
+            # the cursor swap in their resize cursor (and drop it again on the way
+            # out). GUI emits these; the TUI does not, so it's a GUI-only affordance.
+            self.panel.dispatch_event(event)
+            self.panel.render()
+            return
         if event.type is EventType.KEY:
             has_sel = bool(self.active_pane()["selected_files"])
             action = self.keys.find_action_for_event(event, has_sel)
