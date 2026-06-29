@@ -28,8 +28,14 @@ from typing import Callable
 
 from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
+from puikit.font import Font
 from puikit.text import elide
 from puikit.widgets.base import Widget, draw_list_row
+
+#: Size and date are numeric columns: pin them to a fixed-advance face so digits
+#: line up in their right-aligned columns. (Names keep the Panel's default
+#: proportional UI font on GUI; on TUI everything is the one grid font anyway.)
+MONO = Font(monospace=True)
 
 #: Base-unit width reserved at the right edge for the size column.
 SIZE_COL = 9
@@ -163,6 +169,9 @@ class FilePane(Widget):
         def measure(s: str) -> float:
             return ctx.measure_text(s)
 
+        def measure_mono(s: str) -> float:
+            return ctx.measure_text(s, Style(font=MONO))
+
         first = int(self.offset)
         frac = self.offset - first
         row = 0
@@ -174,7 +183,7 @@ class FilePane(Widget):
             if i >= 0:
                 entry = files[i]
                 self._draw_row(ctx, y, entry, i == cursor, str(entry) in selected,
-                               name_w, size_right, show_date, date_right, measure)
+                               name_w, size_right, show_date, date_right, measure, measure_mono)
             row += 1
 
         if show_bar:
@@ -185,7 +194,7 @@ class FilePane(Widget):
             ctx.draw_scrollbar(ctx.size_units[0] - 1, 0, view_h, max(0.0, min(1.0, pos)), ratio)
 
     def _draw_row(self, ctx, y, entry, is_cursor, selected,
-                  name_w, size_right, show_date, date_right, measure) -> None:
+                  name_w, size_right, show_date, date_right, measure, measure_mono) -> None:
         theme = ctx.theme
         info = self._info(entry)
         is_dir = info["is_dir"]
@@ -203,9 +212,9 @@ class FilePane(Widget):
             if selected:
                 ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, bg=bg, attr=TextAttribute.BOLD))
             if size:
-                ctx.draw_text(size_right - measure(size), y, size, Style(fg=fg, bg=bg))
+                ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=fg, bg=bg, font=MONO))
             if date:
-                ctx.draw_text(date_right - measure(date), y, date, Style(fg=fg, bg=bg))
+                ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=fg, bg=bg, font=MONO))
         else:
             if selected:
                 ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, attr=TextAttribute.BOLD))
@@ -214,9 +223,9 @@ class FilePane(Widget):
                 fg = theme.accent if is_dir else theme.text
             ctx.draw_text(MARK_W, y, name_text, Style(fg=fg))
             if size:
-                ctx.draw_text(size_right - measure(size), y, size, Style(fg=theme.muted_text))
+                ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=theme.muted_text, font=MONO))
             if date:
-                ctx.draw_text(date_right - measure(date), y, date, Style(fg=theme.muted_text))
+                ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=theme.muted_text, font=MONO))
 
     # --- events --------------------------------------------------------------
 
