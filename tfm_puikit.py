@@ -136,6 +136,11 @@ class TfmApp:
             orientation="vertical",
             fraction=PANES_FRACTION,
             min_first=5, min_second=2,
+            # No handle row on the grid: the pane footer already sits directly
+            # above the log and serves as the divider, so a separate handle cell
+            # would waste a row. Still draggable via the grab margin; the vector
+            # backend keeps its hairline.
+            flat=True,
         )
         self.panel.set_layout(
             VSplit(
