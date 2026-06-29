@@ -106,11 +106,13 @@ class TfmApp:
         self.panel = Panel(backend)
         self.left_view = FilePane(
             self.pm.left_pane,
+            config=self.config,
             on_click=lambda i: self._on_click("left", i),
             on_context=lambda i, x, y: self._show_context_menu("left", i, x, y),
         )
         self.right_view = FilePane(
             self.pm.right_pane,
+            config=self.config,
             on_click=lambda i: self._on_click("right", i),
             on_context=lambda i, x, y: self._show_context_menu("right", i, x, y),
         )

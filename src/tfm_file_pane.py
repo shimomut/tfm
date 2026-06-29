@@ -57,10 +57,14 @@ class FilePane(Widget):
     def __init__(
         self,
         pane_data: dict,
+        config=None,
         on_click: Callable[[int], None] | None = None,
         on_context: Callable[[int, float, float], None] | None = None,
     ):
         self.pane = pane_data
+        #: TFM Config; read for SEPARATE_EXTENSIONS / MAX_EXTENSION_LENGTH so the
+        #: extension column matches the ttk build. None disables the split.
+        self.config = config
         #: Active pane (controller sets it on switch_pane / click); drives the
         #: louder cursor highlight.
         self.active = False
@@ -79,6 +83,10 @@ class FilePane(Widget):
         self._last_cursor = -1
         self._view_h = 1.0
         self._viewport_rows = 1
+        #: Cached extension-column width keyed on the ``files`` list identity
+        #: (refreshed/sorted/filtered lists are fresh objects), so we measure the
+        #: whole pane once per listing rather than every frame.
+        self._ext_cache: tuple[int, float] = (0, 0.0)
 
     # --- helpers -------------------------------------------------------------
 
@@ -106,6 +114,42 @@ class FilePane(Widget):
             if date_str:
                 return len(date_str)
         return 0
+
+    def _split_name(self, name: str, is_dir: bool) -> tuple[str, str]:
+        """Split ``name`` into (basename, extension) for the separate-extension
+        column, mirroring ttk TFM's ``separate_filename_extension``:
+        directories, dotfiles (leading dot), no-dot names, and over-long
+        extensions are not split (extension == "").
+        """
+        if is_dir or self.config is None or not getattr(self.config, "SEPARATE_EXTENSIONS", False):
+            return name, ""
+        dot = name.rfind(".")
+        if dot <= 0:
+            return name, ""
+        ext = name[dot:]
+        if len(ext) > getattr(self.config, "MAX_EXTENSION_LENGTH", 5):
+            return name, ""
+        return name[:dot], ext
+
+    def _ext_width(self, measure: Callable[[str], float]) -> float:
+        """Width of the extension column: the widest split-off extension in the
+        pane (0 when none qualify, so the column is dropped). Cached per listing.
+        """
+        if self.config is None or not getattr(self.config, "SEPARATE_EXTENSIONS", False):
+            return 0.0
+        files = self.pane["files"]
+        if self._ext_cache[0] == id(files):
+            return self._ext_cache[1]
+        info_cache = self.pane.get("file_info", {})
+        width = 0.0
+        for entry in files:
+            info = info_cache.get(str(entry))
+            is_dir = info["is_dir"] if info else False
+            _, ext = self._split_name(entry.name, is_dir)
+            if ext:
+                width = max(width, measure(ext))
+        self._ext_cache = (id(files), width)
+        return width
 
     def _clamp(self, count: int, view_h: float) -> None:
         self.offset = max(0.0, min(self.offset, max(0.0, count - view_h)))
@@ -154,23 +198,34 @@ class FilePane(Widget):
         # and the right-aligned columns reach the true pane edge.
         full_w = ctx.size_units[0] - (1.0 if show_bar else 0.0)
 
-        # Date column, shown to the right of size — but only while the name still
-        # has room to breathe, matching ttk TFM's narrow-pane behaviour.
-        date_w = self._date_width()
-        name_if_dated = int(full_w) - MARK_W - SIZE_COL - date_w - COL_GAP * 2
-        show_date = date_w > 0 and name_if_dated >= MIN_NAME_W
-        tail = SIZE_COL + COL_GAP + (date_w + COL_GAP if show_date else 0)
-        name_w = max(1, int(full_w) - MARK_W - tail)
-        # Right edges of the size / date columns.
-        date_right = full_w
-        size_right = (full_w - date_w - COL_GAP) if show_date else full_w
-        selected = self.pane["selected_files"]
-
         def measure(s: str) -> float:
             return ctx.measure_text(s)
 
         def measure_mono(s: str) -> float:
             return ctx.measure_text(s, Style(font=MONO))
+
+        # Columns, left to right: marker | basename | ext | size | date. The
+        # extension column sits between the name and size (ttk TFM layout); it is
+        # dropped when the pane has no splittable extensions.
+        ext_w = self._ext_width(measure)
+        ext_block = (COL_GAP + ext_w) if ext_w > 0 else 0.0
+
+        # Date column (right of size), shown only while the name still has room to
+        # breathe, matching ttk TFM's narrow-pane behaviour.
+        date_w = self._date_width()
+        name_if_dated = full_w - MARK_W - SIZE_COL - date_w - COL_GAP * 2 - ext_block
+        show_date = date_w > 0 and name_if_dated >= MIN_NAME_W
+        tail = SIZE_COL + COL_GAP + (date_w + COL_GAP if show_date else 0)
+
+        # Fractional name width / ext origin so the extension column lands at the
+        # exact pixel after the (proportional) name, not snapped to the char grid.
+        # (Whole-unit backends still snap on draw, so the TUI stays grid-aligned.)
+        name_w = max(1.0, full_w - MARK_W - ext_block - tail)
+        ext_x = MARK_W + name_w + COL_GAP
+        # Right edges of the size / date columns.
+        date_right = full_w
+        size_right = (full_w - date_w - COL_GAP) if show_date else full_w
+        selected = self.pane["selected_files"]
 
         first = int(self.offset)
         frac = self.offset - first
@@ -183,7 +238,8 @@ class FilePane(Widget):
             if i >= 0:
                 entry = files[i]
                 self._draw_row(ctx, y, entry, i == cursor, str(entry) in selected,
-                               name_w, size_right, show_date, date_right, measure, measure_mono)
+                               name_w, ext_x, ext_w, size_right, show_date, date_right,
+                               measure, measure_mono)
             row += 1
 
         if show_bar:
@@ -194,14 +250,17 @@ class FilePane(Widget):
             ctx.draw_scrollbar(ctx.size_units[0] - 1, 0, view_h, max(0.0, min(1.0, pos)), ratio)
 
     def _draw_row(self, ctx, y, entry, is_cursor, selected,
-                  name_w, size_right, show_date, date_right, measure, measure_mono) -> None:
+                  name_w, ext_x, ext_w, size_right, show_date, date_right,
+                  measure, measure_mono) -> None:
         theme = ctx.theme
         info = self._info(entry)
         is_dir = info["is_dir"]
-        name = entry.name + ("/" if is_dir else "")
+        basename, ext = self._split_name(entry.name, is_dir)
+        name = basename + ("/" if is_dir else "")
         size = info["size_str"]
         date = info["date_str"] if show_date else ""
         name_text = elide(name, name_w, where="end", measure=measure)
+        ext_text = elide(ext, ext_w, where="end", measure=measure) if ext_w > 0 else ""
 
         if is_cursor:
             # Cursor row: a full-width fill (louder on the active pane); the
@@ -211,6 +270,8 @@ class FilePane(Widget):
             draw_list_row(ctx, y, name_text, name_w, Style(fg=fg, bg=bg), x=MARK_W, fill_w=date_right)
             if selected:
                 ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, bg=bg, attr=TextAttribute.BOLD))
+            if ext_text:
+                ctx.draw_text(ext_x, y, ext_text, Style(fg=fg, bg=bg))
             if size:
                 ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=fg, bg=bg, font=MONO))
             if date:
@@ -222,6 +283,8 @@ class FilePane(Widget):
             else:
                 fg = theme.accent if is_dir else theme.text
             ctx.draw_text(MARK_W, y, name_text, Style(fg=fg))
+            if ext_text:
+                ctx.draw_text(ext_x, y, ext_text, Style(fg=fg))
             if size:
                 ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=theme.muted_text, font=MONO))
             if date:
