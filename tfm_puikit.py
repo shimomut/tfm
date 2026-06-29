@@ -139,12 +139,22 @@ class TfmApp:
         )
         self.panel.set_layout(
             VSplit(
-                # The MenuBar self-sizes: a 1-row strip on curses, zero height on
-                # macOS (it installs the native bar instead), so no row branch.
-                Item(self.menu_bar, hints={"surface": "header"}),
-                Item(self.content_splitter, weight=1, hints={"surface": "content"}),
-                Item(self.status, size=1, hints={"surface": "status"}),
-                divider="subtle",
+                # The MenuBar self-sizes via "content": a 1-row strip on curses,
+                # zero height on macOS (it installs the native bar instead), so
+                # no row branch. Without "content" the item would flex and eat
+                # half the window. It carries no divider after it — when it
+                # collapses to 0 height (macOS), a divider here would float at the
+                # very top — so the subtle divider lives on the nested split below,
+                # only between the content and the status bar.
+                Item(self.menu_bar, size="content", hints={"surface": "header"}),
+                Item(
+                    VSplit(
+                        Item(self.content_splitter, weight=1, hints={"surface": "content"}),
+                        Item(self.status, size=1, hints={"surface": "status"}),
+                        divider="subtle",
+                    ),
+                    weight=1,
+                ),
             ),
             margin_px=4,
         )
