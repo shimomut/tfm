@@ -168,10 +168,15 @@ class TfmApp:
     def _pane_column(self, name: str, view: FilePane) -> LayoutView:
         # A LayoutView wraps the header/list/footer sub-layout as a single widget
         # so it can be a Splitter child (Splitter hosts widgets, not layouts).
+        # A "subtle" divider draws a hairline between the path/info bars and the
+        # file list on GUI (zero base-unit cost) — without it the footer's status
+        # surface matches the content background and the boundary vanishes; on TUI
+        # nothing is reserved and the surface-role contrast does the separating.
         return LayoutView(VSplit(
             Item(PaneHeader(self, name), size=1, hints={"surface": "header"}),
             Item(view, weight=1, hints={"surface": "content"}),
             Item(PaneFooter(self, name), size=1, hints={"surface": "status"}),
+            divider="subtle",
         ))
 
     # --- state ---------------------------------------------------------------
