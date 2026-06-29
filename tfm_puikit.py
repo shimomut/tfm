@@ -37,6 +37,7 @@ from tfm_config import KeyBindings, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
 from tfm_filter_list_dialog import show_filter_list  # noqa: E402
+from tfm_input_dialog import show_input  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 
@@ -268,6 +269,15 @@ class TfmApp:
         elif action == "favorites":
             self.show_favorites()
             return False  # the dialog drives its own redraw
+        elif action == "create_directory":
+            self.create_directory()
+            return False  # the dialog drives its own redraw
+        elif action == "create_file":
+            self.create_file()
+            return False
+        elif action == "rename_file":
+            self.rename()
+            return False
         else:
             return False
         return True
@@ -321,6 +331,10 @@ class TfmApp:
             MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
                      shortcut="Backspace"),
             MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut="J"),
+            SEPARATOR,
+            MenuItem("New Folder…", on_select=self.create_directory, shortcut="M"),
+            MenuItem("New File…", on_select=self.create_file, shortcut="Shift-E"),
+            MenuItem("Rename…", on_select=self.rename, enabled=has_files, shortcut="R"),
             SEPARATOR,
             MenuItem("Quit", on_select=self.confirm_quit, shortcut="q"),
             title="File",
@@ -415,6 +429,110 @@ class TfmApp:
         self.log_info(f"Jumped to {fav['name']} ({fav['path']})")
         self.panel.render()
 
+    def _select_by_name(self, pane: dict, name: str) -> None:
+        """Land the cursor on the entry called ``name`` (after create/rename)."""
+        for i, entry in enumerate(pane["files"]):
+            if entry.name == name:
+                pane["focused_index"] = i
+                break
+
+    def create_directory(self) -> None:
+        """Prompt for a name and create a directory in the active pane — the
+        canonical text-input dialog, mirroring ttk TFM's create-directory flow."""
+        pane = self.active_pane()
+
+        def validate(name: str) -> str | None:
+            name = name.strip()
+            if not name:
+                return "Directory name cannot be empty"
+            if (pane["path"] / name).exists():
+                return f"'{name}' already exists"
+            return None
+
+        def accept(name: str) -> None:
+            name = name.strip()
+            try:
+                (pane["path"] / name).mkdir(parents=True, exist_ok=False)
+            except OSError as exc:
+                self.log_info(f"Failed to create directory '{name}': {exc}")
+            else:
+                self.log_info(f"Created directory: {name}")
+                self._refresh(pane)
+                self._select_by_name(pane, name)
+            self.panel.render()
+
+        show_input(self.panel, title="New Directory", prompt="Name:",
+                   on_accept=accept, validate=validate, region=self._active_pane_region())
+        self.panel.render()
+
+    def create_file(self) -> None:
+        """Prompt for a name and create an empty file in the active pane."""
+        pane = self.active_pane()
+
+        def validate(name: str) -> str | None:
+            name = name.strip()
+            if not name:
+                return "File name cannot be empty"
+            if (pane["path"] / name).exists():
+                return f"'{name}' already exists"
+            return None
+
+        def accept(name: str) -> None:
+            name = name.strip()
+            try:
+                (pane["path"] / name).touch()
+            except OSError as exc:
+                self.log_info(f"Failed to create file '{name}': {exc}")
+            else:
+                self.log_info(f"Created file: {name}")
+                self._refresh(pane)
+                self._select_by_name(pane, name)
+            self.panel.render()
+
+        show_input(self.panel, title="New File", prompt="Name:",
+                   on_accept=accept, validate=validate, region=self._active_pane_region())
+        self.panel.render()
+
+    def rename(self) -> None:
+        """Prompt to rename the focused entry in the active pane. Batch rename
+        (multiple selected) lands in a later phase."""
+        pane = self.active_pane()
+        files = pane["files"]
+        if not files:
+            self.log_info("No file to rename")
+            return
+        entry = files[pane["focused_index"]]
+        original = entry.name
+
+        def validate(name: str) -> str | None:
+            name = name.strip()
+            if not name:
+                return "Name cannot be empty"
+            if name == original:
+                return None  # unchanged is allowed (a no-op on accept)
+            if (entry.parent / name).exists():
+                return f"'{name}' already exists"
+            return None
+
+        def accept(name: str) -> None:
+            name = name.strip()
+            if name == original:
+                self.panel.render()
+                return
+            try:
+                entry.rename(entry.parent / name)
+            except OSError as exc:
+                self.log_info(f"Failed to rename '{original}': {exc}")
+            else:
+                self.log_info(f"Renamed '{original}' to '{name}'")
+                self._refresh(pane)
+                self._select_by_name(pane, name)
+            self.panel.render()
+
+        show_input(self.panel, title="Rename", prompt="Rename to:", text=original,
+                   on_accept=accept, validate=validate, region=self._active_pane_region())
+        self.panel.render()
+
     def show_about(self) -> None:
         from tfm_const import VERSION
         show_message_box(
@@ -437,6 +555,8 @@ class TfmApp:
             MenuItem("Open", on_select=lambda: self._menu("open_item")),
             MenuItem("Deselect" if selected else "Select",
                      on_select=lambda: self._menu("select_file")),
+            SEPARATOR,
+            MenuItem("Rename…", on_select=self.rename, enabled=entry is not None),
             SEPARATOR,
             MenuItem("Copy", enabled=False),   # file ops land in a later phase
             MenuItem("Move", enabled=False),

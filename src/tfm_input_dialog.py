@@ -1,0 +1,202 @@
+"""InputDialog — a modal single-line text prompt for the PuiKit port.
+
+The text-entry counterpart to :class:`tfm_filter_list_dialog.FilterListDialog`: a
+small centered modal with a title, a prompt label, and one ``TextEdit``. It is
+the PuiKit equivalent of ttk TFM's ``QuickEditBar`` prompts — Create Directory,
+Create File, Rename — collapsed into one reusable primitive.
+
+Like the filter-list dialog it reuses PuiKit primitives rather than
+re-implementing them:
+
+- ``TextEdit`` for the field — real caret, selection, clipboard, and focus-gated
+  IME. Because the dialog is a ``FocusContainer`` and the top layer is the focus
+  root, the field's ``wants_text_input`` engages the backend's text-input system
+  while the dialog is open and releases it when it closes.
+
+Interaction: typing edits the field; Enter accepts (the text is handed to
+``on_accept``); Esc or an outside click cancels. An optional ``validate(text)``
+returning an error string keeps the dialog open and shows the message inline
+(empty / duplicate names), so a bad value never silently closes the dialog.
+
+Push it with :func:`show_input`, which sizes and centers the layer with the
+shared shadow / dim-below intent the other PuiKit modals use, and can anchor it
+over the active pane via ``region`` (the same contract as ``show_filter_list``).
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
+from puikit.backend import Style, TextAttribute
+from puikit.event import Event, EventType
+from puikit.focus import FocusContainer, focus_on_click
+from puikit.panel import Rect
+from puikit.widgets.base import Widget
+from puikit.widgets.text_edit import TextEdit
+
+
+class InputDialog(FocusContainer, Widget):
+    """Modal single-line text prompt. Construct via :func:`show_input`, which
+    sizes and pushes the layer; this class owns layout, focus, and events."""
+
+    focusable = True
+    # Always handles keys itself (escape closes), so it stays a focus stop.
+    focus_stop_when_empty = True
+
+    def __init__(
+        self,
+        *,
+        title: str = "",
+        prompt: str = "",
+        text: str = "",
+        on_accept: Callable[[str], None] | None = None,
+        on_cancel: Callable[[], None] | None = None,
+        validate: Callable[[str], str | None] | None = None,
+    ):
+        self.title = title
+        self.prompt = prompt
+        self.on_accept = on_accept
+        self.on_cancel = on_cancel
+        self.validate = validate
+        self._panel: Any = None
+        self._error = ""
+
+        self.edit = TextEdit(text=text)
+        # Start with the whole value selected so typing replaces it (rename),
+        # while the caret sits at the end for an empty field (create).
+        self.edit.cursor = len(text)
+        self.edit._anchor = 0
+        self._field_rect = Rect(0.0, 0.0, 0.0, 0.0)
+        self._size: tuple[float, float] = (0.0, 0.0)
+
+    # --- focus ---------------------------------------------------------------
+
+    def focus_children(self) -> list[Any]:
+        return [self.edit]
+
+    # --- outcome -------------------------------------------------------------
+
+    def _accept(self) -> None:
+        text = self.edit.text
+        if self.validate is not None:
+            error = self.validate(text)
+            if error:
+                self._error = error
+                if self._panel is not None:
+                    self._panel.render()
+                return
+        self._close()
+        if self.on_accept is not None:
+            self.on_accept(text)
+
+    def _cancel(self) -> None:
+        self._close()
+        if self.on_cancel is not None:
+            self.on_cancel()
+
+    def _close(self) -> None:
+        panel = self._panel
+        if panel is not None and panel.has_layers and panel._layers[-1].widget is self:
+            panel.pop_layer()
+
+    # --- drawing -------------------------------------------------------------
+
+    def draw(self, ctx) -> None:
+        self._panel = ctx.panel
+        self._size = ctx.size_units
+        theme = ctx.theme
+        wu, _ = ctx.size_units
+        surface_bg = theme.popup_bg if theme is not None else None
+        box_style = Style(bg=surface_bg, fg=theme.popup_border if theme else None)
+        ctx.draw_box(0, 0, ctx.width, ctx.height, box_style, hints={"fill": True})
+
+        pad = 1.0
+        y = pad
+        if self.title:
+            ctx.draw_text(2, y, self.title, Style(bg=surface_bg, attr=TextAttribute.BOLD))
+            y += 2
+
+        # Prompt label + field on one row; the field fills the rest of the width.
+        field_x = 2.0
+        if self.prompt:
+            ctx.draw_text(2, y, self.prompt, Style(bg=surface_bg))
+            field_x = 2.0 + ctx.measure_text(self.prompt + " ")
+        field_w = max(1.0, wu - field_x - 2.0)
+        self._field_rect = Rect(field_x, y, field_w, 1.0)
+        ctx.draw_child(
+            self.edit, field_x, y, field_w, 1.0, hints={"focused": True},
+        )
+        y += 2
+
+        if self._error:
+            ctx.draw_text(2, y, self._error,
+                          Style(bg=surface_bg, fg=(229, 110, 110), attr=TextAttribute.DIM))
+
+    # --- events --------------------------------------------------------------
+
+    def handle_event(self, event: Event) -> bool:
+        if event.type is EventType.KEY:
+            key = event.key
+            if key == "escape":
+                self._cancel()
+            elif key == "enter":
+                self._accept()
+            else:
+                # Editing clears a stale validation message as the user retypes.
+                self._error = ""
+                self.edit.handle_event(event)
+            return True
+
+        if event.type in (
+            EventType.MOUSE_DOWN, EventType.MOUSE_UP, EventType.MOUSE_CLICK,
+            EventType.MOUSE_DRAG, EventType.MOUSE_SCROLL,
+        ):
+            if event.x is not None and self._field_rect.contains(event.x, event.y):
+                if event.type is EventType.MOUSE_DOWN:
+                    focus_on_click(self, self.edit)
+                local = event.translated(-self._field_rect.x, -self._field_rect.y)
+                self.edit.handle_event(local)
+            elif event.type is EventType.MOUSE_CLICK and event.x is not None and not (
+                0 <= event.x < self._size[0] and 0 <= event.y < self._size[1]
+            ):
+                self._cancel()  # click outside the dialog dismisses it
+            return True
+        return True  # modal: swallow everything else
+
+
+def show_input(
+    panel: Any,
+    *,
+    title: str = "",
+    prompt: str = "",
+    text: str = "",
+    on_accept: Callable[[str], None] | None = None,
+    on_cancel: Callable[[], None] | None = None,
+    validate: Callable[[str], str | None] | None = None,
+    region: tuple[float, float] | None = None,
+    z: int = 70,
+) -> InputDialog:
+    """Push a modal :class:`InputDialog` over ``panel`` and return it.
+
+    Sized to a comfortable fraction of the window and centered, with the shared
+    shadow + dim-below modal intent. The entered text is reported through
+    ``on_accept``; ``on_cancel`` fires on escape / outside-click. ``region`` is
+    an optional ``(x, width)`` column span to anchor the dialog over the pane it
+    acts on (see :func:`tfm_filter_list_dialog.show_filter_list`)."""
+    dialog = InputDialog(
+        title=title, prompt=prompt, text=text,
+        on_accept=on_accept, on_cancel=on_cancel, validate=validate,
+    )
+    sw, sh = panel.backend.size_units
+    w = max(36.0, min(sw * 0.6, 64.0))
+    h = 7.0
+    hints: dict[str, Any] = {"shadow": True, "dim_below": True, "w": w, "h": h}
+    if region is not None:
+        region_x, region_w = region
+        w = min(w, region_w)
+        hints["w"] = w
+        hints["x"] = max(0.0, min(region_x + (region_w - w) / 2.0, sw - w))
+    dialog._panel = panel
+    panel.push_layer(dialog, z=z, hints=hints)
+    panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
+    return dialog
