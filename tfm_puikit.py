@@ -391,8 +391,20 @@ class TfmApp:
             self.panel, favorites, title="Go to Favorite",
             to_label=lambda fav: f"{fav['name']}  —  {fav['path']}",
             on_accept=self._jump_to_favorite,
+            region=self._active_pane_region(),
         )
         self.panel.render()
+
+    def _active_pane_region(self) -> tuple[float, float]:
+        """The ``(x, width)`` column span of the active pane, in base units, for
+        anchoring pane-targeting dialogs over the pane they act on. Mirrors the
+        pane_splitter geometry: the left pane gets ``left_pane_ratio`` of the
+        width, the right pane the remainder."""
+        sw, _ = self.panel.backend.size_units
+        left_w = sw * self.pm.left_pane_ratio
+        if self.pm.active_pane == "left":
+            return (0.0, left_w)
+        return (left_w, sw - left_w)
 
     def _jump_to_favorite(self, fav: dict) -> None:
         pane = self.active_pane()

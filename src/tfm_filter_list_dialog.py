@@ -187,22 +187,35 @@ def show_filter_list(
     to_label: Callable[[Any], str] = str,
     on_accept: Callable[[Any], None] | None = None,
     on_cancel: Callable[[], None] | None = None,
+    region: tuple[float, float] | None = None,
     z: int = 70,
 ) -> FilterListDialog:
     """Push a modal :class:`FilterListDialog` over ``panel`` and return it.
 
     Sized to a comfortable fraction of the window and centered, with the shared
     shadow + dim-below modal intent. The chosen value is reported through
-    ``on_accept``; ``on_cancel`` fires on escape / outside-click."""
+    ``on_accept``; ``on_cancel`` fires on escape / outside-click.
+
+    ``region`` is an optional ``(x, width)`` column span (in base units) to anchor
+    the dialog within instead of the whole window — used to place a pane-targeting
+    picker (favorites, drives, …) over the active pane, so the user can tell which
+    pane it will act on. The dialog is centered within the region and never wider
+    than it."""
     dialog = FilterListDialog(
         items, title=title, to_label=to_label, on_accept=on_accept, on_cancel=on_cancel,
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 72.0))
     h = max(8.0, min(sh * 0.6, float(len(items) + 5)))
+    hints: dict[str, Any] = {"shadow": True, "dim_below": True, "w": w, "h": h}
+    if region is not None:
+        region_x, region_w = region
+        # Constrain to the region and center within it; clamp on-screen so a
+        # narrow pane near the window edge still shows the whole dialog.
+        w = min(w, region_w)
+        hints["w"] = w
+        hints["x"] = max(0.0, min(region_x + (region_w - w) / 2.0, sw - w))
     dialog._panel = panel
-    panel.push_layer(
-        dialog, z=z, hints={"shadow": True, "dim_below": True, "w": w, "h": h}
-    )
+    panel.push_layer(dialog, z=z, hints=hints)
     panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
     return dialog
