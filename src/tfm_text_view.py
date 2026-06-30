@@ -157,6 +157,19 @@ def _highlight(lines: list[str], path) -> list[list[tuple[str, Any]]]:
         return plain
 
 
+def draw_hscrollbar(ctx, x: float, y: float, w: float, left: float,
+                    content_w: int, max_line: int) -> None:
+    """Draw a horizontal scrollbar spanning ``w`` columns in the row at ``y``.
+    ``left`` is the first visible column, ``content_w`` the visible width, and
+    ``max_line`` the longest line. A thin convenience wrapper that computes the
+    thumb position/ratio and defers to the ``draw_scrollbar`` primitive (which
+    renders the bar at the vertical bar's thickness, centered in the row)."""
+    ratio = min(1.0, content_w / max_line) if max_line > 0 else 1.0
+    denom = max_line - content_w
+    pos = max(0.0, min(1.0, left / denom)) if denom > 0 else 0.0
+    ctx.draw_scrollbar(x, y, w, pos, ratio, orientation="horizontal")
+
+
 class _ScrollBody(Widget):
     """A clip region whose draw delegates to a callback. Lets a viewer render its
     scrolling rows at a *fractional* vertical offset (smooth GUI scroll): the
@@ -279,8 +292,11 @@ class TextViewer(Widget):
         self._gutter = gutter_w
         self._content_x = gutter_w
         self._content_w = max(1, w - gutter_w - 1)
-        self._view_h = max(1, h - 2)  # header + footer
         self._bg, self._text_fg, self._muted = bg, text_fg, muted
+        # A horizontal scrollbar (no-wrap only) steals a row when a line overruns
+        # the content width; the header and footer always take one each.
+        show_hbar = not self.wrap and self._max_line > self._content_w
+        self._view_h = max(1, h - 2 - (1 if show_hbar else 0))
         if self.wrap:
             self._rebuild_wrap(self._content_w)
         self._clamp()
@@ -297,6 +313,11 @@ class TextViewer(Widget):
             sbpos = self.top / denom if denom > 0 else 0.0
             ctx.draw_scrollbar(ctx.size_units[0] - 1, 1, self._view_h,
                                max(0.0, min(1.0, sbpos)), ratio)
+
+        # Horizontal scrollbar, in the row between the content and the footer.
+        if show_hbar:
+            draw_hscrollbar(ctx, self._content_x, 1 + self._view_h, self._content_w,
+                            self.left, self._content_w, self._max_line)
 
         # Footer: search bar or hint.
         fy = h - 1

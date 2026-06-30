@@ -24,7 +24,7 @@ from puikit.panel import Rect
 from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
-from tfm_text_view import MONO, _ScrollBody, _highlight, _read_lines
+from tfm_text_view import MONO, _ScrollBody, _highlight, _read_lines, draw_hscrollbar
 
 #: Whole-row tints by diff tag.
 _DEL_BG = (60, 30, 30)
@@ -227,6 +227,22 @@ class DiffViewer(Widget):
         self.top = max(0.0, min(self.top, float(max(0, len(self.rows) - self._view_h))))
         self.left = max(0.0, min(self.left, float(max(0, self._max_line - 1))))
 
+    def _pane_columns(self, wu: float, gutter: int) -> tuple[float, int, float, int]:
+        """``(left_x, left_content_w, right_x, right_content_w)`` for the two panes'
+        content regions (after the gutter; the right side reserves the scrollbar
+        column). Uses the splitter's actual rects once it has drawn, falling back
+        to the fraction before the first draw."""
+        fr, sr = self.splitter._first_rect, self.splitter._second_rect
+        if fr.w > 0:
+            lx, lw = fr.x, fr.w
+            rx, rw = sr.x, sr.w
+        else:  # before the first splitter draw
+            frac = self.splitter.fraction
+            lx, lw = 0.0, frac * wu
+            rx, rw = lw, wu - lw
+        return (lx + gutter, max(1, int(lw) - gutter),
+                rx + gutter, max(1, int(rw) - gutter - 1))
+
     def _step_block(self, delta: int) -> None:
         if not self.blocks:
             return
@@ -248,7 +264,17 @@ class DiffViewer(Widget):
         bg = getattr(theme, "popup_bg", None) if theme is not None else None
         muted = theme.muted_text if theme is not None else (150, 150, 150)
         ctx.fill_rect(0, 0, wu, ctx.size_units[1], Style(bg=bg))
-        self._view_h = max(1, h - 2)  # minus a filename header row and a footer
+
+        # Each pane gets its own horizontal scrollbar (the panes pan together by
+        # self.left but have different widths). A row is reserved below the panes
+        # when either side's content overruns its width. The reserve decision uses
+        # the splitter's geometry from the *previous* frame (it persists), since
+        # the current rects are only set when the splitter draws below; the bars
+        # are then positioned from the fresh rects. One row, header, and footer.
+        gutter = self._gutter_w()
+        lx, lcw, rx, rcw = self._pane_columns(wu, gutter)
+        show_hbar = self._max_line > lcw or self._max_line > rcw
+        self._view_h = max(1, h - 2 - (1 if show_hbar else 0))
         self._clamp()
 
         # Two panes + the draggable divider fill the area above the footer.
@@ -260,6 +286,16 @@ class DiffViewer(Widget):
             ratio = self._view_h / len(self.rows)
             ctx.draw_scrollbar(wu - 1, 1, self._view_h,
                                max(0.0, min(1.0, self.top / denom if denom else 0.0)), ratio)
+
+        # One horizontal scrollbar per pane, positioned from the now-current
+        # splitter rects, in the reserved row below the content.
+        if show_hbar:
+            lx, lcw, rx, rcw = self._pane_columns(wu, gutter)
+            hy = 1 + self._view_h
+            if self._max_line > lcw:
+                draw_hscrollbar(ctx, lx, hy, lcw, self.left, lcw, self._max_line)
+            if self._max_line > rcw:
+                draw_hscrollbar(ctx, rx, hy, rcw, self.left, rcw, self._max_line)
 
         hint = (f" {len(self.rows)} rows · {len(self.blocks)} changes · "
                 "n/N jump · ←→ pan · drag divider · q close ")
