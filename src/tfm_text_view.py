@@ -163,11 +163,15 @@ def draw_hscrollbar(ctx, x: float, y: float, w: float, left: float,
     ``left`` is the first visible column, ``content_w`` the visible width, and
     ``max_line`` the longest line. A thin convenience wrapper that computes the
     thumb position/ratio and defers to the ``draw_scrollbar`` primitive (which
-    renders the bar at the vertical bar's thickness, centered in the row)."""
+    renders the bar at the vertical bar's thickness, centered in the row).
+
+    The viewer's surface (``popup_bg``) is passed so the half-block bar's upper
+    half blends with the client area on a character grid."""
     ratio = min(1.0, content_w / max_line) if max_line > 0 else 1.0
     denom = max_line - content_w
     pos = max(0.0, min(1.0, left / denom)) if denom > 0 else 0.0
-    ctx.draw_scrollbar(x, y, w, pos, ratio, orientation="horizontal")
+    surface = getattr(ctx.theme, "popup_bg", None) if ctx.theme is not None else None
+    ctx.draw_scrollbar(x, y, w, pos, ratio, orientation="horizontal", surface=surface)
 
 
 class _ScrollBody(Widget):
