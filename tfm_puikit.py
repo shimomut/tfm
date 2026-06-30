@@ -42,7 +42,9 @@ from tfm_input_dialog import show_input  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 from tfm_batch_rename_view import show_batch_rename  # noqa: E402
+from tfm_diff_view import show_diff_viewer  # noqa: E402
 from tfm_text_dialog import show_text  # noqa: E402
+from tfm_text_view import show_text_viewer  # noqa: E402
 
 
 class PaneHeader(Widget):
@@ -284,6 +286,12 @@ class TfmApp:
         elif action == "jump_to_path":
             self.jump_to_path()
             return False
+        elif action == "view_file":
+            self.view_file()
+            return False
+        elif action == "diff_files":
+            self.diff_files()
+            return False
         elif action == "help":
             self.show_help()
             return False
@@ -337,6 +345,8 @@ class TfmApp:
         file_menu = Menu(
             MenuItem("Open", on_select=lambda: self._menu("open_item"),
                      enabled=has_files, shortcut="Enter"),
+            MenuItem("View File", on_select=self.view_file,
+                     enabled=has_files, shortcut="V"),
             MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
                      shortcut="Backspace"),
             MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut="J"),
@@ -355,6 +365,8 @@ class TfmApp:
             MenuItem("Select All Items", on_select=lambda: self._menu("select_all")),
             MenuItem("Clear Selection", on_select=lambda: self._menu("unselect_all"),
                      enabled=lambda: bool(self.active_pane()["selected_files"])),
+            SEPARATOR,
+            MenuItem("Compare Selected Files…", on_select=self.diff_files, shortcut="="),
             title="Select",
         )
         view_menu = Menu(
@@ -568,6 +580,45 @@ class TfmApp:
         show_batch_rename(self.panel, files, on_done=done)
         self.panel.render()
 
+    def view_file(self) -> None:
+        """Open the focused file in the built-in text viewer (directories are
+        skipped). Binary files show a placeholder rather than garbage."""
+        pane = self.active_pane()
+        files = pane["files"]
+        if not files:
+            return
+        entry = files[pane["focused_index"]]
+        try:
+            if entry.is_dir():
+                self.log_info(f"{entry.name} is a directory")
+                return
+        except Exception:
+            pass
+        show_text_viewer(self.panel, entry)
+        self.panel.render()
+
+    def diff_files(self) -> None:
+        """Compare exactly two selected files side by side. Files may be selected
+        across both panes (mirrors ttk TFM)."""
+        selected: list = []
+        for name in ("left", "right"):
+            pane = self.pane(name)
+            for entry in pane["files"]:
+                if str(entry) in pane["selected_files"]:
+                    selected.append(entry)
+        files = []
+        for entry in selected:
+            try:
+                if not entry.is_dir():
+                    files.append(entry)
+            except Exception:
+                pass
+        if len(files) != 2:
+            self.log_info(f"Select exactly 2 files to compare (selected {len(files)})")
+            return
+        show_diff_viewer(self.panel, files[0], files[1])
+        self.panel.render()
+
     def jump_to_path(self) -> None:
         """Prompt for a directory path and navigate the active pane there.
         Accepts ``~``, relative (to the current path), and absolute paths;
@@ -640,6 +691,8 @@ class TfmApp:
             ("rename_file", "Rename file/directory"),
         )),
         ("View", (
+            ("view_file", "View file (text viewer)"),
+            ("diff_files", "Compare two selected files"),
             ("toggle_hidden", "Toggle hidden files"),
             ("sort_menu", "Sort options (menu)"),
         )),
@@ -689,6 +742,7 @@ class TfmApp:
         selected = entry is not None and str(entry) in pane["selected_files"]
         menu = Menu(
             MenuItem("Open", on_select=lambda: self._menu("open_item")),
+            MenuItem("View File", on_select=self.view_file, enabled=entry is not None),
             MenuItem("Deselect" if selected else "Select",
                      on_select=lambda: self._menu("select_file")),
             SEPARATOR,
