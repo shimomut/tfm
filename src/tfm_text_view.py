@@ -181,10 +181,11 @@ class TextViewer(Widget):
         self.highlighted = _highlight(self.lines, path)
         self._panel: Any = None
         self.top = 0.0       # first visible display row (vertical scroll)
-        self.left = 0        # horizontal scroll, columns (no-wrap only)
+        self.left = 0.0      # horizontal scroll, columns — float for smooth pan
         self.wrap = False
         self._view_h = 1
         self._content_w = 1
+        self._max_line = max((len(line) for line in self.lines), default=0)
         # Wrap layout cache: keyed on content width, maps display row -> (line,
         # chunk) so wrapped rows virtualize without re-splitting every frame.
         self._wrap_w = -1
@@ -222,8 +223,8 @@ class TextViewer(Widget):
     def _clamp(self) -> None:
         max_top = max(0, self._total_rows() - self._view_h)
         self.top = max(0.0, min(self.top, float(max_top)))
-        if self.left < 0:
-            self.left = 0
+        # No horizontal scroll while wrapping; otherwise clamp to the content.
+        self.left = 0.0 if self.wrap else max(0.0, min(self.left, float(max(0, self._max_line - 1))))
 
     # --- search --------------------------------------------------------------
 
@@ -324,37 +325,45 @@ class TextViewer(Widget):
             y = vis - frac
             if self.wrap:
                 line_idx, chunk = self._row_map[row]
-                col0 = chunk * self._content_w
+                col0 = float(chunk * self._content_w)
                 show_no = chunk == 0
             else:
                 line_idx, col0, show_no = row, self.left, True
+            # Content first, then the gutter — the gutter fill masks the partial
+            # left column that a fractional horizontal offset bleeds leftward.
+            self._draw_line(ctx, y, line_idx, col0)
+            ctx.fill_rect(0, y, self._content_x, 1.0, Style(bg=self._bg))
             if show_no:
                 num = str(line_idx + 1).rjust(self._gutter - 1)
                 ctx.draw_text(0, y, num, Style(fg=self._muted, bg=self._bg, font=MONO))
-            self._draw_line(ctx, y, line_idx, col0)
 
     def _draw_line(self, ctx, y, line_idx, col0) -> None:
-        """Draw source line ``line_idx`` showing columns [col0, col0+content_w)."""
+        """Draw source line ``line_idx`` showing columns [col0, col0+content_w).
+        ``col0`` may be fractional: the view shifts left by its fractional part
+        (``xfrac``) for smooth horizontal scroll, with one extra column drawn so
+        the right edge fills; the gutter (drawn after) masks the left bleed."""
         content_x, text_fg, bg = self._content_x, self._text_fg, self._bg
-        window_end = col0 + self._content_w
+        col0_int = int(col0)
+        xfrac = col0 - col0_int
+        window_end = col0_int + self._content_w + (1 if xfrac > 0 else 0)
         col = 0
         for text, fg in self.highlighted[line_idx]:
             seg_end = col + len(text)
-            vis_start = max(col, col0)
+            vis_start = max(col, col0_int)
             vis_end = min(seg_end, window_end)
             if vis_end > vis_start:
                 sub = text[vis_start - col: vis_end - col]
                 style_fg = _ERROR_FG if self.is_error else (fg if fg is not None else text_fg)
-                ctx.draw_text(content_x + (vis_start - col0), y, sub,
+                ctx.draw_text(content_x + (vis_start - col0_int) - xfrac, y, sub,
                               Style(fg=style_fg, bg=bg, font=MONO))
             col = seg_end
             if col >= window_end:
                 break
         # Overlay search highlights for this column window.
         if self.pattern:
-            self._draw_matches(ctx, y, line_idx, col0, window_end, content_x, text_fg)
+            self._draw_matches(ctx, y, line_idx, col0_int, xfrac, window_end, content_x, text_fg)
 
-    def _draw_matches(self, ctx, y, line_idx, col0, window_end, content_x, text_fg) -> None:
+    def _draw_matches(self, ctx, y, line_idx, col0_int, xfrac, window_end, content_x, text_fg) -> None:
         plain = self.lines[line_idx].lower()
         pat = self.pattern.lower()
         if not pat:
@@ -367,13 +376,13 @@ class TextViewer(Widget):
                 break
             s, e = hit, hit + len(pat)
             start = e
-            vis_start = max(s, col0)
+            vis_start = max(s, col0_int)
             vis_end = min(e, window_end)
             if vis_end <= vis_start:
                 continue
             sub = self.lines[line_idx][vis_start:vis_end]
             hl_bg = _CURRENT_MATCH_BG if is_current else _MATCH_BG
-            ctx.draw_text(content_x + (vis_start - col0), y, sub,
+            ctx.draw_text(content_x + (vis_start - col0_int) - xfrac, y, sub,
                           Style(fg=text_fg, bg=hl_bg, font=MONO))
 
     # --- events --------------------------------------------------------------
@@ -385,8 +394,11 @@ class TextViewer(Widget):
 
     def handle_event(self, event: Event) -> bool:
         if event.type is EventType.MOUSE_SCROLL:
-            amount = event.hints.get("scroll_units")
-            self.top -= float(amount) if amount is not None else float(event.scroll)
+            uy = event.hints.get("scroll_units")
+            self.top -= float(uy) if uy is not None else float(event.scroll)
+            ux = event.hints.get("scroll_units_x")  # precise horizontal swipe
+            if ux is not None and not self.wrap:
+                self.left -= float(ux)
             self._clamp()
             return True
         if event.type is not EventType.KEY:
@@ -412,10 +424,10 @@ class TextViewer(Widget):
         elif key == "right" and not self.wrap:
             self.left += 4
         elif key == "left" and not self.wrap:
-            self.left = max(0, self.left - 4)
+            self.left = max(0.0, self.left - 4)
         elif event.char == "w":
             self.wrap = not self.wrap
-            self.left = 0
+            self.left = 0.0
             self._wrap_w = -1
         elif event.char == "/":
             self.searching = True

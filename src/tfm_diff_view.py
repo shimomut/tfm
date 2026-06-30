@@ -21,6 +21,7 @@ from typing import Any
 from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
 from puikit.panel import Rect
+from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
 from tfm_text_view import MONO, _ScrollBody, _highlight, _read_lines
@@ -88,10 +89,118 @@ def compute_diff(lines1: list[str], lines2: list[str]) -> tuple[list[dict], list
     return rows, blocks
 
 
+def _side_bg(row: dict, side: str) -> tuple[int, int, int] | None:
+    """Whole-row tint for one side of a diff row (None for an unchanged line)."""
+    tag = row["tag"]
+    if tag == "equal":
+        return None
+    if tag == "replace":
+        return _REPLACE_BG
+    if tag == "delete":
+        return _DEL_BG if side == "l" else _EMPTY_BG
+    return _EMPTY_BG if side == "l" else _INS_BG  # insert
+
+
+class _DiffPane(Widget):
+    """One side of the diff — its filename header, gutter, and scrolling content.
+    Reads shared scroll state (``top``/``left``/``_view_h``) from the parent
+    :class:`DiffViewer`, so the two sides stay row-aligned and pan together; only
+    the split *width* differs (the Splitter owns that). The scrolling rows live
+    in a clipped child for smooth fractional scroll on both axes."""
+
+    def __init__(self, viewer: "DiffViewer", side: str):
+        self.v = viewer
+        self.side = side                 # "l" (left/old) or "r" (right/new)
+        self._body = _ScrollBody(self._draw_rows)
+        self._w = 1
+        self._gutter = 2
+        self._content_x = 2
+        self._content_w = 1
+        self._bg = self._text_fg = self._muted = None
+
+    def draw(self, ctx) -> None:
+        v = self.v
+        theme = ctx.theme
+        w = ctx.width
+        bg = getattr(theme, "popup_bg", None) if theme is not None else None
+        accent = theme.accent if theme is not None else (0, 122, 204)
+        self._bg = bg
+        self._text_fg = theme.text if theme is not None else (212, 212, 212)
+        self._muted = theme.muted_text if theme is not None else (150, 150, 150)
+        self._gutter = v._gutter_w()
+        self._content_x = self._gutter
+        self._w = w
+        # The right pane leaves a column for the shared scrollbar at the edge.
+        reserve = 1 if self.side == "r" else 0
+        self._content_w = max(1, w - self._gutter - reserve)
+
+        name = v.path1.name if self.side == "l" else v.path2.name
+        ctx.draw_text(0, 0, f" {name}"[:w], Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
+        # Content below the filename header, clipped for smooth scroll.
+        ctx.draw_child(self._body, 0, 1, w, float(v._view_h))
+
+    def _draw_rows(self, ctx) -> None:
+        v = self.v
+        side = self.side
+        bg, muted, text_fg = self._bg, self._muted, self._text_fg
+        content_x, content_w = self._content_x, self._content_w
+        highlighted = v.hl1 if side == "l" else v.hl2
+        char_bg = _CHAR_DEL_BG if side == "l" else _CHAR_INS_BG
+        first = int(v.top)
+        vfrac = v.top - first
+        col0_int = int(v.left)
+        xfrac = v.left - col0_int
+        window_end = col0_int + content_w + (1 if xfrac > 0 else 0)
+        for vis in range(v._view_h + 1):
+            ri = first + vis
+            if ri >= len(v.rows):
+                break
+            y = vis - vfrac
+            row = v.rows[ri]
+            lineno = row["n1"] if side == "l" else row["n2"]
+            plain = row["l1"] if side == "l" else row["l2"]
+            cranges = row["cr1"] if side == "l" else row["cr2"]
+            side_bg = _side_bg(row, side)
+            row_bg = side_bg if side_bg is not None else bg
+            if side_bg is not None:
+                ctx.fill_rect(0, y, self._w, 1.0, Style(bg=side_bg))
+            if lineno is not None:
+                segs = highlighted[lineno - 1] if 0 <= lineno - 1 < len(highlighted) else [(plain, None)]
+                col = 0
+                for text, fg in segs:
+                    seg_end = col + len(text)
+                    vis_start = max(col, col0_int)
+                    vis_end = min(seg_end, window_end)
+                    if vis_end > vis_start:
+                        sub = text[vis_start - col: vis_end - col]
+                        ctx.draw_text(content_x + (vis_start - col0_int) - xfrac, y, sub,
+                                      Style(fg=fg if fg is not None else text_fg, bg=row_bg, font=MONO))
+                    col = seg_end
+                    if col >= window_end:
+                        break
+                for s, e in (cranges or []):
+                    vs, ve = max(s, col0_int), min(e, window_end)
+                    if ve > vs:
+                        ctx.draw_text(content_x + (vs - col0_int) - xfrac, y, plain[vs:ve],
+                                      Style(fg=text_fg, bg=char_bg, font=MONO))
+            # Gutter (after content) masks the left horizontal bleed, then numbers.
+            ctx.fill_rect(0, y, content_x, 1.0, Style(bg=row_bg))
+            if lineno is not None:
+                ctx.draw_text(0, y, str(lineno).rjust(self._gutter - 1),
+                              Style(fg=muted, bg=row_bg, font=MONO))
+
+
 class DiffViewer(Widget):
-    """Full-window modal side-by-side diff. Construct via :func:`show_diff_viewer`."""
+    """Full-window modal side-by-side diff. Two :class:`_DiffPane` children sit in
+    a draggable :class:`Splitter`; a shared scrollbar and footer are chrome.
+    Construct via :func:`show_diff_viewer`."""
 
     focusable = True
+
+    _MOUSE = frozenset({
+        EventType.MOUSE_DOWN, EventType.MOUSE_UP,
+        EventType.MOUSE_CLICK, EventType.MOUSE_DRAG,
+    })
 
     def __init__(self, path1, path2):
         self.path1, self.path2 = path1, path2
@@ -102,19 +211,21 @@ class DiffViewer(Widget):
         self.rows, self.blocks = compute_diff(self.lines1, self.lines2)
         self._panel: Any = None
         self.top = 0.0
-        self.left = 0
+        self.left = 0.0
         self._view_h = 1
-        # Layout captured each draw, read by the clipped scroll body.
-        self._body = _ScrollBody(self._draw_rows)
-        self._cols: dict = {}
-        self._bg = self._text_fg = self._muted = None
+        self._max_line = max((len(line) for line in self.lines1 + self.lines2), default=0)
+        self.left_pane = _DiffPane(self, "l")
+        self.right_pane = _DiffPane(self, "r")
+        self.splitter = Splitter(self.left_pane, self.right_pane,
+                                 orientation="horizontal", fraction=0.5,
+                                 min_first=10, min_second=10)
 
     def _gutter_w(self) -> int:
         return len(str(max(1, len(self.lines1), len(self.lines2)))) + 1
 
     def _clamp(self) -> None:
         self.top = max(0.0, min(self.top, float(max(0, len(self.rows) - self._view_h))))
-        self.left = max(0, self.left)
+        self.left = max(0.0, min(self.left, float(max(0, self._max_line - 1))))
 
     def _step_block(self, delta: int) -> None:
         if not self.blocks:
@@ -135,112 +246,24 @@ class DiffViewer(Widget):
         w, h = ctx.width, ctx.height
         wu = ctx.size_units[0]
         bg = getattr(theme, "popup_bg", None) if theme is not None else None
-        text_fg = theme.text if theme is not None else (212, 212, 212)
         muted = theme.muted_text if theme is not None else (150, 150, 150)
-        accent = theme.accent if theme is not None else (0, 122, 204)
         ctx.fill_rect(0, 0, wu, ctx.size_units[1], Style(bg=bg))
-
-        gutter = self._gutter_w()
-        side_w = (w - 1) // 2            # one column reserved for the divider
-        r_gutter_x = side_w + 1
-        r_content_x = r_gutter_x + gutter
-        self._cols = {
-            "sep_x": side_w,
-            "l_content_x": gutter, "l_content_w": max(1, side_w - gutter),
-            "r_gutter_x": r_gutter_x, "r_content_x": r_content_x,
-            "r_content_w": max(1, w - r_content_x - 1),
-        }
-        self._bg, self._text_fg, self._muted = bg, text_fg, muted
-        self._view_h = max(1, h - 2)
+        self._view_h = max(1, h - 2)  # minus a filename header row and a footer
         self._clamp()
 
-        # Header.
-        ctx.draw_text(0, 0, f" {self.path1.name}"[:side_w],
-                      Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
-        ctx.draw_text(r_gutter_x, 0, f" {self.path2.name}"[:self._cols['r_content_w'] + gutter],
-                      Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
+        # Two panes + the draggable divider fill the area above the footer.
+        ctx.draw_child(self.splitter, 0, 0, wu, float(max(1, h - 1)))
 
-        # Scrolling rows in a clipped child for smooth fractional GUI scroll.
-        ctx.draw_child(self._body, 0, 1, wu, float(self._view_h))
-
+        # Shared vertical scrollbar over the right edge of the content.
         if len(self.rows) > self._view_h:
             denom = len(self.rows) - self._view_h
             ratio = self._view_h / len(self.rows)
             ctx.draw_scrollbar(wu - 1, 1, self._view_h,
                                max(0.0, min(1.0, self.top / denom if denom else 0.0)), ratio)
 
-        changes = len(self.blocks)
-        hint = f" {len(self.rows)} rows · {changes} change blocks · n/N jump · ←→ pan · q close "
+        hint = (f" {len(self.rows)} rows · {len(self.blocks)} changes · "
+                "n/N jump · ←→ pan · drag divider · q close ")
         ctx.draw_text(0, h - 1, hint[:w], Style(fg=muted, bg=bg, attr=TextAttribute.DIM))
-
-    def _draw_rows(self, ctx) -> None:
-        """Render the visible diff rows into the clipped body, shifted up by the
-        fractional part of ``self.top`` for smooth GUI scroll."""
-        c = self._cols
-        text_fg, muted, bg = self._text_fg, self._muted, self._bg
-        first = int(self.top)
-        frac = self.top - first
-        for vis in range(self._view_h + 1):
-            ri = first + vis
-            if ri >= len(self.rows):
-                break
-            y = vis - frac
-            row = self.rows[ri]
-            ctx.draw_text(c["sep_x"], y, "│", Style(fg=muted, bg=bg))
-            self._draw_side(ctx, y, 0, c["l_content_x"], c["l_content_w"],
-                            row["n1"], row["l1"], self.hl1, self._side_bg(row, "l"),
-                            row["cr1"], _CHAR_DEL_BG, text_fg, muted, bg)
-            self._draw_side(ctx, y, c["r_gutter_x"], c["r_content_x"], c["r_content_w"],
-                            row["n2"], row["l2"], self.hl2, self._side_bg(row, "r"),
-                            row["cr2"], _CHAR_INS_BG, text_fg, muted, bg)
-
-    @staticmethod
-    def _side_bg(row: dict, side: str) -> tuple[int, int, int] | None:
-        tag = row["tag"]
-        if tag == "equal":
-            return None
-        if tag == "replace":
-            return _REPLACE_BG
-        if tag == "delete":
-            return _DEL_BG if side == "l" else _EMPTY_BG
-        # insert
-        return _EMPTY_BG if side == "l" else _INS_BG
-
-    def _draw_side(self, ctx, y, gutter_x, content_x, content_w, lineno, plain,
-                   highlighted, side_bg, char_ranges, char_bg, text_fg, muted, bg) -> None:
-        # Row tint fills the gutter + content for this side.
-        if side_bg is not None:
-            ctx.fill_rect(gutter_x, y, (content_x - gutter_x) + content_w, 1.0, Style(bg=side_bg))
-        row_bg = side_bg if side_bg is not None else bg
-        if lineno is not None:
-            ctx.draw_text(gutter_x, y, str(lineno).rjust(self._gutter_w() - 1),
-                          Style(fg=muted, bg=row_bg, font=MONO))
-        if lineno is None:
-            return
-        # Syntax segments for this line (clipped to the horizontal window).
-        segs = highlighted[lineno - 1] if 0 <= lineno - 1 < len(highlighted) else [(plain, None)]
-        col0, window_end = self.left, self.left + content_w
-        col = 0
-        for text, fg in segs:
-            seg_end = col + len(text)
-            vis_start = max(col, col0)
-            vis_end = min(seg_end, window_end)
-            if vis_end > vis_start:
-                sub = text[vis_start - col: vis_end - col]
-                ctx.draw_text(content_x + (vis_start - col0), y, sub,
-                              Style(fg=fg if fg is not None else text_fg, bg=row_bg, font=MONO))
-            col = seg_end
-            if col >= window_end:
-                break
-        # Char-level diff overlay (stronger bg over the changed spans).
-        if char_ranges:
-            for s, e in char_ranges:
-                vis_start = max(s, col0)
-                vis_end = min(e, window_end)
-                if vis_end <= vis_start:
-                    continue
-                ctx.draw_text(content_x + (vis_start - col0), y, plain[vis_start:vis_end],
-                              Style(fg=text_fg, bg=char_bg, font=MONO))
 
     # --- events --------------------------------------------------------------
 
@@ -251,9 +274,17 @@ class DiffViewer(Widget):
 
     def handle_event(self, event: Event) -> bool:
         if event.type is EventType.MOUSE_SCROLL:
-            amount = event.hints.get("scroll_units")
-            self.top -= float(amount) if amount is not None else float(event.scroll)
+            uy = event.hints.get("scroll_units")
+            self.top -= float(uy) if uy is not None else float(event.scroll)
+            ux = event.hints.get("scroll_units_x")
+            if ux is not None:
+                self.left -= float(ux)
             self._clamp()
+            return True
+        if event.type in self._MOUSE:
+            # Route to the splitter so the divider can be dragged (the panes
+            # themselves are display-only).
+            self.splitter.handle_event(event)
             return True
         if event.type is not EventType.KEY:
             return True
@@ -275,7 +306,7 @@ class DiffViewer(Widget):
         elif key == "right":
             self.left += 4
         elif key == "left":
-            self.left = max(0, self.left - 4)
+            self.left = max(0.0, self.left - 4)
         elif event.char == "n":
             self._step_block(1)
         elif event.char == "N":
