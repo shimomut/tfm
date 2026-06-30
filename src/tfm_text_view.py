@@ -24,6 +24,7 @@ from typing import Any, Sequence
 from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
 from puikit.font import Font
+from puikit.panel import Rect
 from puikit.widgets.base import Widget
 
 try:
@@ -156,6 +157,19 @@ def _highlight(lines: list[str], path) -> list[list[tuple[str, Any]]]:
         return plain
 
 
+class _ScrollBody(Widget):
+    """A clip region whose draw delegates to a callback. Lets a viewer render its
+    scrolling rows at a *fractional* vertical offset (smooth GUI scroll): the
+    partial top/bottom rows are trimmed by this child's clip instead of bleeding
+    into the header/footer the parent drew."""
+
+    def __init__(self, render):
+        self._render = render
+
+    def draw(self, ctx) -> None:
+        self._render(ctx)
+
+
 class TextViewer(Widget):
     """Full-window modal text viewer. Construct via :func:`show_text_viewer`."""
 
@@ -180,6 +194,11 @@ class TextViewer(Widget):
         self.pattern = ""
         self.matches: list[int] = []  # source line indices containing pattern
         self.match_pos = -1
+        # Layout captured each draw, read by the clipped scroll body.
+        self._body = _ScrollBody(self._draw_rows)
+        self._gutter = 2
+        self._content_x = 2
+        self._bg = self._text_fg = self._muted = None
 
     # --- layout helpers ------------------------------------------------------
 
@@ -256,30 +275,18 @@ class TextViewer(Widget):
         ctx.draw_text(max(0, ctx.size_units[0] - len(info)), 0, info, Style(fg=muted, bg=bg))
 
         gutter_w = self._gutter_w()
-        content_x = gutter_w
+        self._gutter = gutter_w
+        self._content_x = gutter_w
         self._content_w = max(1, w - gutter_w - 1)
         self._view_h = max(1, h - 2)  # header + footer
+        self._bg, self._text_fg, self._muted = bg, text_fg, muted
         if self.wrap:
             self._rebuild_wrap(self._content_w)
         self._clamp()
 
-        first = int(self.top)
-        for vis in range(self._view_h):
-            row = first + vis
-            y = vis + 1
-            if row >= self._total_rows():
-                break
-            if self.wrap:
-                line_idx, chunk = self._row_map[row]
-                col0 = chunk * self._content_w
-                show_no = chunk == 0
-            else:
-                line_idx, col0, show_no = row, self.left, True
-            # Gutter line number (only on the first wrapped chunk).
-            if show_no:
-                num = str(line_idx + 1).rjust(gutter_w - 1)
-                ctx.draw_text(0, y, num, Style(fg=muted, bg=bg, font=MONO))
-            self._draw_line(ctx, y, line_idx, col0, content_x, text_fg, bg)
+        # Scrolling rows live in a clipped child so a fractional self.top renders
+        # a partial top/bottom row (smooth GUI scroll) without touching the header.
+        ctx.draw_child(self._body, 0, 1, ctx.size_units[0], float(self._view_h))
 
         # Vertical scrollbar.
         total_rows = self._total_rows()
@@ -303,8 +310,32 @@ class TextViewer(Widget):
             hint = " ↑↓ scroll · ←→ pan · w wrap · / search · n/N next · q close "
             ctx.draw_text(0, fy, hint[:w], Style(fg=muted, bg=bg, attr=TextAttribute.DIM))
 
-    def _draw_line(self, ctx, y, line_idx, col0, content_x, text_fg, bg) -> None:
+    def _draw_rows(self, ctx) -> None:
+        """Render the visible rows into the clipped body. ``self.top``'s fractional
+        part shifts every row up by ``frac``, so the first/last rows are partial
+        (smooth scroll); the body's clip trims them at the content edges."""
+        first = int(self.top)
+        frac = self.top - first
+        # One extra row so the partial bottom row is present to be clipped.
+        for vis in range(self._view_h + 1):
+            row = first + vis
+            if row >= self._total_rows():
+                break
+            y = vis - frac
+            if self.wrap:
+                line_idx, chunk = self._row_map[row]
+                col0 = chunk * self._content_w
+                show_no = chunk == 0
+            else:
+                line_idx, col0, show_no = row, self.left, True
+            if show_no:
+                num = str(line_idx + 1).rjust(self._gutter - 1)
+                ctx.draw_text(0, y, num, Style(fg=self._muted, bg=self._bg, font=MONO))
+            self._draw_line(ctx, y, line_idx, col0)
+
+    def _draw_line(self, ctx, y, line_idx, col0) -> None:
         """Draw source line ``line_idx`` showing columns [col0, col0+content_w)."""
+        content_x, text_fg, bg = self._content_x, self._text_fg, self._bg
         window_end = col0 + self._content_w
         col = 0
         for text, fg in self.highlighted[line_idx]:
@@ -416,10 +447,13 @@ class TextViewer(Widget):
 
 
 def show_text_viewer(panel: Any, path, z: int = 80) -> TextViewer:
-    """Push a full-window modal :class:`TextViewer` over ``panel``."""
+    """Push a full-window modal :class:`TextViewer` over ``panel``. The ``reflow``
+    callback re-derives the layer rect from the live window size each render, so
+    the viewer follows terminal / window resizes."""
     viewer = TextViewer(path)
     sw, sh = panel.backend.size_units
     viewer._panel = panel
-    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh})
+    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh},
+                     reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     panel.animate(viewer, hints={"transition": "fade", "duration_ms": 120})
     return viewer

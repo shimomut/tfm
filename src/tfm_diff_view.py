@@ -20,9 +20,10 @@ from typing import Any
 
 from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
+from puikit.panel import Rect
 from puikit.widgets.base import Widget
 
-from tfm_text_view import MONO, _highlight, _read_lines
+from tfm_text_view import MONO, _ScrollBody, _highlight, _read_lines
 
 #: Whole-row tints by diff tag.
 _DEL_BG = (60, 30, 30)
@@ -103,6 +104,10 @@ class DiffViewer(Widget):
         self.top = 0.0
         self.left = 0
         self._view_h = 1
+        # Layout captured each draw, read by the clipped scroll body.
+        self._body = _ScrollBody(self._draw_rows)
+        self._cols: dict = {}
+        self._bg = self._text_fg = self._muted = None
 
     def _gutter_w(self) -> int:
         return len(str(max(1, len(self.lines1), len(self.lines2)))) + 1
@@ -137,36 +142,26 @@ class DiffViewer(Widget):
 
         gutter = self._gutter_w()
         side_w = (w - 1) // 2            # one column reserved for the divider
-        l_content_x = gutter
-        l_content_w = max(1, side_w - gutter)
-        sep_x = side_w
         r_gutter_x = side_w + 1
         r_content_x = r_gutter_x + gutter
-        r_content_w = max(1, w - r_content_x - 1)
+        self._cols = {
+            "sep_x": side_w,
+            "l_content_x": gutter, "l_content_w": max(1, side_w - gutter),
+            "r_gutter_x": r_gutter_x, "r_content_x": r_content_x,
+            "r_content_w": max(1, w - r_content_x - 1),
+        }
+        self._bg, self._text_fg, self._muted = bg, text_fg, muted
         self._view_h = max(1, h - 2)
         self._clamp()
 
         # Header.
         ctx.draw_text(0, 0, f" {self.path1.name}"[:side_w],
                       Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
-        ctx.draw_text(r_gutter_x, 0, f" {self.path2.name}"[:r_content_w + gutter],
+        ctx.draw_text(r_gutter_x, 0, f" {self.path2.name}"[:self._cols['r_content_w'] + gutter],
                       Style(fg=accent, bg=bg, attr=TextAttribute.BOLD))
 
-        first = int(self.top)
-        for vis in range(self._view_h):
-            ri = first + vis
-            y = vis + 1
-            if ri >= len(self.rows):
-                break
-            row = self.rows[ri]
-            # Divider.
-            ctx.draw_text(sep_x, y, "│", Style(fg=muted, bg=bg))
-            self._draw_side(ctx, y, 0, l_content_x, l_content_w, row["n1"], row["l1"],
-                            self.hl1, self._side_bg(row, "l"), row["cr1"], _CHAR_DEL_BG,
-                            text_fg, muted, bg)
-            self._draw_side(ctx, y, r_gutter_x, r_content_x, r_content_w, row["n2"], row["l2"],
-                            self.hl2, self._side_bg(row, "r"), row["cr2"], _CHAR_INS_BG,
-                            text_fg, muted, bg)
+        # Scrolling rows in a clipped child for smooth fractional GUI scroll.
+        ctx.draw_child(self._body, 0, 1, wu, float(self._view_h))
 
         if len(self.rows) > self._view_h:
             denom = len(self.rows) - self._view_h
@@ -177,6 +172,27 @@ class DiffViewer(Widget):
         changes = len(self.blocks)
         hint = f" {len(self.rows)} rows · {changes} change blocks · n/N jump · ←→ pan · q close "
         ctx.draw_text(0, h - 1, hint[:w], Style(fg=muted, bg=bg, attr=TextAttribute.DIM))
+
+    def _draw_rows(self, ctx) -> None:
+        """Render the visible diff rows into the clipped body, shifted up by the
+        fractional part of ``self.top`` for smooth GUI scroll."""
+        c = self._cols
+        text_fg, muted, bg = self._text_fg, self._muted, self._bg
+        first = int(self.top)
+        frac = self.top - first
+        for vis in range(self._view_h + 1):
+            ri = first + vis
+            if ri >= len(self.rows):
+                break
+            y = vis - frac
+            row = self.rows[ri]
+            ctx.draw_text(c["sep_x"], y, "│", Style(fg=muted, bg=bg))
+            self._draw_side(ctx, y, 0, c["l_content_x"], c["l_content_w"],
+                            row["n1"], row["l1"], self.hl1, self._side_bg(row, "l"),
+                            row["cr1"], _CHAR_DEL_BG, text_fg, muted, bg)
+            self._draw_side(ctx, y, c["r_gutter_x"], c["r_content_x"], c["r_content_w"],
+                            row["n2"], row["l2"], self.hl2, self._side_bg(row, "r"),
+                            row["cr2"], _CHAR_INS_BG, text_fg, muted, bg)
 
     @staticmethod
     def _side_bg(row: dict, side: str) -> tuple[int, int, int] | None:
@@ -273,6 +289,7 @@ def show_diff_viewer(panel: Any, path1, path2, z: int = 80) -> DiffViewer:
     viewer = DiffViewer(path1, path2)
     sw, sh = panel.backend.size_units
     viewer._panel = panel
-    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh})
+    panel.push_layer(viewer, z=z, hints={"x": 0, "y": 0, "w": sw, "h": sh},
+                     reflow=lambda sw, sh: Rect(0, 0, sw, sh))
     panel.animate(viewer, hints={"transition": "fade", "duration_ms": 120})
     return viewer
