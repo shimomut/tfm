@@ -17,6 +17,7 @@ yet — those are later phases. The legacy ``tfm.py`` (ttk) stays runnable.
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path as _StdPath
 
@@ -40,6 +41,8 @@ from tfm_filter_list_dialog import show_filter_list  # noqa: E402
 from tfm_input_dialog import show_input  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
+from tfm_batch_rename_view import show_batch_rename  # noqa: E402
+from tfm_text_dialog import show_text  # noqa: E402
 
 
 class PaneHeader(Widget):
@@ -278,6 +281,12 @@ class TfmApp:
         elif action == "rename_file":
             self.rename()
             return False
+        elif action == "jump_to_path":
+            self.jump_to_path()
+            return False
+        elif action == "help":
+            self.show_help()
+            return False
         else:
             return False
         return True
@@ -331,6 +340,7 @@ class TfmApp:
             MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
                      shortcut="Backspace"),
             MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut="J"),
+            MenuItem("Jump to Path…", on_select=self.jump_to_path, shortcut="Shift-J"),
             SEPARATOR,
             MenuItem("New Folder…", on_select=self.create_directory, shortcut="M"),
             MenuItem("New File…", on_select=self.create_file, shortcut="Shift-E"),
@@ -357,7 +367,12 @@ class TfmApp:
             MenuItem("Switch Pane", on_select=lambda: self._menu("switch_pane"), shortcut="Tab"),
             title="View",
         )
-        help_menu = Menu(MenuItem("About TFM", on_select=self.show_about), title="Help")
+        help_menu = Menu(
+            MenuItem("Keyboard Shortcuts…", on_select=self.show_help, shortcut="?"),
+            SEPARATOR,
+            MenuItem("About TFM", on_select=self.show_about),
+            title="Help",
+        )
         return Menu(
             MenuItem("File", submenu=file_menu),
             MenuItem("Select", submenu=select_menu),
@@ -494,12 +509,16 @@ class TfmApp:
         self.panel.render()
 
     def rename(self) -> None:
-        """Prompt to rename the focused entry in the active pane. Batch rename
-        (multiple selected) lands in a later phase."""
+        """Rename in the active pane. With more than one file selected this opens
+        the batch-rename dialog; otherwise it prompts for the focused entry."""
         pane = self.active_pane()
         files = pane["files"]
         if not files:
             self.log_info("No file to rename")
+            return
+        selected = [f for f in files if str(f) in pane["selected_files"]]
+        if len(selected) > 1:
+            self.batch_rename(selected)
             return
         entry = files[pane["focused_index"]]
         original = entry.name
@@ -531,6 +550,123 @@ class TfmApp:
 
         show_input(self.panel, title="Rename", prompt="Rename to:", text=original,
                    on_accept=accept, validate=validate, region=self._active_pane_region())
+        self.panel.render()
+
+    def batch_rename(self, files: list) -> None:
+        """Open the regex batch-rename dialog over the given selected files."""
+        pane = self.active_pane()
+
+        def done(success: int, errors: list[str]) -> None:
+            for err in errors:
+                self.log_info(f"Rename failed: {err}")
+            self.log_info(f"Batch rename: {success} file(s) renamed"
+                          + (f", {len(errors)} failed" if errors else ""))
+            pane["selected_files"].clear()
+            self._refresh(pane)
+            self.panel.render()
+
+        show_batch_rename(self.panel, files, on_done=done)
+        self.panel.render()
+
+    def jump_to_path(self) -> None:
+        """Prompt for a directory path and navigate the active pane there.
+        Accepts ``~``, relative (to the current path), and absolute paths;
+        mirrors ttk TFM's jump-to-path. (TAB path completion is a later phase.)"""
+        pane = self.active_pane()
+        current = str(pane["path"])
+
+        def resolve(text: str) -> Path:
+            text = text.strip()
+            if text.startswith("~"):
+                target = Path.home() / text[1:].lstrip("/")
+            elif not os.path.isabs(text):
+                target = Path(current) / text
+            else:
+                target = Path(text)
+            return Path(os.path.normpath(str(target)))
+
+        def validate(text: str) -> str | None:
+            if not text.strip():
+                return "Path cannot be empty"
+            target = resolve(text)
+            if not target.exists():
+                return f"Path does not exist: {target}"
+            if not target.is_dir():
+                return f"Not a directory: {target}"
+            return None
+
+        def accept(text: str) -> None:
+            target = resolve(text)
+            pane["path"] = target
+            self._refresh(pane)
+            pane["selected_files"].clear()
+            self.log_info(f"Jumped to: {target}")
+            self.panel.render()
+
+        # Prefill with the current path plus a trailing separator, ready to type
+        # a child directory name (the ttk behaviour).
+        initial = current if current.endswith(os.sep) else current + os.sep
+        show_input(self.panel, title="Jump to Path", prompt="Path:", text=initial,
+                   on_accept=accept, validate=validate, select_all=False,
+                   region=self._active_pane_region())
+        self.panel.render()
+
+    #: Help layout: (section title, [(action, description)]). Only actions the
+    #: PuiKit port actually handles are listed, so the help never promises a
+    #: feature that isn't wired yet.
+    _HELP_SECTIONS = (
+        ("Navigation", (
+            ("cursor_up", "Move cursor up"),
+            ("cursor_down", "Move cursor down"),
+            ("page_up", "Scroll up by page"),
+            ("page_down", "Scroll down by page"),
+            ("open_item", "Enter directory"),
+            ("go_parent", "Go to parent directory"),
+            ("switch_pane", "Switch active pane"),
+            ("favorites", "Go to a favorite directory"),
+            ("jump_to_path", "Jump to a typed path"),
+        )),
+        ("Selection", (
+            ("select_file", "Toggle selection, move down"),
+            ("select_file_up", "Toggle selection, move up"),
+            ("select_all_files", "Toggle all files"),
+            ("select_all_items", "Toggle all items"),
+            ("select_all", "Select every item"),
+            ("unselect_all", "Clear selection"),
+        )),
+        ("File Operations", (
+            ("create_directory", "Create new directory"),
+            ("create_file", "Create new file"),
+            ("rename_file", "Rename file/directory"),
+        )),
+        ("View", (
+            ("toggle_hidden", "Toggle hidden files"),
+            ("sort_menu", "Sort options (menu)"),
+        )),
+        ("Other", (
+            ("help", "Show this help"),
+            ("quit", "Quit TFM"),
+        )),
+    )
+
+    def _keys_label(self, action: str) -> str:
+        """Comma-joined, display-formatted key(s) bound to ``action`` ("—" if
+        unbound), for the help dialog."""
+        keys, _ = self.keys.get_keys_for_action(action)
+        if not keys:
+            return "—"
+        return ", ".join(self.keys.format_key_for_display(k) for k in keys)
+
+    def show_help(self) -> None:
+        """A scrollable key-binding reference, built live from the port's keymap."""
+        from tfm_const import VERSION
+        lines = [f"TFM on PuiKit — Version {VERSION}", ""]
+        for title, entries in self._HELP_SECTIONS:
+            lines.append(f"{title}:")
+            for action, desc in entries:
+                lines.append(f"  {self._keys_label(action)}  —  {desc}")
+            lines.append("")
+        show_text(self.panel, lines, title="Help")
         self.panel.render()
 
     def show_about(self) -> None:

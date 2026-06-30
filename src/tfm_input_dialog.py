@@ -52,6 +52,7 @@ class InputDialog(FocusContainer, Widget):
         on_accept: Callable[[str], None] | None = None,
         on_cancel: Callable[[], None] | None = None,
         validate: Callable[[str], str | None] | None = None,
+        select_all: bool = True,
     ):
         self.title = title
         self.prompt = prompt
@@ -62,10 +63,11 @@ class InputDialog(FocusContainer, Widget):
         self._error = ""
 
         self.edit = TextEdit(text=text)
-        # Start with the whole value selected so typing replaces it (rename),
-        # while the caret sits at the end for an empty field (create).
+        # Caret at the end. With ``select_all`` the whole value is also selected,
+        # so the first keystroke replaces it (rename); without it the caret just
+        # sits at the end, ready to append (jump-to-path's trailing separator).
         self.edit.cursor = len(text)
-        self.edit._anchor = 0
+        self.edit._anchor = 0 if select_all else len(text)
         self._field_rect = Rect(0.0, 0.0, 0.0, 0.0)
         self._size: tuple[float, float] = (0.0, 0.0)
 
@@ -173,6 +175,7 @@ def show_input(
     on_accept: Callable[[str], None] | None = None,
     on_cancel: Callable[[], None] | None = None,
     validate: Callable[[str], str | None] | None = None,
+    select_all: bool = True,
     region: tuple[float, float] | None = None,
     z: int = 70,
 ) -> InputDialog:
@@ -186,6 +189,7 @@ def show_input(
     dialog = InputDialog(
         title=title, prompt=prompt, text=text,
         on_accept=on_accept, on_cancel=on_cancel, validate=validate,
+        select_all=select_all,
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 64.0))

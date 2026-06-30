@@ -37,7 +37,8 @@ from puikit.widgets.text_edit import TextEdit
 
 #: Navigation keys the *list* owns even while the filter field holds focus —
 #: typing filters, but the arrows still drive the selection (the ttk behavior).
-_LIST_KEYS = frozenset({"up", "down", "page_up", "page_down"})
+#: Backend key names are unsuffixed ("pageup"/"pagedown"), matching ListView.
+_LIST_KEYS = frozenset({"up", "down", "pageup", "pagedown"})
 
 
 class FilterListDialog(FocusContainer, Widget):
