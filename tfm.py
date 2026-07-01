@@ -21,6 +21,8 @@ kept for reference under ``legacy/``.
 
 import argparse
 import os
+import platform
+import subprocess
 import sys
 from pathlib import Path as _StdPath
 
@@ -290,6 +292,58 @@ class TfmApp:
             self.flm.show_hidden = not self.flm.show_hidden
             self.flm.refresh_files(pane)
             self.log_info(f"Hidden files: {'shown' if self.flm.show_hidden else 'hidden'}")
+        elif action in ("quick_sort_name", "quick_sort_size",
+                        "quick_sort_date", "quick_sort_ext"):
+            self._quick_sort(action[len("quick_sort_"):])
+        elif action == "sort_menu":
+            self.show_sort_menu()
+            return False  # the menu popup drives its own redraw
+        elif action == "clear_filter":
+            if pane["filter_pattern"]:
+                self.flm.apply_filter(pane, "")
+                self.log_info("Filter cleared")
+            else:
+                self.log_info("No filter to clear")
+        elif action == "sync_current_to_other":
+            if self.pm.sync_current_to_other(self.log_info):
+                self.flm.refresh_files(self.active_pane())
+        elif action == "sync_other_to_current":
+            if self.pm.sync_other_to_current(self.log_info):
+                self.flm.refresh_files(self.pm.get_inactive_pane())
+        elif action == "redraw":
+            pass  # falls through to a full re-render below
+        elif action == "adjust_pane_left":     # make the left pane smaller
+            self._nudge(self.pane_splitter, -self._PANE_STEP)
+        elif action == "adjust_pane_right":    # make the left pane larger
+            self._nudge(self.pane_splitter, +self._PANE_STEP)
+        elif action == "reset_pane_boundary":  # even 50 | 50 split
+            self.pane_splitter.fraction = 0.5
+        elif action == "adjust_log_up":        # grow the log (panes shrink)
+            self._nudge(self.content_splitter, -self._LOG_STEP)
+        elif action == "adjust_log_down":      # shrink the log (panes grow)
+            self._nudge(self.content_splitter, +self._LOG_STEP)
+        elif action == "reset_log_height":     # back to the default share
+            self.content_splitter.fraction = PANES_FRACTION
+        elif action == "scroll_log_up":
+            self.log.scroll_by(-1.0)
+        elif action == "scroll_log_down":
+            self.log.scroll_by(+1.0)
+        elif action == "scroll_log_page_up":
+            self.log.scroll_by(-self._LOG_PAGE)
+        elif action == "scroll_log_page_down":
+            self.log.scroll_by(+self._LOG_PAGE)
+        elif action == "open_with_os":
+            self.open_with_os()
+            return False  # hands off to the OS; no in-app redraw
+        elif action == "reveal_in_os":
+            self.reveal_in_os()
+            return False
+        elif action in ("edit_file", "subshell"):
+            # Both need the TUI to release the terminal to a full-screen program
+            # and reclaim it after — a backend suspend/resume PuiKit doesn't expose
+            # yet. Report it rather than launch a program under the live UI.
+            self.log_info(f"'{action}' needs terminal suspend/resume (a later phase)")
+            return False
         elif action == "filter":
             self.enter_filter()
             return False  # the dialog drives its own redraw
@@ -360,12 +414,7 @@ class TfmApp:
         def has_files() -> bool:
             return bool(self.active_pane()["files"])
 
-        sort_modes = (("Name", "name"), ("Size", "size"), ("Date", "date"), ("Type", "type"))
-        sort_menu = Menu(*[
-            MenuItem(label, on_select=(lambda m=mode: self._set_sort(m)),
-                     checked=(lambda m=mode: self.active_pane()["sort_mode"] == m))
-            for label, mode in sort_modes
-        ], title="Sort By")
+        sort_menu = self._sort_menu()
 
         file_menu = Menu(
             MenuItem("Open", on_select=lambda: self._menu("open_item"),
@@ -424,6 +473,94 @@ class TfmApp:
         """Run a keymap action from a menu/context-menu selection and redraw."""
         if self.dispatch(action):
             self.panel.render()
+
+    def _focused_entry(self):
+        """The entry under the cursor in the active pane, or None if empty."""
+        pane = self.active_pane()
+        files = pane["files"]
+        if not files:
+            return None
+        return files[pane["focused_index"]]
+
+    def open_with_os(self) -> None:
+        """Open the focused entry with the OS default application (the desktop
+        'open' / 'xdg-open' / 'start'). Errors are logged, not raised."""
+        entry = self._focused_entry()
+        if entry is None:
+            return
+        system = platform.system()
+        try:
+            if system == "Darwin":
+                subprocess.run(["open", str(entry)], check=True)
+            elif system == "Windows":
+                subprocess.run(["start", "", str(entry)], shell=True, check=True)
+            else:
+                subprocess.run(["xdg-open", str(entry)], check=True)
+        except Exception as exc:
+            self.log_info(f"Failed to open {entry.name}: {exc}")
+        else:
+            self.log_info(f"Opened {entry.name} with the default app")
+
+    def reveal_in_os(self) -> None:
+        """Reveal the focused entry in the OS file manager (Finder / Explorer),
+        falling back to opening its parent directory elsewhere."""
+        entry = self._focused_entry()
+        if entry is None:
+            return
+        system = platform.system()
+        try:
+            if system == "Darwin":
+                subprocess.run(["open", "-R", str(entry)], check=True)
+            elif system == "Windows":
+                subprocess.run(["explorer", "/select,", str(entry)], check=True)
+            else:
+                subprocess.run(["xdg-open", str(entry.parent)], check=True)
+        except Exception as exc:
+            self.log_info(f"Failed to reveal {entry.name}: {exc}")
+        else:
+            self.log_info(f"Revealed {entry.name}")
+
+    def _sort_menu(self) -> Menu:
+        """The sort-mode menu, shared by the menu-bar's 'Sort By' submenu and the
+        keyboard-triggered sort popup (``show_sort_menu``). A live ``checked``
+        predicate marks the active pane's current mode."""
+        sort_modes = (("Name", "name"), ("Size", "size"), ("Date", "date"), ("Type", "type"))
+        return Menu(*[
+            MenuItem(label, on_select=(lambda m=mode: self._set_sort(m)),
+                     checked=(lambda m=mode: self.active_pane()["sort_mode"] == m))
+            for label, mode in sort_modes
+        ], title="Sort By")
+
+    def show_sort_menu(self) -> None:
+        """Pop the sort menu over the active pane (the 's' key)."""
+        rx, rw = self._active_pane_region()
+        self.panel.popup_menu(self._sort_menu(), rx + rw / 2.0, 2.0)
+        self.panel.render()
+
+    #: Keyboard nudge for the pane boundary / log height (fraction of the split),
+    #: and the page size (lines) for keyboard log scrolling.
+    _PANE_STEP = 0.05
+    _LOG_STEP = 0.05
+    _LOG_PAGE = 10.0
+
+    @staticmethod
+    def _nudge(splitter, delta: float) -> None:
+        """Shift a Splitter's fraction by ``delta`` from the keyboard, clamped to
+        a sane range so a pane can't be nudged to nothing (the mouse-drag path has
+        its own base-unit min-size clamp; this keeps the keyboard path safe too)."""
+        splitter.fraction = max(0.1, min(0.9, splitter.fraction + delta))
+
+    def _quick_sort(self, mode: str) -> None:
+        """Set the active pane's sort mode from a quick-sort key; pressing the
+        same mode again toggles the sort direction (mirrors ttk TFM's quick_sort).
+        The current reverse setting is kept when switching to a new mode."""
+        pane = self.active_pane()
+        if pane["sort_mode"] == mode:
+            pane["sort_reverse"] = not pane["sort_reverse"]
+        else:
+            pane["sort_mode"] = mode
+        self.flm.refresh_files(pane)
+        self.log_info(f"Sort: {self.flm.get_sort_description(pane)}")
 
     def _set_sort(self, mode: str) -> None:
         pane = self.active_pane()
@@ -763,8 +900,12 @@ class TfmApp:
             ("open_item", "Enter directory"),
             ("go_parent", "Go to parent directory"),
             ("switch_pane", "Switch active pane"),
+            ("nav_left", "Focus left pane / go to parent"),
+            ("nav_right", "Focus right pane / go to parent"),
             ("favorites", "Go to a favorite directory"),
             ("jump_to_path", "Jump to a typed path"),
+            ("sync_current_to_other", "Go to the other pane's directory"),
+            ("sync_other_to_current", "Send this directory to the other pane"),
         )),
         ("Selection", (
             ("select_file", "Toggle selection, move down"),
@@ -778,16 +919,23 @@ class TfmApp:
             ("create_directory", "Create new directory"),
             ("create_file", "Create new file"),
             ("rename_file", "Rename file/directory"),
+            ("open_with_os", "Open with the default app"),
+            ("reveal_in_os", "Reveal in the OS file manager"),
         )),
         ("Search", (
             ("search", "Incremental search (jump to match)"),
             ("filter", "Filter list by filename pattern"),
+            ("clear_filter", "Clear the filename filter"),
         )),
         ("View", (
             ("view_file", "View file (text viewer)"),
             ("diff_files", "Compare two selected files"),
             ("toggle_hidden", "Toggle hidden files"),
             ("sort_menu", "Sort options (menu)"),
+            ("quick_sort_name", "Quick-sort by name (repeat: reverse)"),
+            ("quick_sort_size", "Quick-sort by size (repeat: reverse)"),
+            ("quick_sort_date", "Quick-sort by date (repeat: reverse)"),
+            ("quick_sort_ext", "Quick-sort by extension (repeat: reverse)"),
         )),
         ("Other", (
             ("help", "Show this help"),
