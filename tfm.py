@@ -113,6 +113,12 @@ class TfmApp:
         self.pm = PaneManager(self.config, Path(left_dir), Path(right_dir))
         self.flm.refresh_files(self.pm.left_pane)
         self.flm.refresh_files(self.pm.right_pane)
+        #: Recent-directory history for the history picker — a bounded, in-order
+        #: list of visited paths, recorded on every directory change (see
+        #: ``_record_history``). Seeded with the two starting directories.
+        self._history: list[str] = []
+        for p in (self.pm.left_pane["path"], self.pm.right_pane["path"]):
+            self._record_history_path(str(p))
 
         self.panel = Panel(backend)
         self.left_view = FilePane(
@@ -229,6 +235,15 @@ class TfmApp:
         pane["focused_index"] = 0
         pane["scroll_offset"] = 0
         self.flm.refresh_files(pane)
+        self._record_history_path(str(pane["path"]))
+
+    def _record_history_path(self, path: str) -> None:
+        """Append ``path`` to the recent-directory history, coalescing an
+        immediate repeat (a same-directory refresh from create/rename doesn't add
+        a duplicate) and capping the list length."""
+        if not self._history or self._history[-1] != path:
+            self._history.append(path)
+            del self._history[:-100]
 
     # --- actions -------------------------------------------------------------
 
@@ -332,6 +347,21 @@ class TfmApp:
             self.log.scroll_by(-self._LOG_PAGE)
         elif action == "scroll_log_page_down":
             self.log.scroll_by(+self._LOG_PAGE)
+        elif action == "file_details":
+            self.file_details()
+            return False  # the dialog drives its own redraw
+        elif action == "drives_dialog":
+            self.show_drives()
+            return False
+        elif action == "search_dialog":
+            self.show_search()
+            return False
+        elif action == "history":
+            self.show_history()
+            return False
+        elif action == "programs":
+            self.show_programs()
+            return False
         elif action == "open_with_os":
             self.open_with_os()
             return False  # hands off to the OS; no in-app redraw
@@ -421,10 +451,17 @@ class TfmApp:
                      enabled=has_files, shortcut="Enter"),
             MenuItem("View File", on_select=self.view_file,
                      enabled=has_files, shortcut="V"),
+            MenuItem("Details…", on_select=self.file_details, enabled=has_files),
+            MenuItem("Open with Default App", on_select=self.open_with_os, enabled=has_files),
+            MenuItem("Reveal in File Manager", on_select=self.reveal_in_os, enabled=has_files),
+            MenuItem("External Programs…", on_select=self.show_programs, shortcut="X"),
+            SEPARATOR,
             MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
                      shortcut="Backspace"),
             MenuItem("Go to Favorite…", on_select=self.show_favorites, shortcut="J"),
             MenuItem("Jump to Path…", on_select=self.jump_to_path, shortcut="Shift-J"),
+            MenuItem("Drives…", on_select=self.show_drives),
+            MenuItem("History…", on_select=self.show_history, shortcut="H"),
             SEPARATOR,
             MenuItem("New Folder…", on_select=self.create_directory, shortcut="M"),
             MenuItem("New File…", on_select=self.create_file, shortcut="Shift-E"),
@@ -446,6 +483,7 @@ class TfmApp:
         view_menu = Menu(
             MenuItem("Find…", on_select=self.enter_isearch, enabled=has_files, shortcut="F"),
             MenuItem("Filter…", on_select=self.enter_filter, shortcut=";"),
+            MenuItem("Search Files…", on_select=self.show_search, shortcut="Shift-F"),
             SEPARATOR,
             MenuItem("Show Hidden Files", on_select=lambda: self._menu("toggle_hidden"),
                      checked=lambda: self.flm.show_hidden, shortcut="."),
@@ -481,6 +519,56 @@ class TfmApp:
         if not files:
             return None
         return files[pane["focused_index"]]
+
+    def file_details(self) -> None:
+        """Show stat details for the focused entry — or an aggregate summary plus
+        per-item details for a multi-file selection — in a scrollable text dialog
+        (mirrors ttk TFM's file-details, reusing the shared text-dialog)."""
+        import datetime as _dt
+        import stat as _stat
+        pane = self.active_pane()
+        files = pane["files"]
+        if not files:
+            self.log_info("No file to show details for")
+            return
+        selected = [f for f in files if str(f) in pane["selected_files"]]
+        targets = selected if selected else [files[pane["focused_index"]]]
+
+        def details(entry) -> list[str]:
+            out = [entry.name, f"  Path: {entry}"]
+            try:
+                st = entry.stat()
+            except Exception as exc:
+                out.append(f"  (stat unavailable: {exc})")
+                return out
+            try:
+                kind = "Directory" if entry.is_dir() else \
+                       ("Symlink" if entry.is_symlink() else "File")
+            except Exception:
+                kind = "File"
+            mtime = _dt.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            out += [
+                f"  Type: {kind}",
+                f"  Size: {st.st_size:,} bytes",
+                f"  Modified: {mtime}",
+                f"  Permissions: {_stat.filemode(st.st_mode)}",
+            ]
+            return out
+
+        if len(targets) == 1:
+            lines = details(targets[0])
+        else:
+            total = 0
+            for t in targets:
+                try:
+                    total += t.stat().st_size
+                except Exception:
+                    pass
+            lines = [f"{len(targets)} items selected", f"  Total size: {total:,} bytes", ""]
+            for t in targets:
+                lines += details(t) + [""]
+        show_text(self.panel, lines, title="Details")
+        self.panel.render()
 
     def open_with_os(self) -> None:
         """Open the focused entry with the OS default application (the desktop
@@ -613,6 +701,191 @@ class TfmApp:
         if self.pm.active_pane == "left":
             return (0.0, left_w)
         return (left_w, sw - left_w)
+
+    def _local_drives(self) -> list[dict]:
+        """Home / root / common folders + mounted volumes, as ``{name, path}``
+        rows for the drives picker. SSH/S3 remotes are a later phase (they need
+        the remote-storage layer, not yet wired into the port)."""
+        drives = [{"name": "Home", "path": str(Path.home())},
+                  {"name": "Root", "path": "/"}]
+        for name in ("Documents", "Downloads", "Desktop"):
+            p = Path.home() / name
+            try:
+                if p.exists() and p.is_dir():
+                    drives.append({"name": name, "path": str(p)})
+            except Exception:
+                pass
+        if platform.system() == "Darwin":
+            vol_roots = ["/Volumes"]
+        else:
+            vol_roots = [f"/media/{os.environ.get('USER', '')}", "/media", "/mnt"]
+        for root in vol_roots:
+            try:
+                rp = Path(root)
+                if rp.exists() and rp.is_dir():
+                    for v in rp.iterdir():
+                        if v.is_dir():
+                            drives.append({"name": v.name, "path": str(v)})
+            except Exception:
+                pass
+        seen, out = set(), []
+        for d in drives:
+            if d["path"] not in seen:
+                seen.add(d["path"])
+                out.append(d)
+        return out
+
+    def show_drives(self) -> None:
+        """The drives picker: choose a volume / common location and jump the
+        active pane there (reuses the searchable-list dialog, like favorites)."""
+        show_filter_list(
+            self.panel, self._local_drives(), title="Drives",
+            to_label=lambda d: f"{d['name']}  —  {d['path']}",
+            on_accept=self._go_to_drive,
+            region=self._active_pane_region())
+        self.panel.render()
+
+    def _go_to_drive(self, drive: dict) -> None:
+        pane = self.active_pane()
+        pane["path"] = Path(drive["path"])
+        self._refresh(pane)
+        pane["selected_files"].clear()
+        self.log_info(f"Drive: {drive['path']}")
+        self.panel.render()
+
+    def show_search(self) -> None:
+        """Recursive filename search under the active pane (the Shift-F dialog):
+        prompt for a substring, walk the tree (bounded, honouring the hidden-file
+        setting), then present the hits in the searchable-list dialog; picking one
+        navigates to its directory and lands the cursor on it."""
+        pane = self.active_pane()
+        root = pane["path"]
+
+        def run(pattern: str) -> None:
+            pattern = pattern.strip()
+            if not pattern:
+                self.panel.render()
+                return
+            results = self._walk_match(root, pattern)
+            if not results:
+                show_message_box(self.panel, f"No matches for '{pattern}'.",
+                                 title="Search", icon="info")
+                self.panel.render()
+                return
+            root_str = str(root)
+            def label(entry) -> str:
+                s = str(entry)
+                return s[len(root_str):].lstrip("/") if s.startswith(root_str) else s
+            show_filter_list(
+                self.panel, results, title=f"Search: {pattern} ({len(results)})",
+                to_label=label, on_accept=self._go_to_result,
+                region=self._active_pane_region())
+            self.panel.render()
+
+        show_input(self.panel, title="Search Files", prompt="Filename:",
+                   on_accept=run, region=self._active_pane_region())
+        self.panel.render()
+
+    def _walk_match(self, root, pattern: str, cap: int = 1000, node_cap: int = 50000):
+        """Depth-first walk under ``root`` collecting entries whose name contains
+        ``pattern`` (case-insensitive), bounded by ``cap`` results and ``node_cap``
+        entries visited so a huge tree can't hang the UI. Hidden entries are
+        skipped unless the pane is showing them."""
+        import fnmatch
+        pat = pattern.lower()
+        if not pat.startswith("*"):
+            pat = "*" + pat
+        if not pat.endswith("*"):
+            pat = pat + "*"
+        results, stack, nodes = [], [root], 0
+        while stack and len(results) < cap and nodes < node_cap:
+            try:
+                entries = list(stack.pop().iterdir())
+            except Exception:
+                continue
+            for e in entries:
+                nodes += 1
+                if not self.flm.show_hidden and e.name.startswith("."):
+                    continue
+                try:
+                    if fnmatch.fnmatch(e.name.lower(), pat):
+                        results.append(e)
+                    if e.is_dir():
+                        stack.append(e)
+                except Exception:
+                    continue
+        return results
+
+    def _go_to_result(self, entry) -> None:
+        pane = self.active_pane()
+        pane["path"] = entry.parent
+        self._refresh(pane)
+        self._select_by_name(pane, entry.name)
+        self.log_info(f"Found: {entry}")
+        self.panel.render()
+
+    def show_history(self) -> None:
+        """The recent-directory picker: pick a previously visited directory and
+        jump the active pane there. Shows most-recent-first, de-duplicated."""
+        seen, items = set(), []
+        for p in reversed(self._history):
+            if p not in seen:
+                seen.add(p)
+                items.append(p)
+        if not items:
+            show_message_box(self.panel, "No directory history yet.",
+                             title="History", icon="info")
+            self.panel.render()
+            return
+        show_filter_list(
+            self.panel, items, title="History", to_label=lambda p: p,
+            on_accept=self._go_to_history, region=self._active_pane_region())
+        self.panel.render()
+
+    def _go_to_history(self, path: str) -> None:
+        pane = self.active_pane()
+        pane["path"] = Path(path)
+        self._refresh(pane)
+        pane["selected_files"].clear()
+        self.log_info(f"History: {path}")
+        self.panel.render()
+
+    def show_programs(self) -> None:
+        """The external-programs picker: choose a configured program and launch it
+        on the selection (or the focused entry). Launched fire-and-forget with the
+        active pane as the working directory — well suited to the GUI launchers in
+        the default config (VS Code, BeyondCompare). Programs that need to take
+        over the terminal await a backend suspend/resume (see ``edit_file``)."""
+        programs = getattr(self.config, "PROGRAMS", None) or []
+        if not programs:
+            show_message_box(self.panel, "No external programs configured.",
+                             title="Programs", icon="info")
+            self.panel.render()
+            return
+        show_filter_list(
+            self.panel, programs, title="External Programs",
+            to_label=lambda p: p.get("name", "?"),
+            on_accept=self._run_program, region=self._active_pane_region())
+        self.panel.render()
+
+    def _run_program(self, program: dict) -> None:
+        from tfm_external_programs import (ensure_common_paths_in_env,
+                                           get_selected_or_cursor_files)
+        pane = self.active_pane()
+        command = list(program.get("command", []))
+        if not command:
+            self.log_info(f"Program '{program.get('name')}' has no command")
+            return
+        args = get_selected_or_cursor_files(pane)  # bare names, resolved via cwd
+        env = os.environ.copy()
+        ensure_common_paths_in_env(env)
+        try:
+            subprocess.Popen(command + args, cwd=str(pane["path"]), env=env)
+        except Exception as exc:
+            self.log_info(f"Failed to launch {program.get('name')}: {exc}")
+        else:
+            self.log_info(f"Launched: {program.get('name')}")
+        self.panel.render()
 
     def _jump_to_favorite(self, fav: dict) -> None:
         pane = self.active_pane()
@@ -904,6 +1177,8 @@ class TfmApp:
             ("nav_right", "Focus right pane / go to parent"),
             ("favorites", "Go to a favorite directory"),
             ("jump_to_path", "Jump to a typed path"),
+            ("drives_dialog", "Open the drives / locations picker"),
+            ("history", "Go to a recently-visited directory"),
             ("sync_current_to_other", "Go to the other pane's directory"),
             ("sync_other_to_current", "Send this directory to the other pane"),
         )),
@@ -919,13 +1194,16 @@ class TfmApp:
             ("create_directory", "Create new directory"),
             ("create_file", "Create new file"),
             ("rename_file", "Rename file/directory"),
+            ("file_details", "Show file details"),
             ("open_with_os", "Open with the default app"),
             ("reveal_in_os", "Reveal in the OS file manager"),
+            ("programs", "Run an external program on the selection"),
         )),
         ("Search", (
             ("search", "Incremental search (jump to match)"),
             ("filter", "Filter list by filename pattern"),
             ("clear_filter", "Clear the filename filter"),
+            ("search_dialog", "Recursive filename search"),
         )),
         ("View", (
             ("view_file", "View file (text viewer)"),
