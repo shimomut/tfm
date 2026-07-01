@@ -424,7 +424,7 @@ the Panel/widget patterns are established in Phase 2.
    `src/` is a UI module (dialogs/viewers/`tfm_main`) that Phases 2–4 rewrite as
    widgets. **Phase 1 complete.**
 5. ~~Phase 0/2 spike — two-pane PuiKit shell.~~ **Done (first slice).** TFM runs
-   on PuiKit for the first time: `tfm_puikit.py` (entry point + `TfmApp`
+   on PuiKit for the first time: `tfm.py` (entry point + `TfmApp`
    controller + `StatusBar`) hosts two custom `FilePane` widgets
    (`src/tfm_file_pane.py`) in a `VSplit(HSplit(left, right, divider), status)`
    layout. It **reuses the decoupled business logic unchanged** — `tfm_path.Path`
@@ -477,7 +477,7 @@ the Panel/widget patterns are established in Phase 2.
 10. ~~Major UI patterns — capability spike (message box, menu, context menu).~~
     **Done.** A deliberate check that PuiKit can express TFM's interactive UI
     vocabulary *before* committing to a specific dialog UX. Wired into
-    `tfm_puikit.py`: a **`MenuBar`** from one `puikit.menu.Menu` model
+    `tfm.py`: a **`MenuBar`** from one `puikit.menu.Menu` model
     (File / Select / View / Help) — the OS-native NSMenu on macOS, an in-window
     strip on curses, no app branch; **`show_message_box`** modals for a quit
     confirmation (`q` and File → Quit) and an About box; a **right-click context

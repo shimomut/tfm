@@ -1,7 +1,8 @@
 # Legacy TTK implementation (reference only)
 
 This directory holds the original **ttk**-rendered TFM: kept for reference while
-the app is ported to PuiKit (`tfm_puikit.py` + the `tfm_*` UI modules in `src/`).
+the app is ported to PuiKit (the top-level `tfm.py` + the `tfm_*` UI modules in
+`src/`).
 
 **It is frozen and not executed.** Imports here point at `src/` modules that no
 longer sit on its path, so it will not run as-is — that is intentional. Consult

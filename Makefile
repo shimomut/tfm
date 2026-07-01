@@ -118,11 +118,11 @@ PUIKIT_DIRS := $(if $(LEFT),--left $(LEFT)) $(if $(RIGHT),--right $(RIGHT))
 
 run: check-venv
 	@echo "Running TFM on PuiKit (terminal)..."
-	@$(PYTHON) tfm_puikit.py $(PUIKIT_DIRS)
+	@$(PYTHON) tfm.py $(PUIKIT_DIRS)
 
 run-gui: check-venv
 	@echo "Running TFM on PuiKit (macOS GUI)..."
-	@$(PYTHON) tfm_puikit.py --backend gui $(PUIKIT_DIRS)
+	@$(PYTHON) tfm.py --backend gui $(PUIKIT_DIRS)
 
 test: check-venv
 	@echo "Running TFM tests..."

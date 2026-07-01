@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""TFM on PuiKit — dual-pane shell spike (Phase 0/2).
+"""TFM on PuiKit — dual-pane file manager.
 
-The first time TFM runs on PuiKit instead of ttk. It reuses the storage-agnostic
-business logic unchanged — ``tfm_path.Path`` for listing, ``PaneManager`` /
-``FileListManager`` for pane state, and ``tfm_config``'s keymap (already ported
-to the PuiKit keyboard contract) — and renders through a custom ``FilePane``
-widget hosted in a PuiKit ``Panel`` layout.
+TFM running on PuiKit instead of ttk. It reuses the storage-agnostic business
+logic unchanged — ``tfm_path.Path`` for listing, ``PaneManager`` /
+``FileListManager`` for pane state, and ``tfm_config``'s keymap (ported to the
+PuiKit keyboard contract) — and renders through a custom ``FilePane`` widget
+hosted in a PuiKit ``Panel`` layout, on curses + macOS.
 
-Scope of this slice: browse, move the cursor, switch panes, descend / go up,
-toggle hidden files, on curses + macOS. No dialogs, viewers, or file operations
-yet — those are later phases. The legacy ``tfm.py`` (ttk) stays runnable.
+Wired so far: browse / navigate (cursor, pane switch, arrow-key focus, descend /
+go up), selection, sort, hidden-file toggle, filename filter and incremental
+search, the built-in text and diff viewers, and the create / rename / batch-
+rename / favorites / jump-to-path dialogs. File operations (copy / move / delete)
+and archive / remote storage are later phases. The original ttk implementation is
+kept for reference under ``legacy/``.
 
-    python tfm_puikit.py                       # TUI (curses)
-    python tfm_puikit.py --backend gui         # macOS GUI
-    python tfm_puikit.py --left ./src --right ./test
+    python tfm.py                       # TUI (curses)
+    python tfm.py --backend gui         # macOS GUI
+    python tfm.py --left ./src --right ./test
 """
 
 import argparse
