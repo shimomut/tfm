@@ -221,9 +221,6 @@ class FileListManager:
                         return ""  # Directories first (no extension)
                     else:
                         # Use the same extension logic as rendering
-                        from tfm_main import FileManager
-                        # Create a temporary instance to access the method
-                        # We'll use a simpler approach here
                         filename = entry.name
                         dot_index = filename.rfind('.')
                         if dot_index <= 0:
