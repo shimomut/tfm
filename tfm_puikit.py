@@ -263,10 +263,26 @@ class TfmApp:
         elif action == "switch_pane":
             self.pm.active_pane = "right" if self.pm.active_pane == "left" else "left"
             self._sync_active()
-        elif action in ("open_item", "nav_right"):
+        elif action == "open_item":
             self._open(pane)
-        elif action in ("go_parent", "nav_left"):
+        elif action == "go_parent":
             self._go_parent(pane)
+        elif action == "nav_left":
+            # Context-aware LEFT (ttk TFM): from the right pane, move focus to the
+            # left pane; already in the left pane, go to its parent directory.
+            if self.pm.active_pane == "right":
+                self.pm.active_pane = "left"
+                self._sync_active()
+            else:
+                self._go_parent(pane)
+        elif action == "nav_right":
+            # Context-aware RIGHT (ttk TFM): from the left pane, move focus to the
+            # right pane; already in the right pane, go to its parent directory.
+            if self.pm.active_pane == "left":
+                self.pm.active_pane = "right"
+                self._sync_active()
+            else:
+                self._go_parent(pane)
         elif action == "toggle_hidden":
             self.flm.show_hidden = not self.flm.show_hidden
             self.flm.refresh_files(pane)
