@@ -51,6 +51,7 @@ class InputDialog(FocusContainer, Widget):
         text: str = "",
         on_accept: Callable[[str], None] | None = None,
         on_cancel: Callable[[], None] | None = None,
+        on_change: Callable[[str], None] | None = None,
         validate: Callable[[str], str | None] | None = None,
         select_all: bool = True,
     ):
@@ -58,6 +59,9 @@ class InputDialog(FocusContainer, Widget):
         self.prompt = prompt
         self.on_accept = on_accept
         self.on_cancel = on_cancel
+        #: Fires with the field's current text after every edit keystroke, for
+        #: live-updating prompts (incremental search). Never fires on Enter/Esc.
+        self.on_change = on_change
         self.validate = validate
         self._panel: Any = None
         self._error = ""
@@ -146,7 +150,10 @@ class InputDialog(FocusContainer, Widget):
             else:
                 # Editing clears a stale validation message as the user retypes.
                 self._error = ""
+                before = self.edit.text
                 self.edit.handle_event(event)
+                if self.on_change is not None and self.edit.text != before:
+                    self.on_change(self.edit.text)
             return True
 
         if event.type in (
@@ -174,27 +181,36 @@ def show_input(
     text: str = "",
     on_accept: Callable[[str], None] | None = None,
     on_cancel: Callable[[], None] | None = None,
+    on_change: Callable[[str], None] | None = None,
     validate: Callable[[str], str | None] | None = None,
     select_all: bool = True,
     region: tuple[float, float] | None = None,
+    dim_below: bool = True,
+    anchor: str = "center",
     z: int = 70,
 ) -> InputDialog:
     """Push a modal :class:`InputDialog` over ``panel`` and return it.
 
     Sized to a comfortable fraction of the window and centered, with the shared
     shadow + dim-below modal intent. The entered text is reported through
-    ``on_accept``; ``on_cancel`` fires on escape / outside-click. ``region`` is
-    an optional ``(x, width)`` column span to anchor the dialog over the pane it
-    acts on (see :func:`tfm_filter_list_dialog.show_filter_list`)."""
+    ``on_accept``; ``on_cancel`` fires on escape / outside-click; ``on_change``
+    fires live on every keystroke (incremental search). ``region`` is an optional
+    ``(x, width)`` column span to anchor the dialog over the pane it acts on (see
+    :func:`tfm_filter_list_dialog.show_filter_list`). ``dim_below`` can be turned
+    off so the pane behind stays fully lit (a live-preview prompt like isearch,
+    where the cursor jumps behind the box); ``anchor="top"`` pins the box near the
+    top of the window instead of centering it, keeping the list below visible."""
     dialog = InputDialog(
         title=title, prompt=prompt, text=text,
-        on_accept=on_accept, on_cancel=on_cancel, validate=validate,
-        select_all=select_all,
+        on_accept=on_accept, on_cancel=on_cancel, on_change=on_change,
+        validate=validate, select_all=select_all,
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 64.0))
-    h = 7.0
-    hints: dict[str, Any] = {"shadow": True, "dim_below": True, "w": w, "h": h}
+    h = 7.0 if title else 5.0
+    hints: dict[str, Any] = {"shadow": True, "dim_below": dim_below, "w": w, "h": h}
+    if anchor == "top":
+        hints["y"] = 2.0
     if region is not None:
         region_x, region_w = region
         w = min(w, region_w)

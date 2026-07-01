@@ -51,6 +51,10 @@ MARK_W = 1
 #: color). TODO: promote to a theme token when TFM's color schemes are ported.
 MARKER = "•"
 MARKED_FG = (229, 192, 123)
+#: Incremental-search match highlight: a muted background behind every row that
+#: matches the live isearch pattern (the cursor row keeps its own fill). Green,
+#: distinct from the amber selection marker and the blue directory color.
+MATCH_BG = (58, 84, 58)
 
 
 class FilePane(Widget):
@@ -68,6 +72,10 @@ class FilePane(Widget):
         #: Active pane (controller sets it on switch_pane / click); drives the
         #: louder cursor highlight.
         self.active = False
+        #: Row indices matching the live incremental-search pattern (the
+        #: controller sets this while isearch is open; empty otherwise). Matched
+        #: rows get a subtle green background so every hit is visible at once.
+        self.search_matches: set[int] = set()
         #: Called with the clicked row index — the controller makes this pane
         #: active and moves the cursor there.
         self.on_click = on_click
@@ -238,6 +246,7 @@ class FilePane(Widget):
             if i >= 0:
                 entry = files[i]
                 self._draw_row(ctx, y, entry, i == cursor, str(entry) in selected,
+                               i in self.search_matches,
                                name_w, ext_x, ext_w, size_right, show_date, date_right,
                                measure, measure_mono)
             row += 1
@@ -249,7 +258,7 @@ class FilePane(Widget):
             pos = self.offset / denom if denom > 0 else 0.0
             ctx.draw_scrollbar(ctx.size_units[0] - 1, 0, view_h, max(0.0, min(1.0, pos)), ratio)
 
-    def _draw_row(self, ctx, y, entry, is_cursor, selected,
+    def _draw_row(self, ctx, y, entry, is_cursor, selected, is_match,
                   name_w, ext_x, ext_w, size_right, show_date, date_right,
                   measure, measure_mono) -> None:
         theme = ctx.theme
@@ -277,18 +286,24 @@ class FilePane(Widget):
             if date:
                 ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=fg, bg=bg, font=MONO))
         else:
+            # A live isearch match paints a full-width background behind the row
+            # (the cursor row keeps its own fill above); text is then drawn with
+            # the same bg so a proportional GUI font's cells match the fill.
+            row_bg = MATCH_BG if is_match else None
+            if row_bg is not None:
+                ctx.fill_rect(0, y, date_right, 1.0, Style(bg=row_bg))
             if selected:
-                ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, attr=TextAttribute.BOLD))
+                ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, bg=row_bg, attr=TextAttribute.BOLD))
                 fg = MARKED_FG
             else:
                 fg = theme.accent if is_dir else theme.text
-            ctx.draw_text(MARK_W, y, name_text, Style(fg=fg))
+            ctx.draw_text(MARK_W, y, name_text, Style(fg=fg, bg=row_bg))
             if ext_text:
-                ctx.draw_text(ext_x, y, ext_text, Style(fg=fg))
+                ctx.draw_text(ext_x, y, ext_text, Style(fg=fg, bg=row_bg))
             if size:
-                ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=theme.muted_text, font=MONO))
+                ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=theme.muted_text, bg=row_bg, font=MONO))
             if date:
-                ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=theme.muted_text, font=MONO))
+                ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=theme.muted_text, bg=row_bg, font=MONO))
 
     # --- events --------------------------------------------------------------
 

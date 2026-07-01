@@ -86,8 +86,8 @@ class PaneFooter(Widget):
 class StatusBar(Widget):
     """The bottom bar: global key hints (TFM's dynamic status line, simplified)."""
 
-    HINTS = ("q quit   tab switch    space select   a all-files   ↵ open   "
-             "⌫ parent   . hidden")
+    HINTS = ("q quit   tab switch   space select   a all-files   ↵ open   "
+             "⌫ parent   f find   ; filter   . hidden")
 
     def __init__(self, app: "TfmApp"):
         self.app = app
@@ -271,6 +271,12 @@ class TfmApp:
             self.flm.show_hidden = not self.flm.show_hidden
             self.flm.refresh_files(pane)
             self.log_info(f"Hidden files: {'shown' if self.flm.show_hidden else 'hidden'}")
+        elif action == "filter":
+            self.enter_filter()
+            return False  # the dialog drives its own redraw
+        elif action == "search":
+            self.enter_isearch()
+            return False  # the isearch overlay drives its own redraw
         elif action == "favorites":
             self.show_favorites()
             return False  # the dialog drives its own redraw
@@ -370,6 +376,9 @@ class TfmApp:
             title="Select",
         )
         view_menu = Menu(
+            MenuItem("Find…", on_select=self.enter_isearch, enabled=has_files, shortcut="F"),
+            MenuItem("Filter…", on_select=self.enter_filter, shortcut=";"),
+            SEPARATOR,
             MenuItem("Show Hidden Files", on_select=lambda: self._menu("toggle_hidden"),
                      checked=lambda: self.flm.show_hidden, shortcut="."),
             MenuItem("Reverse Sort", on_select=self._toggle_reverse,
@@ -619,6 +628,67 @@ class TfmApp:
         show_diff_viewer(self.panel, files[0], files[1])
         self.panel.render()
 
+    def _active_view(self) -> FilePane:
+        return self.left_view if self.pm.active_pane == "left" else self.right_view
+
+    def enter_filter(self) -> None:
+        """Prompt for a filename filter and apply it to the active pane (the ';'
+        key). An ``fnmatch`` glob (e.g. ``*.py``); directories are always shown,
+        an empty pattern clears the filter. Mirrors ttk TFM's filter mode — the
+        pattern lives in ``pane['filter_pattern']`` and the footer already shows
+        it. Prefilled with the current filter so it's easy to edit or clear."""
+        pane = self.active_pane()
+
+        def accept(pattern: str) -> None:
+            pattern = pattern.strip()
+            count = self.flm.apply_filter(pane, pattern)
+            if pattern:
+                self.log_info(f"Filter '{pattern}': {count} item(s)")
+            else:
+                self.log_info("Filter cleared")
+            self.panel.render()
+
+        show_input(self.panel, title="Filter", prompt="Pattern:",
+                   text=pane["filter_pattern"], on_accept=accept,
+                   region=self._active_pane_region())
+        self.panel.render()
+
+    def enter_isearch(self) -> None:
+        """Incremental search over the active pane (the 'F' key): a compact prompt
+        pinned above the pane; as you type a case-insensitive *contains* pattern
+        (space-separated patterns all match), every hit is highlighted and the
+        cursor jumps to the nearest match at or after its current position. Enter
+        keeps the landing spot; Esc restores the pre-search position. Mirrors ttk
+        TFM's isearch, reusing ``FileListManager.find_matches``."""
+        pane = self.active_pane()
+        view = self._active_view()
+        origin = pane["focused_index"]
+
+        def jump(pattern: str) -> None:
+            matches = self.flm.find_matches(
+                pane, pattern, match_all=True, return_indices_only=True)
+            view.search_matches = set(matches)
+            if matches:
+                cur = pane["focused_index"]
+                pane["focused_index"] = next((m for m in matches if m >= cur), matches[0])
+            else:
+                pane["focused_index"] = origin
+            self.panel.render()
+
+        def finish(_pattern: str) -> None:
+            view.search_matches = set()
+            self.panel.render()
+
+        def cancel() -> None:
+            view.search_matches = set()
+            pane["focused_index"] = origin
+            self.panel.render()
+
+        show_input(self.panel, prompt="I-Search:", on_change=jump,
+                   on_accept=finish, on_cancel=cancel, dim_below=False,
+                   anchor="top", region=self._active_pane_region())
+        self.panel.render()
+
     def jump_to_path(self) -> None:
         """Prompt for a directory path and navigate the active pane there.
         Accepts ``~``, relative (to the current path), and absolute paths;
@@ -689,6 +759,10 @@ class TfmApp:
             ("create_directory", "Create new directory"),
             ("create_file", "Create new file"),
             ("rename_file", "Rename file/directory"),
+        )),
+        ("Search", (
+            ("search", "Incremental search (jump to match)"),
+            ("filter", "Filter list by filename pattern"),
         )),
         ("View", (
             ("view_file", "View file (text viewer)"),
