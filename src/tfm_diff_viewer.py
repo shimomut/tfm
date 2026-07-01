@@ -6,7 +6,7 @@ within changed lines. Deletions, insertions, and replacements are tinted; the
 matched/changed spans inside a replaced line are highlighted more strongly.
 
 It reuses the text viewer's file reading and syntax highlighting
-(:mod:`tfm_text_view`), so each side keeps its syntax colors with the diff
+(:mod:`tfm_text_viewer`), so each side keeps its syntax colors with the diff
 tint laid over them. Push it with :func:`show_diff_viewer`.
 
 Keys: ↑/↓/PageUp/PageDown/Home/End scroll; ←/→ scroll horizontally;
@@ -24,7 +24,7 @@ from puikit.panel import Rect
 from puikit.widgets import Splitter
 from puikit.widgets.base import Widget
 
-from tfm_text_view import MONO, _ScrollBody, _highlight, _read_lines, draw_hscrollbar
+from tfm_text_viewer import MONO, _ScrollBody, _highlight, _read_lines, draw_hscrollbar
 
 #: Whole-row tints by diff tag.
 _DEL_BG = (60, 30, 30)

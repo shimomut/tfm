@@ -41,10 +41,10 @@ from tfm_filter_list_dialog import show_filter_list  # noqa: E402
 from tfm_input_dialog import show_input  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
-from tfm_batch_rename_view import show_batch_rename  # noqa: E402
-from tfm_diff_view import show_diff_viewer  # noqa: E402
+from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
+from tfm_diff_viewer import show_diff_viewer  # noqa: E402
 from tfm_text_dialog import show_text  # noqa: E402
-from tfm_text_view import show_text_viewer  # noqa: E402
+from tfm_text_viewer import show_text_viewer  # noqa: E402
 
 
 class PaneHeader(Widget):
