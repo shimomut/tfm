@@ -473,6 +473,12 @@ class TfmApp:
         elif action == "delete_files":
             self.delete_files()
             return False
+        elif action == "create_archive":
+            self.create_archive()
+            return False  # the dialog drives its own redraw
+        elif action == "extract_archive":
+            self.extract_archive()
+            return False
         elif action == "jump_to_path":
             self.jump_to_path()
             return False
@@ -553,6 +559,11 @@ class TfmApp:
                      enabled=has_files, shortcut="M"),
             MenuItem("Delete…", on_select=self.delete_files,
                      enabled=has_files, shortcut="K"),
+            SEPARATOR,
+            MenuItem("Create Archive…", on_select=self.create_archive,
+                     enabled=has_files, shortcut="P"),
+            MenuItem("Extract Archive…", on_select=self.extract_archive,
+                     enabled=has_files, shortcut="U"),
             SEPARATOR,
             MenuItem("Quit", on_select=self.confirm_quit, shortcut="q"),
             title="File",
@@ -1326,6 +1337,181 @@ class TfmApp:
         else:
             run()
 
+    # --- archives (create / extract) -----------------------------------------
+
+    #: Recognised archive extensions → format label, longest suffixes first so
+    #: ``.tar.gz`` is matched before ``.tar`` when scanning a filename's end.
+    _ARCHIVE_EXTS = (
+        (".tar.gz", "tar.gz"), (".tgz", "tar.gz"),
+        (".tar.bz2", "tar.bz2"), (".tbz2", "tar.bz2"),
+        (".tar.xz", "tar.xz"), (".txz", "tar.xz"),
+        (".zip", "zip"), (".tar", "tar"),
+    )
+    #: tarfile write modes per format label (zip is handled separately).
+    _TAR_MODES = {"tar": "w", "tar.gz": "w:gz", "tar.bz2": "w:bz2", "tar.xz": "w:xz"}
+
+    @classmethod
+    def _archive_format(cls, name: str) -> str | None:
+        """The format label for ``name`` by its extension, or None if it isn't a
+        recognised archive."""
+        low = name.lower()
+        return next((fmt for ext, fmt in cls._ARCHIVE_EXTS if low.endswith(ext)), None)
+
+    @classmethod
+    def _archive_basename(cls, name: str) -> str:
+        """``name`` with its recognised archive extension stripped (the default
+        extraction subdirectory), or unchanged if none matches."""
+        low = name.lower()
+        for ext, _fmt in cls._ARCHIVE_EXTS:
+            if low.endswith(ext):
+                return name[: -len(ext)]
+        return name
+
+    @staticmethod
+    def _add_to_zip(zf, path, arcname: str) -> int:
+        """Add ``path`` to an open ZipFile under ``arcname``, recursing into
+        directories (tarfile recurses on its own; zipfile does not). Returns the
+        number of files written."""
+        if path.is_dir() and not path.is_symlink():
+            count = 0
+            for child in path.iterdir():
+                count += TfmApp._add_to_zip(zf, child, f"{arcname}/{child.name}")
+            return count
+        zf.write(str(path), arcname)
+        return 1
+
+    def _write_archive(self, sources: list, archive_path, fmt: str) -> int:
+        """Write ``sources`` into a new archive at ``archive_path`` in ``fmt``.
+        Local filesystem paths (this phase); returns the number of files added."""
+        import tarfile
+        import zipfile
+        if fmt == "zip":
+            with zipfile.ZipFile(str(archive_path), "w", zipfile.ZIP_DEFLATED) as zf:
+                return sum(self._add_to_zip(zf, s, s.name) for s in sources)
+        with tarfile.open(str(archive_path), self._TAR_MODES[fmt]) as tf:
+            for s in sources:
+                tf.add(str(s), arcname=s.name)  # tarfile recurses into directories
+            return len(tf.getmembers())
+
+    def _extract_archive(self, archive_path, dest_dir, fmt: str) -> int:
+        """Extract ``archive_path`` into ``dest_dir`` (created if absent). Returns
+        the number of entries. Tar extraction uses the ``data`` filter where
+        available (Python 3.12+) to reject unsafe member paths."""
+        import tarfile
+        import zipfile
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        if fmt == "zip":
+            with zipfile.ZipFile(str(archive_path)) as zf:
+                zf.extractall(str(dest_dir))
+                return len(zf.namelist())
+        with tarfile.open(str(archive_path)) as tf:
+            members = tf.getmembers()
+            try:
+                tf.extractall(str(dest_dir), filter="data")
+            except TypeError:  # older Python without the extraction filter
+                tf.extractall(str(dest_dir))
+            return len(members)
+
+    def create_archive(self) -> None:
+        """Create an archive from the active pane's selection (or cursor entry)
+        in the other pane's directory (the 'P' key). Prompts for a filename whose
+        extension picks the format; an unrecognised extension defaults to
+        ``.tar.gz``. Mirrors ttk TFM's create-archive flow."""
+        pane = self.active_pane()
+        sources = self._selected_or_focused(pane)
+        if not sources:
+            self.log_info("No files to archive")
+            return
+        dest_dir = self.pm.get_inactive_pane()["path"]
+        # Prefill a single item's name plus a dot, ready for the extension.
+        initial = ""
+        if len(sources) == 1:
+            base = sources[0].stem if sources[0].is_file() else sources[0].name
+            initial = f"{base}."
+
+        def accept(name: str) -> None:
+            name = name.strip()
+            if not name:
+                self.panel.render()
+                return
+            fmt = self._archive_format(name)
+            if fmt is None:  # no recognised extension → default to .tar.gz
+                name += ".tar.gz"
+                fmt = "tar.gz"
+            archive_path = dest_dir / name
+
+            def go() -> None:
+                try:
+                    added = self._write_archive(sources, archive_path, fmt)
+                except Exception as exc:
+                    self.log_info(f"Archive creation failed: {exc}")
+                else:
+                    self.log_info(f"Created {name} ({added} file(s)) in {dest_dir}")
+                self.flm.refresh_files(self.pm.get_inactive_pane())
+                self.panel.render()
+
+            if archive_path.exists():
+                show_message_box(
+                    self.panel, f"'{name}' already exists in the other pane. Overwrite?",
+                    title="Create Archive", icon="warning", buttons=("Overwrite", "Cancel"),
+                    default=1, cancel=1,
+                    on_result=lambda l: go() if l == "Overwrite" else self.panel.render())
+                self.panel.render()
+            else:
+                go()
+
+        def validate(name: str) -> str | None:
+            return None if name.strip() else "Archive name cannot be empty"
+
+        show_input(self.panel, title="Create Archive", prompt="Archive filename:",
+                   text=initial, on_accept=accept, validate=validate, select_all=False,
+                   region=self._active_pane_region())
+        self.panel.render()
+
+    def extract_archive(self) -> None:
+        """Extract the focused archive into a subdirectory (named after the
+        archive) in the other pane's directory (the 'U' key). Confirms when
+        ``CONFIRM_EXTRACT_ARCHIVE`` is set or the destination already exists."""
+        entry = self._focused_entry()
+        if entry is None:
+            self.log_info("No file to extract")
+            return
+        try:
+            if not entry.is_file():
+                self.log_info(f"{entry.name} is not a file")
+                return
+        except Exception:
+            pass
+        fmt = self._archive_format(entry.name)
+        if fmt is None:
+            self.log_info(f"'{entry.name}' is not a supported archive")
+            return
+        dest_dir = self.pm.get_inactive_pane()["path"]
+        target = dest_dir / self._archive_basename(entry.name)
+
+        def go() -> None:
+            try:
+                count = self._extract_archive(entry, target, fmt)
+            except Exception as exc:
+                self.log_info(f"Extraction failed: {exc}")
+            else:
+                self.log_info(f"Extracted {entry.name} → {target.name}/ ({count} entries)")
+            self.flm.refresh_files(self.pm.get_inactive_pane())
+            self.panel.render()
+
+        exists = target.exists()
+        if exists or getattr(self.config, "CONFIRM_EXTRACT_ARCHIVE", True):
+            message = f"Extract '{entry.name}' to {target}?"
+            if exists:
+                message += "\nThe destination exists; files may be overwritten."
+            show_message_box(
+                self.panel, message, title="Extract Archive", icon="info",
+                buttons=("Extract", "Cancel"), default=0, cancel=1,
+                on_result=lambda l: go() if l == "Extract" else self.panel.render())
+            self.panel.render()
+        else:
+            go()
+
     def _active_view(self) -> FilePane:
         return self.left_view if self.pm.active_pane == "left" else self.right_view
 
@@ -1466,6 +1652,8 @@ class TfmApp:
             ("copy_files", "Copy selection to the other pane"),
             ("move_files", "Move selection to the other pane"),
             ("delete_files", "Delete selection"),
+            ("create_archive", "Create archive from selection"),
+            ("extract_archive", "Extract the focused archive"),
             ("file_details", "Show file details"),
             ("open_with_os", "Open with the default app"),
             ("reveal_in_os", "Reveal in the OS file manager"),
