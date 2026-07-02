@@ -2,6 +2,14 @@
 
 Status: **complete — all four slices landed; 28 headless tests pass (TUI+GUI).
 Pending manual GUI verification on macOS + curses.**
+
+Tree-line rendering is capability-split (`ctx.vector_shapes`): the GUI draws the
+hierarchy connectors as thin `fill_rect` lines (1 device pixel, aligned to a
+base-unit grid) with node names in the proportional UI font, elided to the
+column by measured width; the terminal keeps box-drawing connectors on the
+character grid. An earlier all-monospace pass fixed alignment but looked like a
+terminal in the GUI — box-drawing glyphs are the wrong primitive for a
+proportional font (same lesson as the MessageBox proportional-truncation bug).
 Branch: `puikit-port`
 Scope: port `legacy/src/tfm_directory_diff_viewer.py` (~4,527 lines) to a PuiKit
 widget, the last major unported UI module (Phase 4 tentpole).

@@ -32,13 +32,13 @@ from typing import Any, Callable, Optional
 from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
 from puikit.panel import Rect
-from puikit.text import truncate_to_width
+from puikit.text import elide, truncate_to_width
 from puikit.widgets import show_message_box
 from puikit.widgets.base import Widget
 
 from tfm_path import Path
 from tfm_str_format import format_size
-from tfm_text_viewer import _ScrollBody
+from tfm_text_viewer import MONO, _ScrollBody
 from tfm_diff_viewer import show_diff_viewer
 
 
@@ -283,6 +283,8 @@ def _recursive_delete(entry: Path) -> None:
 _DIFF_FG = (222, 120, 110)
 #: Faint fill for the blank side of an only-left / only-right row.
 _EMPTY_BG = (32, 32, 34)
+#: Horizontal base units reserved per tree depth level (the connector column).
+_INDENT = 2
 
 
 class DirectoryDiffView(Widget):
@@ -509,6 +511,17 @@ class DirectoryDiffView(Widget):
         if node.is_expanded:
             for child in node.children:
                 self._flatten(child, out)
+
+    def _connector_chain(self, node: TreeNode) -> list[bool]:
+        """One ``is_last_child`` flag per depth level from the top ancestor down
+        to ``node`` (length == ``node.depth``). Drives both the box-drawing
+        connectors (grid) and the drawn connector lines (vector)."""
+        nodes: list[TreeNode] = []
+        cur: Optional[TreeNode] = node
+        while cur is not None and cur.depth > 0:
+            nodes.insert(0, cur)
+            cur = cur.parent
+        return [n.parent.children[-1] is n for n in nodes if n.parent is not None]
 
     def _tree_lines(self, node: TreeNode, *, branch: bool) -> str:
         """Box-drawing prefix showing this node's place in the tree. With
@@ -813,9 +826,9 @@ class DirectoryDiffView(Widget):
             base_fg = self._accent
         # A pending file/dir is dimmed until its verdict resolves.
         pending = verdict == DifferenceType.PENDING
-        suffix = ""
-        if pending and not node.is_directory:
-            suffix = " …"
+        suffix = " …" if (pending and not node.is_directory) else ""
+        vector = ctx.vector_shapes
+        flags = self._connector_chain(node)
 
         def side(x: int, col_w: int, path, is_active: bool) -> None:
             row_bg = bg
@@ -824,25 +837,70 @@ class DirectoryDiffView(Widget):
                 row_bg = self._sel_active if is_active else self._sel_inactive
                 fg = (255, 255, 255)
                 ctx.fill_rect(x, y, col_w, 1.0, Style(bg=row_bg))
-            if path is None:
-                lines = self._tree_lines(node, branch=False)
-                if not focused:
-                    ctx.fill_rect(x, y, col_w, 1.0, Style(bg=_EMPTY_BG))
-                if lines:
-                    ctx.draw_text(x, y, lines[:col_w], Style(fg=self._muted, bg=row_bg))
-                return
-            lines = self._tree_lines(node, branch=True)
-            marker = ("▾ " if node.is_expanded else "▸ ") if node.is_directory else ""
-            label = lines + marker + node.name + ("/" if node.is_directory else "") + suffix
-            ctx.draw_text(x, y, truncate_to_width(label, col_w), Style(fg=fg, bg=row_bg))
-            if lines:  # redraw the tree lines muted over the label's start
-                ctx.draw_text(x, y, lines[:col_w], Style(fg=self._muted, bg=row_bg))
+            elif path is None:
+                ctx.fill_rect(x, y, col_w, 1.0, Style(bg=_EMPTY_BG))
+            if vector:
+                self._draw_side_vector(ctx, x, col_w, node, flags, path, y,
+                                       fg, row_bg, suffix)
+            else:
+                self._draw_side_grid(ctx, x, col_w, node, path, y, fg, row_bg, suffix)
 
         side(self._left_x, self._left_w, node.left_path, self.active == "left")
         sep = _SEPARATOR.get(verdict, " ! ")
         sep_fg = _DIFF_FG if is_diff else self._muted
-        ctx.draw_text(self._sep_x, y, sep, Style(fg=sep_fg, bg=bg, attr=TextAttribute.BOLD))
+        ctx.draw_text(self._sep_x, y, sep,
+                      Style(fg=sep_fg, bg=bg, attr=TextAttribute.BOLD, font=MONO))
         side(self._right_x, self._right_w, node.right_path, self.active == "right")
+
+    def _draw_side_grid(self, ctx, x, col_w, node, path, y, fg, row_bg, suffix) -> None:
+        """Terminal / character-grid tree column: box-drawing connectors in the
+        cell grid (monospace, so ├ └ │ align and column-count truncation is
+        exact)."""
+        if path is None:
+            lines = self._tree_lines(node, branch=False)
+            if lines:
+                ctx.draw_text(x, y, lines[:col_w], Style(fg=self._muted, bg=row_bg, font=MONO))
+            return
+        lines = self._tree_lines(node, branch=True)
+        marker = ("▾ " if node.is_expanded else "▸ ") if node.is_directory else ""
+        label = lines + marker + node.name + ("/" if node.is_directory else "") + suffix
+        ctx.draw_text(x, y, truncate_to_width(label, col_w), Style(fg=fg, bg=row_bg, font=MONO))
+        if lines:  # redraw the tree lines muted over the label's start
+            ctx.draw_text(x, y, lines[:col_w], Style(fg=self._muted, bg=row_bg, font=MONO))
+
+    def _draw_side_vector(self, ctx, x, col_w, node, flags, path, y,
+                          fg, row_bg, suffix) -> None:
+        """GUI / pixel tree column: connectors drawn as thin lines (aligned to a
+        base-unit grid regardless of the proportional font) with the name in the
+        proportional UI font, indented a fixed distance per depth and elided to
+        the column by measured width."""
+        depth = len(flags)
+        line_style = Style(bg=self._muted)
+        lw = 1.0 / max(1, ctx.base_size[0])   # ~1 device-pixel vertical stroke
+        lh = 1.0 / max(1, ctx.base_size[1])   # ~1 device-pixel horizontal stroke
+        mid = y + 0.5
+        label_x = x + depth * _INDENT
+        for i, is_last in enumerate(flags):
+            cx = x + i * _INDENT + 0.5
+            if i < depth - 1:
+                if not is_last:  # ancestor with siblings below → continuation bar
+                    ctx.fill_rect(cx, y, lw, 1.0, line_style)
+            elif path is not None:
+                # The node's own level: a stem from the top to the middle (full
+                # height when it has siblings below), plus an elbow to the label.
+                ctx.fill_rect(cx, y, lw, 1.0 if not is_last else 0.5, line_style)
+                ctx.fill_rect(cx, mid, max(0.0, label_x - cx), lh, line_style)
+            elif not is_last:
+                # Missing on this side: only the continuation bar, no elbow.
+                ctx.fill_rect(cx, y, lw, 1.0, line_style)
+        if path is None:
+            return
+        marker = ("▾ " if node.is_expanded else "▸ ") if node.is_directory else ""
+        label = marker + node.name + ("/" if node.is_directory else "") + suffix
+        avail = col_w - depth * _INDENT
+        if avail > 0:
+            ctx.draw_text(label_x, y, elide(label, float(avail), measure=ctx.measure_text),
+                          Style(fg=fg, bg=row_bg))
 
     # --- events --------------------------------------------------------------
 

@@ -144,6 +144,9 @@ def test_push_and_render(backend, trees):
     rows = backend.snapshot()
     # A difference separator glyph is drawn somewhere in the tree.
     assert any(" ! " in row or " < " in row or " > " in row for row in rows)
+    # Names render in both the grid (box-char) and vector (drawn-line) paths.
+    text = "\n".join(rows)
+    assert "diff.txt" in text and "sub" in text
 
 
 def test_navigation_events_render(backend, trees):
