@@ -449,6 +449,15 @@ class TfmApp:
         elif action == "rename_file":
             self.rename()
             return False
+        elif action == "copy_files":
+            self.copy_files()
+            return False  # the confirm dialog drives its own redraw
+        elif action == "move_files":
+            self.move_files()
+            return False
+        elif action == "delete_files":
+            self.delete_files()
+            return False
         elif action == "jump_to_path":
             self.jump_to_path()
             return False
@@ -523,6 +532,12 @@ class TfmApp:
             MenuItem("New Folder…", on_select=self.create_directory, shortcut="M"),
             MenuItem("New File…", on_select=self.create_file, shortcut="Shift-E"),
             MenuItem("Rename…", on_select=self.rename, enabled=has_files, shortcut="R"),
+            MenuItem("Copy to Other Pane", on_select=self.copy_files,
+                     enabled=has_files, shortcut="C"),
+            MenuItem("Move to Other Pane", on_select=self.move_files,
+                     enabled=has_files, shortcut="M"),
+            MenuItem("Delete…", on_select=self.delete_files,
+                     enabled=has_files, shortcut="K"),
             SEPARATOR,
             MenuItem("Quit", on_select=self.confirm_quit, shortcut="q"),
             title="File",
@@ -1145,6 +1160,157 @@ class TfmApp:
         show_diff_viewer(self.panel, files[0], files[1])
         self.panel.render()
 
+    # --- file operations (copy / move / delete) ------------------------------
+
+    def _selected_or_focused(self, pane: dict) -> list:
+        """The operation targets: the explicitly selected entries, or — when the
+        selection is empty — the single entry under the cursor. Returns Path
+        objects (``selected_files`` stores string paths), preserving list order."""
+        selected = [f for f in pane["files"] if str(f) in pane["selected_files"]]
+        if selected:
+            return selected
+        entry = self._focused_entry()
+        return [entry] if entry is not None else []
+
+    @staticmethod
+    def _delete_path(entry) -> None:
+        """Delete a file or directory through the storage-agnostic Path API,
+        recursing into directories (``copy_to`` / ``move_to`` handle their own
+        recursion, but delete has no single primitive)."""
+        if entry.is_dir() and not entry.is_symlink():
+            for child in entry.iterdir():
+                TfmApp._delete_path(child)
+            entry.rmdir()
+        else:
+            entry.unlink()
+
+    def copy_files(self) -> None:
+        """Copy the active pane's selection (or cursor entry) into the other
+        pane's directory (the 'C' key). Mirrors ttk TFM's copy-to-other-pane."""
+        self._transfer("copy")
+
+    def move_files(self) -> None:
+        """Move the active pane's selection (or cursor entry) into the other
+        pane's directory (the 'M' key, when a selection exists)."""
+        self._transfer("move")
+
+    def _transfer(self, kind: str) -> None:
+        """Shared copy/move flow: resolve targets and destination, warn on
+        conflicts, confirm (honouring ``CONFIRM_COPY`` / ``CONFIRM_MOVE``), then
+        run the transfer through ``Path.copy_to`` / ``Path.move_to`` (which
+        recurse into directories and handle cross-storage transfers)."""
+        verb = "Copy" if kind == "copy" else "Move"
+        src_pane = self.active_pane()
+        dst_pane = self.pm.get_inactive_pane()
+        dest_dir = dst_pane["path"]
+        targets = self._selected_or_focused(src_pane)
+        if not targets:
+            self.log_info(f"No file to {kind}")
+            return
+        if str(dest_dir) == str(src_pane["path"]):
+            self.log_info(f"Cannot {kind}: source and destination are the same directory")
+            return
+
+        conflicts = [t for t in targets if (dest_dir / t.name).exists()]
+        message = f"{verb} {len(targets)} item(s) to {dest_dir}?"
+        if conflicts:
+            message += f"\n{len(conflicts)} already exist there."
+
+        def run(overwrite: bool) -> None:
+            done = skipped = failed = 0
+            for t in targets:
+                dest = dest_dir / t.name
+                try:
+                    if dest.exists() and not overwrite:
+                        skipped += 1
+                        continue
+                    (t.copy_to if kind == "copy" else t.move_to)(dest, overwrite=overwrite)
+                    done += 1
+                except Exception as exc:
+                    failed += 1
+                    self.log_info(f"{verb} failed for {t.name}: {exc}")
+            self.flm.refresh_files(dst_pane)
+            if kind == "move":
+                self.flm.refresh_files(src_pane)
+            src_pane["selected_files"].clear()
+            summary = f"{verb}: {done} done"
+            if skipped:
+                summary += f", {skipped} skipped (exists)"
+            if failed:
+                summary += f", {failed} failed"
+            self.log_info(summary)
+            self.panel.render()
+
+        confirm = getattr(self.config, f"CONFIRM_{verb.upper()}", True)
+        # A conflict always prompts (never silently overwrite), even if the plain
+        # confirm is disabled; the buttons then choose the overwrite policy.
+        if conflicts:
+            def on_result(label: str) -> None:
+                if label == "Cancel":
+                    self.panel.render()
+                else:
+                    run(overwrite=(label == "Overwrite"))
+            show_message_box(
+                self.panel, message, title=verb, icon="warning",
+                buttons=("Overwrite", "Skip existing", "Cancel"),
+                default=2, cancel=2, on_result=on_result)
+        elif confirm:
+            def on_result(label: str) -> None:
+                if label == verb:
+                    run(overwrite=False)
+                else:
+                    self.panel.render()
+            show_message_box(
+                self.panel, message, title=verb, icon="info",
+                buttons=(verb, "Cancel"), default=0, cancel=1, on_result=on_result)
+        else:
+            run(overwrite=False)
+            return
+        self.panel.render()
+
+    def delete_files(self) -> None:
+        """Delete the active pane's selection (or cursor entry) after a confirm
+        (honouring ``CONFIRM_DELETE``). Directories are removed recursively."""
+        pane = self.active_pane()
+        targets = self._selected_or_focused(pane)
+        if not targets:
+            self.log_info("No file to delete")
+            return
+
+        def run() -> None:
+            done = failed = 0
+            for t in targets:
+                try:
+                    self._delete_path(t)
+                    done += 1
+                except Exception as exc:
+                    failed += 1
+                    self.log_info(f"Delete failed for {t.name}: {exc}")
+            pane["selected_files"].clear()
+            self._refresh(pane)
+            summary = f"Delete: {done} removed"
+            if failed:
+                summary += f", {failed} failed"
+            self.log_info(summary)
+            self.panel.render()
+
+        if getattr(self.config, "CONFIRM_DELETE", True):
+            names = ", ".join(t.name for t in targets[:3])
+            if len(targets) > 3:
+                names += f", … ({len(targets)} total)"
+            def on_result(label: str) -> None:
+                if label == "Delete":
+                    run()
+                else:
+                    self.panel.render()
+            show_message_box(
+                self.panel, f"Delete {len(targets)} item(s)?\n{names}\nThis cannot be undone.",
+                title="Delete", icon="warning", buttons=("Delete", "Cancel"),
+                default=1, cancel=1, on_result=on_result)
+            self.panel.render()
+        else:
+            run()
+
     def _active_view(self) -> FilePane:
         return self.left_view if self.pm.active_pane == "left" else self.right_view
 
@@ -1282,6 +1448,9 @@ class TfmApp:
             ("create_directory", "Create new directory"),
             ("create_file", "Create new file"),
             ("rename_file", "Rename file/directory"),
+            ("copy_files", "Copy selection to the other pane"),
+            ("move_files", "Move selection to the other pane"),
+            ("delete_files", "Delete selection"),
             ("file_details", "Show file details"),
             ("open_with_os", "Open with the default app"),
             ("reveal_in_os", "Reveal in the OS file manager"),
@@ -1356,9 +1525,9 @@ class TfmApp:
             SEPARATOR,
             MenuItem("Rename…", on_select=self.rename, enabled=entry is not None),
             SEPARATOR,
-            MenuItem("Copy", enabled=False),   # file ops land in a later phase
-            MenuItem("Move", enabled=False),
-            MenuItem("Delete", enabled=False),
+            MenuItem("Copy to Other Pane", on_select=self.copy_files, enabled=entry is not None),
+            MenuItem("Move to Other Pane", on_select=self.move_files, enabled=entry is not None),
+            MenuItem("Delete", on_select=self.delete_files, enabled=entry is not None),
             SEPARATOR,
             MenuItem("Show Hidden Files", on_select=lambda: self._menu("toggle_hidden"),
                      checked=lambda: self.flm.show_hidden),
