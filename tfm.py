@@ -29,7 +29,7 @@ from pathlib import Path as _StdPath
 sys.path.insert(0, str(_StdPath(__file__).parent / "src"))
 
 import _config  # noqa: E402  (the canonical default Config template)
-from puikit import EventType, Item, Panel, Style, TextAttribute, VSplit  # noqa: E402
+from puikit import EventType, Item, Panel, Style, TextAttribute, Theme, VSplit, derive_theme  # noqa: E402
 from puikit.backends import create_backend  # noqa: E402
 from puikit.menu import Menu, MenuItem, SEPARATOR  # noqa: E402
 from puikit.text import elide  # noqa: E402
@@ -50,6 +50,55 @@ from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_diff_viewer import show_diff_viewer  # noqa: E402
 from tfm_text_dialog import show_text  # noqa: E402
 from tfm_text_viewer import show_text_viewer  # noqa: E402
+
+
+# --- theme palettes ----------------------------------------------------------
+#
+# Theme switching is pure intent, exactly as in PuiKit's demo catalog: the shell
+# tags its panes with semantic surface roles (header / content / status) instead
+# of hardcoded colors, and every widget reads its accent / selection / text
+# colors from ``panel.theme`` at draw time (see ``PaneHeader`` / ``PaneFooter`` /
+# ``StatusBar`` below). So cycling the active ``Theme`` (the ``toggle_color_scheme``
+# action, bound to ``T``) recolors the whole file manager — chrome and file lists
+# alike — with one assignment and no per-widget repaint logic; the surface
+# backgrounds re-resolve from the new theme on the next render.
+#
+# Each theme is the six base colors ``derive_theme`` needs; it computes the rest
+# (hovers, borders, inactive selections, dividers) by lighten/darken/blend rules.
+#   background — content surface (its luminance also picks the lift direction)
+#   foreground — primary text          muted     — secondary text / dividers
+#   accent     — focus / status bar    surface   — raised panels (header/popup)
+#   selection  — active selection fill
+THEMES: list[tuple[str, Theme]] = [
+    ("Dark+", derive_theme(
+        background=(30, 30, 30), foreground=(212, 212, 212), muted=(157, 157, 157),
+        accent=(0, 122, 204), surface=(48, 48, 52), selection=(10, 105, 178))),
+    ("Monokai", derive_theme(
+        background=(39, 40, 34), foreground=(248, 248, 242), muted=(140, 140, 130),
+        accent=(166, 226, 46), surface=(56, 57, 48), selection=(86, 122, 38))),
+    ("Dracula", derive_theme(
+        background=(40, 42, 54), foreground=(248, 248, 242), muted=(98, 114, 164),
+        accent=(189, 147, 249), surface=(56, 59, 76), selection=(120, 86, 175))),
+    ("Nord", derive_theme(
+        background=(46, 52, 64), foreground=(216, 222, 233), muted=(76, 86, 106),
+        accent=(136, 192, 208), surface=(62, 70, 88), selection=(76, 128, 158))),
+    ("Solarized", derive_theme(
+        background=(0, 43, 54), foreground=(147, 161, 161), muted=(88, 110, 117),
+        accent=(38, 139, 210), surface=(10, 62, 78), selection=(26, 102, 150))),
+    # --- light variants: same six bases, opposite polarity (panels sink, text
+    # defaults dark), so a light background reads correctly on every backend.
+    ("Light+", derive_theme(
+        background=(255, 255, 255), foreground=(30, 30, 30), muted=(110, 110, 110),
+        accent=(0, 122, 204), surface=(235, 235, 238), selection=(120, 180, 240))),
+    ("Solarized Light", derive_theme(
+        background=(253, 246, 227), foreground=(88, 110, 117), muted=(147, 161, 161),
+        accent=(38, 139, 210), surface=(234, 228, 206), selection=(150, 195, 230))),
+]
+
+#: Which theme each ``Config.COLOR_SCHEME`` value starts on (ttk TFM's two
+#: schemes map onto the matching PuiKit palette; anything else falls back to the
+#: first, dark, theme).
+_INITIAL_THEME = {"dark": "Dark+", "light": "Light+"}
 
 
 class PaneHeader(Widget):
@@ -182,6 +231,12 @@ class TfmApp:
             ),
             margin_px=4,
         )
+        # Seed the active theme from the config's color scheme, then let the
+        # ``toggle_color_scheme`` action (T) cycle through the palettes.
+        start = _INITIAL_THEME.get(getattr(self.config, "COLOR_SCHEME", "dark"), "Dark+")
+        self._theme_index = next(
+            (i for i, (name, _t) in enumerate(THEMES) if name == start), 0)
+        self.panel.theme = THEMES[self._theme_index][1]
         self.log_info(f"TFM on PuiKit — {self.pm.left_pane['path']}")
 
     def _pane_column(self, name: str, view: FilePane) -> LayoutView:
@@ -307,6 +362,8 @@ class TfmApp:
             self.flm.show_hidden = not self.flm.show_hidden
             self.flm.refresh_files(pane)
             self.log_info(f"Hidden files: {'shown' if self.flm.show_hidden else 'hidden'}")
+        elif action == "toggle_color_scheme":
+            self._cycle_theme()  # falls through to a full re-render below
         elif action in ("quick_sort_name", "quick_sort_size",
                         "quick_sort_date", "quick_sort_ext"):
             self._quick_sort(action[len("quick_sort_"):])
@@ -491,6 +548,10 @@ class TfmApp:
                      checked=lambda: self.active_pane()["sort_reverse"]),
             MenuItem("Sort By", submenu=sort_menu),
             SEPARATOR,
+            MenuItem("Theme", submenu=self._theme_menu()),
+            MenuItem("Next Theme", on_select=lambda: self._menu("toggle_color_scheme"),
+                     shortcut="T"),
+            SEPARATOR,
             MenuItem("Switch Pane", on_select=lambda: self._menu("switch_pane"), shortcut="Tab"),
             title="View",
         )
@@ -637,6 +698,33 @@ class TfmApp:
         a sane range so a pane can't be nudged to nothing (the mouse-drag path has
         its own base-unit min-size clamp; this keeps the keyboard path safe too)."""
         splitter.fraction = max(0.1, min(0.9, splitter.fraction + delta))
+
+    def _theme_menu(self) -> Menu:
+        """The theme picker, shared by the View menu's 'Theme' submenu. A live
+        ``checked`` predicate marks the active palette (mirrors ``_sort_menu``)."""
+        return Menu(*[
+            MenuItem(name, on_select=(lambda i=i: self._select_theme(i)),
+                     checked=(lambda i=i: self._theme_index == i))
+            for i, (name, _theme) in enumerate(THEMES)
+        ], title="Theme")
+
+    def _apply_theme(self, index: int) -> None:
+        """Switch the active palette. One assignment recolors every widget: the
+        chrome and file lists read the theme at draw time, and the surface-role
+        backgrounds re-resolve on the next render."""
+        self._theme_index = index % len(THEMES)
+        name, theme = THEMES[self._theme_index]
+        self.panel.theme = theme
+        self.log_info(f"Theme: {name}")
+
+    def _cycle_theme(self) -> None:
+        """Advance to the next palette (the ``toggle_color_scheme`` / T action)."""
+        self._apply_theme(self._theme_index + 1)
+
+    def _select_theme(self, index: int) -> None:
+        """Pick a specific palette from the menu, then redraw."""
+        self._apply_theme(index)
+        self.panel.render()
 
     def _quick_sort(self, mode: str) -> None:
         """Set the active pane's sort mode from a quick-sort key; pressing the
@@ -1209,6 +1297,7 @@ class TfmApp:
             ("view_file", "View file (text viewer)"),
             ("diff_files", "Compare two selected files"),
             ("toggle_hidden", "Toggle hidden files"),
+            ("toggle_color_scheme", "Cycle color theme"),
             ("sort_menu", "Sort options (menu)"),
             ("quick_sort_name", "Quick-sort by name (repeat: reverse)"),
             ("quick_sort_size", "Quick-sort by size (repeat: reverse)"),
