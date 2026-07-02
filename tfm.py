@@ -159,7 +159,8 @@ class TfmApp:
         self.config = _config.Config()
         self.keys = KeyBindings(self.config.KEY_BINDINGS)
         self.flm = FileListManager(self.config)
-        self.pm = PaneManager(self.config, Path(left_dir), Path(right_dir))
+        self.pm = PaneManager(self.config, self._resolve_dir(left_dir),
+                              self._resolve_dir(right_dir))
         self.flm.refresh_files(self.pm.left_pane)
         self.flm.refresh_files(self.pm.right_pane)
         #: Recent-directory history for the history picker — a bounded, in-order
@@ -252,6 +253,20 @@ class TfmApp:
             Item(PaneFooter(self, name), size=1, hints={"surface": "status"}),
             divider="subtle",
         ))
+
+    @staticmethod
+    def _resolve_dir(path_str: str) -> Path:
+        """Make a startup directory absolute (expanding ``~``) so the pane header
+        and every path derived from it — parents on ``go_parent``, children from
+        ``iterdir``, the ``selected_files`` keys, history entries, and file-op
+        destinations — is a full path, not one relative to the launch directory.
+        Falls back to ``absolute`` (a plain cwd join, no symlink resolution) if
+        ``resolve`` fails for an odd input."""
+        p = Path(path_str).expanduser()
+        try:
+            return p.resolve()
+        except Exception:
+            return p.absolute()
 
     # --- state ---------------------------------------------------------------
 
