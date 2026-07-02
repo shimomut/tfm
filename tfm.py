@@ -48,6 +48,7 @@ from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
 from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_diff_viewer import show_diff_viewer  # noqa: E402
+from tfm_directory_diff_viewer import show_directory_diff_viewer  # noqa: E402
 from tfm_text_dialog import show_text  # noqa: E402
 from tfm_text_viewer import show_text_viewer  # noqa: E402
 
@@ -488,6 +489,9 @@ class TfmApp:
         elif action == "diff_files":
             self.diff_files()
             return False
+        elif action == "diff_directories":
+            self.diff_directories()
+            return False
         elif action == "help":
             self.show_help()
             return False
@@ -576,6 +580,8 @@ class TfmApp:
                      enabled=lambda: bool(self.active_pane()["selected_files"])),
             SEPARATOR,
             MenuItem("Compare Selected Files…", on_select=self.diff_files, shortcut="="),
+            MenuItem("Compare Directories…", on_select=self.diff_directories,
+                     shortcut="Shift-="),
             title="Select",
         )
         view_menu = Menu(
@@ -1184,6 +1190,15 @@ class TfmApp:
             self.log_info(f"Select exactly 2 files to compare (selected {len(files)})")
             return
         show_diff_viewer(self.panel, files[0], files[1])
+        self.panel.render()
+
+    def diff_directories(self) -> None:
+        """Recursively compare the two panes' current directories side by side
+        (the Shift-EQUAL action). Mirrors ttk TFM's directory diff viewer."""
+        left = self.pane("left")["path"]
+        right = self.pane("right")["path"]
+        show_directory_diff_viewer(self.panel, left, right,
+                                   show_hidden=self.flm.show_hidden)
         self.panel.render()
 
     # --- file operations (copy / move / delete) ------------------------------

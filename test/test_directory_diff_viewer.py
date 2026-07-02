@@ -1,0 +1,296 @@
+"""Headless tests for the PuiKit directory diff viewer.
+
+Run with: PYTHONPATH=.:src:ttk pytest test/test_directory_diff_viewer.py -v
+
+Covers the backend-agnostic classification/tree logic and the widget's
+navigation + rendering on the MemoryBackend (TUI + GUI profiles), per the
+minimal-tests decision in doc/dev/DIRECTORY_DIFF_PORT_PLAN.md.
+"""
+
+import os
+import sys
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from puikit import Event, EventType, Panel, PROFILE_GUI_DESKTOP, PROFILE_TUI
+from puikit.backends.memory_backend import MemoryBackend
+
+from tfm_path import Path
+from tfm_directory_diff_viewer import (
+    DifferenceType,
+    DiffEngine,
+    DirectoryScanner,
+    DirectoryDiffView,
+    show_directory_diff_viewer,
+)
+
+
+def _sync_view(left, right, **kw):
+    """A viewer scanned synchronously (deterministic for tests)."""
+    return DirectoryDiffView(left, right, background=False, **kw)
+
+
+@pytest.fixture
+def trees(tmp_path):
+    """Two directory trees exercising every classification."""
+    left = tmp_path / "L"
+    right = tmp_path / "R"
+    (left / "sub").mkdir(parents=True)
+    (right / "sub").mkdir(parents=True)
+    (left / "same.txt").write_text("hello")
+    (right / "same.txt").write_text("hello")            # identical
+    (left / "diff.txt").write_text("aaa")
+    (right / "diff.txt").write_text("bbb")              # content-different
+    (left / "only_left.txt").write_text("x")            # only-left
+    (right / "only_right.txt").write_text("y")          # only-right
+    (left / "sub" / "a.txt").write_text("1")
+    (right / "sub" / "a.txt").write_text("2")           # nested difference
+    return Path(str(left)), Path(str(right))
+
+
+def _key(name, char=None):
+    return Event(type=EventType.KEY, key=name, char=char)
+
+
+def _find(node, name):
+    return next((c for c in node.children if c.name == name), None)
+
+
+# --- classification ----------------------------------------------------------
+
+
+def test_classification(trees):
+    left, right = trees
+    tree = DiffEngine(DirectoryScanner().scan(left), DirectoryScanner().scan(right)).build_tree()
+    assert _find(tree, "same.txt").difference_type is DifferenceType.IDENTICAL
+    assert _find(tree, "diff.txt").difference_type is DifferenceType.CONTENT_DIFFERENT
+    assert _find(tree, "only_left.txt").difference_type is DifferenceType.ONLY_LEFT
+    assert _find(tree, "only_right.txt").difference_type is DifferenceType.ONLY_RIGHT
+    sub = _find(tree, "sub")
+    assert sub.difference_type is DifferenceType.CONTAINS_DIFFERENCE
+    # Root summarises to "contains difference".
+    assert tree.difference_type is DifferenceType.CONTAINS_DIFFERENCE
+
+
+def test_scanner_respects_show_hidden(tmp_path):
+    d = tmp_path / "d"
+    d.mkdir()
+    (d / "visible.txt").write_text("v")
+    (d / ".hidden").write_text("h")
+    shown = DirectoryScanner(show_hidden=True).scan(Path(str(d)))
+    hidden = DirectoryScanner(show_hidden=False).scan(Path(str(d)))
+    assert ".hidden" in shown
+    assert ".hidden" not in hidden
+    assert "visible.txt" in hidden
+
+
+# --- tree / navigation -------------------------------------------------------
+
+
+def test_auto_expand_reveals_nested_difference(trees):
+    view = _sync_view(*trees)
+    # "sub" contains a difference, so it is auto-expanded and its child shows.
+    assert any(n.name == "a.txt" and n.depth == 2 for n in view.visible)
+
+
+def test_expand_collapse_index_integrity(trees):
+    view = _sync_view(*trees)
+    sub = _find(view.root, "sub")
+    view.cursor = view.visible.index(sub)
+    view._toggle(expand=False)
+    assert not any(n.name == "a.txt" for n in view.visible)
+    # Cursor stays on the (now collapsed) sub node.
+    assert view.visible[view.cursor] is sub
+    view._toggle(expand=True)
+    assert any(n.name == "a.txt" for n in view.visible)
+    assert view.visible[view.cursor] is sub
+
+
+def test_step_diff_skips_identical(trees):
+    view = _sync_view(*trees)
+    seen = set()
+    for _ in range(len(view.visible)):
+        view._step_diff(1)
+        node = view.visible[view.cursor]
+        assert node.difference_type is not DifferenceType.IDENTICAL
+        seen.add(node.name)
+    # The identical file is never landed on.
+    assert "same.txt" not in seen
+
+
+def test_cursor_clamps_at_ends(trees):
+    view = _sync_view(*trees)
+    view._move_cursor(-100)
+    assert view.cursor == 0
+    view._move_cursor(100)
+    assert view.cursor == len(view.visible) - 1
+
+
+# --- rendering + wiring ------------------------------------------------------
+
+
+@pytest.fixture(params=[PROFILE_TUI, PROFILE_GUI_DESKTOP], ids=["tui", "gui"])
+def backend(request):
+    return MemoryBackend(width=100, height=30, capabilities=request.param)
+
+
+def test_push_and_render(backend, trees):
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False)
+    assert panel._layers[-1].widget is view
+    panel.render()  # must not raise
+    rows = backend.snapshot()
+    # A difference separator glyph is drawn somewhere in the tree.
+    assert any(" ! " in row or " < " in row or " > " in row for row in rows)
+
+
+def test_navigation_events_render(backend, trees):
+    panel = Panel(backend)
+    show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    for ev in (_key("down"), _key("up"), _key("tab"),
+               _key(None, "n"), _key(None, "N"), _key("end"), _key("home")):
+        panel.dispatch_event(ev)
+        panel.render()  # each must not raise
+
+
+def test_escape_closes(backend, trees):
+    panel = Panel(backend)
+    show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    panel.dispatch_event(_key("escape"))
+    assert panel._layers == []
+
+
+def test_enter_on_differing_file_opens_file_diff(backend, trees):
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    diff_node = _find(view.root, "diff.txt")
+    view.cursor = view.visible.index(diff_node)
+    view.active = "left"
+    panel.dispatch_event(_key("enter"))
+    # A per-file DiffViewer layer is pushed on top.
+    assert len(panel._layers) == 2
+
+
+# --- progressive scanning (slice 3) ------------------------------------------
+
+
+def test_background_scan_populates_and_resolves(trees):
+    view = DirectoryDiffView(*trees, background=True)
+    view.join()
+    assert not view._scanning
+    assert any(n.name == "a.txt" for n in view.visible)
+    # Deferred comparison resolved every file's verdict (nothing left pending).
+    assert _find(view.root, "diff.txt").difference_type is DifferenceType.CONTENT_DIFFERENT
+    assert _find(view.root, "same.txt").difference_type is DifferenceType.IDENTICAL
+    assert not any(n.difference_type is DifferenceType.PENDING for n in view.visible)
+
+
+def test_tick_renders_when_dirty_and_stops_when_done(trees):
+    view = DirectoryDiffView(*trees, background=True)
+    calls = []
+    view._panel = type("P", (), {"render": lambda self: calls.append(1)})()
+    view.join()
+    # Drive ticks until the callback unregisters (returns False).
+    for _ in range(10):
+        if not view._tick():
+            break
+    assert calls, "tick should have rendered at least the final frame"
+    # Once idle and clean, the tick returns False so the backend drops it.
+    assert view._tick() is False
+
+
+def test_cancel_stops_the_tick(trees):
+    view = DirectoryDiffView(*trees, background=True)
+    view.join()
+    view.cancel()
+    assert view._tick() is False
+
+
+# --- file operations across sides (slice 4) ----------------------------------
+
+
+def test_copy_focused_creates_file_on_other_side(backend, trees):
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    node = _find(view.root, "only_left.txt")
+    view.cursor = view.visible.index(node)
+    view.active = "left"
+    view._copy_focused()          # pushes a confirmation message box
+    panel.dispatch_event(_key("enter"))  # default button is "Copy"
+    view.join()
+    assert (trees[1] / "only_left.txt").exists()
+
+
+def test_delete_focused_removes_file(backend, trees):
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    node = _find(view.root, "only_left.txt")
+    view.cursor = view.visible.index(node)
+    view.active = "left"
+    view._delete_focused()        # confirm box, default = Cancel
+    panel.dispatch_event(_key("left"))   # focus the "Delete" button
+    panel.dispatch_event(_key("enter"))
+    view.join()
+    assert not (trees[0] / "only_left.txt").exists()
+
+
+def test_delete_cancel_keeps_file(backend, trees):
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    node = _find(view.root, "only_left.txt")
+    view.cursor = view.visible.index(node)
+    view.active = "left"
+    view._delete_focused()
+    panel.dispatch_event(_key("enter"))  # default = Cancel
+    assert (trees[0] / "only_left.txt").exists()
+
+
+def test_rescan_preserves_collapsed_state(trees):
+    view = DirectoryDiffView(*trees, background=True)
+    view.join()
+    sub = _find(view.root, "sub")
+    view.cursor = view.visible.index(sub)
+    view._toggle(expand=False)
+    view._restart_scan()
+    view.join()
+    assert not _find(view.root, "sub").is_expanded
+
+
+def test_rescan_preserves_expanded_state(trees):
+    view = DirectoryDiffView(*trees, background=True)
+    view.join()
+    assert _find(view.root, "sub").is_expanded  # auto-expanded (contains diff)
+    view._restart_scan()
+    view.join()
+    assert _find(view.root, "sub").is_expanded
+
+
+def test_help_pushes_message_box(backend, trees):
+    panel = Panel(backend)
+    view = show_directory_diff_viewer(panel, *trees, background=False)
+    panel.render()
+    view._show_help()
+    assert len(panel._layers) == 2
+
+
+def test_deferred_build_leaves_files_pending():
+    # A tree built without content comparison marks two-sided files PENDING
+    # and summarises their directory as PENDING (not yet known).
+    from tfm_directory_diff_viewer import FileInfo
+
+    def info(rel, is_dir=False):
+        return FileInfo(Path("/x/" + rel), rel, is_dir, 0, 0.0, True)
+
+    left = {"a.txt": info("a.txt")}
+    right = {"a.txt": info("a.txt")}
+    tree = DiffEngine(left, right, compare_content=False).build_tree()
+    assert _find(tree, "a.txt").difference_type is DifferenceType.PENDING
+    assert tree.difference_type is DifferenceType.PENDING
