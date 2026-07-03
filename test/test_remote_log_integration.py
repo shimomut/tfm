@@ -103,7 +103,7 @@ def test_file_permissions():
     """Test that scripts have correct permissions"""
     print("\nTesting file permissions...")
     
-    scripts = ['tools/tfm_log_client.py', 'demo/demo_remote_log.py']
+    scripts = ['tools/tfm_log_client.py', 'legacy/demo/demo_remote_log.py']
     
     for script in scripts:
         script_path = Path(script)

@@ -5,7 +5,7 @@ recursive-include src/tools *
 exclude tfm.py
 exclude temp/*
 exclude test/*
-exclude demo/*
+recursive-exclude legacy *
 exclude doc/*
 exclude build/*
 exclude *.egg-info/*

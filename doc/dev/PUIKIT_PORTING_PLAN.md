@@ -63,10 +63,6 @@ it, but TFM has **never been run/tested on Windows**. Stand it up: launch, smoke
 test navigation/dialogs/viewers, fix backend-specific gaps. (New capability vs.
 `ttk`, which was curses + macOS only.)
 
-### 2.3 Retire the legacy ttk-era demos (optional)
-The six `demo/demo_*` scripts that `import ttk` (system-event-broadcast,
-progress-animation, the directory-diff demos, recursion-fix) are **already broken**
-— `ttk` is gone — and target the pre-port architecture. Retire or port them.
 
 ---
 

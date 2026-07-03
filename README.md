@@ -335,7 +335,7 @@ tfm/
 ├── test/          # Test files (720+ passing tests)
 ├── doc/           # User documentation
 ├── doc/dev/       # Developer documentation
-├── demo/          # Interactive demonstrations
+├── legacy/        # Pre-PuiKit-port code (retired: old ttk src/test/demo)
 └── tfm.py         # Main entry point
 ```
 
