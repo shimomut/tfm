@@ -70,7 +70,7 @@ def test_date_column_widths():
     
     print("=" * 60)
     
-    return all_passed
+    return
 
 
 def test_column_layout_calculation():

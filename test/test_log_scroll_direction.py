@@ -63,11 +63,11 @@ def test_log_scroll_direction():
         print(f"  - scroll_log_down decreases offset (toward newer messages)")
         print(f"  - Boundary checking handled in draw_log_pane method")
         
-        return True
+        return
         
     except Exception as e:
         print(f"✗ Error testing log scroll direction: {e}")
-        return False
+        return
 
 def test_scroll_method_comments():
     """Test that scroll method docstrings are correct"""
@@ -84,11 +84,11 @@ def test_scroll_method_comments():
         assert "newer messages" in scroll_down_doc, "scroll_log_down docstring should mention 'newer messages'"
         
         print("✓ Scroll method documentation is correct")
-        return True
+        return
         
     except Exception as e:
         print(f"✗ Error testing scroll method documentation: {e}")
-        return False
+        return
 
 def main():
     """Run log scroll direction tests"""

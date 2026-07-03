@@ -130,8 +130,8 @@ def test_python_script():
             print("Errors:")
             print(result.stderr)
             
-        return result.returncode == 0
+        return
         
     except Exception as e:
         print(f"❌ Error running Python test: {e}")
-        return False
+        return

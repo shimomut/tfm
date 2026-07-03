@@ -60,7 +60,7 @@ def test_directory_existence_check():
         assert str(non_existing_dir) in history_after  # This should be removed
         
         print("Test shows current behavior: non-existing directories remain in history")
-        return True
+        return
 
 
 def test_cleanup_non_existing_directories():
@@ -129,4 +129,4 @@ def test_cleanup_non_existing_directories():
         assert str(non_existing_dir1) not in right_history_after
         
         print("Cleanup function successfully removed non-existing directories")
-        return True
+        return

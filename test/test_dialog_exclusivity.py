@@ -102,7 +102,7 @@ def test_dialog_exclusivity_logic():
     print("✓ Dialog handlers get first chance at keys")
     print("✓ Regular key processing is skipped when dialogs are open")
     
-    return True
+    return
 
 def test_specific_conflict():
     """Test the specific help dialog + search conflict"""
@@ -138,4 +138,4 @@ def test_specific_conflict():
     print("• Predictable behavior")
     print("• Help dialog remains focused")
     
-    return True
+    return

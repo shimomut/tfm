@@ -7,6 +7,7 @@ empty S3 directories fails with "No files to delete" error.
 Run with: PYTHONPATH=.:src:ttk pytest test/test_s3_directory_deletion.py -v
 """
 
+import pytest
 import tempfile
 import shutil
 from pathlib import Path
@@ -23,12 +24,13 @@ except ImportError:
     print("boto3 or moto not available, skipping S3 tests")
 
 
+@pytest.mark.skipif(not HAS_BOTO3, reason="requires boto3 + moto for mocked S3")
 class TestS3DirectoryDeletionFix:
     """Test S3 directory deletion fix"""
-    
-    def __init__(self):
-        self.test_bucket = 'test-bucket-s3-dir-deletion'
-    
+
+    # Class attribute (was __init__, which prevented pytest from collecting the class).
+    test_bucket = 'test-bucket-s3-dir-deletion'
+
     @mock_s3
     def test_empty_directory_deletion(self):
         """Test deleting an empty S3 directory"""

@@ -142,9 +142,9 @@ def test_backward_compatibility():
         
     except ImportError as e:
         print(f"✗ Import error: {e}")
-        return False
+        return
     
-    return True
+    return
 
 
 def test_file_operations_integration():
@@ -185,9 +185,9 @@ def test_file_operations_integration():
         
     except Exception as e:
         print(f"✗ Integration test failed: {e}")
-        return False
+        return
     
-    return True
+    return
 
 
 def main():

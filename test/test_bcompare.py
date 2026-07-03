@@ -53,19 +53,19 @@ def test_bcompare_config():
                     print("✓ Wrapper script is executable")
                 else:
                     print("✗ Wrapper script is not executable")
-                    return False
+                    return
             else:
                 print(f"✗ Wrapper script not found: {wrapper_path}")
-                return False
+                return
     
     # Check if all expected programs were found
     missing_programs = set(programs_to_check) - set(found_programs)
     if missing_programs:
         print(f"✗ Missing BeyondCompare programs: {', '.join(missing_programs)}")
-        return False
+        return
     
     print("\n✓ BeyondCompare configuration test passed!")
-    return True
+    return
 
 def test_wrapper_scripts():
     """Test the wrapper scripts with mock environment variables"""
@@ -114,4 +114,4 @@ def test_wrapper_scripts():
         success = False
     
     print("  (Not executing to avoid launching BeyondCompare)")
-    return success
+    return

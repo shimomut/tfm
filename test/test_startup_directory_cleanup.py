@@ -153,7 +153,7 @@ def test_startup_directory_cleanup():
         assert str(non_existing_dir1) not in right_history_after
         
         print("✓ Startup directory cleanup working correctly")
-        return True
+        return
 
 
 def test_startup_with_no_cleanup_needed():
@@ -201,4 +201,4 @@ def test_startup_with_no_cleanup_needed():
         assert str(existing_dir1) in right_history_after
         
         print("✓ Startup with no cleanup needed working correctly")
-        return True
+        return

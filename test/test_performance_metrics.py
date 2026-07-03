@@ -22,12 +22,12 @@ def test_metrics_functions_exist():
             "cpp_renderer should have reset_metrics function"
         
         print("✓ Metrics functions exist in cpp_renderer module")
-        return True
+        return
         
     except ImportError as e:
         print(f"✗ Failed to import cpp_renderer: {e}")
         print("  Note: This is expected if the C++ extension is not built")
-        return False
+        return
 
 
 def test_get_performance_metrics():
@@ -77,14 +77,14 @@ def test_get_performance_metrics():
         
         print("✓ get_performance_metrics returns correct structure")
         print(f"  Current metrics: {metrics}")
-        return True
+        return
         
     except ImportError as e:
         print(f"✗ Failed to import cpp_renderer: {e}")
-        return False
+        return
     except Exception as e:
         print(f"✗ Test failed: {e}")
-        return False
+        return
 
 
 def test_reset_metrics():
@@ -126,14 +126,14 @@ def test_reset_metrics():
               f"time={metrics_before['total_render_time_ms']:.2f}ms")
         print(f"  Metrics after reset: frames={metrics_after['frames_rendered']}, "
               f"time={metrics_after['total_render_time_ms']:.2f}ms")
-        return True
+        return
         
     except ImportError as e:
         print(f"✗ Failed to import cpp_renderer: {e}")
-        return False
+        return
     except Exception as e:
         print(f"✗ Test failed: {e}")
-        return False
+        return
 
 
 def main():

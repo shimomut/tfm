@@ -18,7 +18,7 @@ def test_options_parsing():
     
     if not bcompare_programs:
         print("✗ No BeyondCompare programs found")
-        return False
+        return
     
     success = True
     for prog in bcompare_programs:
@@ -38,7 +38,7 @@ def test_options_parsing():
             print("✗ No options found")
             success = False
     
-    return success
+    return
 
 def create_test_program():
     """Create a simple test program to demonstrate auto_return"""

@@ -39,11 +39,11 @@ def test_confirmation_config_options():
         
         print("✓ All new confirmation options accessible from loaded config (with fallback defaults)")
         
-        return True
+        return
         
     except Exception as e:
         print(f"✗ Error testing confirmation options: {e}")
-        return False
+        return
 
 def test_template_config_file():
     """Test that template config file contains new confirmation options"""
@@ -54,7 +54,7 @@ def test_template_config_file():
         
         if not template_file.exists():
             print(f"✗ Template config file not found: {template_file}")
-            return False
+            return
         
         with open(template_file, 'r') as f:
             content = f.read()
@@ -66,11 +66,11 @@ def test_template_config_file():
         
         print("✓ All new confirmation options found in template config file")
         
-        return True
+        return
         
     except Exception as e:
         print(f"✗ Error testing template config file: {e}")
-        return False
+        return
 
 def test_confirmation_usage():
     """Test that confirmation options can be used with getattr"""
@@ -93,11 +93,11 @@ def test_confirmation_usage():
         
         print("✓ All confirmation options work with getattr pattern")
         
-        return True
+        return
         
     except Exception as e:
         print(f"✗ Error testing confirmation usage: {e}")
-        return False
+        return
 
 def main():
     """Run all confirmation option tests"""

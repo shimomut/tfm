@@ -101,4 +101,4 @@ def test_s3_backspace_navigation():
     else:
         print("\n💥 Some tests failed!")
         
-    return all_passed
+    return

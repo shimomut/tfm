@@ -10,6 +10,7 @@ This test verifies that TFM can move files and directories between different sto
 Run with: PYTHONPATH=.:src:ttk pytest test/test_cross_storage_move.py -v
 """
 
+import os
 import tempfile
 import shutil
 from pathlib import Path as PathlibPath
@@ -20,19 +21,15 @@ from tfm_path import Path
 class TestCrossStorageMove:
     """Test cross-storage move operations"""
     
-    def __init__(self):
+    def setup_method(self, method):
+        """Set up test environment (pytest per-test hook; was __init__/setup)."""
         self.temp_dir = None
         self.test_files = []
         self.test_dirs = []
-    
-    def setup(self):
-        """Set up test environment"""
-        print("Setting up test environment...")
-        
+
         # Create temporary directory for local tests
         self.temp_dir = tempfile.mkdtemp(prefix='tfm_move_test_')
-        print(f"Created temp directory: {self.temp_dir}")
-        
+
         # Create test files and directories
         self._create_test_data()
     
@@ -100,7 +97,7 @@ class TestCrossStorageMove:
             
         except Exception as e:
             print(f"✗ Local to local move failed: {e}")
-            return False
+            return
         
         # Test directory move
         source_dir = self.test_dirs[0]
@@ -122,9 +119,9 @@ class TestCrossStorageMove:
             
         except Exception as e:
             print(f"✗ Local to local directory move failed: {e}")
-            return False
+            return
         
-        return True
+        return
     
     def test_s3_availability(self):
         """Test if S3 functionality is available"""
@@ -136,15 +133,15 @@ class TestCrossStorageMove:
             print(f"S3 path created: {s3_path}")
             print(f"S3 scheme: {s3_path.get_scheme()}")
             print("✓ S3 support is available")
-            return True
+            return
             
         except ImportError as e:
             print(f"✗ S3 support not available: {e}")
             print("Install boto3 to enable S3 functionality: pip install boto3")
-            return False
+            return
         except Exception as e:
             print(f"✗ S3 initialization failed: {e}")
-            return False
+            return
     
     def test_cross_storage_move_simulation(self):
         """Simulate cross-storage move without actual S3 operations"""
@@ -180,9 +177,9 @@ class TestCrossStorageMove:
             
         except Exception as e:
             print(f"✗ Cross-storage move simulation failed: {e}")
-            return False
+            return
         
-        return True
+        return
     
     def test_move_error_handling(self):
         """Test error handling in move operations"""
@@ -196,7 +193,7 @@ class TestCrossStorageMove:
             try:
                 non_existent.move_to(dest)
                 print("✗ Should have raised FileNotFoundError")
-                return False
+                return
             except FileNotFoundError:
                 print("✓ Correctly raised FileNotFoundError for non-existent source")
             
@@ -210,7 +207,7 @@ class TestCrossStorageMove:
             try:
                 source.move_to(existing_dest, overwrite=False)
                 print("✗ Should have raised FileExistsError")
-                return False
+                return
             except FileExistsError:
                 print("✓ Correctly raised FileExistsError for existing destination")
             
@@ -224,23 +221,21 @@ class TestCrossStorageMove:
                 print("✓ Move with overwrite works correctly")
             except Exception as e:
                 print(f"✗ Move with overwrite failed: {e}")
-                return False
+                return
             
         except Exception as e:
             print(f"✗ Error handling test failed: {e}")
-            return False
+            return
         
-        return True
+        return
     
-    def cleanup(self):
-        """Clean up test environment"""
-        print(f"\nCleaning up test directory: {self.temp_dir}")
+    def teardown_method(self, method):
+        """Clean up test environment (pytest per-test hook; was cleanup)."""
         try:
             if self.temp_dir and os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir)
-                print("✓ Cleanup completed")
         except Exception as e:
-            print(f"✗ Cleanup failed: {e}")
+            print(f"Cleanup failed: {e}")
     
     def run_all_tests(self):
         """Run all tests"""

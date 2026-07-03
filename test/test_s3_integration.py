@@ -44,7 +44,7 @@ def test_s3_name_property():
     else:
         print("⚠ S3 name property test had failures")
     
-    return all_passed
+    return
 
 def test_s3_credentials():
     """Test if AWS credentials are available"""
@@ -55,13 +55,13 @@ def test_s3_credentials():
         # This will trigger credential check
         s3_path._impl._client
         print("✓ AWS credentials are available")
-        return True
+        return
     except RuntimeError as e:
         print(f"⚠ AWS credentials not available: {e}")
-        return False
+        return
     except Exception as e:
         print(f"⚠ AWS connection issue: {e}")
-        return False
+        return
 
 def test_s3_bucket_operations():
     """Test S3 bucket operations (requires valid credentials and bucket)"""
@@ -88,10 +88,10 @@ def test_s3_bucket_operations():
                 print(f"Error listing bucket contents: {e}")
         
         print("✓ S3 bucket operations test completed")
-        return True
+        return
     except Exception as e:
         print(f"⚠ S3 bucket operations failed: {e}")
-        return False
+        return
 
 def test_s3_file_operations():
     """Test S3 file operations"""
@@ -133,10 +133,10 @@ def test_s3_file_operations():
             print("✓ Test file deleted")
         
         print("✓ S3 file operations test completed")
-        return True
+        return
     except Exception as e:
         print(f"⚠ S3 file operations failed: {e}")
-        return False
+        return
 
 def main():
     """Run all integration tests"""

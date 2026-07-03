@@ -40,7 +40,7 @@ def test_list_directory_error_no_stat_cache():
         try:
             conn.list_directory('/nonexistent')
             print("❌ FAIL: Expected SSHPathNotFoundError to be raised")
-            return False
+            return
         except SSHPathNotFoundError as e:
             print(f"✓ SSHPathNotFoundError raised as expected: {e}")
         
@@ -51,7 +51,7 @@ def test_list_directory_error_no_stat_cache():
         
         if stat_count > 0:
             print(f"❌ FAIL: Found {stat_count} stat cache entries, expected 0")
-            return False
+            return
         
         print("✓ No stat cache entries created")
         
@@ -63,12 +63,12 @@ def test_list_directory_error_no_stat_cache():
                 path='/nonexistent'
             )
             print("❌ FAIL: Expected cached error to be re-raised")
-            return False
+            return
         except SSHPathNotFoundError:
             print("✓ Error was cached for list_directory operation")
     
     print("✓ Test 1 PASSED")
-    return True
+    return
 
 
 def test_partial_parse_failures_cache_successful():
@@ -107,7 +107,7 @@ drwxr-xr-x  2 user group  4096 Jan 15 10:30 subdir
         if len(entries) != 3:
             print(f"❌ FAIL: Expected 3 entries, got {len(entries)}")
             print(f"Entries: {[e['name'] for e in entries]}")
-            return False
+            return
         
         print(f"✓ Parsed {len(entries)} valid entries from mixed output")
         
@@ -122,11 +122,11 @@ drwxr-xr-x  2 user group  4096 Jan 15 10:30 subdir
                 )
                 if cached_stat is None:
                     print(f"❌ FAIL: No cache entry for {filename}")
-                    return False
+                    return
                 print(f"✓ Stat cached for {filename}: size={cached_stat['size']}")
             except Exception as e:
                 print(f"❌ FAIL: Error getting cached stat for {filename}: {e}")
-                return False
+                return
         
         # Verify cache stats
         cache_stats = cache.get_stats()
@@ -134,12 +134,12 @@ drwxr-xr-x  2 user group  4096 Jan 15 10:30 subdir
         
         if stat_count != 3:
             print(f"❌ FAIL: Expected 3 stat cache entries, got {stat_count}")
-            return False
+            return
         
         print(f"✓ Created {stat_count} stat cache entries for valid files")
     
     print("✓ Test 2 PASSED")
-    return True
+    return
 
 
 def test_cached_errors_are_reraised():
@@ -163,7 +163,7 @@ def test_cached_errors_are_reraised():
         try:
             conn.stat('/forbidden/file.txt')
             print("❌ FAIL: Expected SSHPermissionDeniedError to be raised")
-            return False
+            return
         except SSHPermissionDeniedError as e:
             print(f"✓ First call raised SSHPermissionDeniedError: {e}")
     
@@ -175,19 +175,19 @@ def test_cached_errors_are_reraised():
         try:
             conn.stat('/forbidden/file.txt')
             print("❌ FAIL: Expected cached SSHPermissionDeniedError to be raised")
-            return False
+            return
         except SSHPermissionDeniedError as e:
             print(f"✓ Second call raised cached SSHPermissionDeniedError: {e}")
         
         # Verify that _execute_sftp_command was NOT called
         if mock_exec.called:
             print("❌ FAIL: Network call was made despite cached error")
-            return False
+            return
         
         print("✓ No network call made (error was cached)")
     
     print("✓ Test 3 PASSED")
-    return True
+    return
 
 
 def test_list_directory_success_caches_stats():
@@ -232,14 +232,14 @@ drwxr-xr-x  2 user group  4096 Jan 15 10:30 subdir
                 )
                 if cached_stat is None:
                     print(f"❌ FAIL: No cache entry for {filename}")
-                    return False
+                    return
                 print(f"✓ Stat cached for {filename}")
             except Exception as e:
                 print(f"❌ FAIL: Error getting cached stat for {filename}: {e}")
-                return False
+                return
     
     print("✓ Test 4 PASSED")
-    return True
+    return
 
 
 def main():

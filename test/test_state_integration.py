@@ -109,7 +109,7 @@ def test_state_manager_integration():
         print("✓ Session cleanup working")
         
         print("✓ All integration tests passed!")
-        return True
+        return
 
 
 def test_state_persistence():
@@ -164,7 +164,7 @@ def test_state_persistence():
         state_manager2.cleanup_session()
         
         print("✓ State persistence across instances working!")
-        return True
+        return
 
 
 def test_concurrent_state_access():
@@ -237,10 +237,10 @@ def test_concurrent_state_access():
         # Check results
         if errors:
             print(f"Errors during concurrent access: {errors[:3]}...")
-            return False
+            return
         
         print(f"✓ Concurrent access successful ({len(results)} operations)")
-        return True
+        return
 
 
 def run_integration_tests():

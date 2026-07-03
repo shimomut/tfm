@@ -126,10 +126,10 @@ def test_concurrent_access():
         # Check results
         if errors:
             print(f"Errors during concurrent access: {errors[:5]}...")  # Show first 5 errors
-            return False
+            return
         
         print(f"✓ Concurrent access successful ({len(results)} operations)")
-        return True
+        return
 
 
 def test_tfm_specific_operations():

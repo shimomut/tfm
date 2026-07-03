@@ -117,13 +117,13 @@ def test_key_binding():
                 print(f"⚠ Expected 'm' and 'M' keys, found: {move_keys}")
         else:
             print("✗ move_files key binding not found in configuration")
-            return False
+            return
             
     except Exception as e:
         print(f"✗ Error testing key binding: {e}")
-        return False
+        return
     
-    return True
+    return
 
 def test_method_existence():
     """Test that the move methods exist in FileManager"""
@@ -147,20 +147,20 @@ def test_method_existence():
                 print(f"✓ {method.split('(')[0]} method found")
             else:
                 print(f"✗ {method.split('(')[0]} method not found")
-                return False
+                return
         
         # Check method call in key handler
         if "self.move_selected_files()" in content:
             print("✓ Move method call found in key handler")
         else:
             print("✗ Move method call not found in key handler")
-            return False
+            return
             
     except Exception as e:
         print(f"✗ Error checking method implementation: {e}")
-        return False
+        return
     
-    return True
+    return
 
 def main():
     """Run all tests"""

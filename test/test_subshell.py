@@ -32,7 +32,7 @@ def test_subshell_environment():
     if missing_vars:
         print(f"❌ Missing variables: {', '.join(missing_vars)}")
         print("This script should be run from within TFM sub-shell mode (press 'x' in TFM)")
-        return False
+        return
     else:
         print("✅ All TFM environment variables are set correctly!")
         
@@ -81,4 +81,4 @@ def test_subshell_environment():
         else:
             print("ℹ️  Prompt variables set but may not be active in non-interactive mode")
         
-        return True
+        return

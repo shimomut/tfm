@@ -124,7 +124,7 @@ def test_priority_matching():
     else:
         print("❌ Some tests failed!")
     
-    return 0 if all_passed else 1
+    return
 
 
 def test_real_world_example():

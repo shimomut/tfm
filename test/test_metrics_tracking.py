@@ -30,16 +30,16 @@ def test_metrics_tracking_during_render():
         
         print("✓ Metrics tracking infrastructure is in place")
         print("  Note: Actual rendering metrics tracking is verified in integration tests")
-        return True
+        return
         
     except ImportError as e:
         print(f"✗ Failed to import cpp_renderer: {e}")
-        return False
+        return
     except Exception as e:
         print(f"✗ Test failed: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        return
 
 
 def test_metrics_calculation():
@@ -62,16 +62,16 @@ def test_metrics_calculation():
             "attr_dict_cache_hit_rate should be 0.0 when no cache accesses"
         
         print("✓ Average calculations handle zero frames correctly")
-        return True
+        return
         
     except ImportError as e:
         print(f"✗ Failed to import cpp_renderer: {e}")
-        return False
+        return
     except Exception as e:
         print(f"✗ Test failed: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        return
 
 
 def test_metrics_persistence():
@@ -91,16 +91,16 @@ def test_metrics_persistence():
             "get_performance_metrics should not modify metrics"
         
         print("✓ Metrics persist correctly across multiple calls")
-        return True
+        return
         
     except ImportError as e:
         print(f"✗ Failed to import cpp_renderer: {e}")
-        return False
+        return
     except Exception as e:
         print(f"✗ Test failed: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        return
 
 
 def main():
