@@ -64,7 +64,52 @@ GUI (proportional-font) mode: rows clip too early or overflow by a fraction.
 
 ---
 
-## 2. Stop drawing lines/frames with characters in GUI mode
+## 2. Stop drawing lines/frames with characters in GUI mode — ✅ DONE
+
+**Audit result: the codebase was already ~95% vector-guarded.** Confirmed already
+correct: pane/layout + widget dividers (`hairline`), dialog frames (`draw_box` →
+real rects), `Tabs`, `ProgressBar`, `Menu` separators, all scrollbars (the
+`draw_scrollbar` backend primitive), and the directory-diff **tree connectors**
+(`_draw_side_vector`). `MarkdownView` and the legacy glyph `tfm_scrollbar.py` are
+not used by tfm.
+
+**Only two residual char-lines reached a GUI backend; both fixed — via a new
+Panel-layer intent primitive, not widget-level `vector_shapes` branches** (see
+the architecture note below):
+- puikit `panel.py` — added `DrawContext.draw_hairline(x, y, length, *, vertical,
+  style)`, the intent primitive for a free-form separating line. It resolves the
+  visible-vs-grid choice *inside the Panel layer* (vector → device-pixel
+  `fill_rect` stroke; grid → `─`/`│` glyph run), mirroring `round_rect` /
+  `draw_divider`. The across-axis coord is the centerline; the along-axis coord
+  is the start.
+- puikit `widgets/markdown_view.py` — the horizontal rule (`─`) and blockquote
+  bar (`│ `) now call `ctx.draw_hairline`; the widget no longer reads
+  `vector_shapes` at all (blockquote also gained a correct bar on every wrapped
+  line). New tests `test_rule_and_quote_are_hairlines_not_glyphs_on_gui` /
+  `..._glyphs_on_tui` (a `_VectorBackend` helper keeps `vector_shapes` on, which
+  MemoryBackend otherwise forces off).
+- puikit `widgets/menu.py` — the separator now calls `ctx.draw_hairline`, paying
+  down the pre-existing `vector_shapes` branch there.
+- tfm `tfm_directory_diff_viewer.py` — the header column-divider now calls
+  `ctx.draw_hairline`; grid keeps a `│`, GUI gets a stroke. (Per-row `= < > ! ?`
+  are verdict indicators — semantic content, left as text. The tree connectors'
+  own `_draw_side_vector`/`_grid` split is a pre-existing, more-complex branch
+  left as-is.)
+- New primitive tests `test_draw_hairline_strokes_thin_rects_on_vector` /
+  `..._uses_box_glyphs_on_grid`. Verification: puikit 688 passed; tfm diff 37.
+
+**Architecture note (why the primitive, not a widget branch):** puikit's
+`vector_shapes` property doc (`panel.py`) says widgets read it *only to drop
+pixel-only ornamentation* — the hairline-vs-glyph *decision* belongs in the Panel
+layer via an intent primitive (like `round_rect` / `draw_divider`). The first cut
+branched on `ctx.vector_shapes` inside the widgets (matching existing debt in
+`menu`/`tabs`/`progress_bar`); this was refactored to `draw_hairline` so the
+switch lives in the Panel layer as the architecture intends. `tabs`/`progress_bar`
+still branch because their vector path draws more than a hairline (a 4-side frame,
+a rounded pill) — a future `draw_frame`/pill intent could absorb those too.
+
+Original analysis follows.
+
 
 **Status: mostly already done in puikit; remaining offenders are tfm-side.**
 

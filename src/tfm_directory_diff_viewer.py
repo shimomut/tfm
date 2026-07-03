@@ -734,13 +734,15 @@ class DirectoryDiffView(Widget):
         self._right_w = right_w
 
         # Header: the two directory paths, active side in accent.
-        head = Style(bg=bg, attr=TextAttribute.BOLD)
         left_head = Style(fg=accent if self.active == "left" else self._text_fg, bg=bg,
                           attr=TextAttribute.BOLD)
         right_head = Style(fg=accent if self.active == "right" else self._text_fg, bg=bg,
                            attr=TextAttribute.BOLD)
         ctx.draw_text(0, 0, truncate_to_width(str(self.left_path), left_w), left_head)
-        ctx.draw_text(self._sep_x, 0, " │ ", head)
+        # A hairline column divider between the two header paths (a stroke on GUI,
+        # a │ glyph on grid); the Panel layer picks which. Centerline at the
+        # middle of the gap column.
+        ctx.draw_hairline(self._sep_x + 1.5, 0, 1.0, vertical=True, style=Style(fg=muted, bg=bg))
         ctx.draw_text(self._right_x, 0, truncate_to_width(str(self.right_path), right_w),
                       right_head)
 
