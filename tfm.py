@@ -24,6 +24,7 @@ import os
 import platform
 import queue
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path as _StdPath
@@ -653,11 +654,11 @@ class TfmApp:
         elif action == "reveal_in_os":
             self.reveal_in_os()
             return False
-        elif action in ("edit_file", "subshell"):
-            # Both need the TUI to release the terminal to a full-screen program
-            # and reclaim it after — a backend suspend/resume PuiKit doesn't expose
-            # yet. Report it rather than launch a program under the live UI.
-            self.log_info(f"'{action}' needs terminal suspend/resume (a later phase)")
+        elif action == "edit_file":
+            self.edit_file()
+            return False
+        elif action == "subshell":
+            self.subshell()
             return False
         elif action == "filter":
             self.enter_filter()
@@ -754,10 +755,13 @@ class TfmApp:
                      enabled=has_files, shortcut="Enter"),
             MenuItem("View File", on_select=self.view_file,
                      enabled=has_files, shortcut="V"),
+            MenuItem("Edit File", on_select=self.edit_file,
+                     enabled=has_files, shortcut="E"),
             MenuItem("Details…", on_select=self.file_details, enabled=has_files),
             MenuItem("Open with Default App", on_select=self.open_with_os, enabled=has_files),
             MenuItem("Reveal in File Manager", on_select=self.reveal_in_os, enabled=has_files),
             MenuItem("External Programs…", on_select=self.show_programs, shortcut="X"),
+            MenuItem("Subshell Here", on_select=self.subshell, shortcut="Shift-X"),
             SEPARATOR,
             MenuItem("Parent Directory", on_select=lambda: self._menu("go_parent"),
                      shortcut="Backspace"),
@@ -840,6 +844,61 @@ class TfmApp:
         if not files:
             return None
         return files[pane["focused_index"]]
+
+    _REMOTE_SCHEMES = ("ssh://", "s3://", "scp://", "ftp://", "archive://")
+
+    @classmethod
+    def _is_local(cls, path) -> bool:
+        """Whether ``path`` is a plain local-filesystem path — the only kind a
+        terminal editor or subshell can operate on directly."""
+        return not str(path).startswith(cls._REMOTE_SCHEMES)
+
+    def _run_in_terminal(self, argv: list, cwd: str | None = None) -> None:
+        """Run a full-screen child process (editor / shell) with the display
+        handed over via ``backend.suspended()``, then refresh both panes and
+        repaint — the child may have changed files while we were away."""
+        try:
+            with self.backend.suspended():
+                subprocess.run(argv, cwd=cwd)
+        except FileNotFoundError:
+            self.log_info(f"Command not found: {argv[0]}")
+        except Exception as exc:
+            self.log_info(f"Command failed: {exc}")
+        self.flm.refresh_files(self.pm.left_pane)
+        self.flm.refresh_files(self.pm.right_pane)
+        self.panel.render()
+
+    def edit_file(self) -> None:
+        """Open the focused file in the configured editor (``TEXT_EDITOR``),
+        handing the terminal to it via the backend suspend/resume. Local files
+        only; directories and remote paths are skipped."""
+        entry = self._focused_entry()
+        if entry is None:
+            return
+        if not self._is_local(entry):
+            self.log_info("Edit is only available for local files")
+            return
+        try:
+            if entry.is_dir():
+                self.log_info(f"{entry.name} is a directory")
+                return
+        except Exception:
+            pass
+        editor = getattr(self.config, "TEXT_EDITOR", "vim")
+        self._run_in_terminal(shlex.split(editor) + [str(entry)])
+        self.log_info(f"Edited {entry.name}")
+
+    def subshell(self) -> None:
+        """Drop to an interactive shell (``$SHELL``) in the active pane's
+        directory, handing over the terminal via suspend/resume; refresh on
+        return. Local directories only."""
+        path = self.active_pane()["path"]
+        if not self._is_local(path):
+            self.log_info("Subshell is only available for local directories")
+            return
+        shell = os.environ.get("SHELL", "/bin/sh")
+        self.log_info(f"Subshell in {path} — exit the shell to return")
+        self._run_in_terminal([shell], cwd=str(path))
 
     def file_details(self) -> None:
         """Show stat details for the focused entry — or an aggregate summary plus
@@ -2040,6 +2099,8 @@ class TfmApp:
             ("create_archive", "Create archive from selection"),
             ("extract_archive", "Extract the focused archive"),
             ("file_details", "Show file details"),
+            ("edit_file", "Edit the focused file in $EDITOR"),
+            ("subshell", "Open a shell in the current directory"),
             ("open_with_os", "Open with the default app"),
             ("reveal_in_os", "Reveal in the OS file manager"),
             ("programs", "Run an external program on the selection"),
