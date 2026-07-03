@@ -63,6 +63,19 @@ it, but TFM has **never been run/tested on Windows**. Stand it up: launch, smoke
 test navigation/dialogs/viewers, fix backend-specific gaps. (New capability vs.
 `ttk`, which was curses + macOS only.)
 
+### 2.3 File-list pane visual language
+Rework how the file list draws cursor position vs. selection so the two are
+visually orthogonal:
+- **Cursor position** — TUI: `[` … `]` brackets around the current row. GUI: a
+  drawn rectangle (outline) around the row. Not a background-color highlight.
+- **Selection** — mark selected rows with a background color, not the leading dot
+  character.
+
+This frees background color to mean "selected" and the bracket/rectangle to mean
+"cursor," so a selected row *under* the cursor reads unambiguously (outlined
+**and** background-filled) instead of the two states fighting over the same
+channel.
+
 
 ---
 
