@@ -208,6 +208,10 @@ class TfmApp:
                  left_provided: bool = True, right_provided: bool = True,
                  state_manager=None):
         self.backend = backend
+        # The log pane's copy chord follows the platform convention: Cmd-C on the
+        # macOS GUI, Ctrl-C on the curses TUI and other GUI platforms (curses
+        # never sees Cmd; Windows/Linux copy with Ctrl). See _copy_log_selection.
+        self._log_copy_mod = "cmd" if type(backend).__name__ == "MacOSBackend" else "ctrl"
         self.config = _config.Config()
         self.keys = KeyBindings(self.config.KEY_BINDINGS)
         # Persistent cross-session state (window layout, pane dirs, cursor
@@ -2405,6 +2409,23 @@ class TfmApp:
         EventType.MOUSE_DRAG, EventType.MOUSE_SCROLL,
     })
 
+    def _copy_log_selection(self, event) -> bool:
+        """Copy the log pane's selected text to the clipboard on the platform
+        copy chord (Cmd-C on macOS, Ctrl-C on the TUI / other platforms), then
+        clear the selection. Only fires when the log holds keyboard focus and has
+        a selection, so the chord otherwise falls through to the global keymap.
+        Returns True when it handled the event (a redraw is due)."""
+        if event.key != "c" or self._log_copy_mod not in event.modifiers:
+            return False
+        if self.panel.focused_leaf() is not self.log:
+            return False
+        text = self.log.selection_text()
+        if not text:
+            return False
+        self.panel.set_clipboard(text)
+        self.log.clear_selection()
+        return True
+
     def on_event(self, event) -> None:
         # Flush any filesystem reloads that landed since the last frame, so user
         # input and idle ticks both surface them; render if a pane changed.
@@ -2427,6 +2448,12 @@ class TfmApp:
                 self.panel.render()
             return
         if event.type is EventType.KEY:
+            # A copy chord over a focused, selected log pane copies the selection
+            # (and clears it) before the global keymap sees the key; otherwise it
+            # falls through to normal keymap handling.
+            if self._copy_log_selection(event):
+                self.panel.render()
+                return
             has_sel = bool(self.active_pane()["selected_files"])
             action = self.keys.find_action_for_event(event, has_sel)
             if self.dispatch(action):
