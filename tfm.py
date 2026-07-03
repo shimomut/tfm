@@ -22,6 +22,7 @@ kept for reference under ``legacy/``.
 import argparse
 import os
 import platform
+import queue
 import subprocess
 import sys
 from pathlib import Path as _StdPath
@@ -41,6 +42,7 @@ PANES_FRACTION = 0.74
 
 from tfm_config import KeyBindings, get_favorite_directories  # noqa: E402
 from tfm_file_list_manager import FileListManager  # noqa: E402
+from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
 from tfm_filter_list_dialog import show_filter_list  # noqa: E402
 from tfm_input_dialog import show_input  # noqa: E402
@@ -258,6 +260,17 @@ class TfmApp:
         # Files are listed now, so the saved cursor filenames can be matched.
         self._restore_cursor_positions()
 
+        # Filesystem monitoring: observer threads post pane names to
+        # ``reload_queue``; the main thread drains it via an animation tick (and
+        # opportunistically on every event). ``_sync_monitored_dirs`` re-points
+        # the watchers whenever a pane navigates, so navigation code stays
+        # unaware of monitoring. Auto-disables cleanly if watchdog is missing.
+        self.reload_queue: queue.Queue = queue.Queue()
+        self.file_monitor = FileMonitorManager(self.config, self)
+        self._monitored: dict[str, object] = {"left": None, "right": None}
+        self._sync_monitored_dirs()
+        self.panel.request_animation_ticks(self._reload_tick)
+
     def _pane_column(self, name: str, view: FilePane) -> LayoutView:
         # A LayoutView wraps the header/list/footer sub-layout as a single widget
         # so it can be a Splitter child (Splitter hosts widgets, not layouts).
@@ -371,9 +384,98 @@ class TfmApp:
             self.log_info(f"Could not save application state: {e}")
 
     def _quit(self) -> None:
-        """Save state, then tell the backend to end the event loop."""
+        """Stop monitoring, save state, then end the event loop."""
+        if getattr(self, "file_monitor", None) is not None:
+            self.file_monitor.stop_monitoring()
         self._save_application_state()
         self.backend.quit()
+
+    # --- filesystem monitoring -----------------------------------------------
+
+    def _sync_monitored_dirs(self) -> None:
+        """Point each pane's watcher at that pane's current directory, (re)starting
+        monitoring on the ones that changed. Called on every tick, so navigating a
+        pane transparently moves its watcher — no navigation site needs to know."""
+        if not self.file_monitor.is_monitoring_enabled():
+            return
+        for name in ("left", "right"):
+            path = self.pane(name)["path"]
+            if path != self._monitored[name]:
+                self._monitored[name] = path
+                self.file_monitor.update_monitored_directory(name, path)
+
+    def _pump_monitoring(self) -> bool:
+        """Re-point watchers and apply any queued reloads. Returns True if a pane
+        was reloaded (so the caller re-renders)."""
+        self._sync_monitored_dirs()
+        return self._process_reload_queue()
+
+    def _reload_tick(self) -> bool:
+        """Animation-tick pump: drains reload requests on idle. Stays registered
+        for the app's lifetime (returns True)."""
+        if self._pump_monitoring():
+            self.panel.render()
+        return True
+
+    def _process_reload_queue(self) -> bool:
+        reloaded = False
+        while True:
+            try:
+                pane_name = self.reload_queue.get_nowait()
+            except queue.Empty:
+                break
+            if self._handle_reload_request(pane_name):
+                reloaded = True
+        return reloaded
+
+    def _handle_reload_request(self, pane_name: str) -> bool:
+        """Reload one pane's file list while preserving user context: keep the
+        cursor on the same filename if it survives, otherwise the nearest name
+        alphabetically, and hold the scroll offset where it can still show it.
+
+        Returns True if the pane was reloaded, False for an unknown pane name."""
+        if pane_name == "left":
+            pane = self.pm.left_pane
+        elif pane_name == "right":
+            pane = self.pm.right_pane
+        else:
+            return False
+
+        old_focused = pane["focused_index"]
+        old_scroll = pane["scroll_offset"]
+        selected_filename = None
+        if pane["files"] and 0 <= old_focused < len(pane["files"]):
+            selected_filename = pane["files"][old_focused].name
+
+        self.flm.refresh_files(pane)
+
+        files = pane["files"]
+        if selected_filename and files:
+            idx = next((i for i, f in enumerate(files)
+                        if f.name == selected_filename), None)
+            if idx is None:
+                # Selected file is gone: land on where it would have sorted, so
+                # the cursor stays near its old neighbours (list is name-sorted).
+                idx = 0
+                for i, f in enumerate(files):
+                    if f.name < selected_filename:
+                        idx = i + 1
+                    else:
+                        break
+                idx = min(idx, len(files) - 1)
+            pane["focused_index"] = idx
+
+            display_height = self._display_height()
+            max_offset = max(0, len(files) - display_height)
+            pane["scroll_offset"] = min(old_scroll, max_offset)
+            if pane["focused_index"] < pane["scroll_offset"]:
+                pane["scroll_offset"] = pane["focused_index"]
+            elif pane["focused_index"] >= pane["scroll_offset"] + display_height:
+                pane["scroll_offset"] = pane["focused_index"] - display_height + 1
+        else:
+            pane["focused_index"] = 0
+            pane["scroll_offset"] = 0
+        return True
 
     # --- state ---------------------------------------------------------------
 
@@ -1869,6 +1971,10 @@ class TfmApp:
     })
 
     def on_event(self, event) -> None:
+        # Flush any filesystem reloads that landed since the last frame, so user
+        # input and idle ticks both surface them; render if a pane changed.
+        if self._pump_monitoring():
+            self.panel.render()
         if event.type is EventType.RESIZE:
             self.panel.render()
             return
