@@ -76,6 +76,17 @@ This frees background color to mean "selected" and the bracket/rectangle to mean
 **and** background-filled) instead of the two states fighting over the same
 channel.
 
+### 2.4 MenuItem shortcuts from the configured keymap
+`MenuItem(..., shortcut="…")` labels in `tfm.py` (Go/File/View/… menus around
+`tfm.py:971`+) are **hardcoded strings** (`"Enter"`, `"Shift-X"`, `"Cmd-Shift-C"`,
+…). They drift from `KEY_BINDINGS` and ignore user rebindings. Derive each label
+from the action instead: look up the bound key(s) via
+`KeyBindings.get_keys_for_action(action)` and render with
+`format_key_for_display()` (both already in `tfm_config.py`). Menu items that
+already dispatch through `self._menu("<action>")` name their action directly;
+the ones wired to bespoke callbacks need an action id (or an explicit mapping) so
+the same lookup applies.
+
 
 ---
 
