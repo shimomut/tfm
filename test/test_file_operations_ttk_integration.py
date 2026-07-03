@@ -26,6 +26,7 @@ class MockConfig:
     CONFIRM_COPY = False
     CONFIRM_MOVE = False
     CONFIRM_DELETE = False
+    DATE_FORMAT = "%Y-%m-%d %H:%M"  # needed by FileListManager._format_date
 
 
 class MockLogManager:
@@ -169,7 +170,7 @@ class TestFileListManager:
         
         # Get directory info
         size_str, date_str = self.file_ops.get_file_info(TFMPath(test_dir))
-        
+
         assert size_str == "<DIR>"
         assert date_str is not None
     

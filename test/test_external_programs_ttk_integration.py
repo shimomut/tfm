@@ -37,11 +37,12 @@ class TestExternalProgramsTTKIntegration(unittest.TestCase):
         self.assertEqual(self.manager.log_manager, self.mock_log_manager)
         self.assertEqual(self.manager.renderer, self.mock_renderer)
     
+    @patch('builtins.input', return_value='')
     @patch('tfm_external_programs.subprocess.run')
     @patch('tfm_external_programs.os.chdir')
     @patch('tfm_colors.init_colors')
     @patch('tfm_log_manager.LogCapture')
-    def test_execute_external_program_uses_renderer(self, mock_log_capture, mock_init_colors, mock_chdir, mock_subprocess):
+    def test_execute_external_program_uses_renderer(self, mock_log_capture, mock_init_colors, mock_chdir, mock_subprocess, mock_input):
         """Test that execute_external_program uses renderer API"""
         # Set up mock pane manager
         mock_pane_manager = Mock()
@@ -49,13 +50,13 @@ class TestExternalProgramsTTKIntegration(unittest.TestCase):
             'path': Path('/left'),
             'selected_files': [],
             'files': [Path('/left/file1.txt')],
-            'selected_index': 0
+            'focused_index': 0
         }
         mock_pane_manager.right_pane = {
             'path': Path('/right'),
             'selected_files': [],
             'files': [Path('/right/file2.txt')],
-            'selected_index': 0
+            'focused_index': 0
         }
         mock_pane_manager.get_current_pane = Mock(return_value=mock_pane_manager.left_pane)
         mock_pane_manager.get_inactive_pane = Mock(return_value=mock_pane_manager.right_pane)
@@ -82,11 +83,12 @@ class TestExternalProgramsTTKIntegration(unittest.TestCase):
         # Verify init_colors was called with renderer
         mock_init_colors.assert_called_once_with(self.mock_renderer, 'dark')
     
+    @patch('builtins.input', return_value='')
     @patch('tfm_external_programs.subprocess.run')
     @patch('tfm_external_programs.os.chdir')
     @patch('tfm_colors.init_colors')
     @patch('tfm_log_manager.LogCapture')
-    def test_enter_subshell_mode_uses_renderer(self, mock_log_capture, mock_init_colors, mock_chdir, mock_subprocess):
+    def test_enter_subshell_mode_uses_renderer(self, mock_log_capture, mock_init_colors, mock_chdir, mock_subprocess, mock_input):
         """Test that enter_subshell_mode uses renderer API"""
         # Set up mock pane manager
         mock_pane_manager = Mock()
@@ -94,13 +96,13 @@ class TestExternalProgramsTTKIntegration(unittest.TestCase):
             'path': Path('/left'),
             'selected_files': [],
             'files': [Path('/left/file1.txt')],
-            'selected_index': 0
+            'focused_index': 0
         }
         mock_pane_manager.right_pane = {
             'path': Path('/right'),
             'selected_files': [],
             'files': [Path('/right/file2.txt')],
-            'selected_index': 0
+            'focused_index': 0
         }
         mock_pane_manager.get_current_pane = Mock(return_value=mock_pane_manager.left_pane)
         mock_pane_manager.get_inactive_pane = Mock(return_value=mock_pane_manager.right_pane)
@@ -145,7 +147,7 @@ class TestHelperFunctions(unittest.TestCase):
         pane_data = {
             'selected_files': [Path('/dir/file1.txt'), Path('/dir/file2.txt')],
             'files': [Path('/dir/file1.txt'), Path('/dir/file2.txt'), Path('/dir/file3.txt')],
-            'selected_index': 0
+            'focused_index': 0
         }
         
         result = get_selected_or_cursor_files(pane_data)
@@ -156,7 +158,7 @@ class TestHelperFunctions(unittest.TestCase):
         pane_data = {
             'selected_files': [],
             'files': [Path('/dir/file1.txt'), Path('/dir/file2.txt'), Path('/dir/file3.txt')],
-            'selected_index': 1
+            'focused_index': 1
         }
         
         result = get_selected_or_cursor_files(pane_data)

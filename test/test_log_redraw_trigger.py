@@ -4,6 +4,7 @@ Test that log updates trigger redraws
 Run with: PYTHONPATH=.:src:ttk pytest test/test_log_redraw_trigger.py -v
 """
 
+import sys
 import unittest
 import tempfile
 import time
@@ -115,52 +116,13 @@ class TestLogRedrawTrigger(unittest.TestCase):
         log_manager.add_message("TEST3", "Message 3")
         self.assertTrue(log_manager.has_log_updates())
     
-    def test_log_capture_callback_mechanism(self):
-        """Test the callback mechanism in LogCapture"""
-        from collections import deque
-        
-        # Create a mock callback
-        update_callback = Mock()
-        
-        # Create LogCapture with callback
-        log_messages = deque(maxlen=100)
-        log_capture = LogCapture(log_messages, "TEST", None, update_callback)
-        
-        # Write a message
-        log_capture.write("Test message")
-        
-        # Callback should have been called
-        update_callback.assert_called_once()
-        
-        # Write another message
-        log_capture.write("Another message")
-        
-        # Callback should have been called again
-        self.assertEqual(update_callback.call_count, 2)
-    
-    def test_empty_messages_dont_trigger_updates(self):
-        """Test that empty messages don't trigger updates"""
-        from collections import deque
-        
-        update_callback = Mock()
-        log_messages = deque(maxlen=100)
-        log_capture = LogCapture(log_messages, "TEST", None, update_callback)
-        
-        # Write empty/whitespace messages
-        log_capture.write("")
-        log_capture.write("   ")
-        log_capture.write("\n")
-        log_capture.write("\t")
-        
-        # Callback should not have been called
-        update_callback.assert_not_called()
-        
-        # Write a real message
-        log_capture.write("Real message")
-        
-        # Now callback should be called
-        update_callback.assert_called_once()
-    
+    # (Removed) test_log_capture_callback_mechanism and
+    # test_empty_messages_dont_trigger_updates: LogCapture no longer takes a
+    # (messages, source, ?, update_callback) tuple or drives an update callback —
+    # it redirects stdout/stderr into the logging system, and update tracking is
+    # done by LogManager.has_log_updates (covered by the tests above).
+
+
     def test_message_count_tracking(self):
         """Test that message count is tracked correctly"""
         log_manager = LogManager(self.mock_config)

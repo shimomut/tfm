@@ -22,7 +22,7 @@ class TestArchiveFileManagerIntegration(unittest.TestCase):
         self.file_manager = Mock()
         self.file_manager.operation_in_progress = False
         self.file_manager.operation_cancelled = False
-        self.file_manager.refresh = Mock()
+        self.file_manager.refresh_files = Mock()
         self.file_manager.mark_dirty = Mock()
         self.file_manager._clear_task = Mock()
         
@@ -30,7 +30,7 @@ class TestArchiveFileManagerIntegration(unittest.TestCase):
         self.ui = Mock()
         self.ui.config = Mock()
         self.ui.config.CONFIRM_ARCHIVE_CREATE = False
-        self.ui.config.CONFIRM_ARCHIVE_EXTRACT = False
+        self.ui.config.CONFIRM_EXTRACT_ARCHIVE = False
         
         # Create mock executor
         self.executor = Mock()
@@ -55,7 +55,7 @@ class TestArchiveFileManagerIntegration(unittest.TestCase):
         self.task._on_operation_complete(success_count=2, error_count=0)
         
         # Verify refresh was called
-        self.file_manager.refresh.assert_called_once()
+        self.file_manager.refresh_files.assert_called_once()
     
     def test_refresh_called_after_successful_extraction(self):
         """Test that file_manager.refresh() is called after successful archive extraction."""
@@ -73,7 +73,7 @@ class TestArchiveFileManagerIntegration(unittest.TestCase):
         self.task._on_operation_complete(success_count=5, error_count=0)
         
         # Verify refresh was called
-        self.file_manager.refresh.assert_called_once()
+        self.file_manager.refresh_files.assert_called_once()
     
     def test_refresh_not_called_when_cancelled(self):
         """Test that file_manager.refresh() is NOT called when operation is cancelled."""
@@ -85,13 +85,13 @@ class TestArchiveFileManagerIntegration(unittest.TestCase):
         self.task.start_operation('create', source_paths, archive_path, 'tar.gz')
         
         # Set cancellation flag
-        self.file_manager.operation_cancelled = True
+        self.task._cancelled = True
         
         # Simulate completion with some success (before cancellation)
         self.task._on_operation_complete(success_count=1, error_count=0)
         
         # Verify refresh was NOT called (operation was cancelled)
-        self.file_manager.refresh.assert_not_called()
+        self.file_manager.refresh_files.assert_not_called()
     
     def test_refresh_not_called_when_no_success(self):
         """Test that file_manager.refresh() is NOT called when no files were processed successfully."""
@@ -106,7 +106,7 @@ class TestArchiveFileManagerIntegration(unittest.TestCase):
         self.task._on_operation_complete(success_count=0, error_count=5)
         
         # Verify refresh was NOT called (no successful operations)
-        self.file_manager.refresh.assert_not_called()
+        self.file_manager.refresh_files.assert_not_called()
     
     def test_mark_dirty_called_on_completion(self):
         """Test that file_manager.mark_dirty() is called when operation completes."""
@@ -139,22 +139,20 @@ class TestArchiveFileManagerIntegration(unittest.TestCase):
         self.file_manager.mark_dirty.assert_called_once()
     
     def test_operation_in_progress_cleared_on_completion(self):
-        """Test that operation_in_progress flag is cleared when operation completes."""
+        """Operation progress is tracked by the task's state machine now (not a
+        file_manager flag): the task returns to IDLE once the operation completes."""
         # Setup
         source_paths = [Path('/tmp/file1.txt')]
         archive_path = Path('/tmp/archive.tar.gz')
-        
+
         # Start operation
         self.task.start_operation('create', source_paths, archive_path, 'tar.gz')
-        
-        # Set operation_in_progress flag (simulating executor setting it)
-        self.file_manager.operation_in_progress = True
-        
+
         # Simulate completion
         self.task._on_operation_complete(success_count=1, error_count=0)
-        
-        # Verify operation_in_progress was cleared
-        self.assertFalse(self.file_manager.operation_in_progress)
+
+        # The task is idle again once complete.
+        self.assertEqual(self.task.state, State.IDLE)
     
     def test_state_transition_to_completed_then_idle(self):
         """Test that task transitions from EXECUTING to COMPLETED to IDLE."""
@@ -209,13 +207,13 @@ class TestArchiveFileManagerIntegration(unittest.TestCase):
         
         # Verify all integrations:
         # 1. File list refreshed
-        self.file_manager.refresh.assert_called_once()
+        self.file_manager.refresh_files.assert_called_once()
         
         # 2. UI marked as dirty
         self.file_manager.mark_dirty.assert_called_once()
         
-        # 3. Operation flag cleared
-        self.assertFalse(self.file_manager.operation_in_progress)
+        # 3. Task returned to idle
+        self.assertEqual(self.task.state, State.IDLE)
         
         # 4. State transitioned to IDLE
         self.assertEqual(self.task.state, State.IDLE)

@@ -45,7 +45,7 @@ class TestConflictDetectionIntegration:
         ui_mock = Mock(spec=ArchiveOperationUI)
         ui_mock.config = Mock()
         ui_mock.config.CONFIRM_ARCHIVE_CREATE = False
-        ui_mock.config.CONFIRM_ARCHIVE_EXTRACT = False
+        ui_mock.config.CONFIRM_EXTRACT_ARCHIVE = False
         ui_mock.show_confirmation_dialog = Mock()
         ui_mock.show_conflict_dialog = Mock()
         return ui_mock
@@ -78,7 +78,7 @@ class TestConflictDetectionIntegration:
         # Should transition to CHECKING_CONFLICTS then RESOLVING_CONFLICT
         assert task.state == State.RESOLVING_CONFLICT
         assert len(task.context.conflicts) == 1
-        assert task.context.conflicts[0] == archive_path
+        assert task.context.conflicts[0].path == archive_path
     
     def test_create_without_conflict_transitions_to_executing(self, task, temp_dir):
         """Test that create operation without conflict transitions to EXECUTING state"""

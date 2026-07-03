@@ -50,28 +50,40 @@ class TestDragSessionManager:
         
         urls = ["file:///path/to/file.txt"]
         result = manager.start_drag(urls, "1 file")
-        
+
+        # Drag is fire-and-forget: the OS owns the session, so the manager hands
+        # the URLs to the backend and immediately returns to IDLE (no lingering
+        # DRAGGING state).
         assert result
-        assert manager.is_dragging()
-        assert manager.state == DragState.DRAGGING
+        assert not manager.is_dragging()
+        assert manager.state == DragState.IDLE
         assert backend.started_urls == urls
         assert backend.started_text == "1 file"
-    
-    def test_start_drag_with_callback(self):
-        """Test drag start with completion callback."""
+
+    def test_start_drag_accepts_callback_without_retaining_it(self):
+        """A completion callback is accepted but not retained — completion
+        notifications are a later phase (see start_drag)."""
         backend = MockBackend()
         manager = DragSessionManager(backend)
-        
-        callback_called = []
+
         def callback(completed):
-            callback_called.append(completed)
-        
+            pass
+
         urls = ["file:///path/to/file.txt"]
         result = manager.start_drag(urls, "1 file", completion_callback=callback)
-        
+
         assert result
-        assert manager.completion_callback == callback
-    
+        assert manager.completion_callback is None
+
+    def test_can_start_again_after_a_drag(self):
+        """Since each drag returns to IDLE immediately, a second drag succeeds."""
+        backend = MockBackend()
+        manager = DragSessionManager(backend)
+
+        urls = ["file:///path/to/file.txt"]
+        assert manager.start_drag(urls, "1 file")
+        assert manager.start_drag(urls, "1 file")
+
     def test_start_drag_fails_without_backend_support(self):
         """Test drag start fails when backend doesn't support it."""
         backend = MockBackend(supports_drag=False)
@@ -93,59 +105,6 @@ class TestDragSessionManager:
         
         assert not result
         assert not manager.is_dragging()
-    
-    def test_start_drag_fails_when_already_dragging(self):
-        """Test that starting drag while dragging fails."""
-        backend = MockBackend()
-        manager = DragSessionManager(backend)
-        
-        urls = ["file:///path/to/file.txt"]
-        manager.start_drag(urls, "1 file")
-        
-        # Try to start another drag
-        result = manager.start_drag(urls, "1 file")
-        
-        assert not result
-    
-    def test_handle_drag_completed(self):
-        """Test handling drag completion."""
-        backend = MockBackend()
-        manager = DragSessionManager(backend)
-        
-        callback_called = []
-        def callback(completed):
-            callback_called.append(completed)
-        
-        urls = ["file:///path/to/file.txt"]
-        manager.start_drag(urls, "1 file", completion_callback=callback)
-        
-        manager.handle_drag_completed()
-        
-        assert manager.state == DragState.IDLE
-        assert not manager.is_dragging()
-        assert callback_called == [True]
-        assert manager.current_urls is None
-        assert manager.completion_callback is None
-    
-    def test_handle_drag_cancelled(self):
-        """Test handling drag cancellation."""
-        backend = MockBackend()
-        manager = DragSessionManager(backend)
-        
-        callback_called = []
-        def callback(completed):
-            callback_called.append(completed)
-        
-        urls = ["file:///path/to/file.txt"]
-        manager.start_drag(urls, "1 file", completion_callback=callback)
-        
-        manager.handle_drag_cancelled()
-        
-        assert manager.state == DragState.IDLE
-        assert not manager.is_dragging()
-        assert callback_called == [False]
-        assert manager.current_urls is None
-        assert manager.completion_callback is None
     
     def test_completion_without_callback(self):
         """Test completion without callback doesn't crash."""

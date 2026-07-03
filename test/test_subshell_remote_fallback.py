@@ -79,10 +79,12 @@ class TestSubshellRemoteFallback(unittest.TestCase):
             'selected_index': 0
         }
         
-        # Mock stdscr
+        # Mock stdscr / renderer. enter_subshell_mode now uses self.renderer
+        # (set on the manager) rather than a stdscr passed to the method.
         self.stdscr = Mock()
         self.stdscr.clear = Mock()
         self.stdscr.refresh = Mock()
+        self.external_program_manager.renderer = self.stdscr
     
     @patch('curses.curs_set')
     @patch('curses.endwin')
@@ -104,12 +106,10 @@ class TestSubshellRemoteFallback(unittest.TestCase):
         
         # Mock environment and imports
         with patch.dict(os.environ, {'SHELL': '/bin/bash'}, clear=False), \
-             patch('tfm_external_programs.init_colors'), \
-             patch('tfm_external_programs.LogCapture'):
+             patch('tfm_colors.init_colors'), \
+             patch('tfm_log_manager.LogCapture'):
             # Call enter_subshell_mode
-            result = self.external_program_manager.enter_subshell_mode(
-                self.stdscr, self.pane_manager
-            )
+            result = self.external_program_manager.enter_subshell_mode(self.pane_manager)
         
         # Verify that os.chdir was called with TFM's working directory, not the remote path
         mock_chdir.assert_called_once_with(tfm_working_dir)
@@ -145,12 +145,10 @@ class TestSubshellRemoteFallback(unittest.TestCase):
         
         # Mock environment and imports
         with patch.dict(os.environ, {'SHELL': '/bin/bash'}, clear=False), \
-             patch('tfm_external_programs.init_colors'), \
-             patch('tfm_external_programs.LogCapture'):
+             patch('tfm_colors.init_colors'), \
+             patch('tfm_log_manager.LogCapture'):
             # Call enter_subshell_mode
-            result = self.external_program_manager.enter_subshell_mode(
-                self.stdscr, self.pane_manager
-            )
+            result = self.external_program_manager.enter_subshell_mode(self.pane_manager)
         
         # Verify that os.chdir was called with the local directory, not TFM's working directory
         mock_chdir.assert_called_once_with('/home/user/local')
@@ -192,11 +190,10 @@ class TestSubshellRemoteFallback(unittest.TestCase):
         }
         
         # Mock imports and call execute_external_program
-        with patch('tfm_external_programs.init_colors'), \
-             patch('tfm_external_programs.LogCapture'):
-            result = self.external_program_manager.execute_external_program(
-                self.stdscr, self.pane_manager, program
-            )
+        with patch('tfm_colors.init_colors'), \
+             patch('tfm_log_manager.LogCapture'), \
+             patch('builtins.input', return_value=''):
+            result = self.external_program_manager.execute_external_program(self.pane_manager, program)
         
         # Verify that os.chdir was called with TFM's working directory, not the remote path
         mock_chdir.assert_called_once_with(tfm_working_dir)
@@ -238,11 +235,10 @@ class TestSubshellRemoteFallback(unittest.TestCase):
         }
         
         # Mock imports and call execute_external_program
-        with patch('tfm_external_programs.init_colors'), \
-             patch('tfm_external_programs.LogCapture'):
-            result = self.external_program_manager.execute_external_program(
-                self.stdscr, self.pane_manager, program
-            )
+        with patch('tfm_colors.init_colors'), \
+             patch('tfm_log_manager.LogCapture'), \
+             patch('builtins.input', return_value=''):
+            result = self.external_program_manager.execute_external_program(self.pane_manager, program)
         
         # Verify that os.chdir was called with the local directory, not TFM's working directory
         mock_chdir.assert_called_once_with('/home/user/local')

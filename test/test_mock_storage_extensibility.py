@@ -314,7 +314,11 @@ class MockPathImpl(PathImpl):
     def supports_file_editing(self) -> bool:
         """Return True if this storage implementation supports file editing"""
         return False  # Mock storage is read-only
-    
+
+    def supports_write_operations(self) -> bool:
+        """Return True if this storage implementation supports write operations"""
+        return False  # Mock storage is read-only
+
     # Display methods for UI presentation
     def get_display_prefix(self) -> str:
         """Return a prefix for display purposes.

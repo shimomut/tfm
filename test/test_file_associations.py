@@ -64,10 +64,10 @@ def test_multiple_actions():
 
 def test_has_action():
     """Test checking if action is available for file"""
-    # PDF should have all actions
+    # PDF has open/view; its edit is None in the default config (no editor).
     assert has_action_for_file('doc.pdf', 'open'), "PDF should have open action"
     assert has_action_for_file('doc.pdf', 'view'), "PDF should have view action"
-    assert has_action_for_file('doc.pdf', 'edit'), "PDF should have edit action"
+    assert not has_action_for_file('doc.pdf', 'edit'), "PDF edit is None in default config"
     print("✓ has_action_for_file() works for available actions")
     
     # Unknown extension should not have actions
@@ -85,12 +85,12 @@ def test_no_match():
 def test_none_action():
     """Test files with None action (action not available)"""
     # AVI files have edit set to None in default config
-    edit_cmd = get_program_for_file('video.avi', 'edit')
-    assert edit_cmd is None, "AVI edit should be None (not configured)"
+    edit_cmd = get_program_for_file('video.mp4', 'edit')
+    assert edit_cmd is None, "mp4 edit is None (not configured)"
     
     # But open and view should work
-    open_cmd = get_program_for_file('video.avi', 'open')
-    assert open_cmd is not None, "AVI open should be available"
+    open_cmd = get_program_for_file('video.mp4', 'open')
+    assert open_cmd is not None, "mp4 open should be available"
     
     print("✓ None actions handled correctly")
 

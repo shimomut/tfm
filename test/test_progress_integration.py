@@ -5,6 +5,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_progress_integration.py -v
 """
 
 import tempfile
+from pathlib import Path
 import shutil
 from unittest.mock import Mock
 

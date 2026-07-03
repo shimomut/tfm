@@ -531,9 +531,21 @@ class ConfigManager:
         return self._key_bindings
     
     def validate_config(self, config):
-        """Validate configuration values"""
+        """Validate configuration values.
+
+        Overlay the given config onto a complete default ``Config`` first (as
+        loading does), so a config that overrides only some settings validates
+        just those fields instead of raising ``AttributeError`` on the ones it
+        omits."""
+        from _config import Config as _DefaultConfig
+        merged = _DefaultConfig()
+        for name in dir(config):
+            if name.isupper():
+                setattr(merged, name, getattr(config, name))
+        config = merged
+
         errors = []
-        
+
         # Validate backend selection
         if config.PREFERRED_BACKEND not in ['curses', 'coregraphics']:
             errors.append("PREFERRED_BACKEND must be 'curses' or 'coregraphics'")
@@ -621,19 +633,28 @@ class ConfigManager:
     def get_selection_requirement(self, action):
         """Get the selection requirement for a specific action"""
         config = self.get_config()
-        
+
         if action in config.KEY_BINDINGS:
             binding = config.KEY_BINDINGS[action]
         else:
             return 'any'
-        
+
         # Handle extended format
         if isinstance(binding, dict) and 'selection' in binding:
             return binding['selection']
-        
+
         # Simple format defaults to 'any'
         return 'any'
-    
+
+    def is_key_bound_to_action_with_selection(self, key, action, has_selection):
+        """Whether ``key`` triggers ``action`` given the current selection state.
+
+        A key is "available" for an action when it is one of the action's bound
+        keys AND the action's selection requirement is met: ``required`` needs a
+        selection, ``none`` needs no selection, ``any`` always applies. ``key``
+        may be a single-character string or an ``ord()`` keycode."""
+        return is_key_bound_to_with_selection(key, action, has_selection)
+
 
 
 
@@ -678,6 +699,40 @@ def get_keys_for_action(action: str) -> tuple:
     """
     key_bindings = config_manager.get_key_bindings()
     return key_bindings.get_keys_for_action(action)
+
+
+def _key_char(key) -> str:
+    """Normalize a key to a single-character string; accepts an ``ord()`` int."""
+    return chr(key) if isinstance(key, int) else key
+
+
+def _key_matches(key, keys) -> bool:
+    """Case-insensitive membership test — the keymap normalizes a bare letter to
+    its upper form (see ``KeyBindings`` parsing), so ``m`` and ``M`` both match a
+    binding of ``M``."""
+    k = _key_char(key).upper()
+    return any(k == expr.upper() for expr in keys)
+
+
+def is_key_bound_to(key, action: str) -> bool:
+    """Whether ``key`` is one of the keys bound to ``action`` (ignoring selection
+    state). ``key`` may be a character string or an ``ord()`` keycode."""
+    keys, _requirement = get_keys_for_action(action)
+    return _key_matches(key, keys)
+
+
+def is_key_bound_to_with_selection(key, action: str, has_selection: bool) -> bool:
+    """Whether ``key`` triggers ``action`` given the selection state — i.e. the
+    key is bound to the action and the action's selection requirement is met
+    (``required`` needs a selection, ``none`` needs none, ``any`` always)."""
+    keys, requirement = get_keys_for_action(action)
+    if not _key_matches(key, keys):
+        return False
+    if requirement == 'required':
+        return has_selection
+    if requirement == 'none':
+        return not has_selection
+    return True
 
 
 def format_key_for_display(key_expr: str) -> str:

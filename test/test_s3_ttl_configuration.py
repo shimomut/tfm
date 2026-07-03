@@ -36,8 +36,8 @@ class TestS3TTLConfiguration(unittest.TestCase):
         tfm_s3._s3_cache = None
     
     def test_default_s3_cache_ttl(self):
-        """Test that DefaultConfig has S3_CACHE_TTL set to 60"""
-        self.assertTrue(hasattr(DefaultConfig, 'S3_CACHE_TTL'))
+        """Test that Config has S3_CACHE_TTL set to 60"""
+        self.assertTrue(hasattr(Config, 'S3_CACHE_TTL'))
         self.assertEqual(Config.S3_CACHE_TTL, 60)
     
     def test_s3_cache_uses_default_ttl(self):

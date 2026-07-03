@@ -5,6 +5,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_empty_directory_display.py -v
 """
 
 import tempfile
+from pathlib import Path
 from unittest.mock import Mock
 
 

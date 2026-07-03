@@ -107,7 +107,7 @@ class TestArchiveOperationTaskBasic:
         file_manager = Mock()
         ui = Mock()
         ui.config = Mock()
-        ui.config.CONFIRM_ARCHIVE_EXTRACT = False
+        ui.config.CONFIRM_EXTRACT_ARCHIVE = False
         executor = Mock()
         
         task = ArchiveOperationTask(file_manager, ui, executor)

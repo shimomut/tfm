@@ -13,6 +13,13 @@ import time
 from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
 
 
+
+def _entry_text(entry):
+    """Message text from a (formatted, record) LogPaneHandler entry."""
+    formatted, record = entry
+    return formatted if formatted is not None else record.getMessage()
+
+
 def test_requirement_1_1_deque_storage():
     """
     Requirement 1.1: LogPaneHandler stores messages in a deque
@@ -40,8 +47,8 @@ def test_requirement_1_1_deque_storage():
     assert len(messages) == 5, f"Expected 5 messages, got {len(messages)}"
     
     # Should have messages 5-9 (oldest discarded)
-    assert "Message 5" in messages[0][2]
-    assert "Message 9" in messages[4][2]
+    assert "Message 5" in _entry_text(messages[0])
+    assert "Message 9" in _entry_text(messages[4])
     
     print("  ✓ LogPaneHandler correctly uses deque with maxlen")
 
@@ -84,10 +91,10 @@ def test_requirement_1_2_is_stream_capture_flag():
     messages = log_pane.get_messages()
     
     # Stream capture should be raw
-    assert messages[0][2] == "Raw output", "Stream capture not handled correctly"
+    assert _entry_text(messages[0]) == "Raw output", "Stream capture not handled correctly"
     
     # Logger message should be formatted
-    assert "INFO:" in messages[1][2], "Logger message not formatted correctly"
+    assert "INFO:" in _entry_text(messages[1]), "Logger message not formatted correctly"
     
     print("  ✓ LogPaneHandler handles is_stream_capture flag")
     
@@ -153,7 +160,7 @@ def test_requirement_2_1_log_pane_routing():
     assert len(messages) == 5, f"Expected 5 messages, got {len(messages)}"
     
     # Verify all levels are present
-    levels_found = [msg[2] for msg in messages]
+    levels_found = [_entry_text(msg) for msg in messages]
     assert any("DEBUG:" in msg for msg in levels_found)
     assert any("INFO:" in msg for msg in levels_found)
     assert any("WARNING:" in msg for msg in levels_found)

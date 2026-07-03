@@ -38,7 +38,7 @@ class TestConflictResolution:
         fm.operation_cancelled = False
         fm.config = Mock()
         fm.config.CONFIRM_ARCHIVE_CREATE = False
-        fm.config.CONFIRM_ARCHIVE_EXTRACT = False
+        fm.config.CONFIRM_EXTRACT_ARCHIVE = False
         return fm
     
     @pytest.fixture

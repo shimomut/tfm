@@ -17,8 +17,10 @@ class MockConfig:
 def test_configure_handlers_enables_log_pane():
     """Test that configure_handlers can enable log pane handler"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config)
-    
+    # Start with the log pane disabled so we can exercise enabling it dynamically;
+    # the default construction now creates the handler up front.
+    log_manager = LogManager(mock_config, no_log_pane=True)
+
     # Initially, log pane handler should be None
     assert log_manager._log_pane_handler is None
     
@@ -105,7 +107,7 @@ def test_configure_handlers_disables_stream_output():
 def test_configure_handlers_attaches_to_existing_loggers():
     """Test that configure_handlers attaches handlers to existing loggers"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config)
+    log_manager = LogManager(mock_config, no_log_pane=True)
     
     # Create a logger before enabling handlers
     logger1 = log_manager.getLogger("TestLogger1")

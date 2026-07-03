@@ -200,9 +200,47 @@ class ProgressManager:
         
         return int((self.current_operation['processed_items'] / self.current_operation['total_items']) * 100)
     
+    def get_progress_text(self, max_width: int = 80) -> str:
+        """Render the current operation's progress as a single plain-text line no
+        wider than ``max_width``.
+
+        A flat-text companion to :meth:`get_progress_segments` (which returns
+        rich segments for the animated renderer) — handy for logging and tests.
+        Returns an empty string when no operation is active."""
+        if not self.current_operation:
+            return ""
+
+        op = self.current_operation
+        operation_verbs = {
+            OperationType.COPY: "Copying",
+            OperationType.MOVE: "Moving",
+            OperationType.DELETE: "Deleting",
+            OperationType.ARCHIVE_CREATE: "Creating archive",
+            OperationType.ARCHIVE_EXTRACT: "Extracting archive",
+        }
+        verb = operation_verbs.get(op['type'], "Processing")
+        frame = self.animator.get_current_frame()
+        desc = f" ({op['description']})" if op.get('description') else ""
+
+        if op.get('counting', False):
+            text = f"{frame} {verb}{desc}... Preparing"
+        else:
+            text = f"{frame} {verb}{desc}... {op['processed_items']}/{op['total_items']}"
+
+        if op.get('current_item'):
+            text = f"{text} - {op['current_item']}"
+            file_bytes_copied = op.get('file_bytes_copied', 0)
+            file_bytes_total = op.get('file_bytes_total', 0)
+            if file_bytes_total > 1024 * 1024 and file_bytes_copied > 0:
+                copied = format_size(file_bytes_copied, compact=True)
+                total = format_size(file_bytes_total, compact=True)
+                text = f"{text} [{copied}/{total}]"
+
+        return text[:max_width]
+
     def get_progress_segments(self):
         """Get progress segments for rendering with text layout system
-        
+
         Returns:
             List of text segments, or empty list if no operation is active
         """

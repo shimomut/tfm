@@ -4,6 +4,7 @@ Integration test for log redraw trigger functionality
 Run with: PYTHONPATH=.:src:ttk pytest test/test_log_redraw_integration.py -v
 """
 
+import sys
 import unittest
 from unittest.mock import Mock, patch
 

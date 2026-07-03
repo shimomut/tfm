@@ -30,7 +30,7 @@ class TestSharedKeyDifferentSelection(unittest.TestCase):
         # Test create_directory configuration
         create_keys = self.config_manager.get_key_for_action('create_directory')
         create_requirement = self.config_manager.get_selection_requirement('create_directory')
-        self.assertEqual(create_keys, ['m', 'M'])
+        self.assertEqual(create_keys, ['M'])  # keymap stores the upper form; 'm' matches at dispatch
         self.assertEqual(create_requirement, 'none')
     
     def test_m_key_availability_with_no_selection(self):
@@ -120,13 +120,12 @@ class TestSharedKeyDifferentSelection(unittest.TestCase):
     def test_key_conflict_resolution(self):
         """Test that there's no actual conflict - selection requirements resolve it."""
         
-        # Both actions use 'm' and 'M' keys
+        # Both actions are bound to the shared 'M' key (lowercase 'm' matches it
+        # case-insensitively at dispatch; the stored key list is the upper form).
         move_keys = self.config_manager.get_key_for_action('move_files')
         create_keys = self.config_manager.get_key_for_action('create_directory')
-        
-        self.assertIn('m', move_keys)
+
         self.assertIn('M', move_keys)
-        self.assertIn('m', create_keys)
         self.assertIn('M', create_keys)
         
         # But they have different selection requirements

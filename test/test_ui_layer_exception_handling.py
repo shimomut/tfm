@@ -8,7 +8,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_ui_layer_exception_handling.py -
 """
 
 import pytest
-from src.tfm_ui_layer import UILayer, UILayerStack
+from tfm_ui_layer import UILayer, UILayerStack
 
 
 class ExceptionThrowingLayer(UILayer):
@@ -30,7 +30,13 @@ class ExceptionThrowingLayer(UILayer):
         if self.throw_on_char:
             raise RuntimeError(f"Char event error in {self.name}")
         return False
-    
+
+    def handle_mouse_event(self, event) -> bool:
+        return False
+
+    def handle_system_event(self, event) -> bool:
+        return False
+
     def render(self, renderer) -> None:
         if self.throw_on_render:
             raise RuntimeError(f"Render error in {self.name}")
@@ -57,14 +63,41 @@ class ExceptionThrowingLayer(UILayer):
         pass
 
 
-class MockLogManager:
-    """Mock log manager for testing."""
-    
+class MockLogger:
+    """Records log calls as (LEVEL, message) tuples."""
+
     def __init__(self):
-        self.messages = []
-    
-    def add_message(self, level, message):
-        self.messages.append((level, message))
+        self.records = []
+
+    def error(self, msg):
+        self.records.append(("ERROR", msg))
+
+    def warning(self, msg):
+        self.records.append(("WARNING", msg))
+
+    def info(self, msg):
+        self.records.append(("INFO", msg))
+
+    def debug(self, msg):
+        self.records.append(("DEBUG", msg))
+
+
+class MockLogManager:
+    """Mock log manager for testing.
+
+    UILayerStack now logs through ``log_manager.getLogger(...)`` rather than an
+    ``add_message`` call, so route through a recording logger and expose its
+    records as ``.messages`` for the existing assertions."""
+
+    def __init__(self):
+        self.logger = MockLogger()
+
+    def getLogger(self, name=None):
+        return self.logger
+
+    @property
+    def messages(self):
+        return self.logger.records
 
 
 class MockRenderer:

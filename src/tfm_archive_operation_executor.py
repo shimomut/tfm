@@ -884,12 +884,11 @@ class ArchiveOperationExecutor:
                         
                         try:
                             if source_path.is_file():
-                                # Update progress before adding file
+                                # Add single file, then count it — a failed add must
+                                # not be counted as a success.
+                                tar.add(str(source_path), arcname=source_path.name)
                                 success_count += 1
                                 self.progress_manager.update_progress(source_path.name, success_count)
-                                
-                                # Add single file
-                                tar.add(str(source_path), arcname=source_path.name)
                                 self.logger.info(f"Added to archive: {source_path.name}")
                             elif source_path.is_dir():
                                 # Update progress immediately to show we're processing this directory
@@ -906,13 +905,12 @@ class ArchiveOperationExecutor:
                                         try:
                                             # Create relative path within the directory
                                             rel_path = file_path.relative_to(source_path.parent)
-                                            
-                                            # Update progress before adding file
+
+                                            # Add file, then count it — a failed add
+                                            # must not be counted as a success.
+                                            tar.add(str(file_path), arcname=str(rel_path))
                                             success_count += 1
                                             self.progress_manager.update_progress(str(rel_path), success_count)
-                                            
-                                            # Add file to archive
-                                            tar.add(str(file_path), arcname=str(rel_path))
                                             self.logger.info(f"Added to archive: {rel_path}")
                                         except PermissionError as e:
                                             self.logger.error(f"Permission denied adding {file_path.name} to archive: {e}")
@@ -982,10 +980,11 @@ class ArchiveOperationExecutor:
                         
                         try:
                             if source_path.is_file():
-                                # Update progress before writing
+                                # Write, then count — a failed write must not be
+                                # counted as a success.
+                                zip_file.write(str(source_path), source_path.name)
                                 success_count += 1
                                 self.progress_manager.update_progress(source_path.name, success_count)
-                                zip_file.write(str(source_path), source_path.name)
                                 self.logger.info(f"Added to archive: {source_path.name}")
                             elif source_path.is_dir():
                                 # Update progress immediately to show we're processing this directory
@@ -1002,12 +1001,12 @@ class ArchiveOperationExecutor:
                                         try:
                                             # Create relative path within the directory
                                             rel_path = file_path.relative_to(source_path.parent)
-                                            
-                                            # Update progress before writing
+
+                                            # Write, then count — a failed write must
+                                            # not be counted as a success.
+                                            zip_file.write(str(file_path), str(rel_path))
                                             success_count += 1
                                             self.progress_manager.update_progress(str(rel_path), success_count)
-                                            
-                                            zip_file.write(str(file_path), str(rel_path))
                                             self.logger.info(f"Added to archive: {rel_path}")
                                         except PermissionError as e:
                                             self.logger.error(f"Permission denied adding {file_path.name} to archive: {e}")

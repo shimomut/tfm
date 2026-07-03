@@ -52,17 +52,9 @@ class TestConfigCompleteness(unittest.TestCase):
                                  f"Config.{setting} should be positive")
     
     def test_dialog_settings_exist(self):
-        """Test that all dialog settings are defined"""
-        dialog_settings = [
-            'INFO_DIALOG_WIDTH_RATIO',
-            'INFO_DIALOG_HEIGHT_RATIO', 
-            'INFO_DIALOG_MIN_WIDTH',
-            'INFO_DIALOG_MIN_HEIGHT',
-            'LIST_DIALOG_WIDTH_RATIO',
-            'LIST_DIALOG_HEIGHT_RATIO',
-            'LIST_DIALOG_MIN_WIDTH',
-            'LIST_DIALOG_MIN_HEIGHT'
-        ]
+        """Dialog sizing moved out of config into the PuiKit dialog widgets, so
+        the old INFO_DIALOG_*/LIST_DIALOG_* config settings no longer exist."""
+        dialog_settings = []
         
         for setting in dialog_settings:
             with self.subTest(setting=setting):
@@ -117,12 +109,12 @@ class TestConfigCompleteness(unittest.TestCase):
     def test_jump_dialog_key_binding_exists(self):
         """Test that jump dialog key binding exists in both configs"""
         # Check default config
-        self.assertIn('jump_dialog', self.default_config.KEY_BINDINGS)
-        self.assertIn('J', self.default_config.KEY_BINDINGS['jump_dialog'])
-        
+        self.assertIn('jump_to_path', self.default_config.KEY_BINDINGS)
+        self.assertIn('Shift-J', self.default_config.KEY_BINDINGS['jump_to_path'])
+
         # Check user config
-        self.assertIn('jump_dialog', self.user_config.KEY_BINDINGS)
-        self.assertIn('J', self.user_config.KEY_BINDINGS['jump_dialog'])
+        self.assertIn('jump_to_path', self.user_config.KEY_BINDINGS)
+        self.assertIn('Shift-J', self.user_config.KEY_BINDINGS['jump_to_path'])
     
     def test_config_values_consistency(self):
         """Test that default and user config have consistent values for key settings"""
@@ -132,10 +124,6 @@ class TestConfigCompleteness(unittest.TestCase):
             'MAX_SEARCH_RESULTS',
             'MAX_JUMP_DIRECTORIES',
             'MAX_HISTORY_ENTRIES',
-            'INFO_DIALOG_WIDTH_RATIO',
-            'INFO_DIALOG_HEIGHT_RATIO',
-            'LIST_DIALOG_WIDTH_RATIO',
-            'LIST_DIALOG_HEIGHT_RATIO'
         ]
         
         for setting in consistent_settings:

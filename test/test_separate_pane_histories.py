@@ -16,7 +16,7 @@ from tfm_pane_manager import PaneManager
 from _config import Config
 
 
-class TestConfig(DefaultConfig):
+class TestConfig(Config):
     """Test configuration with custom cursor history limit"""
     MAX_CURSOR_HISTORY_ENTRIES = 5  # Small limit for testing
 

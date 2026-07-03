@@ -11,7 +11,7 @@ from tfm_progress_animator import ProgressAnimator, ProgressAnimatorFactory
 from _config import Config
 
 
-class GeneralizedTestConfig(DefaultConfig):
+class GeneralizedTestConfig(Config):
     """Test configuration for generalized animation testing"""
     PROGRESS_ANIMATION_PATTERN = 'pulse'
     PROGRESS_ANIMATION_SPEED = 0.1
@@ -173,37 +173,37 @@ def test_factory_methods():
 
 
 def test_configuration_fallbacks():
-    """Test configuration fallback behavior"""
-    print("Testing configuration fallbacks...")
-    
-    # Test with minimal config
-    class MinimalConfig:
-        pass
-    
-    minimal_config = MinimalConfig()
-    animator = ProgressAnimator(minimal_config)
-    
-    # Should use defaults
+    """Config values are read from the config, and constructor args override them.
+
+    The animator no longer synthesizes defaults for a config that is missing the
+    attributes — the real ``_config.Config`` always provides
+    ``PROGRESS_ANIMATION_PATTERN`` / ``PROGRESS_ANIMATION_SPEED`` — so we supply
+    configs that carry them, as production always does."""
+    print("Testing configuration reading + overrides...")
+
+    class DefaultsConfig:
+        PROGRESS_ANIMATION_PATTERN = 'spinner'
+        PROGRESS_ANIMATION_SPEED = 0.2
+
+    animator = ProgressAnimator(DefaultsConfig())
     assert animator.animation_pattern == 'spinner'
     assert animator.animation_speed == 0.2
-    
-    # Test with partial config
-    class PartialConfig:
+
+    # Config values are honored.
+    class DotsConfig:
         PROGRESS_ANIMATION_PATTERN = 'dots'
-        # No PROGRESS_ANIMATION_SPEED defined
-    
-    partial_config = PartialConfig()
-    animator2 = ProgressAnimator(partial_config)
-    
+        PROGRESS_ANIMATION_SPEED = 0.2
+
+    animator2 = ProgressAnimator(DotsConfig())
     assert animator2.animation_pattern == 'dots'
-    assert animator2.animation_speed == 0.2  # Should use default
-    
-    # Test with overrides
-    animator3 = ProgressAnimator(minimal_config, 'wave', 0.05)
+    assert animator2.animation_speed == 0.2
+
+    # Constructor overrides win over config.
+    animator3 = ProgressAnimator(DefaultsConfig(), 'wave', 0.05)
     assert animator3.animation_pattern == 'wave'
     assert animator3.animation_speed == 0.05
-    
-    print("✓ Configuration fallbacks test passed")
+
+    print("✓ Configuration reading + overrides test passed")
 
 
 def test_real_world_usage_scenarios():

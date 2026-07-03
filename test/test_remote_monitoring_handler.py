@@ -135,14 +135,13 @@ def test_broadcast_to_single_client():
     data = client.recv(4096).decode('utf-8')
     message = json.loads(data.strip())
     
-    # Verify message structure
+    # Verify message structure. The broadcast payload no longer carries a
+    # separate 'level' field — the level is prefixed into the message text.
     assert 'timestamp' in message
     assert 'source' in message
-    assert 'level' in message
     assert 'message' in message
     assert message['source'] == 'TestLogger'
-    assert message['level'] == 'INFO'
-    assert message['message'] == 'Test broadcast'
+    assert message['message'] == 'INFO: Test broadcast'
     print("✓ Task 9.3: Broadcast to single client works")
     
     # Cleanup
@@ -189,8 +188,7 @@ def test_broadcast_to_multiple_clients():
     for i, client in enumerate(clients):
         data = client.recv(4096).decode('utf-8')
         message = json.loads(data.strip())
-        assert message['message'] == 'Multi-client test'
-        assert message['level'] == 'WARNING'
+        assert message['message'] == 'WARNING: Multi-client test'
     
     print("✓ Task 9.3: Broadcast to multiple clients works")
     

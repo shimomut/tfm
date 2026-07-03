@@ -15,7 +15,8 @@ from pathlib import Path
 import tempfile
 import shutil
 
-from tfm_config import ConfigManager, DefaultConfig
+from tfm_config import ConfigManager
+from _config import Config  # the default config template (was tfm_config.DefaultConfig)
 
 
 def test_default_backend_config():

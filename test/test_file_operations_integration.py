@@ -410,9 +410,11 @@ def test_no_circular_dependencies():
     assert task.ui == file_ops_ui
     assert task.executor == executor
     
-    # FileOperationExecutor should not depend on Task or UI
-    assert not hasattr(executor, 'task')
+    # FileOperationExecutor does not depend on the UI. It keeps a reference to
+    # the current task only to poll it for cancellation (set per-run), starting
+    # out as None — not a structural dependency.
     assert not hasattr(executor, 'ui')
+    assert executor.task is None
     
     print("✓ No circular dependencies detected")
 

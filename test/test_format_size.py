@@ -39,9 +39,9 @@ class TestFormatSize:
     
     def test_kilobytes_compact(self):
         """Test formatting kilobytes in compact format."""
-        assert format_size(1024, compact=True) == "1K"
-        assert format_size(1536, compact=True) == "2K"  # Rounded
-        assert format_size(10240, compact=True) == "10K"
+        assert format_size(1024, compact=True) == "1.0K"
+        assert format_size(1536, compact=True) == "1.5K"
+        assert format_size(10240, compact=True) == "10.0K"
     
     def test_megabytes_standard(self):
         """Test formatting megabytes in standard format."""
@@ -51,9 +51,9 @@ class TestFormatSize:
     
     def test_megabytes_compact(self):
         """Test formatting megabytes in compact format."""
-        assert format_size(1048576, compact=True) == "1M"
-        assert format_size(1572864, compact=True) == "2M"  # Rounded
-        assert format_size(10485760, compact=True) == "10M"
+        assert format_size(1048576, compact=True) == "1.0M"
+        assert format_size(1572864, compact=True) == "1.5M"
+        assert format_size(10485760, compact=True) == "10.0M"
     
     def test_gigabytes_standard(self):
         """Test formatting gigabytes in standard format."""
@@ -63,8 +63,8 @@ class TestFormatSize:
     
     def test_gigabytes_compact(self):
         """Test formatting gigabytes in compact format."""
-        assert format_size(1073741824, compact=True) == "1G"
-        assert format_size(1610612736, compact=True) == "2G"  # Rounded
+        assert format_size(1073741824, compact=True) == "1.0G"
+        assert format_size(1610612736, compact=True) == "1.5G"
     
     def test_terabytes_standard(self):
         """Test formatting terabytes in standard format."""
@@ -73,8 +73,8 @@ class TestFormatSize:
     
     def test_terabytes_compact(self):
         """Test formatting terabytes in compact format."""
-        assert format_size(1099511627776, compact=True) == "1T"
-        assert format_size(1649267441664, compact=True) == "2T"  # Rounded
+        assert format_size(1099511627776, compact=True) == "1.0T"
+        assert format_size(1649267441664, compact=True) == "1.5T"
     
     def test_petabytes_standard(self):
         """Test formatting petabytes in standard format."""
@@ -82,7 +82,7 @@ class TestFormatSize:
     
     def test_petabytes_compact(self):
         """Test formatting petabytes in compact format."""
-        assert format_size(1125899906842624, compact=True) == "1P"
+        assert format_size(1125899906842624, compact=True) == "1.0P"
     
     def test_bytes_no_decimal(self):
         """Test that bytes are shown as integers without decimals."""

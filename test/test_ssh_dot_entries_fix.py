@@ -14,6 +14,10 @@ import pytest
 from tfm_path import Path
 import fnmatch
 
+import pytest
+pytest.skip("Requires live SSH host 'Ec2-Dev-Ubuntu24' (developer integration test)", allow_module_level=True)
+
+
 
 def test_iterdir_excludes_dot_entries():
     """Test that iterdir does not return . or .. entries"""

@@ -147,6 +147,7 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
         
         self.mock_file_manager.get_current_pane.return_value = {
             'selected_files': set(),
+            'focused_index': 0,
             'files': [archive_path],
             'selected_index': 0
         }
@@ -178,6 +179,7 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
         
         self.mock_file_manager.get_current_pane.return_value = {
             'selected_files': set(),
+            'focused_index': 0,
             'files': [archive_path],
             'selected_index': 0
         }
@@ -212,6 +214,7 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
         with patch.object(Path, 'exists', return_value=True):
             self.mock_file_manager.get_current_pane.return_value = {
                 'selected_files': {str(local_path)},
+                'focused_index': 0,
                 'files': [local_path],
                 'selected_index': 0
             }
@@ -245,6 +248,7 @@ class TestArchiveUnsupportedOperations(unittest.TestCase):
         with patch.object(Path, 'exists', return_value=True):
             self.mock_file_manager.get_current_pane.return_value = {
                 'selected_files': {str(local_path)},
+                'focused_index': 0,
                 'files': [local_path],
                 'selected_index': 0
             }

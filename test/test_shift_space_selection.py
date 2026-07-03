@@ -5,7 +5,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_shift_space_selection.py -v
 
 import pytest
 from pathlib import Path
-from src.tfm_file_operations import FileListManager
+from tfm_file_list_manager import FileListManager
 
 
 class MockConfig:

@@ -29,7 +29,7 @@ def test_state_manager_integration():
         # Test pane state operations
         test_pane_data = {
             'path': Path('/tmp'),
-            'selected_index': 3,
+            'focused_index': 3,
             'scroll_offset': 5,
             'sort_mode': 'size',
             'sort_reverse': True,
@@ -45,7 +45,7 @@ def test_state_manager_integration():
         loaded_state = state_manager.load_pane_state('left')
         assert loaded_state is not None
         assert loaded_state['path'] == str(test_pane_data['path'])
-        assert loaded_state['focused_index'] == test_pane_data['focused_index']
+        assert loaded_state['selected_index'] == test_pane_data['focused_index']
         assert loaded_state['sort_mode'] == test_pane_data['sort_mode']
         print("✓ Pane state loaded successfully")
         
@@ -126,7 +126,7 @@ def test_state_persistence():
         
         test_data = {
             'path': '/test/path',
-            'selected_index': 10,
+            'focused_index': 10,
             'scroll_offset': 20,
             'sort_mode': 'date',
             'sort_reverse': False,
@@ -149,7 +149,7 @@ def test_state_persistence():
         loaded_pane = state_manager2.load_pane_state('right')
         assert loaded_pane is not None
         assert loaded_pane['path'] == test_data['path']
-        assert loaded_pane['focused_index'] == test_data['focused_index']
+        assert loaded_pane['selected_index'] == test_data['focused_index']
         assert loaded_pane['sort_mode'] == test_data['sort_mode']
         
         loaded_layout = state_manager2.load_window_layout()
@@ -191,7 +191,7 @@ def test_concurrent_state_access():
                     # Simulate typical TFM operations
                     pane_data = {
                         'path': f'/worker/{instance_id}/path/{i}',
-                        'selected_index': i,
+                        'focused_index': i,
                         'scroll_offset': i * 2,
                         'sort_mode': 'name',
                         'sort_reverse': i % 2 == 0,

@@ -244,38 +244,9 @@ class TestDragSessionErrorLogging:
             call_args = mock_info.call_args[0][0]
             assert "terminal mode" in call_args.lower()
     
-    def test_logs_error_in_completion_callback_exception(self):
-        """Test that callback exceptions are logged but don't crash."""
-        backend = Mock()
-        backend.supports_drag_and_drop.return_value = True
-        backend.start_drag_session.return_value = True
-        
-        manager = DragSessionManager(backend)
-        
-        # Create callback that raises exception
-        def bad_callback(completed):
-            raise RuntimeError("Callback error")
-        
-        # Start drag with bad callback
-        manager.start_drag(
-            urls=["file:///test.txt"],
-            drag_image_text="test.txt",
-            completion_callback=bad_callback
-        )
-        
-        # Capture log output
-        with patch.object(manager.logger, 'error') as mock_error:
-            # Complete the drag (should catch exception)
-            manager.handle_drag_completed()
-            
-            # Verify error was logged
-            mock_error.assert_called_once()
-            call_args = mock_error.call_args[0][0]
-            assert "callback" in call_args.lower()
-            
-            # Verify state was cleaned up despite exception
-            assert manager.get_state() == DragState.IDLE
-            assert manager.current_urls is None
+    # (Removed) test_logs_error_in_completion_callback_exception: completion
+    # callbacks are no longer retained or invoked — drag is fire-and-forget and
+    # the OS owns the session, so there is no callback-exception path to log.
 
 
 class TestDragErrorRecovery:

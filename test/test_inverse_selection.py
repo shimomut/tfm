@@ -15,7 +15,10 @@ def test_inverse_files_selection():
     
     # Create a mock config object
     class MockConfig:
-        pass
+        SHOW_HIDDEN_FILES = False
+        DEFAULT_SORT_MODE = 'name'
+        DEFAULT_SORT_REVERSE = False
+        MAX_HISTORY_ENTRIES = 100
     
     file_ops = FileListManager(MockConfig())
     
@@ -83,7 +86,10 @@ def test_inverse_items_selection():
     
     # Create a mock config object
     class MockConfig:
-        pass
+        SHOW_HIDDEN_FILES = False
+        DEFAULT_SORT_MODE = 'name'
+        DEFAULT_SORT_REVERSE = False
+        MAX_HISTORY_ENTRIES = 100
     
     file_ops = FileListManager(MockConfig())
     

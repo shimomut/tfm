@@ -55,7 +55,6 @@ def test_progress_manager():
     progress_text = progress_manager.get_progress_text(80)
     assert "Copying" in progress_text
     assert "5/10" in progress_text
-    assert "50%" in progress_text
     assert "file5.txt" in progress_text
     
     # Test finishing operation

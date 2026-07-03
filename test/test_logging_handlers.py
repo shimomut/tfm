@@ -11,6 +11,13 @@ from datetime import datetime
 from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler
 
 
+
+def _entry_text(entry):
+    """Message text from a (formatted, record) LogPaneHandler entry."""
+    formatted, record = entry
+    return formatted if formatted is not None else record.getMessage()
+
+
 def test_log_pane_handler_basic():
     """Test basic LogPaneHandler functionality"""
     handler = LogPaneHandler(max_messages=10)
@@ -31,7 +38,7 @@ def test_log_pane_handler_basic():
     messages = handler.get_messages()
     
     assert len(messages) == 1
-    timestamp, source, message = messages[0]
+    source, message = messages[0][1].name, _entry_text(messages[0])
     assert source == "TestLogger"
     assert "INFO: Test message" in message
     print("✓ LogPaneHandler basic test passed")
@@ -57,7 +64,7 @@ def test_log_pane_handler_stream_capture():
     messages = handler.get_messages()
     
     assert len(messages) == 1
-    timestamp, source, message = messages[0]
+    source, message = messages[0][1].name, _entry_text(messages[0])
     assert source == "STDOUT"
     assert message == "Raw stdout output"
     print("✓ LogPaneHandler stream capture test passed")
@@ -82,11 +89,11 @@ def test_log_pane_handler_multiline():
     handler.emit(record)
     messages = handler.get_messages()
     
-    # Should have 3 separate messages (one per line)
-    assert len(messages) == 3
-    assert messages[0][2] == "Line 1"
-    assert messages[1][2] == "Line 2"
-    assert messages[2][2] == "Line 3"
+    # Stream output is kept as a single multi-line message (rendered across
+    # lines in the pane) rather than split into one entry per line.
+    assert len(messages) == 1
+    text = _entry_text(messages[0])
+    assert "Line 1" in text and "Line 2" in text and "Line 3" in text
     print("✓ LogPaneHandler multi-line test passed")
 
 
@@ -113,9 +120,9 @@ def test_log_pane_handler_max_messages():
     # Should only have 3 messages (oldest discarded)
     assert len(messages) == 3
     # Should have messages 2, 3, 4 (0 and 1 were discarded)
-    assert "Message 2" in messages[0][2]
-    assert "Message 3" in messages[1][2]
-    assert "Message 4" in messages[2][2]
+    assert "Message 2" in _entry_text(messages[0])
+    assert "Message 3" in _entry_text(messages[1])
+    assert "Message 4" in _entry_text(messages[2])
     print("✓ LogPaneHandler max messages test passed")
 
 
@@ -239,15 +246,15 @@ def test_is_stream_capture_flag():
     assert len(messages) == 3
     
     # First should be raw stream output
-    assert messages[0][1] == "STDOUT"
-    assert messages[0][2] == "Stream output"
+    assert messages[0][1].name == "STDOUT"
+    assert _entry_text(messages[0]) == "Stream output"
     
     # Second should be formatted logger output
-    assert messages[1][1] == "Logger"
-    assert "INFO: Logger output" in messages[1][2]
+    assert messages[1][1].name == "Logger"
+    assert "INFO: Logger output" in _entry_text(messages[1])
     
     # Third should be formatted logger output (default)
-    assert messages[2][1] == "Logger2"
-    assert "INFO: Default output" in messages[2][2]
+    assert messages[2][1].name == "Logger2"
+    assert "INFO: Default output" in _entry_text(messages[2])
     
     print("✓ is_stream_capture flag test passed")

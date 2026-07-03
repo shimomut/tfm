@@ -581,10 +581,17 @@ class LogManager:
             return True
         return False
     
+    @property
+    def log_messages(self):
+        """Live view of captured messages — the pane handler's ``(formatted,
+        record)`` deque. Backward-compatible accessor supporting ``len()``,
+        indexing, and ``clear()`` on the underlying store."""
+        return self._log_pane_handler.messages if self._log_pane_handler else []
+
     def get_log_messages(self):
         """
         Get all log messages as a list of formatted strings (backward compatibility).
-        
+
         This method is provided for backward compatibility with tests that expect
         a simple list of message strings. In production, messages are accessed
         through the handler's get_messages() method which returns (formatted, record) tuples.

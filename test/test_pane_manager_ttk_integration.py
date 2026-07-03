@@ -65,7 +65,7 @@ class TestPaneManagerTTKIntegration(unittest.TestCase):
         right_pane = self.pane_manager.right_pane
         
         # Check required fields exist
-        required_fields = ['path', 'selected_index', 'scroll_offset', 'files', 
+        required_fields = ['path', 'focused_index', 'scroll_offset', 'files', 
                           'selected_files', 'sort_mode', 'sort_reverse', 'filter_pattern']
         
         for field in required_fields:
@@ -104,14 +104,14 @@ class TestPaneManagerTTKIntegration(unittest.TestCase):
         self.pane_manager.switch_pane()
         self.assertEqual(self.pane_manager.active_pane, 'left')
     
-    def test_adjust_scroll_for_selection(self):
+    def test_adjust_scroll_for_focus(self):
         """Test scroll adjustment for selection"""
         pane = self.pane_manager.left_pane
         pane['focused_index'] = 10
         pane['scroll_offset'] = 0
         
         # Adjust scroll for display height of 5
-        self.pane_manager.adjust_scroll_for_selection(pane, 5)
+        self.pane_manager.adjust_scroll_for_focus(pane, 5)
         
         # Scroll should be adjusted to keep selection visible
         self.assertGreaterEqual(pane['scroll_offset'], 6)

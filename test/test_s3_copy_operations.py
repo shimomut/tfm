@@ -33,6 +33,7 @@ class TestS3CopyFix(unittest.TestCase):
         """Test copying a local file to S3"""
         # Mock S3 client
         mock_client = Mock()
+        mock_client.list_objects_v2.return_value = {'KeyCount': 0}
         mock_boto3.client.return_value = mock_client
         
         # Create S3 destination path
@@ -63,6 +64,7 @@ class TestS3CopyFix(unittest.TestCase):
         """Test copying an S3 file to local filesystem"""
         # Mock S3 client and response
         mock_client = Mock()
+        mock_client.list_objects_v2.return_value = {'KeyCount': 0}
         mock_response = {
             'Body': Mock()
         }
@@ -148,6 +150,7 @@ class TestS3CopyIntegration(unittest.TestCase):
         """Test that the copy_to method exists and is callable"""
         # Mock boto3 to avoid import errors
         mock_client = Mock()
+        mock_client.list_objects_v2.return_value = {'KeyCount': 0}
         mock_boto3.client.return_value = mock_client
         
         try:

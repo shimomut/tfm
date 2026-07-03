@@ -207,7 +207,7 @@ class TestProgressManager(unittest.TestCase):
         progress_text = self.progress_manager.get_progress_text(max_width=80)
         
         # Check that text contains byte progress in human-readable format
-        self.assertIn("[15M/32", progress_text)  # Should show "15M/32.0G" or similar
+        self.assertIn("[15.0M/32", progress_text)  # e.g. "[15.0M/32.0G]"
         self.assertIn("G]", progress_text)
     
     def test_progress_throttling(self):
@@ -265,8 +265,9 @@ class TestCopyProgressIntegration(unittest.TestCase):
                 f.write(f"Sub file {i}\n")
         
         # Count files
-        from tfm_file_operation_ui import FileOperationUI
-        
+        # _count_files_recursively lives on the executor (the I/O layer) now.
+        from tfm_file_operation_executor import FileOperationExecutor
+
         # Create a mock file manager
         class MockFileManager:
             def __init__(self):
@@ -274,11 +275,11 @@ class TestCopyProgressIntegration(unittest.TestCase):
                 self.log_manager = None
                 self.cache_manager = None
                 self.config = None
-        
+
         file_manager = MockFileManager()
-        file_ops_ui = FileOperationUI(file_manager, None)
-        
-        total_files = file_ops_ui._count_files_recursively([self.source_dir])
+        executor = FileOperationExecutor(file_manager)
+
+        total_files = executor._count_files_recursively([self.source_dir])
         
         # Should count 5 files in root + 3 files in subdir = 8 files
         self.assertEqual(total_files, 8)

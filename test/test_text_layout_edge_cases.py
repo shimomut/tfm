@@ -19,7 +19,6 @@ from tfm_text_layout import (
     draw_text_segments,
     AbbreviationSegment,
     FilepathSegment,
-    TruncateSegment,
     AllOrNothingSegment,
     AsIsSegment,
     SpacerSegment
@@ -125,24 +124,6 @@ class TestSingleCharacterSegments:
         renderer.draw_text.assert_called_once()
         call_args = renderer.draw_text.call_args[0]
         assert call_args[2] == "A"  # text argument
-    
-    def test_single_char_truncate(self):
-        """Single character truncate segment should render correctly."""
-        renderer = Mock()
-        
-        segments = [TruncateSegment("B")]
-        
-        draw_text_segments(
-            renderer=renderer,
-            row=0,
-            col=0,
-            segments=segments,
-            rendering_width=10
-        )
-        
-        renderer.draw_text.assert_called_once()
-        call_args = renderer.draw_text.call_args[0]
-        assert call_args[2] == "B"
     
     def test_single_char_with_width_one(self):
         """Single character with rendering width of 1 should fit."""
@@ -599,7 +580,7 @@ class TestCombinedEdgeCases:
         
         segments = [
             AbbreviationSegment("A"),
-            TruncateSegment("B"),
+            AsIsSegment("B"),
             AllOrNothingSegment("C"),
             AsIsSegment("D")
         ]

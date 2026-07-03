@@ -11,7 +11,7 @@ import unittest
 import tempfile
 import shutil
 from pathlib import Path as PathlibPath
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 
 # Add src to path for imports
 from tfm_cache_manager import CacheManager
@@ -29,20 +29,25 @@ class TestS3CacheInvalidation(unittest.TestCase):
         self.mock_s3_cache = Mock()
         self.mock_s3_cache.invalidate_key = Mock()
         
-        # Mock S3 paths
-        self.mock_s3_path = Mock()
-        self.mock_s3_path.get_scheme.return_value = 's3'
-        self.mock_s3_path._impl = Mock()
-        self.mock_s3_path._impl._bucket = 'test-bucket'
-        self.mock_s3_path._impl._key = 'test/file.txt'
-        
-        self.mock_s3_dir = Mock()
-        self.mock_s3_dir.get_scheme.return_value = 's3'
-        self.mock_s3_dir._impl = Mock()
-        self.mock_s3_dir._impl._bucket = 'test-bucket'
-        self.mock_s3_dir._impl._key = 'test/'
+        # Mock S3 paths. The cache manager now does path arithmetic
+        # (``destination_dir / source.name``), so the dir mock must support ``/``
+        # (hence MagicMock) and yield a child with the joined S3 key.
+        def _s3_path(bucket, key, name=None):
+            p = MagicMock()
+            p.get_scheme.return_value = 's3'
+            p.name = name
+            p._impl._bucket = bucket
+            p._impl._key = key
+            return p
+
+        self.mock_s3_path = _s3_path('test-bucket', 'test/file.txt', name='file.txt')
+        self.mock_s3_path.parent = _s3_path('test-bucket', 'test/')
+
+        self.mock_s3_dir = _s3_path('test-bucket', 'test/')
+        self.mock_s3_dir.__truediv__.side_effect = (
+            lambda child: _s3_path('test-bucket', 'test/' + str(child)))
     
-    @patch('tfm_cache_manager.get_s3_cache')
+    @patch('tfm_s3.get_s3_cache')
     def test_invalidate_cache_for_copy_operation(self, mock_get_s3_cache):
         """Test cache invalidation for copy operations"""
         mock_get_s3_cache.return_value = self.mock_s3_cache
@@ -72,7 +77,7 @@ class TestS3CacheInvalidation(unittest.TestCase):
         for expected_call in expected_calls:
             self.assertIn(expected_call, actual_calls)
     
-    @patch('tfm_cache_manager.get_s3_cache')
+    @patch('tfm_s3.get_s3_cache')
     def test_invalidate_cache_for_move_operation(self, mock_get_s3_cache):
         """Test cache invalidation for move operations"""
         mock_get_s3_cache.return_value = self.mock_s3_cache
@@ -105,7 +110,7 @@ class TestS3CacheInvalidation(unittest.TestCase):
         
         self.assertEqual(actual_buckets, expected_buckets)
     
-    @patch('tfm_cache_manager.get_s3_cache')
+    @patch('tfm_s3.get_s3_cache')
     def test_invalidate_cache_for_delete_operation(self, mock_get_s3_cache):
         """Test cache invalidation for delete operations"""
         mock_get_s3_cache.return_value = self.mock_s3_cache
@@ -138,7 +143,7 @@ class TestS3CacheInvalidation(unittest.TestCase):
         for expected_key in expected_keys:
             self.assertIn(expected_key, actual_keys)
     
-    @patch('tfm_cache_manager.get_s3_cache')
+    @patch('tfm_s3.get_s3_cache')
     def test_invalidate_cache_for_archive_operation(self, mock_get_s3_cache):
         """Test cache invalidation for archive operations"""
         mock_get_s3_cache.return_value = self.mock_s3_cache
@@ -177,7 +182,7 @@ class TestS3CacheInvalidation(unittest.TestCase):
         for expected_key in expected_keys:
             self.assertIn(expected_key, actual_keys)
     
-    @patch('tfm_cache_manager.get_s3_cache')
+    @patch('tfm_s3.get_s3_cache')
     def test_invalidate_cache_for_create_operation(self, mock_get_s3_cache):
         """Test cache invalidation for create operations"""
         mock_get_s3_cache.return_value = self.mock_s3_cache
@@ -215,7 +220,7 @@ class TestS3CacheInvalidation(unittest.TestCase):
         local_path.get_scheme.return_value = 'file'
         
         # Test that no S3 cache operations are performed for local paths
-        with patch('tfm_cache_manager.get_s3_cache') as mock_get_s3_cache:
+        with patch('tfm_s3.get_s3_cache') as mock_get_s3_cache:
             self.cache_manager.invalidate_cache_for_paths([local_path], "test operation")
             
             # S3 cache should not be accessed for local paths
@@ -224,7 +229,7 @@ class TestS3CacheInvalidation(unittest.TestCase):
     def test_cache_invalidation_error_handling(self):
         """Test that cache invalidation errors are handled gracefully"""
         # Mock S3 cache to raise an exception
-        with patch('tfm_cache_manager.get_s3_cache') as mock_get_s3_cache:
+        with patch('tfm_s3.get_s3_cache') as mock_get_s3_cache:
             mock_get_s3_cache.side_effect = Exception("Cache error")
             
             # Should not raise exception, but log warning

@@ -111,13 +111,15 @@ def test_log_manager_has_config():
 def test_handler_attributes_exist():
     """Test that LogManager has handler attributes"""
     mock_config = MockConfig()
-    log_manager = LogManager(mock_config)
-    
+    # Disable the log pane so the handlers start unconfigured (the default
+    # construction now eagerly creates the log-pane handler).
+    log_manager = LogManager(mock_config, no_log_pane=True)
+
     # Check handler attributes exist
     assert hasattr(log_manager, '_log_pane_handler')
     assert hasattr(log_manager, '_stream_output_handler')
     assert hasattr(log_manager, '_remote_monitoring_handler')
-    
+
     # Initially, handlers should be None (not configured yet)
     assert log_manager._log_pane_handler is None
     assert log_manager._stream_output_handler is None
