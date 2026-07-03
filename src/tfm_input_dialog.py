@@ -34,6 +34,8 @@ from puikit.panel import Rect
 from puikit.widgets.base import Widget
 from puikit.widgets.text_edit import TextEdit
 
+from tfm_dialog_geometry import pane_anchored_box
+
 
 class InputDialog(FocusContainer, Widget):
     """Modal single-line text prompt. Construct via :func:`show_input`, which
@@ -212,10 +214,9 @@ def show_input(
     if anchor == "top":
         hints["y"] = 2.0
     if region is not None:
-        region_x, region_w = region
-        w = min(w, region_w)
+        w, x = pane_anchored_box(w, sw, region)
         hints["w"] = w
-        hints["x"] = max(0.0, min(region_x + (region_w - w) / 2.0, sw - w))
+        hints["x"] = x
     dialog._panel = panel
     panel.push_layer(dialog, z=z, hints=hints)
     panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})

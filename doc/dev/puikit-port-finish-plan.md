@@ -196,7 +196,25 @@ Either way needs:
 
 ---
 
-## 4. Dialog sizing — larger than the pane, still pane-anchored
+## 4. Dialog sizing — larger than the pane, still pane-anchored — ✅ DONE
+
+**Implemented:**
+- New `src/tfm_dialog_geometry.py` — `pane_anchored_box(desired_w, screen_w,
+  region, *, factor=1.4, margin=2.0) -> (w, x)`. The dialog grows up to 1.4× the
+  pane width (never past its own desired width, never narrower than pane-fit),
+  then a final on-screen cap keeps a 2-unit margin each side. Centered on the
+  pane's center, so it leans over its target pane; near a screen edge the clamp
+  shifts it inward but keeps it over the correct pane.
+- `tfm_input_dialog.py` and `tfm_filter_list_dialog.py` both replaced their
+  identical `w = min(w, region_w)` clamp with a call to the shared helper (fixed
+  the filter docstring's "never wider than it").
+- New `test/test_dialog_geometry.py` (7 cases: grow-past-pane, factor cap,
+  interior centering, right-pane lean, screen-margin on a huge pane, narrow
+  edge pane). Two caught real issues during development — a floor-vs-screen-cap
+  ordering bug, and that an edge pane can't stay perfectly centered — both
+  resolved. All 36 picker/dialog tests pass.
+
+Original analysis follows.
 
 **Status: small, localized change in two dialog helpers.**
 

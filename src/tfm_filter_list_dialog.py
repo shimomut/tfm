@@ -35,6 +35,8 @@ from puikit.widgets.base import Widget
 from puikit.widgets.list import ListView
 from puikit.widgets.text_edit import TextEdit
 
+from tfm_dialog_geometry import pane_anchored_box
+
 #: Navigation keys the *list* owns even while the filter field holds focus —
 #: typing filters, but the arrows still drive the selection (the ttk behavior).
 #: Backend key names are unsuffixed ("pageup"/"pagedown"), matching ListView.
@@ -200,8 +202,8 @@ def show_filter_list(
     ``region`` is an optional ``(x, width)`` column span (in base units) to anchor
     the dialog within instead of the whole window — used to place a pane-targeting
     picker (favorites, drives, …) over the active pane, so the user can tell which
-    pane it will act on. The dialog is centered within the region and never wider
-    than it."""
+    pane it will act on. The dialog is centered on the pane's center and may run a
+    bit wider than the pane for comfort (see :func:`tfm_dialog_geometry`)."""
     dialog = FilterListDialog(
         items, title=title, to_label=to_label, on_accept=on_accept, on_cancel=on_cancel,
     )
@@ -210,12 +212,11 @@ def show_filter_list(
     h = max(8.0, min(sh * 0.6, float(len(items) + 5)))
     hints: dict[str, Any] = {"shadow": True, "dim_below": True, "w": w, "h": h}
     if region is not None:
-        region_x, region_w = region
-        # Constrain to the region and center within it; clamp on-screen so a
-        # narrow pane near the window edge still shows the whole dialog.
-        w = min(w, region_w)
+        # Anchor over the pane, but a bit wider than it for comfort (still
+        # centered on the pane's center, so it leans over its target pane).
+        w, x = pane_anchored_box(w, sw, region)
         hints["w"] = w
-        hints["x"] = max(0.0, min(region_x + (region_w - w) / 2.0, sw - w))
+        hints["x"] = x
     dialog._panel = panel
     panel.push_layer(dialog, z=z, hints=hints)
     panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})
