@@ -148,7 +148,60 @@ widget dividers branch on the `hairline` capability
 
 ---
 
-## 3. Threading for file-IO and network access
+## 3. Threading for file-IO and network access — ✅ DONE (always-async)
+
+**Implemented — every directory *listing* runs off the UI thread, so navigation
+never blocks regardless of path kind (local, slow network mount, spun-down disk,
+huge dir, or remote S3/SSH).** The first cut was remote-only (scheme check), but
+a slow *local* mount would still freeze; `_is_local` classifies by scheme, not
+latency, so it can't see NFS/SMB/autofs/sleeping-disk. Rather than an OS mount
+probe (leaky: autofs/sleeping disks still slip through, and `statfs` can itself
+hang on a dead mount), we made **all** listings async with a deferred indicator.
+
+- `tfm_file_list_manager.py` — split `refresh_files` into `compute_listing`
+  (pure, worker-safe: the blocking `iterdir` + per-entry `is_dir`/`stat`) and
+  `apply_listing` (pane mutation on the UI thread). `refresh_files` = compute +
+  apply, so all existing synchronous callers are unchanged (137 FLM-touching
+  tests green).
+- `tfm.py` — new `_list_pane(pane_name, *, on_ready)`: **always** computes on a
+  daemon worker that posts `(pane_name, gen, result, on_ready)` to a new
+  `_result_queue`, drained on the same animation tick as `reload_queue`
+  (`_process_result_queue`). **Single-flight per pane** via a `_load_gen` counter
+  — a newer navigation supersedes an in-flight listing, so stale results are
+  dropped, never clobber. The worker only reads a snapshot of the pane inputs;
+  the UI thread owns all pane mutation.
+- **Deferred loading indicator** — `_list_pane` clears the pane and records a
+  start time; `_pump_loading_indicator` (on the tick) reveals "Loading…" only
+  once a listing has been pending past `_LOADING_INDICATOR_DELAY` (0.12s),
+  forcing one re-render as it crosses. A fast (local) listing lands within a tick
+  and swaps in with **no flash**; only a genuinely slow directory shows the
+  indicator. `tfm_file_pane.py` shows blank-then-"Loading…" via the
+  `_loading_shown` flag.
+- `_settle_listings(timeout)` / `_listings_pending()` — block until in-flight
+  listings complete and drain (the interactive UI never calls these; they let
+  **tests** navigate then assert deterministically). Updated the navigate-then-
+  assert tests (monitoring reloads, content-search, edit/subshell) to call
+  `_settle_listings()`.
+- Routed through the async path: every path-change navigation (`_refresh` →
+  `_open`, `_go_parent`, `_go_to_result`/`_content_hit`/`drive`/`history`), the
+  pane-sync actions, `toggle_hidden`, and the monitor reload
+  (`_handle_reload_request`). Cursor-placement that depended on the freshly-listed
+  files (`_go_parent` landing on child, `_select_by_name`) moved into `on_ready`
+  callbacks that run when the result lands.
+- **Left synchronous (documented follow-ups):** filter apply/clear and quick-sort
+  (coupled to synchronous returns / current-dir re-list), post-file-operation
+  reloads, and the two startup refreshes (panel/queue not up yet).
+- Tests: new `test_tfm_app_async_listing.py` (7: async-install, deferred
+  indicator reveal/idempotence/clear, two single-flight cases). Full suite:
+  **1160 passed**, 1 pre-existing flaky (`test_remote_path_cleanup_optimization`
+  — state-DB pollution, passes standalone, touches none of this code).
+
+**Trade-off accepted:** a fast local listing now lands on the next idle tick
+(≤50ms on curses, ~a frame on GUI) rather than truly inline — puikit exposes no
+thread-safe event-loop wake, so a worker can't nudge the loop early. The deferred
+indicator hides this (no flash); the payoff is the UI never freezes on any path.
+
+Original analysis follows.
 
 **Status: background *operations* already threaded; interactive *listing* is not.**
 

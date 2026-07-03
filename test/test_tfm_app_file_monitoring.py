@@ -119,6 +119,7 @@ class ReloadQueue(MonitoringTestBase):
         self.app.reload_queue.put("left")
 
         reloaded = self.app._process_reload_queue()
+        self.app._settle_listings()
 
         self.assertTrue(reloaded)
         self.assertEqual(self.left_names(), ["a.txt", "c.txt"])
@@ -134,6 +135,7 @@ class ReloadQueue(MonitoringTestBase):
         self.app.reload_queue.put("right")
 
         reloaded = self.app._process_reload_queue()
+        self.app._settle_listings()
 
         self.assertTrue(reloaded)
         self.assertEqual(self.left_names(), ["b.txt", "c.txt"])
@@ -147,6 +149,7 @@ class ContextPreservation(MonitoringTestBase):
         open(os.path.join(self.left_dir, "a2.txt"), "w").close()  # list grows
 
         self.app._handle_reload_request("left")
+        self.app._settle_listings()
 
         self.assertEqual(
             self.left_names()[self.app.pm.left_pane["focused_index"]], "b.txt")
@@ -156,6 +159,7 @@ class ContextPreservation(MonitoringTestBase):
         os.remove(os.path.join(self.left_dir, "b.txt"))
 
         self.app._handle_reload_request("left")
+        self.app._settle_listings()
 
         # Nearest name after 'b.txt' in the sorted list is 'c.txt'.
         self.assertEqual(
@@ -167,6 +171,7 @@ class ContextPreservation(MonitoringTestBase):
             os.remove(os.path.join(self.left_dir, n))
 
         self.app._handle_reload_request("left")
+        self.app._settle_listings()
 
         self.assertEqual(self.app.pm.left_pane["files"], [])
         self.assertEqual(self.app.pm.left_pane["focused_index"], 0)
@@ -177,6 +182,7 @@ class ContextPreservation(MonitoringTestBase):
         os.remove(os.path.join(self.left_dir, "c.txt"))
 
         self.app._handle_reload_request("left")
+        self.app._settle_listings()
 
         self.assertEqual(
             self.left_names()[self.app.pm.left_pane["focused_index"]], "b.txt")
@@ -193,6 +199,7 @@ class ContextPreservation(MonitoringTestBase):
         pane["scroll_offset"] = 5
 
         self.app._handle_reload_request("left")  # nothing changed on disk
+        self.app._settle_listings()
 
         self.assertEqual(pane["scroll_offset"], 5)
         self.assertEqual(pane["files"][pane["focused_index"]].name, "f15.dat")
@@ -208,6 +215,7 @@ class ContextPreservation(MonitoringTestBase):
         pane["scroll_offset"] = 12     # ...but scrolled far down (focus off-screen)
 
         self.app._handle_reload_request("left")
+        self.app._settle_listings()
 
         # Offset pulled up so the focused row is visible again.
         self.assertLessEqual(pane["scroll_offset"], pane["focused_index"])
@@ -221,6 +229,7 @@ class ContextPreservation(MonitoringTestBase):
         open(os.path.join(self.right_dir, "r0.txt"), "w").close()  # shifts indices
 
         self.app._handle_reload_request("right")
+        self.app._settle_listings()
 
         self.assertEqual(
             pane["files"][pane["focused_index"]].name, "r2.txt")

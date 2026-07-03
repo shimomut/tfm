@@ -118,6 +118,7 @@ class Navigation(unittest.TestCase):
             app = tfm.TfmApp(b, tmp, tmp, left_provided=True, right_provided=True)
             try:
                 app._go_to_content_hit({"path": Path(target), "line": 1, "text": "x"})
+                app._settle_listings()  # navigation lists on a worker; wait for it
                 pane = app.active_pane()
                 self.assertEqual(str(pane["path"]), os.path.join(tmp, "sub"))
                 self.assertEqual(pane["files"][pane["focused_index"]].name, "hit.txt")

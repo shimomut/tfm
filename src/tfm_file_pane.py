@@ -187,9 +187,18 @@ class FilePane(Widget):
         self._viewport_rows = max(1, int(view_h))
 
         if count == 0:
-            msg = "(empty)" if not self.pane.get("error") else str(self.pane["error"])
-            ctx.draw_text(1, 0, elide(msg, max(0, ctx.width - 2), measure=ctx.measure_text),
-                          Style(fg=theme.muted_text, attr=TextAttribute.DIM))
+            if self.pane.get("loading"):
+                # Blank until the load is slow enough to have crossed the
+                # deferred-indicator threshold (``_loading_shown``), so a fast
+                # (local) listing swaps in without ever flashing "Loading…".
+                msg = "Loading…" if self.pane.get("_loading_shown") else ""
+            elif self.pane.get("error"):
+                msg = str(self.pane["error"])
+            else:
+                msg = "(empty)"
+            if msg:
+                ctx.draw_text(1, 0, elide(msg, max(0, ctx.width - 2), measure=ctx.measure_text),
+                              Style(fg=theme.muted_text, attr=TextAttribute.DIM))
             return
 
         cursor = self.pane["focused_index"]

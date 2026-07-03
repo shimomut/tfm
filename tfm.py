@@ -26,6 +26,8 @@ import queue
 import re
 import shlex
 import subprocess
+import threading
+import time
 import sys
 from pathlib import Path as _StdPath
 
@@ -268,6 +270,11 @@ class TfmApp:
         # the watchers whenever a pane navigates, so navigation code stays
         # unaware of monitoring. Auto-disables cleanly if watchdog is missing.
         self.reload_queue: queue.Queue = queue.Queue()
+        # Completed async directory listings (remote panes list off the UI
+        # thread; see ``_list_pane``): worker threads post
+        # ``(pane_name, gen, result, on_ready)`` here and the main thread drains
+        # it on the same tick as ``reload_queue``.
+        self._result_queue: queue.Queue = queue.Queue()
         self.file_monitor = FileMonitorManager(self.config, self)
         self._monitored: dict[str, object] = {"left": None, "right": None}
         self._sync_monitored_dirs()
@@ -407,10 +414,124 @@ class TfmApp:
                 self.file_monitor.update_monitored_directory(name, path)
 
     def _pump_monitoring(self) -> bool:
-        """Re-point watchers and apply any queued reloads. Returns True if a pane
-        was reloaded (so the caller re-renders)."""
+        """Re-point watchers, apply queued reloads, and install any async remote
+        listings that have completed. Returns True if a pane changed (so the
+        caller re-renders)."""
         self._sync_monitored_dirs()
-        return self._process_reload_queue()
+        reloaded = self._process_reload_queue()
+        listed = self._process_result_queue()
+        loading = self._pump_loading_indicator()
+        return reloaded or listed or loading
+
+    def _pane_name_of(self, pane: dict) -> str:
+        return "left" if pane is self.pm.left_pane else "right"
+
+    #: How long a listing may run before the pane shows a "Loading…" indicator.
+    #: Below this, a fast (local) listing lands and swaps in with no flash; only a
+    #: genuinely slow directory (a network mount, a spun-down disk, a huge dir, or
+    #: a remote path) ever shows the indicator. See ``_pump_loading_indicator``.
+    _LOADING_INDICATOR_DELAY = 0.12
+
+    def _list_pane(self, pane_name: str, *, on_ready=None) -> None:
+        """(Re)list a pane's directory on a worker thread, so the UI never blocks
+        on the ``iterdir`` + per-entry ``stat`` — no matter whether the path is
+        local, a slow network mount, a spun-down disk, or a remote (S3/SSH) URL.
+        The result is installed on the UI thread by ``_process_result_queue``.
+
+        A fast (typically local) listing completes within a tick and swaps in with
+        no visible change; only one still pending past ``_LOADING_INDICATOR_DELAY``
+        shows a "Loading…" state (``_pump_loading_indicator``), so ordinary
+        navigation never flashes an indicator.
+
+        Single-flight per pane: each call bumps the pane's ``_load_gen``; a result
+        whose generation no longer matches (a newer navigation superseded it) is
+        dropped. ``on_ready(pane)`` runs once the files are in place (on the tick),
+        for cursor placement etc."""
+        pane = self.pane(pane_name)
+        gen = pane["_load_gen"] = pane.get("_load_gen", 0) + 1
+        pane["loading"] = True
+        pane["_load_started"] = time.monotonic()
+        pane["_loading_shown"] = False
+        # Clear the old listing so a stale entry can't be acted on under the new
+        # path; the pane shows blank (then "Loading…" only if slow) until the
+        # result lands. Snapshot the inputs so the worker never reads the pane
+        # dict — the UI thread owns it.
+        pane["files"] = []
+        pane["file_info"] = {}
+        path = pane["path"]
+        filter_pattern = pane["filter_pattern"]
+        sort_mode = pane["sort_mode"]
+        sort_reverse = pane["sort_reverse"]
+
+        def worker() -> None:
+            result = self.flm.compute_listing(
+                path, filter_pattern=filter_pattern,
+                sort_mode=sort_mode, sort_reverse=sort_reverse,
+            )
+            self._result_queue.put((pane_name, gen, result, on_ready))
+
+        threading.Thread(target=worker, name=f"tfm-list-{pane_name}", daemon=True).start()
+
+    def _process_result_queue(self) -> bool:
+        """Install completed async listings on the UI thread, dropping any that a
+        newer navigation superseded (stale generation)."""
+        applied = False
+        while True:
+            try:
+                pane_name, gen, result, on_ready = self._result_queue.get_nowait()
+            except queue.Empty:
+                break
+            pane = self.pane(pane_name)
+            if gen != pane.get("_load_gen"):
+                continue  # superseded by a newer navigation
+            self.flm.apply_listing(pane, result)
+            pane["loading"] = False
+            pane["_loading_shown"] = False
+            if on_ready:
+                on_ready(pane)
+            applied = True
+        return applied
+
+    def _listings_pending(self) -> bool:
+        """True while any pane's async listing is still in flight (worker running
+        or its result not yet drained)."""
+        return any(self.pane(n).get("loading") for n in ("left", "right"))
+
+    def _settle_listings(self, timeout: float = 2.0) -> None:
+        """Block until every in-flight async listing has completed and been
+        installed, draining results as workers post them.
+
+        The interactive UI never calls this — it drains listings on the idle tick
+        (``_reload_tick``) so it never blocks. It exists for callers that need a
+        directory listed before they can proceed deterministically — chiefly unit
+        tests, which navigate and then assert on ``pane["files"]``."""
+        deadline = time.monotonic() + timeout
+        self._process_result_queue()
+        while self._listings_pending():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                item = self._result_queue.get(timeout=remaining)
+            except queue.Empty:
+                break
+            self._result_queue.put(item)
+            self._process_result_queue()
+
+    def _pump_loading_indicator(self) -> bool:
+        """Reveal the "Loading…" indicator on any pane whose listing has been
+        pending past ``_LOADING_INDICATOR_DELAY``, forcing exactly one re-render as
+        it crosses the threshold (so a slow directory shows the indicator without a
+        fast one ever flashing it). Returns True if a pane just crossed."""
+        crossed = False
+        now = time.monotonic()
+        for name in ("left", "right"):
+            pane = self.pane(name)
+            if (pane.get("loading") and not pane.get("_loading_shown")
+                    and now - pane.get("_load_started", now) >= self._LOADING_INDICATOR_DELAY):
+                pane["_loading_shown"] = True
+                crossed = True
+        return crossed
 
     def _reload_tick(self) -> bool:
         """Animation-tick pump: drains reload requests on idle. Stays registered
@@ -449,34 +570,38 @@ class TfmApp:
         if pane["files"] and 0 <= old_focused < len(pane["files"]):
             selected_filename = pane["files"][old_focused].name
 
-        self.flm.refresh_files(pane)
+        def restore(pane: dict) -> None:
+            files = pane["files"]
+            if selected_filename and files:
+                idx = next((i for i, f in enumerate(files)
+                            if f.name == selected_filename), None)
+                if idx is None:
+                    # Selected file is gone: land on where it would have sorted, so
+                    # the cursor stays near its old neighbours (list is name-sorted).
+                    idx = 0
+                    for i, f in enumerate(files):
+                        if f.name < selected_filename:
+                            idx = i + 1
+                        else:
+                            break
+                    idx = min(idx, len(files) - 1)
+                pane["focused_index"] = idx
 
-        files = pane["files"]
-        if selected_filename and files:
-            idx = next((i for i, f in enumerate(files)
-                        if f.name == selected_filename), None)
-            if idx is None:
-                # Selected file is gone: land on where it would have sorted, so
-                # the cursor stays near its old neighbours (list is name-sorted).
-                idx = 0
-                for i, f in enumerate(files):
-                    if f.name < selected_filename:
-                        idx = i + 1
-                    else:
-                        break
-                idx = min(idx, len(files) - 1)
-            pane["focused_index"] = idx
+                display_height = self._display_height()
+                max_offset = max(0, len(files) - display_height)
+                pane["scroll_offset"] = min(old_scroll, max_offset)
+                if pane["focused_index"] < pane["scroll_offset"]:
+                    pane["scroll_offset"] = pane["focused_index"]
+                elif pane["focused_index"] >= pane["scroll_offset"] + display_height:
+                    pane["scroll_offset"] = pane["focused_index"] - display_height + 1
+            else:
+                pane["focused_index"] = 0
+                pane["scroll_offset"] = 0
 
-            display_height = self._display_height()
-            max_offset = max(0, len(files) - display_height)
-            pane["scroll_offset"] = min(old_scroll, max_offset)
-            if pane["focused_index"] < pane["scroll_offset"]:
-                pane["scroll_offset"] = pane["focused_index"]
-            elif pane["focused_index"] >= pane["scroll_offset"] + display_height:
-                pane["scroll_offset"] = pane["focused_index"] - display_height + 1
-        else:
-            pane["focused_index"] = 0
-            pane["scroll_offset"] = 0
+        # Local: lists + restores synchronously (unchanged). Remote: lists on a
+        # worker (a polled remote reload no longer blocks the tick), restoring the
+        # cursor when the result lands.
+        self._list_pane(pane_name, on_ready=restore)
         return True
 
     # --- state ---------------------------------------------------------------
@@ -512,11 +637,15 @@ class TfmApp:
         self._sync_active()
         self.active_pane()["focused_index"] = index
 
-    def _refresh(self, pane: dict) -> None:
+    def _refresh(self, pane: dict, *, on_ready=None) -> None:
+        """Re-list ``pane`` after a directory change: reset the cursor, record
+        history, and (re)list — synchronously for a local path, on a worker for a
+        remote one (see ``_list_pane``). ``on_ready(pane)`` runs once the files
+        are in place, for callers that then place the cursor by name."""
         pane["focused_index"] = 0
         pane["scroll_offset"] = 0
-        self.flm.refresh_files(pane)
         self._record_history_path(str(pane["path"]))
+        self._list_pane(self._pane_name_of(pane), on_ready=on_ready)
 
     def _record_history_path(self, path: str) -> None:
         """Append ``path`` to the recent-directory history, coalescing an
@@ -586,7 +715,7 @@ class TfmApp:
                 self._go_parent(pane)
         elif action == "toggle_hidden":
             self.flm.show_hidden = not self.flm.show_hidden
-            self.flm.refresh_files(pane)
+            self._list_pane(self._pane_name_of(pane))
             self.log_info(f"Hidden files: {'shown' if self.flm.show_hidden else 'hidden'}")
         elif action == "toggle_color_scheme":
             self._cycle_theme()  # falls through to a full re-render below
@@ -604,10 +733,10 @@ class TfmApp:
                 self.log_info("No filter to clear")
         elif action == "sync_current_to_other":
             if self.pm.sync_current_to_other(self.log_info):
-                self.flm.refresh_files(self.active_pane())
+                self._list_pane(self._pane_name_of(self.active_pane()))
         elif action == "sync_other_to_current":
             if self.pm.sync_other_to_current(self.log_info):
-                self.flm.refresh_files(self.pm.get_inactive_pane())
+                self._list_pane(self._pane_name_of(self.pm.get_inactive_pane()))
         elif action == "redraw":
             pass  # falls through to a full re-render below
         elif action == "adjust_pane_left":     # make the left pane smaller
@@ -730,13 +859,17 @@ class TfmApp:
         if str(parent) != str(pane["path"]):
             child_name = pane["path"].name
             pane["path"] = parent
-            self._refresh(pane)
+
+            # Land the cursor on the directory we came from — once the listing is
+            # in place (deferred for a remote pane that lists on a worker).
+            def land_on_child(p: dict) -> None:
+                for i, f in enumerate(p["files"]):
+                    if f.name == child_name:
+                        p["focused_index"] = i
+                        break
+
+            self._refresh(pane, on_ready=land_on_child)
             self.log_info(f"Up to {parent}")
-            # Land the cursor on the directory we came from.
-            for i, f in enumerate(pane["files"]):
-                if f.name == child_name:
-                    pane["focused_index"] = i
-                    break
 
     # --- menus & dialogs -----------------------------------------------------
 
@@ -1284,8 +1417,7 @@ class TfmApp:
     def _go_to_result(self, entry) -> None:
         pane = self.active_pane()
         pane["path"] = entry.parent
-        self._refresh(pane)
-        self._select_by_name(pane, entry.name)
+        self._refresh(pane, on_ready=lambda p: self._select_by_name(p, entry.name))
         self.log_info(f"Found: {entry}")
         self.panel.render()
 
@@ -1383,8 +1515,7 @@ class TfmApp:
         entry = hit["path"]
         pane = self.active_pane()
         pane["path"] = entry.parent
-        self._refresh(pane)
-        self._select_by_name(pane, entry.name)
+        self._refresh(pane, on_ready=lambda p: self._select_by_name(p, entry.name))
         self.log_info(f"Match: {entry}:{hit['line']}")
         self.panel.render()
 

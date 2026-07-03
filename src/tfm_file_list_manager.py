@@ -28,27 +28,42 @@ class FileListManager:
         self.logger = getLogger("FileList")
     
     def refresh_files(self, pane_data):
-        """Refresh the file list for specified pane.
-        
-        This method reads the directory contents, applies filters, and updates
-        the pane's file list. It handles both regular directories and archive
-        virtual directories.
-        
+        """Refresh a pane's file list synchronously: read the directory, apply
+        the filter, sort, and reconcile the cursor/selection.
+
+        This is ``compute_listing`` (the blocking I/O) followed by
+        ``apply_listing`` (the pane mutation). The two are split so a caller can
+        run the I/O on a worker thread and apply the result on the UI thread
+        without freezing on a slow remote directory; ``refresh_files`` keeps the
+        simple synchronous contract for local paths and existing callers.
+
         Args:
-            pane_data: Dictionary containing pane state including:
-                - path: Path object for the directory
-                - filter_pattern: Optional filename filter pattern
-                - show_hidden: Whether to show hidden files
-        
-        Updates:
-            - pane_data['files']: List of file Path objects
-            - pane_data['file_info']: Cache of file info (size, date, is_dir)
-            - pane_data['error']: Error message if refresh fails
-        
-        Error Handling:
-            - Logs errors and sets pane_data['error'] message
-            - Handles archive-specific errors (corrupted, permissions, etc.)
-            - Handles general I/O errors
+            pane_data: Dictionary containing pane state (``path``,
+                ``filter_pattern``, ``sort_mode``, ``sort_reverse``, cursor,
+                selection).
+
+        Updates ``pane_data['files']`` and ``pane_data['file_info']``, and
+        reconciles ``focused_index`` / ``selected_files``.
+        """
+        result = self.compute_listing(
+            pane_data['path'],
+            filter_pattern=pane_data.get('filter_pattern'),
+            sort_mode=pane_data['sort_mode'],
+            sort_reverse=pane_data['sort_reverse'],
+        )
+        self.apply_listing(pane_data, result)
+
+    def compute_listing(self, path, *, filter_pattern=None, sort_mode='name',
+                        sort_reverse=False):
+        """Read ``path`` and return its listing as a plain dict — **no pane
+        mutation**, so this is safe to call on a worker thread.
+
+        Does the blocking work (``iterdir`` + per-entry ``is_dir``/``stat`` for
+        the sort and the display cache), honouring ``self.show_hidden`` and the
+        optional ``filter_pattern``. Returns
+        ``{"ok": bool, "files": [...], "file_info": {...}}``; on any error
+        ``ok`` is False with empty lists (the error is logged, as before). The
+        caller installs the result with :meth:`apply_listing`.
         """
         try:
             # Import archive exceptions for specific error handling
@@ -56,120 +71,112 @@ class FileListManager:
                 ArchiveError, ArchiveNavigationError, ArchiveCorruptedError,
                 ArchivePermissionError
             )
-            
+
             # Get all entries in the directory
-            all_entries = list(pane_data['path'].iterdir())
-            
+            all_entries = list(path.iterdir())
+
             # Filter hidden files if needed
             if not self.show_hidden:
                 all_entries = [entry for entry in all_entries if not entry.name.startswith('.')]
-            
+
             # Apply filename filter if active (only to files, not directories)
-            if pane_data['filter_pattern']:
+            if filter_pattern:
                 filtered_entries = []
                 for entry in all_entries:
                     # Always include directories, only filter files
-                    if entry.is_dir() or fnmatch.fnmatch(entry.name.lower(), pane_data['filter_pattern'].lower()):
+                    if entry.is_dir() or fnmatch.fnmatch(entry.name.lower(), filter_pattern.lower()):
                         filtered_entries.append(entry)
                 all_entries = filtered_entries
-            
+
             # Sort the entries
-            pane_data['files'] = self.sort_entries(
-                all_entries, 
-                pane_data['sort_mode'], 
-                pane_data['sort_reverse']
-            )
-            
+            files = self.sort_entries(all_entries, sort_mode, sort_reverse)
+
             # Populate file info cache for all files
             # This is done once at load time to avoid stat() calls during rendering
-            if 'file_info' not in pane_data:
-                pane_data['file_info'] = {}
-            else:
-                pane_data['file_info'].clear()
-            
-            for file_path in pane_data['files']:
+            file_info = {}
+            for file_path in files:
                 file_key = str(file_path)
                 try:
                     stat_info = file_path.stat()
                     is_dir = file_path.is_dir()
-                    
+
                     # Format size
                     if is_dir:
                         size_str = "<DIR>"
                     else:
                         size_str = format_size(stat_info.st_size, compact=True)
-                    
+
                     # Format date
                     date_str = self._format_date(stat_info.st_mtime)
-                    
+
                     # Cache the formatted info
-                    pane_data['file_info'][file_key] = {
+                    file_info[file_key] = {
                         'size_str': size_str,
                         'date_str': date_str,
                         'is_dir': is_dir
                     }
                 except Exception:
                     # Cache error result to avoid repeated stat() calls
-                    pane_data['file_info'][file_key] = {
+                    file_info[file_key] = {
                         'size_str': '---',
                         'date_str': '---',
                         'is_dir': False
                     }
-            
-            # Ensure focused index is valid
-            if pane_data['files']:
-                pane_data['focused_index'] = min(pane_data['focused_index'], len(pane_data['files']) - 1)
-            else:
-                pane_data['focused_index'] = 0
-            
-            # Clean up selected files - remove any that no longer exist
-            current_file_paths = {str(f) for f in pane_data['files']}
-            pane_data['selected_files'] = pane_data['selected_files'] & current_file_paths
-            
+
+            return {"ok": True, "files": files, "file_info": file_info}
+
         except ArchiveNavigationError as e:
             # Archive navigation error - path doesn't exist in archive
             user_msg = getattr(e, 'user_message', str(e))
             self.logger.error(f"Archive navigation error: {user_msg}")
-            self.logger.error(f"Archive navigation error: {pane_data['path']}: {e}")
-            pane_data['files'] = []
-            pane_data['focused_index'] = 0
+            self.logger.error(f"Archive navigation error: {path}: {e}")
         except ArchiveCorruptedError as e:
             # Archive is corrupted
             user_msg = getattr(e, 'user_message', str(e))
             self.logger.error(f"Corrupted archive: {user_msg}")
-            self.logger.error(f"Corrupted archive: {pane_data['path']}: {e}")
-            pane_data['files'] = []
-            pane_data['focused_index'] = 0
+            self.logger.error(f"Corrupted archive: {path}: {e}")
         except ArchivePermissionError as e:
             # Permission denied for archive
             user_msg = getattr(e, 'user_message', str(e))
             self.logger.error(f"Permission denied: {user_msg}")
-            self.logger.error(f"Archive permission denied: {pane_data['path']}: {e}")
-            pane_data['files'] = []
-            pane_data['focused_index'] = 0
+            self.logger.error(f"Archive permission denied: {path}: {e}")
         except ArchiveError as e:
             # Generic archive error
             user_msg = getattr(e, 'user_message', str(e))
             self.logger.error(f"Archive error: {user_msg}")
-            self.logger.error(f"Archive error: {pane_data['path']}: {e}")
-            pane_data['files'] = []
-            pane_data['focused_index'] = 0
+            self.logger.error(f"Archive error: {path}: {e}")
         except PermissionError as e:
-            self.logger.error(f"Permission denied accessing directory {pane_data['path']}: {e}")
-            pane_data['files'] = []
-            pane_data['focused_index'] = 0
+            self.logger.error(f"Permission denied accessing directory {path}: {e}")
         except FileNotFoundError as e:
-            self.logger.error(f"Directory not found: {pane_data['path']}: {e}")
-            pane_data['files'] = []
-            pane_data['focused_index'] = 0
+            self.logger.error(f"Directory not found: {path}: {e}")
         except OSError as e:
-            self.logger.error(f"System error reading directory {pane_data['path']}: {e}")
-            pane_data['files'] = []
-            pane_data['focused_index'] = 0
+            self.logger.error(f"System error reading directory {path}: {e}")
         except Exception as e:
-            self.logger.error(f"Unexpected error reading directory {pane_data['path']}: {e}")
+            self.logger.error(f"Unexpected error reading directory {path}: {e}")
+        return {"ok": False, "files": [], "file_info": {}}
+
+    def apply_listing(self, pane_data, result):
+        """Install a :meth:`compute_listing` result into ``pane_data`` and
+        reconcile the cursor and selection — the pane-mutating tail of a refresh,
+        run on the UI thread. On an error result (``ok`` False) the pane is
+        emptied and the cursor reset, matching the old ``refresh_files`` error
+        path (selection is left untouched)."""
+        if not result.get("ok"):
             pane_data['files'] = []
             pane_data['focused_index'] = 0
+            return
+        pane_data['files'] = result['files']
+        pane_data['file_info'] = result['file_info']
+
+        # Ensure focused index is valid
+        if pane_data['files']:
+            pane_data['focused_index'] = min(pane_data['focused_index'], len(pane_data['files']) - 1)
+        else:
+            pane_data['focused_index'] = 0
+
+        # Clean up selected files - remove any that no longer exist
+        current_file_paths = {str(f) for f in pane_data['files']}
+        pane_data['selected_files'] = pane_data['selected_files'] & current_file_paths
     
     def _natural_sort_key(self, text):
         """

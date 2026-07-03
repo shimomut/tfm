@@ -83,6 +83,7 @@ class EditFile(EditSubshellBase):
     def test_skips_directory(self):
         os.makedirs(os.path.join(self.tmp, "adir"))
         self.app._refresh(self.app.active_pane())
+        self.app._settle_listings()  # _refresh lists on a worker; wait for it
         self._focus("adir")
         with patch("subprocess.run") as run:
             self.app.edit_file()
