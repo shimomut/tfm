@@ -9,7 +9,22 @@ Legend: **puikit** = `/Users/crftwr/projects/puikit`, **tfm** = this repo.
 
 ---
 
-## 1. Stop truncating text by monospace cell count
+## 1. Stop truncating text by monospace cell count — ✅ DONE
+
+**Implemented (categories A + B below):**
+- puikit `widgets/list.py`, `widgets/tree.py` — rows clip by `ctx.measure_text`.
+- puikit `widgets/_selection.py` — click→glyph hit-test measures real width to
+  match the highlight; `_set_selection_rows` gained a `measure` arg, passed by
+  `label.py` and `text_block.py`.
+- puikit `widgets/busy_indicator.py` — spinner→label offset uses `measure_text`.
+- tfm `tfm_file_pane.py` — the `(empty)`/error message elides with `measure`.
+- New test `test_widgets.py::test_listview_clips_by_measured_width_not_column_count`;
+  full puikit suite green (684 passed).
+- Not needed: `tfm_progress_manager.py` / `tfm_text_layout.py` — progress is not
+  wired into any GUI draw path (only tracked by the file-op executors), and
+  `get_progress_text` is the flat-text/log helper. Revisit if progress is drawn.
+
+Original analysis follows.
 
 **Status: infrastructure already exists; two call sites remain.**
 

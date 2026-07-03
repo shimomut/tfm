@@ -188,7 +188,7 @@ class FilePane(Widget):
 
         if count == 0:
             msg = "(empty)" if not self.pane.get("error") else str(self.pane["error"])
-            ctx.draw_text(1, 0, elide(msg, max(0, ctx.width - 2)),
+            ctx.draw_text(1, 0, elide(msg, max(0, ctx.width - 2), measure=ctx.measure_text),
                           Style(fg=theme.muted_text, attr=TextAttribute.DIM))
             return
 
