@@ -159,6 +159,48 @@ class StatusBar(Widget):
         ctx.draw_text(0, 0, text, Style(fg=ctx.theme.muted_text))
 
 
+class _StreamToLog:
+    """A ``sys.stdout`` / ``sys.stderr`` stand-in that funnels writes into the
+    log pane, mirroring the terminal build's stdout/stderr capture so real-world
+    output — a stray ``print``, a library warning, an uncaught traceback, and the
+    WARNING+ records Python's ``logging.lastResort`` emits for our handler-less
+    loggers — stays visible even when there is no terminal behind the GUI.
+
+    Writes are line-buffered (a ``print`` that emits its text and its newline as
+    two writes becomes one log line) and complete lines are handed to a
+    thread-safe queue rather than the ``LogView`` directly: output can originate
+    on worker threads (async listings, file ops, archives) that must never touch
+    the widget. The UI thread drains the queue on its monitoring pump."""
+
+    def __init__(self, source: str, sink: "queue.Queue"):
+        self.source = source  # "STDOUT" or "STDERR"
+        self._sink = sink
+        self._buffer = ""
+        self._lock = threading.Lock()
+
+    def write(self, text: str) -> int:
+        with self._lock:
+            self._buffer += text
+            while "\n" in self._buffer:
+                line, self._buffer = self._buffer.split("\n", 1)
+                self._sink.put((self.source, line))
+        return len(text)
+
+    def drain_partial(self) -> None:
+        """Emit any buffered text not yet terminated by a newline. Called on
+        restore so a trailing partial line is not silently dropped."""
+        with self._lock:
+            if self._buffer:
+                self._sink.put((self.source, self._buffer))
+                self._buffer = ""
+
+    def flush(self) -> None:
+        pass
+
+    def isatty(self) -> bool:
+        return False
+
+
 class TfmApp:
     """Controller: owns pane state and maps key actions onto it."""
 
@@ -279,6 +321,17 @@ class TfmApp:
         self._monitored: dict[str, object] = {"left": None, "right": None}
         self._sync_monitored_dirs()
         self.panel.request_animation_ticks(self._reload_tick)
+
+        # Route stdout/stderr into the log pane (as the terminal build does), so
+        # output that would otherwise vanish behind the GUI surfaces here: worker
+        # threads post complete lines to ``_log_queue`` and the UI thread drains
+        # it on the monitoring pump. Redirected last, once everything above has
+        # initialized, and undone in ``run``'s finally.
+        self._log_queue: queue.Queue = queue.Queue()
+        self._orig_stdout = sys.stdout
+        self._orig_stderr = sys.stderr
+        sys.stdout = _StreamToLog("STDOUT", self._log_queue)
+        sys.stderr = _StreamToLog("STDERR", self._log_queue)
 
     def _pane_column(self, name: str, view: FilePane) -> LayoutView:
         # A LayoutView wraps the header/list/footer sub-layout as a single widget
@@ -421,7 +474,29 @@ class TfmApp:
         reloaded = self._process_reload_queue()
         listed = self._process_result_queue()
         loading = self._pump_loading_indicator()
-        return reloaded or listed or loading
+        captured = self._drain_captured_output()
+        return reloaded or listed or loading or captured
+
+    #: Log-pane colors for captured streams: stderr reads as a warning, stdout as
+    #: ordinary output dimmer than TFM's own ``log_info`` lines.
+    _STDERR_STYLE = Style(fg=(230, 130, 120))
+    _STDOUT_STYLE = Style(fg=(150, 160, 170))
+
+    def _drain_captured_output(self) -> bool:
+        """Append any stdout/stderr lines captured since the last pump to the log
+        pane. Runs on the UI thread (only place the ``LogView`` is touched); the
+        queue is fed by the ``_StreamToLog`` streams, possibly from worker
+        threads. Returns True if anything was appended (so the caller redraws)."""
+        appended = False
+        while True:
+            try:
+                source, line = self._log_queue.get_nowait()
+            except queue.Empty:
+                break
+            style = self._STDERR_STYLE if source == "STDERR" else self._STDOUT_STYLE
+            self.log.append(line, style)
+            appended = True
+        return appended
 
     def _pane_name_of(self, pane: dict) -> str:
         return "left" if pane is self.pm.left_pane else "right"
@@ -2363,7 +2438,22 @@ class TfmApp:
 
     def run(self) -> None:
         self.panel.render()
-        self.backend.run_event_loop(self.on_event)
+        try:
+            self.backend.run_event_loop(self.on_event)
+        finally:
+            self._restore_streams()
+
+    def _restore_streams(self) -> None:
+        """Put the real stdout/stderr back so anything printed after the event
+        loop (a shutdown traceback, teardown warnings) reaches the terminal
+        again. Idempotent: safe if the streams were already restored."""
+        for stream in (sys.stdout, sys.stderr):
+            if isinstance(stream, _StreamToLog):
+                stream.drain_partial()
+        if isinstance(sys.stdout, _StreamToLog):
+            sys.stdout = self._orig_stdout
+        if isinstance(sys.stderr, _StreamToLog):
+            sys.stderr = self._orig_stderr
 
 
 _BACKENDS = {"tui": "tui", "curses": "tui", "gui": "gui", "macos": "gui"}
