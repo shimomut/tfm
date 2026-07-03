@@ -1283,7 +1283,7 @@ class TfmApp:
         """A modal confirm before quitting — the canonical message-box pattern."""
         show_message_box(
             self.panel, "Quit TFM?", title="Confirm", icon="warning",
-            buttons=("Quit", "Cancel"), default=1, cancel=1,
+            buttons=("Quit", "Cancel"), default=0, cancel=1,
             on_result=lambda label: self._quit() if label == "Quit" else None,
         )
         self.panel.render()
