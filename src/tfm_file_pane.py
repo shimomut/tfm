@@ -30,7 +30,7 @@ from puikit.backend import Style, TextAttribute
 from puikit.event import Event, EventType
 from puikit.font import Font
 from puikit.text import elide
-from puikit.widgets.base import Widget, draw_list_row
+from puikit.widgets.base import Widget
 
 #: Size and date are numeric columns: pin them to a fixed-advance face so digits
 #: line up in their right-aligned columns. (Names keep the Panel's default
@@ -44,17 +44,36 @@ COL_GAP = 1
 #: Smallest name column we'll allow before dropping the date column on a narrow
 #: pane — mirrors ttk TFM, which hides the datetime when the pane gets tight.
 MIN_NAME_W = 12
-#: Left gutter (base units) for the selection marker, reserved always so names
-#: don't shift when you select.
-MARK_W = 1
-#: Selection marker glyph + color (a warm amber, distinct from the blue dir
-#: color). TODO: promote to a theme token when TFM's color schemes are ported.
-MARKER = "•"
-MARKED_FG = (229, 192, 123)
+#: Left/right gutter (base units) reserved on a **grid** (TUI) for the cursor
+#: row's framing brackets — ``[`` on the left, ``]`` on the right. GUI reserves
+#: neither (its cursor is a drawn outline rectangle — see ``_draw_cursor``), so
+#: names sit flush against the pane edge there.
+GUTTER_W = 1
+BRACKET_W = 1
 #: Incremental-search match highlight: a muted background behind every row that
-#: matches the live isearch pattern (the cursor row keeps its own fill). Green,
-#: distinct from the amber selection marker and the blue directory color.
+#: matches the live isearch pattern. Green, distinct from the selection fill and
+#: the blue directory color, and drawn *under* the selection fill / cursor cue.
 MATCH_BG = (58, 84, 58)
+#: Cursor-position cue color — a distinct **red**, orthogonal to the selection
+#: fill so the two never read as the same channel: vivid on the active pane, a
+#: muted red on the inactive one (the louder cue marks the focused pane).
+CURSOR_ACTIVE = (231, 76, 76)
+CURSOR_INACTIVE = (140, 92, 94)
+#: Selection fill = the pane background blended toward the accent by this ratio
+#: (a tint that reads as "selected" without being the loud accent itself): a
+#: firmer blend on the active pane, subtler on the inactive one.
+SELECT_MIX_ACTIVE = 0.42
+SELECT_MIX_INACTIVE = 0.22
+#: Fallback pane background when the context reports none (mix base for the
+#: selection tint).
+DEFAULT_BG = (30, 30, 38)
+#: Cursor-outline corner radius (device pixels) on a GUI backend.
+CURSOR_RADIUS = 3.0
+
+
+def _mix(a, b, t):
+    """Linear RGB blend a→b by ``t`` (0..1)."""
+    return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
 class FilePane(Widget):
@@ -215,13 +234,21 @@ class FilePane(Widget):
         # and the right-aligned columns reach the true pane edge.
         full_w = ctx.size_units[0] - (1.0 if show_bar else 0.0)
 
+        # The cursor cue differs by backend: a grid draws framing brackets and so
+        # reserves a gutter on each side (``[`` … ``]``); a GUI draws an outline
+        # rectangle over the row and reserves nothing, so its names sit flush to
+        # the edges. Content is laid out inside [content_left, content_right).
+        grid = not ctx.vector_shapes
+        content_left = float(GUTTER_W) if grid else 0.0
+        content_right = full_w - (BRACKET_W if grid else 0.0)
+
         def measure(s: str) -> float:
             return ctx.measure_text(s)
 
         def measure_mono(s: str) -> float:
             return ctx.measure_text(s, Style(font=MONO))
 
-        # Columns, left to right: marker | basename | ext | size | date. The
+        # Columns, left to right: gutter | basename | ext | size | date. The
         # extension column sits between the name and size (ttk TFM layout); it is
         # dropped when the pane has no splittable extensions.
         ext_w = self._ext_width(measure)
@@ -230,18 +257,18 @@ class FilePane(Widget):
         # Date column (right of size), shown only while the name still has room to
         # breathe, matching ttk TFM's narrow-pane behaviour.
         date_w = self._date_width()
-        name_if_dated = full_w - MARK_W - SIZE_COL - date_w - COL_GAP * 2 - ext_block
+        name_if_dated = content_right - content_left - SIZE_COL - date_w - COL_GAP * 2 - ext_block
         show_date = date_w > 0 and name_if_dated >= MIN_NAME_W
         tail = SIZE_COL + COL_GAP + (date_w + COL_GAP if show_date else 0)
 
         # Fractional name width / ext origin so the extension column lands at the
         # exact pixel after the (proportional) name, not snapped to the char grid.
         # (Whole-unit backends still snap on draw, so the TUI stays grid-aligned.)
-        name_w = max(1.0, full_w - MARK_W - ext_block - tail)
-        ext_x = MARK_W + name_w + COL_GAP
+        name_w = max(1.0, content_right - content_left - ext_block - tail)
+        ext_x = content_left + name_w + COL_GAP
         # Right edges of the size / date columns.
-        date_right = full_w
-        size_right = (full_w - date_w - COL_GAP) if show_date else full_w
+        date_right = content_right
+        size_right = (content_right - date_w - COL_GAP) if show_date else content_right
         selected = self.pane["selected_files"]
 
         first = int(self.offset)
@@ -255,9 +282,9 @@ class FilePane(Widget):
             if i >= 0:
                 entry = files[i]
                 self._draw_row(ctx, y, entry, i == cursor, str(entry) in selected,
-                               i in self.search_matches,
-                               name_w, ext_x, ext_w, size_right, show_date, date_right,
-                               measure, measure_mono)
+                               i in self.search_matches, grid,
+                               content_left, name_w, ext_x, ext_w, size_right, show_date,
+                               date_right, content_right, full_w, measure, measure_mono)
             row += 1
 
         if show_bar:
@@ -267,9 +294,9 @@ class FilePane(Widget):
             pos = self.offset / denom if denom > 0 else 0.0
             ctx.draw_scrollbar(ctx.size_units[0] - 1, 0, view_h, max(0.0, min(1.0, pos)), ratio)
 
-    def _draw_row(self, ctx, y, entry, is_cursor, selected, is_match,
-                  name_w, ext_x, ext_w, size_right, show_date, date_right,
-                  measure, measure_mono) -> None:
+    def _draw_row(self, ctx, y, entry, is_cursor, selected, is_match, grid,
+                  content_left, name_w, ext_x, ext_w, size_right, show_date,
+                  date_right, content_right, full_w, measure, measure_mono) -> None:
         theme = ctx.theme
         info = self._info(entry)
         is_dir = info["is_dir"]
@@ -280,39 +307,61 @@ class FilePane(Widget):
         name_text = elide(name, name_w, where="end", measure=measure)
         ext_text = elide(ext, ext_w, where="end", measure=measure) if ext_w > 0 else ""
 
-        if is_cursor:
-            # Cursor row: a full-width fill (louder on the active pane); the
-            # marker still shows so a selected-and-focused row is unambiguous.
-            bg = theme.selection_active_bg if self.active else theme.selection_inactive_bg
-            fg = (255, 255, 255) if self.active else theme.text
-            draw_list_row(ctx, y, name_text, name_w, Style(fg=fg, bg=bg), x=MARK_W, fill_w=date_right)
-            if selected:
-                ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, bg=bg, attr=TextAttribute.BOLD))
-            if ext_text:
-                ctx.draw_text(ext_x, y, ext_text, Style(fg=fg, bg=bg))
-            if size:
-                ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=fg, bg=bg, font=MONO))
-            if date:
-                ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=fg, bg=bg, font=MONO))
+        # Row background carries "selected": the pane background tinted toward the
+        # accent (never the accent itself), firmer on the active pane, painted
+        # over any live isearch-match tint. It spans only the content region, so
+        # the grid's cursor-bracket gutters stay clear (they are the cursor's
+        # channel). The cursor is drawn *on top* as an orthogonal red outline/
+        # bracket cue, so a selected row under the cursor reads as both at once.
+        base = ctx.background or DEFAULT_BG
+        if selected:
+            ratio = SELECT_MIX_ACTIVE if self.active else SELECT_MIX_INACTIVE
+            row_bg = _mix(base, theme.accent, ratio)
+        elif is_match:
+            row_bg = MATCH_BG
         else:
-            # A live isearch match paints a full-width background behind the row
-            # (the cursor row keeps its own fill above); text is then drawn with
-            # the same bg so a proportional GUI font's cells match the fill.
-            row_bg = MATCH_BG if is_match else None
-            if row_bg is not None:
-                ctx.fill_rect(0, y, date_right, 1.0, Style(bg=row_bg))
-            if selected:
-                ctx.draw_text(0, y, MARKER, Style(fg=MARKED_FG, bg=row_bg, attr=TextAttribute.BOLD))
-                fg = MARKED_FG
-            else:
-                fg = theme.accent if is_dir else theme.text
-            ctx.draw_text(MARK_W, y, name_text, Style(fg=fg, bg=row_bg))
-            if ext_text:
-                ctx.draw_text(ext_x, y, ext_text, Style(fg=fg, bg=row_bg))
-            if size:
-                ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=theme.muted_text, bg=row_bg, font=MONO))
-            if date:
-                ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=theme.muted_text, bg=row_bg, font=MONO))
+            row_bg = None
+        if row_bg is not None:
+            ctx.fill_rect(content_left, y, max(0.0, content_right - content_left), 1.0,
+                          Style(bg=row_bg))
+
+        # Foreground keeps the dir/file color language on every row — the subtle
+        # selection tint reads underneath it without needing a contrast override.
+        name_fg = theme.accent if is_dir else theme.text
+        col_fg = theme.muted_text
+
+        ctx.draw_text(content_left, y, name_text, Style(fg=name_fg, bg=row_bg))
+        if ext_text:
+            ctx.draw_text(ext_x, y, ext_text, Style(fg=name_fg, bg=row_bg))
+        if size:
+            ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=col_fg, bg=row_bg, font=MONO))
+        if date:
+            ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=col_fg, bg=row_bg, font=MONO))
+
+        if is_cursor:
+            self._draw_cursor(ctx, y, full_w, grid)
+
+    def _draw_cursor(self, ctx, y, full_w, grid) -> None:
+        """Draw the cursor-position cue for the current row — a distinct **red**,
+        orthogonal to the selection fill. Vivid on the active pane, muted on the
+        inactive one so the focused pane's cursor reads louder.
+
+        - **GUI** (``vector_shapes``): an outline rectangle framing the row.
+        - **TUI** (grid): a bold ``[`` … ``]`` bracket pair around the row.
+        """
+        color = CURSOR_ACTIVE if self.active else CURSOR_INACTIVE
+        if not grid:
+            # Inset one device pixel so the stroke sits inside the row band and
+            # clear of the scrollbar, framing the row rather than butting its edges.
+            bw, bh = ctx.base_size
+            ix = 1.0 / bw if bw else 0.0
+            iy = 1.0 / bh if bh else 0.0
+            ctx.round_rect(ix, y + iy, max(0.0, full_w - 2 * ix), max(0.0, 1.0 - 2 * iy),
+                           Style(fg=color), radius=CURSOR_RADIUS)
+            return
+        style = Style(fg=color, attr=TextAttribute.BOLD)
+        ctx.draw_text(0, y, "[", style)
+        ctx.draw_text(int(full_w) - BRACKET_W, y, "]", style)
 
     # --- events --------------------------------------------------------------
 
