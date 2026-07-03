@@ -323,14 +323,16 @@ class TFMStateManager(StateManager):
     TFM-specific state manager with convenience methods for common state operations.
     """
     
-    def __init__(self, instance_id: Optional[str] = None):
+    def __init__(self, instance_id: Optional[str] = None, db_path: Optional[Path] = None):
         """
         Initialize TFM state manager.
-        
+
         Args:
             instance_id: Optional instance identifier for this TFM session
+            db_path: Optional custom database path. Defaults to ~/.tfm/state.db.
+                Mainly useful for tests that must not touch the real state store.
         """
-        super().__init__()
+        super().__init__(db_path=db_path)
         
         # Generate instance ID if not provided
         if instance_id is None:

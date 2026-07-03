@@ -46,6 +46,7 @@ from tfm_filter_list_dialog import show_filter_list  # noqa: E402
 from tfm_input_dialog import show_input  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
+from tfm_state_manager import get_state_manager  # noqa: E402
 from tfm_batch_rename_dialog import show_batch_rename  # noqa: E402
 from tfm_diff_viewer import show_diff_viewer  # noqa: E402
 from tfm_directory_diff_viewer import show_directory_diff_viewer  # noqa: E402
@@ -155,13 +156,27 @@ class StatusBar(Widget):
 class TfmApp:
     """Controller: owns pane state and maps key actions onto it."""
 
-    def __init__(self, backend, left_dir: str, right_dir: str):
+    def __init__(self, backend, left_dir: str, right_dir: str, *,
+                 left_provided: bool = True, right_provided: bool = True,
+                 state_manager=None):
         self.backend = backend
         self.config = _config.Config()
         self.keys = KeyBindings(self.config.KEY_BINDINGS)
+        # Persistent cross-session state (window layout, pane dirs, cursor
+        # positions, recent dirs). Injectable so tests can supply a temp-db
+        # manager instead of touching ~/.tfm/state.db.
+        self.state_manager = state_manager if state_manager is not None else get_state_manager()
+        self._left_provided = left_provided
+        self._right_provided = right_provided
         self.flm = FileListManager(self.config)
         self.pm = PaneManager(self.config, self._resolve_dir(left_dir),
-                              self._resolve_dir(right_dir))
+                              self._resolve_dir(right_dir),
+                              state_manager=self.state_manager,
+                              file_list_manager=self.flm)
+        # Restore saved window layout and pane paths/sort/filter *before* the
+        # splitters are built (they read ``pm.left_pane_ratio`` /
+        # ``_panes_fraction``) and before the first refresh lists a directory.
+        self._restore_layout_and_paths()
         self.flm.refresh_files(self.pm.left_pane)
         self.flm.refresh_files(self.pm.right_pane)
         #: Recent-directory history for the history picker — a bounded, in-order
@@ -204,7 +219,7 @@ class TfmApp:
         self.content_splitter = Splitter(
             self.pane_splitter, self.log,
             orientation="vertical",
-            fraction=PANES_FRACTION,
+            fraction=self._panes_fraction,
             min_first=5, min_second=2,
             # No handle row on the grid: the pane footer already sits directly
             # above the log and serves as the divider, so a separate handle cell
@@ -240,6 +255,8 @@ class TfmApp:
             (i for i, (name, _t) in enumerate(THEMES) if name == start), 0)
         self.panel.theme = THEMES[self._theme_index][1]
         self.log_info(f"TFM on PuiKit — {self.pm.left_pane['path']}")
+        # Files are listed now, so the saved cursor filenames can be matched.
+        self._restore_cursor_positions()
 
     def _pane_column(self, name: str, view: FilePane) -> LayoutView:
         # A LayoutView wraps the header/list/footer sub-layout as a single widget
@@ -268,6 +285,95 @@ class TfmApp:
             return p.resolve()
         except Exception:
             return p.absolute()
+
+    # --- persistent state ----------------------------------------------------
+
+    def _restore_layout_and_paths(self) -> None:
+        """Restore window layout and each pane's directory / sort / filter from
+        the saved session, *before* the splitters and file lists are built.
+
+        A pane's saved directory is only re-applied when the user did not pass an
+        explicit startup directory for it on the command line, and only if that
+        directory still exists; sort mode and filter are always restored. Fully
+        best-effort — the log view does not exist yet, so failures stay silent
+        rather than blocking startup on a corrupt or absent state store."""
+        self._panes_fraction = PANES_FRACTION
+        try:
+            self.state_manager.update_session_heartbeat()
+            self.state_manager.cleanup_non_existing_directories()
+
+            layout = self.state_manager.load_window_layout()
+            if layout:
+                ratio = layout.get('left_pane_ratio', self.pm.left_pane_ratio)
+                self.pm.left_pane_ratio = max(0.1, min(0.9, ratio))
+                log_h = layout.get('log_height_ratio', 1.0 - PANES_FRACTION)
+                self._panes_fraction = max(0.1, min(0.95, 1.0 - log_h))
+
+            self._restore_one_pane('left', self.pm.left_pane, self._left_provided)
+            self._restore_one_pane('right', self.pm.right_pane, self._right_provided)
+        except Exception:
+            pass
+
+    def _restore_one_pane(self, name: str, pane: dict, cmdline_provided: bool) -> None:
+        state = self.state_manager.load_pane_state(name)
+        if not state:
+            return
+        if not cmdline_provided:
+            try:
+                saved = Path(state['path'])
+                if saved.exists():
+                    pane['path'] = saved
+            except Exception:
+                pass
+        pane['sort_mode'] = state.get('sort_mode', pane['sort_mode'])
+        pane['sort_reverse'] = state.get('sort_reverse', pane['sort_reverse'])
+        pane['filter_pattern'] = state.get('filter_pattern', pane['filter_pattern'])
+
+    def _display_height(self) -> int:
+        """Rows available for a file list, used to keep a restored cursor on
+        screen. Best-effort: falls back to a sane default before first layout."""
+        try:
+            _w, h = self.backend.size
+            return max(1, int(h) - 4)
+        except Exception:
+            return 20
+
+    def _restore_cursor_positions(self) -> None:
+        """Move each pane's cursor to the file remembered for its directory."""
+        try:
+            display_height = self._display_height()
+            self.pm.restore_cursor_position(self.pm.left_pane, display_height)
+            self.pm.restore_cursor_position(self.pm.right_pane, display_height)
+        except Exception:
+            pass
+
+    def _save_application_state(self) -> None:
+        """Persist window layout, pane state, cursor positions, and recent dirs.
+        Called on quit; best-effort so a state-store failure never blocks exit."""
+        try:
+            self.state_manager.save_window_layout(
+                self.pane_splitter.fraction,
+                1.0 - self.content_splitter.fraction,
+            )
+            self.state_manager.save_pane_state('left', self.pm.left_pane)
+            self.state_manager.save_pane_state('right', self.pm.right_pane)
+            self.pm.save_cursor_position(self.pm.left_pane)
+            self.pm.save_cursor_position(self.pm.right_pane)
+
+            left_path = str(self.pm.left_pane['path'])
+            right_path = str(self.pm.right_pane['path'])
+            self.state_manager.add_recent_directory(left_path)
+            if left_path != right_path:
+                self.state_manager.add_recent_directory(right_path)
+
+            self.state_manager.cleanup_session()
+        except Exception as e:
+            self.log_info(f"Could not save application state: {e}")
+
+    def _quit(self) -> None:
+        """Save state, then tell the backend to end the event loop."""
+        self._save_application_state()
+        self.backend.quit()
 
     # --- state ---------------------------------------------------------------
 
@@ -804,7 +910,7 @@ class TfmApp:
         show_message_box(
             self.panel, "Quit TFM?", title="Confirm", icon="warning",
             buttons=("Quit", "Cancel"), default=1, cancel=1,
-            on_result=lambda label: self.backend.quit() if label == "Quit" else None,
+            on_result=lambda label: self._quit() if label == "Quit" else None,
         )
         self.panel.render()
 
@@ -1800,13 +1906,21 @@ _BACKENDS = {"tui": "tui", "curses": "tui", "gui": "gui", "macos": "gui"}
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", default="tui", help="tui (curses) | gui (macOS)")
-    parser.add_argument("--left", default=".", help="left pane startup directory")
-    parser.add_argument("--right", default=".", help="right pane startup directory")
+    parser.add_argument("--left", default=None, help="left pane startup directory")
+    parser.add_argument("--right", default=None, help="right pane startup directory")
     args = parser.parse_args()
 
+    # ``default=None`` lets us tell an explicit ``--left .`` from no flag: an
+    # explicitly given directory wins over the one saved from the last session.
     backend = create_backend(_BACKENDS.get(args.backend, args.backend))
     with backend:
-        TfmApp(backend, args.left, args.right).run()
+        TfmApp(
+            backend,
+            args.left if args.left is not None else ".",
+            args.right if args.right is not None else ".",
+            left_provided=args.left is not None,
+            right_provided=args.right is not None,
+        ).run()
 
 
 if __name__ == "__main__":
