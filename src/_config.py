@@ -96,6 +96,10 @@ class Config:
         'select_all_files': ['A'],             # Toggle selection of all files in current pane
         'select_all_items': ['Shift-A'],       # Toggle selection of all items (files + dirs)
         
+        # === Clipboard (copy names/paths to the system clipboard) ===
+        'copy_names': ['Command-Shift-C'],     # Copy selected/focused file name(s) to clipboard
+        'copy_paths': ['Command-Shift-P'],     # Copy selected/focused full path(s) to clipboard
+
         # === File Operations ===
         'copy_files': {'keys': ['C'], 'selection': 'required'},  # Copy selected files to other pane
         'move_files': {'keys': ['M'], 'selection': 'required'},  # Move selected files to other pane

@@ -886,6 +886,10 @@ class TfmApp:
         elif action == "rename_file":
             self.rename()
             return False
+        elif action == "copy_names":
+            self.copy_names_to_clipboard()
+        elif action == "copy_paths":
+            self.copy_paths_to_clipboard()
         elif action == "copy_files":
             self.copy_files()
             return False  # the confirm dialog drives its own redraw
@@ -991,6 +995,11 @@ class TfmApp:
                      enabled=has_files, shortcut="M"),
             MenuItem("Delete…", on_select=self.delete_files,
                      enabled=has_files, shortcut="K"),
+            SEPARATOR,
+            MenuItem("Copy Name(s)", on_select=self.copy_names_to_clipboard,
+                     enabled=has_files, shortcut="Cmd-Shift-C"),
+            MenuItem("Copy Full Path(s)", on_select=self.copy_paths_to_clipboard,
+                     enabled=has_files, shortcut="Cmd-Shift-P"),
             SEPARATOR,
             MenuItem("Create Archive…", on_select=self.create_archive,
                      enabled=has_files, shortcut="P"),
@@ -1852,6 +1861,33 @@ class TfmApp:
         entry = self._focused_entry()
         return [entry] if entry is not None else []
 
+    def copy_names_to_clipboard(self) -> None:
+        """Copy the active pane's selected file name(s) — or the cursor entry's
+        name when nothing is selected — to the system clipboard, one per line
+        (ttk TFM's Cmd-Shift-C). On the curses backend the clipboard is process-
+        local, but the copy still succeeds."""
+        self._copy_to_clipboard(lambda f: f.name, "name")
+
+    def copy_paths_to_clipboard(self) -> None:
+        """Copy the active pane's selected full path(s) — or the cursor entry's
+        path when nothing is selected — to the system clipboard, one per line
+        (ttk TFM's Cmd-Shift-P)."""
+        self._copy_to_clipboard(str, "path")
+
+    def _copy_to_clipboard(self, render, label: str) -> None:
+        """Shared body of the clipboard-copy actions: gather the selection (or
+        cursor entry), join ``render(entry)`` for each with newlines, push it to
+        the clipboard, and report the count. ``label`` names the unit for the log
+        message ("name" / "path")."""
+        targets = self._selected_or_focused(self.active_pane())
+        if not targets:
+            self.log_info(f"No files to copy {label}s from")
+            return
+        text = "\n".join(render(f) for f in targets)
+        self.panel.set_clipboard(text)
+        count = len(targets)
+        self.log_info(f"Copied {count} {label}{'s' if count != 1 else ''} to clipboard")
+
     @staticmethod
     def _delete_path(entry) -> None:
         """Delete a file or directory through the storage-agnostic Path API,
@@ -2304,6 +2340,8 @@ class TfmApp:
             ("create_file", "Create new file"),
             ("rename_file", "Rename file/directory"),
             ("copy_files", "Copy selection to the other pane"),
+            ("copy_names", "Copy selection's name(s) to the clipboard"),
+            ("copy_paths", "Copy selection's full path(s) to the clipboard"),
             ("move_files", "Move selection to the other pane"),
             ("delete_files", "Delete selection"),
             ("create_archive", "Create archive from selection"),
@@ -2393,6 +2431,11 @@ class TfmApp:
             MenuItem("Copy to Other Pane", on_select=self.copy_files, enabled=entry is not None),
             MenuItem("Move to Other Pane", on_select=self.move_files, enabled=entry is not None),
             MenuItem("Delete", on_select=self.delete_files, enabled=entry is not None),
+            SEPARATOR,
+            MenuItem("Copy Name(s)", on_select=self.copy_names_to_clipboard,
+                     enabled=entry is not None),
+            MenuItem("Copy Full Path(s)", on_select=self.copy_paths_to_clipboard,
+                     enabled=entry is not None),
             SEPARATOR,
             MenuItem("Show Hidden Files", on_select=lambda: self._menu("toggle_hidden"),
                      checked=lambda: self.flm.show_hidden),
