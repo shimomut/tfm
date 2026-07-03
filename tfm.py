@@ -2483,7 +2483,11 @@ def create_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = create_parser().parse_args()
 
-    backend = create_backend(_BACKENDS.get(args.backend, args.backend))
+    backend_name = _BACKENDS.get(args.backend, args.backend)
+    # The GUI backend persists and restores the window's position and size via
+    # the native NSWindow frame-autosave feature; the curses backend ignores it.
+    backend_kwargs = {"frame_autosave_name": "TFMMainWindow"} if backend_name == "gui" else {}
+    backend = create_backend(backend_name, **backend_kwargs)
     with backend:
         TfmApp(
             backend,
