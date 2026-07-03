@@ -49,23 +49,30 @@ def test_level_checking_before_formatting():
     after_skip_count = len(log_manager._log_pane_handler.get_messages()) if log_manager._log_pane_handler else 0
     
     assert after_skip_count == initial_count, f"Expected {initial_count} messages, got {after_skip_count}"
-    print(f"✓ DEBUG and INFO messages were skipped (count stayed at {initial_count})")
-    
+    # NOTE: no print() here — stdout is captured into the log pane, so a print
+    # between the two counts would itself add a message and skew the assertion.
+
+    # Re-read the count immediately before the warning to isolate its effect.
+    before_warning_count = len(log_manager._log_pane_handler.get_messages()) if log_manager._log_pane_handler else 0
+
     # Now log a WARNING message (should be processed)
     logger.warning("This WARNING message should be processed")
-    
-    # Count messages after - should increase by 1
+
+    # Count messages after - should increase by exactly 1
     after_warning_count = len(log_manager._log_pane_handler.get_messages()) if log_manager._log_pane_handler else 0
-    
-    assert after_warning_count == initial_count + 1, f"Expected {initial_count + 1} messages, got {after_warning_count}"
+
+    assert after_warning_count == before_warning_count + 1, f"Expected {before_warning_count + 1} messages, got {after_warning_count}"
     print(f"✓ WARNING message was processed (count increased to {after_warning_count})")
     
-    # Verify the message content
+    # Verify the message content. Find our warning specifically — the print()
+    # above is itself captured into the log pane, so it, not the warning, is the
+    # last entry.
     messages = log_manager._log_pane_handler.get_messages()
-    last_message = messages[-1][0]  # Get formatted message
-    assert "WARNING" in last_message, f"Expected WARNING in message, got: {last_message}"
-    assert "This WARNING message should be processed" in last_message
-    print(f"✓ Message content verified: {last_message}")
+    warning_msgs = [m for m, _ in messages
+                    if m and "This WARNING message should be processed" in m]
+    assert warning_msgs, "Warning message should be in the log pane"
+    assert "WARNING" in warning_msgs[0], f"Expected WARNING level, got: {warning_msgs[0]}"
+    print(f"✓ Message content verified: {warning_msgs[0]}")
     
     # Clean up
     log_manager.restore_stdio()
@@ -116,12 +123,14 @@ def test_visibility_checking_for_log_pane():
     assert all_formatted, "Expected all messages to be formatted after becoming visible"
     print(f"✓ All {len(formatted_messages)} messages are now formatted")
     
-    # Verify message content
-    assert len(formatted_messages) >= 3, f"Expected at least 3 messages, got {len(formatted_messages)}"
-    last_three = formatted_messages[-3:]
-    assert "Message 1 while not visible" in last_three[0][0]
-    assert "Message 2 while not visible" in last_three[1][0]
-    assert "Message 3 while not visible" in last_three[2][0]
+    # Verify message content. Filter to the messages we logged — stdout is
+    # captured into the log pane, so the test's own print() calls also appear as
+    # entries and would otherwise shift a positional [-3:] slice.
+    ours = [msg for msg, _ in formatted_messages if msg and "while not visible" in msg]
+    assert len(ours) >= 3, f"Expected at least 3 of our messages, got {len(ours)}"
+    assert "Message 1 while not visible" in ours[0]
+    assert "Message 2 while not visible" in ours[1]
+    assert "Message 3 while not visible" in ours[2]
     print("✓ Message content verified")
     
     # Clean up

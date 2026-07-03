@@ -126,8 +126,8 @@ class TestFileMonitorManagerReloadPosting(unittest.TestCase):
         manager._post_reload_request('left')
         
         # Verify logger.info was called with appropriate message
-        mock_logger.info.assert_called()
-        call_args = mock_logger.info.call_args[0][0]
+        mock_logger.debug.assert_called()
+        call_args = mock_logger.debug.call_args[0][0]
         self.assertIn('left', call_args.lower())
         self.assertIn('reload', call_args.lower())
     

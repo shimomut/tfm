@@ -112,32 +112,31 @@ class TestArchiveCompletionCallbacks(unittest.TestCase):
             summary_logged = any("Archive created successfully" in str(call) for call in info_calls)
             self.assertFalse(summary_logged, "Summary logging should be suppressed when callback provided")
     
-    def test_no_callback_logs_summary(self):
-        """Test that default summary logging occurs when no callback provided"""
+    def test_no_callback_still_completes_operation(self):
+        """With no completion callback, the operation still runs to completion.
+
+        (Summary/result logging is the operation *task*'s responsibility now, not
+        the executor's — the executor just performs the I/O — so we verify the
+        functional outcome: the archive is created.)"""
         # Create test file
         test_file = self.temp_path / "test.txt"
         test_file.write_text("test content")
-        
+
         archive_path = self.temp_path / "test2.tar.gz"
-        
-        # Patch logger to capture log calls
-        with patch.object(self.executor.logger, 'info') as mock_info:
-            # Start create operation WITHOUT callback
-            self.executor.perform_create_operation(
-                [test_file],
-                archive_path,
-                'tar.gz',
-                completion_callback=None
-            )
-            
-            # Wait for thread to complete
-            time.sleep(0.5)
-            
-            # Verify summary logging occurred
-            # Check that "Archive created successfully" message WAS logged
-            info_calls = [str(call) for call in mock_info.call_args_list]
-            summary_logged = any("Archive created successfully" in str(call) for call in info_calls)
-            self.assertTrue(summary_logged, "Summary logging should occur when no callback provided")
+
+        # Start create operation WITHOUT callback
+        self.executor.perform_create_operation(
+            [test_file],
+            archive_path,
+            'tar.gz',
+            completion_callback=None
+        )
+
+        # Wait for thread to complete
+        time.sleep(0.5)
+
+        # The archive was created despite there being no callback.
+        self.assertTrue(archive_path.exists(), "Archive should be created even without a callback")
     
     def test_callback_invoked_on_background_thread(self):
         """Test that callback is invoked on background thread, not main thread"""

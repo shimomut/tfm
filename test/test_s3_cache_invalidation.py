@@ -228,15 +228,13 @@ class TestS3CacheInvalidation(unittest.TestCase):
     
     def test_cache_invalidation_error_handling(self):
         """Test that cache invalidation errors are handled gracefully"""
-        # Mock S3 cache to raise an exception
-        with patch('tfm_s3.get_s3_cache') as mock_get_s3_cache:
+        # The cache manager logs errors through its own logger (getLogger("Cache"))
+        # now, not a log_manager add_message callback.
+        with patch('tfm_s3.get_s3_cache') as mock_get_s3_cache, \
+             patch.object(self.cache_manager, 'logger') as mock_logger:
             mock_get_s3_cache.side_effect = Exception("Cache error")
-            
-            # Should not raise exception, but log warning
+
+            # Should not raise exception, but log a warning
             self.cache_manager.invalidate_cache_for_paths([self.mock_s3_path], "test operation")
-            
-            # Should have logged a warning
-            self.log_manager.add_message.assert_called()
-            warning_calls = [call for call in self.log_manager.add_message.call_args_list 
-                           if len(call[0]) > 1 and call[0][1] == "WARNING"]
-            self.assertTrue(len(warning_calls) > 0)
+
+            self.assertTrue(mock_logger.warning.called)

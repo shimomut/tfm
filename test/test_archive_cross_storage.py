@@ -246,12 +246,14 @@ class TestCrossStorageArchiveOperations:
                 f.write_text(f'Content {i}')
                 files.append(Path(f))
             
-            # Set cancellation flag
-            self.file_manager.operation_cancelled = True
-            
+            # Signal cancellation via the task the executor polls in
+            # _should_continue_operation (file_manager flags aren't consulted).
+            self.executor.task = Mock()
+            self.executor.task.is_cancelled.return_value = True
+
             archive_path = Path(tmpdir_path / 'test.tar.gz')
             format_info = {'type': 'tar', 'compression': 'gz'}
-            
+
             # Attempt to create archive (should be cancelled)
             success, errors = self.executor._create_archive_local(
                 files, archive_path, format_info

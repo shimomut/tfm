@@ -121,15 +121,17 @@ class TestArchiveCacheInvalidation(unittest.TestCase):
         source_paths = [Path(test_file)]
         archive_path = Path(self.temp_path / 'test.tar.gz')
         
-        # Set cancellation flag before operation
-        self.mock_file_manager.operation_cancelled = True
-        
+        # Signal cancellation via the task the executor polls (_should_continue_operation).
+        cancelled_task = Mock()
+        cancelled_task.is_cancelled.return_value = True
+
         # Create archive (will be cancelled)
         self.executor.perform_create_operation(
             source_paths,
             archive_path,
             'tar.gz',
-            completion_callback=None
+            completion_callback=None,
+            task=cancelled_task
         )
         
         # Wait for background thread to complete
@@ -153,16 +155,18 @@ class TestArchiveCacheInvalidation(unittest.TestCase):
         with tarfile.open(str(archive_path), 'w:gz') as tar:
             tar.add(str(test_file), arcname='test.txt')
         
-        # Set cancellation flag before operation
-        self.mock_file_manager.operation_cancelled = True
-        
+        # Signal cancellation via the task the executor polls.
+        cancelled_task = Mock()
+        cancelled_task.is_cancelled.return_value = True
+
         # Extract archive (will be cancelled)
         self.executor.perform_extract_operation(
             archive_path,
             extract_dir,
             overwrite=True,
             skip_files=[],
-            completion_callback=None
+            completion_callback=None,
+            task=cancelled_task
         )
         
         # Wait for background thread to complete

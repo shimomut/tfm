@@ -40,7 +40,7 @@ class MockFileManager:
         self.left_pane = {
             'path': Path.cwd(),
             'files': [],
-            'selected_index': 0,
+            'focused_index': 0,
             'scroll_offset': 0,
             'selected_files': set(),
             'sort_mode': 'name',
@@ -50,7 +50,7 @@ class MockFileManager:
         self.right_pane = {
             'path': Path.cwd(),
             'files': [],
-            'selected_index': 0,
+            'focused_index': 0,
             'scroll_offset': 0,
             'selected_files': set(),
             'sort_mode': 'name',
@@ -66,6 +66,9 @@ class MockFileManager:
         return self.right_pane if self.active_pane == 'left' else self.left_pane
     
     def refresh_files(self, pane=None):
+        pass
+
+    def mark_dirty(self):
         pass
 
 
@@ -254,17 +257,17 @@ def test_copy_with_file_operations():
         
         assert archive_file is not None, "Should find file1.txt in archive"
         
-        # Copy the file
+        # Copy the file. Copying is done by the executor's threaded
+        # perform_copy_operation now; wait for its completion callback.
+        import threading
+        from tfm_file_operation_executor import FileOperationExecutor
         files_to_copy = [archive_file]
-        file_ops_ui.copy_files_to_directory(files_to_copy, file_manager.right_pane['path'])
-        
-        # Wait for background thread to complete
-        import time
-        max_wait = 5
-        waited = 0
-        while file_manager.operation_in_progress and waited < max_wait:
-            time.sleep(0.1)
-            waited += 0.1
+        executor = FileOperationExecutor(file_manager)
+        done = threading.Event()
+        executor.perform_copy_operation(
+            files_to_copy, file_manager.right_pane['path'],
+            completion_callback=lambda success, errors: done.set())
+        done.wait(timeout=5)
         
         # Verify file was copied
         dest_file = dest_dir / 'file1.txt'

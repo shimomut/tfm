@@ -93,10 +93,11 @@ def test_add_message_reaches_all_handlers():
     """Test that add_message() reaches all configured handlers"""
     print("\n=== Test: add_message() reaches all configured handlers ===")
     
-    # Create LogManager with stream output enabled
+    # Create LogManager with stream output enabled (desktop mode enables the
+    # stream-output handler that echoes to the original stdout/stderr).
     config = MockConfig()
-    log_manager = LogManager(config, remote_port=None)
-    
+    log_manager = LogManager(config, remote_port=None, is_desktop_mode=True)
+
     # Verify both handlers are created
     assert log_manager._log_pane_handler is not None, "LogPaneHandler should be created"
     assert log_manager._stream_output_handler is not None, "StreamOutputHandler should be created"

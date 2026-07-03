@@ -114,17 +114,16 @@ def test_copy_from_archive_to_local():
         
         assert file1 is not None, "Should find file1.txt"
         
-        # Copy the file
-        file_ops_ui.copy_files_to_directory([file1], fm.right_pane['path'])
-        
-        # Wait for operation to complete
-        import time
-        max_wait = 5
-        waited = 0
-        while fm.operation_in_progress and waited < max_wait:
-            time.sleep(0.1)
-            waited += 0.1
-        
+        # Copy the file via the executor's threaded copy; wait on its callback.
+        import threading
+        from tfm_file_operation_executor import FileOperationExecutor
+        executor = FileOperationExecutor(fm)
+        done = threading.Event()
+        executor.perform_copy_operation(
+            [file1], fm.right_pane['path'],
+            completion_callback=lambda success, errors: done.set())
+        done.wait(timeout=5)
+
         # Verify file was copied
         assert (dest_dir / 'file1.txt').exists(), "file1.txt should be copied"
         content = (dest_dir / 'file1.txt').read_text()
@@ -171,16 +170,16 @@ def test_copy_directory_from_archive():
         
         assert dir1 is not None, "Should find dir1"
         
-        # Copy the directory
-        file_ops_ui.copy_files_to_directory([dir1], fm.right_pane['path'])
-        
-        # Wait for operation to complete
+        # Copy the directory via the executor's threaded copy; wait on its callback.
         import time
-        max_wait = 10
-        waited = 0
-        while fm.operation_in_progress and waited < max_wait:
-            time.sleep(0.2)
-            waited += 0.2
+        import threading
+        from tfm_file_operation_executor import FileOperationExecutor
+        executor = FileOperationExecutor(fm)
+        done = threading.Event()
+        executor.perform_copy_operation(
+            [dir1], fm.right_pane['path'],
+            completion_callback=lambda success, errors: done.set())
+        done.wait(timeout=10)
         
         # Give a bit more time for filesystem to sync
         time.sleep(0.5)
@@ -240,16 +239,15 @@ def test_copy_multiple_files_from_archive():
         
         assert len(files_to_copy) == 2, "Should find 2 files"
         
-        # Copy the files
-        file_ops_ui.copy_files_to_directory(files_to_copy, fm.right_pane['path'])
-        
-        # Wait for operation to complete
-        import time
-        max_wait = 5
-        waited = 0
-        while fm.operation_in_progress and waited < max_wait:
-            time.sleep(0.1)
-            waited += 0.1
+        # Copy the files via the executor's threaded copy; wait on its callback.
+        import threading
+        from tfm_file_operation_executor import FileOperationExecutor
+        executor = FileOperationExecutor(fm)
+        done = threading.Event()
+        executor.perform_copy_operation(
+            files_to_copy, fm.right_pane['path'],
+            completion_callback=lambda success, errors: done.set())
+        done.wait(timeout=5)
         
         # Verify files were copied
         assert (dest_dir / 'file1.txt').exists(), "file1.txt should be copied"

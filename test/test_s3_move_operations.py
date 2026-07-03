@@ -19,8 +19,10 @@ class TestS3MoveFix(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Mock boto3 client
+        # Mock boto3 client. Give list_objects_v2 a real dict so the is_dir
+        # probe (KeyCount > 0) compares ints rather than a Mock.
         self.mock_s3_client = Mock()
+        self.mock_s3_client.list_objects_v2.return_value = {'KeyCount': 0}
         
         # Create S3 paths for testing
         self.source_path = Path('s3://test-bucket/source/file1.txt')

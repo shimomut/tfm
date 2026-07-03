@@ -203,10 +203,13 @@ class TestS3CachingOptimization(unittest.TestCase):
         # Invalidate specific key
         cache.invalidate_key('bucket', 'key1')
         
-        # Verify only key1 was invalidated
+        # key1's own entry is gone, and so is the parent directory listing that
+        # would have included it (invalidate_key also drops list_objects_v2
+        # entries whose prefix contains the key — here the root listing). A
+        # sibling key's head_object entry is untouched.
         self.assertIsNone(cache.get('head_object', 'bucket', 'key1'))
         self.assertIsNotNone(cache.get('head_object', 'bucket', 'key2'))
-        self.assertIsNotNone(cache.get('list_objects_v2', 'bucket', ''))
+        self.assertIsNone(cache.get('list_objects_v2', 'bucket', ''))
         
         # Invalidate entire bucket
         cache.invalidate_bucket('bucket')

@@ -831,9 +831,11 @@ class S3PathImpl(PathImpl):
     def _yield_paths_from_cached_listing(self, cached_listing):
         """Yield Path objects from a cached complete directory listing"""
         # Yield directories (common prefixes)
+        common_prefix_keys = set()
         for prefix_info in cached_listing.get('CommonPrefixes', []):
             dir_key = prefix_info['Prefix'].rstrip('/')
-            
+            common_prefix_keys.add(dir_key)
+
             # Create directory with metadata
             dir_metadata = {
                 'is_dir': True,
@@ -843,14 +845,19 @@ class S3PathImpl(PathImpl):
                 'etag': '',
                 'storage_class': ''
             }
-            
+
             # Create Path with metadata
             yield S3PathImpl.create_path_with_metadata(f's3://{self._bucket}/{dir_key}/', dir_metadata)
-        
+
         # Yield files (objects) and cache their stat information
         prefix = cached_listing.get('Prefix', '')
         for obj in cached_listing.get('Contents', []):
             key = obj['Key']
+            # Skip the directory-marker object for a subdirectory that already
+            # appeared in CommonPrefixes, otherwise the subdirectory is listed
+            # twice (once as a prefix, once as its zero-byte marker object).
+            if key.endswith('/') and key.rstrip('/') in common_prefix_keys:
+                continue
             if key != prefix:  # Don't include the directory itself
                 # Extract metadata from S3 object
                 size = obj.get('Size', 0)

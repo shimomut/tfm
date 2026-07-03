@@ -26,8 +26,12 @@ class TestConflictResolution:
     
     @pytest.fixture
     def temp_dir(self):
-        """Create temporary directory for tests"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        """Create temporary directory for tests.
+
+        ignore_cleanup_errors: an archive operation may still be finishing on a
+        background thread when the test ends, briefly holding a file in the dir;
+        don't let that raced cleanup fail teardown."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             yield PathlibPath(tmpdir)
     
     @pytest.fixture

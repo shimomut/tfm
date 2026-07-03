@@ -230,19 +230,19 @@ class TestFallbackToPolling(unittest.TestCase):
         """Test that fallback to polling logs mode transition."""
         manager = FileMonitorManager(self.config, self.file_manager)
         
-        # Mock logger to capture messages
-        with patch.object(manager.logger, 'info') as mock_info:
+        # The polling-fallback messages are logged at DEBUG level.
+        with patch.object(manager.logger, 'debug') as mock_debug:
             # Trigger polling fallback
             manager._attempt_polling_fallback('left', self.temp_path)
-            
+
             # Wait for operation to complete
             time.sleep(0.5)
-            
+
             # Should have logged mode transition
             # Check if any call contains "Mode transition" or "polling"
-            info_calls = [str(call) for call in mock_info.call_args_list]
-            has_transition_log = any('transition' in str(call).lower() or 'polling' in str(call).lower() 
-                                    for call in info_calls)
+            debug_calls = [str(call) for call in mock_debug.call_args_list]
+            has_transition_log = any('transition' in str(call).lower() or 'polling' in str(call).lower()
+                                    for call in debug_calls)
             self.assertTrue(has_transition_log, "Should log mode transition to polling")
         
         # Clean up
@@ -292,17 +292,17 @@ class TestErrorLogging(unittest.TestCase):
         manager = FileMonitorManager(self.config, self.file_manager)
         
         # Mock logger to capture info messages
-        with patch.object(manager.logger, 'info') as mock_info:
+        with patch.object(manager.logger, 'debug') as mock_debug:
             # Set up state for retry
             state = manager.monitoring_state['left']
             state['retry_count'] = 0
-            
+
             # Schedule a retry
             manager._schedule_retry('left', self.temp_path)
-            
-            # Should have logged retry scheduling
-            info_calls = [str(call) for call in mock_info.call_args_list]
-            has_retry_log = any('retry' in str(call).lower() for call in info_calls)
+
+            # Should have logged retry scheduling (at DEBUG level)
+            debug_calls = [str(call) for call in mock_debug.call_args_list]
+            has_retry_log = any('retry' in str(call).lower() for call in debug_calls)
             self.assertTrue(has_retry_log, "Should log retry scheduling")
     
     def test_permanent_failure_logged(self):
