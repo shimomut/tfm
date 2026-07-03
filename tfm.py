@@ -1047,8 +1047,8 @@ class TfmApp:
 
     def _local_drives(self) -> list[dict]:
         """Home / root / common folders + mounted volumes, as ``{name, path}``
-        rows for the drives picker. SSH/S3 remotes are a later phase (they need
-        the remote-storage layer, not yet wired into the port)."""
+        rows for the drives picker. SSH hosts are added by ``_ssh_drives``; S3
+        buckets (an async, credentialed scan) remain a later phase."""
         drives = [{"name": "Home", "path": str(Path.home())},
                   {"name": "Root", "path": "/"}]
         for name in ("Documents", "Downloads", "Desktop"):
@@ -1078,11 +1078,30 @@ class TfmApp:
                 out.append(d)
         return out
 
+    def _ssh_drives(self) -> list[dict]:
+        """SSH hosts from ``~/.ssh/config`` as ``ssh://host/`` rows for the drives
+        picker. Reads only the local config file (no network); best-effort, so a
+        missing or unreadable config — or an absent SSH layer — yields nothing.
+        ``Host *`` wildcard blocks are dropped by the parser, not connectable."""
+        try:
+            from tfm_ssh_config import SSHConfigParser
+            hosts = SSHConfigParser().parse()
+        except Exception:
+            return []
+        out = []
+        for hostname, cfg in hosts.items():
+            user = cfg.get("User", "")
+            actual = cfg.get("HostName", hostname)
+            label = f"{user}@{actual}" if user else actual
+            out.append({"name": label, "path": f"ssh://{hostname}/"})
+        return out
+
     def show_drives(self) -> None:
-        """The drives picker: choose a volume / common location and jump the
-        active pane there (reuses the searchable-list dialog, like favorites)."""
+        """The drives picker: choose a volume / common location / SSH host and
+        jump the active pane there (reuses the searchable-list dialog, like
+        favorites). Selecting an ``ssh://`` host connects on first listing."""
         show_filter_list(
-            self.panel, self._local_drives(), title="Drives",
+            self.panel, self._local_drives() + self._ssh_drives(), title="Drives",
             to_label=lambda d: f"{d['name']}  —  {d['path']}",
             on_accept=self._go_to_drive,
             region=self._active_pane_region())
