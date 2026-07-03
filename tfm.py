@@ -1096,12 +1096,51 @@ class TfmApp:
             out.append({"name": label, "path": f"ssh://{hostname}/"})
         return out
 
+    @staticmethod
+    def _aws_configured() -> bool:
+        """Whether AWS credentials are plausibly available *locally* — env vars or
+        an ``~/.aws`` config/credentials file. Used to skip the S3 scan entirely
+        when there's nothing to scan, so the picker never blocks (and never waits
+        on the IMDS endpoint) for the common no-AWS case."""
+        if os.environ.get("AWS_ACCESS_KEY_ID") or os.environ.get("AWS_PROFILE"):
+            return True
+        aws = Path.home() / ".aws"
+        try:
+            return (aws / "credentials").exists() or (aws / "config").exists()
+        except Exception:
+            return False
+
+    def _s3_drives(self) -> list[dict]:
+        """S3 buckets as ``s3://bucket/`` rows for the drives picker. A single
+        ``list_buckets`` call, gated on local AWS credentials and bounded by short
+        timeouts so it fails fast instead of hanging the picker. Best-effort: no
+        boto3, no credentials, or any AWS error yields nothing.
+
+        Note: EC2 instance-role (IMDS-only) credentials are intentionally not
+        probed here — that is the one path that can hang — so buckets won't list
+        on a bare instance role without an env var or ``~/.aws`` file."""
+        try:
+            from tfm_s3 import HAS_BOTO3
+            if not HAS_BOTO3 or not self._aws_configured():
+                return []
+            import boto3
+            from botocore.config import Config as _BotoConfig
+            client = boto3.client("s3", config=_BotoConfig(
+                connect_timeout=2, read_timeout=3, retries={"max_attempts": 0}))
+            resp = client.list_buckets()
+        except Exception:
+            return []
+        return [{"name": b["Name"], "path": f"s3://{b['Name']}/"}
+                for b in resp.get("Buckets", [])]
+
     def show_drives(self) -> None:
-        """The drives picker: choose a volume / common location / SSH host and
-        jump the active pane there (reuses the searchable-list dialog, like
-        favorites). Selecting an ``ssh://`` host connects on first listing."""
+        """The drives picker: choose a volume / common location / SSH host / S3
+        bucket and jump the active pane there (reuses the searchable-list dialog,
+        like favorites). Selecting an ``ssh://`` or ``s3://`` row connects on
+        first listing."""
+        drives = self._local_drives() + self._ssh_drives() + self._s3_drives()
         show_filter_list(
-            self.panel, self._local_drives() + self._ssh_drives(), title="Drives",
+            self.panel, drives, title="Drives",
             to_label=lambda d: f"{d['name']}  —  {d['path']}",
             on_accept=self._go_to_drive,
             region=self._active_pane_region())

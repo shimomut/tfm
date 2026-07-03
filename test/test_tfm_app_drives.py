@@ -68,5 +68,42 @@ class SshDrives(unittest.TestCase):
             self.assertEqual(_bare_app()._ssh_drives(), [])
 
 
+class S3Drives(unittest.TestCase):
+    def _client_returning(self, buckets):
+        client = MagicMock()
+        client.list_buckets.return_value = {"Buckets": [{"Name": n} for n in buckets]}
+        return client
+
+    def test_maps_buckets_to_s3_urls(self):
+        client = self._client_returning(["alpha", "beta"])
+        with patch.object(tfm.TfmApp, "_aws_configured", return_value=True), \
+             patch("boto3.client", return_value=client):
+            rows = _bare_app()._s3_drives()
+
+        self.assertEqual(rows, [
+            {"name": "alpha", "path": "s3://alpha/"},
+            {"name": "beta", "path": "s3://beta/"},
+        ])
+
+    def test_skips_scan_when_aws_not_configured(self):
+        with patch.object(tfm.TfmApp, "_aws_configured", return_value=False), \
+             patch("boto3.client") as mock_client:
+            rows = _bare_app()._s3_drives()
+
+        self.assertEqual(rows, [])
+        mock_client.assert_not_called()  # no network call at all
+
+    def test_empty_on_aws_error(self):
+        client = MagicMock()
+        client.list_buckets.side_effect = RuntimeError("no creds")
+        with patch.object(tfm.TfmApp, "_aws_configured", return_value=True), \
+             patch("boto3.client", return_value=client):
+            self.assertEqual(_bare_app()._s3_drives(), [])
+
+    def test_aws_configured_reads_env(self):
+        with patch.dict(os.environ, {"AWS_ACCESS_KEY_ID": "x"}, clear=False):
+            self.assertTrue(tfm.TfmApp._aws_configured())
+
+
 if __name__ == "__main__":
     unittest.main()
