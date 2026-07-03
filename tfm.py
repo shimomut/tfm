@@ -2008,16 +2008,31 @@ class TfmApp:
 
 _BACKENDS = {"tui": "tui", "curses": "tui", "gui": "gui", "macos": "gui"}
 
+_VERSION = "0.99"
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+
+def create_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser. Factored out of ``main`` so the entry
+    point's argument contract (``--version``, ``--help``, the pane flags) can be
+    unit-tested without launching the app."""
+    parser = argparse.ArgumentParser(
+        prog="tfm",
+        description=__doc__,
+        epilog="Project home: https://github.com/shimomut/tfm",
+    )
+    parser.add_argument("-v", "--version", action="version",
+                        version=f"TUI File Manager {_VERSION}")
     parser.add_argument("--backend", default="tui", help="tui (curses) | gui (macOS)")
-    parser.add_argument("--left", default=None, help="left pane startup directory")
-    parser.add_argument("--right", default=None, help="right pane startup directory")
-    args = parser.parse_args()
-
     # ``default=None`` lets us tell an explicit ``--left .`` from no flag: an
     # explicitly given directory wins over the one saved from the last session.
+    parser.add_argument("--left", default=None, help="left pane startup directory")
+    parser.add_argument("--right", default=None, help="right pane startup directory")
+    return parser
+
+
+def main() -> None:
+    args = create_parser().parse_args()
+
     backend = create_backend(_BACKENDS.get(args.backend, args.backend))
     with backend:
         TfmApp(
