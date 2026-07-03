@@ -2088,13 +2088,18 @@ class TfmApp:
         show_text(self.panel, lines, title="Help")
         self.panel.render()
 
+    @staticmethod
+    def _about_text() -> str:
+        """The About box body: name, version, and project URL (mirrors the legacy
+        About dialog's content, minus its cosmetic Matrix-rain background)."""
+        from tfm_const import VERSION, GITHUB_URL
+        return (f"TFM on PuiKit — Terminal File Manager\n"
+                f"Version {VERSION}\n\n"
+                f"{GITHUB_URL}")
+
     def show_about(self) -> None:
-        from tfm_const import VERSION
-        show_message_box(
-            self.panel,
-            f"TFM on PuiKit\nVersion {VERSION}\n\nA dual-pane file manager.",
-            title="About", icon="info", buttons=("OK",),
-        )
+        show_message_box(self.panel, self._about_text(),
+                         title="About TFM", icon="info", buttons=("OK",))
         self.panel.render()
 
     def _show_context_menu(self, pane_name: str, index: int, x: float, y: float) -> None:
