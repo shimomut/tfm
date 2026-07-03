@@ -14,8 +14,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from unittest.mock import Mock, patch, MagicMock
-from src.tfm_ssh_connection import SSHConnection, SSHPathNotFoundError, SSHPermissionDeniedError
-from src.tfm_ssh_cache import SSHCache
+from tfm_ssh_connection import SSHConnection, SSHPathNotFoundError, SSHPermissionDeniedError
+from tfm_ssh_cache import SSHCache
 
 
 def test_list_directory_error_no_stat_cache():

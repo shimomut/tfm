@@ -7,7 +7,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_adaptive_fps.py -v
 import unittest
 import time
 
-from src.tfm_adaptive_fps import AdaptiveFPSManager
+from tfm_adaptive_fps import AdaptiveFPSManager
 
 
 class TestAdaptiveFPSManager(unittest.TestCase):

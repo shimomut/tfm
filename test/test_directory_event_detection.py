@@ -12,7 +12,7 @@ from pathlib import Path
 import tempfile
 import shutil
 
-from src.tfm_file_monitor_observer import TFMFileSystemEventHandler
+from tfm_file_monitor_observer import TFMFileSystemEventHandler
 
 
 class TestDirectoryEventDetection(unittest.TestCase):

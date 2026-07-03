@@ -11,7 +11,7 @@ import logging
 import threading
 import time
 
-from src.tfm_logging_handlers import LogPaneHandler, RemoteMonitoringHandler
+from tfm_logging_handlers import LogPaneHandler, RemoteMonitoringHandler
 
 
 def test_logpane_handler_concurrent_emit():

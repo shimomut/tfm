@@ -8,7 +8,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_ui_layer_basic.py -v
 """
 
 import pytest
-from src.tfm_ui_layer import UILayer, UILayerStack
+from tfm_ui_layer import UILayer, UILayerStack
 
 
 class MockLayer(UILayer):

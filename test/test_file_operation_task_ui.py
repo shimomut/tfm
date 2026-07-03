@@ -8,8 +8,8 @@ import unittest
 from unittest.mock import Mock, MagicMock, call
 from pathlib import Path
 
-from src.tfm_file_operation_task import FileOperationTask, State
-from src.tfm_path import Path as TFMPath
+from tfm_file_operation_task import FileOperationTask, State
+from tfm_path import Path as TFMPath
 
 
 class TestFileOperationTaskUIInterface(unittest.TestCase):

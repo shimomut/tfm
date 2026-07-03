@@ -7,7 +7,7 @@ Run with: PYTHONPATH=.:src:ttk pytest test/test_menu_manager.py -v
 import unittest
 from unittest.mock import Mock, MagicMock
 import platform
-from src.tfm_menu_manager import MenuManager
+from tfm_menu_manager import MenuManager
 
 
 class TestMenuManager(unittest.TestCase):
