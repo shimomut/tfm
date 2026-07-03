@@ -23,6 +23,7 @@ import argparse
 import os
 import platform
 import queue
+import re
 import subprocess
 import sys
 from pathlib import Path as _StdPath
@@ -637,6 +638,9 @@ class TfmApp:
         elif action == "search_dialog":
             self.show_search()
             return False
+        elif action == "search_content":
+            self.show_content_search()
+            return False
         elif action == "history":
             self.show_history()
             return False
@@ -796,6 +800,7 @@ class TfmApp:
             MenuItem("Find…", on_select=self.enter_isearch, enabled=has_files, shortcut="F"),
             MenuItem("Filter…", on_select=self.enter_filter, shortcut=";"),
             MenuItem("Search Files…", on_select=self.show_search, shortcut="Shift-F"),
+            MenuItem("Search Content…", on_select=self.show_content_search, shortcut="Shift-G"),
             SEPARATOR,
             MenuItem("Show Hidden Files", on_select=lambda: self._menu("toggle_hidden"),
                      checked=lambda: self.flm.show_hidden, shortcut="."),
@@ -1223,6 +1228,105 @@ class TfmApp:
         self._refresh(pane)
         self._select_by_name(pane, entry.name)
         self.log_info(f"Found: {entry}")
+        self.panel.render()
+
+    def show_content_search(self) -> None:
+        """Recursive content (grep) search under the active pane (the Shift-G
+        dialog): prompt for a regular expression, walk the tree reading text
+        files, and present each matching line; picking a hit navigates to the
+        file and lands the cursor on it. Bounded like the filename search
+        (``_walk_grep``) so a huge tree can't hang the UI."""
+        pane = self.active_pane()
+        root = pane["path"]
+
+        def run(pattern: str) -> None:
+            pattern = pattern.strip()
+            if not pattern:
+                self.panel.render()
+                return
+            try:
+                regex = re.compile(pattern, re.IGNORECASE)
+            except re.error as exc:
+                show_message_box(self.panel, f"Invalid pattern: {exc}",
+                                 title="Search", icon="warning")
+                self.panel.render()
+                return
+            results = self._walk_grep(root, regex)
+            if not results:
+                show_message_box(self.panel, f"No content matches for '{pattern}'.",
+                                 title="Search", icon="info")
+                self.panel.render()
+                return
+            root_str = str(root)
+            def label(hit) -> str:
+                s = str(hit["path"])
+                rel = s[len(root_str):].lstrip("/") if s.startswith(root_str) else s
+                return f"{rel}:{hit['line']}: {hit['text']}"
+            show_filter_list(
+                self.panel, results, title=f"Content: {pattern} ({len(results)})",
+                to_label=label, on_accept=self._go_to_content_hit,
+                region=self._active_pane_region())
+            self.panel.render()
+
+        show_input(self.panel, title="Search Content", prompt="Text (regex):",
+                   on_accept=run, region=self._active_pane_region())
+        self.panel.render()
+
+    @staticmethod
+    def _looks_textual(path, sample_size: int = 1024) -> bool:
+        """Cheap binary filter for content search: a NUL byte in the first chunk
+        means binary. Empty or unreadable files are treated as non-text — there's
+        nothing to grep in them."""
+        try:
+            with path.open("rb") as f:
+                chunk = f.read(sample_size)
+        except Exception:
+            return False
+        return bool(chunk) and b"\x00" not in chunk
+
+    def _walk_grep(self, root, regex, cap: int = 1000, node_cap: int = 50000,
+                   max_line: int = 200):
+        """Depth-first walk under ``root`` collecting ``{path, line, text}`` hits
+        where a line of a text file matches ``regex`` (compiled). Bounded by
+        ``cap`` hits and ``node_cap`` entries visited so a huge tree can't hang
+        the UI; binary and (unless the pane shows them) hidden entries are
+        skipped. Mirrors ``_walk_match``'s bounded synchronous walk."""
+        results, stack, nodes = [], [root], 0
+        while stack and len(results) < cap and nodes < node_cap:
+            try:
+                entries = list(stack.pop().iterdir())
+            except Exception:
+                continue
+            for e in entries:
+                nodes += 1
+                if len(results) >= cap:
+                    break
+                if not self.flm.show_hidden and e.name.startswith("."):
+                    continue
+                try:
+                    if e.is_dir():
+                        stack.append(e)
+                        continue
+                    if not self._looks_textual(e):
+                        continue
+                    with e.open("r", encoding="utf-8", errors="ignore") as f:
+                        for line_num, line in enumerate(f, 1):
+                            if regex.search(line):
+                                results.append({"path": e, "line": line_num,
+                                                "text": line.strip()[:max_line]})
+                                if len(results) >= cap:
+                                    break
+                except Exception:
+                    continue
+        return results
+
+    def _go_to_content_hit(self, hit) -> None:
+        entry = hit["path"]
+        pane = self.active_pane()
+        pane["path"] = entry.parent
+        self._refresh(pane)
+        self._select_by_name(pane, entry.name)
+        self.log_info(f"Match: {entry}:{hit['line']}")
         self.panel.render()
 
     def show_history(self) -> None:
@@ -1945,6 +2049,7 @@ class TfmApp:
             ("filter", "Filter list by filename pattern"),
             ("clear_filter", "Clear the filename filter"),
             ("search_dialog", "Recursive filename search"),
+            ("search_content", "Recursive content (grep) search"),
         )),
         ("View", (
             ("view_file", "View file (text viewer)"),
