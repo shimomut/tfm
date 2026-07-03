@@ -69,6 +69,11 @@ SELECT_MIX_INACTIVE = 0.22
 DEFAULT_BG = (30, 30, 38)
 #: Cursor-outline corner radius (device pixels) on a GUI backend.
 CURSOR_RADIUS = 3.0
+#: Inner margin (device pixels) between the pane edge and its file list, so the
+#: content breathes rather than butting the surrounding frame. GUI only — a
+#: character grid has no sub-cell pixels, so it collapses to zero and rows stay
+#: flush to whole cells.
+INNER_MARGIN = 2.0
 
 
 def _mix(a, b, t):
@@ -108,6 +113,9 @@ class FilePane(Widget):
         #: fractional on backends whose scroll carries sub-unit deltas (smooth).
         self.offset: float = 0.0
         self._last_cursor = -1
+        #: Top inner-margin (base units) captured each draw, so a pointer's
+        #: widget-local ``y`` maps back to the right row despite the inset.
+        self._margin_y = 0.0
         self._view_h = 1.0
         self._viewport_rows = 1
         #: Cached extension-column width keyed on the ``files`` list identity
@@ -199,9 +207,17 @@ class FilePane(Widget):
         self._abs = ctx.screen_rect
         files = self.pane["files"]
         count = len(files)
+        # Inner margin, in base units: INNER_MARGIN device pixels converted through
+        # the backend's pixel-per-unit, dropped to zero on a character grid (no
+        # sub-cell pixels). Insets the content band on every side.
+        bw, bh = ctx.base_size
+        mx = (INNER_MARGIN / bw) if (ctx.vector_shapes and bw) else 0.0
+        my = (INNER_MARGIN / bh) if (ctx.vector_shapes and bh) else 0.0
+        self._margin_y = my
         # Exact (fractional) extent so the last partial row and the scroll bounds
         # line up with the pane edge at pixel granularity, not whole base units.
-        view_h = ctx.size_units[1]
+        # The margin eats into it on top and bottom.
+        view_h = max(0.0, ctx.size_units[1] - 2 * my)
         self._view_h = view_h
         self._viewport_rows = max(1, int(view_h))
 
@@ -216,7 +232,7 @@ class FilePane(Widget):
             else:
                 msg = "(empty)"
             if msg:
-                ctx.draw_text(1, 0, elide(msg, max(0, ctx.width - 2), measure=ctx.measure_text),
+                ctx.draw_text(mx + 1, my, elide(msg, max(0, ctx.width - 2), measure=ctx.measure_text),
                               Style(fg=theme.muted_text, attr=TextAttribute.DIM))
             return
 
@@ -230,17 +246,19 @@ class FilePane(Widget):
         self._clamp(count, view_h)
 
         show_bar = count > view_h
-        # Fractional inner width (up to the scrollbar's left edge) so a row fill
-        # and the right-aligned columns reach the true pane edge.
-        full_w = ctx.size_units[0] - (1.0 if show_bar else 0.0)
+        # The content band spans [band_left, band_right): inset by the inner margin
+        # on each side, and on the right up to the scrollbar's left edge, so a row
+        # fill and the right-aligned columns stop just shy of the pane frame.
+        band_left = mx
+        band_right = ctx.size_units[0] - (1.0 if show_bar else 0.0) - mx
 
         # The cursor cue differs by backend: a grid draws framing brackets and so
         # reserves a gutter on each side (``[`` … ``]``); a GUI draws an outline
         # rectangle over the row and reserves nothing, so its names sit flush to
-        # the edges. Content is laid out inside [content_left, content_right).
+        # the band edges. Content is laid out inside [content_left, content_right).
         grid = not ctx.vector_shapes
-        content_left = float(GUTTER_W) if grid else 0.0
-        content_right = full_w - (BRACKET_W if grid else 0.0)
+        content_left = band_left + (GUTTER_W if grid else 0.0)
+        content_right = band_right - (BRACKET_W if grid else 0.0)
 
         def measure(s: str) -> float:
             return ctx.measure_text(s)
@@ -276,15 +294,16 @@ class FilePane(Widget):
         row = 0
         while True:
             i = first + row
-            y = row - frac
-            if y >= view_h or i >= count:
+            ry = row - frac
+            if ry >= view_h or i >= count:
                 break
             if i >= 0:
                 entry = files[i]
-                self._draw_row(ctx, y, entry, i == cursor, str(entry) in selected,
+                self._draw_row(ctx, my + ry, entry, i == cursor, str(entry) in selected,
                                i in self.search_matches, grid,
                                content_left, name_w, ext_x, ext_w, size_right, show_date,
-                               date_right, content_right, full_w, measure, measure_mono)
+                               date_right, content_right, band_left, band_right,
+                               measure, measure_mono)
             row += 1
 
         if show_bar:
@@ -292,11 +311,12 @@ class FilePane(Widget):
             ratio = view_h / content_h
             denom = content_h - view_h
             pos = self.offset / denom if denom > 0 else 0.0
-            ctx.draw_scrollbar(ctx.size_units[0] - 1, 0, view_h, max(0.0, min(1.0, pos)), ratio)
+            ctx.draw_scrollbar(ctx.size_units[0] - 1, my, view_h, max(0.0, min(1.0, pos)), ratio)
 
     def _draw_row(self, ctx, y, entry, is_cursor, selected, is_match, grid,
                   content_left, name_w, ext_x, ext_w, size_right, show_date,
-                  date_right, content_right, full_w, measure, measure_mono) -> None:
+                  date_right, content_right, band_left, band_right,
+                  measure, measure_mono) -> None:
         theme = ctx.theme
         info = self._info(entry)
         is_dir = info["is_dir"]
@@ -339,12 +359,13 @@ class FilePane(Widget):
             ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=col_fg, bg=row_bg, font=MONO))
 
         if is_cursor:
-            self._draw_cursor(ctx, y, full_w, grid)
+            self._draw_cursor(ctx, y, band_left, band_right, grid)
 
-    def _draw_cursor(self, ctx, y, full_w, grid) -> None:
+    def _draw_cursor(self, ctx, y, band_left, band_right, grid) -> None:
         """Draw the cursor-position cue for the current row — a distinct **red**,
         orthogonal to the selection fill. Vivid on the active pane, muted on the
-        inactive one so the focused pane's cursor reads louder.
+        inactive one so the focused pane's cursor reads louder. Framed within the
+        margin-inset content band ``[band_left, band_right)``.
 
         - **GUI** (``vector_shapes``): an outline rectangle framing the row.
         - **TUI** (grid): a bold ``[`` … ``]`` bracket pair around the row.
@@ -356,12 +377,13 @@ class FilePane(Widget):
             bw, bh = ctx.base_size
             ix = 1.0 / bw if bw else 0.0
             iy = 1.0 / bh if bh else 0.0
-            ctx.round_rect(ix, y + iy, max(0.0, full_w - 2 * ix), max(0.0, 1.0 - 2 * iy),
+            ctx.round_rect(band_left + ix, y + iy,
+                           max(0.0, (band_right - band_left) - 2 * ix), max(0.0, 1.0 - 2 * iy),
                            Style(fg=color), radius=CURSOR_RADIUS)
             return
         style = Style(fg=color, attr=TextAttribute.BOLD)
-        ctx.draw_text(0, y, "[", style)
-        ctx.draw_text(int(full_w) - BRACKET_W, y, "]", style)
+        ctx.draw_text(int(band_left), y, "[", style)
+        ctx.draw_text(int(band_right) - BRACKET_W, y, "]", style)
 
     # --- events --------------------------------------------------------------
 
@@ -375,13 +397,13 @@ class FilePane(Widget):
             self.scroll_by(-amount)
             return True
         if event.type is EventType.MOUSE_CLICK and event.button == "left":
-            index = int(self.offset + (event.y or 0.0))
+            index = int(self.offset + max(0.0, (event.y or 0.0) - self._margin_y))
             if 0 <= index < len(self.pane["files"]):
                 if self.on_click is not None:
                     self.on_click(index)
                 return True
         if event.type is EventType.MOUSE_CLICK and event.button == "right":
-            index = int(self.offset + (event.y or 0.0))
+            index = int(self.offset + max(0.0, (event.y or 0.0) - self._margin_y))
             if 0 <= index < len(self.pane["files"]) and self.on_context is not None:
                 rx, ry, *_ = self._abs
                 self.on_context(index, rx + (event.x or 0.0), ry + (event.y or 0.0))
