@@ -1,555 +1,157 @@
-# TFM → PuiKit Porting Project Plan
+# TFM → PuiKit Port
 
-Status: **draft / living document**
-Branch: `puikit-port`
-Last updated: 2026-06-27
+Status: **port essentially complete** — living document, tasks only.
+Branch: `puikit-port` · Last updated: 2026-07-03
 
----
-
-## 1. Goal
-
-Replace TFM's rendering/UI foundation, currently built on the in-repo **`ttk`**
-toolkit, with **[PuiKit](https://github.com/...)** — a capability-based UI
-framework that runs the *same* widget code on TUI (curses), macOS, and Windows
-backends, with Web/Linux/mobile planned.
-
-PuiKit's own design document already names **tfm as its first real user** and
-ships `examples/file_manager/` as a planned canonical example. This project
-makes that real: TFM becomes a PuiKit application.
-
-### What success looks like
-
-- TFM runs on the curses backend and the macOS backend through PuiKit, with no
-  `ttk` import remaining in `src/`.
-- The macOS build additionally gains a real native window experience (native
-  menus, drag-out, proportional fonts where it makes sense) for free from
-  PuiKit's GUI backends, plus a path to a **Windows** build that `ttk` never had.
-- Feature parity on the things that matter (see §3). The UI may be
-  **redesigned** where a PuiKit-native approach is cleaner — pixel-perfect
-  reproduction of the current curses screen is a non-goal.
-
-### Explicit non-goals
-
-- Preserving the `ttk` library (it is the predecessor; PuiKit supersedes it).
-- Reproducing every curses rendering detail 1:1.
-- Rewriting business logic that already works (storage backends, file
-  operations, search, state). We **reuse** that wherever practical.
+TFM's rendering/UI foundation has been moved off the in-repo **`ttk`** toolkit
+onto **[PuiKit](https://github.com/...)**, a capability-based framework that runs
+the same widget code on TUI (curses), macOS, and Windows backends. This doc
+tracks what's **left**; the how/why of finished work lives in git history and the
+keyboard-contract reference (§3 below).
 
 ---
 
-## 2. Two toolkits, side by side
+## 1. Where the port stands
 
-### 2.1 `ttk` (current)
+`ttk` is **fully removed from `src/`** (no `from ttk` / `import ttk` remains; the
+`ttk/` package and the legacy UI modules — `tfm_single_line_text_edit`,
+`tfm_base_list_dialog`, `tfm_quick_edit_bar`, … — are deleted). TFM runs on
+PuiKit on curses + macOS.
 
-A character-grid renderer. The app owns *everything* above raw drawing
-primitives.
+Done and wired (Phases 1–4, plus the GUI-polish pass):
 
-- `ttk.renderer.Renderer` (ABC): `draw_text`, `draw_hline`, `draw_vline`,
-  `draw_rect`, `clear`, `refresh`, `init_color_pair`, `move_cursor`,
-  `run_event_loop` / `run_event_loop_iteration`, plus system integration
-  (`set_menu_bar`, clipboard, drag session, `suspend`/`resume`).
-- Backends: `CursesBackend`, `CoreGraphicsBackend` (Python + C++ extension
-  `ttk_coregraphics_render`).
-- Event model: `EventCallback` with `on_key_event` / `on_char_event` /
-  `on_system_event` / `on_menu_event` / `on_mouse_event`; `KeyEvent`,
-  `CharEvent`, `MouseEvent`, scancode-centric.
-- Color: integer **color pairs** (fg+bg RGB) registered on the backend.
-- **No widget layer, no layout, no layering.** TFM hand-rolls all of it.
+- **Shell** — dual `FilePane` widgets in a `Splitter(Splitter(left, right), log)`
+  layout with per-pane header/footer, a tail-following `LogView` log pane, and a
+  status bar. Virtualized draw, smooth/precise scroll, click/double-click, wheel,
+  draggable splitters, scrollbars.
+- **Interaction** — navigation, selection + focus marker, sort (incl. quick-sort
+  keys), pane-local filter, incremental search, theme colors.
+- **Dialogs / menus** — `MenuBar` (native NSMenu on macOS, in-window strip on
+  curses), message boxes, right-click context menus, the searchable
+  filter-list picker (favorites / drives / programs / jump), and input dialogs
+  (rename / mkdir / create), all as `push_layer` modals.
+- **File operations** — copy / move / delete / rename / batch-rename, threaded
+  with progress, wired through the context menu and keymap.
+- **Search** — recursive filename and content (grep) search, bounded, results in
+  the filter-list dialog.
+- **Viewers** — text viewer (pygments, isearch), file diff viewer, directory-diff
+  viewer, all ported.
+- **Keyboard** — the cross-backend contract (§3) is implemented on curses /
+  macOS / Windows and backed by live regression tests.
+- **GUI polish** — text clips by measured width (not cell count); lines/frames
+  draw as vectors in GUI mode; dialogs grow past the pane while staying
+  pane-anchored; directory listing is always async so navigation never blocks.
+- **edit_file / subshell** — terminal suspend/resume wired.
 
-### 2.2 PuiKit (target)
+---
 
-A capability-based framework with three layers: **App/Widget → Panel/Layout →
-Backend**. Apps express *intent*; the Panel resolves *how* per backend
-capability. Apps never branch on capabilities.
+## 2. Remaining tasks
 
-- `puikit.backend.Backend` (ABC): `draw_text`, `draw_box`, `fill_rect`,
-  `dim_rect`, `draw_scrollbar`, `draw_icon`/`draw_image` (GUI; TUI falls back),
-  `measure_text`, clipboard, menus, `begin_file_drag`, `run_event_loop`.
-  `Style(fg, bg, attr, font)` replaces color pairs; `TextAttribute` is an
-  `IntFlag` (same OR-able pattern as ttk).
-- `puikit.panel.Panel`: layout (`set_layout(VSplit/HSplit/Item)`), layering
-  (`push_layer(widget, z, hints)` with `shadow`/`dim_below`), focus
-  (`focus_tab`, focus chain), event dispatch (`dispatch_event`), animation
-  (`animate`), menus (`set_menu_bar`, `popup_menu`), and `DrawContext` — the
-  only thing widgets draw through.
-- `puikit.theme.Theme`: semantic **surface roles** (`content`, `sidebar`,
-  `header`, `status`) + control palette (accent, selection fills, hover tints)
-  → per-backend colors. Replaces TFM's color-pair scheme system.
-- Widget library (`puikit/widgets/`): `Container`, `Label`, `TextBlock`,
-  `Button`, `Checkbox`, `RadioGroup`, `DropDown`, `ComboBox`, `TextEdit`
-  (full IME), `ProgressBar`, `BusyIndicator`, `Splitter`, **`ListView`**,
-  **`LogView`** (virtualized, tail-follow, drag-select+copy), `MarkdownView`,
-  **`TreeView`**, `Tabs`, `MenuBar`/`MenuPopup`, `MessageBox`, `ScrollBar`,
-  `ScrollView`, `ImageView`, `LayoutView`.
-- Backends: `CursesBackend`, `MacOSBackend` (PyObjC + C++), `WindowsBackend`
-  (ctypes / Direct2D / DirectWrite), `MemoryBackend` (headless tests).
+### 2.1 Async-listing gaps (low priority)
+Directory *listing* runs off the UI thread everywhere it matters, but a few paths
+still list **synchronously**. Fine for local dirs; only bites on genuinely slow
+mounts. Route these through the async path (`_list_pane` in `tfm.py`) when worth
+it:
+- filter apply / clear,
+- quick-sort re-list,
+- post-file-operation reloads,
+- the two startup refreshes (panel/queue not up yet — needs a deferred kick).
 
-### 2.3 The key structural shift
+### 2.2 Windows backend bring-up
+The PuiKit `WindowsBackend` exists and the keyboard contract is implemented for
+it, but TFM has **never been run/tested on Windows**. Stand it up: launch, smoke-
+test navigation/dialogs/viewers, fix backend-specific gaps. (New capability vs.
+`ttk`, which was curses + macOS only.)
 
-| Concern | ttk (today) | PuiKit (target) |
+### 2.3 Retire the legacy ttk-era demos (optional)
+The six `demo/demo_*` scripts that `import ttk` (system-event-broadcast,
+progress-animation, the directory-diff demos, recursion-fix) are **already broken**
+— `ttk` is gone — and target the pre-port architecture. Retire or port them.
+
+---
+
+## 3. Reference — PuiKit keyboard contract
+
+The normative spec for keyboard semantics across backends. Implemented on curses,
+macOS, and Windows via the shared helper `puikit.event.char_key_event`, and
+asserted by `test/test_puikit_keyboard_contract.py` (per-backend translation) and
+`test/test_keybindings_puikit_contract.py` (TFM's matcher on the real keymap). A
+KEY event carries `key` (canonical identity), `char` (produced glyph or `None`),
+and `modifiers ⊆ {"shift","ctrl","alt","cmd"}`.
+
+**Rule 1 — Named non-text keys.** `key` ∈
+`enter, escape, tab, backspace, delete, insert, up, down, left, right, home, end,
+pageup, pagedown, f1…f12`; `char` is `None`; `modifiers` as detected. (PuiKit's
+concatenated names — `pageup`, not `page_up` — are canonical; TFM's parser adapts.)
+
+**Rule 2 — Letters `a`–`z`.** `key` is **always the lowercase letter**; `char` is
+the literal typed glyph (`"a"`/`"A"`); `modifiers` includes `"shift"` **iff** the
+shift form was produced. So **Shift-A is `key="a", modifiers={"shift"}` on every
+backend.** curses *infers* `shift` from an uppercase letter and lowercases `key`;
+macOS lowercases `key` while keeping its real shift flag.
+
+**Rule 3 — Other printables (digits, punctuation, shifted symbols).**
+`key = char =` the **literal produced character** (`"?"`, `"@"`, `"="`, `"!"`).
+The shifted symbol *is* the identity — bind `"!"`, never `"Shift-1"`. **`shift`
+must NOT appear in `modifiers`** (a GUI backend that knows shift was held drops
+it, so `Shift+1` reports `("!", {})` everywhere). `alt` (Option) is **kept** (it
+doesn't change the base glyph); `ctrl`/`cmd` are **kept**.
+
+**Rule 4 — Ctrl/Cmd + letter.** `key` = lowercase letter,
+`modifiers ⊇ {"ctrl"}` (or `{"cmd"}`).
+
+**Rule 5 — Terminal limits are explicit.** curses cannot deliver `cmd`, and
+`alt`/Option combos are unreliable. Bindings needing them (`open_with_os` =
+`Cmd-ENTER`, `reveal_in_os` = `Alt-ENTER`) are **GUI-only** and simply never fire
+on TUI.
+
+**Matcher rules (TFM side).** A binding token resolves to `(identity,
+required_mods)`:
+- **letter / named-key identity:** match iff `event.key == identity` **and**
+  `event.modifiers == required_mods` (exact — so `Shift-A` differs from `a`).
+- **single punctuation identity:** match iff `event.char == identity`
+  (case-sensitive), **ignoring** `shift`/`alt`; `ctrl`/`cmd` still significant if
+  the binding names them.
+
+> **SPACE** is a named key (`key="space"`, `char=" "` retained), so `Shift-SPACE`
+> is distinguishable from `SPACE` like `Shift-A` from `a`.
+>
+> **Bare uppercase letters do not imply shift** — under Rule 2 a bare `'J'`
+> parses to key `j` with shift *dropped* (identical to `'j'`); only `'Shift-J'`
+> keeps the modifier. Alphabetical bindings are case-insensitive **by design**.
+
+### 3.1 TFM token → identity map (in the binding parser)
+
+| TFM token(s) | PuiKit `key` / `char` | Match on |
 |---|---|---|
-| Drawing | app calls `draw_text`/`draw_rect` directly | widgets draw via `DrawContext` |
-| Layout | hand-computed x/y/width in `tfm_main` | declarative `VSplit`/`HSplit`/`Item` |
-| Modals/dialogs | `tfm_ui_layer.UILayerStack` (custom stack) | `Panel.push_layer` |
-| Color | integer color pairs + `tfm_colors` schemes | `Style` + `Theme` surface roles |
-| Focus | implicit (active pane / top layer) | `Panel` focus chain + `focus_tab` |
-| Menus | `tfm_menu_manager` + `set_menu_bar` dict | `puikit.menu.Menu` intent |
-| Text widgets | `tfm_single_line_text_edit` | `puikit.widgets.TextEdit` |
-| Scrollbars | `tfm_scrollbar` | `puikit.widgets.ScrollBar` |
+| `A`…`Z` | lowercase letter | `key` + mods (`Shift-` adds `shift`) |
+| `ENTER, ESCAPE, TAB, BACKSPACE, DELETE, INSERT` | same lowercased | `key` + mods |
+| `UP/DOWN/LEFT/RIGHT/HOME/END` | same lowercased | `key` + mods |
+| `PAGE_UP / PAGE_DOWN` | `pageup` / `pagedown` | `key` + mods |
+| `F1…F12` | `f1`…`f12` | `key` + mods |
+| `MINUS, EQUAL, LEFT_BRACKET, RIGHT_BRACKET, BACKSLASH, SEMICOLON` | `- = [ ] \ ;` | `char` (ignore shift/alt) |
+| `SPACE` | `key="space"`, `char=" "` | `key` + mods |
+| punctuation literals (`?`, `.`, `:`, `;`, `{`, `}`, `[`, `]`) | the literal char | `char` |
+| `Shift-X` | `x` + `shift` | `key` + mods |
+| `Command-X` / `Alt-X` | `x` + `cmd`/`alt` | `key` + mods (GUI-only) |
 
-**TFM already has a Panel-shaped abstraction** in `tfm_ui_layer.UILayerStack`
-(a LIFO layer stack with event routing to the top layer, dirty tracking, and
-full-screen detection). This is the conceptual ancestor of `Panel.push_layer`
-and is the cleanest seam to cut along: the layer stack maps almost directly onto
-the Panel's layer model.
+### 3.2 Command keys vs. text input — focus-gated IME
 
----
+A keypress is sometimes a **command** and sometimes **text**; a GUI's IME makes
+this sharp (with a CJK source, every keystroke would otherwise start composition,
+so single-letter bindings like `j`/`f`/`v` would compose instead of dispatch).
+PuiKit keeps one `Event(KEY, key, char)` (+ `IME_COMPOSITION`) and gates on
+**focus**:
 
-## 3. TFM feature inventory
+- A text-editing widget declares `wants_text_input = True` (`TextEdit`,
+  `ComboBox`). The Panel resolves the focused **leaf** each render and, on a
+  transition, calls `backend.begin_text_input()` / `end_text_input()`.
+- **Text widget focused** → macOS `keyDown` routes through `interpretKeyEvents`
+  (insertText / IME / editing commands).
+- **Anything else focused** → `keyDown` translates **directly** to a command KEY
+  event and does **not** engage the IME, so `j` dispatches even under a Japanese
+  input source. curses/Windows/memory backends inherit the no-op default.
 
-Grouped by how the port treats each. The doc set in `doc/*.md` is the
-authoritative feature catalog; this is the porting-relevant condensation.
-
-### 3.1 Business logic — REUSE (storage/ops; little or no `ttk` coupling)
-
-These modules implement *what TFM does*, independent of how it draws. They are
-the crown jewels and should port with minimal change.
-
-- **Path polymorphism** — `tfm_path.py` (1577), the storage-agnostic `Path`
-  abstraction. Local, **S3** (`tfm_s3.py`), **SFTP/SSH**
-  (`tfm_ssh*.py` — connection, cache, config), and **archive virtual
-  directories** (`tfm_archive*.py`). See `doc/dev/PATH_POLYMORPHISM_SYSTEM.md`.
-- **File operations** — `tfm_file_operation_executor.py` (1301),
-  `tfm_file_operation_task.py` (1029): threaded copy/move/delete, cross-storage
-  move, conflict resolution, fine-grained progress, cancellation.
-- **Archive operations** — `tfm_archive_operation_executor.py` (1853),
-  `tfm_archive_operation_task.py`: create/extract with progress.
-- **Search** — content/filename search engine behind `tfm_search_dialog`
-  (threaded, cancellable, works on remote + in archives).
-- **State & config** — `tfm_state_manager.py`, `tfm_config.py`, `_config.py`
-  (key bindings, favorites, programs), `tfm_cache_manager.py`.
-- **File monitoring** — `tfm_file_monitor_manager.py`,
-  `tfm_file_monitor_observer.py` (watchdog-based auto-reload).
-- **Logging** — `tfm_log_manager.py`, `tfm_logging_handlers.py`, remote log
-  monitoring server.
-- **Progress / FPS / tasks** — `tfm_progress_manager.py`, `tfm_base_task.py`,
-  `tfm_adaptive_fps.py`, `tfm_progress_animator.py`.
-- **External programs / subshell** — `tfm_external_programs.py`,
-  sub-shell env injection.
-
-> Coupling caveat: several of these import `ttk` indirectly (e.g. text width
-> via `ttk.wide_char_utils`, `TextAttribute`, key codes in callbacks). PuiKit
-> provides equivalents (`puikit.text.display_width`, `TextAttribute`,
-> symbolic key names) — these are mechanical swaps, catalogued in Phase 1.
-
-### 3.2 UI layer — REWRITE on PuiKit widgets
-
-The heart of the port. Everything below is `ttk`-coupled rendering code.
-
-**Main shell** (`tfm_main.py`, 5829 lines — the `FileManager` god-class):
-- Dual-pane file list with column layout (name/size/date), color coding by
-  type, selection markers, focused-item marker, incremental-search match
-  highlighting, horizontal scroll, wide-char/NFD handling.
-- Header (path + sort/filter indicators), status bar (dynamic key hints),
-  log pane (resizable, scrollable), pane boundary adjustment.
-- Main key/mouse dispatch, double-click, mouse-wheel, drag-and-drop gesture.
-
-**Dialogs / overlays** (each a `UILayer` today → a `push_layer` widget):
-- `tfm_base_list_dialog.py` → list-style dialogs base (favorites, history,
-  jump, drives, programs, settings menus). Maps to **`ListView` in a dialog**.
-- `tfm_list_dialog.py`, `tfm_drives_dialog.py`, `tfm_info_dialog.py`,
-  `tfm_about_dialog.py`.
-- `tfm_search_dialog.py` (filename/content search w/ live results +
-  animation).
-- `tfm_batch_rename_dialog.py` (regex rename with live preview + match
-  highlighting).
-- `tfm_quick_choice_bar.py` (yes/no/cancel confirmation bar) → **`MessageBox`**
-  or a thin custom bar.
-- `tfm_quick_edit_bar.py` (single-line prompt: rename, mkdir, filter) →
-  **`TextEdit`** in a bar.
-- `tfm_candidate_list_overlay.py` (tab-completion popup) → floating
-  `push_layer` list, like PuiKit's `DropDown` popup.
-- Help dialog (`?`).
-
-**Viewers** (full-screen layers):
-- `tfm_text_viewer.py` (1267) — syntax-highlighted text viewer (pygments),
-  line numbers, h-scroll, in-viewer isearch, tab handling, remote/in-archive.
-- `tfm_diff_viewer.py` (1499) — two-file side-by-side diff.
-- `tfm_directory_diff_viewer.py` (4527!) — recursive directory diff, the
-  single largest UI module.
-
-**Rendering support** (replace with PuiKit equivalents):
-- `tfm_colors.py` (927) — color schemes → **`Theme`** + `Style`.
-- `tfm_text_layout.py` (1429) — text wrapping/layout → PuiKit `text`/`TextBlock`
-  / widget measuring (keep parts that encode TFM-specific layout rules).
-- `tfm_str_format.py` — size/date formatting (pure, **reuse**).
-- `tfm_scrollbar.py` → `puikit.widgets.ScrollBar`.
-- `tfm_single_line_text_edit.py` (1163) → `puikit.widgets.TextEdit`.
-- `tfm_menu_manager.py` → `puikit.menu.Menu`.
-- `tfm_ui_layer.py` (UILayerStack) → `puikit.Panel` layers.
-- `tfm_pane_manager.py`, `tfm_file_list_manager.py` — pane/list state; partly
-  reusable (state), partly UI (rendering moves into widgets).
-
----
-
-## 4. Gap analysis — custom widgets TFM needs
-
-PuiKit's philosophy (widget_catalog.md §2): *configure/compose existing widgets
-before adding new ones.* Applying that test:
-
-| TFM need | PuiKit answer |
-|---|---|
-| Confirmation bars, alerts | `MessageBox` (configure) |
-| Single-line prompts (rename, mkdir) | `TextEdit` in a one-row layer |
-| Tab-completion popup | floating `ListView`/`DropDown`-style popup |
-| Favorites / history / drives / programs / settings | `ListView` inside a dialog layer |
-| Sort / view / settings menus | `Menu` (native on GUI, widget on TUI) |
-| Log pane | **`LogView`** (already does virtualize + tail + copy) |
-| Scrollbars | `ScrollBar` |
-| Progress feedback | `ProgressBar` + `BusyIndicator` |
-| Markdown help / about | `MarkdownView` |
-| Directory diff tree | `TreeView` as a base, custom row rendering |
-
-**Genuinely new widgets to build** (no adequate existing PuiKit widget):
-
-1. **`FilePane`** — the dual-pane core. A virtualized, columnar, selectable list
-   with: per-type color coding, selection + focus markers, incremental-search
-   highlighting, horizontal scroll, wide-char/NFD-aware truncation, mouse
-   click/double-click/drag. `ListView` is the starting point but the column
-   model, selection semantics, and search highlighting are TFM-specific. This is
-   the flagship custom widget and the one to prototype first (§6, Phase 2).
-2. **`SyntaxTextView`** — text viewer with pygments highlighting, line numbers,
-   in-view isearch. Could extend `ScrollView` + a custom content widget; the
-   highlighting → `Style` runs per line is the new part.
-3. **`DiffView`** / **`DirectoryDiffView`** — side-by-side and tree diff. Large;
-   likely custom, possibly sharing a two-column scroll-synced base widget.
-
-Each new widget is proposed to PuiKit upstream where it is general enough
-(`FilePane` arguably is; the diff views are TFM-specific). Decide per widget
-whether it lives in `puikit/widgets/` or in TFM's app code.
-
----
-
-## 5. Target architecture
-
-```
-tfm.py / entry point
-  └─ selects PuiKit backend (curses | macos | windows)
-       └─ Panel(backend, theme)
-            ├─ set_layout( VSplit(
-            │     Item(MenuBar?,    size="content"),     # GUI: native, zero-space
-            │     Item(HSplit(                            # dual pane
-            │        Item(FilePane(left),  weight=…),
-            │        Item(FilePane(right), weight=…),
-            │        divider="subtle"), weight=1),
-            │     Item(LogView,     size=log_h, surface="status"),
-            │     Item(StatusBar,   size="content", surface="status"),
-            │  ))
-            └─ push_layer(...) for dialogs / viewers / menus
-
-  TFM "controller" (slimmed FileManager): owns panes' business state, wires
-  widget callbacks to reused business logic (file ops, search, nav, config).
-```
-
-Principles:
-- **Widgets render; the controller orchestrates.** The 5829-line `FileManager`
-  is decomposed: rendering moves into widgets, orchestration stays in a much
-  smaller controller that holds `PaneManager`/`FileListManager` state and
-  dispatches actions.
-- **Dialogs/viewers are `push_layer` widgets**, replacing `UILayerStack`.
-- **Theme replaces color schemes.** Dark/light become two `Theme`s; the
-  `toggle_color_scheme` key swaps `panel.theme`.
-- **Keep business logic backend-agnostic** — it already is, mostly.
-
----
-
-## 6. Phased migration strategy
-
-Incremental, keeping a runnable app at each phase end where feasible. Validate
-on **curses first** (fastest loop, no compiled deps), then macOS, then Windows.
-
-### Phase 0 — Foundations & spike *(de-risk)*
-- Stand up `examples/file_manager/` skeleton in PuiKit (or a `puikit-port`
-  entry in TFM) that opens a Panel with a two-pane layout + status bar showing
-  **static** content on curses + macOS. Proves the layout/theme/run-loop wiring.
-- Decide repo topology (§8) and the `ttk`→`puikit` compatibility shim strategy.
-- Inventory every `from ttk …` import in `src/` and map each symbol to a PuiKit
-  equivalent (text width, `TextAttribute`, key names, mouse events).
-- **Exit:** empty dual-pane shell runs on curses and macOS.
-
-### Phase 1 — Decouple business logic from `ttk`
-- Introduce a thin `tfm.compat` (or adopt `puikit` directly) for: display
-  width, key/char/mouse event shapes, `TextAttribute`. Replace `ttk` imports in
-  the **reuse** modules (§3.1) so they no longer depend on `ttk`.
-- Run the existing test suite against the decoupled logic (the bulk of the
-  720+ tests target business logic and should keep passing).
-- **Exit:** §3.1 modules import no `ttk`; logic tests green.
-
-### Phase 2 — `FilePane` widget + main shell
-- Build the **`FilePane`** custom widget (the flagship). Wire two of them +
-  header/status into the Panel layout. Hook navigation, selection, sorting,
-  filtering, incremental search highlighting to reused state managers.
-- Replace `tfm_colors` usage with a `Theme` (dark + light).
-- Port the **status bar** (dynamic key hints) and **log pane** (→ `LogView`).
-- Mouse: click/double-click/wheel/pane-focus via Panel event dispatch.
-- **Exit:** browse, navigate, select, sort, filter, isearch, switch panes,
-  resize panes/log on curses + macOS. No dialogs yet.
-
-### Phase 3 — Bars, dialogs & menus
-- Quick-edit bar (rename/mkdir/create-file/filter) → `TextEdit` layer.
-- Quick-choice/confirmation → `MessageBox`.
-- List dialogs (favorites, history, jump, drives, programs) → `ListView` layers
-  on a shared dialog base.
-- Sort/view/settings menus + main menu bar → `puikit.menu.Menu` (native on
-  macOS, widget on curses).
-- Tab-completion overlay; help & about (`MarkdownView`).
-- **Exit:** all non-viewer interactions work; file operations (copy/move/delete/
-  rename/mkdir) fully wired with progress.
-
-### Phase 4 — Viewers
-- `SyntaxTextView` (text viewer + isearch + highlighting).
-- File diff viewer.
-- Directory diff viewer (largest; budget accordingly).
-- Batch rename dialog (live preview).
-- Search dialogs (filename/content with live results + animation).
-- **Exit:** feature parity reached.
-
-### Phase 5 — GUI polish, Windows, system integration
-- Native macOS menus, drag-out (`begin_file_drag`), clipboard rich, file
-  monitoring, window geometry persistence, fonts.
-- Bring up the **Windows** backend (new capability vs ttk).
-- Performance pass (adaptive FPS, virtualized rendering, profiling parity).
-- **Exit:** macOS + Windows + curses all shippable.
-
-### Phase 6 — Cleanup
-- Delete `ttk/` and dead UI modules. Update docs, `setup.py`/`pyproject`,
-  `macos_app/` build. Migrate/retire `demo/` scripts.
-
----
-
-## 7. Testing strategy
-
-- **Business logic tests** (most of the 720+) should survive Phase 1 largely
-  intact — they don't touch rendering.
-- **Widget tests** run headless on PuiKit's `MemoryBackend`, identically across
-  backends (PuiKit policy). New widgets (`FilePane`, viewers) get such tests.
-- **Replace** `ttk`-integration tests (`test_*_ttk_integration.py`,
-  CoreGraphics tests) with PuiKit-backend equivalents; retire the rest.
-- Keep `demo/` as manual verification scripts, ported opportunistically.
-
----
-
-## 8. Resolved decisions
-
-- **Repo topology — DECIDED.** PuiKit stays a **separate repo**; TFM will
-  eventually depend on it from **PyPI** (`pip install puikit`). During this
-  project both repos are edited together, so PuiKit is installed into TFM's venv
-  in **editable mode**:
-  ```bash
-  .venv/bin/python -m pip install -e /Users/crftwr/projects/puikit
-  ```
-  This resolves `import puikit` straight to the sibling source tree
-  (`/Users/crftwr/projects/puikit/puikit/`), so PuiKit edits are picked up live
-  with **no reinstall** — reinstall is only needed if PuiKit's package layout or
-  entry points in `pyproject.toml` change, not for ordinary code edits. Add this
-  to TFM's dev setup (`Makefile` `venv` target / dev requirements) so the
-  editable link is reproducible.
-- **Where new widgets live — DECIDED.** `FilePane` and the other TFM-specific
-  widgets (`SyntaxTextView`, diff views) live in **TFM's repo**, not upstream in
-  PuiKit. They draw purely through `DrawContext`, so they remain backend-
-  agnostic and could be proposed upstream later if they prove general — but the
-  default home is TFM.
-
-## 9. Open questions / decisions needed
-
-1. **PuiKit keyboard contract (gating).** PuiKit's event model is unverified for
-   real keyboard-driven control; TFM's ttk-based keymap is the proven spec.
-   Before porting key handling we must decide & implement PuiKit's Shift/case +
-   rich-modifier semantics (Command/Alt/Shift across all backends), importing
-   ttk's `ModifierKey` concepts. See
-   [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md) §1.3.
-   Recommendation: keep TFM's matcher; define the contract in PuiKit; verify
-   with TFM's real keymap. This is the first Phase-1 task.
-2. **`FileManager` decomposition depth.** How aggressively to break up the
-   5829-line god-class — full MVC split vs. pragmatic "move rendering out,
-   keep an orchestrator." Recommendation: pragmatic, guided by what the Panel
-   model naturally pulls apart.
-3. **Theme fidelity.** Reproduce TFM's existing color schemes as `Theme`s, or
-   redesign around PuiKit's surface-role palette? Recommendation: start from
-   PuiKit's defaults (VS Code-like flat), port the popular schemes later.
-4. **Wide-char/NFD handling.** TFM has extensive macOS NFD normalization logic.
-   Confirm PuiKit's `text` module covers it or carry TFM's helpers forward.
-5. **Compiled backends.** macOS C++ extension and Windows ctypes layer are
-   PuiKit's responsibility; confirm they're stable enough for TFM's needs early
-   (Phase 0 spike).
-
----
-
-## 10. Effort shape (rough)
-
-| Phase | Relative size | Risk |
-|---|---|---|
-| 0 Foundations/spike | S | low |
-| 1 Decouple logic | M | low–med |
-| 2 FilePane + shell | **L** | **high** (flagship widget) |
-| 3 Bars/dialogs/menus | L | med |
-| 4 Viewers | **XL** | high (dir-diff is 4.5k lines) |
-| 5 GUI/Windows/perf | L | med |
-| 6 Cleanup | S | low |
-
-The two tentpoles are **Phase 2 (`FilePane`)** and **Phase 4 (viewers,
-especially directory diff)**. Everything else is comparatively mechanical once
-the Panel/widget patterns are established in Phase 2.
-
----
-
-## 11. Immediate next steps
-
-1. ~~Resolve repo topology and widget home.~~ **Done** — see §8 (PyPI dependency,
-   editable install for dev; new widgets live in TFM's repo).
-2. ~~Pin down the PuiKit keyboard contract **and land the backend changes**.~~
-   **Done** — see [PUIKIT_KEYBOARD_CONTRACT.md](PUIKIT_KEYBOARD_CONTRACT.md).
-   The contract is defined, the 5 PuiKit-side changes (curses + macOS
-   shift-letter normalization, F1–F12, SPACE-as-named) are implemented, and the
-   spec (`test/test_puikit_keyboard_contract.py`) passes 17/17 with PuiKit's full
-   suite still green.
-3. ~~Port `tfm_config`'s matcher onto the contract.~~ **Done** — `tfm_config` is
-   now ttk-free; matcher rewritten to the contract triple with a transitional
-   ttk-event branch so the app keeps running pre-backend-swap. 23 keybinding
-   tests pass (`test/test_keybindings_puikit_contract.py` + the legacy ttk one).
-4. ~~Phase 1 logic decoupling — text/colors/logging/archive-task off ttk.~~
-   **Done** — `puikit.text.truncate_to_width` gained `ellipsis`; `tfm_text_layout`,
-   `tfm_colors`, `tfm_logging_handlers`, `tfm_archive_operation_task` are
-   ttk-free. **No logic module imports ttk** — every remaining `from ttk` in
-   `src/` is a UI module (dialogs/viewers/`tfm_main`) that Phases 2–4 rewrite as
-   widgets. **Phase 1 complete.**
-5. ~~Phase 0/2 spike — two-pane PuiKit shell.~~ **Done (first slice).** TFM runs
-   on PuiKit for the first time: `tfm.py` (entry point + `TfmApp`
-   controller + `StatusBar`) hosts two custom `FilePane` widgets
-   (`src/tfm_file_pane.py`) in a `VSplit(HSplit(left, right, divider), status)`
-   layout. It **reuses the decoupled business logic unchanged** — `tfm_path.Path`
-   for listing, `PaneManager`/`FileListManager` for pane state, `tfm_config`'s
-   contract keymap for dispatch — and the input foundation just built (command
-   keys, IME-gated). Working: browse, cursor up/down/page/home/end, switch pane
-   (Tab), descend (Enter), go-parent (Backspace, cursor lands on origin dir),
-   toggle hidden, quit; name + size columns, dirs-first sort, theme colors.
-   Verified headlessly on `MemoryBackend`; runs on curses + macOS.
-
-   **Before keyboard-input work could even start, GUI testing surfaced (and we
-   fixed) four cross-backend input bugs the headless tests couldn't catch:**
-   macOS punctuation-shift, the whole Windows printable path, macOS `insertText`
-   letter handling, and the always-on IME (now focus-gated). See
-   [PUIKIT_KEYBOARD_CONTRACT.md](PUIKIT_KEYBOARD_CONTRACT.md) §§3,5.
-6. ~~`FilePane` interaction parity with `ListView`.~~ **Done.** `FilePane` now
-   matches `ListView` on the interaction/rendering features: **virtualized**
-   draw (only the visible window), **smooth scroll** (float `offset` in base
-   units; GUI trackpad/precise-wheel `scroll_units` → pixel-granular; TUI stays
-   grid-aligned), **click**-to-select-and-activate, **wheel/trackpad** scroll
-   (viewport-only, the pane under the pointer), a **scrollbar** when the list
-   outgrows the pane, and measured fitting. Mouse routes via
-   `Panel.dispatch_event` (keyboard stays on TFM's global keymap). Verified
-   headlessly (per-pane routing, fractional offset, cursor-follow).
-7. ~~Selection + focused-item marker.~~ **Done.** Space (toggle + move),
-   Shift-Space (toggle + up), `A` (all files), Shift-A (all items), Home (select
-   all), End (clear) — all reuse `FileListManager`'s selection methods on
-   `pane_data['selected_files']`. `FilePane` renders a `•` marker in a left
-   gutter (names don't shift), selected names in a distinct amber; the status bar
-   shows the count. Fixed a bug: Home/End were cursor-jump, now select/unselect
-   per TFM's bindings.
-8. ~~Window chrome — header / footer / log pane / status bar.~~ **Done.** The
-   layout is now TFM-shaped: each pane is a column of `VSplit(PaneHeader,
-   FilePane, PaneFooter)` (one strong divider runs full height), over a
-   full-width `LogView` log pane and a `StatusBar`. **PaneHeader** shows the
-   pane's path (accent when active); **PaneFooter** shows `N dirs, M files
-   (K selected) | Sort: Name ↑ | Filter: …` (reusing `get_sort_description`);
-   the **log pane** is a tail-following `LogView` the controller appends action
-   messages to (selection/navigation/hidden-toggle); the **status bar** shows
-   global key hints. Surfaces: header/content/status roles per row.
-9. ~~Draggable splitters (mouse resize).~~ **Done.** The static dividers are now
-   two `Splitter` widgets: a **horizontal** one between the file panes (drag the
-   vertical handle to re-apportion left/right) nested inside a **vertical** one
-   between the panes-area and the log pane (drag the horizontal handle to resize
-   the log). Each pane column is a `LayoutView(VSplit(header, list, footer))` so
-   it can be a Splitter child. Click/scroll still route correctly through the
-   deeper Splitter→LayoutView→FilePane nesting; the handle shows a
-   col-/row-resize cursor and accent highlight on hover/drag. `Splitter.fraction`
-   is now the pane-ratio source of truth (wire `[`/`]`/`-` keys to nudge it).
-10. ~~Major UI patterns — capability spike (message box, menu, context menu).~~
-    **Done.** A deliberate check that PuiKit can express TFM's interactive UI
-    vocabulary *before* committing to a specific dialog UX. Wired into
-    `tfm.py`: a **`MenuBar`** from one `puikit.menu.Menu` model
-    (File / Select / View / Help) — the OS-native NSMenu on macOS, an in-window
-    strip on curses, no app branch; **`show_message_box`** modals for a quit
-    confirmation (`q` and File → Quit) and an About box; a **right-click context
-    menu** on `FilePane` rows via `Panel.popup_menu` (open / select / show-hidden,
-    file-ops disabled until their phase). Menu `checked`/`enabled` are **live
-    predicates** (Show Hidden ✓ tracks state, Open/Clear-Selection enable on
-    content/selection), and View → Sort By drives a real re-sort
-    (`FileListManager`). Integration seams added: `Panel.has_layers` (public
-    modal check) so TFM's global keymap stands down while a layer owns events,
-    and `FilePane.on_context` (captures `screen_rect`, maps the pointer to screen
-    coords for the popup). Verified headlessly on `MemoryBackend` (menu shape,
-    predicate tracking, quit-confirm push/cancel, sort, context-menu push/close,
-    strip render). **Finding: PuiKit covers these patterns with no gaps** — the
-    only additions were the two small seams above.
-
-    **Open UX question (deferred deliberately):** TTK's single bottom *text-input
-    bar* multiplexes many roles (filter, incremental search, rename, mkdir,
-    create-archive…). Before porting it verbatim, decide whether a bottom bar is
-    still the best UI on PuiKit or whether some of those roles read better as
-    **modal input dialogs** (the searchable list dialog — `BaseListDialog` — is
-    TFM's real workhorse and is itself a modal: a filter field + scrollable list
-    + on-select).
-
-11. ~~Modal list/input dialog (the searchable-list workhorse).~~ **Done.**
-    `src/tfm_filter_list_dialog.py` — a `FilterListDialog(FocusContainer, Widget)`
-    pushed as a modal layer by `show_filter_list`, the PuiKit equivalent of ttk's
-    `BaseListDialog`. It **composes PuiKit primitives** instead of re-rolling
-    them: a `TextEdit` filter field over a `ListView` of results. Typing filters
-    (substring, case-insensitive); ↑/↓/PageUp/PageDown drive the list while the
-    field keeps focus; Enter accepts; Esc / outside-click cancels; reports through
-    `on_accept(value)` / `on_cancel()`. Wired to TFM's **favorites** (plain `j`,
-    and File → "Go to Favorite…") — pick a favorite dir, jump the active pane
-    there — reusing `get_favorite_directories()`. Verified headlessly (filter,
-    nav, accept, cancel, outside-click) on `MemoryBackend`.
-
-    **Gap found & fixed in PuiKit (the point of the spike):** text input inside a
-    modal layer didn't engage. `Panel.focused_leaf()` (which gates IME) descended
-    only from the *page* focus (`_focused`), and `_apply_layout` resets that to a
-    page widget every render — so a `TextEdit` in a pushed layer (this dialog, or
-    even `Drawer`) never turned on the IME, even though `dispatch_event` already
-    treats the top layer as modal for *events*. Fixed by making `focused_leaf()`
-    descend from the **top layer** when one is open (focus now follows the same
-    modal rule as events). Regression test added
-    (`tests/test_text_input_gating.py::test_modal_layer_owns_the_focus_leaf`); full
-    suite green (680 passed). This is the second PuiKit seam this Phase-2/3 work
-    needed, after `Panel.has_layers`.
-
-    **Finding — bar vs. modal (the UX question):** the modal list dialog is the
-    right home for **discrete selection** (favorites, drives, programs, jump-to)
-    — a filter that narrows a fixed set to one choice. It is *not* the right home
-    for **live, incremental** roles (filter-the-current-pane, incremental search)
-    where the result updates the pane as you type and there is no "accept one row"
-    moment — those still read better as a lightweight **bottom input bar**. So the
-    recommendation is to **split TTK's single multiplexed bar by role**: modal
-    list dialog for pickers; a small bottom bar for live filter/search and for
-    one-line text entry (rename / mkdir). Both reuse `TextEdit` (focus-gated IME).
-
-    **Follow-up (config nuance, non-blocking):** under the keyboard contract a
-    bare uppercase-letter binding parses with shift *dropped* (`'J'` → key `j`,
-    no modifier — same as `'j'`), while `'Shift-J'` keeps the shift. So the
-    default config's `favorites: ['J']` fires on **plain `j`**, and
-    `jump_to_path: ['Shift-J']` on Shift+J — likely inverting the author's intent
-    (they probably meant Shift+J for favorites). Revisit the default bindings (or
-    decide bare-uppercase should imply shift) when porting the full keymap.
-
-12. **Next** — the **bottom input bar** for the live/one-line roles (filter,
-    incremental search, rename, mkdir), completing the bar-vs-modal split above;
-    then file operations (copy/move/delete) now that selection + context menu
-    exist; the quick-sort keys (1–4) and keyboard pane/log resize
-    (`[` `]` `-` `{` `}`). Later: wire TFM's `LogManager` to feed the log pane;
-    double-click (needs backend click-count).
-6. ~~Phase 1 import inventory.~~ **Done** — see
-   [PUIKIT_TTK_IMPORT_INVENTORY.md](PUIKIT_TTK_IMPORT_INVENTORY.md): every `ttk`
-   symbol used in `src/` mapped to its PuiKit equivalent, with a per-file
-   strategy and a suggested Phase-1 execution order.
+`Panel.focused_leaf()` descends from the **top layer** when a modal is open, so a
+`TextEdit` inside a pushed dialog engages the IME (same modal rule as event
+dispatch). Covered by PuiKit's `tests/test_text_input_gating.py`.

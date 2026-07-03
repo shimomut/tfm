@@ -1,7 +1,7 @@
 """DirectoryDiffView — recursive side-by-side directory diff for the PuiKit port.
 
-The PuiKit counterpart to ttk TFM's ``DirectoryDiffViewer``: compares two
-directories recursively and shows the union of their trees side by side, each
+Compares two directories recursively and shows the union of their trees side by
+side, each
 node classified (only-left, only-right, content-different, contains-difference,
 identical) with a centre separator glyph carrying the verdict. Directories
 expand/collapse; ``n``/``N`` jump between differences; Enter on a differing file
@@ -14,9 +14,8 @@ A per-frame tick registered via ``panel.request_animation_ticks`` runs on the
 main thread and re-renders when the flag is set, so a large tree fills in live
 without blocking the UI. Pass ``background=False`` (tests) to scan synchronously.
 
-This module keeps the backend-agnostic scanning/classification logic (ported
-from the ttk version with the ttk imports dropped) and rewrites the rendering
-and event handling as a :class:`~puikit.widgets.base.Widget`, following the
+This module keeps the backend-agnostic scanning/classification logic and renders
+via a :class:`~puikit.widgets.base.Widget`, following the
 :mod:`tfm_diff_viewer` pattern. Push it with :func:`show_directory_diff_viewer`.
 """
 
@@ -94,7 +93,7 @@ class TreeNode:
     parent: Optional["TreeNode"] = None
 
 
-# --- scanning / classification (backend-agnostic, ported from ttk) -----------
+# --- scanning / classification (backend-agnostic) ---------------------------
 
 
 class DirectoryScanner:
