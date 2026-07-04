@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from puikit.backend import Style, TextAttribute
+from puikit.backend import Style, TextAttribute, TRANSPARENT
 from puikit.event import Event, EventType
 from puikit.font import Font
 from puikit.text import elide
@@ -254,7 +254,7 @@ class FilePane(Widget):
 
         # The cursor cue differs by backend: a grid draws framing brackets and so
         # reserves a gutter on each side (``[`` … ``]``); a GUI draws an outline
-        # rectangle over the row and reserves nothing, so its names sit flush to
+        # rectangle framing the row and reserves nothing, so its names sit flush to
         # the band edges. Content is laid out inside [content_left, content_right).
         grid = not ctx.vector_shapes
         content_left = band_left + (GUTTER_W if grid else 0.0)
@@ -331,8 +331,8 @@ class FilePane(Widget):
         # accent (never the accent itself), firmer on the active pane, painted
         # over any live isearch-match tint. It spans only the content region, so
         # the grid's cursor-bracket gutters stay clear (they are the cursor's
-        # channel). The cursor is drawn *on top* as an orthogonal red outline/
-        # bracket cue, so a selected row under the cursor reads as both at once.
+        # channel).
+        gui_cursor = is_cursor and not grid
         base = ctx.background or DEFAULT_BG
         if selected:
             ratio = SELECT_MIX_ACTIVE if self.active else SELECT_MIX_INACTIVE
@@ -341,24 +341,38 @@ class FilePane(Widget):
             row_bg = MATCH_BG
         else:
             row_bg = None
-        if row_bg is not None:
+
+        # Paint the row background first, then (on a GUI cursor row) the red
+        # outline, then the text — the three layers the cursor cue needs, in
+        # order. The cursor row always gets a solid fill so the outline sits on an
+        # opaque base: its own tint when selected/matched, else the pane bg.
+        fill_bg = row_bg if row_bg is not None else (base if gui_cursor else None)
+        if fill_bg is not None:
             ctx.fill_rect(content_left, y, max(0.0, content_right - content_left), 1.0,
-                          Style(bg=row_bg))
+                          Style(bg=fill_bg))
+        if gui_cursor:
+            self._draw_cursor(ctx, y, band_left, band_right, grid)
 
         # Foreground keeps the dir/file color language on every row — the subtle
         # selection tint reads underneath it without needing a contrast override.
+        # The cursor row's glyphs draw over a *transparent* background so they land
+        # directly on the fill + outline below without a per-run fill repainting
+        # (and breaking) the stroke — the outline stays whole, the glyphs stay crisp.
         name_fg = theme.accent if is_dir else theme.text
         col_fg = theme.muted_text
+        text_bg = TRANSPARENT if gui_cursor else row_bg
 
-        ctx.draw_text(content_left, y, name_text, Style(fg=name_fg, bg=row_bg))
+        ctx.draw_text(content_left, y, name_text, Style(fg=name_fg, bg=text_bg))
         if ext_text:
-            ctx.draw_text(ext_x, y, ext_text, Style(fg=name_fg, bg=row_bg))
+            ctx.draw_text(ext_x, y, ext_text, Style(fg=name_fg, bg=text_bg))
         if size:
-            ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=col_fg, bg=row_bg, font=MONO))
+            ctx.draw_text(size_right - measure_mono(size), y, size, Style(fg=col_fg, bg=text_bg, font=MONO))
         if date:
-            ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=col_fg, bg=row_bg, font=MONO))
+            ctx.draw_text(date_right - measure_mono(date), y, date, Style(fg=col_fg, bg=text_bg, font=MONO))
 
-        if is_cursor:
+        # Grid cursor cue drawn last: bold ``[`` … ``]`` brackets in the gutter
+        # (they sit in the reserved gutter columns, clear of the glyphs).
+        if is_cursor and grid:
             self._draw_cursor(ctx, y, band_left, band_right, grid)
 
     def _draw_cursor(self, ctx, y, band_left, band_right, grid) -> None:
