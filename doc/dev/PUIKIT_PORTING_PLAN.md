@@ -74,43 +74,53 @@ already dispatch through `self._menu("<action>")` name their action directly;
 the ones wired to bespoke callbacks need an action id (or an explicit mapping) so
 the same lookup applies.
 
-### 2.4 Progress dialogs for async file / archive operations
-Copy / move / delete and archive create / extract run on background threads and
-already **track** progress and support cancellation — what the port lost is the
-*visible surface*. Wire up modal progress dialogs.
+### 2.4 File / archive operations: threading, progress, cancellation, conflict resolution
+The port did **not** reuse the ttk four-layer operation framework
+(`BaseTask` + `FileOperationTask` / `Executor` / `UI` and the `ArchiveOperation*`
+trio). Instead it **reimplemented copy / move / delete and archive create /
+extract inline and synchronously** on `TfmApp`:
 
-**What already exists (reuse, don't rebuild):**
-- `ProgressManager` (`tfm_progress_manager.py`) tracks the whole operation:
-  item count (`processed_items`/`total_items`, `get_progress_percentage`),
-  per-file byte progress (`update_file_byte_progress`, used for large/SSH
-  copies), error count, a spinner animation (`refresh_animation`), and
-  render-ready output (`get_progress_segments` / `get_progress_text`).
-- Cancellation is fully plumbed: `BaseTask.request_cancellation()` /
-  `is_cancelled()` and each task's `cancel()`; the executor loops in
-  `tfm_file_operation_executor.py` / `tfm_archive_operation_executor.py` already
-  poll `task.is_cancelled()` between items and stop cleanly.
-- The only UI hook today is `_progress_callback` → `file_manager.mark_dirty()`
-  (executors), i.e. a redraw request from the worker thread. **Nothing consumes
-  `get_progress_segments`/`get_progress_text` in the ported `tfm.py`**, so the
-  operation currently runs invisibly with no way to cancel mid-flight.
+- copy / move → [`tfm.py` `_transfer()`](../../tfm.py) — conflict check, a
+  `show_message_box` confirm, then a synchronous `run()` closure calling
+  `Path.copy_to` / `Path.move_to`.
+- delete → `delete_files` / `_delete_path` (recurse + `unlink` / `rmdir`).
+- archive → `create_archive` / `_write_archive` / `_extract_archive` (stdlib
+  `zipfile` / `tarfile`).
 
-**To build:**
-- A modal progress dialog pushed like the other dialogs (`push_layer` /
-  `show_message_box` pattern), built on PuiKit's `ProgressBar` widget, shown for
-  the duration of an active operation and popped on finish/cancel.
-- **Progress bar(s):** an overall determinate bar (items processed / total, from
-  `get_progress_percentage`); plus a *second* per-file byte bar shown only while
-  byte progress is active (`update_file_byte_progress` — large / SSH copies).
-  Fall back to an indeterminate `BusyIndicator` when a total isn't known yet.
-  Show the current item name + error count (`get_progress_segments`).
-- **Cancellation:** a Cancel button and `Esc` that call the active task's
-  `cancel()`; reflect a "cancelling…" state until the worker unwinds, then pop.
-- **Threading:** progress updates originate on worker threads — the dialog must
-  *read* `ProgressManager` state during its own `draw` (driven by the existing
-  `mark_dirty` redraw kick / animation ticks), never be mutated from the worker.
-- Wire the same dialog for both operation families (they share `BaseTask` +
-  `ProgressManager` + the four-layer architecture), through
-  `FileOperationUI` / `ArchiveOperationUI` where the task is created/started.
+The heavy lifting — directory recursion and cross-storage (S3 / SSH) transfer —
+is delegated to the storage-agnostic `Path` API (`tfm_path.py`), which the port
+reuses unchanged. That is why the whole task framework became orphaned; it now
+lives under **`legacy/src/`** (`tfm_file_operation_*.py`, `tfm_archive_operation_*.py`,
+`tfm_base_task.py`) as **reference only** — consult it for the state-machine /
+executor design when building the items below, but the port does not import it.
+`tfm_progress_manager.py` / `tfm_progress_animator.py` remain live in `src/` but
+the operation path does not currently wire into them.
+
+Four capabilities the inline reimplementation dropped, to build back:
+
+- **Threading** — operations run synchronously on the UI thread today, so a large
+  copy / delete / archive freezes the app until it finishes. Move the work onto a
+  background worker (as the legacy executors did), keeping the `Path` calls but
+  driving them from a thread; marshal results back to the UI thread for the
+  refresh / summary.
+- **Progress UI** — no visible surface during an operation. Add a modal progress
+  dialog (pushed like other dialogs via the `push_layer` / `show_message_box`
+  pattern) built on PuiKit's `ProgressBar`: an overall determinate bar (items
+  processed / total), plus a second per-file byte bar for large / SSH copies,
+  falling back to an indeterminate `BusyIndicator` when no total is known. Reuse
+  `ProgressManager` for the accounting (item + byte progress, error count,
+  spinner, `get_progress_segments`) rather than rebuilding it. The dialog must
+  *read* the shared `ProgressManager` state during its own `draw`, never be
+  mutated from the worker.
+- **Cancellation** — none today. Add a Cancel button + `Esc` that set a
+  cooperative cancel flag the worker polls between items (the legacy
+  `BaseTask.request_cancellation()` / `is_cancelled()` pattern), showing a
+  "cancelling…" state until the worker unwinds, then popping the dialog.
+- **Conflict resolution** — the port collapses conflicts to a single up-front
+  three-button prompt (Overwrite / Skip existing / Cancel) applied to the whole
+  batch. Restore richer per-conflict resolution (overwrite / skip / rename, with
+  an "apply to all remaining" option), as the ttk `FileOperationUI` /
+  `ArchiveOperationUI` offered, interleaved with the background execution.
 
 ### 2.5 Make the Directory Diff Viewer scan more progressively (ttk parity)
 The ported viewer (`tfm_directory_diff_viewer.py`) *is* threaded, but its

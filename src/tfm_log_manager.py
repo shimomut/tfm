@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 from tfm_const import LOG_TIME_FORMAT, MAX_LOG_MESSAGES
 from tfm_colors import get_log_color, get_status_color
-from tfm_scrollbar import draw_scrollbar, calculate_scrollbar_width
 from tfm_logging_handlers import LogPaneHandler, StreamOutputHandler, RemoteMonitoringHandler, FileLoggingHandler
 
 
@@ -689,85 +688,6 @@ class LogManager:
                 text = text[width:]
         
         return wrapped
-    
-    def draw_log_pane(self, renderer, y_start, height, width):
-        """Draw the log pane at the specified position with line wrapping"""
-        if height <= 0:
-            return
-            
-        try:
-            # Draw log messages (no header)
-            display_height = height  # Use full height for messages
-            
-            # Get messages from LogPaneHandler (list of (formatted_message, record) tuples)
-            handler_messages = self._log_pane_handler.get_messages()
-            total_messages = len(handler_messages)
-            
-            # Reserve space for scrollbar if we have messages
-            # We'll calculate total wrapped lines for accurate scrollbar
-            scrollbar_width = calculate_scrollbar_width(total_messages, display_height)
-            content_width = width - scrollbar_width
-            
-            if total_messages > 0 and display_height > 0:
-                # Wrap all messages and create a flat list of (wrapped_line, record) tuples
-                wrapped_lines = []
-                for formatted_message, record in handler_messages:
-                    lines = self._wrap_line(formatted_message, content_width)
-                    for line in lines:
-                        wrapped_lines.append((line, record))
-                
-                total_wrapped_lines = len(wrapped_lines)
-                
-                # Recalculate scrollbar width based on wrapped lines
-                scrollbar_width = calculate_scrollbar_width(total_wrapped_lines, display_height)
-                
-                # If scrollbar width changed, re-wrap with new content width
-                new_content_width = width - scrollbar_width
-                if new_content_width != content_width:
-                    content_width = new_content_width
-                    wrapped_lines = []
-                    for formatted_message, record in handler_messages:
-                        lines = self._wrap_line(formatted_message, content_width)
-                        for line in lines:
-                            wrapped_lines.append((line, record))
-                    total_wrapped_lines = len(wrapped_lines)
-                
-                # Calculate which wrapped lines to show
-                # Cap scroll offset to prevent scrolling beyond available content
-                max_scroll = max(0, total_wrapped_lines - display_height)
-                self.log_scroll_offset = min(self.log_scroll_offset, max_scroll)
-                
-                start_idx = max(0, total_wrapped_lines - display_height - self.log_scroll_offset)
-                end_idx = min(total_wrapped_lines, start_idx + display_height)
-                
-                lines_to_show = wrapped_lines[start_idx:end_idx]
-                
-                for i, (wrapped_line, record) in enumerate(lines_to_show):
-                    if i >= display_height:
-                        break
-                        
-                    y = y_start + i
-                    if y >= y_start + height:
-                        break
-                    
-                    # Get color from handler based on record
-                    color_pair, attributes = self._log_pane_handler.get_color_for_record(record)
-                    renderer.draw_text(y, 0, wrapped_line.ljust(content_width)[:content_width], color_pair=color_pair, attributes=attributes)
-                
-                # Draw scrollbar if needed using unified implementation
-                # Use inverted=True because scroll_offset=0 means bottom (newest messages)
-                if scrollbar_width > 0:
-                    draw_scrollbar(renderer, y_start, width - 1, height, 
-                                 total_wrapped_lines, self.log_scroll_offset, inverted=True)
-            
-        except Exception:
-            pass  # Ignore drawing errors
-        finally:
-            # Always mark log updates as processed when draw_log_pane is called
-            # This ensures updates are marked as processed even if drawing fails
-            self.mark_log_updates_processed()
-    
-
     
     def stop_remote_server(self):
         """
