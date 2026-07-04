@@ -126,7 +126,16 @@ class PaneHeader(Widget):
     def draw(self, ctx) -> None:
         pane = self.app.pane(self.pane_name)
         active = self.app.pm.active_pane == self.pane_name
-        text = elide(" " + str(pane["path"]), ctx.width, where="middle", measure=ctx.measure_text)
+        virtual = pane.get("virtual")
+        if virtual:
+            # Not a directory: a search-results feed. Say so (and which pane an
+            # operation will hit) rather than showing the — misleading — root path.
+            mode = "content" if virtual["mode"] == "content" else "filename"
+            n = len(pane["files"])
+            label = f' ⌕ "{virtual["query"]}" — {n} result{"" if n == 1 else "s"} ({mode})'
+            text = elide(label, ctx.width, where="end", measure=ctx.measure_text)
+        else:
+            text = elide(" " + str(pane["path"]), ctx.width, where="middle", measure=ctx.measure_text)
         fg = ctx.theme.accent if active else ctx.theme.text
         ctx.draw_text(0, 0, text, Style(fg=fg, attr=TextAttribute.BOLD))
 
@@ -678,6 +687,13 @@ class TfmApp:
         else:
             return False
 
+        # A virtual (search-results) pane isn't a directory listing — a
+        # filesystem event on its old watched root must not re-list and blow the
+        # result set away. Monitoring is effectively suspended while it is virtual;
+        # a mutating op reconciles it explicitly via _refresh -> _refresh_virtual.
+        if pane.get("virtual"):
+            return False
+
         old_focused = pane["focused_index"]
         old_scroll = pane["scroll_offset"]
         selected_filename = None
@@ -755,7 +771,19 @@ class TfmApp:
         """Re-list ``pane`` after a directory change: reset the cursor, record
         history, and (re)list — synchronously for a local path, on a worker for a
         remote one (see ``_list_pane``). ``on_ready(pane)`` runs once the files
-        are in place, for callers that then place the cursor by name."""
+        are in place, for callers that then place the cursor by name.
+
+        For a **virtual pane** (a search-results feed) there is no directory to
+        re-list: rebuild the flat listing from the result set in place (re-stat
+        survivors, re-sort, re-filter — see ``FileListManager.refresh_files``),
+        preserving the cursor rather than resetting it, and fire ``on_ready``
+        synchronously. This is the post-op reconciliation path — every existing
+        ``self._refresh(pane)`` call site keeps working after a mutating op."""
+        if pane.get("virtual"):
+            self.flm.refresh_files(pane)
+            if on_ready is not None:
+                on_ready(pane)
+            return
         pane["focused_index"] = 0
         pane["scroll_offset"] = 0
         self._record_history_path(str(pane["path"]))
@@ -846,10 +874,22 @@ class TfmApp:
             else:
                 self.log_info("No filter to clear")
         elif action == "sync_current_to_other":
-            if self.pm.sync_current_to_other(self.log_info):
-                self._list_pane(self._pane_name_of(self.active_pane()))
+            # When a search-results (virtual) pane is involved, O goes to the
+            # highlighted result's real location *here* (this pane), landing the
+            # cursor on the file — whether the results are in this pane or the
+            # other. Otherwise the plain pane-sync ("go to the other pane's dir").
+            if not self._reveal_result_here():
+                if self.pm.sync_current_to_other(self.log_info):
+                    self._list_pane(self._pane_name_of(self.active_pane()))
         elif action == "sync_other_to_current":
-            if self.pm.sync_other_to_current(self.log_info):
+            # From the results pane, Shift-O reveals the highlighted result in the
+            # *other* pane, keeping the results here. If instead the *other* pane
+            # is the results view, there is nowhere to send a directory — block it.
+            if self._reveal_result_other():
+                pass
+            elif self.pm.get_inactive_pane().get("virtual"):
+                self.log_info("The other pane is a search-results view")
+            elif self.pm.sync_other_to_current(self.log_info):
                 self._list_pane(self._pane_name_of(self.pm.get_inactive_pane()))
         elif action == "redraw":
             pass  # falls through to a full re-render below
@@ -959,6 +999,12 @@ class TfmApp:
             return False
         return True
 
+    def _exit_virtual(self, pane: dict) -> None:
+        """Drop a pane out of virtual (search-results) mode so a subsequent
+        ``_refresh`` lists a real directory. Called by every navigation that sets
+        a real ``pane['path']``; a no-op on a normal pane."""
+        pane["virtual"] = None
+
     def _open(self, pane: dict) -> None:
         files = pane["files"]
         if not files:
@@ -966,6 +1012,7 @@ class TfmApp:
         entry = files[pane["focused_index"]]
         try:
             if entry.is_dir():
+                self._exit_virtual(pane)  # entering a dir leaves the result set
                 pane["path"] = entry
                 self._refresh(pane)
                 self.log_info(f"Entered {entry.name}/")
@@ -973,6 +1020,13 @@ class TfmApp:
             self.log_info(f"Cannot open {entry.name}: {exc}")
 
     def _go_parent(self, pane: dict) -> None:
+        # From a virtual pane, "up" leaves the result set and lists the search
+        # root (pane['path'] still holds it); land the cursor generically.
+        if pane.get("virtual"):
+            self._exit_virtual(pane)
+            self._refresh(pane)
+            self.log_info(f"Up to {pane['path']}")
+            return
         parent = pane["path"].parent
         if str(parent) != str(pane["path"]):
             child_name = pane["path"].name
@@ -1173,6 +1227,11 @@ class TfmApp:
         selected = [f for f in files if str(f) in pane["selected_files"]]
         targets = selected if selected else [files[pane["focused_index"]]]
 
+        # Content search-results panes carry a per-file matched line/text map;
+        # empty for a normal or filename-results pane (no extra row then).
+        virtual = pane.get("virtual")
+        match_meta = virtual["meta"] if virtual and virtual["mode"] == "content" else {}
+
         def _md_escape(text: str) -> str:
             # Keep a filename with Markdown-significant characters (``|`` splits a
             # table cell, ``*``/``_``/`` ` `` are emphasis) rendering literally.
@@ -1201,8 +1260,13 @@ class TfmApp:
                 f"| Size | {st.st_size:,} bytes |",
                 f"| Modified | {mtime} |",
                 f"| Permissions | `{_stat.filemode(st.st_mode)}` |",
-                "",
             ]
+            # On a content search-results pane, surface the matched line as extra
+            # metadata (kept in virtual['meta']; not shown in the list itself).
+            m = match_meta.get(str(entry))
+            if m is not None:
+                out.append(f"| Match | line {m['line']}: `{_md_escape(m['text'])}` |")
+            out.append("")
             return out
 
         if len(targets) == 1:
@@ -1487,6 +1551,7 @@ class TfmApp:
 
     def _go_to_drive(self, drive: dict) -> None:
         pane = self.active_pane()
+        self._exit_virtual(pane)
         pane["path"] = Path(drive["path"])
         self._refresh(pane)
         pane["selected_files"].clear()
@@ -1533,15 +1598,55 @@ class TfmApp:
             return s[len(root_str):].lstrip("/") if s.startswith(root_str) else s
 
         def on_accept(mode, value):
-            if mode == "content":
-                self._go_to_content_hit(value)
-            else:
-                self._go_to_result(value)
+            # Feed-by-default: accepting doesn't navigate to the one hit — it
+            # feeds the *whole* result set into the active pane as a flat virtual
+            # listing, so every file operation can act on it. Read the dialog's
+            # full results + current query (the accepted ``value`` is ignored).
+            self._feed_search_results(mode, list(dialog.results),
+                                      root, dialog.query_edit.text.strip())
 
-        show_progressive_search(
+        dialog = show_progressive_search(
             self.panel, initial_mode=initial_mode,
             search_iter=search_iter, to_label=to_label, on_accept=on_accept,
             region=self._active_pane_region())
+        self.panel.render()
+
+    def _feed_search_results(self, mode: str, results: list, root, query: str) -> None:
+        """Turn a search result set into the active pane's flat, virtual listing
+        (feed-by-default; see the search dialog's ``on_accept``). Filename results
+        are ``Path`` objects; content results are ``{path, line, text}`` hits,
+        collapsed to **one entry per file** (ops act on files, not lines) with the
+        *first* match's line/text kept in ``virtual['meta']`` for the Info dialog
+        and reveal-at-line. Starts unfiltered, keeping the pane's current sort."""
+        pane = self.active_pane()
+        meta: dict[str, dict] = {}
+        if mode == "content":
+            paths, seen = [], set()
+            for hit in results:
+                p = hit["path"]
+                key = str(p)
+                if key in seen:
+                    continue  # first match per file wins; later lines drop
+                seen.add(key)
+                paths.append(p)
+                meta[key] = {"line": hit["line"], "text": hit["text"]}
+        else:
+            paths = list(results)
+        if not paths:
+            self.log_info("No results to open")
+            self.panel.render()
+            return
+        pane["virtual"] = {
+            "kind": "search", "root": Path(root), "mode": mode,
+            "query": query, "results": paths, "meta": meta,
+        }
+        pane["filter_pattern"] = ""
+        pane["focused_index"] = 0
+        pane["scroll_offset"] = 0
+        pane["selected_files"].clear()
+        self.flm.refresh_files(pane)  # virtual-aware: sorts/filters the set in memory
+        self.log_info(f'Search results for "{query}": {len(paths)} item(s)  '
+                      f'— O go to location · Shift-O reveal in other pane · ⌫ back')
         self.panel.render()
 
     def _iter_filename_matches(self, root, pattern, cancel, node_cap: int = 50000):
@@ -1584,6 +1689,58 @@ class TfmApp:
         self._refresh(pane, on_ready=lambda p: self._select_by_name(p, entry.name))
         self.log_info(f"Found: {entry}")
         self.panel.render()
+
+    @staticmethod
+    def _virtual_focused_entry(pane: dict):
+        """The ``Path`` under the cursor of a virtual (search-results) ``pane``, or
+        ``None`` if the pane isn't virtual / has no rows. Used by the reveal keys
+        to find *which* highlighted result to open."""
+        if not pane.get("virtual"):
+            return None
+        files = pane["files"]
+        idx = pane["focused_index"]
+        if files and 0 <= idx < len(files):
+            return files[idx]
+        return None
+
+    def _reveal_result_here(self) -> bool:
+        """O: jump the **active** pane to the highlighted search result's real
+        directory and land the cursor on the file. The result is taken from
+        whichever pane is the results view — the active pane if *it* is virtual,
+        otherwise the other pane. So you can stand on a normal pane, with the
+        results on the other side, press O, and pull the highlighted hit's
+        location into the pane you're on. Returns True if a results pane was
+        involved (and handled), False otherwise (caller falls back to plain sync)."""
+        pane = self.active_pane()
+        entry = self._virtual_focused_entry(pane) \
+            or self._virtual_focused_entry(self.pm.get_inactive_pane())
+        if entry is None:
+            return False
+        self._exit_virtual(pane)  # if the active pane was the virtual one, leave it
+        pane["path"] = entry.parent
+        pane["selected_files"].clear()
+        self._refresh(pane, on_ready=lambda p: self._select_by_name(p, entry.name))
+        self.log_info(f"Go to result: {entry}")
+        self.panel.render()
+        return True
+
+    def _reveal_result_other(self) -> bool:
+        """Shift-O from the results pane: open the highlighted result's real
+        directory in the *other* pane (landing on the file), keeping the result
+        set intact here — reveal without leaving virtual mode. Only meaningful when
+        the active pane is the virtual one; returns False otherwise."""
+        pane = self.active_pane()
+        entry = self._virtual_focused_entry(pane)
+        if entry is None:
+            return False
+        other = self.pm.get_inactive_pane()
+        self._exit_virtual(other)
+        other["path"] = entry.parent
+        other["selected_files"].clear()
+        self._refresh(other, on_ready=lambda p: self._select_by_name(p, entry.name))
+        self.log_info(f"Revealed in other pane: {entry.parent}")
+        self.panel.render()
+        return True
 
     @staticmethod
     def _looks_textual(path, sample_size: int = 1024) -> bool:
@@ -1662,6 +1819,7 @@ class TfmApp:
 
     def _go_to_history(self, path: str) -> None:
         pane = self.active_pane()
+        self._exit_virtual(pane)
         pane["path"] = Path(path)
         self._refresh(pane)
         pane["selected_files"].clear()
@@ -1694,11 +1852,20 @@ class TfmApp:
         if not command:
             self.log_info(f"Program '{program.get('name')}' has no command")
             return
-        args = get_selected_or_cursor_files(pane)  # bare names, resolved via cwd
+        virtual = pane.get("virtual")
+        if virtual:
+            # A virtual (search-results) pane has no single directory: bare names
+            # resolved via one cwd can't reach files scattered across the tree.
+            # Pass absolute paths, and run from the search root.
+            args = [str(p) for p in self._selected_or_focused(pane)]
+            cwd = str(virtual["root"])
+        else:
+            args = get_selected_or_cursor_files(pane)  # bare names, resolved via cwd
+            cwd = str(pane["path"])
         env = os.environ.copy()
         ensure_common_paths_in_env(env)
         try:
-            subprocess.Popen(command + args, cwd=str(pane["path"]), env=env)
+            subprocess.Popen(command + args, cwd=cwd, env=env)
         except Exception as exc:
             self.log_info(f"Failed to launch {program.get('name')}: {exc}")
         else:
@@ -1707,6 +1874,7 @@ class TfmApp:
 
     def _jump_to_favorite(self, fav: dict) -> None:
         pane = self.active_pane()
+        self._exit_virtual(pane)
         pane["path"] = Path(fav["path"])
         self._refresh(pane)
         self.log_info(f"Jumped to {fav['name']} ({fav['path']})")
@@ -1953,12 +2121,19 @@ class TfmApp:
         verb = "Copy" if kind == "copy" else "Move"
         src_pane = self.active_pane()
         dst_pane = self.pm.get_inactive_pane()
+        if dst_pane.get("virtual"):
+            # The other pane is a search-results feed, not a directory — there is
+            # nowhere to write. Reveal a real destination first (O / Shift-O).
+            self.log_info(f"Cannot {kind}: the other pane is a search-results view")
+            return
         dest_dir = dst_pane["path"]
         targets = self._selected_or_focused(src_pane)
         if not targets:
             self.log_info(f"No file to {kind}")
             return
-        if str(dest_dir) == str(src_pane["path"]):
+        # A virtual source spans many directories, so the single "same directory"
+        # guard doesn't apply — the per-target dest-exists check below still holds.
+        if not src_pane.get("virtual") and str(dest_dir) == str(src_pane["path"]):
             self.log_info(f"Cannot {kind}: source and destination are the same directory")
             return
 

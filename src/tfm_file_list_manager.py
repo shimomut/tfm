@@ -37,6 +37,12 @@ class FileListManager:
         without freezing on a slow remote directory; ``refresh_files`` keeps the
         simple synchronous contract for local paths and existing callers.
 
+        For a **virtual pane** (a search-results feed, ``pane_data['virtual']``
+        set) there is no directory to read: the listing is rebuilt from the
+        explicit result set — surviving paths are re-stat'd (vanished ones dropped),
+        then filtered/sorted in memory. This is the single choke point that makes
+        sort, filter, and post-op reconciliation Just Work on a virtual pane.
+
         Args:
             pane_data: Dictionary containing pane state (``path``,
                 ``filter_pattern``, ``sort_mode``, ``sort_reverse``, cursor,
@@ -45,6 +51,23 @@ class FileListManager:
         Updates ``pane_data['files']`` and ``pane_data['file_info']``, and
         reconciles ``focused_index`` / ``selected_files``.
         """
+        virtual = pane_data.get('virtual')
+        if virtual:
+            # Re-stat the found set: drop entries that have vanished (moved/
+            # deleted by a prior op) and prune their metadata in step.
+            survivors = [p for p in virtual['results'] if self._path_exists(p)]
+            virtual['results'] = survivors
+            keys = {str(p) for p in survivors}
+            virtual['meta'] = {k: v for k, v in virtual.get('meta', {}).items()
+                               if k in keys}
+            result = self.compute_listing_from_paths(
+                survivors,
+                filter_pattern=pane_data.get('filter_pattern'),
+                sort_mode=pane_data['sort_mode'],
+                sort_reverse=pane_data['sort_reverse'],
+            )
+            self.apply_listing(pane_data, result)
+            return
         result = self.compute_listing(
             pane_data['path'],
             filter_pattern=pane_data.get('filter_pattern'),
@@ -52,6 +75,15 @@ class FileListManager:
             sort_reverse=pane_data['sort_reverse'],
         )
         self.apply_listing(pane_data, result)
+
+    @staticmethod
+    def _path_exists(path):
+        """Whether ``path`` still resolves — tolerant of a raised error (a broken
+        remote handle counts as gone rather than crashing the re-stat)."""
+        try:
+            return path.exists()
+        except Exception:
+            return False
 
     def compute_listing(self, path, *, filter_pattern=None, sort_mode='name',
                         sort_reverse=False):
@@ -91,39 +123,8 @@ class FileListManager:
             # Sort the entries
             files = self.sort_entries(all_entries, sort_mode, sort_reverse)
 
-            # Populate file info cache for all files
-            # This is done once at load time to avoid stat() calls during rendering
-            file_info = {}
-            for file_path in files:
-                file_key = str(file_path)
-                try:
-                    stat_info = file_path.stat()
-                    is_dir = file_path.is_dir()
-
-                    # Format size
-                    if is_dir:
-                        size_str = "<DIR>"
-                    else:
-                        size_str = format_size(stat_info.st_size, compact=True)
-
-                    # Format date
-                    date_str = self._format_date(stat_info.st_mtime)
-
-                    # Cache the formatted info
-                    file_info[file_key] = {
-                        'size_str': size_str,
-                        'date_str': date_str,
-                        'is_dir': is_dir
-                    }
-                except Exception:
-                    # Cache error result to avoid repeated stat() calls
-                    file_info[file_key] = {
-                        'size_str': '---',
-                        'date_str': '---',
-                        'is_dir': False
-                    }
-
-            return {"ok": True, "files": files, "file_info": file_info}
+            return {"ok": True, "files": files,
+                    "file_info": self._build_file_info(files)}
 
         except ArchiveNavigationError as e:
             # Archive navigation error - path doesn't exist in archive
@@ -154,6 +155,71 @@ class FileListManager:
         except Exception as e:
             self.logger.error(f"Unexpected error reading directory {path}: {e}")
         return {"ok": False, "files": [], "file_info": {}}
+
+    def compute_listing_from_paths(self, paths, *, filter_pattern=None,
+                                   sort_mode='name', sort_reverse=False):
+        """Build a listing dict from an explicit list of ``Path`` objects — a
+        virtual / search-results pane — instead of reading a directory. Applies
+        the filename filter and the sort in memory and builds the display-info
+        cache, mirroring :meth:`compute_listing`'s tail so :meth:`apply_listing`
+        installs it unchanged. Always ``ok`` (there is no directory I/O to fail);
+        a per-entry ``stat`` error is absorbed into the info cache as ``---``.
+
+        Unlike :meth:`compute_listing` this does **not** apply the hidden-file
+        filter: the search that produced ``paths`` already honoured
+        ``show_hidden``, and a scattered result set has no single directory whose
+        dotfiles to hide."""
+        all_entries = list(paths)
+        if filter_pattern:
+            # Filter files by name; always keep directories (matches compute_listing).
+            all_entries = [e for e in all_entries
+                           if self._is_dir_safe(e)
+                           or fnmatch.fnmatch(e.name.lower(), filter_pattern.lower())]
+        files = self.sort_entries(all_entries, sort_mode, sort_reverse)
+        return {"ok": True, "files": files,
+                "file_info": self._build_file_info(files)}
+
+    @staticmethod
+    def _is_dir_safe(entry):
+        try:
+            return entry.is_dir()
+        except Exception:
+            return False
+
+    def _build_file_info(self, files):
+        """Populate the per-entry display cache (size/date strings, is_dir) once
+        at load time, so rendering never issues a ``stat``. Shared by the
+        directory listing and the virtual (search-results) listing."""
+        file_info = {}
+        for file_path in files:
+            file_key = str(file_path)
+            try:
+                stat_info = file_path.stat()
+                is_dir = file_path.is_dir()
+
+                # Format size
+                if is_dir:
+                    size_str = "<DIR>"
+                else:
+                    size_str = format_size(stat_info.st_size, compact=True)
+
+                # Format date
+                date_str = self._format_date(stat_info.st_mtime)
+
+                # Cache the formatted info
+                file_info[file_key] = {
+                    'size_str': size_str,
+                    'date_str': date_str,
+                    'is_dir': is_dir
+                }
+            except Exception:
+                # Cache error result to avoid repeated stat() calls
+                file_info[file_key] = {
+                    'size_str': '---',
+                    'date_str': '---',
+                    'is_dir': False
+                }
+        return file_info
 
     def apply_listing(self, pane_data, result):
         """Install a :meth:`compute_listing` result into ``pane_data`` and

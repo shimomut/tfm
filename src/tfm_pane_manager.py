@@ -26,6 +26,7 @@ class PaneManager:
             'sort_mode': config.DEFAULT_SORT_MODE,
             'sort_reverse': config.DEFAULT_SORT_REVERSE,
             'filter_pattern': "",  # Filename filter pattern for this pane
+            'virtual': None,  # When set, a search-results feed (see _feed_search_results)
         }
         self.right_pane = {
             'path': right_startup_path,
@@ -36,6 +37,7 @@ class PaneManager:
             'sort_mode': config.DEFAULT_SORT_MODE,
             'sort_reverse': config.DEFAULT_SORT_REVERSE,
             'filter_pattern': "",  # Filename filter pattern for this pane
+            'virtual': None,  # When set, a search-results feed (see _feed_search_results)
         }
         
         self.active_pane = 'left'  # 'left' or 'right'

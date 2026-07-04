@@ -1,7 +1,43 @@
 # Search Results Pane — Plan
 
-Status: **draft — design agreed (feed results into a virtual pane; feed-by-default
-entry; content hits keep line numbers as metadata), not yet started.**
+Status: **implemented — all five slices landed; 11 new tests pass
+(`test/test_search_results_pane.py`), full suite green except one
+pre-existing environment-dependent failure. Pending manual GUI verification.**
+
+Implementation notes (as built):
+
+- Single choke point for the virtual listing is `FileListManager.refresh_files`
+  ([src/tfm_file_list_manager.py](../../src/tfm_file_list_manager.py)): when
+  `pane['virtual']` is set it re-stats the result set (drops vanished paths,
+  prunes `meta`), then filters+sorts in memory via the new
+  `compute_listing_from_paths`. So sort, filter, and post-op reconciliation all
+  Just Work — every existing `refresh_files`/`_refresh` caller is unchanged.
+- `TfmApp._refresh` gained a virtual branch (synchronous re-stat, no re-list),
+  the reload pump (`_handle_reload_request`) skips virtual panes (monitoring
+  suspended), the header shows a `⌕ "query" — N results` banner, and the five
+  navigation sites (`_open`, `_go_parent`, favorite/drive/history) call
+  `_exit_virtual` before listing a real path.
+- Feed-by-default: the search dialog's `on_accept` now calls
+  `_feed_search_results(mode, dialog.results, root, query)`; content hits dedupe
+  to one entry/file with the first match's `{line, text}` in `virtual['meta']`.
+- Reveal keys act on **whichever pane holds the results**, driven by the virtual
+  pane's cursor, so you can stand on the *normal* pane (results on the other side)
+  and pull the highlighted hit's location in:
+  - **O** (`sync_current_to_other`) → `_reveal_result_here`: jump the **active**
+    pane to the highlighted result's real directory, cursor on the file. Takes the
+    result from the active pane if it's virtual, else the other pane. Falls back to
+    the plain sync when no results pane is involved.
+  - **Shift-O** (`sync_other_to_current`) → `_reveal_result_other`: from the
+    results pane, open the highlighted result in the *other* pane, keeping the
+    results intact. Blocked (with a message) if the other pane is the results view.
+  - The name column shows each hit's **root-relative path** (`FilePane._display_name`,
+    middle-elided) so a scattered result reveals where it lives.
+- Copy/move blocks a virtual *destination* and skips the same-dir guard for a
+  virtual source. Run-command passes absolute paths with `cwd` = root.
+
+Open questions resolved during build: §9.1 run-command → **(a)** absolute paths +
+root cwd. §9.4 both-panes-virtual → copy/move into a virtual pane is blocked with
+a clear message.
 
 Branch: `puikit-port`
 Goal: let TFM's full pane feature set (copy/move, archive, view/diff,

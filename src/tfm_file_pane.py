@@ -162,6 +162,21 @@ class FilePane(Widget):
                 return len(date_str)
         return 0
 
+    def _display_name(self, entry) -> str:
+        """The text shown in the name column. Normally the entry's basename; on a
+        **virtual (search-results) pane** the path relative to the search root, so
+        a hit scattered deep in the tree shows *where* it lives (``sub/dir/a.txt``)
+        rather than a bare, location-less ``a.txt``."""
+        virtual = self.pane.get("virtual")
+        if virtual:
+            root = str(virtual["root"])
+            s = str(entry)
+            if s.startswith(root):
+                rel = s[len(root):].lstrip("/\\")
+                if rel:
+                    return rel
+        return entry.name
+
     def _split_name(self, name: str, is_dir: bool) -> tuple[str, str]:
         """Split ``name`` into (basename, extension) for the separate-extension
         column, mirroring ttk TFM's ``separate_filename_extension``:
@@ -183,6 +198,10 @@ class FilePane(Widget):
         pane (0 when none qualify, so the column is dropped). Cached per listing.
         """
         if self.config is None or not getattr(self.config, "SEPARATE_EXTENSIONS", False):
+            return 0.0
+        # A virtual pane shows whole relative paths in the name column, not split
+        # basename/ext — so there is no extension column to size.
+        if self.pane.get("virtual"):
             return 0.0
         files = self.pane["files"]
         if self._ext_cache[0] == id(files):
@@ -342,11 +361,20 @@ class FilePane(Widget):
         theme = ctx.theme
         info = self._info(entry)
         is_dir = info["is_dir"]
-        basename, ext = self._split_name(entry.name, is_dir)
+        virtual = self.pane.get("virtual")
+        if virtual:
+            # Whole root-relative path in the name column, no extension split;
+            # elide in the middle so both the leading dirs and the trailing
+            # filename stay visible when the path is too long for the column.
+            basename, ext = self._display_name(entry), ""
+            name_elide = "middle"
+        else:
+            basename, ext = self._split_name(entry.name, is_dir)
+            name_elide = "end"
         name = basename + ("/" if is_dir else "")
         size = info["size_str"]
         date = info["date_str"] if show_date else ""
-        name_text = elide(name, name_w, where="end", measure=measure)
+        name_text = elide(name, name_w, where=name_elide, measure=measure)
         ext_text = elide(ext, ext_w, where="end", measure=measure) if ext_w > 0 else ""
 
         # Row background carries "selected": the pane background tinted toward the
