@@ -23,10 +23,13 @@ Implementation notes (as built):
 - Reveal keys act on **whichever pane holds the results**, driven by the virtual
   pane's cursor, so you can stand on the *normal* pane (results on the other side)
   and pull the highlighted hit's location in:
-  - **O** (`sync_current_to_other`) → `_reveal_result_here`: jump the **active**
-    pane to the highlighted result's real directory, cursor on the file. Takes the
-    result from the active pane if it's virtual, else the other pane. Falls back to
-    the plain sync when no results pane is involved.
+  - **O** (`sync_current_to_other`) = "go to the other pane's location, cursor
+    there." If the **other** pane is the results view, its location is the
+    highlighted hit's directory (cursor on that file) — so standing on a normal
+    pane you pull the highlighted hit's location *here*. If **this** pane is the
+    results view, O behaves exactly like a normal pane: leave the results and open
+    the *other* pane's directory, cursor synced to the other pane's cursor. Both go
+    through `_go_to_dir`; neither keeps a stale virtual listing.
   - **Shift-O** (`sync_other_to_current`) → `_reveal_result_other`: from the
     results pane, open the highlighted result in the *other* pane, keeping the
     results intact. Blocked (with a message) if the other pane is the results view.

@@ -874,13 +874,22 @@ class TfmApp:
             else:
                 self.log_info("No filter to clear")
         elif action == "sync_current_to_other":
-            # When a search-results (virtual) pane is involved, O goes to the
-            # highlighted result's real location *here* (this pane), landing the
-            # cursor on the file — whether the results are in this pane or the
-            # other. Otherwise the plain pane-sync ("go to the other pane's dir").
-            if not self._reveal_result_here():
-                if self.pm.sync_current_to_other(self.log_info):
-                    self._list_pane(self._pane_name_of(self.active_pane()))
+            # O = go to the other pane's location, landing the cursor there.
+            other = self.pm.get_inactive_pane()
+            other_hit = self._virtual_focused_entry(other)
+            if other_hit is not None:
+                # Other pane is a results view: its "location" is the highlighted
+                # hit's directory, cursor on that file.
+                self._go_to_dir(pane, other_hit.parent, other_hit.name)
+                self.log_info(f"Go to: {other_hit}")
+            elif pane.get("virtual"):
+                # Standing on the results view: O behaves like a normal pane —
+                # leave the results and open the other pane's directory (cursor
+                # synced to the other pane's cursor).
+                self._go_to_dir(pane, other["path"], self._focused_name(other))
+                self.log_info(f"Go to {other['path']}")
+            elif self.pm.sync_current_to_other(self.log_info):
+                self._list_pane(self._pane_name_of(self.active_pane()))
         elif action == "sync_other_to_current":
             # From the results pane, Shift-O reveals the highlighted result in the
             # *other* pane, keeping the results here. If instead the *other* pane
@@ -1703,26 +1712,29 @@ class TfmApp:
             return files[idx]
         return None
 
-    def _reveal_result_here(self) -> bool:
-        """O: jump the **active** pane to the highlighted search result's real
-        directory and land the cursor on the file. The result is taken from
-        whichever pane is the results view — the active pane if *it* is virtual,
-        otherwise the other pane. So you can stand on a normal pane, with the
-        results on the other side, press O, and pull the highlighted hit's
-        location into the pane you're on. Returns True if a results pane was
-        involved (and handled), False otherwise (caller falls back to plain sync)."""
-        pane = self.active_pane()
-        entry = self._virtual_focused_entry(pane) \
-            or self._virtual_focused_entry(self.pm.get_inactive_pane())
-        if entry is None:
-            return False
-        self._exit_virtual(pane)  # if the active pane was the virtual one, leave it
-        pane["path"] = entry.parent
-        pane["selected_files"].clear()
-        self._refresh(pane, on_ready=lambda p: self._select_by_name(p, entry.name))
-        self.log_info(f"Go to result: {entry}")
+    @staticmethod
+    def _focused_name(pane: dict):
+        """The name of the entry under a pane's cursor, or ``None`` if empty."""
+        files = pane["files"]
+        idx = pane["focused_index"]
+        if files and 0 <= idx < len(files):
+            return files[idx].name
+        return None
+
+    def _go_to_dir(self, dest: dict, target_dir, target_name) -> None:
+        """Point ``dest`` at ``target_dir`` and land the cursor on ``target_name``
+        (or the top if it's None/gone). Leaves virtual mode if ``dest`` was in it,
+        and always re-lists — so it is correct even when ``dest``'s path already
+        equals ``target_dir`` (a stale virtual listing still gets replaced, and an
+        'already there' sync just moves the cursor)."""
+        self._exit_virtual(dest)
+        dest["path"] = target_dir
+        dest["selected_files"].clear()
+        self._refresh(
+            dest,
+            on_ready=(lambda p: self._select_by_name(p, target_name)) if target_name else None,
+        )
         self.panel.render()
-        return True
 
     def _reveal_result_other(self) -> bool:
         """Shift-O from the results pane: open the highlighted result's real

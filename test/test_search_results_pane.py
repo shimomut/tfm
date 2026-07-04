@@ -161,15 +161,22 @@ class AppVirtual(unittest.TestCase):
         self.app._settle_listings()
         self.assertIsNone(pane["virtual"])
 
-    def test_reveal_here_navigates_and_exits(self):
+    def test_O_on_results_pane_goes_to_other_pane_dir(self):
+        # Standing ON the results pane, O behaves like a normal pane: leave the
+        # results and open the OTHER pane's directory, cursor synced to it.
         a = self._write("sub/a.txt")
+        other = self.app.pm.get_inactive_pane()
+        other["path"] = Path(os.path.join(self.tmp, "sub"))
+        self.app.flm.refresh_files(other)
+        other["focused_index"] = 0
         self.app._feed_search_results("filename", [a], Path(self.tmp), "txt")
-        pane = self.app.active_pane()
-        pane["focused_index"] = 0
-        self.app._reveal_result_here()
+        active = self.app.active_pane()
+        self.assertIsNotNone(active["virtual"])
+        self.assertTrue(self.app.dispatch("sync_current_to_other"))
         self.app._settle_listings()
-        self.assertIsNone(pane["virtual"])
-        self.assertEqual(str(pane["path"]), str(a.parent))
+        self.assertIsNone(active["virtual"])                       # left the results
+        self.assertEqual(str(active["path"]), str(other["path"]))  # went to other's dir
+        self.assertEqual(active["files"][active["focused_index"]].name, "a.txt")
 
     def test_reveal_other_keeps_virtual(self):
         a = self._write("sub/a.txt")
