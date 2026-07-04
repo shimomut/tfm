@@ -31,6 +31,8 @@ from puikit.widgets.base import Widget
 from puikit.widgets.list import ListView
 from puikit.widgets.markdown_view import MarkdownView
 
+from tfm_dialog_geometry import draw_title_bar
+
 #: Keys the body widget consumes for scrolling while the dialog is open. (Backend
 #: key names are unsuffixed: "pageup"/"pagedown", matching ListView / MarkdownView.)
 _SCROLL_KEYS = frozenset({"up", "down", "pageup", "pagedown", "home", "end"})
@@ -95,14 +97,16 @@ class _ScrollModal(FocusContainer, Widget):
         wu, hu = ctx.size_units
         surface_bg = theme.popup_bg if theme is not None else None
         box_style = Style(bg=surface_bg, fg=theme.popup_border if theme else None)
-        ctx.draw_box(0, 0, ctx.width, ctx.height, box_style, hints={"fill": True})
+        # Exact (fractional) extent, not ctx.width/height: those truncate to whole
+        # units and draw the frame short of the fill on a fractional-height GUI box.
+        ctx.draw_box(0, 0, *ctx.size_units, box_style, hints={"fill": True})
 
         pad = 1.0
         y = pad
         if self.title:
-            ctx.draw_text(2, y, self.title, Style(bg=surface_bg, attr=TextAttribute.BOLD))
-            y += 1
-        # A hint at the bottom of the title area.
+            border = theme.popup_border if theme else None
+            y = draw_title_bar(ctx, self.title, surface_bg=surface_bg, border=border, y=y)
+        # A hint row just under the title bar (or at the top when untitled).
         ctx.draw_text(2, y, self.hint,
                       Style(bg=surface_bg, fg=theme.muted_text if theme else None,
                             attr=TextAttribute.DIM))
@@ -221,7 +225,10 @@ def _push(panel: Any, dialog: _ScrollModal, *, rows: int, z: int) -> None:
     body scrolls, so an approximate reserve is fine)."""
     sw, sh = panel.backend.size_units
     w = max(48.0, min(sw * 0.7, 96.0))
-    h = max(10.0, min(sh * 0.8, float(rows + 6)))
+    # rows + chrome: pad, title, divider, hint, blank, pad (the +1 over the old
+    # reserve is the title bar's divider row). The body scrolls, so an approximate
+    # reserve is fine.
+    h = max(10.0, min(sh * 0.8, float(rows + 7)))
     dialog._panel = panel
     panel.push_layer(dialog, z=z, hints={"shadow": True, "w": w, "h": h})
     panel.animate(dialog, hints={"transition": "fade", "duration_ms": 150})

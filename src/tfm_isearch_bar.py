@@ -104,7 +104,7 @@ class ISearchBar(FocusContainer, Widget):
         bg = theme.surface_bg(self.surface) if theme is not None else None
         fg = theme.text if theme is not None else None
 
-        label = f" {self.prompt} "
+        label = f"  {self.prompt}  "
         ctx.draw_text(0, 0, label, Style(bg=bg, fg=fg, attr=TextAttribute.BOLD))
         label_w = ctx.measure_text(label)
 

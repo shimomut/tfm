@@ -29,6 +29,8 @@ from puikit.panel import Rect
 from puikit.widgets.base import Widget
 from puikit.widgets.list import ListView
 
+from tfm_dialog_geometry import draw_title_bar
+
 #: Characters we refuse in a result name (matches the ttk dialog's check).
 _INVALID_CHARS = set('/\\:*?"<>|')
 #: Preview-list scroll keys (unsuffixed backend names, matching ListView).
@@ -204,13 +206,15 @@ class BatchRenameDialog(FocusContainer, Widget):
         surface_bg = theme.popup_bg if theme is not None else None
         muted = theme.muted_text if theme is not None else None
         box_style = Style(bg=surface_bg, fg=theme.popup_border if theme else None)
-        ctx.draw_box(0, 0, ctx.width, ctx.height, box_style, hints={"fill": True})
+        # Exact (fractional) extent, not ctx.width/height: those truncate to whole
+        # units and draw the frame short of the fill on a fractional-height GUI box.
+        ctx.draw_box(0, 0, *ctx.size_units, box_style, hints={"fill": True})
 
         pad = 1.0
         y = pad
-        ctx.draw_text(2, y, f"Batch Rename — {len(self.files)} files",
-                      Style(bg=surface_bg, attr=TextAttribute.BOLD))
-        y += 2
+        border = theme.popup_border if theme else None
+        y = draw_title_bar(ctx, f"Batch Rename — {len(self.files)} files",
+                           surface_bg=surface_bg, border=border, y=y)
 
         # Both fields share a left edge past the wider of the two labels.
         labels = ("Search:", "Replace:")

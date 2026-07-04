@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Sequence
 
-from puikit.backend import Style, TextAttribute
+from puikit.backend import Style
 from puikit.event import Event, EventType
 from puikit.focus import FocusContainer, focus_on_click
 from puikit.panel import Rect
@@ -35,7 +35,7 @@ from puikit.widgets.base import Widget
 from puikit.widgets.list import ListView
 from puikit.widgets.text_edit import TextEdit
 
-from tfm_dialog_geometry import pane_anchored_box
+from tfm_dialog_geometry import draw_title_bar, pane_anchored_box
 
 #: Navigation keys the *list* owns even while the filter field holds focus —
 #: typing filters, but the arrows still drive the selection (the ttk behavior).
@@ -129,13 +129,15 @@ class FilterListDialog(FocusContainer, Widget):
         wu, hu = ctx.size_units
         surface_bg = theme.popup_bg if theme is not None else None
         box_style = Style(bg=surface_bg, fg=theme.popup_border if theme else None)
-        ctx.draw_box(0, 0, ctx.width, ctx.height, box_style, hints={"fill": True})
+        # Exact (fractional) extent, not ctx.width/height: those truncate to whole
+        # units and draw the frame short of the fill on a fractional-height GUI box.
+        ctx.draw_box(0, 0, *ctx.size_units, box_style, hints={"fill": True})
 
         pad = 1.0
         y = pad
         if self.title:
-            ctx.draw_text(2, y, self.title, Style(bg=surface_bg, attr=TextAttribute.BOLD))
-            y += 1
+            border = theme.popup_border if theme else None
+            y = draw_title_bar(ctx, self.title, surface_bg=surface_bg, border=border, y=y)
 
         # Filter field — one row, focused so the caret blinks and the IME stays on.
         self._filter_rect = Rect(2.0, y, max(1.0, wu - 4.0), 1.0)
@@ -225,7 +227,10 @@ def show_filter_list(
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 72.0))
-    h = max(8.0, min(sh * 0.6, float(len(items) + 5)))
+    # +1 chrome row for the title bar's divider (the title now sits in its own
+    # band above a rule, not directly on top of the filter field).
+    rows = len(items) + 5 + (1 if title else 0)
+    h = max(8.0, min(sh * 0.6, float(rows)))
     hints: dict[str, Any] = {"shadow": True, "w": w, "h": h}
     if region is not None:
         # Anchor over the pane, but a bit wider than it for comfort (still

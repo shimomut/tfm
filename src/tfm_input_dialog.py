@@ -34,7 +34,7 @@ from puikit.panel import Rect
 from puikit.widgets.base import Widget
 from puikit.widgets.text_edit import TextEdit
 
-from tfm_dialog_geometry import pane_anchored_box
+from tfm_dialog_geometry import draw_title_bar, pane_anchored_box
 
 
 class InputDialog(FocusContainer, Widget):
@@ -116,13 +116,16 @@ class InputDialog(FocusContainer, Widget):
         wu, _ = ctx.size_units
         surface_bg = theme.popup_bg if theme is not None else None
         box_style = Style(bg=surface_bg, fg=theme.popup_border if theme else None)
-        ctx.draw_box(0, 0, ctx.width, ctx.height, box_style, hints={"fill": True})
+        # Frame the box at its exact (fractional) extent, not ctx.width/height —
+        # those truncate to whole units and would draw the frame short of the fill
+        # on a GUI backend where the height is fractional (grid rounds back the same).
+        ctx.draw_box(0, 0, *ctx.size_units, box_style, hints={"fill": True})
 
         pad = 1.0
         y = pad
         if self.title:
-            ctx.draw_text(2, y, self.title, Style(bg=surface_bg, attr=TextAttribute.BOLD))
-            y += 2
+            border = theme.popup_border if theme else None
+            y = draw_title_bar(ctx, self.title, surface_bg=surface_bg, border=border, y=y)
 
         # Prompt label + field on one row; the field fills the rest of the width.
         field_x = 2.0
@@ -211,9 +214,14 @@ def show_input(
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 64.0))
-    # pad + [title + gap] + field + error row + pad. Error shares the row directly
-    # below the field, so no blank line is reserved for it.
-    h = 6.0 if title else 4.0
+    # pad + title bar + field + error row + pad. Error shares the row directly
+    # below the field, so no blank line is reserved for it. The compact GUI title
+    # bar pulls the field up ~1 row, so the box is one row shorter there to keep
+    # the bottom padding balanced (grid keeps the whole-row title bar).
+    if title:
+        h = 5.0 if panel.backend.capabilities.supports("vector_shapes") else 6.0
+    else:
+        h = 4.0
     hints: dict[str, Any] = {"shadow": True, "w": w, "h": h}
     if anchor == "top":
         hints["y"] = 2.0

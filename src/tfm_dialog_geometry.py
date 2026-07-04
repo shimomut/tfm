@@ -1,13 +1,21 @@
-"""Geometry for pane-anchored dialogs.
+"""Geometry (and shared chrome) for pane-anchored dialogs.
 
 A picker that acts on one pane (filter, favorites, drives, an input prompt) is
 anchored over that pane so the user can see which side it targets. It reads as
 belonging to the pane by being *centered over it*, but its width is independent
 of the pane: a narrow pane (splitter dragged over) must not shrink the dialog.
 The box keeps its own desired width and just leans over its target pane.
+
+This module also owns :func:`draw_title_bar`, the one place every TFM modal draws
+its title bar, so the bold title and the rule beneath it look identical across
+the input, filter-list, scroll, and batch-rename dialogs.
 """
 
 from __future__ import annotations
+
+from typing import Any
+
+from puikit.backend import Style, TextAttribute
 
 
 def pane_anchored_box(
@@ -35,3 +43,54 @@ def pane_anchored_box(
     else:
         x = max(margin, min(center - w / 2.0, screen_w - w - margin))
     return w, x
+
+
+# Vector (GUI) title-bar metrics, in base units. On a character grid the title
+# and the rule each need a whole cell (title on row ``y``, rule on ``y+1``,
+# content on ``y+2``). On a vector backend those full base-unit rows read as an
+# airy, over-tall header with the proportional title floating in its cell, so the
+# bar is sized to the *measured* title line instead: a small equal pad above and
+# below the title's line box (so it reads balanced and thin), then the rule, then
+# the content a gap below.
+_GUI_TITLE_PAD = 0.18     # equal pad above/below the title line box
+_GUI_CONTENT_GAP = 0.65   # gap from the rule down to the first content row
+
+
+def gui_title_bar_height(ctx: Any, title_style: Any) -> float:
+    """Height (base units) of the vector title bar: the title line box framed by
+    an equal pad above and below. Shared with a dialog's size calculation so the
+    box reserves exactly what :func:`draw_title_bar` draws."""
+    return ctx.line_height(title_style) + 2.0 * _GUI_TITLE_PAD
+
+
+def draw_title_bar(
+    ctx: Any,
+    title: str,
+    *,
+    surface_bg: Any,
+    border: Any,
+    y: float = 1.0,
+) -> float:
+    """Draw a modal's title bar and return the first content row.
+
+    The bar is a bold ``title`` with a frame-connecting rule just beneath it, so
+    the title reads as a distinct band separated from the content instead of
+    floating above it. The rule joins the box frame at both ends (tee glyphs on a
+    grid, a full-width stroke on a vector backend) and is drawn in ``border`` (the
+    popup frame color) on the dialog surface — ``surface_bg`` both pins the title
+    to that surface and backs the rule so it never sits on the layer's default
+    (darker) fill. On a grid the title, rule, and content take whole rows
+    (``y``, ``y+1``, ``y+2``); on a vector backend the bar is sized to the measured
+    title line (see the ``_GUI_*`` metrics) so it is thin and vertically balanced."""
+    title_style = Style(bg=surface_bg, attr=TextAttribute.BOLD)
+    rule_style = Style(fg=border, bg=surface_bg)
+    if ctx.vector_shapes:
+        # Center the title's line box in the bar: an equal pad above and below,
+        # the rule at the bar's bottom edge, content a small gap under it.
+        ctx.draw_text(2, _GUI_TITLE_PAD, title, title_style)
+        rule_y = gui_title_bar_height(ctx, title_style)
+        ctx.draw_frame_divider(rule_y, style=rule_style)
+        return rule_y + _GUI_CONTENT_GAP
+    ctx.draw_text(2, y, title, title_style)
+    ctx.draw_frame_divider(y + 1.0, style=rule_style)
+    return y + 2.0
