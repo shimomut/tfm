@@ -69,11 +69,23 @@ SELECT_MIX_INACTIVE = 0.22
 DEFAULT_BG = (30, 30, 38)
 #: Cursor-outline corner radius (device pixels) on a GUI backend.
 CURSOR_RADIUS = 3.0
-#: Inner margin (device pixels) between the pane edge and its file list, so the
-#: content breathes rather than butting the surrounding frame. GUI only — a
-#: character grid has no sub-cell pixels, so it collapses to zero and rows stay
-#: flush to whole cells.
+#: Top/bottom inner margin (device pixels) between the pane edge and its file
+#: list, so the content breathes rather than butting the surrounding frame. GUI
+#: only — a character grid has no sub-cell pixels, so it collapses to zero and
+#: rows stay flush to whole cells.
 INNER_MARGIN = 2.0
+#: Left/right content padding (base units = cells) on a GUI backend: the gap
+#: between the pane edge and where a row's text/columns sit, so names don't butt
+#: the frame. Zero on a grid (flush to whole cells).
+CONTENT_PAD_CELLS = 0.5
+#: Left/right padding (cells) of the GUI cursor outline. Smaller than
+#: ``CONTENT_PAD_CELLS`` so the red rectangle reclaims part of the content margin
+#: and frames the row a touch wider than the text — a little breathing room
+#: between the glyphs and the stroke.
+CURSOR_PAD_CELLS = 0.25
+#: Device pixels the GUI cursor outline extends *beyond* the row band on each
+#: side, so the red frame sits a little wider than the selection fill.
+CURSOR_BLEED_PX = 1.0
 
 
 def _mix(a, b, t):
@@ -207,11 +219,13 @@ class FilePane(Widget):
         self._abs = ctx.screen_rect
         files = self.pane["files"]
         count = len(files)
-        # Inner margin, in base units: INNER_MARGIN device pixels converted through
-        # the backend's pixel-per-unit, dropped to zero on a character grid (no
-        # sub-cell pixels). Insets the content band on every side.
-        bw, bh = ctx.base_size
-        mx = (INNER_MARGIN / bw) if (ctx.vector_shapes and bw) else 0.0
+        # Inner margins, in base units, dropped to zero on a character grid (no
+        # sub-cell pixels). Horizontal is a fixed fraction of a cell so the text
+        # padding reads the same at any font size; vertical converts INNER_MARGIN
+        # device pixels through the backend's pixel-per-unit.
+        _, bh = ctx.base_size
+        mx = CONTENT_PAD_CELLS if ctx.vector_shapes else 0.0
+        cursor_pad = CURSOR_PAD_CELLS if ctx.vector_shapes else 0.0
         my = (INNER_MARGIN / bh) if (ctx.vector_shapes and bh) else 0.0
         self._margin_y = my
         # Exact (fractional) extent so the last partial row and the scroll bounds
@@ -246,19 +260,27 @@ class FilePane(Widget):
         self._clamp(count, view_h)
 
         show_bar = count > view_h
-        # The content band spans [band_left, band_right): inset by the inner margin
-        # on each side, and on the right up to the scrollbar's left edge, so a row
-        # fill and the right-aligned columns stop just shy of the pane frame.
-        band_left = mx
-        band_right = ctx.size_units[0] - (1.0 if show_bar else 0.0) - mx
-
-        # The cursor cue differs by backend: a grid draws framing brackets and so
-        # reserves a gutter on each side (``[`` … ``]``); a GUI draws an outline
-        # rectangle framing the row and reserves nothing, so its names sit flush to
-        # the band edges. Content is laid out inside [content_left, content_right).
+        right_edge = ctx.size_units[0] - (1.0 if show_bar else 0.0)
         grid = not ctx.vector_shapes
-        content_left = band_left + (GUTTER_W if grid else 0.0)
-        content_right = band_right - (BRACKET_W if grid else 0.0)
+
+        # Content region [content_left, content_right): where a row's text/columns
+        # and its selection/match fill sit — inset by the content margin, up to the
+        # scrollbar's left edge, plus a bracket gutter on a grid (the TUI cursor's
+        # channel).
+        content_left = mx + (GUTTER_W if grid else 0.0)
+        content_right = right_edge - mx - (BRACKET_W if grid else 0.0)
+
+        # Cursor band [band_left, band_right): where the row's cursor cue is drawn.
+        # A grid puts its framing brackets in the gutter cells, one cell outside the
+        # content on each side; a GUI strokes its red outline at CURSOR_PAD_CELLS —
+        # inside the content margin but wider than the text, so the rectangle frames
+        # the row with a little breathing room around the glyphs.
+        if grid:
+            band_left = mx
+            band_right = right_edge - mx
+        else:
+            band_left = cursor_pad
+            band_right = right_edge - cursor_pad
 
         def measure(s: str) -> float:
             return ctx.measure_text(s)
@@ -386,13 +408,15 @@ class FilePane(Widget):
         """
         color = CURSOR_ACTIVE if self.active else CURSOR_INACTIVE
         if not grid:
-            # Inset one device pixel so the stroke sits inside the row band and
-            # clear of the scrollbar, framing the row rather than butting its edges.
-            bw, bh = ctx.base_size
-            ix = 1.0 / bw if bw else 0.0
-            iy = 1.0 / bh if bh else 0.0
-            ctx.round_rect(band_left + ix, y + iy,
-                           max(0.0, (band_right - band_left) - 2 * ix), max(0.0, 1.0 - 2 * iy),
+            # Span the full row height so the outline matches the selection fill
+            # exactly (top and bottom flush). Horizontally, bleed CURSOR_BLEED_PX
+            # past the band on each side so the red frame sits a touch wider than
+            # the fill (the band already clears the scrollbar, so there is room to
+            # grow outward).
+            bw, _ = ctx.base_size
+            bleed = CURSOR_BLEED_PX / bw if bw else 0.0
+            ctx.round_rect(band_left - bleed, y,
+                           max(0.0, (band_right - band_left) + 2 * bleed), 1.0,
                            Style(fg=color), radius=CURSOR_RADIUS)
             return
         style = Style(fg=color, attr=TextAttribute.BOLD)
