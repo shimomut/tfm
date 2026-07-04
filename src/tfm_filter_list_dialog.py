@@ -272,10 +272,10 @@ def show_filter_list(
     )
     sw, sh = panel.backend.size_units
     w = max(36.0, min(sw * 0.6, 72.0))
-    # +1 chrome row for the title bar's divider (the title now sits in its own
-    # band above a rule, not directly on top of the filter field).
-    rows = len(items) + 5 + (1 if title else 0)
-    h = max(8.0, min(sh * 0.6, float(rows)))
+    # Height follows the window, not the item count: a short list still opens at a
+    # comfortable, consistent size (empty rows show below) rather than a stubby box
+    # that snaps to however many items it happens to hold.
+    h = max(8.0, sh * 0.6)
     hints: dict[str, Any] = {"shadow": True, "w": w, "h": h}
     if region is not None:
         # Anchor over the pane, but a bit wider than it for comfort (still
