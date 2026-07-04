@@ -1,7 +1,7 @@
 # TFM → PuiKit Port
 
 Status: **port essentially complete** — living document, tasks only.
-Branch: `puikit-port` · Last updated: 2026-07-03
+Branch: `puikit-port` · Last updated: 2026-07-04
 
 TFM's rendering/UI foundation has been moved off the in-repo **`ttk`** toolkit
 onto **[PuiKit](https://github.com/...)**, a capability-based framework that runs
@@ -74,6 +74,43 @@ already dispatch through `self._menu("<action>")` name their action directly;
 the ones wired to bespoke callbacks need an action id (or an explicit mapping) so
 the same lookup applies.
 
+### 2.4 Progress dialogs for async file / archive operations
+Copy / move / delete and archive create / extract run on background threads and
+already **track** progress and support cancellation — what the port lost is the
+*visible surface*. Wire up modal progress dialogs.
+
+**What already exists (reuse, don't rebuild):**
+- `ProgressManager` (`tfm_progress_manager.py`) tracks the whole operation:
+  item count (`processed_items`/`total_items`, `get_progress_percentage`),
+  per-file byte progress (`update_file_byte_progress`, used for large/SSH
+  copies), error count, a spinner animation (`refresh_animation`), and
+  render-ready output (`get_progress_segments` / `get_progress_text`).
+- Cancellation is fully plumbed: `BaseTask.request_cancellation()` /
+  `is_cancelled()` and each task's `cancel()`; the executor loops in
+  `tfm_file_operation_executor.py` / `tfm_archive_operation_executor.py` already
+  poll `task.is_cancelled()` between items and stop cleanly.
+- The only UI hook today is `_progress_callback` → `file_manager.mark_dirty()`
+  (executors), i.e. a redraw request from the worker thread. **Nothing consumes
+  `get_progress_segments`/`get_progress_text` in the ported `tfm.py`**, so the
+  operation currently runs invisibly with no way to cancel mid-flight.
+
+**To build:**
+- A modal progress dialog pushed like the other dialogs (`push_layer` /
+  `show_message_box` pattern), built on PuiKit's `ProgressBar` widget, shown for
+  the duration of an active operation and popped on finish/cancel.
+- **Progress bar(s):** an overall determinate bar (items processed / total, from
+  `get_progress_percentage`); plus a *second* per-file byte bar shown only while
+  byte progress is active (`update_file_byte_progress` — large / SSH copies).
+  Fall back to an indeterminate `BusyIndicator` when a total isn't known yet.
+  Show the current item name + error count (`get_progress_segments`).
+- **Cancellation:** a Cancel button and `Esc` that call the active task's
+  `cancel()`; reflect a "cancelling…" state until the worker unwinds, then pop.
+- **Threading:** progress updates originate on worker threads — the dialog must
+  *read* `ProgressManager` state during its own `draw` (driven by the existing
+  `mark_dirty` redraw kick / animation ticks), never be mutated from the worker.
+- Wire the same dialog for both operation families (they share `BaseTask` +
+  `ProgressManager` + the four-layer architecture), through
+  `FileOperationUI` / `ArchiveOperationUI` where the task is created/started.
 
 ---
 
