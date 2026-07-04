@@ -115,9 +115,14 @@ class _ScrollModal(FocusContainer, Widget):
         self._style_body(theme, surface_bg)
         body_h = max(1.0, hu - y - pad)
         self._body_rect = Rect(2.0, y, max(1.0, wu - 4.0), body_h)
+        # Give the body the popup surface as its inherited background, so any
+        # bg=None content (a table's un-striped rows, gaps between prose) resolves
+        # to the dialog gray rather than the darker content default beneath the
+        # layer — otherwise those rows read as dark bands over the popup.
         ctx.draw_child(
             self.body, self._body_rect.x, self._body_rect.y,
-            self._body_rect.w, self._body_rect.h, hints={"focused": False},
+            self._body_rect.w, self._body_rect.h,
+            hints={"focused": False, "bg": surface_bg},
         )
 
     # --- events --------------------------------------------------------------
