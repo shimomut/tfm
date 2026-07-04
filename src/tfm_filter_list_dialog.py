@@ -140,16 +140,61 @@ class FilterListDialog(FocusContainer, Widget):
             y = draw_title_bar(ctx, self.title, surface_bg=surface_bg, border=border, y=y)
 
         # Filter field — one row, focused so the caret blinks and the IME stays on.
-        self._filter_rect = Rect(2.0, y, max(1.0, wu - 4.0), 1.0)
+        # A magnifier icon sits on the dialog surface just left of the field; the
+        # field box shifts right to make room. (Grid backends reserve a bit more
+        # since the emoji occupies two cells there.)
+        vector = ctx.vector_shapes
+        field_h = 1.0
+        icon_gap = 2.5 if vector else 3.0  # left columns claimed by the icon
+        box_x = 2.0 + icon_gap
+
+        # Breathing room above/below the field. The title rule already leaves a
+        # small gap above, so on a vector backend widen it a touch and match the
+        # gap below, centering the field between the header and the list. A grid
+        # keeps its whole-row rhythm (field row, one blank row, then the list).
+        if vector:
+            if self.title:
+                y += 0.25
+            below_gap = 0.9
+        else:
+            below_gap = 1.0
+
+        # The field's right edge lines up with the list below it (both end at the
+        # 2-unit right margin). TextEdit caps its box at ``self.width``, so widen
+        # it to the rect first.
+        self._filter_rect = Rect(box_x, y, max(1.0, wu - 2.0 - box_x), field_h)
+        self.filter_edit.width = int(self._filter_rect.w) + 1
         ctx.draw_child(
             self.filter_edit, self._filter_rect.x, self._filter_rect.y,
             self._filter_rect.w, self._filter_rect.h, hints={"focused": True},
         )
-        y += 2
+        # Magnifier left of the field, on the dialog surface, on the field row.
+        ty = (field_h - 1.0) / 2.0
+        ctx.draw_text(
+            2.0, self._filter_rect.y + ty,
+            "\U0001F50D", Style(fg=theme.text if theme else None, bg=surface_bg),
+        )
+        y += field_h + below_gap
 
-        # Result list fills the rest, above the bottom padding.
+        # Result list fills the rest, above the bottom padding. On a vector
+        # backend it reads as a bounded inset panel: a rounded frame (in the popup
+        # frame color) whose outer edges line up with the search box, with the
+        # rows/scrollbar inset inside it. A grid keeps the flush, frameless list.
         list_h = max(1.0, hu - y - pad)
-        self._list_rect = Rect(2.0, y, max(1.0, wu - 4.0), list_h)
+        frame = Rect(2.0, y, max(1.0, wu - 4.0), list_h)
+        if vector:
+            ctx.round_rect(
+                frame.x, frame.y, frame.w, frame.h,
+                Style(fg=theme.popup_border if theme else None),
+                radius=4.0,
+            )
+            inset = 0.6
+            self._list_rect = Rect(
+                frame.x + inset, frame.y + inset,
+                max(1.0, frame.w - 2 * inset), max(1.0, frame.h - 2 * inset),
+            )
+        else:
+            self._list_rect = frame
         ctx.draw_child(
             self.list, self._list_rect.x, self._list_rect.y,
             self._list_rect.w, self._list_rect.h, hints={"focused": False},
