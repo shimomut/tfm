@@ -112,6 +112,40 @@ already **track** progress and support cancellation — what the port lost is th
   `ProgressManager` + the four-layer architecture), through
   `FileOperationUI` / `ArchiveOperationUI` where the task is created/started.
 
+### 2.5 Make the Directory Diff Viewer scan more progressively (ttk parity)
+The ported viewer (`tfm_directory_diff_viewer.py`) *is* threaded, but its
+progressive model is **coarser** than the ttk original. `_scan_worker` currently:
+scans the **whole** left tree, then the **whole** right tree, builds the entire
+tree in one shot (`DiffEngine(...).build_tree()`), and only then compares files
+sequentially. So on a large / slow tree the user sees only `Scanning… (N items)`
+and the tree **appears all at once** after both full walks — no live top-down
+growth, and no bias toward what's on screen.
+
+**What ttk did (restore this feel)** — `legacy/src/tfm_directory_diff_viewer.py`
+is queue-driven and incremental:
+- `_queue_initial_scan_tasks` seeds a `scan_queue`; `_directory_scanner_worker`
+  pulls one directory level, scans it, enqueues child dirs (breadth-first), and
+  calls `_update_tree_node` to **insert nodes into the tree as they're
+  discovered** — the tree grows level-by-level, live.
+- A separate `comparison_queue` + comparator worker resolves file-content
+  verdicts, decoupled from scanning.
+- `ScanPriority` + `_update_priorities` push **visible / expanded** nodes to the
+  front, so what the user is looking at fills in first.
+- The status bar reports queue depth + a percentage (`scan_queue.qsize()` /
+  `comparison_queue.qsize()` vs. their initial sizes).
+
+**Scope of the change:**
+- Replace the two-phase `_scan_worker` with the breadth-first, queue-driven
+  scan + incremental `_update_tree_node` insertion (this machinery was earmarked
+  "reuse" in `DIRECTORY_DIFF_PORT_PLAN.md` §2.1 but got simplified away).
+- Split comparison onto its own queue; add visible-first prioritisation
+  (re-prioritise on scroll / expand / collapse).
+- Reuse the **existing** main-thread redraw loop as-is — the `_lock` /
+  `_dirty` flag, `_tick`, and `panel.request_animation_ticks` wiring already
+  work; only the worker/queue structure and the incremental tree mutation
+  change. Keep the `background=False` synchronous path for tests.
+- Surface scan/compare queue depth (+ %) in the status/progress line.
+
 ---
 
 ## 3. Reference — PuiKit keyboard contract
