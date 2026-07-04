@@ -2,9 +2,11 @@
 Recursive content (grep) search for the PuiKit TfmApp.
 
 Covers the pane-independent search core behind ``show_content_search`` — the
-bounded tree walk (``_walk_grep``), the binary-file filter (``_looks_textual``),
-and result navigation (``_go_to_content_hit``). The input/results dialogs are
-``show_input`` + ``show_filter_list`` modals, exercised via a smoke construction.
+streaming tree walk (``_iter_content_matches``), the binary-file filter
+(``_looks_textual``), and result navigation (``_go_to_content_hit``). The
+results now stream into the progressive ``ProgressiveSearchDialog`` (see
+``test_progressive_search_dialog.py``); the walk itself is a cancellable
+generator, exercised here directly.
 """
 
 import os
@@ -12,6 +14,7 @@ import re
 import sys
 import tempfile
 import shutil
+import threading
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,7 +47,8 @@ class WalkGrep(unittest.TestCase):
 
     def _grep(self, pattern, **kw):
         app = _bare_app(**kw)
-        return app._walk_grep(Path(self.tmp), re.compile(pattern, re.IGNORECASE))
+        return list(app._iter_content_matches(
+            Path(self.tmp), re.compile(pattern, re.IGNORECASE), threading.Event()))
 
     def test_finds_matching_line_with_number(self):
         self._write("a.txt", "alpha\nneedle here\ngamma\n")
@@ -70,11 +74,19 @@ class WalkGrep(unittest.TestCase):
         self.assertEqual(self._grep("password"), [])
         self.assertEqual(len(self._grep("password", show_hidden=True)), 1)
 
-    def test_result_cap_is_honored(self):
+    def test_walk_is_uncapped(self):
+        # The walk yields every match; the result cap now lives in the dialog.
+        self._write("big.txt", "hit\n" * 50)
+        self.assertEqual(len(self._grep("hit")), 50)
+
+    def test_cancel_stops_the_walk(self):
         self._write("big.txt", "hit\n" * 50)
         app = _bare_app()
-        hits = app._walk_grep(Path(self.tmp), re.compile("hit"), cap=10)
-        self.assertEqual(len(hits), 10)
+        cancel = threading.Event()
+        cancel.set()  # already cancelled -> generator yields nothing
+        hits = list(app._iter_content_matches(
+            Path(self.tmp), re.compile("hit"), cancel))
+        self.assertEqual(hits, [])
 
     def test_no_matches_returns_empty(self):
         self._write("a.txt", "nothing interesting\n")

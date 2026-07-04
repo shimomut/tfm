@@ -55,6 +55,7 @@ from tfm_file_monitor_manager import FileMonitorManager  # noqa: E402
 from tfm_file_pane import FilePane  # noqa: E402
 from tfm_filter_list_dialog import show_filter_list  # noqa: E402
 from tfm_input_dialog import show_input  # noqa: E402
+from tfm_progressive_search_dialog import show_progressive_search  # noqa: E402
 from tfm_isearch_bar import ISearchBar  # noqa: E402
 from tfm_pane_manager import PaneManager  # noqa: E402
 from tfm_path import Path  # noqa: E402
@@ -1493,115 +1494,95 @@ class TfmApp:
         self.panel.render()
 
     def show_search(self) -> None:
-        """Recursive filename search under the active pane (the Shift-F dialog):
-        prompt for a substring, walk the tree (bounded, honouring the hidden-file
-        setting), then present the hits in the searchable-list dialog; picking one
+        """Live filename search under the active pane (the Shift-F dialog): opens
+        the progressive search dialog in filename mode. Typing walks the tree
+        (bounded, honouring the hidden-file setting) and streams matching entries
+        into the list as you type; Tab switches to content search; picking a hit
         navigates to its directory and lands the cursor on it."""
-        pane = self.active_pane()
-        root = pane["path"]
+        self._open_search("filename")
 
-        def run(pattern: str) -> None:
-            pattern = pattern.strip()
-            if not pattern:
-                self.panel.render()
-                return
-            results = self._walk_match(root, pattern)
-            if not results:
-                show_message_box(self.panel, f"No matches for '{pattern}'.",
-                                 title="Search", icon="info")
-                self.panel.render()
-                return
-            root_str = str(root)
-            def label(entry) -> str:
-                s = str(entry)
-                return s[len(root_str):].lstrip("/") if s.startswith(root_str) else s
-            show_filter_list(
-                self.panel, results, title=f"Search: {pattern} ({len(results)})",
-                to_label=label, on_accept=self._go_to_result,
-                region=self._active_pane_region())
-            self.panel.render()
+    def show_content_search(self) -> None:
+        """Live content (grep) search under the active pane (the Shift-G dialog):
+        opens the progressive search dialog in content mode. Typing walks the tree
+        reading text files and streams each matching line; Tab switches to
+        filename search; picking a hit navigates to the file and lands on it."""
+        self._open_search("content")
 
-        show_input(self.panel, title="Search Files", prompt="Filename:",
-                   on_accept=run, region=self._active_pane_region())
+    def _open_search(self, initial_mode: str) -> None:
+        """Open the progressive search dialog anchored over the active pane. Both
+        Shift-F and Shift-G land here — they differ only in the starting mode, and
+        Tab toggles between them in place. The dialog runs ``search_iter`` on a
+        worker thread and streams results in, so a huge tree never blocks the UI;
+        each keystroke supersedes the previous search."""
+        root = self.active_pane()["path"]
+        root_str = str(root)
+
+        def search_iter(mode, query, cancel):
+            if mode == "content":
+                regex = re.compile(query, re.IGNORECASE)  # re.error surfaces in the dialog
+                yield from self._iter_content_matches(root, regex, cancel)
+            else:
+                yield from self._iter_filename_matches(root, query, cancel)
+
+        def to_label(mode, value):
+            if mode == "content":
+                s = str(value["path"])
+                rel = s[len(root_str):].lstrip("/") if s.startswith(root_str) else s
+                return f"{rel}:{value['line']}: {value['text']}"
+            s = str(value)
+            return s[len(root_str):].lstrip("/") if s.startswith(root_str) else s
+
+        def on_accept(mode, value):
+            if mode == "content":
+                self._go_to_content_hit(value)
+            else:
+                self._go_to_result(value)
+
+        show_progressive_search(
+            self.panel, initial_mode=initial_mode,
+            search_iter=search_iter, to_label=to_label, on_accept=on_accept,
+            region=self._active_pane_region())
         self.panel.render()
 
-    def _walk_match(self, root, pattern: str, cap: int = 1000, node_cap: int = 50000):
-        """Depth-first walk under ``root`` collecting entries whose name contains
-        ``pattern`` (case-insensitive), bounded by ``cap`` results and ``node_cap``
-        entries visited so a huge tree can't hang the UI. Hidden entries are
-        skipped unless the pane is showing them."""
+    def _iter_filename_matches(self, root, pattern, cancel, node_cap: int = 50000):
+        """Depth-first walk under ``root`` yielding entries whose name matches
+        ``pattern`` (case-insensitive glob), checking ``cancel`` between entries so
+        a superseded search stops promptly. Hidden entries are skipped unless the
+        pane is showing them; ``node_cap`` bounds the walk. The result cap is
+        applied by the dialog consuming this generator."""
         import fnmatch
         pat = pattern.lower()
         if not pat.startswith("*"):
             pat = "*" + pat
         if not pat.endswith("*"):
             pat = pat + "*"
-        results, stack, nodes = [], [root], 0
-        while stack and len(results) < cap and nodes < node_cap:
+        stack, nodes = [root], 0
+        while stack and nodes < node_cap:
+            if cancel.is_set():
+                return
             try:
                 entries = list(stack.pop().iterdir())
             except Exception:
                 continue
             for e in entries:
+                if cancel.is_set():
+                    return
                 nodes += 1
                 if not self.flm.show_hidden and e.name.startswith("."):
                     continue
                 try:
                     if fnmatch.fnmatch(e.name.lower(), pat):
-                        results.append(e)
+                        yield e
                     if e.is_dir():
                         stack.append(e)
                 except Exception:
                     continue
-        return results
 
     def _go_to_result(self, entry) -> None:
         pane = self.active_pane()
         pane["path"] = entry.parent
         self._refresh(pane, on_ready=lambda p: self._select_by_name(p, entry.name))
         self.log_info(f"Found: {entry}")
-        self.panel.render()
-
-    def show_content_search(self) -> None:
-        """Recursive content (grep) search under the active pane (the Shift-G
-        dialog): prompt for a regular expression, walk the tree reading text
-        files, and present each matching line; picking a hit navigates to the
-        file and lands the cursor on it. Bounded like the filename search
-        (``_walk_grep``) so a huge tree can't hang the UI."""
-        pane = self.active_pane()
-        root = pane["path"]
-
-        def run(pattern: str) -> None:
-            pattern = pattern.strip()
-            if not pattern:
-                self.panel.render()
-                return
-            try:
-                regex = re.compile(pattern, re.IGNORECASE)
-            except re.error as exc:
-                show_message_box(self.panel, f"Invalid pattern: {exc}",
-                                 title="Search", icon="warning")
-                self.panel.render()
-                return
-            results = self._walk_grep(root, regex)
-            if not results:
-                show_message_box(self.panel, f"No content matches for '{pattern}'.",
-                                 title="Search", icon="info")
-                self.panel.render()
-                return
-            root_str = str(root)
-            def label(hit) -> str:
-                s = str(hit["path"])
-                rel = s[len(root_str):].lstrip("/") if s.startswith(root_str) else s
-                return f"{rel}:{hit['line']}: {hit['text']}"
-            show_filter_list(
-                self.panel, results, title=f"Content: {pattern} ({len(results)})",
-                to_label=label, on_accept=self._go_to_content_hit,
-                region=self._active_pane_region())
-            self.panel.render()
-
-        show_input(self.panel, title="Search Content", prompt="Text (regex):",
-                   on_accept=run, region=self._active_pane_region())
         self.panel.render()
 
     @staticmethod
@@ -1616,23 +1597,25 @@ class TfmApp:
             return False
         return bool(chunk) and b"\x00" not in chunk
 
-    def _walk_grep(self, root, regex, cap: int = 1000, node_cap: int = 50000,
-                   max_line: int = 200):
-        """Depth-first walk under ``root`` collecting ``{path, line, text}`` hits
-        where a line of a text file matches ``regex`` (compiled). Bounded by
-        ``cap`` hits and ``node_cap`` entries visited so a huge tree can't hang
-        the UI; binary and (unless the pane shows them) hidden entries are
-        skipped. Mirrors ``_walk_match``'s bounded synchronous walk."""
-        results, stack, nodes = [], [root], 0
-        while stack and len(results) < cap and nodes < node_cap:
+    def _iter_content_matches(self, root, regex, cancel, node_cap: int = 50000,
+                              max_line: int = 200):
+        """Depth-first walk under ``root`` yielding ``{path, line, text}`` for each
+        line of a text file that matches ``regex`` (compiled), checking ``cancel``
+        between entries so a superseded search stops promptly. Binary and (unless
+        the pane shows them) hidden entries are skipped; ``node_cap`` bounds the
+        walk. The result cap is applied by the dialog consuming this generator."""
+        stack, nodes = [root], 0
+        while stack and nodes < node_cap:
+            if cancel.is_set():
+                return
             try:
                 entries = list(stack.pop().iterdir())
             except Exception:
                 continue
             for e in entries:
+                if cancel.is_set():
+                    return
                 nodes += 1
-                if len(results) >= cap:
-                    break
                 if not self.flm.show_hidden and e.name.startswith("."):
                     continue
                 try:
@@ -1643,14 +1626,13 @@ class TfmApp:
                         continue
                     with e.open("r", encoding="utf-8", errors="ignore") as f:
                         for line_num, line in enumerate(f, 1):
+                            if cancel.is_set():
+                                return
                             if regex.search(line):
-                                results.append({"path": e, "line": line_num,
-                                                "text": line.strip()[:max_line]})
-                                if len(results) >= cap:
-                                    break
+                                yield {"path": e, "line": line_num,
+                                       "text": line.strip()[:max_line]}
                 except Exception:
                     continue
-        return results
 
     def _go_to_content_hit(self, hit) -> None:
         entry = hit["path"]
